@@ -9,7 +9,9 @@ import { hint } from '../../kit/hint.js';
 noZoom();
 const $ = id => document.getElementById(id), query = new URLSearchParams(location.search);
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const landscape = matchMedia('(orientation: landscape) and (max-height: 480px)');
 const KEY = 'night-bells:save';
+const HINT_LIFT = 20, HINT_HEIGHT = 53;
 const palettes = {
   amber: { sky:'#111e30', horizon:'#334956', stone:'#304150', edge:'#4d5d65', accent:'#ffcd75', ink:'#f9e7be', panel:'#192b3e', bells:['#f4c878','#98cebf','#d5aece'] },
   moon: { sky:'#101d30', horizon:'#365a73', stone:'#2b425c', edge:'#536b83', accent:'#a6dfef', ink:'#e5f5ff', panel:'#172f49', bells:['#a6dfef','#bab9f0','#f4d8a3'] },
@@ -26,14 +28,16 @@ if (old && typeof old === 'object') {
 }
 if (Object.hasOwn(palettes,query.get('look'))) save.look = query.get('look');
 const store = () => writeJson(KEY, save);
-let palette = palettes[save.look], mode='menu', selected=1, s=create(3,17), W=0,H=0,dpr=1,top=0,bottom=0;
+let palette = palettes[save.look], mode='menu', selected=1, s=create(3,17), W=0,H=0,dpr=1,top=0,bottom=0,safeLeft=0,safeRight=0;
 let accumulator=0,last=performance.now(),queue=[],activePointer=null,burst=0,ringTime=0;
-let pads=[],positions=[],fx=[];
+let pads=[],positions=[],gallery={},fx=[];
 const cv=$('c'),g=cv.getContext('2d'),snd=sound({on:()=>save.sound});
+const objective=$('objective');
 const unlocked=()=>{let n=1;while(n<LEVELS&&save.stars[n-1])n++;return n;};
 selected=unlocked();
 const show=screens(['menu','paused','end'],name=>{
   mode=name; $('pause').style.display=name==='play'?'block':'none';
+  objective.hidden=name!=='play'||s.endless||s.bells.length===1||s.harmony>0;
   for(let i=0;i<3;i++) $('pad'+i).style.display=name==='play'&&i<s.bells.length?'block':'none';
 });
 function applyPalette(){
@@ -85,7 +89,8 @@ $('retry').onclick=()=>start(s.level,s.endless);
 $('next').onclick=()=>s.won&&!s.endless?(s.level<LEVELS?start(s.level+1,false):start(1,true)):start(s.level,s.endless);
 for(const b of document.querySelectorAll('[data-look]'))b.onclick=()=>{save.look=b.dataset.look;applyPalette();store();};
 onLeave(pause);
-function tap(i){if(mode!=='play'||i>=s.bells.length||queue.length)return;queue.push(i);help.done();snd.unlock();}
+const learning=()=>mode==='play'&&!s.endless&&s.level===1;
+function tap(i){if(mode!=='play'||i>=s.bells.length||queue.length)return;queue.push(i);if(learning())help.done();snd.unlock();}
 for(let i=0;i<3;i++){
   $('pad'+i).addEventListener('pointerdown',e=>{e.preventDefault();if(!e.isPrimary||activePointer!==null)return;activePointer=e.pointerId;tap(i);});
   $('pad'+i).addEventListener('click',e=>{if(e.detail===0)tap(i);});
@@ -93,7 +98,7 @@ for(let i=0;i<3;i++){
 cv.addEventListener('pointerdown',e=>{
   if(!e.isPrimary||activePointer!==null||mode!=='play')return;e.preventDefault();
   let best=-1,d=Infinity;
-  positions.forEach((p,i)=>{const n=Math.hypot(e.clientX-p.x,e.clientY-p.y);if(n<d&&n<Math.max(42,W/s.bells.length*.43)){best=i;d=n;}});
+  positions.forEach((p,i)=>{const n=Math.hypot(e.clientX-p.x,e.clientY-p.y);if(n<d&&n<p.hitRadius){best=i;d=n;}});
   if(best>=0){activePointer=e.pointerId;tap(best);}
 });
 for(const type of ['pointerup','pointercancel'])addEventListener(type,e=>{if(e.pointerId===activePointer)activePointer=null;});
@@ -103,12 +108,15 @@ addEventListener('keydown',e=>{
   const i=Number(e.key)-1;if(i>=0&&i<3){e.preventDefault();tap(i);}
   if(e.code==='Space'&&mode==='play'&&s.bells.length===1){e.preventDefault();tap(0);}
 });
-const help=hint(cv,{kind:'tap',key:'night-bells:hint',when:()=>mode==='play'&&s.level===1,played:save.tries>0,delay:1600,bottom:()=>H-(pads[0]?.y||H*.82),label:'Tap the circle when its ring shines'});
+const help=hint($('pad0'),{kind:'tap',key:'night-bells:hint',when:learning,played:save.stars[0]>0,delay:1600,label:'Tap the circle when its ring shines'});
 function layout(){
   W=innerWidth;H=innerHeight;dpr=Math.min(devicePixelRatio||1,2);cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);
   const cs=getComputedStyle($('probe'));top=parseFloat(cs.paddingTop)||0;bottom=parseFloat(cs.paddingBottom)||0;
+  safeLeft=parseFloat(cs.paddingLeft)||0;safeRight=parseFloat(cs.paddingRight)||0;
   const n=s.bells.length,span=Math.min(W-36,460),left=(W-span)/2;
-  pads=s.bells.map((_,i)=>({x:left+span*(i+.5)/n,y:H-bottom-Math.min(100,H*.13),r:Math.min(43,(span/n-16)/2)}));
+  const clearance=Math.max(HINT_LIFT+HINT_HEIGHT+5,Math.min(100,H*.13));
+  document.documentElement.style.setProperty('--pad-clearance',`${clearance}px`);
+  pads=s.bells.map((_,i)=>({x:left+span*(i+.5)/n,y:H-bottom-clearance,r:Math.min(43,(span/n-16)/2)}));
   pads.forEach((p,i)=>Object.assign($('pad'+i).style,{left:`${p.x-p.r-7}px`,top:`${p.y-p.r-7}px`,width:`${2*p.r+14}px`,height:`${2*p.r+14}px`}));
 }
 addEventListener('resize',layout);
@@ -116,7 +124,7 @@ function update(){
   const prevHits=s.hits,prevHarmony=s.harmony,prevMiss=s.misses;
   step(s,queue.splice(0,1));
   if(s.hits>prevHits){const i=s.events.find(e=>e.type==='hit')?.index??0;chime(i);const p=positions[Math.max(0,i)];if(p)fx.push({x:p.x,y:p.y,t:0,c:palette.bells[Math.max(0,i)]});ringTime=s.t;}
-  if(s.harmony>prevHarmony){burst=1;chime(-1);}
+  if(s.harmony>prevHarmony){objective.hidden=true;burst=1;chime(-1);}
   if(s.endless&&s.score>save.best){save.best=Math.floor(s.score);store();}
   if(s.misses>prevMiss&&save.sound)snd.tone(130,.08,.015,'triangle',-45);
   burst=Math.max(0,burst-DT*.65);fx=fx.filter(f=>(f.t+=DT)<.8);
@@ -148,16 +156,21 @@ function village(){
   const grad=g.createLinearGradient(0,ground,0,H*.87);grad.addColorStop(0,'#101e3000');grad.addColorStop(1,palette.sky);g.fillStyle=grad;g.fillRect(0,ground,W,H-ground);
 }
 function tower(){
-  const n=s.bells.length,span=Math.min(W-34,480),left=(W-span)/2,roof=top+H*.17,base=roof+H*.29;
+  const n=s.bells.length,sideMenu=mode==='menu'&&landscape.matches;
+  const span=Math.min(sideMenu?W*.42:W-34,480),center=sideMenu?W*.25:W/2,left=center-span/2;
+  const roof=top+Math.max(H*.17,mode==='menu'?0:112),base=roof+H*.29;
   g.fillStyle=palette.stone;g.fillRect(left-10,roof-14,span+20,16);g.fillStyle=palette.edge;g.fillRect(left-15,roof-18,span+30,5);
   g.fillStyle=palette.stone;g.fillRect(left-7,roof,9,base-roof+8);g.fillRect(left+span-2,roof,9,base-roof+8);
   positions=[];
+  const lengths=s.bells.map(b=>b.length),shortest=Math.min(...lengths),range=Math.max(...lengths)-shortest;
+  const swingLength=Math.min(H*.20,n===1?135:n===2?105:78);
   s.bells.forEach((b,i)=>{
     const v=view(s,i),cx=left+span*(i+.5)/n,py=roof+15;
-    const lengths=s.bells.map(b=>b.length),min=Math.min(...lengths),max=Math.max(...lengths);
-    const len=Math.min(H*.20,n===1?135:n===2?105:78)+(max>min?((b.length-min)/(max-min))*(n===3?18:25):0);
-    const theta=v.angle,x=cx+Math.sin(theta)*len,y=py+Math.cos(theta)*len,size=n===1?57:n===2?44:36;
-    positions.push({x,y,size});
+    const size=n===1?57:n===2?44:36;
+    const lengthOffset=range?(b.length-shortest)/range*(n===3?18:25):0;
+    const len=Math.max(1,Math.min(base-py-size*.65-4,swingLength+lengthOffset));
+    const theta=v.angle,x=cx+Math.sin(theta)*len,y=py+Math.cos(theta)*len;
+    positions.push({x,y,hitRadius:Math.max(24,size*.65),lowest:py+len+size*.65});
     // The two apex rings are fixed in the bell's current swing envelope.
     const peak=.68*Math.sqrt(Math.max(.015,v.energy));
     g.save();g.setLineDash([2,6]);g.strokeStyle=palette.bells[i]+'40';g.lineWidth=1;g.beginPath();g.arc(cx,py,len,Math.PI/2-peak,Math.PI/2+peak);g.stroke();g.restore();
@@ -172,7 +185,8 @@ function tower(){
   });
   g.fillStyle=palette.stone;g.fillRect(left-10,base,span+20,10);g.fillStyle=palette.edge;g.fillRect(left-12,base-2,span+24,3);
   // The ringer stands on the gallery. A successful ring lifts one arm.
-  const rx=W*(n===1?.12:.5),ry=base-23,reach=s.t-ringTime<.25?10:0;
+  const rx=n===1?left+span*.08:center,ry=base-23,reach=s.t-ringTime<.25?10:0;
+  gallery={left,right:left+span,y:base,ringerX:rx};
   circle(rx,ry-8,5,palette.ink);g.fillStyle=palette.ink;g.beginPath();g.moveTo(rx-4,ry-2);g.lineTo(rx+4,ry-2);g.lineTo(rx+7,base);g.lineTo(rx-7,base);g.fill();line(rx-3,ry,rx-14,ry-7-reach,palette.ink,3);line(rx+3,ry,rx+14,ry-7-reach,palette.ink,3);
 }
 function controls(){
@@ -195,22 +209,23 @@ function draw(){
   village();tower();
   if(burst>0&&!reduced){g.globalAlpha=burst*.10;g.fillStyle=palette.accent;g.fillRect(0,0,W,H);g.globalAlpha=1;}
   if(mode!=='menu'){
-    g.textAlign='left';g.fillStyle=palette.ink;g.font='11px system-ui';g.fillText(s.endless?'ENDLESS':`NIGHT  ${s.level} / 8`,22,top+30);
-    g.font='23px Georgia';g.fillText(s.endless?`${Math.floor(s.score)} lights`:`${Math.max(0,Math.floor(s.lights))} / ${s.target}`,22,top+57);
-    const width=Math.min(W-110,240);g.fillStyle='#ffffff16';g.fillRect(22,top+70,width,3);g.fillStyle=palette.accent;g.fillRect(22,top+70,width*(s.endless?Math.min(1,s.bells.reduce((a,b)=>a+b.energy,0)/s.bells.length):Math.min(1,s.lights/Math.max(1,s.target))),3);
+    const hudX=22+safeLeft;
+    g.textAlign='left';g.fillStyle=palette.ink;g.font='11px system-ui';g.fillText(s.endless?'ENDLESS':`NIGHT  ${s.level} / 8`,hudX,top+30);
+    g.font='23px Georgia';g.fillText(s.endless?`${Math.floor(s.score)} lights`:`${Math.min(s.target,Math.floor(s.lights))} / ${s.target}`,hudX,top+57);
+    const width=Math.min(W-110-safeLeft-safeRight,240);g.fillStyle='#ffffff16';g.fillRect(hudX,top+70,width,3);g.fillStyle=palette.accent;g.fillRect(hudX,top+70,width*(s.endless?Math.min(1,s.bells.reduce((a,b)=>a+b.energy,0)/s.bells.length):Math.min(1,s.lights/Math.max(1,s.target))),3);
     controls();
     // The kit owns help delay, dismissal and persistence. This demonstration follows the actual beat.
     if(help.shown&&!reduced&&s.level===1){
-      const p=pads[0],ready=view(s,0).ready,lift=ready?0:20;
+      const p=pads[0],ready=view(s,0).ready,lift=ready?0:HINT_LIFT;
       g.save();g.translate(p.x+8,p.y+lift);g.globalAlpha=.88;g.fillStyle=palette.ink;
       g.shadowColor='#0008';g.shadowBlur=6;
       g.beginPath();g.roundRect(-4,0,9,35,4);g.fill();
-      g.beginPath();g.roundRect(-4,24,31,29,9);g.fill();
+      g.beginPath();g.roundRect(-4,24,31,HINT_HEIGHT-24,9);g.fill();
       g.beginPath();g.roundRect(5,16,8,22,4);g.roundRect(13,20,8,20,4);g.roundRect(21,25,7,18,4);g.fill();
       g.restore();if(ready)circle(p.x,p.y,p.r-5,null,palette.ink,2);
     }
     if(s.harmony>0&&burst>.1){g.textAlign='center';g.font='14px Georgia';g.fillStyle=palette.ink;g.fillText(s.bells.length>1?'✦  TOGETHER  ✦':'✦',W/2,H*.58);}
-    if(Number.isFinite(s.timeLimit)&&s.timeLimit>0&&!s.endless){g.textAlign='right';g.font='11px system-ui';g.fillStyle=palette.ink+'99';g.fillText(`${Math.ceil(Math.max(0,s.timeLimit-s.t))}s`,W-22,H-bottom-25);}
+    if(Number.isFinite(s.timeLimit)&&s.timeLimit>0&&!s.endless){g.textAlign='right';g.font='11px system-ui';g.fillStyle=palette.ink+'99';g.fillText(`${Math.ceil(Math.max(0,s.timeLimit-s.t))}s`,W-22-safeRight,H-bottom-25);}
   }
   if(!reduced)for(const f of fx){g.globalAlpha=Math.max(0,1-f.t/.8);circle(f.x,f.y,24+f.t*90,null,f.c,2);g.globalAlpha=1;}
 }
@@ -220,6 +235,10 @@ function frame(now){
   else if(mode==='menu'){s.t+=elapsed;for(const b of s.bells)b.phase+=elapsed*b.omega;}
   draw();requestAnimationFrame(frame);
 }
-window.bellsState=()=>({ ...structuredClone(s),screen:mode,W,H,views:s.bells.map((_,i)=>view(s,i)),pads:structuredClone(pads),saved:structuredClone(save),minTouchPx:Math.min(...[...document.querySelectorAll('button')].filter(b=>b.getClientRects().length).map(b=>Math.min(b.getBoundingClientRect().width,b.getBoundingClientRect().height))) });
+window.bellsState=()=>({
+  ...structuredClone(s),screen:mode,W,H,views:s.bells.map((_,i)=>view(s,i)),saved:structuredClone(save),
+  pads:structuredClone(pads),positions:structuredClone(positions),gallery:{...gallery},hintBottom:pads[0]?.y+HINT_LIFT+HINT_HEIGHT,
+  minTouchPx:Math.min(...[...document.querySelectorAll('button')].filter(b=>b.getClientRects().length).map(b=>Math.min(b.getBoundingClientRect().width,b.getBoundingClientRect().height))),
+});
 if(query.get('test')==='1')window.bellsAdvance=seconds=>{if(mode==='play'){for(let i=0;i<Math.ceil(Math.min(120,Math.max(0,seconds))/DT)&&mode==='play';i++)update();}return window.bellsState();};
 applyPalette();menu();requestAnimationFrame(frame);

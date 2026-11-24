@@ -2,6 +2,8 @@
 
 Lab page at `/lab/lantern-race/`. Only this directory is changed. No build, dependencies, recording, commits or deployment.
 
+The original rules and browser results below describe the first implementation. The dated sections record subsequent changes.
+
 ## Rules and decisions
 
 - The page imports `../../lantern/sim.js` unchanged. The race layer in this directory does not re-export Lantern. Boat collision, flame decay, river generation, pickups and dawn remain Lantern rules.
@@ -49,11 +51,11 @@ Mutation: `node experiments/lab/lantern-race/bots.mjs --mutate` reverses the dis
 
 ## Browser verification
 
-Command: `PLAYWRIGHT=/Users/abdul/code/human-framework/node_modules node experiments/lab/lantern-race/check.mjs`.
+Command: `PLAYWRIGHT="$HOME/code/human-framework/node_modules" node experiments/lab/lantern-race/check.mjs`.
 
 The test serves the **experiments root**, supplies the requested tiny RFC6455 Node mock and an empty notes-button script, and launches WebKit iPhone 13 and Chromium Pixel 7. The mock's handshake, peer lists, first-Ready start, active-round rejection and late-join behavior follow the room server source read at `workers/lab-ai/src/index.mjs` and `room.mjs` on 2026-11-23. These sources were not edited. A late spectator is excluded from the active ranking until the next round. Frames and rolling client rates are independently checked by the mock.
 
-Full races use a continuous synthetic touch PointerEvent path through the shared drag control, as the Fix-It model does, with botControl deciding the thumb's target. Trusted browser input also checks hit testing: Chromium CDP touch drag; WebKit native touchscreen tap plus mouse drag. Synthetic full-race input does not establish real-device touch feel.
+Full races use a continuous synthetic touch PointerEvent path through the shared drag control, with botControl deciding the thumb's target. Trusted browser input also checks hit testing: Chromium CDP touch drag; WebKit native touchscreen tap plus mouse drag. Synthetic full-race input does not establish real-device touch feel.
 
 Final default command: **exit 0**. Both profiles completed two full Night 1 rivers at **87.2 s** each. WebKit received **438/437** remote position reports; Chromium received **437/436**. Every primary online and clean-close offline page had **zero page, console and network errors**. The mock observed **6 rounds, 1953 position frames, 8 done frames, maximum 36-byte client frame and maximum 7 messages per rolling second**.
 
@@ -83,4 +85,24 @@ Read-only SHA-256 snapshots at verification:
 
 - Online, the pause button now needs a second tap within 2.5 s to retire the boat (P, Escape and leaving the page still retire at once).
 - Bots no longer join a race you have finished when the last opponent leaves or the socket drops; recorded human results stay.
-- End titles name the cause: aground, wrecked, or lantern out. A stored `you.round` reads "may be underway", because the server keeps it after the round ends.
+- End titles name the cause: aground, wrecked, or lantern out. The previous server kept `you.round` after the race ended.
+
+## Room readiness and bounded browser checks (2026-11-24)
+
+- The room starts on quorum or 8,000 ms after the first accepted Ready. The client shows local Ready immediately, an estimated wait of up to 8 seconds from its own send and the announced 4,000 ms race countdown with confirmed racer names. The Worker sends no lobby readiness broadcast, so remote Ready is unknown until `roster`. The actual readiness wait can be shorter than the local estimate.
+- `roster.ids` followed by `round` defines the ranked slots. Late and unready sockets follow the live distance reports in the lobby. A welcome during countdown includes its start time. Spectators can press Ready once and the client retries every 2,000 ms until the room admits them. The Worker sends no spectator roster or round-ended frame.
+- An unfinished opponent who leaves while you are racing gets one bot in the same slot, using the same seed and elapsed river. Completed reports keep their results. Reused socket IDs cannot rename or publish into an old slot. A fresh offline race still has three bots.
+- The old check could wait forever on a Playwright call before its first progress line, or during error reporting and teardown. Its 150-second race threshold was checked only after a browser call returned. A retained baseline log shows a WebKit screenshot timing out after 30 seconds, with fonts already loaded. The exact call in the reported hour-long stall is unknown. An independent one-page WebKit probe during verification also returned a blank 390×664 image and zero animation frames in one second while `document.visibilityState` was `visible`.
+- The check logs startup and stages. It gives browser launch 20 seconds, context creation, direct evaluation, browser actions and navigation 12 seconds, screenshots 15 seconds, context close 6 seconds, browser close 8 seconds and server close 5 seconds. Browser actions previously inherited 30 seconds and several other calls had no limit. The explicit bounds give a failed operation a name and leave time for diagnostics. The 150-second full-race and bot-settlement limits, touch, layout, distance, frame-size and frame-rate assertions are retained. The process watchdog exits 1 at 285 seconds. Screenshots use CSS pixels and are written to `/private/tmp/night-r3-race/`.
+- The two engines use separate localhost origins and run concurrently, so the two full nights overlap. The contract mock checks the 8-second path, a late watcher joining the next round, and one replacement after induced socket loss. The loss produces one expected native WebKit diagnostic on the disconnected page. Every other browser or application error on that flow fails the check.
+- Injected never-resolving context creation and browser close. The check printed both failures and exited 1 after 20.33 seconds. The read-only Worker suite passed 13/13. Bot checks passed 10/10 and the ranking mutation exited 1 with 9/10. The new check covers a valid eight-ID roster, duplicate IDs, bad IDs, extra fields and the 200-byte limit. The 204 frame samples still peaked at 81 bytes.
+- The shared kit race smoke and first-time hint check passed on both profiles before and after the change.
+
+`fnm exec --using=26.12.0 node experiments/lab/lantern-race/check.mjs` exited 0 after **135.06 seconds**. Each profile recorded two 87.22-second dawn finishes. Each deadline run started with two ready racers, replaced one departed racer with one bot, and admitted four racers in the next round. Both profiles recovered from an HTTP 404 upgrade with one expected browser diagnostic each. The Chromium 360×640 and 1280×800 layout checks passed.
+
+| Profile | Rounds (quorum) | Ready deadline | Remote progress per racer | Mock progress / done | Max client frame | Peak per rolling second |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| WebKit iPhone 13 | 4 (3) | 8,000 ms | 437 / 437 | 917 / 4 | 36 bytes | 7 |
+| Chromium Pixel 7 | 4 (3) | 8,004 ms | 438 / 438 | 926 / 4 | 36 bytes | 7 |
+
+Inspected both profiles' menu, Ready, countdown, watch, bot replacement, play and result captures, plus the settled small and desktop pause cards. Production room integration, physical phone input and audio, and eight-player browser layout remain unverified.

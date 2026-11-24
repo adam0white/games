@@ -84,3 +84,36 @@ Sixteen screenshots are in `/private/tmp/night-r2-astra2/`: eight per profile co
 - A complete ten-evening campaign through browser input. Each evening is independently solved in Node; browser checks cover evening 1, evening 2 pause/cancel, and the daily.
 - Keyboard gameplay and a screen-reader-accessible graph are not implemented; keyboard controls only pause/resume.
 - No deployment, live integration or full shared-suite success is claimed. The earlier focused kit self-tests passed both profiles. The final focused run passed Chromium but failed WebKit with `hint: shown after the delay of play`. That shared timing assertion was not changed. Concurrent browser startup/capture failures are documented above.
+
+## 2026-11-24 — phone play review
+
+- The first-evening gesture now traces both real path segments, from the keeper to the house. Previously the canvas traced only the first segment, and after 4.5 seconds the kit drew a separate four-dot path across the terrain. The kit still supplies the reduced-motion text. The canvas holds the complete dotted route still when reduced motion is requested.
+- The landscape menu uses one row for ten evening buttons. The sound button previously ended at y=468.34375 in a 390 CSS-pixel viewport and y=467.6875 in a 412 CSS-pixel viewport. The page now permits vertical panning on cards. The canvas retains its drag handling.
+- A route can start on the walking keeper. While the thumb is down, the keeper finishes the current edge and waits at its endpoint. Releasing replaces the remaining route. Cancelling preserves it. Previously the visible keeper rejected a grab outside the target's hit area. An intermediate patch could still discard a slow gesture when the old route left the anchor before release.
+- A win writes the unlock or daily best on the frame it occurs. A reload during the 900 ms before the result card previously reopened the menu with only evening 1 unlocked. Both profiles reproduced that state loss.
+- Evening 4 exposed a wind recovery problem. Waiting about one second before tracing the first-home route let the five-second gust extinguish its lamp before the neighbour arrived. The page now marks the dark lamp until the keeper relights it. The browser check waits at least 1.2 game seconds before sending the route, sees the lit lamp go dark, returns to relight it and verifies the cue clears. The gust schedule and level budgets stayed the same.
+- Holding P keeps the pause card open. A fresh key press toggles it. The check sends a repeated keydown while paused.
+
+The browser check keeps the existing 44 CSS-pixel minimum target and storage, pause, retry and error assertions. It adds rotated-menu hit testing, a canvas pixel check on the second tutorial segment, a held reroute and a save read before the result card. Profile taps use Playwright's touchscreen. Campaign drags use browser mouse events in WebKit and CDP touch events in Chromium. The wind setup and parts of the daily check dispatch touch PointerEvents. All campaign and daily play uses normal simulation time. The check verifies WebKit has painted and retries the viewport resize if navigation stalls frame delivery.
+
+Pure checks on Node 26.12.0 exited 0. Careful play won 10/10, clumsy play won 200/200 and idle play won 0/10. All four fixed daily seeds solved. The disabled-ignition mutation exited 1 at the lit-detour assertion. Acceptance thresholds stayed the same.
+
+The combined browser check exited 0. Both profiles started with a fresh save, cleared all ten evenings and unlocked and won the daily through the menu. They each brought 25 neighbours home across those 11 wins. They returned from Back at the menu, restarted the unlocked evening, reloaded mid-evening and retained the completed unlock. Both also retried after an idle loss and reported zero browser errors and zero outside requests.
+
+| Evening | WebKit iPhone 13, game seconds | Chromium Pixel 7, game seconds |
+| --- | ---: | ---: |
+| 1 | 11.825 | 11.050 |
+| 2 | 7.125 | 6.400 |
+| 3 | 9.675 | 10.175 |
+| 4 | 14.025 | 13.925 |
+| 5 | 9.825 | 10.100 |
+| 6 | 11.275 | 11.650 |
+| 7 | 13.575 | 14.350 |
+| 8 | 11.200 | 12.250 |
+| 9 | 11.750 | 11.675 |
+| 10 | 18.500 | 17.600 |
+| Daily | 16.800 | 15.825 |
+
+Daily scores were 5320 and 5418, both saved and recovered after reload. Landscape viewports were 664 × 390 and 839 × 412 CSS pixels. The sound controls ended at y=358.34375 and y=369.34375. All 13 menu controls passed at 44 CSS pixels or larger on each profile. The second tutorial segment had 49 and 52 bright sampled pixels. Inspected all 42 captures in `/private/tmp/night-r3-review/lamp/acceptance/`, including the later graphs, both wind states, results, pause, retry and landscape.
+
+Physical touch and safe-area behaviour, audio by ear, a stranger's learning time, a real midnight transition and deployment remain unverified.

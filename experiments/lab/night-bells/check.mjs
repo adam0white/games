@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '../..');
 const repo = resolve(root, '..');
-const SHOTS = process.env.SHOTS || '/private/tmp/night-r2-astra1';
+const SHOTS = process.env.SHOTS || '/private/tmp/night-r3-review/bells/check';
 const functionalOnly = process.env.CHECK_FUNCTIONAL_ONLY === '1';
 await mkdir(SHOTS, { recursive: true });
 const notesFile = join(repo, 'workers/feedback/public/notes/button.js');
@@ -46,6 +46,12 @@ async function waitFor(page, fn, label, timeout = 15000) {
 async function menu(page) {
   await page.bringToFront();
   await waitFor(page, () => window.bellsState?.().screen === 'menu', 'menu');
+  // Headless WebKit can open a visible page without scheduling a canvas frame.
+  if (page.context().browser()?.browserType().name() === 'webkit') {
+    const viewport = page.viewportSize();
+    await page.setViewportSize({ ...viewport, width: viewport.width + 1 });
+    await page.setViewportSize(viewport);
+  }
   // The hook is installed before the first canvas paint. Let that paint reach the compositor.
   await page.evaluate(() => Promise.race([
     new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))),
@@ -56,6 +62,15 @@ async function shot(page, name) {
   if (functionalOnly) return;
   await page.bringToFront();
   await page.screenshot({ path: join(SHOTS, name + '.png'), scale: 'css', animations: 'disabled', caret: 'hide', timeout: 45000 });
+}
+
+async function rotate(page, viewport) {
+  await page.setViewportSize(viewport);
+  await page.waitForFunction(({ width, height }) => {
+    const s = window.bellsState();
+    return s.W === width && s.H === height;
+  }, viewport);
+  await page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))));
 }
 
 // Canvas pages can miss Playwright's consecutive-frame stability wait on a busy WebKit host.
@@ -97,7 +112,7 @@ async function geometry(page, label) {
   return Math.min(...g.targets.map(b => Math.min(b.w, b.h)));
 }
 
-// One normal browser touchscreen tap verifies the pad path. Browser RPC latency is unsuitable for
+// Normal browser touchscreen taps verify the pad and moving bell paths. Browser RPC latency is unsuitable for
 // a rhythm controller, so the remainder uses synthetic touch PointerEvents inside real rAF callbacks.
 // A single thumb observes the public drawing state. It never changes rules, state, or time.
 async function realThumb(page, name) {
@@ -117,6 +132,23 @@ async function realThumb(page, name) {
     smokeHit = rules(await snapshot(page)).hits > before.hits;
   }
   assert.ok(smokeHit, 'normal page.tap produces a scored hit');
+  let bellHit = false, bellTaps = 0;
+  for (; bellTaps < 3 && !bellHit; bellTaps++) {
+    const before = rules(await snapshot(page));
+    const position = await page.waitForFunction(count => {
+      const s = window.bellsState(), v = s.views[0], p = s.positions[0];
+      const phase = v.phase % Math.PI;
+      if (s.hits === count && v.ready && phase > Math.PI / 2 && phase < Math.PI - .5 * v.window * 2 * Math.PI / v.period && document.elementFromPoint(p.x, p.y).id === 'c') return p;
+    }, before.hits);
+    const { x, y } = await position.jsonValue();
+    await page.touchscreen.tap(x, y);
+    await page.waitForFunction(before => {
+      const { hits, misses } = window.bellsState();
+      return hits + misses > before;
+    }, before.hits + before.misses, { timeout: 2000 });
+    bellHit = rules(await snapshot(page)).hits > before.hits;
+  }
+  assert.ok(bellHit, 'normal touchscreen tap on the moving bell produces a scored hit');
   const result = await page.evaluate(async () => {
     const started = performance.now(); let lastTap = performance.now(), taps = 0, gap = Infinity, awaiting = null;
     while (performance.now() - started < 59000) {
@@ -140,7 +172,7 @@ async function realThumb(page, name) {
   });
   assert.ok(result.won, `${name}: real-time pointer controller wins within a minute: ${JSON.stringify(result)}`);
   assert.ok(result.minGapMs >= 150, 'synthetic thumb leaves at least 150ms between strikes');
-  return { ...result, seconds: (performance.now() - started) / 1000, smokeTaps, input: 'synthetic browser touch PointerEvents after scored page.tap smoke' };
+  return { ...result, seconds: (performance.now() - started) / 1000, smokeTaps, bellTaps, input: 'synthetic browser touch PointerEvents after native strikes on pad and bell' };
 }
 
 // Only the explicit test build exposes advancement. Synthetic pad events exercise the actual input
@@ -148,10 +180,18 @@ async function realThumb(page, name) {
 async function acceleratedWin(page, level) {
   const before = performance.now();
   const result = await page.evaluate(() => {
-    let taps = 0, last = -Infinity;
+    let taps = 0, last = -Infinity, previousSwingHarmony = false, harmoniesOffApex = 0;
     for (let n = 0; n < 72000; n++) {
       const st = window.bellsState(), s = st.s || st;
-      if (st.screen === 'end') return { won: s.won, taps, simulationSeconds: s.t, hits: s.hits, misses: s.misses, harmony: s.harmony };
+      if (s.events.some(e => e.type === 'harmony')) {
+        const atApex = s.bells.every(b => {
+          const distance = Math.abs(b.phase - Math.round(b.phase / Math.PI) * Math.PI);
+          return distance / b.omega <= s.window + 1e-10;
+        });
+        if (!atApex) harmoniesOffApex++;
+        if (s.bells.some(b => s.t - b.lastGood >= .65)) previousSwingHarmony = true;
+      }
+      if (st.screen === 'end') return { won: s.won, taps, simulationSeconds: s.t, hits: s.hits, misses: s.misses, harmony: s.harmony, previousSwingHarmony, harmoniesOffApex };
       const ready = st.views.map((v, i) => ({ ...v, i })).filter(v => v.ready).sort((a, b) => a.energy - b.energy);
       if (ready.length && s.t - last >= .15) {
         const el = document.getElementById('pad' + ready[0].i), r = el.getBoundingClientRect();
@@ -165,7 +205,39 @@ async function acceleratedWin(page, level) {
     return { won: false, taps, stalled: true };
   });
   assert.ok(result.won, `accelerated level ${level} wins: ${JSON.stringify(result)}`);
+  assert.equal(result.harmoniesOffApex, 0, `level ${level} harmony requires a real apex overlap`);
+  if (level === 7) assert.ok(result.previousSwingHarmony, 'level 7 accepts a prior-swing strike at a three-bell overlap');
   return { level, ...result, wallSeconds: (performance.now() - before) / 1000 };
+}
+
+async function harmonyGate(page) {
+  const cue = page.locator('#objective');
+  assert.match(await cue.textContent(), /each bell.*swings line up/, 'level 2 explains how to achieve harmony');
+  assert.ok(await cue.isVisible(), 'level 2 shows the unmet harmony goal');
+  const result = await page.evaluate(async () => {
+    for (let n = 0; n < 4800; n++) {
+      const st = window.bellsState();
+      if (st.screen !== 'play' || st.lights > st.target) break;
+      if (st.views[0].ready) window.dispatchEvent(new KeyboardEvent('keydown', { key: '1' }));
+      window.bellsAdvance(1 / 120);
+    }
+    // Observe the text sent to the canvas after accumulating excess lights.
+    const paint = CanvasRenderingContext2D.prototype.fillText;
+    const counts = [];
+    CanvasRenderingContext2D.prototype.fillText = function (text, ...args) {
+      if (/^\d+ \/ \d+$/.test(text)) counts.push(text);
+      return paint.call(this, text, ...args);
+    };
+    try {
+      await new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)));
+      return { st: window.bellsState(), counts };
+    } finally { CanvasRenderingContext2D.prototype.fillText = paint; }
+  });
+  assert.equal(result.st.screen, 'play', 'lights alone cannot finish a multi-bell level');
+  assert.equal(result.st.harmony, 0, 'ringing one bell cannot produce harmony');
+  assert.ok(result.st.lights > result.st.target, 'one bell can earn more lights than the display target');
+  assert.ok(result.counts.length && result.counts.every(text => text === `${result.st.target} / ${result.st.target}`), 'painted progress caps at its target');
+  assert.ok(await cue.isVisible(), 'the unmet harmony cue stays visible with a full progress bar');
 }
 
 function validSave(saved) {
@@ -217,9 +289,39 @@ async function run(name) {
       await shot(page, `${name}-1-menu-${look}`);
     }
     await touch(page, "#looks button[data-look='amber']");
+
+    const portrait = device.viewport, landscape = { width: portrait.height, height: portrait.width };
+    await rotate(page, landscape);
+    minTouch = Math.min(minTouch, await geometry(page, 'landscape menu'));
+    const card = await page.locator('#menu .card').boundingBox();
+    assert.ok((await snapshot(page)).gallery.right < card.x, 'landscape menu art clears the controls');
+    await shot(page, `${name}-0-landscape-menu`);
+    await touch(page, '#endless');
+    await delay(1800);
+    assert.equal(await page.locator('.kit-hint.on').count(), 0, 'endless never shows the first campaign hint');
+    await page.touchscreen.tap(landscape.width / 2, (await snapshot(page)).pads[1].y);
+    await touch(page, '#pause'); await touch(page, '#quit');
+    await touch(page, '#play');
+    await waitFor(page, () => document.querySelector('.kit-hint.on'), 'first campaign hint after trying endless');
+    let st = await snapshot(page);
+    assert.ok(st.H - st.hintBottom >= 5, 'landscape teaching hand fits with its finger lifted');
+    assert.ok(st.gallery.ringerX - 14 >= st.gallery.left, 'landscape ringer stays on the gallery');
+    assert.ok(st.positions.every(p => p.lowest <= st.gallery.y), 'landscape bells clear the gallery at the bottom of their swing');
+    minTouch = Math.min(minTouch, await geometry(page, 'landscape play'));
+    const p = st.pads[0];
+    await page.touchscreen.tap(p.x + 130, p.y - 165);
+    await page.waitForFunction(t => window.bellsState().t > t + .15, st.t);
+    st = await snapshot(page);
+    assert.equal(st.hits + st.misses, 0, 'open space beside a moving bell does not count as an attempt');
+    assert.equal(await page.locator('.kit-hint.on').count(), 1, 'open-space tap does not dismiss first-time help');
+    await shot(page, `${name}-0-landscape-hint`);
+    await rotate(page, portrait);
+    await page.reload(); await menu(page);
+    assert.equal(await page.locator('#levels button:not([disabled])').count(), 1, 'mid-level reload preserves the unlock boundary');
+
     const firstStarted = performance.now();
     await touch(page, '#play');
-    let st = await snapshot(page);
+    st = await snapshot(page);
     assert.equal(st.screen, 'play', 'Play starts play'); assert.equal(rules(st).level, 1, 'Play starts level 1');
     assert.equal(rules(st).endless, false, 'Play starts campaign');
     assert.equal(st.views.length, 1, 'first level has one bell');
@@ -228,7 +330,7 @@ async function run(name) {
     st = await snapshot(page);
     assert.equal(rules(st).hits, 0, 'idle play generates no hits');
     assert.equal(rules(st).misses, 0, 'idle play generates no misses');
-    assert.equal(await page.locator('.kit-hint.on').count(), 1, 'first-time hint appears after three idle seconds');
+    assert.equal(await page.locator('.kit-hint.on').count(), 1, 'first-time hint returns after reloading before the first attempt');
     await shot(page, `${name}-2-idle-hint`);
     const realtime = await realThumb(page, name);
     realtime.totalSeconds = (performance.now() - firstStarted) / 1000;
@@ -273,7 +375,9 @@ async function run(name) {
     const accelerated = [];
     for (let level = 2; level <= 8; level++) {
       assert.equal(rules(await snapshot(page)).level, level, 'campaign advances sequentially');
+      if (level === 2) await harmonyGate(page);
       accelerated.push(await acceleratedWin(page, level));
+      assert.equal(await page.locator('#objective').isVisible(), false, 'harmony cue hides on the result card');
       validSave((await snapshot(page)).saved);
       assert.ok((await snapshot(page)).saved.stars[level - 1] > 0, `level ${level} stars saved`);
       if (level < 8) await touch(page, '#next');
@@ -356,6 +460,18 @@ async function run(name) {
 
     const publicPage = await context(null, '');
     assert.equal(await publicPage.evaluate(() => typeof window.bellsAdvance), 'undefined', 'public page does not expose time advancement');
+    await publicPage.emulateMedia({ reducedMotion: 'reduce' });
+    await publicPage.reload(); await menu(publicPage);
+    await touch(publicPage, '#play');
+    await waitFor(publicPage, () => document.querySelector('.kit-hint.on.still'), 'reduced-motion hint');
+    const checkStillHint = () => publicPage.evaluate(() => {
+      const r = document.querySelector('.kit-hint.on.still').getBoundingClientRect(), p = window.bellsState().pads[0];
+      return Math.hypot(r.x - p.x, r.y - p.y);
+    });
+    assert.ok(await checkStillHint() < 1, 'still hint is centred over the portrait pad');
+    await rotate(publicPage, landscape);
+    assert.ok(await checkStillHint() < 1, 'visible still hint moves to the landscape pad on rotation');
+    await shot(publicPage, `${name}-6-landscape-reduced-motion`);
     await publicPage.close();
     // Separate query contexts keep palette validation independent of the campaign's saved choice.
     for (const look of ['moon', 'rose']) {

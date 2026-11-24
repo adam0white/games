@@ -77,8 +77,12 @@ export function step(s, taps = []) {
     b.hitFlash = Math.max(0, b.hitFlash - DT);
     b.missFlash = Math.max(0, b.missFlash - DT);
   }
-  // A burst needs recent player strikes on every bell, inside an actual apex overlap.
-  const aligned = s.bells.every(b => near(s, b) && b.energy > .25 && s.t - b.lastGood < .65);
+  // Three-bell campaign overlaps can be shorter than two cooldowns. Allow a
+  // strike from the previous half-swing while still requiring a real overlap.
+  const aligned = s.bells.every(b => {
+    const recent = !s.endless && s.bells.length === 3 ? Math.PI / b.omega + halfWindow(s) : .65;
+    return near(s, b) && b.energy > .25 && s.t - b.lastGood < recent;
+  });
   if (aligned && !s.aligned) {
     s.harmony++; s.flash = .70; s.score += 40 * s.bells.length;
     s.events.push({ type: 'harmony' });

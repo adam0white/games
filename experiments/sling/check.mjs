@@ -4,6 +4,7 @@
 import { createServer } from 'node:http';
 import { readFile, mkdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
+import { homedir } from 'node:os';
 import { dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gunzipSync } from 'node:zlib';
@@ -28,7 +29,10 @@ const server = createServer(async (req, res) => {
 await new Promise(done => server.listen(0, '127.0.0.1', done));
 const base = `http://127.0.0.1:${server.address().port}`;
 const require = createRequire(import.meta.url);
-const { webkit, chromium, devices } = require(process.env.PLAYWRIGHT ? join(resolve(process.env.PLAYWRIGHT), 'playwright') : 'playwright');
+const playwright = process.env.PLAYWRIGHT
+  ? join(resolve(process.env.PLAYWRIGHT), 'playwright')
+  : require.resolve('playwright', { paths: [join(root, 'sling'), join(homedir(), 'code/human-framework/node_modules')] });
+const { webkit, chromium, devices } = require(playwright);
 const PHONES = { webkit: [webkit, devices['iPhone 13']], chromium: [chromium, devices['Pixel 7']] };
 const DATE = '2026-11-23';
 const sleep = ms => new Promise(done => setTimeout(done, ms));

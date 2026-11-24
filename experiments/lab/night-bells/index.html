@@ -8,14 +8,22 @@
 <style>
 :root{color-scheme:dark;--ink:#f9e7be;--accent:#ffcd75;--panel:#192b3e;--line:#ffffff25}
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#111e30;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}body{font:16px/1.4 ui-rounded,'Trebuchet MS',system-ui,sans-serif;color:var(--ink)}
-#c{display:block;width:100vw;height:100dvh;touch-action:none}#probe{position:fixed;visibility:hidden;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
+#c{display:block;width:100vw;height:100dvh;touch-action:none}#probe{position:fixed;visibility:hidden;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
 button{font:inherit;color:inherit;min-width:48px;min-height:48px;border:1px solid var(--line);background:#ffffff08;border-radius:14px;touch-action:manipulation;cursor:pointer}button:active{transform:scale(.96)}button:focus-visible{outline:3px solid var(--accent);outline-offset:3px}button:disabled{opacity:.3}button.primary{background:var(--accent);color:#172235;border:0;font-weight:800;font-size:20px;box-shadow:0 4px 0 #0004}
 .screen{display:none;position:fixed;inset:0;place-items:center;padding:20px 18px max(20px,env(safe-area-inset-bottom));background:#08152599;overflow-y:auto;touch-action:pan-y}.screen.on{display:grid}#menu{background:linear-gradient(transparent 28%,#101e3040 45%,#101e30 80%);align-items:end}.card{width:min(100%,350px);text-align:center;padding:24px 20px;background:var(--panel);border:1px solid var(--line);border-radius:26px;box-shadow:0 18px 60px #0004}#menu .card{padding:18px 16px 14px;background:transparent;border:0;box-shadow:none}
 h1{font:normal 44px/1 Georgia,serif;letter-spacing:-1px;margin:4px 0 10px}h2{font:normal 36px/1.1 Georgia,serif;margin:8px 0 12px}p{margin:10px 0}.eyebrow{font-size:10px;font-weight:bold;letter-spacing:3px;text-transform:uppercase;color:var(--accent)}.sub{font-size:13px;opacity:.7}.row{display:flex;gap:10px;justify-content:center}.row>*{flex:1}#play{width:100%;min-height:58px}#levels{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin:13px 0}#levels button{font-size:15px;min-height:48px}#levels button.done{border-color:var(--accent);color:var(--accent)}#levels button.selected{background:#ffffff16}#looks{display:flex;gap:10px;justify-content:center;margin-top:8px}#looks button{border-radius:50%;width:48px;min-width:48px;background:transparent;padding:12px}#looks i{display:block;width:22px;height:22px;border-radius:50%;border:2px solid #fff8}#looks button[aria-pressed=true]{border-color:var(--accent)}
-#pause{position:fixed;right:16px;top:calc(16px + env(safe-area-inset-top));width:48px;height:48px;background:#122339bb;display:none;font-size:20px;z-index:2}.pad{position:fixed;display:none;border:0;border-radius:50%;background:transparent;color:transparent;z-index:1;touch-action:none}.pad:focus-visible{outline-color:var(--accent)}#next,#resume{width:100%;margin:8px 0 12px}#endMark{font-size:40px;color:var(--accent)}#sound1,#endless{font-size:13px}#best{margin:8px 0 0;font-size:11px;opacity:.65}
+#pause{position:fixed;right:calc(16px + env(safe-area-inset-right));top:calc(16px + env(safe-area-inset-top));width:48px;height:48px;background:#122339bb;display:none;font-size:20px;z-index:2}.pad{position:fixed;display:none;border:0;border-radius:50%;background:transparent;color:transparent;z-index:1;touch-action:none}.pad:focus-visible{outline-color:var(--accent)}#next,#resume{width:100%;margin:8px 0 12px}#endMark{font-size:40px;color:var(--accent)}#sound1,#endless{font-size:13px}#best{margin:8px 0 0;font-size:11px;opacity:.65}
+#objective{position:fixed;top:calc(76px + env(safe-area-inset-top));left:calc(22px + env(safe-area-inset-left));right:calc(22px + env(safe-area-inset-right));margin:0;font-size:13px;color:var(--accent);pointer-events:none}
 /* Rhythm-specific gesture is drawn on the canvas; the kit still owns its lifecycle and reduced-motion label. */
 .kit-hint:not(.still)>*{visibility:hidden}
+.kit-hint[data-kind=tap]{bottom:calc(var(--pad-clearance) + env(safe-area-inset-bottom))}
 @media(max-height:700px){#menu .eyebrow{display:none}#menu .card{padding:8px 16px 0}h1{font-size:35px}#looks{margin-top:2px}#levels{margin:8px 0;gap:4px}.eyebrow{letter-spacing:2px}}
+@media(orientation:landscape) and (max-height:480px){
+  #menu{justify-items:end;align-items:center;padding-inline:max(18px,env(safe-area-inset-left)) max(18px,env(safe-area-inset-right));background:linear-gradient(90deg,transparent 18%,#101e30ee 56%,#101e30 86%)}
+  #menu .card{width:min(53%,350px)}
+  #levels{grid-template-columns:repeat(4,minmax(48px,1fr))}
+  #end .card{padding-block:12px}
+}
 @media(prefers-reduced-motion:reduce){button:active{transform:none}}
 </style>
 </head>
@@ -23,6 +31,7 @@ h1{font:normal 44px/1 Georgia,serif;letter-spacing:-1px;margin:4px 0 10px}h2{fon
 <canvas id="c" aria-label="Bells swinging above a village. Tap a bell or its circle when its ring glows."></canvas><div id="probe"></div>
 <button id="pad0" class="pad" aria-label="Ring bell 1"></button><button id="pad1" class="pad" aria-label="Ring bell 2"></button><button id="pad2" class="pad" aria-label="Ring bell 3"></button>
 <button id="pause" aria-label="Pause">Ⅱ</button>
+<p id="objective" hidden>Keep each bell ringing until their swings line up.</p>
 <div id="menu" class="screen on"><div class="card">
 <div class="eyebrow">A village after dark</div><h1>Night Bells</h1>
 <button id="play" class="primary" aria-label="Play">▶</button>

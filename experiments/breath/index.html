@@ -45,6 +45,30 @@
         display: block;
         touch-action: none;
       }
+      #c + .kit-hint {
+        bottom: calc(168px + env(safe-area-inset-bottom));
+      }
+      #c + .kit-hint :is(.ring, .ripple) {
+        display: none;
+      }
+      #c + .kit-hint .knob {
+        background: #0b1b27f5;
+        border: 2px solid var(--mint);
+      }
+      #c + .kit-hint.on:not(.still) .knob::after {
+        animation: breath-hint-ring 2.8s infinite;
+      }
+      #c + .kit-hint.on:not(.still) .hand {
+        animation: breath-hint-hand 2.8s infinite;
+      }
+      @keyframes breath-hint-ring {
+        0%, 67%, 100% { opacity: 0; }
+        11%, 56% { opacity: 0.8; }
+      }
+      @keyframes breath-hint-hand {
+        0%, 67%, 100% { transform: translateY(-19px); }
+        11%, 56% { transform: translateY(0); }
+      }
       button {
         font: inherit;
         font-weight: 700;
@@ -210,6 +234,9 @@
         padding-right: env(safe-area-inset-right);
       }
       @media (orientation: landscape) and (max-height: 549px) {
+        #c + .kit-hint {
+          bottom: calc(129px + env(safe-area-inset-bottom));
+        }
         #pause {
           right: calc(12px + env(safe-area-inset-right));
         }
@@ -329,6 +356,59 @@
         }
       }
       @media (orientation: landscape) and (max-height: 549px) {
+        #menu .card,
+        #paused .card {
+          max-width: 540px;
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+          align-items: center;
+          gap: 12px 16px;
+          padding: 12px 16px;
+        }
+        #menu .lab-notice,
+        #paused .lab-toggle {
+          grid-column: 1 / -1;
+          margin: 0 !important;
+        }
+        #menu.has-played .card {
+          gap: 8px 16px;
+        }
+        #menu .row button {
+          padding-inline: 8px;
+        }
+        #menu.has-played .sub {
+          margin: 0;
+        }
+        #menu.has-played #bestLine {
+          margin: 4px 0;
+        }
+        #menu.has-played .row {
+          margin-block: 4px;
+        }
+        #paused .lab-toggle {
+          justify-self: center;
+        }
+        #paused .card {
+          gap: 8px 16px;
+        }
+        #paused .eyebrow {
+          margin-bottom: 4px;
+        }
+        #paused h2 {
+          margin-bottom: 8px;
+        }
+        #select .card {
+          max-width: 430px;
+          padding: 12px 16px;
+        }
+        #select h2 {
+          font-size: 26px;
+          margin-bottom: 8px;
+        }
+        #levels {
+          grid-template-columns: repeat(6, 1fr);
+          margin: 10px 0;
+        }
         #end .card {
           max-width: 540px;
           display: grid;
@@ -366,15 +446,19 @@
     <button id="pause" aria-label="Pause"></button>
     <div id="menu" class="screen on">
       <div class="card">
-        <canvas id="hero" aria-hidden="true"></canvas>
-        <h1>Hold Your<br /><span>Breath</span></h1>
-        <p class="sub">Hold to run. Let go to shelter.</p>
-        <button id="play" class="primary">Play</button>
-        <div id="menuMore">
-          <p id="bestLine" class="small"></p>
-          <div class="row">
-            <button id="choose">Levels</button
-            ><button id="daily">Daily tower</button>
+        <div>
+          <canvas id="hero" aria-hidden="true"></canvas>
+          <h1>Hold Your<br /><span>Breath</span></h1>
+        </div>
+        <div>
+          <p class="sub">Rescue everyone. Hold to run. Let go in mint doorways.</p>
+          <button id="play" class="primary">Play</button>
+          <div id="menuMore">
+            <p id="bestLine" class="small"></p>
+            <div class="row">
+              <button id="choose">Levels</button
+              ><button id="daily">Daily tower</button>
+            </div>
           </div>
         </div>
       </div>
@@ -389,18 +473,22 @@
     </div>
     <div id="paused" class="screen">
       <div class="card">
-        <p class="eyebrow">Catch your breath</p>
-        <h2>Paused</h2>
-        <button id="resume" class="primary">Resume</button>
-        <div class="row">
-          <button id="restart">Restart</button><button id="toMenu">Menu</button>
+        <div>
+          <p class="eyebrow">Catch your breath</p>
+          <h2>Paused</h2>
+          <button id="resume" class="primary">Resume</button>
+          <div class="row">
+            <button id="restart">Restart</button><button id="toMenu">Menu</button>
+          </div>
         </div>
-        <button id="sound">Sound: on</button>
-        <p class="small" style="margin-top: 16px">Building colours</p>
-        <div class="looks">
-          <button data-look="night" aria-pressed="true">Midnight</button
-          ><button data-look="ember" aria-pressed="false">Ember</button
-          ><button data-look="paper" aria-pressed="false">Blueprint</button>
+        <div>
+          <button id="sound">Sound: on</button>
+          <p class="small" style="margin-top: 16px">Building colours</p>
+          <div class="looks">
+            <button data-look="night" aria-pressed="true">Midnight</button
+            ><button data-look="ember" aria-pressed="false">Ember</button
+            ><button data-look="paper" aria-pressed="false">Blueprint</button>
+          </div>
         </div>
       </div>
     </div>

@@ -38,15 +38,16 @@ const starsOf = l => Math.min(3, save.solo[l].best);
 const cv = $('c'), g = cv.getContext('2d');
 let W = 0, H = 0, dpr = 1, inset = 0, k = 300, bx = 0, cy = 0;
 function layout() {
+  const { width, height } = cv.getBoundingClientRect();
+  if (W && (W !== width || H !== height)) clearInput();
   dpr = Math.min(2, devicePixelRatio || 1);
-  W = innerWidth; H = innerHeight;
+  W = width; H = height;
   cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
   const cs = getComputedStyle($('probe'));
   inset = Math.max(parseFloat(cs.paddingTop) || 0, parseFloat(cs.paddingBottom) || 0); // the larger inset on both halves, so neither player gets less
   k = Math.min(W - 8, (H - 2 * inset - 8) / 2, 520);
   bx = (W - k) / 2; cy = H / 2;
 }
-addEventListener('resize', layout); layout();
 const P = (x, y) => [bx + x * k, cy + y * k];
 const toBoard = (sx, sy) => [(sx - bx) / k, (sy - cy) / k];
 // Draw in side `i`'s own frame: side 1's half is the board turned half round about its middle.
@@ -155,7 +156,11 @@ function inputFor(i) {
 }
 
 addEventListener('keydown', e => {
-  if (isPauseKey(e)) { if (screen === 'play') { paused ? resume() : pause(); } e.preventDefault(); return; }
+  if (isPauseKey(e)) {
+    if (!e.repeat && screen === 'play') { paused ? resume() : pause(); }
+    e.preventDefault();
+    return;
+  }
   if (screen !== 'play' || paused) return;
   if (e.key === ' ') {
     e.preventDefault();
@@ -192,6 +197,8 @@ function clearInput() {
   for (const list of [...pending, ...releases, kb.pads]) list.length = 0;
   kb.held = false; kb.chargeAt = null; kb.tap = 0; kb.keys.clear();
 }
+addEventListener('resize', layout);
+layout();
 
 // ---------------------------------------------------------------- matches
 function start(strength) {
@@ -490,9 +497,10 @@ function pictogram(kind, t, i) {
   g.lineWidth = 3; g.strokeStyle = C.ink; g.stroke();
   const ix = cx - w * 0.22, fx2 = cx + w * 0.22, r = h * 0.28;
   const ctl = CONTROL[kind], beat = (t * 2.2) % 1;
+  const drawLit = beat >= 0.6;
   // the duel
   if (kind === 'tug') { g.lineWidth = 9; g.strokeStyle = C.rope; g.beginPath(); g.moveTo(ix, cyy - r * 1.3); g.lineTo(ix, cyy + r * 1.3); g.stroke(); g.lineWidth = 2; g.strokeStyle = C.ropeDark; g.stroke(); const ry = cyy + Math.sin(t * 6) * r * 0.4; star(g, ix, ry, r * 0.35, '#ff6b6b'); }
-  if (kind === 'draw') lantern(g, ix, cyy, r * 0.75, beat < 0.5 ? 1 : 0, t);
+  if (kind === 'draw') lantern(g, ix, cyy, r * 0.75, drawLit ? 1 : 0, t);
   if (kind === 'sumo') beetle(g, ix, cyy + r * 0.2, r * 0.6, c, { squash: ctl === 'hold' ? 0.5 : 0, t, glow: 1 });
   if (kind === 'catch') firefly(g, ix + Math.sin(t * 3) * r * 0.5, cyy + Math.cos(t * 4) * r * 0.5, r * 0.22, t);
   if (kind === 'hockey') { paddle(g, ix, cyy + r * 0.5, r * 0.5, c); seed(g, ix + Math.sin(t * 3) * r * 0.5, cyy - r * 0.6, r * 0.28, t * 2); }
@@ -502,8 +510,9 @@ function pictogram(kind, t, i) {
   if (kind === 'launch') seed(g, ix, cyy + r * (0.55 - (calm ? 0.5 : beat)), r * 0.5, -Math.PI / 2);
   // the thumb
   if (ctl === 'tap') {
-    const press = beat < 0.2 ? Math.sin(beat / 0.2 * Math.PI) : 0;
-    if (beat < 0.55) { g.strokeStyle = c[2]; g.lineWidth = 3; g.globalAlpha = 1 - beat / 0.55; circle(g, fx2, cyy + r * 0.2, 10 + beat * 70); g.stroke(); g.globalAlpha = 1; }
+    const tapBeat = kind === 'draw' ? (drawLit ? (beat - 0.6) / 0.4 : 1) : beat;
+    const press = tapBeat < 0.2 ? Math.sin(tapBeat / 0.2 * Math.PI) : 0;
+    if (tapBeat < 0.55) { g.strokeStyle = c[2]; g.lineWidth = 3; g.globalAlpha = 1 - tapBeat / 0.55; circle(g, fx2, cyy + r * 0.2, 10 + tapBeat * 70); g.stroke(); g.globalAlpha = 1; }
     finger(g, fx2, cyy + r * 0.2 - (1 - press) * 14, r * 1.3, press);
   } else if (ctl === 'hold') {
     const fill = (t % 1.6) / 1.6;
@@ -558,7 +567,7 @@ const DRAW_KIND = {
     for (const s2 of [-1, 1]) { g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(s2 * 22, -18, s2 * 26, 0); g.quadraticCurveTo(s2 * 22, 16, 0, 0); g.fillStyle = '#ff5d73'; g.fill(); g.lineWidth = 2.5; g.strokeStyle = C.ink; g.stroke(); }
     circle(g, 0, 0, 7); g.fillStyle = '#ff8fa0'; g.fill(); g.stroke(); g.restore();
     for (const i of [0, 1]) withSide(i, () => {
-      const me = i === 0 ? off : -off, [x, y] = P(0.5, Math.min(0.95, 0.82 + me));
+      const me = i === 0 ? off : -off, [x, y] = P(0.5, Math.min(0.86, 0.82 + me));
       critter(g, x, y, k * 0.1, cols(i), { lean: 0.6 * d.jerk[i] + 0.15, squash: d.jerk[i] * 0.7, happy: winning(d, i), sad: winning(d, 1 - i), t });
       for (const s2 of [-1, 1]) { circle(g, x + s2 * 12, y - k * 0.08, 7); g.fillStyle = cols(i)[1]; g.fill(); g.lineWidth = 2; g.strokeStyle = C.ink; g.stroke(); } // paws on the rope
     });
@@ -566,9 +575,8 @@ const DRAW_KIND = {
   draw(d, t) {
     field('#26223c');
     const lit = d.st === 'lit' ? 1 : d.st === 'gap' && d.last?.why === 'shot' ? Math.max(0, d.timer / DRAW.gap) : 0;
-    const flick = d.st === 'wait' && !calm ? 0.08 * Math.max(0, Math.sin(t * 23) * Math.sin(t * 7)) : 0;
     const [lx, ly] = P(0.5, 0);
-    lantern(g, lx, ly, k * 0.12, Math.max(lit, flick), t);
+    lantern(g, lx, ly, k * 0.12, lit, t);
     for (const i of [0, 1]) withSide(i, () => {
       const [x, y] = P(0.5, 0.6), won = d.last?.winner === i && d.st === 'gap', early = d.st === 'gap' && d.last?.why === 'early' && d.last.winner === 1 - i;
       critter(g, x, y, k * 0.11, cols(i), { happy: won || winning(d, i), dizzy: early ? 1 : 0, sad: early, t, squash: won ? 0.3 : 0 });
@@ -577,6 +585,9 @@ const DRAW_KIND = {
       g.lineWidth = 4; g.strokeStyle = C.ink; g.beginPath(); g.moveTo(fx0, fy0); g.lineTo(fx0, fy0 - k * (0.1 + 0.12 * up)); g.stroke();
       g.beginPath(); g.moveTo(fx0, fy0 - k * (0.1 + 0.12 * up)); g.lineTo(fx0 + k * 0.09, fy0 - k * (0.07 + 0.12 * up)); g.lineTo(fx0, fy0 - k * (0.04 + 0.12 * up)); g.closePath(); g.fillStyle = cols(i)[0]; g.fill(); g.lineWidth = 2; g.stroke();
       for (let n = 0; n < DRAW.need; n++) { const [sx2, sy2] = P(0.42 + n * 0.16, 0.88); if (n < d.wins[i]) star(g, sx2, sy2, 13, C.gold); else { circle(g, sx2, sy2, 7); g.fillStyle = '#ffffff22'; g.fill(); g.lineWidth = 2; g.strokeStyle = '#ffffff55'; g.stroke(); } }
+      if (s.phase === 'play' && d.st !== 'gap') {
+        text(d.st === 'lit' ? 'Tap now!' : 'Wait for the light', ...P(0.5, 0.31), Math.min(22, k * 0.09), lit ? C.gold : C.cream);
+      }
     });
   },
   sumo(d, t) {
@@ -672,7 +683,7 @@ const DRAW_KIND = {
   swipe(d) {
     field('#273d44');
     for (const i of [0, 1]) withSide(i, () => {
-      const [x, y] = P(0.5, 0.23), [, end] = P(0.5, 0.76), width = 0.32 * k;
+      const [x, y] = P(0.5, SWIPE.start), [, end] = P(0.5, 0.76), width = 0.32 * k;
       rrect(g, x - width / 2, y, width, end - y, 16); g.fillStyle = '#10252b'; g.fill();
       g.lineWidth = 2; g.strokeStyle = '#bbcab766'; g.stroke();
       g.setLineDash([7, 5]); g.lineWidth = 4; g.strokeStyle = C.cream;
@@ -704,7 +715,9 @@ const DRAW_KIND = {
       const flight = !calm && last ? Math.max(0, 1 - (d.t - last.at) / 0.45) : 0;
       const rise = Math.sin(Math.PI * flight) * (last?.points ? 0.15 : 0.045);
       seed(g, ...P(0.5, 0.25 - rise), k * 0.055, -Math.PI / 2 - flight * TAU);
-      text(`${d.scores[i]} pts`, ...P(0.5, 0.39), Math.min(31, k * 0.08), cols(i)[1]);
+      const playing = s.phase === 'play';
+      text(`${d.scores[i]} pts`, ...P(0.5, playing ? 0.39 : 0.9), Math.min(31, k * 0.08), cols(i)[1]);
+      if (!playing) return;
       text(`${shot}/${LAUNCH.shots} shots${last ? ` · +${last.points}` : ''}`, ...P(0.5, 0.72), Math.min(20, k * 0.06), C.cream);
       text(target === undefined ? 'Shots complete' : 'Hold, release at the mark', ...P(0.5, 0.86), Math.min(22, k * 0.065), C.cream);
     });
@@ -712,7 +725,7 @@ const DRAW_KIND = {
 };
 
 // ---------------------------------------------------------------- first-time help: one copy facing each local player
-const hintFor = side => inPlay() && s.kind === 'tug' && s.duels.length === 0 && matchNo === 1 && (!solo || side === 0);
+const hintFor = side => inPlay() && s.kind === 'tug' && s.duels.length === 0 && (!solo || side === 0);
 const help = ['bottom', 'top'].map((seat, side) => hint($(`hint-${seat}`).firstElementChild, {
   kind: 'tap', key: 'duel:hint', label: 'Tap!',
   when: () => hintFor(side),

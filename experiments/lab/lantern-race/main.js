@@ -7,7 +7,7 @@ import { noZoom } from '../../kit/zoom.js';
 import { screens } from '../../kit/screens.js';
 import { drag } from '../../kit/drag.js';
 import { hint } from '../../kit/hint.js';
-import { DISTANCE, SEND_MS, clamp, cleanName, roomCode, makeCode, dailySeed, countdown, decode, position, ranking, ghostTrack, interpolate, nightForSeed, botControl, bytes } from './sim.js';
+import { DISTANCE, SEND_MS, clamp, cleanName, roomCode, makeCode, dailySeed, countdown, decodeRoomFrame, position, ranking, ghostTrack, interpolate, nightForSeed, botControl, bytes } from './sim.js';
 noZoom();
 const $ = id => document.getElementById(id), canvas = $('c'), g = canvas.getContext('2d');
 const query = new URLSearchParams(location.search), linkedRoom = roomCode(query.get('room'));
@@ -24,7 +24,8 @@ function layout() { W = innerWidth; H = innerHeight; dpr = Math.min(2, devicePix
 addEventListener('resize', layout); layout();
 let phase = 'menu', pausedPhase = null, pauseAt = 0, s = create(3, 1, false, []), target = s.x;
 let room = 'open', socket = null, connection = 0, timeout = null, online = false, offline = false, id = 1;
-let peers = new Map(), tracks = new Map(), racers = new Map(), bots = [], botRound = false;
+let peers = new Map(), tracks = new Map(), racers = new Map(), bots = [];
+let pendingRoster = null, watching = new Map(), watchStart = 0, watchUntil = 0, readyUntil = 0, watchingOwnRound = false;
 let seed = 3, night = 1, startAt = 0, roundKey = '', endAt = 0, last = performance.now(), acc = 0, sendAt = 0, readyRetryAt = 0;
 let ready = false, finished = false, offlineRound = 0, particles = [], shake = 0, glow = 0, countLast = -1, uiLast = '';
 const received = { p: 0, done: 0 }, sent = { p: 0, done: 0 };
@@ -41,17 +42,33 @@ function send(m) {
   if (!online || socket?.readyState !== WebSocket.OPEN || bytes(m) > 200) return false;
   try { socket.send(JSON.stringify(m)); if (m.t in sent) sent[m.t]++; return true; } catch { fallback('offline'); return false; }
 }
+function lobbyClock(now = performance.now()) {
+  let text = 'Starts when everyone is ready or 8s after the first Ready.';
+  if (offline) text = 'offline · Race the daily river with bots.';
+  else if (now < watchStart) text = `Watching · starts in ${Math.ceil((watchStart - now) / 1000)}s`;
+  else if (watchUntil > now) text = ready ? 'Ready sent · watching the room.' : 'Watching the room · Ready queues you for the next race.';
+  else if (ready) {
+    const remaining = Math.ceil((readyUntil - now) / 1000);
+    text = remaining > 0 ? `Ready sent · up to ${remaining}s to gather racers` : 'Ready sent · waiting for the room';
+  }
+  if ($('lobbyLine').textContent !== text) $('lobbyLine').textContent = text;
+}
 function lobby() {
   $('roomTitle').textContent = room === 'open' ? 'Quick race' : room;
   $('peers').replaceChildren();
-  for (const p of peers.values()) { const el = document.createElement('span'); el.className = 'tag' + (p.id === id ? ' me' : ''); el.textContent = p.n + (p.id === id ? ' · you' : ''); $('peers').append(el); }
-  if (peers.size < 2) { const el = document.createElement('span'); el.className = 'tag'; el.textContent = '+ 3 bots'; $('peers').append(el); }
-  $('lobbyLine').textContent = offline ? 'offline · Race the daily river with bots.' : ready ? 'Ready · waiting for the river…' : 'Same water. Separate boats.';
+  for (const p of peers.values()) {
+    const el = document.createElement('span'), observed = watching.get(p.id);
+    el.className = 'tag' + (p.id === id ? ' me' : '');
+    el.textContent = p.n + (p.id === id ? (ready ? ' · you · Ready sent' : ' · you') : observed ? ` · ${observed.done ? 'Finished' : `${Math.round(observed.d / 1000)}% to dawn`}` : '');
+    $('peers').append(el);
+  }
+  lobbyClock();
   $('ready').disabled = ready; $('ready').textContent = ready ? 'Ready ✓' : 'Ready';
 }
 function disconnect() { connection++; clearTimeout(timeout); online = false; const old = socket; socket = null; if (old) { old.onclose = old.onerror = old.onmessage = old.onopen = null; old.close(); } }
 function enter(code) {
   snd.unlock(); tone(); disconnect(); room = code; id = 1; peers = new Map([[1, { id: 1, n: cleanName($('name').value) }]]); tracks.clear(); racers.clear(); ready = false; offline = false; roundKey = ''; finished = false; bots = [];
+  pendingRoster = null; watching.clear(); watchStart = watchUntil = readyUntil = 0; watchingOwnRound = false;
   $('name').value = cleanName($('name').value); write('lantern-race-name', $('name').value);
   $('connection').textContent = 'connecting…'; $('shareStatus').textContent = ''; show('lobby'); lobby();
   const epoch = connection;
@@ -59,7 +76,7 @@ function enter(code) {
   try {
     socket = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/lab-api/room/lantern-race/${room}`);
     socket.onopen = () => { if (epoch !== connection) return; online = true; send({ t: 'hi', n: cleanName($('name').value) }); };
-    socket.onmessage = event => { if (epoch !== connection) return; const m = decode(event.data); if (m) receive(m); };
+    socket.onmessage = event => { if (epoch !== connection) return; const m = decodeRoomFrame(event.data); if (m) receive(m); };
     socket.onerror = () => fail('offline');
     socket.onclose = event => fail(event.code === 4001 ? 'Room full · offline' : 'offline');
     timeout = setTimeout(() => fail('offline'), 2500);
@@ -69,66 +86,108 @@ function fallback(note) {
   if (offline || phase === 'menu' || phase === 'friendsCard') return;
   disconnect(); offline = true; $('connection').textContent = note;
   peers = new Map([[id, { id, n: cleanName($('name').value) }]]);
-  // A failed network never discards your river. Existing bot sims have advanced from its start.
-  if (phase === 'end' || finished) {
-    // Your result stands. Keep every recorded boat; ones still racing can no longer report.
-    for (const p of racers.values()) if (p.id !== id && p.a) { p.a = 0; p.left = true; }
-    if (phase === 'end') renderResults();
-  } else if (['race', 'countdown', 'paused'].includes(phase)) {
-    botRound = true;
-    racers = new Map([...racers].filter(([key]) => key === id));
-    for (const b of bots) racers.set(b.id, botEntry(b));
-    if (phase === 'end') renderResults();
-  }
+  watching.clear(); watchStart = watchUntil = 0; pendingRoster = null; watchingOwnRound = false;
+  for (const key of racers.keys()) if (key !== id) opponentLeft(key);
+  if (phase === 'end') renderResults();
   lobby();
   if (ready && phase === 'lobby') localRound();
+}
+function opponentLeft(key) {
+  const p = racers.get(key);
+  tracks.delete(key);
+  if (!p || p.bot || p.left || p.s !== undefined) return;
+  const bot = bots.find(b => b.id === key);
+  if (bot && p.a && !finished) {
+    bot.active = true;
+    racers.set(key, botEntry(bot));
+  } else {
+    p.a = 0; p.left = true;
+  }
+}
+function observe(m, now) {
+  if (!peers.has(m.id) || m.id === id) return;
+  if (now >= watchUntil) { watching.clear(); watchStart = 0; watchUntil = now + 150000; }
+  let prior = watching.get(m.id);
+  if (m.t === 'p' && prior?.done && m.a) { watching.clear(); prior = undefined; watchUntil = now + 150000; }
+  if (m.t === 'p' && prior?.d > m.d) return;
+  const next = m.t === 'done' ? { d: prior?.d ?? 0, done: true } : { d: m.d, done: !m.a };
+  watching.set(m.id, next);
+  if (next.done !== prior?.done || Math.round(next.d / 1000) !== Math.round(prior?.d / 1000)) lobby();
+}
+function waitingForRacers() {
+  return [...racers.values()].some(p => !p.bot && !p.left && p.s === undefined);
+}
+function settleWatch() {
+  if (!watchingOwnRound || waitingForRacers()) return;
+  watchingOwnRound = false; watching.clear(); watchStart = watchUntil = 0; lobby();
 }
 function receive(m) {
   const now = performance.now();
   if (m.t === 'you') {
     clearTimeout(timeout); id = m.id; peers = new Map(m.peers.map(p => [p.id, p])); peers.set(id, { id, n: cleanName($('name').value) });
-    offline = false; $('connection').textContent = 'live · ' + (room === 'open' ? 'open river' : room); lobby();
-    if (m.round) { $('lobbyLine').textContent = 'A race may be underway · Ready joins the next river.'; } else if (ready) send({ t: 'ready' });
+    offline = false; $('connection').textContent = 'live · ' + (room === 'open' ? 'open river' : room);
+    if (m.round) {
+      const offset = m.round.start - Date.now();
+      watchStart = now + clamp(offset, 0, 6000); watchUntil = now + clamp(offset + 150000, 0, 156000); readyUntil = 0;
+    }
+    lobby();
+    if (ready) transmitReady(now);
   } else if (m.t === 'join') {
     peers.set(m.id, { id: m.id, n: m.n }); lobby();
-    // A late arrival is a spectator until the next round. A second join updates its name.
-    if (racers.has(m.id)) racers.get(m.id).n = m.n;
+    const p = racers.get(m.id);
+    if (p && !p.bot && !p.left && p.s === undefined) p.n = m.n;
   } else if (m.t === 'leave') {
-    peers.delete(m.id); tracks.delete(m.id); const p = racers.get(m.id); if (p) { p.a = 0; p.left = true; }
-    // Bots stand in for a vanished opponent only while you are still racing; they never join a race you finished.
-    if (peers.size < 2 && bots.length && !finished) { botRound = true; for (const b of bots) racers.set(b.id, botEntry(b)); }
+    peers.delete(m.id); watching.delete(m.id);
+    const pending = pendingRoster?.get(m.id);
+    if (pending) pending.left = true;
+    opponentLeft(m.id); settleWatch();
     lobby(); if (phase === 'end') renderResults();
-  } else if (m.t === 'round') beginRound(m);
-  else if (m.t === 'p' && roundKey && m.id !== id && racers.has(m.id)) {
-    const existing = racers.get(m.id); if (existing.s !== undefined || existing.left || phase === 'countdown') return;
-    received.p++; tracks.set(m.id, ghostTrack(m, now, tracks.get(m.id)));
-    const p = racers.get(m.id); if (m.d >= p.d) { p.d = m.d; p.a = m.a; } updateBar();
-    if (phase === 'end') renderResults();
-  } else if (m.t === 'done' && roundKey && racers.has(m.id)) {
-    if (phase === 'countdown') return;
-    received.done++; const p = racers.get(m.id); if (p.s !== undefined) return; p.s = m.s; p.a = 0;
+  } else if (m.t === 'roster') {
+    pendingRoster = new Map(m.ids.map(key => [key, { id: key, n: peers.get(key)?.n ?? 'Boat' }]));
+  } else if (m.t === 'round') {
+    const roster = pendingRoster; pendingRoster = null;
+    if (roster?.has(id)) beginRound(m, roster);
+  } else if (m.t === 'p' || m.t === 'done') {
+    const p = racers.get(m.id);
+    if (phase === 'lobby' && (!roundKey || finished) && !p?.bot && !p?.left) observe(m, now);
+    if (!roundKey || !p || p.bot || p.left) return;
+    if (m.t === 'p') {
+      if (m.id === id || p.s !== undefined || (phase === 'countdown' && m.a) || (p.a === 0 && m.a)) return;
+      received.p++; tracks.set(m.id, ghostTrack(m, now, tracks.get(m.id)));
+      if (m.d >= p.d) { p.d = m.d; p.a = m.a; } updateBar();
+    } else {
+      received.done++; if (p.s !== undefined) return; p.s = m.s; p.a = 0; tracks.delete(m.id); settleWatch();
+    }
     if (phase === 'end') renderResults();
   }
 }
-function localRound() { const daily = dailySeed(new Date().toISOString().slice(0, 10)); beginRound({ seed: (daily + offlineRound++) >>> 0, start: Date.now() + 3200 }); }
+function localRound() { const daily = dailySeed(new Date().toISOString().slice(0, 10)); beginRound({ seed: (daily + offlineRound++) >>> 0, start: Date.now() + 3200 }, peers); }
+function transmitReady(now) {
+  if (send({ t: 'ready' }) && !readyUntil && now >= watchUntil) readyUntil = now + 8000;
+  readyRetryAt = now + 2000;
+}
 function requestReady() {
   if (ready || !['lobby', 'end'].includes(phase)) return;
-  snd.unlock(); snd.release(); tone(660, .15); ready = true; readyRetryAt = performance.now() + 2000;
+  snd.unlock(); snd.release(); tone(660, .15); ready = true;
+  if (phase === 'end' && waitingForRacers()) { watchingOwnRound = true; watchUntil = endAt; }
   if (phase === 'end') show('lobby'); lobby();
-  if (offline) localRound(); else if (online) send({ t: 'ready' });
+  if (offline) localRound(); else if (online) transmitReady(performance.now());
 }
-function beginRound(round) {
+function beginRound(round, roster) {
   const key = `${round.seed}:${round.start}`; if (roundKey === key) return;
   roundKey = key; seed = round.seed; night = nightForSeed(seed); startAt = performance.now() + countdown(round.start, Date.now()); endAt = startAt + 150000;
   s = create(seed, night, false, []); target = s.x; acc = 0; last = performance.now(); sendAt = startAt; finished = false; ready = false; tracks.clear(); particles = []; shake = 0; countLast = -1; uiLast = ''; steer.reset(); keys.clear(); snd.release();
-  racers = new Map([...peers.values()].map(p => [p.id, { ...p, d: 0, a: 1 }]));
-  racers.set(id, { id, n: cleanName($('name').value), d: 0, a: 1 });
-  bots = [0, 1, 2].map((skill, i) => ({ id: 9 + i, n: ['Reed', 'Glimmer', 'Drift'][i] + ' · bots', s: create(seed, night, false, []), policy: { skill, id: i, next: 0 }, elapsed: null }));
-  botRound = peers.size < 2; if (botRound) for (const b of bots) racers.set(b.id, botEntry(b));
-  $('roomLine').textContent = room === 'open' ? 'OPEN RIVER' : `ROOM ${room}`; $('raceLabel').textContent = `Night ${night} · ${racers.size} boats`;
+  watching.clear(); watchStart = watchUntil = readyUntil = 0; watchingOwnRound = false;
+  racers = new Map([...roster].map(([key, p]) => [key, { id: key, n: p.n, d: 0, a: 1 }]));
+  const botIds = offline ? [9, 10, 11] : [...racers.keys()].filter(key => key !== id);
+  bots = botIds.map((key, i) => ({ id: key, n: offline ? `${['Reed', 'Glimmer', 'Drift'][i]} · bot` : `${racers.get(key).n} · bot`, s: create(seed, night, false, []), policy: { skill: i % 3, id: i, next: 0 }, elapsed: null, active: offline }));
+  for (const b of bots) if (b.active) racers.set(b.id, botEntry(b));
+  for (const p of roster.values()) if (p.left) opponentLeft(p.id);
+  $('countRoster').textContent = offline ? '' : `Ready · ${[...roster.values()].map(p => p.n).join(' · ')}`;
+  $('raceLabel').textContent = `Night ${night} · ${racers.size} ${racers.size === 1 ? 'boat' : 'boats'}`;
   disarm(); show('countdown'); updateBar();
 }
-function botEntry(b) { return { id: b.id, n: b.n, d: Math.round(progress(b.s) * DISTANCE), s: b.elapsed ?? undefined, a: b.s.over ? 0 : 1 }; }
+function botEntry(b) { return { id: b.id, n: b.n, bot: true, d: Math.round(progress(b.s) * DISTANCE), s: b.elapsed ?? undefined, a: b.s.over ? 0 : 1 }; }
 function burst(x, y, col, count = 12) {
   for (let i = 0; i < count; i++) { const a = i * 2.399 + performance.now() * .001; particles.push({ x, y, vx: Math.cos(a) * (30 + i * 2), vy: Math.sin(a) * (30 + i * 2), life: 1, col }); }
 }
@@ -213,8 +272,14 @@ $('share').onclick = async () => {
   tone(); const link = new URL(`/lab/lantern-race/?room=${room}`, location.origin).href;
   try { await navigator.clipboard.writeText(link); $('shareStatus').textContent = 'Link copied'; } catch { $('shareStatus').textContent = link; }
 };
+function ghosts(now) {
+  return [
+    ...bots.filter(b => b.active).map(b => ({ ...botEntry(b), x: b.s.x * 2 - 1, y: b.s.y })),
+    ...[...tracks].map(([key, track]) => ({ ...racers.get(key), ...interpolate(track, now) })),
+  ];
+}
 // Read-only snapshots for checks. No method can change the simulation or bypass input.
-window.raceState = () => ({ phase, seed, night, id, offline, room, peers: [...peers.values()], x: s.x, y: s.y, d: Math.round(progress(s) * DISTANCE), t: s.t, target, over: s.over, unit, best, ghosts: botRound ? bots.map(botEntry) : [...tracks].map(([id, track]) => ({ id, ...interpolate(track, performance.now()) })), results: ranking([...racers.values()]), river: JSON.parse(JSON.stringify(s)), received: { ...received }, sent: { ...sent } });
+window.raceState = () => ({ phase, seed, night, id, offline, room, peers: [...peers.values()], x: s.x, y: s.y, d: Math.round(progress(s) * DISTANCE), t: s.t, target, over: s.over, unit, best, ghosts: ghosts(performance.now()), results: ranking([...racers.values()]), river: JSON.parse(JSON.stringify(s)), received: { ...received }, sent: { ...sent } });
 function tick() {
   if (phase === 'race' && !finished) {
     if (keys.has('arrowleft') || keys.has('a')) target = s.x - .08;
@@ -229,7 +294,11 @@ function tick() {
     if (s.over) finish();
   }
   // Keep simulated opponents running after your finish so results can settle.
-  for (const b of bots) if (!b.s.over) { step(b.s, botControl(b.s, b.policy)); if (b.s.over) b.elapsed = Math.round(b.s.t * 1000); if (botRound) racers.set(b.id, botEntry(b)); }
+  for (const b of bots) if (!b.s.over && (!finished || b.active)) {
+    step(b.s, botControl(b.s, b.policy));
+    if (b.s.over) b.elapsed = Math.round(b.s.t * 1000);
+    if (b.active) racers.set(b.id, botEntry(b));
+  }
 }
 function boatDraw(x, y, col, label, ghost, now, light = .8, angle = 0) {
   g.save(); g.translate(x, y); g.globalAlpha = ghost ? .55 : 1;
@@ -258,8 +327,7 @@ function draw(now) {
     g.fillStyle = k.ice ? '#d6eceb' : '#64787d'; g.beginPath(); g.ellipse(x - r * .23, y - r * .28, r * .55, r * .27, -.3, 0, 7); g.fill();
   }
   for (const e of s.embers) if (!e.got) { const x = sx(e.x), y = sy(e.y) + Math.sin(now / 300 + e.y) * 3; g.shadowColor = '#ffd08a'; g.shadowBlur = 16; g.fillStyle = '#ffe5ac'; g.beginPath(); g.arc(x, y, 4.5, 0, 7); g.fill(); g.shadowBlur = 0; }
-  let ghosts = botRound ? bots.map(b => ({ ...botEntry(b), x: b.s.x * 2 - 1, y: b.s.y })) : [...tracks].map(([key, track]) => ({ ...racers.get(key), ...interpolate(track, now) }));
-  const visible = ghosts.filter(p => p.a && Math.abs(p.d / DISTANCE * 78 - s.y) < H / unit);
+  const visible = ghosts(now).filter(p => p.a && Math.abs(p.d / DISTANCE * 78 - s.y) < H / unit);
   visible.forEach((p, i) => {
     // The report's distance is progress to dawn, including slow-water credit. No powers in race setup.
     let y = sy(p.y ?? p.d / DISTANCE * 78); if (Math.abs(y - H * .68) < 34) y -= 84 + i * 34; // label hangs 28-52 px below a ghost: clear your own boat
@@ -272,10 +340,16 @@ function draw(now) {
   for (const p of particles) { g.globalAlpha = Math.max(0, p.life); g.fillStyle = p.col; g.beginPath(); g.arc(p.x, p.y, 2.5, 0, 7); g.fill(); } g.globalAlpha = 1;
 }
 function frame(now) {
-  requestAnimationFrame(frame); if (phase === 'lobby' && ready && online && now >= readyRetryAt) { send({ t: 'ready' }); readyRetryAt = now + 2000; } const dt = Math.min(.2, (now - last) / 1000); last = now;
+  requestAnimationFrame(frame);
+  if (phase === 'lobby') {
+    if (watchUntil && now >= watchUntil) { watchStart = watchUntil = 0; watching.clear(); lobby(); }
+    if (ready && online && now >= readyRetryAt) transmitReady(now);
+    if (now - lastLobbyPaint >= 100) { lobbyClock(now); lastLobbyPaint = now; }
+  }
+  const dt = Math.min(.2, (now - last) / 1000); last = now;
   if (phase === 'countdown') {
-    const remaining = Math.ceil((startAt - now) / 1000); $('count').textContent = remaining > 3 ? 'Ready' : String(Math.max(1, remaining));
-    if (remaining !== countLast) { countLast = remaining; tone(remaining > 0 ? 440 : 880, .14); }
+    const remaining = Math.ceil((startAt - now) / 1000);
+    if (remaining !== countLast) { $('countNumber').textContent = String(Math.max(1, remaining)); countLast = remaining; tone(remaining > 0 ? 440 : 880, .14); }
     if (now >= startAt) { show('race'); acc = 0; }
   }
   if (phase === 'race' || phase === 'end') {
@@ -289,4 +363,5 @@ function frame(now) {
   particles = particles.filter(p => p.life > 0); shake = Math.max(0, shake - dt * 2); glow = Math.max(0, glow - dt);
   draw(now);
 }
+let lastLobbyPaint = 0;
 show('menu'); requestAnimationFrame(frame);

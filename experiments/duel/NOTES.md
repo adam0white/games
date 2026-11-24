@@ -136,3 +136,28 @@ The initial run on 2026-11-24 passed with zero page and console errors. WebKit t
 ## Open ideas
 
 - A "party" mode with three-match series and a running tally.
+
+## 2026-11-24 — phone play review
+
+- Quitting to the menu before the first tug input used to retire the help for that visit. The next eligible duel now still shows it. One accepted input still retires both copies.
+- Quick Draw's countdown used to demonstrate repeated taps around both sides of the lamp's flash. The pictured thumb now taps only while its lamp is lit. Each player's live cue distinguishes waiting from tapping.
+- Holding the pause key produced a second toggle through keyboard repeat. One press now makes one transition.
+- Layout changes cancel existing contacts and their queued input. Seed Launch resumes with two fresh holds instead of charging toward a shot with pre-rotation coordinates.
+- A Beetle Race flick could start on the pictured beetle late in the race and score nothing. The minimum starting distance from the center is now 0.23 board widths, down from 0.34, matching the lane's near edge. A flick still needs 0.22 board widths of travel within 0.45 seconds. Both seats use the same rule. No check or bot acceptance threshold changed.
+- At 342 px landscape height, the old result's Menu button spanned y=335–383, leaving 7 of its 48 px visible. The result now keeps both player regions within the viewport and places the bottom actions side by side. Short menu cards permit vertical touch scrolling. Tug keeps both critters in frame during a large pull. Seed Launch separates each final score from its result label.
+- At 280 px height, a native Chromium drag scrolled the menu 110 px and moved the 48 px Sound control from y=262.34–310.34 to y=152.34–200.34. A native tap then toggled it.
+
+Local play used a clean save, the normal countdown, and the real input path. Timings below are wall-clock seconds measured after the initial help and pause exercise for easy, and from starting the driver on medium and hard. The driver reads the game state and sends touches. It leaves the simulation clock and results alone.
+
+| Profile | Easy | Medium | Hard | Two-seat Beetle Race | Two-seat Seed Launch |
+| --- | --- | --- | --- | --- | --- |
+| WebKit iPhone 13 | 3–0 in 28.464 s | 3–1 in 58.980 s | 3–0 in 39.593 s | 17–17 in 5.53 s | 585–451, 6/6 shots per seat, in 7.75 s |
+| Chromium Pixel 7 | 3–0 in 36.643 s | 3–1 in 60.796 s | 3–0 in 39.833 s | 17–16 in 9.40 s | 556–407, 6/6 shots per seat, in 8.33 s |
+
+The review exercised pause and resume, leaving and returning, rematch, landscape and a mid-duel reload that retained completed progression. Chromium used native Playwright taps and CDP multi-touch. WebKit used native taps and dispatched touch PointerEvents for multi-touch. The browser assertions cover each correction above. Phone checks hit-test visible, enabled control centers, verify at least 48 px in both dimensions, then send native Playwright taps. For WebKit, the check nudges the viewport by 1 px and restores it before play, and schedules the timing-sensitive first pair of releases in the document. Both changes address host-side frame and actionability stalls. Screenshots use CSS-pixel resolution and a 90 s capture timeout. The timed launch checks are separate from screenshots taken while charging.
+
+The full bot check exited 0 in 6.2 s. The tug mutation exited 1 with four failed claims. Between equal medium bots, Beetle Race had a 15.92 s median and 17 draws in 200, and Seed Launch had a 10.47 s median and zero draws in 200.
+
+The final screenshot-enabled `check.mjs` exited 0 on WebKit iPhone 13 (127 s, 33 captures) and Chromium Pixel 7 (188 s, 26 phone captures plus four small-screen and desktop captures). Both passed with zero browser errors. The final landscape Seed Launch replay ended 550–550 on WebKit and 569–569 on Chromium after six shots per seat. The registered shared Duel play and hint checks passed on both profiles. Screenshots are under `/private/tmp/night-r3-review/thumb-duel/verified/`. Reviewed first play, layout, pause, rematch, both new duels and landscape results.
+
+Still unverified: first-time human comprehension, two contacts and safe-area insets on physical phones, audio by ear, and live lab delivery.

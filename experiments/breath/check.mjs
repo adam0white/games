@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { gunzipSync } from "node:zlib";
 import assert from "node:assert/strict";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), ".."),
-  shots = "/private/tmp/night-breath";
+  shots = process.env.SHOTS || "/private/tmp/night-r3-review/breath/check";
 await mkdir(shots, { recursive: true });
 const server = createServer(async (req, res) => {
   const u = new URL(req.url, "http://local");
@@ -54,6 +54,19 @@ const require = createRequire(
 const { webkit, chromium, devices } = require("playwright");
 const state = (page) => page.evaluate(() => window.breathState());
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
+const shot = (page, name) => page.screenshot({ path: join(shots, name + ".png"), timeout: 90000 });
+async function ready(page, engine) {
+  await page.waitForFunction(() => window.breathState, undefined, { polling: 50 });
+  if (engine === "webkit") {
+    const view = page.viewportSize();
+    await page.setViewportSize({ ...view, width: view.width - 1 });
+    await page.setViewportSize(view);
+  }
+  await page.waitForFunction(() => {
+    const canvas = document.querySelector("#c");
+    return canvas.getContext("2d").getImageData(0, 0, 1, 1).data[3] === 255;
+  }, undefined, { polling: 50 });
+}
 function landscapeFloors(view) {
   const count = view.floors.filter(
     (y) => y - view.floorHeight + 12 >= view.top && y + 13 <= view.bottom,
@@ -108,6 +121,14 @@ async function bounds(page) {
     "no horizontal overflow",
   );
 }
+async function landscapeCard(page, screen) {
+  await bounds(page);
+  const card = await page.locator(screen).evaluate((el) => ({
+    visible: el.clientHeight,
+    content: el.scrollHeight,
+  }));
+  assert.ok(card.content <= card.visible, `${screen} fits without scrolling: ${card.content}px / ${card.visible}px`);
+}
 let failed = 0;
 try {
   for (const [name, engine, phone] of [
@@ -120,6 +141,21 @@ try {
     const page = await ctx.newPage(),
       errors = [],
       records = [];
+    await page.addInitScript(() => {
+      const fillText = CanvasRenderingContext2D.prototype.fillText;
+      window.breathText = { timers: new Set() };
+      CanvasRenderingContext2D.prototype.fillText = function (value, ...args) {
+        if (this.canvas.id === "c") {
+          if (/^(?:HOLD|RELEASE) TO /.test(value)) breathText.control = value;
+          if (/^[↑↓] /.test(value)) breathText.rescue = value;
+          if (/^\d+:\d\d$/.test(value)) {
+            breathText.timer = value;
+            breathText.timers.add(value);
+          }
+        }
+        return fillText.call(this, value, ...args);
+      };
+    });
     page.on("pageerror", (e) => errors.push(`page: ${e.message}`));
     page.on("console", (m) => {
       if (m.type() === "error") errors.push(`console: ${m.text()}`);
@@ -146,24 +182,47 @@ try {
     });
     try {
       await page.goto(`${base}/breath/?seed=1801&labRunSource=agent`);
-      await page.waitForFunction(() => window.breathState);
+      await ready(page, name);
       await page.evaluate(() =>
         localStorage.setItem("hf-lab-send-localhost", "1"),
       );
       await page.reload();
-      await page.waitForFunction(() => window.breathState);
+      await ready(page, name);
       assert.match(
         await page.textContent("#menu"),
         /The game lab records play/,
       );
       await bounds(page);
-      await page.screenshot({ path: join(shots, `${name}-menu.png`) });
+      await shot(page, `${name}-menu`);
+      await page.setViewportSize(devices[`${phone} landscape`].viewport);
+      await landscapeCard(page, "#menu");
+      await shot(page, `${name}-landscape-fresh`);
+      await page.setViewportSize(devices[phone].viewport);
       await page.click("#play");
       assert.equal((await state(page)).screen, "play");
       await bounds(page);
+      await page.waitForFunction(() => breathText.timers.has("4:00"));
       await page.waitForTimeout(3300);
       await page.waitForFunction(() => window.breathState().hint === "hold-release");
-      await page.screenshot({ path: join(shots, `${name}-hold-release.png`) });
+      assert.notEqual(await page.evaluate(() => breathText.timer), "4:00", "campaign countdown ticks in play");
+      await shot(page, `${name}-hold-release`);
+      const gesture = await page.locator(".kit-hint.on .hand").evaluate((hand) => {
+        const animation = hand.getAnimations().find((a) => a.animationName === "breath-hint-hand");
+        animation.pause();
+        const positions = [500, 1500, 2100].map((ms) => {
+          animation.currentTime = ms;
+          const m = new DOMMatrix(getComputedStyle(hand).transform);
+          return [m.m41, m.m42];
+        });
+        animation.play();
+        return positions;
+      });
+      assert.deepEqual(gesture, [[0, 0], [0, 0], [0, -19]], "the first hint holds in place for at least 1s before lifting");
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      await page.waitForFunction(() => document.querySelector(".kit-hint.still"));
+      assert.equal(await page.locator(".kit-hint .label").isVisible(), true);
+      await shot(page, `${name}-still-hint`);
+      await page.emulateMedia({ reducedMotion: "no-preference" });
       assert.equal(
         (await state(page)).progress,
         0,
@@ -171,6 +230,7 @@ try {
       );
       await finger(page, true);
       assert.equal((await state(page)).hint, null, "play input dismisses the idle hint");
+      assert.equal(await page.locator(".kit-hint").count(), 0);
       await page.waitForFunction(
         () => window.breathState().progress > 0.06,
         undefined,
@@ -178,6 +238,10 @@ try {
       );
       const moved = await state(page);
       assert.ok(moved.progress > 0.06, "holding moves along route");
+      assert.equal(await page.evaluate(() => breathText.control), "RELEASE TO BREATHE");
+      await page.waitForFunction(
+        () => window.breathState().progress > 0.44 && breathText.control === "RELEASE TO CROUCH",
+      );
       await finger(page, false);
       const stopped = await state(page);
       await sleep(300);
@@ -190,6 +254,12 @@ try {
       const paused = await state(page);
       await sleep(250);
       assert.equal((await state(page)).t, paused.t, "pause freezes simulation");
+      await page.click("#resume");
+      await page.keyboard.down("p");
+      assert.equal((await state(page)).screen, "paused");
+      await page.keyboard.down("p");
+      assert.equal((await state(page)).screen, "paused", "repeating a pause key never resumes");
+      await page.keyboard.up("p");
       await page.click("#resume");
       await page.mouse.move(110, 400);
       await page.mouse.down();
@@ -235,7 +305,7 @@ try {
         }));
         input.maxFX = Math.max(input.maxFX, frame.state.fx);
         if (!releaseCue && frame.state.hint === "release") {
-          await page.screenshot({ path: join(shots, `${name}-release-cue.png`) });
+          await shot(page, `${name}-release-cue`);
           releaseCue = true;
         }
         if (frame.want !== down) {
@@ -249,7 +319,7 @@ try {
           down = frame.want;
         }
         if (!mid && frame.state.progress > 3) {
-          await page.screenshot({ path: join(shots, `${name}-mid-play.png`) });
+          await shot(page, `${name}-mid-play`);
           mid = true;
         }
         if (!rooftopFloors && frame.state.progress > 3.9) {
@@ -260,7 +330,12 @@ try {
             return innerWidth > innerHeight && roof >= top && roof < top + 18;
           });
           rooftopFloors = landscapeFloors((await state(page)).view);
-          await page.screenshot({ path: join(shots, `${name}-landscape-roof.png`) });
+          assert.equal(
+            await page.evaluate(() => breathText.rescue),
+            "↓ Out · 0/1",
+            "a joined follower has not been rescued until reaching the street",
+          );
+          await shot(page, `${name}-landscape-roof`);
           await page.setViewportSize(devices[phone].viewport);
         }
         await sleep(45);
@@ -274,6 +349,7 @@ try {
       );
       assert.equal(done.rescued, done.people.length);
       assert.ok(done.stars >= 1);
+      assert.equal(await page.locator("#again").isVisible(), true, "a win keeps the replay action");
       assert.ok(releaseCue, "the first wave showed a release cue while holding");
       assert.ok(
         input.presses >= 3 && input.releases >= 2,
@@ -285,10 +361,10 @@ try {
       );
       await bounds(page);
       await sleep(150);
-      await page.screenshot({ path: join(shots, `${name}-end.png`) });
+      await shot(page, `${name}-end`);
       await page.setViewportSize({ width: 568, height: 320 });
       await bounds(page);
-      await page.screenshot({ path: join(shots, `${name}-landscape-end.png`) });
+      await shot(page, `${name}-landscape-end`);
       await page.setViewportSize(devices[phone].viewport);
       const blob = await page.evaluate(() =>
         localStorage.getItem("breath-save"),
@@ -310,7 +386,7 @@ try {
         "pickup recorded",
       );
       await page.reload();
-      await page.waitForFunction(() => window.breathState);
+      await ready(page, name);
       assert.equal(
         await page.evaluate(() => localStorage.getItem("breath-save")),
         blob,
@@ -350,14 +426,14 @@ try {
       await sleep(400);
       await page.setViewportSize({ width: 360, height: 640 });
       await bounds(page);
-      await page.screenshot({ path: join(shots, `${name}-360-menu.png`) });
+      await shot(page, `${name}-360-menu`);
       await page.click("#play");
       await page.waitForFunction(() => window.breathState().t > 0);
       await bounds(page);
-      await page.screenshot({ path: join(shots, `${name}-360-play.png`) });
+      await shot(page, `${name}-360-play`);
       await page.click("#pause");
       await bounds(page);
-      await page.screenshot({ path: join(shots, `${name}-360-pause.png`) });
+      await shot(page, `${name}-360-pause`);
       await page.click("#toMenu");
       await sleep(400);
       await page.setViewportSize({ width: 1280, height: 800 });
@@ -376,34 +452,71 @@ try {
       const landscape = (await state(page)).view;
       assert.ok(landscape.toast, "opening level toast visible in landscape");
       const visibleFloors = landscapeFloors(landscape);
-      await page.screenshot({ path: join(shots, `${name}-landscape.png`) });
+      await shot(page, `${name}-landscape`);
       await page.setViewportSize({ width: 568, height: 320 });
       const compactFloors = landscapeFloors((await state(page)).view);
       await bounds(page);
-      await page.screenshot({ path: join(shots, `${name}-landscape-compact.png`) });
-      await page.setViewportSize(devices[`${phone} landscape`].viewport);
+      await shot(page, `${name}-landscape-compact`);
       await page.click("#pause");
+      await landscapeCard(page, "#paused");
+      await shot(page, `${name}-landscape-pause`);
       await page.click("#toMenu");
       await sleep(400);
+      await landscapeCard(page, "#menu");
+      await page.click("#choose");
+      await landscapeCard(page, "#select");
+      await shot(page, `${name}-landscape-levels`);
+      await page.locator("#levels button").nth(1).tap();
+      assert.equal((await state(page)).level, 2, "the unlocked level opens in landscape");
+      await page.mouse.move(210, 200);
+      await page.mouse.down();
+      await page.waitForFunction(() => window.breathState().progress > 0.06);
+      await page.mouse.up();
       await page.reload();
-      await page.waitForFunction(() => window.breathState);
+      await ready(page, name);
+      assert.equal((await state(page)).screen, "menu", "mid-level reload returns to menu");
+      assert.equal((await state(page)).opened, 2, "mid-level reload preserves the unlocked level");
       assert.equal((await state(page)).sound, false, "sound setting persists");
       await bounds(page);
+      await page.click("#choose");
+      await page.locator("#levels button").first().tap();
+      await page.mouse.move(210, 200);
+      await page.mouse.down();
+      await page.waitForFunction(() => window.breathState().screen === "end");
+      await page.mouse.up();
+      const lost = await state(page);
+      assert.equal(lost.over, "lost");
+      assert.equal(await page.locator("#endTitle").textContent(), "Take a breather");
+      assert.equal(await page.locator("#again").isVisible(), false, "loss has one retry action");
+      assert.equal(await page.locator("#next").textContent(), "Try again");
+      await shot(page, `${name}-landscape-loss`);
+      await page.locator("#next").tap();
+      assert.equal((await state(page)).screen, "play");
+      assert.equal((await state(page)).progress, 0, "loss retry starts at the street");
+      await page.clock.install();
+      await page.evaluate(() => {
+        // The idle deadline only needs the game's normal 120ms maximum frame interval.
+        window.requestAnimationFrame = (callback) => setTimeout(() => callback(performance.now()), 120);
+      });
+      await page.click("#pause");
+      await page.click("#restart");
+      await page.clock.runFor(241_000);
+      assert.equal((await state(page)).over, "lost");
+      assert.equal(await page.locator("#endTitle").textContent(), "Time ran out");
+      assert.equal(await page.evaluate(() => breathText.timer), "0:00", "the clock reaches zero on timeout");
       assert.deepEqual(
         errors,
         [],
         "zero page, console, request and HTTP errors",
       );
       console.log(
-        `PASS ${name}: level1 ${done.t.toFixed(1)}s, ${done.rescued}/${done.people.length} rescued, ${done.stars} stars; ${input.presses} holds/${input.releases} releases; landscape floors ${visibleFloors} entry/${rooftopFloors} roof/${compactFloors} compact; 0 page/console errors; hints, save, daily, pause, keyboard, 360px and desktop pass`,
+        `PASS ${name}: level1 ${done.t.toFixed(1)}s, ${done.rescued}/${done.people.length} rescued, ${done.stars} stars; ${input.presses} holds/${input.releases} releases; continuous hold lost at ${lost.t.toFixed(2)}s; landscape floors ${visibleFloors} entry/${rooftopFloors} roof/${compactFloors} compact; 0 page/console errors; hints, save, daily, pause, keyboard, 360px and desktop pass`,
       );
     } catch (e) {
       failed++;
       console.error(`FAIL ${name}:`, e);
       console.error(errors);
-      await page
-        .screenshot({ path: join(shots, `${name}-failure.png`) })
-        .catch(() => {});
+      await shot(page, `${name}-failure`).catch(() => {});
     } finally {
       await ctx.close();
       await browser.close();

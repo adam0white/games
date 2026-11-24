@@ -65,6 +65,12 @@ Two new pages and a tuning pass on the second batch, by Codex builders. For this
 | 2026-11-24 | `wild-pour` (retune) | Level 6 eased (planner 5 of 6, was 2 of 6), a smooth liquid surface, a daily pour | Lab rerun: bots and mutation pass. Builder: levels 5 to 8 still win only 12 to 16 of 21 on fresh seeds | Keep testing; late levels still uneven |
 | 2026-11-24 | `ant-draft`, `ant-draft-b`, `ant-creatures`, `boat-b`, `wild2-face-shift` (review fixes) | A reviewer played each page and fixed pointer ownership, lost pointer capture, pause and retry resets and stale transitions. The reviewer prefers build A of Ant Draft: the queen, soldiers and rally marker read more clearly | See the check results recorded in the pull request | Keep testing |
 
+| 2026-11-24 | `night-channels` | Water as the game: cell-based conserved flow down a height field; dig channels so seedbeds stay wet and flower; rocks, sand, a digging budget; 10 gardens and a daily | Builder: 10 of 10 gardens, 5,000 of 5,000 daily gardens solvable, water-loss mutation fails. Lab rerun results are in the pull request | Keep testing |
+| 2026-11-24 | `night-flock` | Sheepdog with a real flocking simulation (12 to 60 sheep); a stray brought home scores more than 99 ordinary arrivals; 10 evenings and endless | Builder: 49 of 49 campaign runs, reversed herding force sends 0 of 12 home. Lab rerun results are in the pull request | Keep testing; the bet is the feel of the flock |
+| 2026-11-24 | `night-podwire` | Wildcard: a plucked string as a wave simulation; an off-centre pluck sends the strongest rebound to the far side; six levels | Builder: 192 of 192 seeded runs; removing wave momentum fails the bots. Lab rerun results are in the pull request | Keep testing |
+| 2026-11-24 | `lantern-race` (client) | Client follows the new room rules: ready list, countdown, racers only, watchers join the next round; `check.mjs` waits are bounded (it hung for an hour on main before) | Builder: check passes both profiles in 135 s | Keep testing with two real phones |
+| 2026-11-24 | `night-bells`, `night-lamp-keeper` (review fixes) | A reviewer played both to the end on both profiles and fixed landscape clipping, hit targets, rerouting, progress saves and the relight cue | Builder: all checks pass | Keep testing |
+
 - 2026-11-24: Codex was upgraded on the build machine while builders ran, and three builders stopped with a missing helper binary. Rerunning them worked. Do not upgrade Codex mid-run.
 
 ## Round of 2026-11-24 (ideas scan)

@@ -42,11 +42,12 @@ export function route(s,ids) {
   s.keeper.queue=ids.slice(1);event(s,'route',anchor);return true;
 }
 function move(entity,to,distance){const dx=to.x-entity.x,dy=to.y-entity.y,d=Math.hypot(dx,dy);if(d<=distance+1e-9){entity.x=to.x;entity.y=to.y;return true;}entity.x+=dx/d*distance;entity.y+=dy/d*distance;return false;}
-function tick(s,dt) {
+function tick(s,dt,holdRoute) {
   s.t=+(s.t+dt).toFixed(6);
   if(s.gust&&!s._gustDone&&s.t>=s.gust.at){s._gustDone=true;const n=s.nodes[s.gust.node];if(!n.homeLight){n.lit=false;event(s,'wind',s.gust.node);}else event(s,'sheltered',s.gust.node);}
   const k=s.keeper;
-  if(k.target===null&&k.queue.length)k.target=k.queue.shift();
+  // A draft keeps its anchor while the keeper finishes the current edge.
+  if(k.target===null&&k.queue.length&&!holdRoute)k.target=k.queue.shift();
   if(k.target!==null&&move(k,s.nodes[k.target],38*dt)){
     k.node=k.target;k.target=null;
     if(!s._mutate&&!s.nodes[k.node].lit){s.nodes[k.node].lit=true;event(s,'light',k.node);}
@@ -62,9 +63,9 @@ function tick(s,dt) {
   if(s.rescued===s.total){s.status='won';s.score=Math.max(0,Math.round((s.budget-s.t)*100+s.total*500));event(s,'won',null);}
   else if(s.t>=s.budget){s.status='lost';event(s,'lost',null);}
 }
-export function step(s,dt) {
+export function step(s,dt,holdRoute=false) {
   if(s.status!=='play'||!Number.isFinite(dt)||dt<=0)return s;
   s._carry+=dt;
-  while(s._carry+1e-10>=.025&&s.status==='play'){s._carry-=.025;tick(s,.025);}
+  while(s._carry+1e-10>=.025&&s.status==='play'){s._carry-=.025;tick(s,.025,holdRoute);}
   return s;
 }

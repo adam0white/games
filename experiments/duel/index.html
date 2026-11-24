@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#211a33">
 <title>Thumb Duel</title>
 <style>
-  html, body { margin: 0; height: 100%; background: #211a33; overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: #211a33; overflow: hidden; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
   body { font: 17px/1.35 ui-rounded, 'Arial Rounded MT Bold', 'Trebuchet MS', system-ui, sans-serif; color: #1b1328; }
   canvas#c { display: block; width: 100vw; height: 100dvh; touch-action: none; }
   #probe { position: fixed; top: 0; left: 0; width: 0; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); visibility: hidden; pointer-events: none; }
@@ -47,6 +47,13 @@
   .half.c1 button.re { background: #58d0c4; color: #1b1328; }
   .half.c0 button.re.ready, .half.c1 button.re.ready { background: #fff4dc; color: #1b1328; }
   .half.ghost > * { visibility: hidden; }
+  @media (max-height: 460px) {
+    .screen:not(#end) { align-items: safe center; }
+    #end { grid-template-rows: repeat(2, minmax(0, 1fr)); }
+    #end .half { padding: max(6px, env(safe-area-inset-top), env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left), env(safe-area-inset-right)); }
+    #end .half.bottom { display: grid; grid-template-columns: repeat(2, max-content); place-content: center; justify-items: center; }
+    #end .half.bottom :is(h2, .line) { grid-column: 1 / -1; }
+  }
   .lab-notice { font-size: 14px !important; }
   .lab-toggle { font-size: 14px !important; }
   .desk { display: none; font-size: .9em; }

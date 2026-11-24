@@ -9,8 +9,9 @@ import {
   safe,
   careful,
 } from "./sim.js";
-import { read, readJson, write, writeJson } from "../kit/save.js";
+import { readJson, writeJson } from "../kit/save.js";
 import { sound } from "../kit/audio.js";
+import { hint } from "../kit/hint.js";
 import { onLeave, isPauseKey } from "../kit/pause.js";
 import { noZoom } from "../kit/zoom.js";
 import { screens } from "../kit/screens.js";
@@ -94,13 +95,7 @@ let s = null,
   lastWarning = false,
   finished = false;
 const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
-const HINT_KEY = "breath:hint";
 const hintMode = query.get("hint");
-let hintDone =
-  hintMode === "0" ||
-  (!["hand", "ring"].includes(hintMode) &&
-    (save.runs > 0 || read(HINT_KEY) === "1"));
-let hintIdle = 0;
 const PALETTES = {
   night: {
     sky: "#101e2b",
@@ -136,6 +131,14 @@ const PALETTES = {
 let C = PALETTES[save.look];
 const cv = $("c"),
   g = cv.getContext("2d");
+// The kit supplies the stationary target and help lifecycle. Local CSS shows a hold and lift.
+const help = hint(cv, {
+  kind: "tap",
+  key: "breath:hint",
+  when: () => screen === "play",
+  played: save.runs > 0,
+  label: "Hold to run. Let go to crouch.",
+});
 let W = 0,
   H = 0,
   dpr = 1,
@@ -313,9 +316,10 @@ function finish() {
     stars: s.stars,
     score: s.score || 0,
   });
+  const timedOut = s.t > s.config.limit;
   $("endLabel").textContent = daily ? "Tower of the day" : `Level ${level}`;
   $("endTitle").textContent =
-    s.over === "win" ? "Everyone out!" : "Take a breather";
+    s.over === "win" ? "Everyone out!" : timedOut ? "Time ran out" : "Take a breather";
   $("stars").textContent = daily
     ? `${s.score || 0} points`
     : "★ ".repeat(s.stars || 0) + "☆ ".repeat(3 - (s.stars || 0));
@@ -328,7 +332,9 @@ function finish() {
   $("endTip").textContent =
     s.over === "win"
       ? "Safe at last."
-      : "Stop in mint doorways. Wait for the whole line.";
+      : timedOut
+        ? "Use clear corridors to make up time."
+        : "Stop in mint doorways. Wait for the whole line.";
   $("next").textContent = daily
     ? "Play today again"
     : s.over === "win" && level < 12
@@ -336,6 +342,7 @@ function finish() {
       : s.over === "win"
         ? "Play the daily tower"
         : "Try again";
+  $("again").hidden = s.over !== "win";
   chooseScreen("end");
   drawResult();
   if (s.over === "win") {
@@ -450,7 +457,6 @@ function press(e) {
   pointer = e.pointerId;
   held = true;
   touched = true;
-  dismissHint();
   snd.unlock();
   try {
     cv.setPointerCapture(pointer);
@@ -475,7 +481,7 @@ for (const type of ["pointerup", "pointercancel", "lostpointercapture"])
 addEventListener("keydown", (e) => {
   if (isPauseKey(e)) {
     e.preventDefault();
-    screen === "paused" ? resume() : pause();
+    if (!e.repeat) screen === "paused" ? resume() : pause();
     return;
   }
   if (
@@ -489,7 +495,6 @@ addEventListener("keydown", (e) => {
     }
     keyboard = true;
     touched = true;
-    dismissHint();
     snd.unlock();
   }
 });
@@ -499,16 +504,10 @@ addEventListener("keyup", (e) => {
     tone(160, 0.08, 0.04);
   }
 });
-function dismissHint() {
-  if (hintDone) return;
-  hintDone = true;
-  write(HINT_KEY, "1");
-}
-
 const holdHand = new Path2D(
   "M-4 15V1Q-4-4 0-4Q4-4 4 1V10Q7 7 10 11Q14 9 16 14Q20 12 21 17V26Q20 36 13 39H3Q-1 38-4 33L-11 22Q-14 17-10 15Q-7 14-4 19Z",
 );
-function gesture(x, y, lift, ringOnly = false) {
+function gesture(x, y, lift) {
   g.save();
   g.translate(x, y);
   g.strokeStyle = lift > 0.5 ? C.mint : C.gold;
@@ -518,14 +517,12 @@ function gesture(x, y, lift, ringOnly = false) {
   g.ellipse(0, 0, 14, 7, 0, 0, Math.PI * 2);
   g.fill();
   g.stroke();
-  if (!ringOnly) {
-    g.translate(0, -lift * 19);
-    g.fillStyle = C.bright;
-    g.strokeStyle = "#0b1b27";
-    g.lineWidth = 1.8;
-    g.fill(holdHand);
-    g.stroke(holdHand);
-  }
+  g.translate(0, -lift * 19);
+  g.fillStyle = C.bright;
+  g.strokeStyle = "#0b1b27";
+  g.lineWidth = 1.8;
+  g.fill(holdHand);
+  g.stroke(holdHand);
   g.restore();
 }
 function liftArrow(x, y) {
@@ -539,31 +536,18 @@ function liftArrow(x, y) {
   g.lineTo(x + 4, y + 4);
   g.stroke();
 }
-function drawGestureHint(x, y, release) {
-  const age = release ? s.t - s.gustStarted : hintIdle - 3;
-  const t = age % 2.8;
-  const lift = release
-    ? Math.min(1, t / 0.32)
-    : t < 0.3
-      ? 1 - t / 0.3
-      : Math.min(1, Math.max(0, (t - 1.58) / 0.3));
+function drawReleaseHint(x, y) {
+  const t = (s.t - s.gustStarted) % 2.8;
+  const lift = reduced ? 1 : Math.min(1, t / 0.32);
   g.save();
   if (landscape) {
     g.translate(x, y);
     g.scale(0.78, 0.78);
     x = y = 0;
   }
-  if (reduced && !release) {
-    round(g, x - 68, y - 32, 136, 78, 18, "#0b1b27f5");
-    gesture(x - 36, y, 0);
-    gesture(x + 30, y, 1);
-    liftArrow(x + 54, y - 15);
-    text("→", x, y + 3, 21, C.mint, "center");
-  } else {
-    round(g, x - 27, y - 27, 56, 72, 15, "#0b1b27f5");
-    gesture(x - 3, y, reduced ? 1 : lift, !release && hintMode === "ring");
-    if (release) liftArrow(x + 18, y - 15);
-  }
+  round(g, x - 27, y - 27, 56, 72, 15, "#0b1b27f5");
+  gesture(x - 3, y, lift);
+  liftArrow(x + 18, y - 15);
   g.restore();
 }
 
@@ -949,7 +933,7 @@ function draw() {
     // Small route chevrons indicate direction without requiring a steering input.
     const target = position(s, Math.min(s.length, s.progress + 0.13));
     if (releaseHint(p)) {
-      drawGestureHint(xx(0.5) + (s.returning ? -67 : 67), yy(1) - fh * 0.53, true);
+      drawReleaseHint(xx(0.5) + (s.returning ? -67 : 67), yy(1) - fh * 0.53);
     } else if (!(p.floor === 1 && wave(s, 1).gust && safe(s))) {
       const dx = Math.sign(target.x - p.x),
         dy = Math.sign(target.y - p.y);
@@ -993,8 +977,11 @@ function draw() {
     g.roundRect(x, y, width, height, 22);
     g.stroke();
     const holding = held || keyboard;
+    const sheltered = safe(s);
+    const action = sheltered ? "RELEASE TO BREATHE" : "RELEASE TO CROUCH";
+    const advice = sheltered ? "Wait for the whole line" : "Stop in mint doorways";
     text(
-      holding ? "RELEASE TO SHELTER" : "HOLD TO RUN",
+      holding ? action : "HOLD TO RUN",
       W / 2,
       y + (landscape ? 13 : 23),
       16,
@@ -1004,8 +991,8 @@ function draw() {
     );
     text(
       holding
-        ? "Keep the whole line together"
-        : safe(s, s.progress)
+        ? advice
+        : sheltered
           ? "Sheltered · breathe"
           : "Crouching",
       W / 2,
@@ -1022,14 +1009,6 @@ function draw() {
       text(toast, x + width / 2, y + height / 2, 16, C.bright, "center");
       g.globalAlpha = 1;
     }
-    if (idleHint()) {
-      const buildingRight = bx + bw;
-      const gap = W - right - buildingRight;
-      const x = landscape && gap > (reduced ? 115 : 58)
-        ? buildingRight + gap / 2
-        : W / 2;
-      drawGestureHint(x, worldBottom - 74, false);
-    }
   }
   for (const b of confetti) {
     g.save();
@@ -1039,9 +1018,6 @@ function draw() {
     g.fillRect(-3, -5, 6, 10);
     g.restore();
   }
-}
-function idleHint() {
-  return screen === "play" && !hintDone && hintIdle >= 3;
 }
 function releaseHint(p) {
   return (
@@ -1065,8 +1041,15 @@ function drawHUD(p) {
     y = top + 14;
   round(g, x - 8, y - 7, w + 9, landscape ? 58 : 70, 18, "#101e2be8");
   text(daily ? `DAILY · ${s.round}` : `LEVEL ${level}`, x, y + 8, 14, C.mint);
+  if (!daily) {
+    const seconds = Math.max(0, Math.ceil(s.config.limit - s.t));
+    const clockLabel = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+    text(clockLabel, x + w / 2 - 12, y + 8, 14, seconds <= 30 ? C.gold : C.bright, "center");
+  }
   text(
-    `${s.returning ? "↓ Street" : "↑ Rescue"} · ${s.people.filter((p) => p.joined || p.rescued).length}/${s.people.length}`,
+    s.returning
+      ? `↓ Out · ${s.rescued}/${s.people.length}`
+      : `↑ Found · ${s.people.filter((p) => p.joined).length}/${s.people.length}`,
     x + w - 15,
     y + 8,
     14,
@@ -1182,7 +1165,6 @@ function frame(now) {
   last = now;
   clock += delta;
   if (screen === "play" && s && !s.over) {
-    if (!hintDone) hintIdle += delta;
     acc += delta;
     while (acc >= DT) {
       acc -= DT;
@@ -1230,7 +1212,7 @@ window.breathState = () => ({
   opened: save.opened,
   fx: fx.length,
   confetti: confetti.length,
-  hint: idleHint() ? "hold-release" : s && releaseHint(position(s)) ? "release" : null,
+  hint: screen === "play" && help.shown ? "hold-release" : s && releaseHint(position(s)) ? "release" : null,
   view: {
     top: worldTop,
     bottom: worldBottom,

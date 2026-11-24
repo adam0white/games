@@ -150,3 +150,50 @@ Careful won 768/768 across both seed ranges. Daily rescued 10 floors in 420.0 se
 | Chromium Pixel 7 | 72.8 s | 1/1 | 3 | 18 / 18 | 2 / 3 / 2 |
 
 Both browser runs recorded zero page, console, request and HTTP errors. Both kept the toast above the building and fit all result actions at 568×320. Separate continuous pointer holds reached the loss card at 14.07 and 14.03 seconds of simulation time respectively, and both retried from the visible primary action. The reduced-motion hint stayed still across samples 550 ms apart. The shared kit check passed on both engines. Screenshots of the hint, play, result and landscape states were inspected in `/private/tmp/night-breath/`. Physical-device play, whether a first-time player reads the cue without text, and live lab storage remain unverified.
+
+## 2026-11-24 — Phone play review
+
+- The landscape introduction clipped the required recording notice. Before the change, the cards needed 406 CSS px of vertical space on both phone profiles, against viewports of 342 px and 360 px. The pause screen needed 501 px and 502 px. Three palette buttons and the recording switch started below the viewport. The introduction and pause cards now use two columns in short landscape. The numbered picker uses six columns. The regression checks that the complete first-run card fits the phone viewport and that the return menu, pause and level picker fit 568×320.
+- Holding the pause key generated a second keydown and resumed play in both browsers. A repeated pause key now leaves the current screen alone. The browser check sends two consecutive keydowns and verifies that the game stays paused.
+- The prompt said release would shelter the firefighter even between doorways. It now says to crouch outside a pocket and to breathe inside one. The intro names the rescue goal and the mint doorways. The return HUD counts rescues at the street. Previously it showed 1/1 on the roof after the first follower joined. The check reads the rendered prompt in both locations and the rendered 0/1 return count before the first rescue.
+- Two campaign runs timed out with positive breath and showed the breath-loss result. The numbered campaign now displays a countdown from 4:00 and identifies a timeout separately. The loss card has one retry action. The browser check distinguishes a live continuous-hold loss from a 240-second idle timeout and verifies an immediate retry at the street.
+- The first-run canvas-only hint timed out in the registered kit check. The hint now uses the kit's existing delay, dismissal, storage and overlay. The local animation holds one contact point for 1.26 seconds before lifting. Reduced motion shows a still target and text. The browser check samples two contact positions 1,000 ms apart and the lifted position, then checks reduced motion and removal on input. The first-floor warning still shows the in-world lift cue.
+
+Both first-run contexts used the shipped seed and real browser input. Chromium used native touchscreen taps and dispatched native touch holds and drags through the browser protocol. WebKit used native touchscreen taps and browser pointer holds and drags. Lift ended the drag at progress 0.2651 on Chromium and 0.2509 on WebKit. Leaving through navigation and returning reloaded the menu on both profiles. A further mid-level reload returned to the menu at progress 0. The clean first continuous holds failed at 17.30 s on Chromium and 18.03 s on WebKit, including the initial idle hint. Both retried from the visible result action.
+
+| Profile | Campaign finish in normal time | Later finish with 3.5× browser frame timing | First timer loss |
+|---|---|---|---|
+| Chromium Pixel 7 | Level 1 in 69.30 s, 3 stars. Level 2 in 84.83 s, 3 stars. | — | Level 3 at 240.03 s, lowest breath 26% |
+| WebKit iPhone 13 | Level 1 in 69.40 s, 3 stars. | Level 2 in 89.17 s, 3 stars. Level 3 in 92.50 s, 2 stars. | Level 4 at 240.03 s, lowest breath 68% |
+
+The browser input driver chose later holds and lifts from the existing page advisor. It did not grant progress, breath or results. The late trials used 3.5× frame timing. Those losses establish that a timeout can occur with breath remaining. The input driver can miss its intended stopping point, so the losses do not establish a difficulty verdict. The rules and bot thresholds were left intact.
+
+Screenshots are in `/private/tmp/night-r3-review/breath/`. Inspected both profiles' portrait introduction, idle hint, first wave, loss, return HUD, landscape introduction and landscape pause. The WebKit harness repaints after navigation with a one-pixel viewport nudge and restores the exact profile. It verifies a drawn pixel before interaction. Screenshot capture allows 90 seconds because this host stalled captures at the prior 30-second limit. The game, input and wall-time level completion thresholds are unchanged.
+
+A separate fixed-frame browser replay used the same page advisor, synthetic touch PointerEvents on the canvas, and native Next level taps. It advanced one normal rules step per frame between taps. Both profiles finished all 12 levels and opened the daily tower. The WebKit replay used a 16×16 canvas backing store between captures to reduce raster work and restored the profile's full canvas for screenshots. Results matched across profiles. The level 12 result and daily entry were inspected on both.
+
+| Level | Simulation time | Rescued | Stars |
+|---:|---:|---:|---:|
+| 1 | 68.47 s | 1/1 | 3 |
+| 2 | 83.57 s | 2/2 | 3 |
+| 3 | 76.33 s | 2/2 | 2 |
+| 4 | 93.63 s | 2/2 | 3 |
+| 5 | 98.33 s | 3/3 | 3 |
+| 6 | 103.07 s | 3/3 | 3 |
+| 7 | 106.73 s | 3/3 | 3 |
+| 8 | 104.70 s | 3/3 | 3 |
+| 9 | 138.17 s | 4/4 | 2 |
+| 10 | 148.03 s | 4/4 | 2 |
+| 11 | 152.27 s | 4/4 | 2 |
+| 12 | 194.60 s | 5/5 | 1 |
+
+Final `check.mjs` runs used 17 captures per profile. The check played the first rescue at normal speed. Its separate idle-timeout case used a browser clock and did not change the game deadline.
+
+| Profile | Level 1 | Stars | Holds / releases | Continuous-hold loss | Page, console, request and HTTP errors |
+|---|---:|---:|---:|---:|---:|
+| WebKit iPhone 13 | 81.4 s | 3 | 17 / 17 | 14.20 s | 0 |
+| Chromium Pixel 7 | 76.0 s | 3 | 17 / 17 | 14.03 s | 0 |
+
+`bots.mjs` exited 0 with 384/384 careful wins and 32 seeds per level. The clumsy block totals stayed at 78, 48, 24 and 6 out of 96. `bots.mjs --mutate` exited 1 when disabling safe pockets caused actual breath loss. The registered shared play and hint checks passed on both profiles. WebKit needed a separate retry after its first play check stalled waiting for a stable button.
+
+Unverified here: physical phones, audio by ear, late-level timing with a person's thumb, and production lab recording.

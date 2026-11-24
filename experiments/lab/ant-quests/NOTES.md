@@ -15,11 +15,11 @@ A standalone lab experiment at `/lab/ant-quests/`. No build, dependency, recordi
 
 ## Dialogue contract
 
-The page starts a request when the ant approaches within 100 units, before the 30-unit conversation radius. Built-in dialogue is ready immediately. Each quest ID is requested at most once, with at most eight requests per run. Each request aborts after four seconds. The game never waits for it. A response can replace a quest's lines only before its offer bubble is shown. Later, malformed, failed and aborted responses are ignored; no retry is sent for that ID. New attempts have new IDs.
+The page starts a request when the ant approaches within 100 units, before the 30-unit conversation radius. The offer uses built-in dialogue immediately while the request is pending. A valid response can update the same active offer, including its later thanks, scold or secret. A response received after the offer closes can enter the cache for a future visit. Each quest ID is requested at most once, with at most eight requests per run. Each request aborts after 12 seconds. The game keeps moving throughout the request. Malformed, failed and aborted responses leave the built-in lines available.
 
 Only the documented giver, kind, target, count, mood and variant are sent. All five response fields must be nonempty strings. Each is clamped to 70 UTF-16 code units. Text enters speech bubbles and the book with `textContent`. Long names ellipsize; the map resizes to remain above a tall speech bubble. Successful response text is not treated as a new rule or a command.
 
-Keys use the `ant-quests` prefix: `ant-quests-save` (v1: best, runs, sound, memory, secrets) and the new `ant-quests:hint`. The shared stick hint appears only during uncovered play for an unplayed device. Sound uses the shared synthesized audio helper, including its touch unlock and pause handling. All cards use `screens.js`; storage, leaving the page and zoom prevention use their kit modules.
+Keys use the `ant-quests` prefix. `ant-quests-save` (v1: best, runs, sound, memory, secrets) stores player progress. `ant-quests:dialogue` caches successful responses by UTC date, giver, task kind, target and count. Matching tasks can reuse lines after a reload. `ant-quests:hint` tracks first stick use. The shared stick hint appears only during uncovered play for an unplayed device. Sound uses the shared synthesized audio helper, including its touch unlock and pause handling. Cards, storage, leaving the page and zoom prevention use their kit modules.
 
 ## Bot acceptance
 
@@ -44,7 +44,7 @@ The clumsy controller uses 46% stick strength, 0.55–1.2-second reactions, targ
 
 Run `node experiments/lab/ant-quests/bots.mjs --mutate`. The mutation doubles the real completion requirement, leaving fewer fetch objects than required. It exits **1** at the careful-win assertion (`night` instead of `won`). A normal run exits **0**. Bot output and the mutation failure are saved in `/private/tmp/night-ant-quests/`.
 
-## Browser verification
+## Original browser verification
 
 Run:
 
@@ -94,3 +94,24 @@ Two read-only delegated reviews covered rules/bot evidence and UI/network/persis
 
 - The bubble shows the meadow name beside a model nickname ("Beetle · Buzzy-Bug").
 - The secrets book lists each friend's secrets under that friend, without duplicate lines; before, they sat below the scroll fold.
+
+## Quest dialogue and phone playthroughs (2026-11-24)
+
+- Raised the request deadline from 4,000 to 12,000 ms. The Worker can spend 6,000 ms on the first attempt and 3,000 ms on the retry. The client allowance includes another 3,000 ms for network and Worker overhead. The browser check releases the slow success at 9,000 ms and holds the timeout response until 13,000 ms to observe cancellation at the new deadline. Task deadlines stayed the same.
+- Cached valid lines by giver and UTC day, with a separate entry for each distinct task. An in-flight response can update its own offer across midnight. Its cache entry expires with the day of the request. Restart, return to menu and the end of a run cancel pending requests.
+- Exposed the ring above the leaf, added approach and hold prompts for both hide tasks, and added find and return prompts for both escorts. The existing Frog and Snail holds are 4.2 and 4.9 simulation seconds. The escort guide now switches home at 45 units and switches back at 70 units, the existing following limit. Using 45 units in both directions made the arrow and prompt repeatedly reverse when the player briefly opened the gap. Each race now shows one pebble marker and describes reaching it before time runs out. Removed the two apparent dry stream crossings so the drawing matches the movement slowdown. Clearing the toast on restart removes messages from the previous run.
+- Seed Sling's check resolves the checkout's Playwright or the shared installation when `PLAYWRIGHT` is unset. Running from `experiments/sling/` passed on both phone profiles. Both completed the opening garden with one seed and each of three daily cases with nine seeds at par nine.
+- The ant bots won 40/40 careful runs in 120.17–123.98 simulation seconds with zero failed first offers. Clumsy task trials passed 151/160 (94.4%), 120/160 (75.0%) and 103/160 (64.4%) at hearts one through three. The mutation exited 1 at the careful-win assertion. Sling's bots passed all 513 checks, and its mutation exited 1 at the water-loss probe. A temporary copy with only the ant client deadline reset to 4,000 ms also exited 1 because the 9,000 ms reply never reached the offer.
+
+Run `fnm exec --using=26.12.0 node experiments/lab/ant-quests/check.mjs` from the worktree. Pass `webkit` or `chromium` to run one profile. Every full run finished all four three-task chains, in order per giver, with zero failed offers, page errors or console errors. Both escorts changed from find to return once during each run.
+
+| Phone profile | Endpoint response | Simulation seconds | Hearts | Requests | Deadline cancellations |
+| --- | --- | ---: | ---: | ---: | ---: |
+| WebKit iPhone 13 | Held 13 s | 123.17 | 12/12 | 8 | 8 |
+| WebKit iPhone 13 | Immediate with markup | 123.30 | 12/12 | 8 | 0 |
+| Chromium Pixel 7 | Held 13 s | 123.73 | 12/12 | 8 | 8 |
+| Chromium Pixel 7 | Immediate with markup | 122.62 | 12/12 | 8 | 0 |
+
+Both profiles passed the 9,000 ms live-offer swap, same-day reload, UTC rollover and a response arriving after completion. The late response was cached without changing the completed offer's thanks or saved secret. The next task from the same giver kept a separate cache entry. The targeted shared-kit run passed all eight checks for Ant Quests, Sling and their hints. The broad before and after runs were stopped after failures in other experiments.
+
+Screenshots and profile JSON are in `/private/tmp/night-r3-quests/`. Reviewed the 12 task stages on each profile, the hide and escort transitions, the slow reply, the menu, the win card and the book. Browser checks used local endpoint doubles. The deployed endpoint and physical phones remain unverified.

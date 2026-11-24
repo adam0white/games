@@ -382,7 +382,7 @@ const balance = {
 const compare = ([a, b]) => a > b ? 0 : b > a ? 1 : -1;
 
 // Swipe race: flick toward the center and lift. A tap, slow drag or sideways stroke does not move the racer.
-export const SWIPE = { start: 0.34, travel: 0.22, sideways: 0.22, maxTime: 0.45, gap: 0.18, need: 17, limit: 17 };
+export const SWIPE = { start: 0.23, travel: 0.22, sideways: 0.22, maxTime: 0.45, gap: 0.18, need: 17, limit: 17 };
 const swipe = {
   limit: SWIPE.limit,
   init: () => ({ strokes: [0, 0], last: [-Infinity, -Infinity] }),

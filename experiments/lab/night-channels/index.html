@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#142923">
+  <title>Night Channels</title>
+  <link rel="stylesheet" href="./garden.css">
+</head>
+<body>
+<main>
+  <header>
+    <div class="heading">
+      <div class="kicker"><span class="sprig" aria-hidden="true">❧</span><span id="folio">Garden 01 / 10</span></div>
+      <h1>Night <i>Channels</i></h1>
+    </div>
+    <button class="round" id="pause" aria-label="Pause"><span class="pause-bars" aria-hidden="true"></span></button>
+  </header>
+  <div class="plate">
+    <canvas id="garden" aria-label="Garden soil. Drag from the spring to a seedbed to dig a water channel."></canvas>
+  </div>
+  <footer>
+    <div class="caption"><h2 id="gardenName"></h2><span id="result" aria-live="polite"></span></div>
+    <div class="instruments">
+      <div class="reading"><span class="symbol spade" aria-hidden="true"></span><div><span class="label">Cuts left</span><strong id="cuts"></strong></div></div>
+      <div class="reading"><span class="symbol floret" aria-hidden="true">✿</span><div><span class="label">In bloom</span><strong id="bloom"></strong></div></div>
+      <button class="round" id="retry" aria-label="Replant this garden" title="Replant this garden"><span aria-hidden="true">↺</span></button>
+    </div>
+    <div class="controls">
+      <button class="text-button" id="daily"><span class="calendar-icon" aria-hidden="true"></span>Daily garden</button>
+      <button class="text-button" id="openList">Gardens <span aria-hidden="true">☷</span></button>
+      <button class="primary next" id="next" hidden>Next garden <span aria-hidden="true">→</span></button>
+    </div>
+    <small id="saveStatus" role="status"></small>
+  </footer>
+</main>
+<div class="screen" id="paused" role="dialog" aria-modal="true" aria-labelledby="pauseTitle">
+  <section class="card">
+    <div class="card-mark" aria-hidden="true">❧</div><h2 id="pauseTitle">Paused</h2>
+    <button class="primary" id="resume">Resume <span aria-hidden="true">▷</span></button>
+    <div class="secondary"><button id="gardens">Gardens</button><button id="sound" aria-pressed="true">Sound on</button></div>
+  </section>
+</div>
+<div class="screen" id="selection" role="dialog" aria-modal="true" aria-labelledby="listTitle">
+  <section class="card">
+    <div class="card-mark" aria-hidden="true">❧</div><h2 id="listTitle">The gardens</h2>
+    <div id="levels" aria-label="Select a garden"></div>
+    <button class="secondary-action" id="pickDaily">Daily garden</button>
+    <small id="dailyBest"></small>
+    <button class="primary" id="return">Back to garden</button>
+  </section>
+</div>
+<script type="module" src="./main.js"></script>
+<script defer src="/notes/button.js"></script>
+</body>
+</html>

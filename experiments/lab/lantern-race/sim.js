@@ -21,7 +21,7 @@ const id = v => integer(v, 1, 8);
 const round = v => v && integer(v.seed, 0, 4294967295) && finite(v.start, 0, Number.MAX_SAFE_INTEGER);
 const name = v => typeof v === 'string' && Array.from(v).length <= 16 && v === cleanName(v);
 // UTF-8 bytes, not JS string length. All client frames and relays cap at 200.
-// The roster alone allows 2048 inbound bytes: eight 16-character names cannot
+// The welcome frame alone allows 2048 inbound bytes: eight 16-character names cannot
 // fit the brief's 200-byte roster limit (334 bytes even with ASCII names).
 export const bytes = message => new TextEncoder().encode(typeof message === 'string' ? message : JSON.stringify(message)).length;
 export function validMessage(m, direction = 'server') {
@@ -44,9 +44,22 @@ export function validMessage(m, direction = 'server') {
     default: return false;
   }
 }
-export function decode(text, direction = 'server') {
-  try { if (typeof text !== 'string' || bytes(text) > 2048) return null; const m = JSON.parse(text); return validMessage(m, direction) ? m : null; } catch { return null; }
+function parseFrame(text, direction, allowRoster) {
+  try {
+    if (typeof text !== 'string') return null;
+    const size = bytes(text);
+    if (size > 2048) return null;
+    const frame = JSON.parse(text);
+    if (size > 200 && !(direction === 'server' && frame?.t === 'you')) return null;
+    if (!allowRoster || frame?.t !== 'roster') return validMessage(frame, direction) ? frame : null;
+    if (Object.keys(frame).length !== 2 || !Array.isArray(frame.ids)) return null;
+    const { ids } = frame;
+    return ids.length > 0 && ids.length <= 8 && ids.every(id) && new Set(ids).size === ids.length ? frame : null;
+  } catch { return null; }
 }
+// Keep the original wire decoder for callers that only handle the legacy frames.
+export const decode = (text, direction = 'server') => parseFrame(text, direction, false);
+export const decodeRoomFrame = text => parseFrame(text, 'server', true);
 export function position(x, d, alive) { return { t: 'p', x: Math.round(clamp(x * 2 - 1, -1, 1) * 1000) / 1000, d: Math.round(clamp(d, 0, DISTANCE)), a: alive ? 1 : 0 }; }
 // Every comparison has a total ordering, including ties and unfinished boats.
 export function ranking(entries) {
