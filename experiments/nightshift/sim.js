@@ -11,6 +11,7 @@ export const CASE = { x: 40, y: 253, width: 94, height: 114 };
 export const REFLECTION = { x: 83, y: 297 };
 export const FUSE = { x: 250, y: 527 };
 export const STAIR = { x: 269, y: 201 };
+export const RETRIP = 16;
 export const DEFAULT_SEED = 836361;
 export const LAST = 18;
 export const WINGS = ['Marble', 'Portrait', 'Natural'];
@@ -23,8 +24,8 @@ const NIGHTS = [
   ['twins', 2, 8.3], ['mixed', 3, 8.7], ['mixed', 3, 8.1],
   ['mirror', 3, 7.1], ['shy', 3, 7], ['cat', 3, 6.9],
   ['mirrors', 4, 7.7], ['pair', 4, 7.4], ['mixed', 4, 7.2],
-  ['fuse', 4, 6.7], ['stairs', 4, 6.5], ['upper', 5, 7.6],
-  ['pair', 5, 7.1], ['mirror-fuse', 5, 6.7], ['all', 6, 7.5],
+  ['fuse', 3, 6.9], ['stairs', 4, 6.5], ['upper', 5, 7.6],
+  ['pair', 5, 7.1], ['mirror-fuse', 5, 7.4], ['all', 6, 8],
 ];
 const INTRO = new Set(['drag', 'hold', 'painting', 'twins', 'mirror', 'shy', 'cat', 'fuse', 'stairs']);
 const clamp = (n, low, high) => Math.max(low, Math.min(high, n));
@@ -96,7 +97,7 @@ export function create({ level = 1, seed = DEFAULT_SEED, mode = 'story' } = {}) 
   const twins = ['twins', 'pair', 'all'].includes(lesson) || level === 6;
   const shy = lesson === 'shy' || level === 10 || level === 16;
   const cat = lesson === 'cat' || (level >= 11 && (level % 2 || level === 18));
-  const fuse = ['fuse', 'upper', 'mirror-fuse', 'all'].includes(lesson);
+  const fuse = ['fuse', 'upper', 'mirror-fuse', 'all'].includes(lesson) || level === 16;
   const stairs = ['stairs', 'upper', 'all'].includes(lesson) || level === 16 || level === 17;
   const actors = HOMES.map(([x, y], id) => {
     let kind = POSES[id];
@@ -130,7 +131,7 @@ export function create({ level = 1, seed = DEFAULT_SEED, mode = 'story' } = {}) 
     level, wing, mode, seed, rng, duration, lesson, count, cadence, mirror, twins, shy, cat, fuse, stairs,
     actors, tick: 0, time: 0, escapes: 0, returned: 0, events: [], outcome: null,
     light: { ...REST }, oldLight: { ...REST }, bounce: null, blackout: false,
-    catAt: null, catLit: false, catOff: 0, fused: false, fuseHold: 0,
+    catAt: null, catLit: false, catOff: 0, fused: false, fuseHold: 0, fuseTrip: Infinity, trips: 0,
     practice, hintDone: false, tutorIds: tutorialIds[lesson] ?? [],
     wave: 0, nextWave: practice || 1.15, activity: 0, closestEscape: 0,
   };
@@ -213,12 +214,22 @@ function updateFuse(s) {
     s.fuseHold += DT;
     if (s.fuseHold >= 0.56) {
       s.fused = true;
+      s.fuseHold = 0;
+      s.fuseTrip = s.time + RETRIP;
       if (s.lesson === 'fuse') s.hintDone = true;
       s.events.push({ type: 'fuse', x: FUSE.x });
     }
   } else if (!s.fused) s.fuseHold = 0;
+  // The breaker trips again while the night is busy, so the doors cannot be guarded forever.
+  if (s.fused && s.time >= s.fuseTrip) {
+    s.fused = false;
+    s.fuseTrip = Infinity;
+    s.trips++;
+    s.events.push({ type: 'trip', x: FUSE.x });
+  }
   const cycle = (s.time + 0.8) % 3.8;
-  s.blackout = !s.fused && (cycle > 3.18 && cycle < 3.32 || cycle > 3.49);
+  // A breaker left broken past the opening, or tripped again, keeps the lights out longer.
+  s.blackout = !s.fused && (cycle > 3.18 && cycle < 3.32 || cycle > (s.trips || s.time > 10 ? 2.6 : 3.49));
 }
 
 export function step(s, aim = REST) {

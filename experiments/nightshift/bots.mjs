@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { pathToFileURL } from 'node:url';
 import {
   create, step, targetFor, random, distance, dailyNight, DEFAULT_SEED, REST, FUSE,
-  LAST, WINGS, MIRROR, RADIUS,
+  LAST, WINGS, MIRROR, RADIUS, RETRIP, DT,
 } from './sim.js';
 
 export function nearest(s, commit = null) {
@@ -28,6 +28,15 @@ export function policy(name, seed) {
     { x: 93, y: 460 }, { x: 302, y: 464 }, { x: 191, y: 173 },
   ];
   if (name === 'idle') return () => REST;
+  // A blind patrol that swaps between the two doorways every 2.3 seconds, as a bored player might.
+  if (name === 'doors') {
+    const doors = [{ x: 65, y: 190 }, { x: 292, y: 173 }];
+    return s => s.fuse && !s.fused && s.time < 2.2 ? FUSE : doors[Math.floor(s.time / 2.3) % 2];
+  }
+  if (name === 'doorsOnly') {
+    const doors = [{ x: 65, y: 190 }, { x: 292, y: 173 }];
+    return s => doors[Math.floor(s.time / 2.3) % 2];
+  }
   if (name === 'sweep') return s => sweep[Math.floor(s.time / 1.7) % sweep.length];
   if (name === 'nearest') {
     const heard = new Map();
@@ -70,7 +79,12 @@ export function policy(name, seed) {
     return { x: point.x + biasX, y: point.y + biasY };
   };
   return s => {
-    if (name === 'competent' && s.fuse && !s.fused && s.time < 2.2) return FUSE;
+    // A tripped breaker is mended between catches, unless an exhibit is close to a door.
+    const pressed = s.actors.some(a => a.state === 'roam' && a.kind !== 'shy' && a.progress > 0.58 && !a.frozen);
+    if (name === 'competent' && s.fuse && !s.fused && (s.time < 2.2 || (!pressed && !s.actors[locked]?.frozen))) {
+      locked = null;
+      return FUSE;
+    }
     const active = s.actors[locked];
     if (active?.state !== 'roam') locked = null;
     const targets = nearest(s, locked);
@@ -166,6 +180,19 @@ function mechanics() {
   assert.ok(cat.catAt.x > initial && cat.catLit);
   assert.equal(cat.returned + cat.escapes, 0);
 
+  const tripped = opening(13);
+  while (!tripped.fused && !tripped.outcome) step(tripped, FUSE);
+  const mended = tripped.time;
+  let dark = 0;
+  // Keep catching exhibits, but never mend the breaker, so the trip can be observed.
+  while (!tripped.outcome && tripped.time < mended + RETRIP + 3.8) {
+    step(tripped, nearest(tripped)?.aim ?? REST);
+    if (tripped.blackout) dark++;
+  }
+  assert.equal(tripped.outcome, null);
+  assert.ok(!tripped.fused && tripped.trips === 1, 'the breaker trips again after it is mended');
+  assert.ok(dark * DT > 1, 'a tripped breaker darkens the beam until it is mended again');
+
   const fuse = opening(13);
   let off = false;
   for (let i = 0; i < 228; i++) { step(fuse); off ||= fuse.blackout; }
@@ -237,6 +264,11 @@ function main() {
   }
   assert.ok(totals.reduce((n, t) => n + t.nearest - t.sweep, 0) >= 36, 'local evidence beats blind sweep');
   assert.ok(totals[0].average > totals[1].average && totals[1].average > totals[2].average, 'average win rate falls each wing');
+  for (const level of [13, 15, 17, 18]) {
+    const wins = Math.max(...['doors', 'doorsOnly'].map(name =>
+      seeds.filter(seed => play({ level, seed }, name).outcome === 'dawn').length));
+    assert.ok(wins <= 2, `night ${level}: a blind two-door patrol cannot replace reading the room (${wins} wins)`);
+  }
   assert.ok(long.every(r => r.outcome === 'escaped' && r.time >= 60 && r.time <= 150), 'long-night window');
   const daily = dailyNight('2026-11-24');
   for (const options of [{ level: 4, seed: 217 }, { level: 18, seed: 353 }, { ...daily, mode: 'daily' }, { level: 18, seed: 777, mode: 'long' }]) {
