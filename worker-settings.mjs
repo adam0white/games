@@ -53,6 +53,11 @@ export const archivedRoutes = archivedHosts.map(host => `${host}/*`);
 // points at the game it came from. scripts/redirects.test.mjs fails when a name here is still a folder in
 // experiments/lab/. One thread edits this list; a builder asks for an entry.
 export const labMoved = {
+  // Rejected small pages with no parent game go to the lab index.
+  'pisti': '/lab/',
+  'night-lamp-keeper': '/lab/',
+  'night-kite': '/lab/',
+  'night-loaves': '/lab/',
   'lantern-3d': '/lantern/',
   'lantern-fp': '/lantern/',
   'lantern-song': '/lantern/',
