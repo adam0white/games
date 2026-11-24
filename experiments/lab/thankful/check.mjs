@@ -15,7 +15,8 @@ const server=createServer(async(req,res)=>{try {
  if(!file.startsWith(root+sep))throw Error('outside root');
  const body=await readFile(file);res.writeHead(200,{'content-type':({'.html':'text/html','.js':'text/javascript','.mjs':'text/javascript','.css':'text/css'})[extname(file)] || 'application/octet-stream','cache-control':'no-store'});res.end(body);
  }catch{res.writeHead(404);res.end('not found');}});
-const require=createRequire(join(resolve(process.env.PLAYWRIGHT || '/Users/abdul/code/human-framework/node_modules'),'x.js'));
+if(!process.env.PLAYWRIGHT)throw Error('Set PLAYWRIGHT to a node_modules directory that has playwright');
+const require=createRequire(join(resolve(process.env.PLAYWRIGHT),'x.js'));
 const {webkit,chromium,devices}=require('playwright');
 const state=page=>page.evaluate(()=>window.__thankful.state);
 const total=s=>Object.values(s.days).reduce((n,a)=>n+a.length,0);
