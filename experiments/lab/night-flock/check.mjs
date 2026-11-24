@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
+import { homedir } from 'node:os';
 import { createRequire } from 'node:module';
 import { dirname, extname, join, resolve, sep } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -23,7 +24,7 @@ const types = {
 const allowed = pathname => pathname === '/notes/button.js' || pathname === '/favicon.ico'
   || pathname.startsWith('/lab/night-flock/') || pathname.startsWith('/kit/');
 
-const requirePlaywright = createRequire(join(resolve(process.env.PLAYWRIGHT || 'node_modules'), 'check.cjs'));
+const requirePlaywright = createRequire(join(resolve(process.env.PLAYWRIGHT || join(homedir(), 'code/human-framework/node_modules')), 'check.cjs'));
 const { chromium, devices, webkit } = requirePlaywright('playwright');
 const fromPlaywright = createRequire(requirePlaywright.resolve('playwright'));
 const { PNG } = fromPlaywright('playwright-core/lib/utilsBundle');

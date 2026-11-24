@@ -61,7 +61,7 @@ export const labPages = {
     verify: () => { const s = window.lanternFPState(); return { screen: s.screen, best: s.best, opened: s.opened, runs: JSON.parse(localStorage.getItem('lantern-fp-save')).runs, sound: document.querySelector('#sound').textContent }; },
     expect: { screen: 'menu', best: 24, opened: 1, runs: 3, sound: 'Sound: on' },
     touch: dragTouch(() => window.lanternFPState().taps, n => window.lanternFPState().taps > n, [[90, 430], [100, 430]]),
-    hint: { delay: 1500, before: () => window.lanternFPState().taps, moved: n => window.lanternFPState().taps > n,
+    hint: { delay: 2500, before: () => window.lanternFPState().taps, moved: n => window.lanternFPState().taps > n,
       alive: () => { const s = window.lanternFPSim(); s.safe = 60; s.light = 1; } },
   }),
   'lab/lantern-race': {

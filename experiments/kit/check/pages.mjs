@@ -81,7 +81,8 @@ export const pages = {
     async touch(page, { finger }) {
       const p = await page.evaluate(() => window.boatState().boat);
       await finger(page, '#c', [['pointerdown', p.x - 60, p.y - 10], ['pointermove', p.x + 60, p.y - 10], ['pointerup', p.x + 60, p.y - 10]]);
-      assert.ok(await page.evaluate(() => window.boatState().ripples > 0), 'a swipe makes a ripple');
+      // The stroke is queued and becomes a ripple on the next simulation step.
+      await page.waitForFunction(() => window.boatState().ripples > 0, null, { timeout: 3000 }).catch(() => assert.fail('a swipe makes a ripple'));
     },
     hint: { key: 'boat:hint', delay: 2500, releaseInput: true, before: () => window.boatState().ripples, moved: n => window.boatState().ripples > n, legacy: { 'boat-save': '{"v":1,"opened":2,"best":430}' } },
   },
