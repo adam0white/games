@@ -11,6 +11,7 @@ Shared code for the games under `experiments/`. It is served at `/kit/` as plain
 | `screens.js` | `screens(ids, after)`: show one full-page card |
 | `stick.js` | `stick(el, { when, reach, leash, dead })`: a floating joystick; the game owns the numbers and draws it from `touch` |
 | `drag.js` | `drag(el, { playing, paused, resume, from, travel, aim, mouse, settle })`: steering by relative finger travel, with the settle distance after a pause; the game owns the gain |
+| `sides.js` | `sides(el, { on, playing, paused, resume })`: press the left or right half to steer, hold to keep turning (Lantern's first-person view) |
 | `hint.js` | `hint(el, { kind, key, when, played, delay, look, label, reach, bottom })`: help for a first-time player who does not touch: a see-through copy of the control with a finger showing how; see below |
 | `lab.js` | `lab(slug)`: play recording for the game lab, with its notice and off switch; see below |
 | `/notes/button.js` | the notes button for testers (it lives in `workers/feedback/public/notes/`) |

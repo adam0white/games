@@ -467,6 +467,20 @@ const GAMES = {
     await page.unroute('**/lab-api/board/lantern');
     await sleep(400); await page.reload(); st = await state(); assert.equal(st.name, 'Rio <b>river</b'); assert.equal(st.board.length, 5, 'the board is kept');
     await page.evaluate(() => localStorage.setItem('hf-lab-recording-off', '1')); await page.reload(); // recording off again, as the steps below expect
+    // Views (notes #158, #159): 2D, 3D and first person, saved under lantern-view. First person steers by pressing a side; a drag does not.
+    assert.equal((await state()).view, '2d', 'a save without lantern-view is 2D'); assert.equal((await saved())['lantern-view'], undefined);
+    await page.route('**/view3d.js*', r => r.abort()); page.context().viewBad = true; await page.click('[data-view="3d"]'); await until(page, () => !document.querySelector('#viewNote').hidden, 'a failed 3D load says so'); assert.equal((await state()).view, '2d', 'no 3D: the river stays 2D'); await page.unroute('**/view3d.js*');
+    await page.reload(); await page.click('[data-view="3d"]'); await until(page, () => window.lanternState().view === '3d' && window.lanternState().viewReady, '3D starts', 20000); assert.equal((await saved())['lantern-view'], '3d');
+    await page.click('#play'); await page.evaluate(() => { const s = window.lanternSim(); s.safe = 60; s.light = 1; }); const v0 = (await state()).target;
+    await finger(page, '#c', [['pointerdown', 200, 400], ['pointermove', 215, 400]]); assert.ok((await state()).target > v0, '3D steers by a drag'); await finger(page, '#c', [['pointerup', 215, 400]]);
+    await finger(page, '#pause', [['pointerdown', 0, 0]]); assert.equal(await page.isVisible('#viewNext'), true, 'the pause card changes the view'); await page.click('#viewNext'); assert.equal((await state()).view, 'first'); assert.equal((await saved())['lantern-view'], 'first');
+    await page.click('#go'); await page.evaluate(() => { const s = window.lanternSim(); s.safe = 60; s.light = 1; });
+    for (const [x, sign] of [[40, -1], [340, 1]]) {
+      await page.evaluate(() => { const s = window.lanternSim(); s.x = 0.5; s.rocks = []; s.safe = 60; }); await finger(page, '#c', [['pointerdown', x, 600]]);
+      await until(page, g => Math.sign(window.lanternState().x - 0.5) === g && Math.abs(window.lanternState().x - 0.5) > 0.02, `a press steers (${sign})`, 8000, sign); await finger(page, '#c', [['pointerup', x, 600]]); await sleep(400);
+    }
+    await finger(page, '#c', [['pointerdown', 100, 600]]); await finger(page, '#c', [['pointermove', 300, 600]]); await until(page, () => window.lanternState().target < window.lanternState().x + 1e-6, 'a press that slides stays a press on the side it began'); await finger(page, '#c', [['pointerup', 300, 600]]);
+    await page.reload(); await until(page, () => window.lanternState().view === 'first', 'the view is kept'); await page.click('[data-view="2d"]'); assert.equal((await state()).view, '2d');
     // A look on the whole screen (notes #73 and #112): tapping an owned boat shows it and hides every button; a tap brings the shop back,
     // and the button under the pack wears it.
     await page.click('#toShop'); await page.click('[data-item="red"]'); st = await state();
@@ -731,7 +745,7 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
     page.on('pageerror', e => errors.push(String(e))); page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
     page.on('requestfailed', r => errors.push(`request failed: ${r.url()}`)); page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
     // Lantern's check is the longest: its seven ability showings (note #123) took it past 150 s on WebKit.
-    try { await within(run(page), game === 'lantern' ? 240000 : 150000, 'the whole check'); assert.deepEqual(errors.filter(e => !(context.labDown && /human\.adamwhite\.work|Load failed|Failed to fetch|ERR_CONNECTION_REFUSED/.test(e))).filter(e => !(context.boardBad && /\/lab-api\/board\/|status of 401/.test(e))).filter(e => !(context.badFrame && /lab check: one bad frame/.test(e))), [], 'page errors'); console.log(`ok   ${game} on ${phone}`); }
+    try { await within(run(page), game === 'lantern' ? 240000 : 150000, 'the whole check'); assert.deepEqual(errors.filter(e => !(context.labDown && /human\.adamwhite\.work|Load failed|Failed to fetch|ERR_CONNECTION_REFUSED/.test(e))).filter(e => !(context.boardBad && /\/lab-api\/board\/|status of 401/.test(e))).filter(e => !(context.badFrame && /lab check: one bad frame/.test(e))).filter(e => !(context.viewBad && /view3d\.js|net::ERR_FAILED|Failed to load resource|Importing a module/.test(e))), [], 'page errors'); console.log(`ok   ${game} on ${phone}`); }
     catch (e) { failed++; console.log(`FAIL ${game} on ${phone}: ${e.message}`); if (process.env.CHECK_STACK) console.log(e.stack); if (errors.length) console.log('     ' + errors.join('\n     ')); }
     try { await within(context.close(), 15000, 'closing the page'); }
     catch (e) { console.log(`     ${e.message}; starting the browser again`); browser.close().catch(() => {}); browser = await engine.launch(); }
