@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#5a2417">
+<link rel="icon" href="data:,">
+<title>Pişti</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  body { background: #5a2417; color: #fbeedb; font: 17px/1.35 system-ui, -apple-system, 'Segoe UI', sans-serif; }
+  :root { --cw: 76px; --ch: 108px; --red: #c3202d; --black: #1d1a17; --club: #1d1a17; --diamond: #c3202d; }
+  body.four { --club: #19733a; --diamond: #1f5cc0; }
+  #fx { position: fixed; inset: 0; width: 100vw; height: 100dvh; display: block; }
+  #table { position: fixed; inset: 0; display: none; }
+  #table.on { display: block; }
+  button { font: inherit; touch-action: manipulation; cursor: pointer; }
+
+  .card { position: absolute; width: var(--cw); height: var(--ch); border-radius: calc(var(--cw) * .11); background: linear-gradient(160deg, #fffdf6, #f3e7cf); box-shadow: 0 2px 0 #0002, 0 3px 10px #0005; border: 1px solid #d9c6a3; padding: 0; margin: 0; color: var(--black); overflow: hidden; }
+  .card .r { position: absolute; left: 7%; top: 3%; font: 800 calc(var(--cw) * .36)/1 system-ui, sans-serif; letter-spacing: -1px; }
+  .card .s { position: absolute; left: 9%; top: calc(var(--cw) * .38); font: calc(var(--cw) * .27)/1 system-ui, sans-serif; }
+  .card .b { position: absolute; right: 8%; bottom: 4%; font: calc(var(--cw) * .58)/1 system-ui, sans-serif; }
+  .card.s0 { color: var(--club); } .card.s1 { color: var(--diamond); } .card.s2 { color: var(--red); } .card.s3 { color: var(--black); }
+  .card.jack .b { font-weight: 800; }
+  .back { background: #7d1d1a; border: 2px solid #f4e2c0; background-image: repeating-linear-gradient(45deg, #ffffff16 0 4px, transparent 4px 10px), repeating-linear-gradient(-45deg, #e9b65a22 0 4px, transparent 4px 10px); }
+  .back::after { content: ''; position: absolute; inset: 14%; border: 1.5px solid #f4e2c088; border-radius: 6px; }
+
+  #hand { position: absolute; left: 0; right: 0; bottom: calc(14px + env(safe-area-inset-bottom)); height: var(--ch); }
+  #hand .card { transition: transform .18s ease, box-shadow .2s, filter .2s; cursor: pointer; }
+  #hand .card.can { animation: can 1.1s ease-in-out infinite alternate; }
+  @keyframes can { from { box-shadow: 0 0 0 2px #ffd36e, 0 0 10px 2px #ffb43c99; } to { box-shadow: 0 0 0 3px #ffe39a, 0 0 22px 7px #ffb43ccc; } }
+  #hand.wait .card { filter: brightness(.82) saturate(.8); }
+  #hand .card:focus-visible { outline: 3px solid #ffd36e; outline-offset: 3px; }
+
+  .row { position: absolute; left: 0; right: 0; display: flex; align-items: flex-end; gap: 8px; padding: 0 calc(14px + env(safe-area-inset-left)); pointer-events: none; }
+  #oppRow { top: calc(10px + env(safe-area-inset-top)); height: 58px; }
+  #myRow { height: 44px; }
+  .who { display: flex; align-items: flex-end; gap: 6px; }
+  .dot { width: 14px; height: 14px; border-radius: 50%; background: #f7c35b; box-shadow: 0 0 0 2px #0003; align-self: center; }
+  .dot.them { background: #b9c3c9; }
+  .stack { position: relative; width: 30px; height: 4px; }
+  .stack i { position: absolute; left: 0; width: 30px; height: 40px; border-radius: 4px; background: #7d1d1a; border: 1.5px solid #f4e2c0; }
+  .flames { display: flex; gap: 2px; align-self: center; }
+  .flames svg { width: 18px; height: 22px; }
+  #oppHand { position: relative; height: 54px; flex: 1; }
+  #oppHand .card { --cw: 38px; --ch: 54px; width: 38px; height: 54px; border-radius: 5px; transition: transform .2s; }
+  #oppHand .back::after { inset: 4px; border-radius: 3px; }
+
+  #pile { position: absolute; width: var(--cw); height: var(--ch); }
+  #pile .card { left: 0; top: 0; transition: none; }
+  #pile.lone .card:last-child { animation: lone 1.3s ease-in-out infinite; }
+  @keyframes lone { 0%, 100% { transform: rotate(-2deg) translateY(0); box-shadow: 0 0 0 2px #ffd36e88, 0 0 18px 4px #ff9b3d88; } 50% { transform: rotate(1.5deg) translateY(-3px); box-shadow: 0 0 0 3px #ffe39a, 0 0 30px 10px #ff9b3dcc; } }
+  #stock { position: absolute; width: calc(var(--cw) * .78); height: calc(var(--ch) * .78); }
+  #stock .card { --cw: calc(var(--cwn) * .78); }
+  #stock .bottom { transform: rotate(90deg); transform-origin: 50% 50%; }
+  .fly { position: fixed; z-index: 5; transition: transform .24s cubic-bezier(.3,.7,.3,1); pointer-events: none; }
+  .sweep { transition: transform .32s ease-in, opacity .32s ease-in; }
+
+  #shout { position: fixed; left: 0; right: 0; text-align: center; font: 900 54px/1 Georgia, 'Times New Roman', serif; color: #ffe08a; text-shadow: 0 0 18px #ff7a1a, 0 2px 0 #7a2a0c; pointer-events: none; opacity: 0; transform: scale(.6); z-index: 6; }
+  #shout.on { animation: shout 1.1s ease-out forwards; }
+  @keyframes shout { 0% { opacity: 0; transform: scale(.6) translateY(10px); } 18% { opacity: 1; transform: scale(1.08) translateY(0); } 70% { opacity: 1; transform: scale(1) translateY(-8px); } 100% { opacity: 0; transform: scale(1) translateY(-26px); } }
+  #practice { position: fixed; top: calc(74px + env(safe-area-inset-top)); left: 0; right: 0; text-align: center; font-size: 14px; letter-spacing: 2px; text-transform: uppercase; color: #fbeedbaa; pointer-events: none; display: none; }
+  #turnName { position: fixed; left: 0; right: 0; text-align: center; font-size: 15px; color: #fbeedbcc; pointer-events: none; }
+
+  #pause { position: absolute; right: calc(10px + env(safe-area-inset-right)); top: calc(10px + env(safe-area-inset-top)); width: 46px; height: 46px; border-radius: 50%; border: 0; background: #ffffff1a; display: grid; place-items: center; padding: 0; z-index: 3; }
+  #pause::before { content: ''; width: 5px; height: 17px; border: solid #fbeedb; border-width: 0 5px; }
+
+  .screen { position: fixed; inset: 0; display: none; place-items: center; padding: calc(12px + env(safe-area-inset-top)) 16px calc(12px + env(safe-area-inset-bottom)); background: #2a0f0acc; overflow-y: auto; touch-action: pan-y; z-index: 10; }
+  .screen.on { display: grid; }
+  .panel { width: min(100%, 380px); padding: 22px 20px 18px; border-radius: 26px; background: #fff6e6; color: #3a1d12; text-align: center; box-shadow: 0 18px 60px #0008; }
+  h1 { font: normal 60px/1 Georgia, 'Times New Roman', serif; margin: 0 0 4px; letter-spacing: -1px; color: #8a2a14; }
+  h2 { font: normal 34px/1.1 Georgia, 'Times New Roman', serif; margin: 0 0 8px; color: #8a2a14; }
+  .sub { margin: 0 0 14px; color: #7b5a45; font-size: 16px; }
+  .btn { display: block; width: 100%; min-height: 50px; margin: 9px 0 0; border: 0; border-radius: 16px; background: #f1dfc2; color: #3a1d12; font-weight: 700; font-size: 18px; box-shadow: 0 3px 0 #0002; }
+  .btn:active { transform: translateY(2px); box-shadow: none; }
+  .btn.main { background: #b5361a; color: #fff4e0; font-size: 22px; min-height: 58px; }
+  .btn small { display: block; font-weight: 500; font-size: 13px; opacity: .75; }
+  .pair { display: flex; gap: 8px; } .pair .btn { flex: 1; }
+  .seg { display: flex; gap: 0; margin: 10px 0 0; border-radius: 14px; overflow: hidden; background: #f1dfc2; }
+  .seg button { flex: 1; min-height: 44px; border: 0; background: transparent; color: #7b5a45; font-weight: 600; font-size: 15px; }
+  .seg button.on { background: #3a1d12; color: #fff4e0; }
+  #hero { width: 100%; height: 120px; display: block; }
+  #levelDots { display: inline-flex; gap: 4px; vertical-align: middle; margin-left: 6px; }
+  #levelDots i { width: 10px; height: 10px; border-radius: 50%; background: #d8c3a3; }
+  #levelDots i.on { background: #e0611d; }
+
+  #scoreT { width: 100%; border-collapse: collapse; font-size: 16px; margin: 4px 0 6px; font-variant-numeric: tabular-nums; }
+  #scoreT td, #scoreT th { padding: 4px 6px; text-align: right; height: 28px; }
+  #scoreT td:first-child, #scoreT th:first-child { text-align: left; color: #7b5a45; }
+  #scoreT th { font-size: 14px; color: #7b5a45; font-weight: 600; }
+  #scoreT tr { opacity: 0; transition: opacity .25s; }
+  #scoreT tr.on, #scoreT tr.head { opacity: 1; }
+  #scoreT tr.total td { border-top: 2px solid #3a1d1233; font-weight: 800; font-size: 20px; color: #3a1d12; }
+  #scoreT .hot { color: #c0410f; font-weight: 800; }
+  #matchLine { color: #7b5a45; font-size: 15px; min-height: 1.2em; margin: 2px 0; }
+  #daily { display: none; }
+  #daily.on { display: block; }
+  #strip { width: 100%; height: 64px; display: block; margin: 4px 0; }
+  #dailyNote { font-size: 14px; color: #7b5a45; margin: 2px 0; }
+  #cover { background: #2a0f0a; }
+  #cover .panel { background: #7d1d1a; color: #fff4e0; border: 3px solid #f4e2c0; background-image: repeating-linear-gradient(45deg, #ffffff12 0 6px, transparent 6px 16px); }
+  #cover h2 { color: #fff4e0; font-size: 40px; }
+  #cover .btn { background: #fff4e0; }
+  #coverMove { font-size: 15px; opacity: .85; min-height: 1.3em; }
+  @media (max-height: 700px) { h1 { font-size: 50px; } #hero { height: 92px; } .panel { padding: 16px 16px 14px; } .btn { min-height: 46px; } .btn.main { min-height: 52px; } #scoreT td, #scoreT th { height: 24px; padding: 2px 6px; } }
+</style>
+</head>
+<body>
+<canvas id="fx" aria-hidden="true"></canvas>
+<div id="table" aria-label="Card table">
+  <div class="row" id="oppRow"><div class="who"><span class="dot them" id="oppDot"></span><div class="stack" id="oppStack"></div><div class="flames" id="oppFlames"></div></div><div id="oppHand"></div></div>
+  <div id="stock"></div>
+  <div id="pile"></div>
+  <div class="row" id="myRow"><div class="who"><span class="dot" id="myDot"></span><div class="stack" id="myStack"></div><div class="flames" id="myFlames"></div></div></div>
+  <div id="hand" role="group" aria-label="Your cards"></div>
+  <div id="turnName"></div>
+  <button id="pause" aria-label="Pause"></button>
+</div>
+<div id="practice">Practice</div>
+<div id="shout">Pişti!</div>
+
+<div class="screen on" id="menu"><div class="panel">
+  <canvas id="hero" aria-hidden="true"></canvas>
+  <h1>Pişti</h1>
+  <p class="sub">Match the top card to take the pile.<br>Take a lone card: pişti!</p>
+  <button class="btn main" id="play">Play <span id="levelDots" aria-label="Bot strength"></span></button>
+  <div class="seg" id="length"><button data-len="one" class="on">One hand</button><button data-len="51">Match to 51</button></div>
+  <button class="btn" id="today">Today’s deal<small id="todayNote"></small></button>
+  <button class="btn" id="two">Two players, one phone</button>
+</div></div>
+
+<div class="screen" id="paused"><div class="panel">
+  <h2>Paused</h2>
+  <button class="btn main" id="resume">Keep going</button>
+  <div class="pair"><button class="btn" id="sound">Sound: on</button><button class="btn" id="colours">Four colours: off</button></div>
+  <button class="btn" id="quit">Menu</button>
+</div></div>
+
+<div class="screen" id="cover"><div class="panel">
+  <h2 id="coverWho">Player 2</h2>
+  <p id="coverMove"></p>
+  <p>Pass the phone. Tap when only you can see.</p>
+  <button class="btn" id="reveal">Show my cards</button>
+</div></div>
+
+<div class="screen" id="score"><div class="panel">
+  <h2 id="scoreTitle">Hand over</h2>
+  <table id="scoreT"><tbody></tbody></table>
+  <p id="matchLine"></p>
+  <div id="daily"><canvas id="strip" aria-label="Your captures, in order"></canvas><p id="dailyNote"></p><button class="btn" id="savePic">Save picture</button></div>
+  <button class="btn main" id="again">Play again</button>
+  <button class="btn" id="scoreMenu">Menu</button>
+</div></div>
+
+<script type="module" src="./main.js"></script>
+</body>
+</html>
