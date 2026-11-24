@@ -8,6 +8,15 @@ import * as P from '/crumbwar/shared/proto.js';
 import { byteOf, angleOf } from '/crumbwar/shared/move.js';
 import { Predictor } from '/crumbwar/shared/predict.js';
 import { UPDATE_CODE, mayReload } from '/crumbwar/shared/version.js';
+import { tables } from '/crumbwar/words.js';
+
+// Words in the player's language, from the shared kit (/kit/i18n.js, served by the games-static site on this origin).
+// Until it loads, and where it is not served (wrangler dev), the page speaks English from its own table.
+const fill = (s, vars) => vars ? String(s).replace(/\{(\w+)\}/g, (m, k) => (k in vars ? vars[k] : m)) : s;
+const english = Object.assign((key, vars) => fill(tables.en[key] ?? key, vars), { plural: (n, one, other) => english(n === 1 ? one : other, { n }) });
+let i18n = { t: english, lang: () => 'en', setLang: () => 'en', langs: ['en'] };
+const t = (key, vars) => i18n.t(key, vars), plural = (n, one, other) => i18n.t.plural(n, one, other);
+const number = (n, digits = 0) => n.toLocaleString(i18n.lang(), { minimumFractionDigits: digits, maximumFractionDigits: digits });
 
 const $ = id => document.getElementById(id), canvas = $('view'), g = canvas.getContext('2d');
 const COLORS = ['#e2574c', '#4c8fe2', '#5fbf6a', '#e8c84a'], TICK_MS = 1000 / C.TICK_HZ, DELAY = 3;
@@ -19,7 +28,8 @@ let ws = null, me = null, pred = null, ants = new Map(), food = new Map(), score
 let offset = null, acc = 0, last = 0, retries = 0, bytesIn = 0, kbps = 0, rtt = 0, pingAt = new Map(), nonce = 0, lastTick = 0, session = null;
 let prevX = 0, prevY = 0, joined = false, feedUntil = 0, playing = false, avoid = '', avoided = 0;
 const feast = mode.name === 'feast', rush = mode.name === 'rush';
-const GOALS = ['Deliver 3 crumbs', 'Hold hill 5 seconds', 'Grab the golden crumb', 'Bite a carrier'];
+const goalText = i => t('goals')[i ?? 0];
+const MODE_KEY = { classic: 'Classic', feast: 'Feast', rush: 'Rush' }[mode.name];
 const GOAL_NEED = [3, 5, 1, 1];
 const sizeOf = mass => Math.min(3.6, Math.sqrt(Math.max(10, mass ?? 10) / 10));
 const input = { angle: 0, move: false, sprint: false, keys: new Set(), stick: null, mouse: false };
@@ -29,8 +39,10 @@ addEventListener('resize', resize); resize();
 
 // kind: '' for a plain line, 'event' for something on the field, 'good' for the player's own success. Each new line
 // pops in (a CSS animation restarted by toggling the class), so a change is noticed without reading.
+// feedLine is the message itself; the frame adds the "back in" line under it while the player waits to return.
+let feedLine = '';
 function say(text, ms = 2500, kind = '') {
-  const e = $('feed'); e.textContent = text; feedUntil = performance.now() + ms;
+  const e = $('feed'); e.textContent = feedLine = text; feedUntil = performance.now() + ms;
   e.className = ''; void e.offsetWidth; e.className = 'pop' + (kind ? ' ' + kind : '');
 }
 // Short effects over the world: rings and bursts at the player's ant, and points that fly to the score. Each ends by itself.
@@ -40,11 +52,44 @@ function points(n) {
   const f = fx.findLast(f => f.kind === 'points' && performance.now() - f.t0 < 300);
   if (f) { f.n += n; f.t0 = performance.now(); } else effect('points', { n, dur: 1000 });
 }
-let peakRank = 0, hillPulse = -1e9, hudBottom = 0, selfTop = 1e9, lastFeature = null, lastLeft = -1, respawnAs = '';
-const nameOf = (a, b) => a === 255 ? 'the nest guards' : `${C.NAMES_A[a]} ${C.NAMES_B[b]}`;
+let peakRank = 0, hillPulse = -1e9, hudBottom = 0, selfTop = 1e9, lastFeature = null, lastLeft = -1, respawnAs = null;
+// Names, colonies and ranks arrive as indexes into the shared lists (config.js, modes.js); the words come from the table.
+const nameOf = (a, b) => a === 255 ? t('nestGuards') : `${t('namesA')[a] ?? C.NAMES_A[a]} ${t('namesB')[b] ?? C.NAMES_B[b]}`;
+const colonyOf = i => t('colonies')[i] ?? C.COLONY_NAMES[i];
+const rankName = i => t('ranks')[i] ?? RANKS[i];
+
+// The card's text, the page title, the status line and the recording notice, drawn again after a language switch.
+// *x* in a table value is drawn bold.
+let status = null;
+function setStatus(key, vars) { status = key ? [key, vars] : null; $('status').textContent = key ? t(key, vars) : ''; }
+function redraw() {
+  document.title = $('title').textContent = t('heading', { mode: t('mode' + MODE_KEY) });
+  for (const e of document.querySelectorAll('[data-i18n]')) e.textContent = t(e.dataset.i18n);
+  for (const e of document.querySelectorAll('[data-i18n-aria]')) e.setAttribute('aria-label', t(e.dataset.i18nAria));
+  for (const e of document.querySelectorAll('[data-i18n-rich]')) e.replaceChildren(...t(e.dataset.i18nRich).split('*').map((part, i) => {
+    if (!(i % 2)) return part;
+    const b = document.createElement('b'); b.textContent = part; return b;
+  }));
+  if (status) $('status').textContent = t(...status);
+  $('notes-button')?.setAttribute('aria-label', t('notes'));
+  if (scores) hud();
+}
+function switchLanguage() {
+  i18n.setLang(i18n.langs.find(l => l !== i18n.lang()));
+  // Keep a ?lang= on the address in step with the choice, so a reload does not undo it.
+  const url = new URL(location.href);
+  if (url.searchParams.has('lang')) { url.searchParams.set('lang', i18n.lang()); history.replaceState(history.state, '', url); }
+  redraw();
+}
+$('language').addEventListener('click', switchLanguage);
+$('notes-script')?.addEventListener('load', () => $('notes-button')?.setAttribute('aria-label', t('notes')));
+const wordsReady = import('/kit/i18n.js')
+  .then(({ words }) => { i18n = words(tables); $('language').hidden = i18n.langs.length < 2; })
+  .catch(() => {})
+  .then(redraw);
 
 function connect() {
-  $('play').disabled = true; $('status').textContent = 'Finding a room…';
+  $('play').disabled = true; setStatus('finding');
   const u = new URL('/crumbwar/play', location.href); u.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
   u.searchParams.set('mode', mode.name);
   u.searchParams.set('v', C.PROTO); // the Worker tells a page of another version to reload (UPDATE_CODE)
@@ -58,10 +103,10 @@ function connect() {
     ws = null; playing = false;
     if (e.code === UPDATE_CODE) return updated();
     // 4003: idle too long. Anything else is the network or a new version of the server: come back by itself.
-    if (e.code !== 4003 && me && retries < 4) { say('Reconnecting…', 60000); setTimeout(connect, 400 * 2 ** retries++); return; }
+    if (e.code !== 4003 && me && retries < 4) { say(t('reconnecting'), 60000); setTimeout(connect, 400 * 2 ** retries++); return; }
     record.end(e.code === 4003 ? 'idle' : 'lost-connection');
     me = null; session = null; $('hud').hidden = true; $('card').hidden = false; $('play').disabled = false;
-    $('status').textContent = e.code === 4003 ? 'You were away, so your place went to someone else.' : e.code === 1006 || !e.code ? 'Could not reach the game. Try again.' : `Disconnected (${e.code}).`;
+    if (e.code === 4003) setStatus('away'); else if (e.code === 1006 || !e.code) setStatus('unreachable'); else setStatus('disconnected', { code: e.code });
   };
 }
 
@@ -71,8 +116,8 @@ function updated() {
   ws = null; playing = false; record.end('lost-connection');
   me = null; session = null; $('hud').hidden = true; $('card').hidden = false;
   let store = null; try { store = sessionStorage; } catch {}
-  if (mayReload(store, Date.now())) { $('play').disabled = true; $('status').textContent = 'Game updated, reloading…'; location.reload(); return; }
-  $('play').disabled = false; $('status').textContent = 'The game was updated. Reload the page to play.';
+  if (mayReload(store, Date.now())) { $('play').disabled = true; setStatus('reloading'); location.reload(); return; }
+  $('play').disabled = false; setStatus('updatedReload');
 }
 
 // A socket can go quiet without closing (a dead network path, or a close that never completes). The server
@@ -93,7 +138,7 @@ function receive(r) {
     }
     me = hello; session = { room: me.room, token: me.token }; avoided = 0;
     pred = new Predictor(mode.name); ants = new Map(); food = new Map(); offset = null; acc = 0; retries = 0; playing = true; snap = null; joined = true;
-    record.joined(); $('card').hidden = true; $('hud').hidden = false; say(feast ? '+ you can eat · ! can eat you · ◇ safe' : `You are ${nameOf(me.nameA, me.nameB)} of ${C.COLONY_NAMES[me.colony]}`, 3500);
+    record.joined(); $('card').hidden = true; $('hud').hidden = false; say(feast ? t('feastWelcome') : t('welcome', { name: nameOf(me.nameA, me.nameB), colony: colonyOf(me.colony) }), 3500);
   } else if (type === P.SNAP && pred) {
     const s = P.readSnap(r, ants, food, C.POS_Q, C.OWN_Q), now = performance.now();
     if (snap && s.alive && snap.alive) {
@@ -101,12 +146,12 @@ function receive(r) {
       if (gain > 0) points(gain);
       if (rush && gain > 0 && !snap.carry === !s.carry && Math.hypot(s.x - 1600, s.y - 1600) < mode.hillRadius) hillPulse = now;
     }
-    if (rush && snap && s.goal !== snap.goal && s.score - snap.score >= 5) { say(`Goal done · +${s.score - snap.score} · next: ${GOALS[s.goal ?? 0]}`, 3000, 'good'); effect('ring', { r1: 120, color: '#ffd549', dur: 800 }); }
-    else if (rush && snap && s.goal !== snap.goal && s.score >= snap.score) say(`New goal · ${GOALS[s.goal ?? 0]}`, 2500, 'event');
-    if (rush && snap && s.boostLeft && !snap.boostLeft) say('↑ Speed for 6 seconds', 1800, 'good');
-    if (rush && snap && s.shieldLeft && !snap.shieldLeft) say('◇ Shield for 6 seconds · bites miss you', 1800, 'good');
+    if (rush && snap && s.goal !== snap.goal && s.score - snap.score >= 5) { say(t('goalDone', { n: s.score - snap.score, goal: goalText(s.goal) }), 3000, 'good'); effect('ring', { r1: 120, color: '#ffd549', dur: 800 }); }
+    else if (rush && snap && s.goal !== snap.goal && s.score >= snap.score) say(t('newGoal', { goal: goalText(s.goal) }), 2500, 'event');
+    if (rush && snap && s.boostLeft && !snap.boostLeft) say(t('speedOn'), 1800, 'good');
+    if (rush && snap && s.shieldLeft && !snap.shieldLeft) say(t('shieldOn'), 1800, 'good');
     // A promotion is announced once per climb: shrinking back under a threshold and growing over it again is not news.
-    if (feast && snap && s.rank > peakRank && s.alive) { say(`Promoted · ${RANKS[s.rank]}${s.rank === 5 ? ' · you leave crumbs' : ''}`, 3000, 'good'); effect('ring', { r1: 190, color: '#a6e38b', dur: 1000, width: 7 }); effect('ring', { r1: 120, color: '#fff', dur: 700, width: 3 }); }
+    if (feast && snap && s.rank > peakRank && s.alive) { say(t(s.rank === 5 ? 'promotedQueen' : 'promoted', { rank: rankName(s.rank) }), 3000, 'good'); effect('ring', { r1: 190, color: '#a6e38b', dur: 1000, width: 7 }); effect('ring', { r1: 120, color: '#fff', dur: 700, width: 3 }); }
     if (feast && s.alive) peakRank = Math.max(peakRank, s.rank ?? 0);
     record.snap(s, snap); pred.onSnap(s); snap = s; lastTick = s.tick;
     if (joined) { prevX = pred.me.x; prevY = pred.me.y; joined = false; } // first snapshot: no blend from a stale position
@@ -119,18 +164,18 @@ function receive(r) {
     }
   } else if (type === P.SCORES) { scores = P.readScores(r); hud(); }
   else if (type === P.EVENT) {
-    const t = r.u8(), a = r.u8(), b = r.u8(), c = r.u8();
-    if (t === 1) { say(`${feast ? 'You ate' : 'You bit'} ${nameOf(a, b)}`, 2000, 'good'); effect('burst', { color: feast ? '#78e9ed' : '#fff', dur: 550 }); effect('ring', { r1: 70, color: feast ? '#78e9ed' : '#fff', dur: 450 }); record.kill(); }
-    else if (t === 4) {
+    const kind = r.u8(), a = r.u8(), b = r.u8(), c = r.u8();
+    if (kind === 1) { say(t(feast ? 'youAte' : 'youBit', { name: nameOf(a, b) }), 2000, 'good'); effect('burst', { color: feast ? '#78e9ed' : '#fff', dur: 550 }); effect('ring', { r1: 70, color: feast ? '#78e9ed' : '#fff', dur: 450 }); record.kill(); }
+    else if (kind === 4) {
       // Feast: say what the player keeps, in the rank words they see, so being eaten reads as a setback, not a reset.
       const kept = Math.max(10, (snap?.mass ?? 10) * (mode.retain ?? 1));
       peakRank = rankOf(kept);
-      respawnAs = feast ? ` as ${RANKS[rankOf(kept)]} · size ${Math.floor(kept)}` : '';
-      say(`${feast ? 'Eaten by' : 'Bitten by'} ${nameOf(a, b)}`, 3000);
+      respawnAs = feast ? { rank: rankOf(kept), size: Math.floor(kept) } : null;
+      say(t(feast ? 'eatenBy' : 'bittenBy', { name: nameOf(a, b) }), 3000);
       record.death();
     }
-    else if (t === 2) { if (feast || rush) say(''); else say(`${C.COLONY_NAMES[a]} wins the round`, 8000); record.end('round', feast ? a === me?.id ? 1 : 0 : a === me?.colony ? 1 : 0); }
-    else if (t === 3) { say('New round', 2500, 'event'); peakRank = 0; record.round(); }
+    else if (kind === 2) { if (feast || rush) say(''); else say(t('roundWin', { colony: colonyOf(a) }), 8000); record.end('round', feast ? a === me?.id ? 1 : 0 : a === me?.colony ? 1 : 0); }
+    else if (kind === 3) { say(t('newRound'), 2500, 'event'); peakRank = 0; record.round(); }
   } else if (type === P.PONG) { const n = r.u16(), at = pingAt.get(n); if (at) { rtt = rtt ? rtt * 0.7 + (performance.now() - at) * 0.3 : performance.now() - at; pingAt.delete(n); record.rtt(performance.now() - at); } }
 }
 
@@ -138,21 +183,21 @@ function hud() {
   const s = scores;
   $('colonies').hidden = feast;
   $('colonies').replaceChildren(...s.colony.map((v, i) => { const e = document.createElement('span'); e.textContent = v; e.style.background = COLORS[i]; if (me && i === me.colony) e.className = 'mine'; return e; }));
-  $('clock').textContent = `${mode.name.toUpperCase()} · ` + (s.inBreak ? 'next round in ' : '') + `${s.left / 60 | 0}:${String(s.left % 60).padStart(2, '0')}`;
-  $('top').replaceChildren(...s.top.map(t => { const e = document.createElement('li'); e.textContent = `${nameOf(t.nameA, t.nameB)}${t.bot ? ' (bot)' : ''}  ${t.score}`; e.style.color = feast ? '#a6e38b' : COLORS[t.colony]; if (t.you) e.className = 'you'; return e; }));
-  $('rank').textContent = feast && snap ? `#${s.rank} of ${s.ants} · ${RANKS[snap.rank ?? rankOf(snap.mass)]} · ${Math.floor(snap.mass ?? 10)}` : snap ? `#${s.rank} of ${s.ants}  ·  ${snap.score} pts  ·  size ${snap.tier + 1}` : '';
+  $('clock').textContent = t(s.inBreak ? 'nextRound' : 'clock', { mode: t('clock' + MODE_KEY), time: `${s.left / 60 | 0}:${String(s.left % 60).padStart(2, '0')}` });
+  $('top').replaceChildren(...s.top.map(p => { const e = document.createElement('li'); e.textContent = `${p.bot ? t('topBot', { name: nameOf(p.nameA, p.nameB) }) : nameOf(p.nameA, p.nameB)}  ${p.score}`; e.style.color = feast ? '#a6e38b' : COLORS[p.colony]; if (p.you) e.className = 'you'; return e; }));
+  $('rank').textContent = feast && snap ? t('rankFeast', { rank: s.rank, ants: s.ants, title: rankName(snap.rank ?? rankOf(snap.mass)), size: Math.floor(snap.mass ?? 10) }) : snap ? t('rankLine', { rank: s.rank, ants: s.ants, score: snap.score, size: snap.tier + 1 }) : '';
   document.body.classList.toggle('frenzy', rush && !s.inBreak && s.left <= 20);
   $('goal').hidden = !rush || s.inBreak;
-  if (rush && snap) $('goal').textContent = `${GOALS[snap.goal ?? 0]} · ${Math.min(GOAL_NEED[snap.goal ?? 0], snap.goal === 1 ? Math.floor((snap.goalProgress ?? 0) / C.TICK_HZ) : snap.goalProgress ?? 0)}/${GOAL_NEED[snap.goal ?? 0]}${snap.boostLeft ? ' · ↑ speed' : ''}${snap.shieldLeft ? ' · ◇ shield' : ''}`;
-  if (rush && !s.inBreak && s.left <= 20) $('clock').textContent = 'FRENZY ×2 · ' + $('clock').textContent;
+  if (rush && snap) $('goal').textContent = t('goalLine', { goal: goalText(snap.goal), got: Math.min(GOAL_NEED[snap.goal ?? 0], snap.goal === 1 ? Math.floor((snap.goalProgress ?? 0) / C.TICK_HZ) : snap.goalProgress ?? 0), need: GOAL_NEED[snap.goal ?? 0] }) + (snap.boostLeft ? ' · ' + t('goalSpeed') : '') + (snap.shieldLeft ? ' · ' + t('goalShield') : '');
+  if (rush && !s.inBreak && s.left <= 20) $('clock').textContent = t('frenzy', { clock: $('clock').textContent });
   // Timed moments, read from the round clock the page already has: announce them once, as they happen.
   if (s.left !== lastLeft && lastLeft >= 0 && !s.inBreak && snap) {
     const age = mode.roundSeconds - s.left;
-    if (rush && s.left === 20) say('FRENZY · everything pays double', 3000, 'event');
-    else if (rush && s.feature?.kind === 2 && (!lastFeature || lastFeature.kind !== 2 || lastFeature.x !== s.feature.x)) say('Golden crumb in the middle · 5 points', 2500, 'event');
-    else if (rush && age > 2 && age % 12 === 0) say('Seeds dropped · ↑ speed  ◇ shield', 2000, 'event');
-    else if (feast && s.feature?.kind === 3 && lastFeature?.kind !== 3) say('Cake! · stay on it 3 s to eat', 2500, 'event');
-    else if (feast && s.feature && lastFeature && s.feature.x !== lastFeature.x) say('Fresh crumbs', 1600, 'event');
+    if (rush && s.left === 20) say(t('frenzyStart'), 3000, 'event');
+    else if (rush && s.feature?.kind === 2 && (!lastFeature || lastFeature.kind !== 2 || lastFeature.x !== s.feature.x)) say(t('golden'), 2500, 'event');
+    else if (rush && age > 2 && age % 12 === 0) say(t('seeds'), 2000, 'event');
+    else if (feast && s.feature?.kind === 3 && lastFeature?.kind !== 3) say(t('cake'), 2500, 'event');
+    else if (feast && s.feature && lastFeature && s.feature.x !== lastFeature.x) say(t('freshCrumbs'), 1600, 'event');
   }
   const final = !s.inBreak && s.left <= 10 && s.left > 0;
   const clock = $('clock'); clock.classList.toggle('final', final);
@@ -164,17 +209,17 @@ function hud() {
   // The break is the results screen: who won, the player's own numbers, and (Rush) the two awards.
   $('summary').className = 'results';
   if (s.inBreak && feast) {
-    const w = s.top[0], win = w ? (w.you ? `Biggest · you · ${w.score}` : `Biggest · ${nameOf(w.nameA, w.nameB)}${w.bot ? ' (bot)' : ''} · ${w.score}`) : 'Round over';
-    $('summary').textContent = `${win}\nYour best rank · ${RANKS[s.bestRank ?? snap?.bestRank ?? 0]}\nYou ate ${s.kills ?? 0} ant${s.kills === 1 ? '' : 's'} · eaten ${s.deaths ?? 0} time${s.deaths === 1 ? '' : 's'}`;
+    const w = s.top[0], win = w ? (w.you ? t('biggestYou', { score: w.score }) : t('biggest', { name: w.bot ? t('topBot', { name: nameOf(w.nameA, w.nameB) }) : nameOf(w.nameA, w.nameB), score: w.score })) : t('roundOver');
+    $('summary').textContent = `${win}\n${t('bestRank', { rank: rankName(s.bestRank ?? snap?.bestRank ?? 0) })}\n${plural(s.kills ?? 0, 'ateOne', 'ateOther')} · ${plural(s.deaths ?? 0, 'eatenOne', 'eatenOther')}`;
   }
   if (s.inBreak && rush) {
     const awards = s.awards ?? [], order = s.colony.map((v, i) => [v, i]).sort((p, q) => q[0] - p[0]);
-    const you = a => me && a.nameA === me.nameA && a.nameB === me.nameB ? 'you' : nameOf(a.nameA, a.nameB);
-    const award = (label, a) => a ? `\n${label} · ${a.count ? `${you(a)} · ${a.count}` : 'nobody'}` : '';
-    $('summary').textContent = `${C.COLONY_NAMES[order[0][1]]} wins · ${order[0][0]} to ${order[1][0]}${me && order[0][1] === me.colony ? ' · your colony!' : ''}` +
-      `\nYou: ${s.delivered ?? 0} delivered · ${s.kills ?? 0} kills · ${s.deaths ?? 0} deaths` + award('Most deliveries', awards[0]) + award('Best biter', awards[1]);
+    const you = a => me && a.nameA === me.nameA && a.nameB === me.nameB ? t('you') : nameOf(a.nameA, a.nameB);
+    const award = (label, a) => a ? '\n' + (a.count ? t('award', { label: t(label), who: you(a), n: a.count }) : t('awardNobody', { label: t(label) })) : '';
+    $('summary').textContent = t('rushWin', { colony: colonyOf(order[0][1]), a: order[0][0], b: order[1][0] }) + (me && order[0][1] === me.colony ? ' · ' + t('yourColony') : '') +
+      '\n' + t('rushYou', { delivered: s.delivered ?? 0, kills: s.kills ?? 0, deaths: s.deaths ?? 0 }) + award('awardDeliveries', awards[0]) + award('awardBiter', awards[1]);
   }
-  $('net').textContent = `${s.people} human${s.people === 1 ? '' : 's'} · ${s.ants - s.people} bots · ${Math.round(rtt)} ms · ${kbps.toFixed(1)} kB/s${agent ? ' · agent' : ''}`;
+  $('net').textContent = t(s.people === 1 ? 'netOne' : 'netOther', { n: s.people, bots: s.ants - s.people, ms: Math.round(rtt), kbps: number(kbps, 1) }) + (agent ? ' · agent' : '');
 }
 setInterval(() => {
   kbps = bytesIn / 2000; bytesIn = 0;
@@ -213,12 +258,16 @@ $('play').addEventListener('click', () => { record.armed = record.noticed(); con
 // serves it on this origin (/kit/hint.js, from the games-static site, not this Worker). Where it is not served (wrangler
 // dev, or before the site has it) the import fails and the page plays on without it. reach 38: the ring drawn above.
 import('/kit/hint.js')
-  .then(({ hint }) => hint(canvas, {
+  .then(async ({ hint }) => { await wordsReady; hint(canvas, {
     kind: 'stick',
+    label: t('hintDrag'),
     key: 'crumbwar:hint',
     reach: 38,
     when: () => playing && $('card').hidden,
-  }))
+  });
+  // The still label (shown when motion is reduced) follows a language switch like the card's text.
+  document.querySelector('.kit-hint .label')?.setAttribute('data-i18n', 'hintDrag');
+  })
   .catch(() => {});
 
 // Play recording for the game lab, through the shared kit (/kit/lab.js, served by the games-static site on this
@@ -229,9 +278,12 @@ let rec = null;
 import('/kit/lab.js')
   .then(({ lab }) => {
     const r = lab('crumbwar'), box = $('lab'), p = r.notice(box);
-    // The kit's notice points to a pause menu; this game has none, so it points to the switch under it.
-    const t = p?.firstChild; if (t?.nodeType === 3) t.textContent = t.textContent.replace('in the pause menu', 'with the switch below');
-    r.toggle(box); rec = r;
+    // The notice and the switch take their words from this page's table. The kit's notice points to a pause menu;
+    // this game has none, so the table's notice points to the switch under it.
+    if (p) { const text = document.createElement('span'), link = p.querySelector('a'); text.dataset.i18n = 'notice'; if (link) link.dataset.i18n = 'privacy'; p.replaceChildren(text, ' ', ...(link ? [link] : [])); }
+    const toggle = r.toggle(box);
+    if (toggle?.lastChild?.nodeType === 3) { const text = document.createElement('span'); text.dataset.i18n = 'recordPlay'; toggle.lastChild.replaceWith(text); }
+    rec = r; redraw();
   })
   .catch(() => {});
 const median = v => { if (!v.length) return 0; const s = [...v].sort((a, b) => a - b), h = s.length >> 1; return Math.round(s.length % 2 ? s[h] : (s[h - 1] + s[h]) / 2); };
@@ -328,13 +380,13 @@ function frame(now) {
     const pulse = 1 + 0.5 * Math.max(0, 1 - ((now - hillPulse) / 600));
     g.strokeStyle = '#ffb06d'; g.lineWidth = 3 * pulse; g.setLineDash([18, 10]); g.beginPath(); g.arc(1600, 1600, 140, 0, 7); g.fill(); g.stroke(); g.setLineDash([]);
     g.fillStyle = '#ffdbb5'; g.font = `bold ${13 * px}px system-ui`; g.textAlign = 'center'; g.lineJoin = 'round'; g.lineWidth = 3 * px; g.strokeStyle = '#000a';
-    g.strokeText('HILL · hold it to score', 1600, 1600 - 140 - 8 * px); g.fillText('HILL · hold it to score', 1600, 1600 - 140 - 8 * px);
+    const hill = t('hill'); g.strokeText(hill, 1600, 1600 - 140 - 8 * px); g.fillText(hill, 1600, 1600 - 140 - 8 * px);
   }
   if (feast) for (const [x, y, r] of GRASS) {
     g.fillStyle = '#467049'; g.strokeStyle = '#b3e2a8'; g.lineWidth = 2; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); g.stroke();
     g.save(); g.beginPath(); g.arc(x, y, r, 0, 7); g.clip(); g.strokeStyle = '#a6e38b44';
     for (let off = -r; off < r; off += 16) { g.beginPath(); g.moveTo(x + off, y - r); g.lineTo(x + off + r, y + r); g.stroke(); }
-    g.restore(); g.fillStyle = '#fff'; g.font = `bold ${15 * px}px system-ui`; g.textAlign = 'center'; g.fillText('◇ safe', x, y + 5 * px);
+    g.restore(); g.fillStyle = '#fff'; g.font = `bold ${15 * px}px system-ui`; g.textAlign = 'center'; g.fillText(t('safe'), x, y + 5 * px);
   }
   for (const f of food.values()) {
     if (rush && f.kind >= 3) {
@@ -370,7 +422,7 @@ function frame(now) {
       g.fillStyle = g.strokeStyle; g.font = `bold ${15 * px}px system-ui`; g.fillText(safe ? '◇' : danger ? '!' : edible ? '+' : '=', x + 24 * sizeOf(a.mass), y + 5 * px);
       g.font = `${11 * px}px system-ui`;
     }
-    labels.push({ x, y: y - (feast ? 24 * sizeOf(a.mass) : 22 + a.tier * 3), d: (x - mx) ** 2 + (y - my) ** 2, text: `${C.NAMES_A[a.nameA]} ${C.NAMES_B[a.nameB]}${a.bot ? ' · bot' : ''}`, bot: a.bot, more: 0, bots: 0 });
+    labels.push({ x, y: y - (feast ? 24 * sizeOf(a.mass) : 22 + a.tier * 3), d: (x - mx) ** 2 + (y - my) ** 2, text: a.bot ? t('tagBot', { name: nameOf(a.nameA, a.nameB) }) : nameOf(a.nameA, a.nameB), bot: a.bot, more: 0, bots: 0 });
     const max = C.TIER_HP[a.tier];
     if (!feast && a.hp < max) { g.fillStyle = '#0008'; g.fillRect(x - 14, y - 19 - a.tier * 3, 28, 3); g.fillStyle = '#e2574c'; g.fillRect(x - 14, y - 19 - a.tier * 3, 28 * a.hp / max, 3); }
   }
@@ -387,7 +439,7 @@ function frame(now) {
   // out; the ants themselves still show.
   const dpr = Math.min(2, devicePixelRatio || 1), topY = my + ((hudBottom + 4) * dpr - H / 2) / zoom;
   const lowY = my + ((selfTop - 2) * dpr - H / 2) / zoom, lowX = mx + ((($('self').getBoundingClientRect().right || 0) + 8) * dpr - W / 2) / zoom;
-  for (const l of placed) if (l.y > topY && !(l.y > lowY && l.x - l.w < lowX)) g.fillText(l.more ? `${l.text} +${l.more}${l.bots === l.more ? ' bot' + (l.more > 1 ? 's' : '') : l.bots ? ` (${l.bots} bot${l.bots > 1 ? 's' : ''})` : ''}` : l.text, l.x, l.y);
+  for (const l of placed) if (l.y > topY && !(l.y > lowY && l.x - l.w < lowX)) g.fillText(!l.more ? l.text : t(l.bots === l.more ? (l.more > 1 ? 'crowdBotsOther' : 'crowdBotsOne') : l.bots ? (l.bots > 1 ? 'crowdSomeOther' : 'crowdSomeOne') : 'crowd', { name: l.text, n: l.more, b: l.bots }), l.x, l.y);
   if (snap.alive) {
     g.strokeStyle = '#fff9'; g.lineWidth = 1.5; g.beginPath(); g.arc(mx, my, feast ? 20 * sizeOf(snap.mass) : 20 + snap.tier * 3, 0, 7); g.stroke();
     ant(mx, my, pred.me.heading, feast ? '#a6e38b' : COLORS[me.colony], feast ? sizeOf(snap.mass) : 1 + snap.tier * 0.18, snap.carry, snap.prot ? 0.5 : 1);
@@ -431,7 +483,7 @@ function frame(now) {
     g.save(); g.translate(ax + c * bob, ay + s * bob); g.rotate(heading); g.fillStyle = hue; g.strokeStyle = '#000a'; g.lineWidth = 2 * d;
     g.beginPath(); g.moveTo(16 * d, 0); g.lineTo(-8 * d, -11 * d); g.lineTo(-8 * d, 11 * d); g.closePath(); g.stroke(); g.fill(); g.restore();
     g.font = `600 ${13 * d}px system-ui`; g.lineJoin = 'round'; g.lineWidth = 3 * d; g.strokeStyle = '#000a'; g.fillStyle = '#fff';
-    const label = feast ? target.kind === 3 ? 'Cake' : 'Fresh crumbs' : rush ? target.kind === 2 ? 'Golden crumb · 5' : 'Hill' : 'Food in the middle';
+    const label = t(feast ? target.kind === 3 ? 'arrowCake' : 'freshCrumbs' : rush ? target.kind === 2 ? 'arrowGolden' : 'arrowHill' : 'arrowFood');
     const lw = g.measureText(label).width, lx = Math.max(8 * d + lw / 2, Math.min(W - 8 * d - lw / 2, ax - c * 34 * d)), ly = ay - s * 26 * d + 5 * d;
     g.textAlign = 'center'; g.strokeText(label, lx, ly); g.fillText(label, lx, ly);
   }
@@ -447,15 +499,15 @@ function frame(now) {
   if (feast) {
     const rank = snap.rank ?? rankOf(snap.mass), lo = RANK_AT[rank], hi = RANK_AT[rank + 1];
     $('hp').style.transform = `scaleX(${hi ? Math.max(0, Math.min(1, (snap.mass - lo) / (hi - lo))) : 1})`;
-    $('hp').parentElement.setAttribute('aria-label', hi ? `Promotion progress ${Math.floor(snap.mass)} of ${hi}` : 'Top rank');
+    $('hp').parentElement.setAttribute('aria-label', hi ? t('promotion', { size: Math.floor(snap.mass), next: hi }) : t('topRank'));
     $('stamina').parentElement.hidden = true;
   } else {
     $('hp').style.transform = `scaleX(${Math.max(0, snap.hp) / C.TIER_HP[snap.tier]})`;
     $('stamina').style.transform = `scaleX(${pred.me.stamina / C.STAMINA})`;
   }
-  if (!snap.alive && ((!feast && !rush) || !scores?.inBreak)) $('feed').textContent = `${$('feed').textContent.split('\n')[0]}\nBack in ${Math.ceil(snap.respawn / C.TICK_HZ)}${respawnAs}`;
-  else if (now > feedUntil) $('feed').textContent = '';
-  else if ($('feed').textContent.includes('\nBack in')) $('feed').textContent = $('feed').textContent.split('\n')[0];
+  if (!snap.alive && ((!feast && !rush) || !scores?.inBreak)) { const n = Math.ceil(snap.respawn / C.TICK_HZ); $('feed').textContent = `${feedLine}\n${respawnAs ? t('backInAs', { n, rank: rankName(respawnAs.rank), size: respawnAs.size }) : t('backIn', { n })}`; }
+  else if (now > feedUntil) $('feed').textContent = feedLine = '';
+  else if ($('feed').textContent !== feedLine) $('feed').textContent = feedLine;
 }
 requestAnimationFrame(frame);
 // For automated checks and the load test's browser probe: read-only numbers, nothing that can steer the game.
