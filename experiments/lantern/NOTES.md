@@ -494,7 +494,7 @@ Checks:
 Not checked: a real phone; whether the friends' leaderboard is fair in other ways (the page still reports its own score, as noted before).
 
 ### Left as a proposal (2026-11-23, notes #119 to #123)
-- **Abilities on the endless river.** The tester asked only about stats. Abilities still work there. If the competition should be plainer still, the endless river could run with no abilities, or with the same fixed two for everyone.
+- **Abilities on the endless river.** The tester asked only about stats. Abilities still work there. If the competition should be plainer still, the endless river could run with no abilities, or with the same fixed two for everyone. **Closed 2026-11-23:** the tester chose "Keep my own two abilities" (note #141); no change.
 - **A showing for the bigger boat.** The size showing always shrinks the boat; the one-in-five bigger boat is only told in words.
 
 ## 2026-11-23: the shop's showings are good as they are (tester t1, note #134)
@@ -532,3 +532,7 @@ Checks:
 - Phone-sized screenshots of the menu, a start from floor 4, and the loss card.
 
 Not checked: a real phone; whether three floors is the right cost at high levels, where a floor is about 9 seconds of fast river.
+
+## 2026-11-23: abilities stay on the endless river (tester t1, note #141)
+
+The lab asked (#133) whether abilities should be the same for everyone on the endless river, now that stats are gone there. The tester chose "Keep my own two abilities". No change; each player keeps the two abilities they switched on. This closes the proposal "Abilities on the endless river" under notes #119 to #123.

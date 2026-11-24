@@ -194,3 +194,7 @@ Open: a player holding the full line of 10 cannot cross a log lane straight with
 **4. Duckling interpolation.** Done, and cheap: the trail, the wake and each duckling are drawn at `delay + (1 − alpha) × tick`, the same partial tick behind that the mother is drawn. One extra add per duckling per frame.
 
 **5. Builder's idea: roll call.** When she first sets off, each duckling in turn hops and peeps up a scale (170 ms apart), and its name floats up beside it for 1.6 s. A quack is answered down the line the same way (hops and peeps, no names). A duckling that joins shows its name too. This puts the personalities in the first seconds instead of only on the end card, and the quack echo repeats the game's rule: they do what she did. Not tested with a person.
+
+## 2026-11-23: "not bad" (tester t1, note #139)
+
+The lab asked (#129) how Follow Me was. Answer: "Fena değil" (not bad), from the choices fun, not bad, boring, hard or annoying. Recorded; no change. Among the three new experiments the tester chose Fix-It Stall to grow (note #103), so Follow Me stays as it is.
