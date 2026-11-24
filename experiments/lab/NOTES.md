@@ -141,3 +141,7 @@ The kept pages do not move to a top-level address or into `kit/games.json` until
 
 Play records: the lab accepted no records from any lab page up to this date (no lab page name is in human-framework `LAB_PROTOTYPES`; five pages import `kit/lab.js` and are refused). The site Worker's request log shows two real phones opening lab pages on 2026-11-24. Opens are the only evidence of play for these pages.
 
+
+## 2026-11-24: Ant Draft, bigger explosions (tester t1, note #237)
+
+The note answers #232 (what should come next in Ant Draft): bigger explosions. They were built the same day (the blast reaches further with each level, with a fireball, a shockwave, smoke and a deeper sound; bots and phone check passed) before the cleanup above moved Ant Draft to `archive/lab/`. Archived code is not polished, so this is not merged. The signed commit is 20ef0ea2 on the branch `ant-draft-blast`. Left as a proposal: apply it if Ant Draft comes back.
