@@ -10,7 +10,7 @@ if (process.argv.includes('--mutate')) {
   assert.ok(code.includes(normal), 'phototropism mutation target exists');
   sim = await import('data:text/javascript;base64,' + Buffer.from(code.replace(normal, reversed)).toString('base64'));
 }
-const { aim, createBed, prune, shadeAt, tick } = sim;
+const { aim, createBed, prune, shadeAt, tick, cue, CUE } = sim;
 const seeds = Array.from({ length: 24 }, (_, i) => Math.imul(i + 1, 2654435761) >>> 0);
 const round = n => Number(n.toFixed(2));
 
@@ -151,3 +151,121 @@ const replay = harvest(7, 65537);
 assert.deepEqual(replay, harvest(7, 65537), 'identical seed and input reproduce the whole vine');
 assert.notDeepEqual(replay.nodes, harvest(7, 65538).nodes, 'the seed changes branching');
 console.log('Deterministic replay matched. A different seed grew a different vine.');
+
+// ---- Players. Each sees the bed only through cue(s), the finger the page draws, at 30 ticks a second.
+// careful: does what the finger shows at once. naive: waits until the page would show the finger, takes a
+// second to react, and once a kind of finger has worked it does that kind as soon as the situation is back,
+// without waiting for the finger again. clumsy: reacts 150 ms late, and 15% of its inputs go wrong (a tap
+// lands up to 90 units off; a flick is too slow, so the page reads it as a lamp move to where it ended).
+const FPS = 30, campaignSeed = level => 8731 + level * 271;
+const fresh = Array.from({ length: 60 }, (_, i) => Math.imul(i + 101, 2246822519) >>> 0);
+function lcg(seed) { let x = seed >>> 0 || 1; return () => (x = (Math.imul(1664525, x) + 1013904223) >>> 0) / 4294967296; }
+const progress = s => s.arms.filter(a => a.grip >= 0).length + s.arms.filter(a => a.ripe).length + (s.window.reached ? 1 : 0);
+
+function player(kind, seed) {
+  const rnd = lcg(seed ^ 0x5bd1e995), learned = new Set(), seen = [];
+  let idle = 0, shaded = 0, ready = 0, wait = null, last = null;
+  return {
+    learned,
+    step(s) {
+      const c = cue(s);
+      seen.push(c);
+      if (seen.length > 6) seen.shift();
+      idle += 1 / FPS;
+      shaded = c?.kind === 'flick' ? shaded + 1 / FPS : 0;
+      if (kind === 'careful') return act(s, c);
+      if (kind === 'clumsy') {
+        // One input at most every 0.6 s, aimed at what the bed showed five ticks (about 150 ms) ago.
+        const late = seen[0];
+        if (!late || (last && s.time - last.at < 0.6)) return;
+        if (late.kind === 'tap' && last?.kind === 'tap' && !last.missed &&
+          Math.hypot(late.at.x - last.to.x, late.at.y - last.to.y) < 1) return;
+        return act(s, late, rnd() < 0.15);
+      }
+      // naive
+      if (!c) { ready = 0; return; }
+      const shown = c.kind === 'flick' ? shaded >= CUE.flickAfter : idle >= CUE.tapIdle;
+      ready = shown || learned.has(c.kind) ? ready + 1 / FPS : 0;
+      if (ready < 1) return;
+      ready = 0;
+      act(s, c);
+    },
+    check(s) {
+      if (!wait) return;
+      if (wait.kind === 'tap' && progress(s) > wait.before) { learned.add('tap'); wait = null; }
+      else if (wait.kind === 'flick' && s.flowers.every(f => f.shade <= 0.38)) { learned.add('flick'); wait = null; }
+      else if (s.time > wait.until) wait = null;
+    },
+  };
+  function act(s, c, wrong = false) {
+    if (!c) return;
+    idle = 0;
+    if (c.kind === 'tap') {
+      const x = c.at.x + (wrong ? (rnd() * 2 - 1) * 90 : 0), y = c.at.y + (wrong ? (rnd() * 2 - 1) * 90 : 0);
+      aim(s, x, y);
+      last = { kind: 'tap', to: c.at, missed: wrong, at: s.time };
+      wait = { kind: 'tap', before: progress(s), until: s.time + 8 };
+    } else if (wrong) {
+      aim(s, c.to.x, c.to.y);
+      last = { kind: 'flick', missed: true, at: s.time };
+    } else {
+      prune(s, c.from.x, c.from.y, c.to.x, c.to.y);
+      last = { kind: 'flick', at: s.time };
+      wait = { kind: 'flick', until: s.time + 3 };
+    }
+  }
+}
+
+function attempt(level, seed, who, limit = 120) {
+  const s = createBed(level, seed);
+  for (let f = 0; f < limit * FPS && s.status === 'growing'; f++) {
+    who.step(s);
+    tick(s);
+    who.check(s);
+  }
+  return s;
+}
+const rate = (kind, level) => fresh.concat(campaignSeed(level)).filter(seed =>
+  attempt(level, seed, player(kind, seed + level)).status === 'won').length / (fresh.length + 1);
+const pct = r => Math.round(r * 100) + '%';
+
+const careful = [], clumsy = [], naive = [];
+for (let level = 1; level <= 10; level++) {
+  careful.push(rate('careful', level));
+  clumsy.push(rate('clumsy', level));
+  naive.push(rate('naive', level));
+}
+console.log('Careful bot, 61 seeds per bed (60 fresh and the page seed):', careful.map(pct).join(' '));
+console.log('Clumsy bot (150 ms late, 15% wrong inputs):', clumsy.map(pct).join(' '));
+console.log('Naive bot, following only the finger:', naive.map(pct).join(' '));
+careful.forEach((r, i) => assert.ok(r >= 0.85, 'no wall: the careful bot wins bed ' + (i + 1) + ' on 85% of seeds, got ' + pct(r)));
+for (let level = 1; level <= 3; level++) assert.ok(clumsy[level - 1] >= 0.85, 'the clumsy bot finishes bed ' + level);
+
+// The naive bot on the page's own beds, in order, with up to three tries a bed and what it learned kept.
+let reach = 0, tries = [];
+{
+  const who = player('naive', 7);
+  for (let level = 1; level <= 10; level++) {
+    let n = 0, won = false;
+    while (n < 3 && !won) { n++; won = attempt(level, campaignSeed(level), who).status === 'won'; }
+    tries.push(n);
+    if (!won) break;
+    reach = level;
+  }
+  console.log('Naive bot on the page beds: reached bed', reach, 'of 10; tries per bed', tries.join(', '), '; learned', [...who.learned].join(' and '));
+}
+assert.ok(reach >= 3, 'a player who only follows the finger finishes the first three beds');
+for (let level = 1; level <= 10; level++) {
+  const who = player('careful', 1);
+  assert.equal(attempt(level, campaignSeed(level), who).status, 'won', 'the careful bot finishes page bed ' + level);
+}
+{
+  // How long a beginner has on the beds that open in shade before the first flower wilts, lamp on the window.
+  const deadline = [6, 8, 10].map(level => {
+    const s = createBed(level, campaignSeed(level));
+    aim(s, s.window.x, s.window.y);
+    advance(s, 60);
+    return level + ': ' + (s.status === 'wilted' ? round(s.time) + ' s' : 'no wilt');
+  });
+  console.log('Time to wilt with no cut, beds', deadline.join(', '));
+}

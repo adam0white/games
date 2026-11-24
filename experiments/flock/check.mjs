@@ -1,4 +1,4 @@
-// PLAYWRIGHT=<directory containing playwright> node experiments/lab/night-flock-2/check.mjs [webkit|chromium]
+// PLAYWRIGHT=<directory containing playwright> node experiments/flock/check.mjs [webkit|chromium]
 import assert from 'node:assert/strict';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
@@ -7,11 +7,12 @@ import { createRequire } from 'node:module';
 import { dirname, extname, join, resolve, sep } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
+import { gunzipSync } from 'node:zlib';
 import { leftEdge, rightEdge } from './sim.js';
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const notesButton = resolve(root, '../workers/feedback/public/notes/button.js');
-const shots = process.env.SHOTS || '/private/tmp/night-r6-review/flock/check';
+const shots = process.env.SHOTS || '/private/tmp/night-r7-flock/check';
 const saveKey = 'night-flock-2:save';
 const types = {
   '.css': 'text/css',
@@ -22,7 +23,7 @@ const types = {
   '.webp': 'image/webp',
 };
 const allowed = pathname => pathname === '/notes/button.js' || pathname === '/favicon.ico'
-  || pathname.startsWith('/lab/night-flock-2/') || pathname.startsWith('/kit/');
+  || pathname.startsWith('/flock/') || pathname.startsWith('/kit/') || pathname === '/lab/night-flock-2/';
 
 const requirePlaywright = createRequire(join(resolve(process.env.PLAYWRIGHT || join(homedir(), 'code/human-framework/node_modules')), 'check.cjs'));
 const { chromium, devices, webkit } = requirePlaywright('playwright');
@@ -37,7 +38,7 @@ await mkdir(shots, { recursive: true });
 
 const server = createServer(async (request, response) => {
   const { pathname } = new URL(request.url, 'http://localhost');
-  if (pathname === '/lab/night-flock-2/check-away.html') {
+  if (pathname === '/flock/check-away.html') {
     response.writeHead(200, { 'content-type': types['.html'] });
     response.end('<!doctype html><title>Away from the field</title>');
     return;
@@ -66,13 +67,48 @@ await new Promise((resolve, reject) => {
   server.listen(0, '127.0.0.1', resolve);
 });
 const origin = `http://127.0.0.1:${server.address().port}`;
-const url = `${origin}/lab/night-flock-2/`;
+const url = `${origin}/flock/`;
+const labOrigin = 'https://human.adamwhite.work';
 
 const state = page => page.evaluate(() => window.flockState());
 const waitForScreen = (page, screen) => page.waitForFunction(
   expected => window.flockState?.().screen === expected, screen, { polling: 50 },
 );
 const stored = page => page.evaluate(key => JSON.parse(localStorage.getItem(key)), saveKey);
+// Every load opens on the first card. Play is the only way past it.
+async function enter(page, name) {
+  await waitForScreen(page, 'start');
+  await page.tap('#play');
+  await waitForScreen(page, 'play');
+  await readyToPaint(page, name);
+}
+// The lab endpoint is answered here. No check reaches the real one.
+async function answerLab(context, pageOrigin) {
+  const lab = { sent: [], tried: 0 };
+  await context.route(labOrigin + '/**', async route => {
+    const request = route.request();
+    const cors = { 'access-control-allow-origin': pageOrigin, 'access-control-allow-methods': 'POST, OPTIONS', 'access-control-allow-headers': 'Content-Type' };
+    lab.tried++;
+    if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+    assert.equal(new URL(request.url()).pathname, '/lab/api/linked', 'only the lab record address is used');
+    const record = JSON.parse(gunzipSync(request.postDataBuffer()).toString());
+    lab.sent.push(record);
+    return route.fulfill({ status: 200, headers: { ...cors, 'content-type': 'application/json' }, body: JSON.stringify({ ok: true, id: record.id }) });
+  });
+  return lab;
+}
+const runs = (lab, outcome) => lab.sent.filter(r => r.game === 'flock' && r.kind === 'run' && (!outcome || r.data.outcome === outcome));
+async function sentRun(lab, outcome, count = 1) {
+  for (let i = 0; i < 80 && runs(lab, outcome).length < count; i++) await sleep(50);
+  assert.ok(runs(lab, outcome).length >= count, `a ${outcome} run reached the lab stand-in`);
+  return runs(lab, outcome).at(-1);
+}
+async function inViewport(page, selector, what) {
+  const box = await page.locator(selector).boundingBox();
+  const viewport = page.viewportSize();
+  assert.ok(box && box.width > 0 && box.height > 0 && box.x >= 0 && box.y >= 0 &&
+    box.x + box.width <= viewport.width + .5 && box.y + box.height <= viewport.height + .5, what);
+}
 
 // Only the daily calendar is fixed. The animation and performance clocks
 // must continue to be the native browser clocks throughout the phone check.
@@ -155,7 +191,7 @@ async function screenshot(page, name, step) {
       ridgeContrast = tones[81] - tones[9];
     }
     if (light - dark > 100 && ridgeContrast > 24) {
-      await writeFile(join(shots, `night-flock-2-${name}-${step}.png`), bytes);
+      await writeFile(join(shots, `flock-${name}-${step}.png`), bytes);
       return;
     }
     await wakeDisplay(page);
@@ -487,7 +523,7 @@ async function flankFlick(page, name, game, direction) {
 
 // Bring both teaching flocks home through the pointer layer. Letting go is
 // important here: a finger still sending targets would cancel the command.
-async function finishLesson(page, input) {
+async function finishLesson(page, input, atGate) {
   let down = false, heldAtGate = false;
   const start = Date.now();
   try {
@@ -510,7 +546,9 @@ async function finishLesson(page, input) {
       if (queue && Math.hypot(game.dog.x - gate.x, game.dog.y - gate.y) < 105) {
         if (down) await input.up(1);
         down = false;
-        await input.down(1, game.dog.x, game.dog.y);
+        if (atGate && !heldAtGate) await atGate(game);
+        const dog = (await state(page)).game.dog;
+        await input.down(1, dog.x, dog.y);
         await page.waitForFunction(() => window.flockState().game.dog.mode === 'hold');
         await input.up(1);
         await page.waitForFunction(() => window.flockState().game.terrain.gate.open, null, {timeout: 18000});
@@ -543,12 +581,11 @@ async function valleyChecks(page, name) {
     localStorage.setItem(key, JSON.stringify({ ...save, unlocked: 20 }));
   }, saveKey);
   await page.goto(url);
-  await waitForScreen(page, 'play');
-  await readyToPaint(page, name);
+  await enter(page, name);
   let game = await selectEvening(page, 2);
   let input = await steering(page, name);
-  await visibleLesson(page, 'hold');
-  await screenshot(page, name, '08-hold-lesson');
+  assert.equal((await state(page)).picture, 'bring', 'a closed cross-gate first asks for the flock');
+  await screenshot(page, name, '08-bring-to-gate');
   await input.down(1, game.dog.x, game.dog.y);
   await page.waitForFunction(() => window.flockState().game.dog.mode === 'hold');
   await input.up(1);
@@ -564,8 +601,33 @@ async function valleyChecks(page, name) {
   await page.waitForFunction(y => window.flockState().game.dog.y < y - 4, held.y);
   await input.up(1);
 
-  const holdLesson = await finishLesson(page, input);
+  assert.equal(await page.evaluate(() => localStorage.getItem('night-flock-2:hint-hold')), null,
+    'lying down away from the gate leaves the lesson open');
+  let handOffset = null;
+  const holdLesson = await finishLesson(page, input, async () => {
+    // The lesson appears where the field asks for the press, once sheep wait at the gate.
+    await page.waitForFunction(() => window.flockState().picture === 'hold', null, { polling: 30 });
+    await visibleLesson(page, 'hold');
+    // The hand hides under the pause card and comes back with the field.
+    await page.keyboard.press('Escape');
+    await waitForScreen(page, 'paused');
+    await page.waitForFunction(() => !document.querySelector('#hint-hold + .kit-hint.on'), null, { timeout: 3000 });
+    await page.tap('#resume');
+    await waitForScreen(page, 'play');
+    await page.waitForFunction(() => window.flockState().picture === 'hold', null, { polling: 30 });
+    await visibleLesson(page, 'hold');
+    handOffset = await page.evaluate(() => {
+      const hand = document.querySelector('#hint-hold + .kit-hint').getBoundingClientRect();
+      const field = document.querySelector('#field').getBoundingClientRect();
+      const { gate } = window.flockState().game.terrain;
+      return { x: hand.x - field.x - field.width * gate.x / 360, y: hand.y - field.y - field.height * (gate.y + 57) / 520 };
+    });
+    await screenshot(page, name, '08a-hold-lesson');
+  });
   assert.equal(holdLesson.heldAtGate, true);
+  assert.ok(handOffset && Math.abs(handOffset.x) <= 1 && Math.abs(handOffset.y) <= 1, 'the lie-down hand sits below the cross-gate');
+  assert.equal(await page.evaluate(() => localStorage.getItem('night-flock-2:hint-hold')), '1',
+    'lying down at the gate completes the lesson');
 
   game = await selectEvening(page, 3);
   await visibleLesson(page, 'outrun');
@@ -573,7 +635,7 @@ async function valleyChecks(page, name) {
   const direction = Math.sign(game.terrain.outrun.x - 180);
   await flankFlick(page, name, game, -direction);
   await page.waitForFunction(() => window.flockState().game.dog.mode === 'outrun' &&
-    document.querySelector('#instruction').textContent.includes('wait before dragging again'), null, { polling: 20 });
+    window.flockState().picture === 'circle', null, { polling: 20 });
   await page.waitForFunction(() => window.flockState().game.dog.mode !== 'outrun', null, { polling: 20 });
   assert.equal((await state(page)).game.terrain.outrun.gathered, false, 'the opposite flank leaves the bellwether behind');
   assert.equal(await page.evaluate(() => localStorage.getItem('night-flock-2:hint-outrun')), null,
@@ -584,6 +646,12 @@ async function valleyChecks(page, name) {
   ({ game, input } = await flankFlick(page, name, game, direction));
   await page.waitForFunction(() => window.flockState().game.dog.mode === 'outrun', null, { polling: 20 });
   await screenshot(page, name, '11-outrun');
+  // A finger on the field cannot call the dog off its circle.
+  await input.down(1, 180, 470);
+  await sleep(250);
+  const circling = (await state(page)).game;
+  assert.ok(circling.dog.mode === 'outrun' || circling.terrain.outrun.gathered, 'a touch during the outrun leaves it running');
+  await input.up(1);
   await page.waitForFunction(x => Math.abs(window.flockState().game.dog.x - x) > 15, game.dog.x);
 
   const outrunLesson = await finishLesson(page, input);
@@ -634,6 +702,324 @@ async function valleyChecks(page, name) {
   return { timing, holdLesson, outrunLesson };
 }
 
+const tidy = text => text.normalize('NFC').trim().replace(/\s+/gu, ' ');
+const escapePattern = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const copyPattern = copy => new RegExp(`^${tidy(copy).split(/\{\w+\}/).map(escapePattern).join('.+?')}$`, 'iu');
+// Which shown strings are English table entries and not Turkish ones.
+function englishCopy(tables) {
+  assert.deepEqual(Object.keys(tables.en).sort(), Object.keys(tables.tr).sort(), 'English and Turkish have identical keys');
+  for (const [key, en] of Object.entries(tables.en)) {
+    const tr = tables.tr[key];
+    assert.ok(en.trim() && tr.trim(), `${key} has copy in both languages`);
+    const fields = copy => [...new Set(copy.match(/\{\w+\}/g))].sort();
+    assert.deepEqual(fields(en), fields(tr), `${key} interpolates the same fields`);
+  }
+  const en = Object.values(tables.en).filter(copy => /[a-z]{2,}/i.test(copy.replace(/\{\w+\}/g, ''))).map(copyPattern);
+  const tr = Object.values(tables.tr).map(copyPattern);
+  const untranslated = value => en.some(pattern => pattern.test(value)) && !tr.some(pattern => pattern.test(value));
+  const sentences = new Intl.Segmenter('en', { granularity: 'sentence' });
+  const pieces = text => [text, ...text.split(/\s+(?:·|\/)\s+/u), ...Array.from(sentences.segment(text), part => part.segment)];
+  return values => [...new Set(values.flatMap(pieces).map(tidy))].filter(untranslated);
+}
+// Every string a player can see or hear read out: text nodes, labels, and words painted on a canvas.
+async function screenCopy(page) {
+  return page.evaluate(() => {
+    const all = [document.title, ...window.paintedText];
+    for (const el of document.querySelectorAll('body *')) {
+      if (!el.getClientRects().length || getComputedStyle(el).visibility !== 'visible') continue;
+      for (const node of el.childNodes) if (node.nodeType === Node.TEXT_NODE) all.push(node.textContent);
+      for (const attr of ['aria-label', 'aria-description', 'alt', 'title', 'placeholder']) {
+        if (el.hasAttribute(attr)) all.push(el.getAttribute(attr));
+      }
+    }
+    window.paintedText.clear();
+    return all;
+  });
+}
+// The card on top, or the field page, fits the viewport, and no button cuts its label.
+async function overflow(page) {
+  return page.evaluate(() => {
+    const failures = [], epsilon = 2;
+    const name = el => el.id ? `#${el.id}` : `${el.tagName.toLowerCase()}.${[...el.classList].join('.')}`;
+    const outside = (a, b, min, max) => a < min - epsilon || b > max + epsilon;
+    if (document.documentElement.scrollWidth > innerWidth + epsilon) failures.push('document scrolls horizontally');
+    const top = document.querySelector('.sheet.on') ?? document.querySelector('.folio');
+    for (const el of top.querySelectorAll('*')) {
+      if (el instanceof SVGElement && el.ownerSVGElement || !el.getClientRects().length || el.closest('.kit-hint')) continue;
+      const rect = el.getBoundingClientRect(), style = getComputedStyle(el);
+      if (style.visibility !== 'visible') continue;
+      if (outside(rect.left, rect.right, 0, innerWidth)) failures.push(`${name(el)} exceeds viewport width`);
+      if (outside(rect.top, rect.bottom, 0, innerHeight)) failures.push(`${name(el)} exceeds viewport height`);
+      if (el.clientWidth && el.scrollWidth > el.clientWidth + epsilon && /hidden|clip|auto|scroll/.test(style.overflowX)) {
+        failures.push(`${name(el)} clips content horizontally`);
+      }
+      // Words stay inside the card or the page column, not only inside the viewport.
+      if ([...el.childNodes].some(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim())) {
+        const frame = (top.querySelector('.card') ?? top).getBoundingClientRect(), range = document.createRange();
+        range.selectNodeContents(el);
+        for (const line of range.getClientRects()) {
+          if (outside(line.left, line.right, frame.left, frame.right)) failures.push(`${name(el)} words leave their column`);
+        }
+      }
+      if (el instanceof HTMLButtonElement) {
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        for (const childRect of range.getClientRects()) {
+          if (outside(childRect.left, childRect.right, rect.left, rect.right)) failures.push(`${name(el)} clips its label`);
+        }
+      }
+    }
+    return [...new Set(failures)];
+  });
+}
+
+// A new player with a Turkish link: every screen of the first evening, the recording switch, and a small phone.
+// A first-time player inside the page: it reads only what teach.js pictures and answers with the pictured gesture
+// one second later (the naive bot of bots.mjs, through real pointer events). It stops when the evening ends.
+function followPictures(page) {
+  return page.evaluate(async () => {
+    const { cue } = await import('/flock/teach.js');
+    const field = document.querySelector('#field');
+    let down = false, stroke = null, seen = null, since = 0, flicked = -9, pressing = false;
+    const send = (type, x, y) => {
+      const r = field.getBoundingClientRect();
+      field.dispatchEvent(new PointerEvent(type, {
+        pointerId: 7, pointerType: 'touch', isPrimary: true, button: 0, buttons: type === 'pointerup' ? 0 : 1,
+        clientX: r.left + r.width * x / 360, clientY: r.top + r.height * y / 520, bubbles: true, cancelable: true,
+      }));
+    };
+    const at = { x: 180, y: 400 };
+    const go = (x, y) => { send(down ? 'pointermove' : 'pointerdown', x, y); down = true; at.x = x; at.y = y; };
+    const lift = () => { if (down) send('pointerup', at.x, at.y); down = false; };
+    const timer = setInterval(() => {
+      const { game, screen } = window.flockState();
+      if (screen !== 'play' || game.status !== 'play') { lift(); if (screen === 'end') clearInterval(timer); return; }
+      const now = performance.now() / 1000;
+      const picture = cue(game), kind = picture?.kind ?? null;
+      if (kind !== seen) { seen = kind; since = now; }
+      const shown = now - since >= 1;
+      const sheep = game.sheep.filter(s => s.status === 'field');
+      if (!sheep.length) return;
+      if (kind !== 'hold') pressing = false;
+      if (shown && kind === 'circle') { stroke = null; return lift(); }
+      if (shown && kind === 'outrun') {
+        stroke = null;
+        lift();
+        if (now - flicked < 2.5) return;
+        flicked = now;
+        send('pointerdown', game.dog.x, game.dog.y);
+        send('pointermove', game.dog.x + picture.dir * 70, game.dog.y - 5);
+        send('pointerup', game.dog.x + picture.dir * 70, game.dog.y - 5);
+        return;
+      }
+      if (shown && kind === 'hold') {
+        stroke = null;
+        if (pressing) return;
+        lift();
+        go(game.dog.x, game.dog.y);
+        go(picture.x, picture.y);
+        pressing = true;
+        return;
+      }
+      if (shown && (kind === 'wolf' || kind === 'edge')) { stroke = null; return go(picture.x, picture.y); }
+      const low = sheep.reduce((a, b) => b.y > a.y ? b : a);
+      if (shown && kind === 'bring') {
+        const dx = picture.x - low.x, dy = picture.y - low.y, far = Math.hypot(dx, dy) || 1;
+        if (!stroke?.along || stroke.done >= 80) {
+          lift();
+          stroke = { along: true, done: 0, x: Math.min(340, Math.max(20, low.x - 40 * dx / far)), y: Math.min(505, low.y - 40 * dy / far) };
+        }
+        stroke.x += 2.6 * dx / far;
+        stroke.y += 2.6 * dy / far;
+        stroke.done += 2.6;
+        return go(stroke.x, stroke.y);
+      }
+      if (!stroke || stroke.along || stroke.y <= 140) { lift(); stroke = { x: low.x, y: Math.min(505, low.y + 40) }; }
+      stroke.y -= 2.6;
+      go(stroke.x, stroke.y);
+    }, 100);
+  });
+}
+
+async function turkish(browser, profile, name) {
+  const report = {};
+  for (const size of [profile.viewport, { width: 320, height: 568 }]) {
+    const context = await browser.newContext({ ...profile, viewport: size });
+    const page = await context.newPage();
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+    const lab = await answerLab(context, origin);
+    await context.addInitScript(() => {
+      if (location.protocol !== 'http:') return;
+      localStorage.setItem('hf-lab-send-localhost', '1');
+      localStorage.setItem('notes.k', 'phone-check');
+      window.flockCheckFrames = 0;
+      requestAnimationFrame(function countFrame() {
+        window.flockCheckFrames++;
+        requestAnimationFrame(countFrame);
+      });
+      window.paintedText = new Set();
+      for (const method of ['fillText', 'strokeText']) {
+        const paint = CanvasRenderingContext2D.prototype[method];
+        CanvasRenderingContext2D.prototype[method] = function (value, ...args) {
+          if (this.globalAlpha > 0) window.paintedText.add(String(value));
+          return paint.call(this, value, ...args);
+        };
+      }
+    });
+    try {
+      if (name === 'webkit') {
+        await page.goto('about:blank');
+        await wakeDisplay(page);
+      }
+      // The old lab address hands the visitor on, with the link's settings.
+      await page.goto(`${origin}/lab/night-flock-2/?lang=tr&look=pine`);
+      await page.waitForURL(`${url}?lang=tr&look=pine`);
+      await page.bringToFront();
+      await waitForScreen(page, 'start');
+      const tables = await page.evaluate(async () => (await import('/flock/words.js')).tables);
+      const leaked = englishCopy(tables);
+      assert.deepEqual(leaked(['Paused', 'Try again', 'Gece Sürüsü', 'Mola']), ['Paused', 'Try again'], 'the English detector finds English and passes Turkish');
+      const label = `${size.width}x${size.height}`;
+      const capture = async stage => {
+        await page.screenshot({ path: join(shots, `flock-${name}-tr-${label}-${stage}.png`) });
+        assert.equal(await page.locator('html').getAttribute('lang'), 'tr', `${stage}: document language`);
+        assert.deepEqual(await overflow(page), [], `Turkish ${label} ${stage}: content fits the viewport`);
+        assert.deepEqual(leaked(await screenCopy(page)), [], `Turkish ${label} ${stage}: no English left`);
+      };
+      await inViewport(page, '#start .lab-notice', `Turkish ${label}: the recording notice is inside the viewport`);
+      await controls(page, ['play', 'lang-start']);
+      const clearOfNotes = async id => {
+        const [a, b] = await Promise.all([page.locator('#notes-button').boundingBox(), page.locator(`#${id}`).boundingBox()]);
+        assert.ok(a && b, 'the tester notes button and the language button are on the page');
+        assert.ok(a.x + a.width <= b.x || b.x + b.width <= a.x || a.y + a.height <= b.y || b.y + b.height <= a.y,
+          `Turkish ${label}: #${id} is clear of the tester notes button`);
+      };
+      await clearOfNotes('lang-start');
+      assert.equal(await page.locator('#notes-button').getAttribute('aria-label'), tables.tr.notes);
+      assert.equal(await page.locator('#play').textContent(), tables.tr.playEvening.replace('{n}', '1'));
+      await capture('1-start');
+      assert.equal(lab.tried, 0, 'nothing is sent from the first card');
+      await enter(page, name);
+      await visibleLesson(page, 'drag');
+      await capture('2-field');
+      assert.equal(lab.tried, 0, 'nothing is sent before the first touch');
+      let input = await steering(page, name);
+      await beginner(page, input);
+      await sleep(900);
+      await capture('3-result');
+      const run = await sentRun(lab, 'won');
+      assert.equal(run.data.start.lang, 'tr');
+      assert.equal(run.data.start.level, 1);
+      if (size.height < 600) {
+        // Let the light run out once: the other ending of an evening.
+        await page.tap('#retry');
+        await waitForScreen(page, 'play');
+        const field = await page.locator('#field').boundingBox();
+        await page.locator('#field').tap({ position: { x: field.width * .9, y: field.height * .95 } });
+        await page.waitForFunction(() => window.flockState().screen === 'end', null, { timeout: 75000, polling: 200 });
+        const night = await state(page);
+        assert.equal(night.game.status, 'lost');
+        assert.equal(night.game.lost, 0, 'no sheep was lost: the light ran out');
+        await sleep(700);
+        await capture('3a-dark');
+        assert.equal(await page.locator('#end-title').textContent(), tables.tr.night);
+        assert.ok(await page.locator('#next').isHidden(), 'no next evening after a loss');
+        assert.ok(await page.locator('#retry').evaluate(button => button.classList.contains('primary') && document.activeElement === button),
+          'Try again is the main, focused button after a loss');
+        const dark = await sentRun(lab, 'dark');
+        assert.equal(dark.data.summary.home, night.game.home);
+        await page.tap('#end-evenings');
+        await waitForScreen(page, 'evenings');
+        await page.getByRole('button', { name: tables.tr.eveningShort.replace('{n}', '2'), exact: true }).tap();
+      } else await page.tap('#next');
+      await waitForScreen(page, 'play');
+      await readyToPaint(page, name);
+      assert.equal((await state(page)).game.level, 2);
+      assert.equal((await state(page)).picture, 'bring', 'evening 2 pictures where the flock goes');
+      await capture('4-evening-2');
+      await page.tap('#pause');
+      await waitForScreen(page, 'paused');
+      await controls(page, ['resume', 'evenings', 'sound', 'lang-pause']);
+      await clearOfNotes('lang-pause');
+      await capture('5-pause');
+      if (size.height < 600) {
+        // The last evening, played to its end by following only what the field pictures.
+        await page.evaluate(() => {
+          const save = JSON.parse(localStorage.getItem('night-flock-2:save'));
+          localStorage.setItem('night-flock-2:save', JSON.stringify({ ...save, unlocked: 20 }));
+        });
+        await page.goto(`${url}?lang=tr`);
+        await waitForScreen(page, 'start');
+        await enter(page, name);
+        await page.tap('#pause');
+        await page.tap('#evenings');
+        await page.getByRole('button', { name: tables.tr.eveningShort.replace('{n}', '20'), exact: true }).tap();
+        await waitForScreen(page, 'play');
+        await followPictures(page);
+        await sleep(2500);
+        await page.screenshot({ path: join(shots, `flock-${name}-tr-${label}-6a-evening-20-line.png`) });
+        await page.waitForFunction(() => window.flockState().screen === 'end', null, { timeout: 140000, polling: 200 });
+        const last = await state(page);
+        assert.equal(last.game.status, 'won', `following the pictures wins evening 20: ${last.game.home}/${last.game.sheep.length} home, ${last.game.lost} lost at ${last.game.time.toFixed(1)} s`);
+        await sleep(900);
+        await capture('7-finale');
+        assert.ok(await page.locator('#end').evaluate(card => card.classList.contains('finale')));
+        assert.equal(await page.locator('#end-title').textContent(), tables.tr.finale);
+        assert.equal(await page.locator('#end-line').textContent(), tables.tr.finaleLine);
+        assert.match(await page.locator('#end-score').textContent(), /★ \d+ \/ 60/);
+        assert.equal(await page.locator('#next').textContent(), tables.tr.endless);
+        const final = await sentRun(lab, 'won', 2);
+        assert.equal(final.data.start.level, 20);
+        report.finale = { seconds: last.game.time, home: last.game.home };
+        await page.tap('#end-evenings');
+        await waitForScreen(page, 'evenings');
+        await page.getByRole('button', { name: tables.tr.eveningShort.replace('{n}', '2'), exact: true }).tap();
+        await waitForScreen(page, 'play');
+        await page.tap('#pause');
+        await waitForScreen(page, 'paused');
+      }
+      // Recording off: the notice says so, and the next evening sends nothing.
+      const sentBefore = lab.sent.length;
+      await page.locator('#paused .lab-toggle input').uncheck();
+      assert.equal(await page.evaluate(() => localStorage.getItem('hf-lab-recording-off')), '1');
+      assert.equal(await page.evaluate(() => localStorage.getItem('hf-lab-player')), null, 'switching off forgets the player number');
+      assert.equal(tidy(await page.locator('#start .lab-notice').evaluate(p => p.firstChild.data)), tables.tr.recordingOff);
+      await page.tap('#evenings');
+      await waitForScreen(page, 'evenings');
+      await capture('6-map');
+      await page.getByRole('button', { name: tables.tr.eveningShort.replace('{n}', '1'), exact: true }).tap();
+      await waitForScreen(page, 'play');
+      input = await steering(page, name);
+      await beginner(page, input);
+      await sleep(600);
+      assert.equal(lab.sent.length, sentBefore, 'no record leaves with recording off');
+      assert.equal((await state(page)).recording, false);
+      // The switch on the pause card changes the words in place and keeps the link consistent.
+      await page.tap('#retry');
+      await waitForScreen(page, 'play');
+      await page.tap('#pause');
+      await waitForScreen(page, 'paused');
+      await page.tap('#lang-pause');
+      assert.equal(await page.locator('html').getAttribute('lang'), 'en');
+      assert.equal(await page.locator('#pause-title').textContent(), tables.en.paused);
+      assert.equal(new URL(page.url()).searchParams.get('lang'), 'en');
+      assert.deepEqual(await overflow(page), [], `English ${label} pause card fits`);
+      await page.goto(url);
+      await waitForScreen(page, 'start');
+      assert.equal(await page.locator('html').getAttribute('lang'), 'en', 'the chosen language is remembered without the link');
+      assert.deepEqual(await overflow(page), [], `English ${label} first card fits`);
+      await page.screenshot({ path: join(shots, `flock-${name}-en-${label}-1-start.png`) });
+      assert.deepEqual(errors, [], 'browser errors in the Turkish pass');
+      report[label] = { runs: runs(lab).length };
+    } finally {
+      await context.close();
+    }
+  }
+  return report;
+}
+
 async function run({ name, engine, device }) {
   const profile = devices[device];
   const browser = await engine.launch({ timeout: 45000 });
@@ -652,17 +1038,19 @@ async function run({ name, engine, device }) {
     await context.route('**/*', async route => {
       const request = route.request();
       const { pathname, origin: requestOrigin } = new URL(request.url());
+      if (requestOrigin === labOrigin) return route.fallback();
       if (requestOrigin !== origin) {
         outside.push(request.url());
         return route.abort();
       }
-      if (request.method() !== 'GET' || !allowed(pathname) || pathname === '/kit/lab.js') {
+      if (request.method() !== 'GET' || !allowed(pathname)) {
         telemetry.push(`${request.method()} ${pathname}`);
         return route.abort();
       }
       assets.add(pathname);
       return route.continue();
     });
+    const lab = await answerLab(context, origin);
     await context.addInitScript(() => {
       if (location.protocol !== 'http:') return;
       localStorage.setItem('hf-lab-send-localhost', '1');
@@ -710,8 +1098,12 @@ async function run({ name, engine, device }) {
     }
     await page.goto(url);
     await page.bringToFront();
-    await waitForScreen(page, 'play');
-    await readyToPaint(page, name);
+    await waitForScreen(page, 'start');
+    await controls(page, ['play', 'lang-start']);
+    await inViewport(page, '#start .lab-notice', 'the recording notice is on the first card, inside the viewport');
+    assert.equal((await state(page)).recording, true, 'recording is allowed once the notice is on the page');
+    await page.screenshot({ path: join(shots, `flock-${name}-00-start.png`) });
+    await enter(page, name);
     await controls(page, ['pause']);
     await sleep(3300);
     const initial = await state(page);
@@ -728,8 +1120,15 @@ async function run({ name, engine, device }) {
       'the uphill route remains visible through the animated hand cycle');
     await screenshot(page, name, '01-first-evening');
     const idleHintOffset = await rotateIdleHint(page, name);
+    assert.equal(lab.tried, 0, 'nothing is sent before the first touch on the field');
+    assert.equal(await page.evaluate(() => localStorage.getItem('hf-lab-player')), null, 'no player number before the first run');
     let input = await steering(page, name);
     const first = await beginner(page, input);
+    const firstRun = await sentRun(lab, 'won');
+    assert.equal(firstRun.data.start.level, 1, 'the run names its evening');
+    assert.equal(firstRun.data.start.mode, 'campaign');
+    assert.equal(firstRun.data.summary.home, 12, 'the run summary counts the fold');
+    assert.equal(firstRun.data.summary.stars, 3);
     await controls(page, ['next', 'retry', 'end-evenings']);
     await screenshot(page, name, '02-first-result');
     const won = await state(page);
@@ -782,16 +1181,18 @@ async function run({ name, engine, device }) {
     await page.goBack();
     await readyToPaint(page, name);
     const returned = await state(page);
-    assert.ok(returned.screen === 'paused' || returned.game.level === 2 && returned.game.time === 0,
+    assert.ok(returned.screen === 'paused' || returned.screen === 'start' && returned.game.level === 2 && returned.game.time === 0,
       'browser Back restores a paused field or reloads the highest unlocked evening');
     if (returned.screen === 'paused') await page.tap('#resume');
+    else await enter(page, name);
     if (!(await state(page)).game.started) await page.locator('#field').tap();
     assert.ok((await state(page)).game.time > 0, 'reload interrupts a running evening');
 
     await page.evaluate(() => localStorage.setItem('notes.k', 'phone-check'));
     await page.reload();
-    await waitForScreen(page, 'play');
-    await readyToPaint(page, name);
+    await waitForScreen(page, 'start');
+    assert.equal(await page.locator('#play').textContent(), 'Play · Evening 2', 'the first card names the evening it opens');
+    await enter(page, name);
     assert.equal((await state(page)).game.level, 2, 'reload opens the highest unlocked evening');
     assert.equal((await state(page)).game.time, 0, 'reload clears the in-progress clock');
     await feedbackLayout(page, name);
@@ -870,8 +1271,7 @@ async function run({ name, engine, device }) {
     await waitForScreen(page, 'paused');
     const bestBeforeReload = (await state(page)).saved.best;
     await page.reload();
-    await waitForScreen(page, 'play');
-    await readyToPaint(page, name);
+    await enter(page, name);
     assert.equal((await state(page)).saved.best, bestBeforeReload, 'endless best survives reload');
     assert.deepEqual(await stored(page), {
       v: 1, unlocked: 2, best: bestBeforeReload, sound: !soundOn, played: true,
@@ -887,8 +1287,7 @@ async function run({ name, engine, device }) {
       localStorage.setItem(key, JSON.stringify({ ...save, unlocked: 10 }));
     }, saveKey);
     await page.goto(`${url}?look=heather`);
-    await waitForScreen(page, 'play');
-    await readyToPaint(page, name);
+    await enter(page, name);
     const late = (await state(page)).game;
     assert.equal(late.level, 10);
     assert.equal(late.seed, 10);
@@ -901,16 +1300,19 @@ async function run({ name, engine, device }) {
     await screenshot(page, name, '07-heather-wolf');
     const newFields = await valleyChecks(page, name);
     assert.ok(assets.has('/notes/button.js'), 'the real notes button was served');
-    assert.deepEqual(await page.evaluate(() => Object.keys(localStorage).filter(key =>
-      key.startsWith('hf-lab-') && key !== 'hf-lab-send-localhost')), [], 'no lab player or telemetry state');
+    assert.ok(runs(lab).every(r => Number.isInteger(r.data.start?.level) && typeof r.data.start.mode === 'string'),
+      'every recorded run names its evening and mode');
+    assert.ok(runs(lab, 'left').length > 0, 'an evening abandoned from the map is recorded as left');
     assert.deepEqual(await page.evaluate(() => Object.keys(localStorage).filter(key => key.startsWith('night-flock:'))), [],
       'the original flock keeps its own storage namespace');
     assert.deepEqual(errors, [], 'browser errors');
     assert.deepEqual(outside, [], 'external requests');
     assert.deepEqual(telemetry, [], 'telemetry requests');
     console.log(JSON.stringify({ browser: name, device, first, slow, secondaryAt, landscape, idleHintOffset, firstWave, secondWave, bestBeforeReload, warningAt, dailySeed: daily.game.seed, dailyResult, dailyStars: dailyRecord.stars, newFields,
-      errors: errors.length, externalRequests: outside.length, telemetry: telemetry.length }));
+      errors: errors.length, externalRequests: outside.length, telemetry: telemetry.length, runsSent: runs(lab).length }));
     await context.close();
+    const words = await turkish(browser, profile, name);
+    console.log(JSON.stringify({ browser: name, words }));
   } finally {
     await browser.close();
   }

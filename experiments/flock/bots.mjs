@@ -12,6 +12,7 @@ if (mutation) {
   simulation = await import('data:text/javascript;base64,' + Buffer.from(code.replace(normal, broken)).toString('base64'));
 }
 const { createGame, step, command, leftEdge, rightEdge, GATE, PEN, HOME_POINTS, RESCUE_POINTS } = simulation;
+const { cue, steerable } = await import('./teach.js');
 const FRAME = 1 / 30;
 
 const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
@@ -24,28 +25,25 @@ function distance(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
-function careful(game, {wide = true, lie = true, park = false} = {}) {
+// What the careful shepherd wants to do now. careful() acts on it directly; the clumsy bot passes it through a finger.
+function intent(game, {wide = true, lie = true, park = false} = {}) {
   const {outrun, gate} = game.terrain;
-  if (game.dog.mode === 'outrun') return null;
-  if (outrun && !outrun.gathered && wide) {
-    if (game.dog.mode !== 'outrun') command(game, 'outrun', Math.sign(outrun.x - 180));
-    return null;
-  }
+  if (game.dog.mode === 'outrun') return {kind: 'wait'};
+  if (outrun && !outrun.gathered && wide) return {kind: 'outrun', dir: Math.sign(outrun.x - 180)};
   if (gate && !gate.open && (lie || park)) {
     const atGate = game.sheep.some(s => s.status === 'field' && s.y < gate.y + 19 &&
       s.y > gate.y && Math.abs(s.x - gate.x) < gate.width / 2);
     if (atGate) {
-      if (park) return {x: gate.x - 108, y: gate.y - 22};
-      if (Math.hypot(game.dog.x - gate.x, game.dog.y - gate.y) >= 110) return {x:gate.x, y:gate.y + 59};
-      if (game.dog.mode !== 'hold') command(game, 'hold');
-      return null;
+      if (park) return {kind: 'run', target: {x: gate.x - 108, y: gate.y - 22}};
+      if (Math.hypot(game.dog.x - gate.x, game.dog.y - gate.y) >= 110) return {kind: 'run', target: {x:gate.x, y:gate.y + 59}};
+      return {kind: 'hold'};
     }
   }
-  if (game.level === 1) return sweep(game);
+  if (game.level === 1) return {kind: 'run', target: sweep(game)};
   const field = game.sheep.filter(sheep => sheep.status === 'field');
-  if (!field.length) return null;
+  if (!field.length) return {kind: 'wait'};
   if (game.wolf?.active || game.wolf?.phase === 'eyes' && game.wolf.age > 1.7) {
-    if (field.some(animal => distance(animal, game.wolf) < 92)) return game.wolf;
+    if (field.some(animal => distance(animal, game.wolf) < 92)) return {kind: 'run', target: game.wolf};
   }
   const priority = animal => {
     const edge = Math.min(animal.x - leftEdge(animal.y), rightEdge(animal.y) - animal.x);
@@ -55,7 +53,14 @@ function careful(game, {wide = true, lie = true, park = false} = {}) {
   const group = field.filter(animal => distance(animal, anchor) < 53 && animal.y > anchor.y - 40);
   const barrier = [game.terrain.bridge, game.terrain.gate, game.terrain.lane]
     .find(b => b && anchor.y >= b.y + b.height - .1);
-  return drive(group, barrier ?? GATE);
+  return {kind: 'run', target: drive(group, barrier ?? GATE)};
+}
+
+function careful(game, options) {
+  const want = intent(game, options);
+  if (want.kind === 'outrun') command(game, 'outrun', want.dir);
+  if (want.kind === 'hold' && game.dog.mode !== 'hold') command(game, 'hold');
+  return want.kind === 'run' ? want.target : null;
 }
 
 function drive(group, gate = GATE) {
@@ -164,7 +169,8 @@ for (const [hazard, edge, sign] of [['woods', leftEdge, -1], ['stream', rightEdg
   const game = createGame(2, 4);
   const animal = game.sheep[0];
   Object.assign(animal, { x: edge(270) - sign * 2, y: 270, kind: 'ewe' });
-  Object.assign(game.dog, { x: edge(270) - sign * 24, y: 270 });
+  // The banks give sheep a foothold from evening 2 on. A dog close behind still drives one over.
+  Object.assign(game.dog, { x: edge(270) - sign * 13, y: 270 });
   step(game, 0.35, { ...game.dog });
   assert.equal(animal.status, 'field', 'a sheep can be brought back just after crossing a bank');
   assert.ok(animal.hazardFor > 0 && animal.stray);
@@ -437,3 +443,147 @@ const allStars = campaign.filter(g => g.minCalm >= .78 && g.time <= g.par).lengt
 console.log(`Farm medians ${farmTimes.map(n=>n.toFixed(2)).join(', ')} s; largest evening rise ${largestRise.toFixed(2)} s; least time left ${(leastMargin*100).toFixed(1)}%. Calm stars ${calmStars}, time stars ${timeStars}, both ${allStars} of ${campaign.length} clears.`);
 assert.ok(calmStars > 4 && calmStars < campaign.length);
 assert.ok(timeStars > 4 && timeStars < campaign.length);
+
+// ---------- First-minute and finish audit (2026-11-24)
+// A finger on the field, as main.js reads one: a moving contact is the dog's target, a contact kept still for
+// 0.43 s once the dog has reached it is the lie-down, a quick sideways stroke is the outrun. `late` delays every
+// decision by that many seconds. `wrong` is the share of half-second inputs replaced by a mistake: a touch on a
+// random spot, a lie-down nobody wanted, or a flick to a random side.
+function randomFrom(seed) {
+  let state = seed >>> 0;
+  return () => {
+    state = (state + 0x6D2B79F5) | 0;
+    let value = Math.imul(state ^ (state >>> 15), 1 | state);
+    value ^= value + Math.imul(value ^ (value >>> 7), 61 | value);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function playFinger(level, seed, brain, {late = 0, wrong = 0} = {}) {
+  const game = createGame(level, seed);
+  const random = randomFrom(seed * 7919 + level);
+  const queue = [];
+  let act = {kind: 'lift'}, still = 0, slip = null, slipUntil = 0, nextInput = 0;
+  for (let frame = 0; game.status === 'play' && frame <= (game.limit + 1) / FRAME; frame++) {
+    const now = frame * FRAME;
+    let next = brain(game, now);
+    if (wrong && now >= nextInput) {
+      nextInput = now + .5;
+      slip = null;
+      if (random() < wrong) {
+        const kind = random();
+        slip = kind < .5 ? {kind: 'run', x: 40 + random() * 280, y: 130 + random() * 370}
+          : kind < .75 ? {kind: 'hold', x: game.dog.x, y: game.dog.y} : {kind: 'flick', dir: random() < .5 ? -1 : 1};
+        slipUntil = nextInput;
+        queue.push({at: now + late, action: slip});
+      }
+    }
+    if (slip && now < slipUntil) next = null;
+    else if (slip) { slip = null; act = {kind: 'lift'}; }
+    if (next) queue.push({at: now + late, action: next});
+    while (queue.length && queue[0].at <= now + 1e-9) {
+      const {action} = queue.shift();
+      if (action.kind === 'flick') { command(game, 'outrun', action.dir); act = {kind: 'lift'}; continue; }
+      if (action.kind !== act.kind || action.kind === 'hold' && distance(action, act) > 8) still = 0;
+      act = action;
+    }
+    let target = null;
+    if (act.kind === 'run') target = act;
+    else if (act.kind === 'hold' && game.dog.mode !== 'hold') {
+      target = act;
+      if (distance(act, game.dog) > 14) still = 0;
+      else if ((still += FRAME) >= .43) { command(game, 'hold'); target = null; }
+    }
+    step(game, FRAME, steerable(game) ? target : null);
+  }
+  return game;
+}
+
+// Clumsy: the careful shepherd's intent through a slow, unreliable finger.
+function clumsyBrain() {
+  let last = -1;
+  return (game, now) => {
+    if (now - last < .1 - 1e-9) return null;
+    last = now;
+    const want = intent(game);
+    if (want.kind === 'outrun') return {kind: 'flick', dir: want.dir};
+    if (want.kind === 'hold') return {kind: 'hold', x: game.dog.x, y: game.dog.y};
+    if (want.kind === 'run') return {kind: 'run', x: want.target.x, y: want.target.y};
+    return {kind: 'lift'};
+  };
+}
+
+// Naive: knows only what the screen pictures (teach.js, the same answer the page draws from). It does the pictured
+// gesture one second after the picture appears. With no picture it repeats the one thing that worked on the first
+// evening: a finger below the lowest sheep, moved straight uphill at the first evening's pace, again and again.
+// It never aims at an opening, reads no weather and does not know what a bridge, a lane or a bog is.
+function naiveBrain(react = 1) {
+  let stroke = null, seen = null, since = 0, last = -1, flicked = -9;
+  return (game, now) => {
+    if (now - last < .1 - 1e-9) return null;
+    last = now;
+    const picture = cue(game), kind = picture?.kind ?? null;
+    if (kind !== seen) { seen = kind; since = now; }
+    const shown = now - since >= react;
+    const field = game.sheep.filter(s => s.status === 'field');
+    if (!field.length) return null;
+    if (shown && kind === 'circle') { stroke = null; return {kind: 'lift'}; }
+    if (shown && kind === 'outrun') {
+      stroke = null;
+      if (now - flicked < 2.5) return {kind: 'lift'};
+      flicked = now;
+      return {kind: 'flick', dir: picture.dir};
+    }
+    if (shown && ['hold', 'wolf', 'edge'].includes(kind)) {
+      stroke = null;
+      return {kind: kind === 'hold' ? 'hold' : 'run', x: picture.x, y: picture.y};
+    }
+    const low = field.reduce((a, b) => b.y > a.y ? b : a);
+    if (shown && kind === 'bring') {
+      // The dotted line runs from the flock to the opening: drag along it from behind the last sheep.
+      const dx = picture.x - low.x, dy = picture.y - low.y, far = Math.hypot(dx, dy) || 1;
+      if (!stroke?.along || stroke.done >= 80) {
+        stroke = {along: true, done: 0, x: Math.min(340, Math.max(20, low.x - 40 * dx / far)), y: Math.min(505, low.y - 40 * dy / far)};
+      }
+      stroke.x += 2.6 * dx / far;
+      stroke.y += 2.6 * dy / far;
+      stroke.done += 2.6;
+      return {kind: 'run', x: stroke.x, y: stroke.y};
+    }
+    if (!stroke || stroke.along || stroke.y <= 140) stroke = {x: low.x, y: Math.min(505, low.y + 40)};
+    stroke.y -= 26 * .1;
+    return {kind: 'run', x: stroke.x, y: stroke.y};
+  };
+}
+
+const fresh = Array.from({length: 60}, (_, i) => 5000 + i * 37);
+const share = runs => runs.filter(g => g.status === 'won').length / runs.length;
+const percent = n => Math.round(n * 100) + '%';
+const table = {careful: [], clumsy: [], naive: [], naiveOwn: []};
+for (let level = 1; level <= 20; level++) {
+  // The campaign always plays seed = level, so that seed is checked beside the sixty fresh ones.
+  const own = play(level, level, careful);
+  const runs = fresh.map(seed => play(level, seed, careful));
+  assert.equal(own.status, 'won', `careful bot wins evening ${level} as the campaign deals it`);
+  assert.ok(share(runs) >= .85, `careful bot wins evening ${level} on at least 85% of 60 fresh seeds: ${percent(share(runs))}`);
+  table.careful.push(share(runs));
+  const blunt = fresh.map(seed => playFinger(level, seed, clumsyBrain(), {late: .15, wrong: .15}));
+  table.clumsy.push(share(blunt));
+  const simple = fresh.slice(0, 20).map(seed => playFinger(level, seed, naiveBrain()));
+  table.naive.push(share(simple));
+  table.naiveOwn.push(playFinger(level, level, naiveBrain()));
+}
+console.log('Evening            ' + table.careful.map((_, i) => String(i + 1).padStart(4)).join(''));
+console.log('Careful, 60 seeds  ' + table.careful.map(n => percent(n).padStart(4)).join(''));
+console.log('Clumsy, 60 seeds   ' + table.clumsy.map(n => percent(n).padStart(4)).join(''));
+console.log('Naive, 20 seeds    ' + table.naive.map(n => percent(n).padStart(4)).join(''));
+console.log('Naive, own seed    ' + table.naiveOwn.map(g => (g.status === 'won' ? Math.round(g.time) + 's' : g.lost ? 'lost' : g.home + '/' + g.sheep.length).padStart(4)).join(' '));
+const reach = table.naiveOwn.findIndex(g => g.status !== 'won');
+console.log(`Naive bot, campaign as dealt: clears evenings 1 to ${reach < 0 ? 20 : reach} in a row` + (reach < 0 ? '.' : `, then fails evening ${reach + 1}.`));
+// A known bad case: a player half a second late with half the inputs wrong must do visibly worse,
+// or the lateness and the wrong inputs are not reaching the field.
+const worse = [3, 12, 20].map(level => share(fresh.slice(0, 20).map(seed => playFinger(level, seed, clumsyBrain(), {late: .5, wrong: .5}))));
+console.log('Very clumsy (500 ms late, 50% wrong), 20 seeds, evenings 3, 12, 20: ' + worse.map(percent).join(', '));
+assert.ok(worse.slice(1).every((rate, i) => rate <= table.clumsy[[12, 20][i] - 1] - .2), 'a much clumsier player wins evenings 12 and 20 clearly less often');
+for (let level = 1; level <= 7; level++) {
+  assert.ok(table.clumsy[level - 1] >= .5, `clumsy bot (150 ms late, 15% wrong) wins evening ${level} on at least half of 60 seeds: ${percent(table.clumsy[level - 1])}`);
+}

@@ -6,13 +6,14 @@ const stops = [
   [221,208],[280,183],[317,141],[265,109],[202,134],[141,120],[83,139]
 ];
 
+// The key of the farm's name in words.js.
 export function farm(level) {
-  if (level <= 6) return 'Low Beck';
-  if (level <= 13) return 'Fellside';
-  return 'High Tarn';
+  if (level <= 6) return 'lowBeck';
+  if (level <= 13) return 'fellside';
+  return 'highTarn';
 }
 
-export function valley(canvas, levels, unlocked, current, stars, select) {
+export function valley(canvas, levels, unlocked, current, stars, select, t) {
   const scale = Math.min(devicePixelRatio || 1, 3);
   canvas.width = Math.round(width * scale);
   canvas.height = Math.round(height * scale);
@@ -92,7 +93,7 @@ export function valley(canvas, levels, unlocked, current, stars, select) {
   ctx.setLineDash([]);
   ctx.fillStyle = '#435449';
   ctx.font = 'italic 17px Georgia, serif';
-  const farms = [[48,318,'Low Beck'],[213,249,'Fellside'],[34,96,'High Tarn']];
+  const farms = [[48,318,t('lowBeck')],[213,249,t('fellside')],[34,96,t('highTarn')]];
   for (const [x,y,name] of farms) {
     cottage(x, y-5, .77);
     ctx.fillText(name, x + 16, y);
@@ -105,8 +106,8 @@ export function valley(canvas, levels, unlocked, current, stars, select) {
     button.style.left = x / width * 100 + '%';
     button.style.top = y / height * 100 + '%';
     button.disabled = n > unlocked;
-    button.setAttribute('aria-label', 'Evening ' + n);
-    button.title = farm(n) + ' · Evening ' + n;
+    button.setAttribute('aria-label', t('eveningShort', { n }));
+    button.title = t('eveningAt', { farm: t(farm(n)), n });
     if (current === n) button.setAttribute('aria-current', 'step');
     const count = document.createElement('span');
     count.className = 'stop';
@@ -116,7 +117,7 @@ export function valley(canvas, levels, unlocked, current, stars, select) {
       const marks = document.createElement('small');
       marks.textContent = [1,2,4].map(bit => stars[n] & bit ? '★' : '·').join('');
       marks.setAttribute('aria-hidden','true');
-      button.setAttribute('aria-description', marks.textContent.split('★').length - 1 + ' of 3 stars');
+      button.setAttribute('aria-description', t('starsOf', { n: marks.textContent.split('★').length - 1 }));
       button.append(marks);
     }
     button.onclick = () => select(n);

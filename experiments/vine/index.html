@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#232421">
+  <title>Night Vine</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <svg width="0" height="0" class="definitions" aria-hidden="true"><defs>
+    <symbol id="i-window" viewBox="0 0 36 36">
+      <path d="M6 29V15a12 12 0 0 1 24 0v14H6Zm3 2h18M18 4v24M7 16h22M18 16 9 9m9 7 9-7"/>
+      <path d="M15 26c3-4 5-3 8-7M18 23q-5 0-4-5 4 1 4 5Z"/>
+    </symbol>
+    <symbol id="i-grapes" viewBox="0 0 36 36">
+      <path d="M18 11q0-8 7-9M19 9q-8 1-10-6 7-1 10 6Z"/>
+      <circle cx="13" cy="15" r="4"/><circle cx="23" cy="15" r="4"/><circle cx="18" cy="22" r="4"/><circle cx="18" cy="29" r="2.5"/>
+    </symbol>
+    <symbol id="i-flower" viewBox="0 0 36 36">
+      <path d="M18 32V18m0 10q-9-1-10-8 8 0 10 8Zm0-4q7 0 9-6-7-1-9 6Z"/>
+      <path d="M15 10c-7-11 8-12 6 0 9-8 15 5 3 6 9 7-2 15-6 4-5 11-15 1-7-5-12-2-5-12 4-5Z"/><circle cx="18" cy="14" r="2"/>
+    </symbol>
+    <symbol id="i-lamp" viewBox="0 0 36 36">
+      <path d="M14 9V7a4 4 0 0 1 8 0v2M11 12h14l3 8-5 8h-10l-5-8 3-8ZM13 31h10"/><path d="M18 14v10"/>
+    </symbol>
+    <symbol id="i-tap" viewBox="0 0 36 36">
+      <circle cx="13" cy="9" r="6" stroke-dasharray="2 3"/>
+      <path d="M13 9v15l-3-3c-2-2-5 0-3 3l6 8h12c2-3 3-6 3-9v-6c0-2-3-2-3 0v-1c0-2-3-2-3 0v-1c0-2-3-2-3 0V9c0-2-3-2-3 0Z"/>
+    </symbol>
+    <symbol id="i-flick" viewBox="0 0 36 36">
+      <path d="M4 25 30 5" stroke-dasharray="3 3"/><path d="M27 3l4 1-1 4"/>
+      <path d="M8 34V20c0-2 3-2 3 0v6l3-1c2 0 3 2 2 4l-2 5"/>
+    </symbol>
+    <symbol id="i-cut" viewBox="0 0 36 36">
+      <circle cx="9" cy="27" r="4"/><circle cx="27" cy="27" r="4"/><path d="M12 24 27 4M24 24 9 4"/>
+    </symbol>
+    <symbol id="i-sprig" viewBox="0 0 72 68">
+      <path d="M15 61c15-14 15-27 35-47M28 46q-14 0-17-14 12 1 17 14ZM32 38q14-13 24-9-5 12-24 9ZM38 29q-13-3-13-17 12 5 13 17ZM44 22q12-1 17-11-12-1-17 11Z"/>
+      <path d="M30 44q8 2 11 8M21 54q-8-2-11-8m28-15q9-7 14-7c9 0 10-8 5-8-4 0-4 5-1 5"/>
+      <g fill="currentColor" stroke="none"><circle cx="39" cy="52" r="2.8"/><circle cx="46" cy="51" r="3"/><circle cx="41" cy="58" r="3"/><circle cx="47" cy="57" r="2.3"/><circle cx="44" cy="62" r="2"/></g>
+    </symbol>
+  </defs></svg>
+  <template id="languageIcon"><svg class="globe" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg><span></span></template>
+  <main id="book">
+    <header>
+      <div class="heading">
+        <div id="edition" class="small">Glasshouse · Bed 01 / 10</div>
+        <h1><span data-i18n="titleA">Night</span> <em data-i18n="titleB">Vine</em></h1>
+      </div>
+      <svg class="sprig" viewBox="0 0 72 68" aria-hidden="true"><use href="#i-sprig"/></svg>
+      <button id="langBoard" class="language" data-i18n-aria="langName"></button>
+      <button id="pauseButton" class="pause-button" data-i18n-aria="pause" aria-label="Pause"><b></b><b></b></button>
+    </header>
+    <div id="frame"><canvas width="360" height="480" id="field" tabindex="0" data-i18n-aria="field"></canvas></div>
+    <footer>
+      <svg id="goalMark" class="sign" viewBox="0 0 36 36" aria-hidden="true"><use href="#i-window"/></svg>
+      <div class="brief">
+        <div id="goal" aria-live="polite">To the window</div>
+        <div id="steps" role="img"></div>
+        <div id="notice"></div>
+      </div>
+    </footer>
+    <section id="result" role="region" aria-labelledby="resultTitle">
+      <div class="finished">
+        <svg class="sign" viewBox="0 0 36 36" aria-hidden="true"><use id="finishIcon" href="#i-window"/></svg>
+        <div><h2 id="resultTitle"></h2><p id="outcome"></p></div>
+      </div>
+      <div class="actions">
+        <button id="next">Next bed</button>
+        <button id="replay" data-i18n-aria="replant" data-i18n-title="replant" aria-label="Replant this bed" title="Replant this bed">↺</button>
+      </div>
+    </section>
+  </main>
+  <section id="pause" class="sheet" role="dialog" aria-modal="true" aria-labelledby="pauseTitle">
+    <div class="card">
+      <div class="pause-help">
+        <div class="small" id="pausedBed">Glasshouse</div>
+        <h2 id="pauseTitle" data-i18n="paused">Paused</h2>
+        <div class="how">
+          <div role="img" data-i18n-aria="howTap"><svg viewBox="0 0 36 36"><use href="#i-tap"/></svg><i>→</i><svg viewBox="0 0 36 36"><use href="#i-lamp"/></svg><i>→</i><svg viewBox="0 0 72 68"><use href="#i-sprig"/></svg></div>
+          <div role="img" data-i18n-aria="howFlick"><svg viewBox="0 0 36 36"><use href="#i-flick"/></svg><i>→</i><svg viewBox="0 0 36 36"><use href="#i-cut"/></svg><i>→</i><svg viewBox="0 0 36 36"><use href="#i-flower"/></svg></div>
+        </div>
+        <div id="recordSlot"></div>
+      </div>
+      <div class="pause-actions">
+        <button class="solid" id="resume" data-i18n="resume">Resume</button>
+        <div class="pair"><button id="restart" data-i18n="restart">Replant bed</button><button id="campaign">Choose a bed</button></div>
+        <div id="beds" hidden></div>
+        <button id="endless">Endless arbour <span aria-hidden="true">∞</span></button>
+        <p id="record"></p>
+      </div>
+      <div class="pair settings"><button id="ink">Ink · Vesper</button><button id="sound">Sound on</button><button id="langPause" class="language" data-i18n-aria="langName"></button></div>
+    </div>
+  </section>
+  <script type="module" src="./main.js"></script>
+  <script src="/notes/button.js" defer></script>
+</body>
+</html>

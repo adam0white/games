@@ -919,6 +919,93 @@ function guideGesture(ctx, game, clock) {
   ctx.restore();
 }
 
+// The pointing hand of the first evening's guide, fingertip at (x, y).
+function finger(ctx, x, y) {
+  ctx.save();
+  ctx.translate(x + 1.8, y + 3.5);
+  sprite(ctx, '#3a353e', 'M-.4-1.6c.4-2.1 3.5-2.4 4.4-.3l2 7.2 1.9-.7 7.1 3.1.9 3.4-1.6 6.4-9 2.3-4.6-6.9-3.4-3c-2-1.9.2-4 2.3-2.7l2.5 1.5Z');
+  sprite(ctx, paper, 'M.6-1.3c-.2-1.3 1.8-1.9 2.4-.6l2.3 8.3 2.7-1 6.2 3 .8 2.8-1.4 5.4-7.5 2-4.5-6.9-3.5-3c-1-1.1 0-2.2 1.2-1.5l4.4 2.8Z');
+  ctx.restore();
+}
+function ring(ctx, color, x, y, radius, weight = 1.3) {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = weight;
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.stroke();
+}
+
+// Pictures for the rules after the first evening (teach.js decides which one). They say where to put the
+// finger and what to do with it, so the field needs no sentence. `hand` is false while the page's own
+// moving hand is on screen.
+function cueMarks(ctx, game, clock, picture, hand) {
+  if (!picture) return;
+  const { dog } = game;
+  const beat = (clock * 1.25) % 1;
+  ctx.save();
+  if (picture.kind === 'edge' || picture.kind === 'wolf') {
+    const warm = picture.kind === 'edge' ? '#f6b48a' : paper;
+    ctx.globalAlpha = .8;
+    ctx.setLineDash([1, 6]);
+    line(ctx, warm, 1.5, `M${dog.x} ${dog.y - 3}L${picture.x} ${picture.y}`);
+    ctx.setLineDash([]);
+    ctx.globalAlpha = .95 * (1 - beat);
+    ring(ctx, warm, picture.x, picture.y, 5 + 11 * beat, 1.6);
+    ctx.globalAlpha = .9;
+    ring(ctx, warm, picture.x, picture.y, 5);
+    if (hand) finger(ctx, picture.x, picture.y);
+  } else if (picture.kind === 'bring') {
+    const field = game.sheep.filter(animal => animal.status === 'field');
+    const x = field.reduce((sum, animal) => sum + animal.x, 0) / field.length;
+    const y = field.reduce((sum, animal) => sum + animal.y, 0) / field.length;
+    ctx.globalAlpha = .63;
+    if (y - picture.y > 46) {
+      ctx.setLineDash([1, 6]);
+      line(ctx, gold, 1.4, `M${x} ${y - 22}Q${x} ${(y + picture.y) / 2} ${picture.x} ${picture.y + 26}`);
+      ctx.setLineDash([]);
+    }
+    line(ctx, gold, 1.65, `M${picture.x - 6} ${picture.y + 22 - 3 * beat}l6 -7 6 7`);
+  } else if (picture.kind === 'hold') {
+    const gate = game.terrain.gate;
+    const lying = dog.mode === 'hold';
+    const x = lying ? dog.x : picture.x, y = lying ? dog.y : picture.y;
+    ctx.globalAlpha = .9;
+    ring(ctx, paper, x, y, 11, 1);
+    // The ring fills while the dog watches the settled sheep; a full ring opens the gate.
+    ctx.strokeStyle = gold;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(x, y, 11, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.max(.02, gate.progress));
+    ctx.stroke();
+    if (!lying) {
+      ctx.globalAlpha = .8 * (1 - beat);
+      ring(ctx, paper, x, y, 11 + 8 * beat);
+      ctx.globalAlpha = .95;
+      if (hand) finger(ctx, x, y);
+    }
+  } else if (picture.kind === 'outrun') {
+    const lead = game.sheep[game.leadId];
+    const side = picture.dir;
+    const outside = (side < 0 ? leftEdge(lead.y) - 7 : rightEdge(lead.y) + 7);
+    const elbow = Math.max(dog.y, lead.y + 70);
+    ctx.globalAlpha = .7;
+    ctx.setLineDash([1.4, 5]);
+    line(ctx, '#f7da9d', 1.3, `M${dog.x} ${dog.y}Q${outside} ${elbow} ${lead.x + side * 30} ${lead.y + 8}`);
+    ctx.setLineDash([]);
+    ctx.globalAlpha = .95 * (1 - beat);
+    ring(ctx, gold, lead.x, lead.y - 3, 7 + 9 * beat, 1.6);
+    ctx.globalAlpha = .9;
+    ring(ctx, gold, lead.x, lead.y - 3, 7);
+    // A short stroke beside the dog, towards the bellwether: the flick.
+    const stroke = Math.min(1, Math.max(0, (((clock * .62) % 1) - .3) / .22));
+    const from = dog.x - side * 20, y = dog.y + 26;
+    ctx.globalAlpha = .85;
+    line(ctx, paper, 1.5, `M${from} ${y}h${side * 46}m${-side * 6} -5l${side * 6} 5 ${-side * 6} 5`);
+    if (hand) finger(ctx, from + side * 46 * stroke, y);
+  }
+  ctx.restore();
+}
+
 const lateStars = [[17, 15], [26, 27], [38, 19], [53, 21], [64, 13], [110, 9],
   [127, 19], [140, 13], [157, 19], [171, 8], [208, 11], [258, 13], [273, 21],
   [291, 12], [305, 23], [311, 21], [323, 12], [342, 23], [349, 9]];
@@ -1098,7 +1185,7 @@ function visibleAnimals(game) {
   return herd.actors;
 }
 
-export function draw(ctx, game, { clock = 0, look = 'pine', guide = false, pressed = false } = {}) {
+export function draw(ctx, game, { clock = 0, look = 'pine', guide = false, pressed = false, picture = null, hand = true } = {}) {
   ctx.save();
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
@@ -1133,6 +1220,7 @@ export function draw(ctx, game, { clock = 0, look = 'pine', guide = false, press
     paint(ctx, animal, clock, index, color);
     if (paint === sheep) arrival(ctx, animal, game.time, index);
   }
+  cueMarks(ctx, game, clock, picture, hand);
   weatherMarks(ctx, game, clock);
   ctx.restore();
 }
