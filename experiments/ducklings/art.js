@@ -84,14 +84,52 @@ export function duckling(g, x, y, a, u, t, phase, look = {}) {
   g.restore();
 }
 
-// "!" in a bubble above a waiting duckling.
+// Warning mark above a waiting duckling or hazard.
 export function alert(g, x, y, u, t, col = '#ff6a3d') {
   const s = 1 + Math.max(0, Math.sin(t * 6)) * 0.12, r = 0.028 * u * s;
   g.save(); g.translate(x, y - 0.07 * u - Math.abs(Math.sin(t * 3)) * 0.01 * u);
   g.fillStyle = '#fffdf3'; g.beginPath(); g.arc(0, 0, r, 0, 7); g.fill();
   g.beginPath(); g.moveTo(-r * 0.3, r * 0.8); g.lineTo(0, r * 1.5); g.lineTo(r * 0.35, r * 0.75); g.fill();
   g.strokeStyle = col; g.lineWidth = Math.max(1.5, 0.004 * u); g.beginPath(); g.arc(0, 0, r, 0, 7); g.stroke();
-  g.fillStyle = col; g.font = `bold ${Math.round(r * 1.5)}px system-ui, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('!', 0, r * 0.08);
+  warningMark(g, 0, 0, r * .6, col);
+  g.restore();
+}
+
+function warningMark(g, x, y, r, color) {
+  g.fillStyle = color;
+  g.beginPath(); g.roundRect(x - r * .18, y - r, r * .36, r * 1.2, r * .17); g.fill();
+  g.beginPath(); g.arc(x, y + r * .65, r * .19, 0, 7); g.fill();
+}
+
+export function chevron(g, x, y, r, angle) {
+  g.save(); g.translate(x, y); g.rotate(angle);
+  g.lineJoin = 'round'; g.lineCap = 'round';
+  g.beginPath(); g.moveTo(-r, r * .4); g.lineTo(0, -r * .65); g.lineTo(r, r * .4);
+  g.lineWidth = r * .52; g.strokeStyle = '#416656'; g.stroke();
+  g.lineWidth = r * .27; g.strokeStyle = '#fff8d8'; g.stroke();
+  g.restore();
+}
+
+export function soundWaves(g, x, y, facing, u, phase) {
+  g.save(); g.translate(x, y); g.rotate(facing);
+  for (let i = 0; i < 3; i++) {
+    const r = (.049 + i * .019 + phase * .02) * u;
+    g.globalAlpha = Math.min(1, 2 * (1 - phase));
+    g.beginPath(); g.arc(0, -.022 * u, r, -Math.PI * .70, -Math.PI * .30);
+    g.lineWidth = .012 * u; g.strokeStyle = '#79532c'; g.stroke();
+    g.lineWidth = .006 * u; g.strokeStyle = '#fff3af'; g.stroke();
+  }
+  g.restore();
+}
+
+export function sun(g, x, y, r) {
+  g.save(); g.translate(x, y);
+  g.lineWidth = r * .21; g.lineCap = 'round'; g.strokeStyle = '#fff6ba';
+  for (let i = 0; i < 8; i++) {
+    const a = i * Math.PI / 4, dx = Math.cos(a) * r, dy = Math.sin(a) * r;
+    g.beginPath(); g.moveTo(.77 * dx, .77 * dy); g.lineTo(1.22 * dx, 1.22 * dy); g.stroke();
+  }
+  oval(g, '#ffed8b', 0, 0, r * .54, r * .54);
   g.restore();
 }
 
@@ -334,10 +372,9 @@ export function sleepingCat(g, x, y, r, phase, t) {
   }
   oval(g, '#df9365', -.24 * r, -.19 * r, .18 * r, .145 * r);
   for (const side of [-1, 1]) oval(g, '#472b2c', (-.24 + side * .068) * r, -.19 * r, .025 * r, (phase === 'rest' ? .009 : .028) * r);
-  g.fillStyle = '#61496b';
-  g.font = `800 ${r * .22}px system-ui`; g.textAlign = 'center';
-  if (phase === 'rest') g.fillText('z Z', r * .29, -r * (.29 + .03 * Math.sin(t * 3)));
-  else if (phase === 'warn') g.fillText('!', r * .27, -r * .32);
+  if (phase === 'rest') {
+    for (let i = 0; i < 3; i++) oval(g, '#efdcc7', r * (.05 + .12 * i), -r * (.27 + .07 * i + .025 * Math.sin(t * 3)), r * (.028 + i * .013), r * (.024 + i * .01));
+  } else if (phase === 'warn') warningMark(g, r * .27, -r * .32, r * .12, '#61496b');
   g.restore();
 }
 

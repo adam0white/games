@@ -9,13 +9,13 @@ assert.equal(warningOnScreen(900, 640), false, 'a hazard behind the screen stays
 assert.equal(warningOnScreen(200, 640), true, 'a visible hazard can sound its warning');
 
 for (const [arrived, hits, scatters, expected] of [
-  [3, 0, 0, 'For three stars, bring all 4 home.'],
-  [4, 1, 0, 'For three stars, avoid hits.'],
-  [4, 0, 1, 'For three stars, avoid scares.'],
-  [3, 1, 1, 'For three stars, bring all 4 home and avoid hits and scares.'],
-  [4, 0, 0, ''],
+  [3, 0, 0, ['nest']],
+  [4, 1, 0, ['heart']],
+  [4, 0, 1, ['scatter']],
+  [3, 1, 1, ['nest', 'heart', 'scatter']],
+  [4, 0, 0, []],
 ]) {
-  assert.equal(starFeedback({ total: 4, arrived: Array(arrived), hits, scatters }), expected);
+  assert.deepEqual(starFeedback({ total: 4, arrived: Array(arrived), hits, scatters }), expected);
 }
 
 
