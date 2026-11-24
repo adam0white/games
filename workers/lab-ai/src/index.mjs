@@ -1,6 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import { handle, takeOne } from './core.mjs';
-import { handleBoard, boardTop, boardPut, boardRemove } from './board.mjs';
+import { handleBoard, boardTop, boardPut, boardRemove, boardStart } from './board.mjs';
 
 // One instance of this class (named "global") counts model calls per UTC day for the daily cap.
 export class DailyCounter extends DurableObject {
@@ -12,6 +12,7 @@ export class Board extends DurableObject {
   top(limit) { return boardTop(this.ctx.storage.sql, limit); }
   put(q, now) { return boardPut(this.ctx.storage.sql, q, now); }
   remove(id) { return boardRemove(this.ctx.storage.sql, id); }
+  start(r, now) { return boardStart(this.ctx.storage.sql, r, now); }
 }
 
 // /lab-api/persona and /lab-api/board/<game> do something; nothing else does. Any error gives a 502 so the page keeps its offline persona.
