@@ -634,21 +634,23 @@ A real phone; whether the hunts are more exciting; the skills at high levels by 
 - Far and small bodies (under 6 pixels of radius) are drawn plain: no outline, eyes, shadow or marks.
 
 ### Overlay checklist
-Compared on one frozen moment (the same seed and placements; `__ant.look(n)` switches the look without moving anything) at levels 6, 12 and 17 in Chromium, and level 12 in WebKit, looks 0 to 4. "Shared" means the same code draws it in every look.
+Compared on one frozen moment (the same seed and placements; `__ant.look(n)` switches the look without moving anything) at levels 6, 12 and 17 in Chromium and level 12 in WebKit, looks 0 to 4, and in motion (a meal, a leap, a death) at level 8. "Shared" means the code that draws it runs after the body is drawn and is the same in every look; the Living branch replaces only the call that draws a body. "Seen" means I saw it in a Living screenshot.
 
 | Overlay | Living |
 | --- | --- |
-| numbers, faster ">>" marks, "zzz" | drawn, shared; raised over a body in the air |
-| "!" on a stronger animal that has seen you | drawn, shared |
-| edge arrows (red) and the green food arrow | drawn, shared |
-| rival: ring, crown, name tag, bubble | drawn, shared |
-| rival: scars | drawn on the body (the rig's own marks) |
-| hunt (chase) lines, sight wedges, dimmed ground | drawn, shared |
-| skill effects: roar ring, sting, "Pounce!", leap dust, shell | drawn, shared; the shell is also a dome on the body |
-| hide state (HUD, dashed ring) | drawn, shared |
-| old animals: purple ring, the red aim while winding up | drawn, shared |
-| eat and death pieces, "+n" floats | drawn, shared |
-| the promotion beam, flashes, cards | drawn, shared |
+| numbers, faster ">>" marks, "zzz" | shared, seen; raised over a body in the air |
+| "!" on a stronger animal that has seen you | shared, not caught in a screenshot |
+| red edge arrows, green food arrow | shared, edge arrows seen; food arrow not caught |
+| rival: ring, crown, name tag, bubble | shared, seen |
+| rival: scars | drawn on the body by the rig's own marks, seen |
+| hunt (chase) lines, sight wedges, dimmed ground | shared, seen |
+| skill effects: "Pounce!", leap dust, shell | shared, seen; the shell is also a dome on the body |
+| skill effects: roar ring, sting | shared, not caught |
+| hide state (HUD "hide ready", dashed ring) | shared, seen |
+| old animals: purple ring | shared, seen; the red aim while winding up is shared, not caught |
+| "+n" floats, eat pieces | shared, seen |
+| death pieces, death card | shared, seen |
+| the promotion beam, flashes, cards | shared; cards seen, beam not caught |
 
 ### Numbers
 - `rig-bots.mjs` (run first by `bots.mjs`): 55 species walk 10,000 steps each at up to the game's top speed with every pose; no NaN, spine and chain error under 1e-10 %, no foot past its leg (worst 98.0 %), the gait alternates 100.0 % of 66,345 waves, feet drag 0.08 % at a walk and 0.39 % at a run. A fleeing Dog steps 92 times in 10 s against 75 calm. 240 s of a real run with the look stepping ends in the same sim state as without it, with up to 63 rigs. 11 sim states each give the pose they should, a calm animal none. Every species in 11 poses draws on a context that rejects NaN (164,034 calls).
