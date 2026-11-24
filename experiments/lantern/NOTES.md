@@ -465,7 +465,7 @@ Checks: `node experiments/kit/check/phone.mjs` passes for every experiment on We
 Not checked: sound and feel on a real phone. Magnet and Flare show only their ring and pickup, because a calm river has no embers to pull and the light is already full.
 
 ### Left as a proposal (2026-11-23, note #112)
-- **A drawing error stops the game for good.** Any error thrown in `draw` ends the frame loop, since `requestAnimationFrame` is called after it. Calling it first, or catching the error, would keep a rare bad frame from freezing the screen.
+- **A drawing error stops the game for good.** Any error thrown in `draw` ends the frame loop, since `requestAnimationFrame` is called after it. Calling it first, or catching the error, would keep a rare bad frame from freezing the screen. **Done 2026-11-23** (see below).
 - **A setting for showing on tap.** The note's "a button to enable and disable the feature" is read as the on/off button for each thing. If the tester meant a setting that turns the whole-screen showing itself off, that is a new saved setting. A question was sent. **Closed 2026-11-23:** the tester answered "It is good as it is" (note #134); no setting is built.
 
 ## 2026-11-23: fair endless river, hearts and force field as abilities, a random first ability, showings that show (tester t1, notes #119 to #123)
@@ -500,3 +500,11 @@ Not checked: a real phone; whether the friends' leaderboard is fair in other way
 ## 2026-11-23: the shop's showings are good as they are (tester t1, note #134)
 
 The lab asked (#118) what should come next for looking at effects in the shop: a test night with the effect, a switch to turn the full-screen look off, all switched-on effects one after another, or nothing. The tester tapped "It is good as it is". No change. This closes the proposal "A setting for showing on tap" under note #112.
+
+## 2026-11-23: one bad frame no longer freezes the game (lab, from the note #112 proposal)
+
+Not asked for by a note; it closes a proposal recorded under note #112. The frame loop asked for the next frame only after `draw` returned, so a single error thrown while drawing stopped the game for good on a frozen screen. The next frame is now asked for first. The error still reaches the console as before, so checks still see it. If `draw` throws, the blend mode and alpha are put back, so the next frame is not drawn in the `lighter` blend a half-drawn frame can leave behind.
+
+Check: a new line at the start of the Lantern phone check makes one `fillRect` throw, waits up to 5 s for that frame, then waits up to 5 s for one more frame. Headless WebKit in CI drew no frame in the first version's 0.2 s. It passes on Chromium Pixel 7 and WebKit iPhone 13. With the old loop it fails with 0 frames (tried). The thrown error is filtered out of that page's errors by its own text. Local Chromium runs on the fix failed 3 times in 10. Two were captured: both were "page errors" from a failed request to `human.adamwhite.work/lab/api/linked`, a live lab server the local check reaches, not this change. The first failure's text was not captured.
+
+Not checked: a real phone. No error has been seen in play that this would have caught; the change is a guard.

@@ -960,6 +960,7 @@ function draw(now) {
 }
 
 function frame(now) {
+  requestAnimationFrame(frame); // first, so one bad frame cannot stop the game for good; its error still reaches the console
   const dt = Math.min(0.1, (now - last) / 1000 || 0); last = now;
   if (playing && !paused) { acc += dt; while (acc >= DT && playing) { tick(); acc -= DT; } }
   else if (looking) drift(dt);
@@ -967,7 +968,7 @@ function frame(now) {
   shake = Math.max(0, shake - dt * 3); glow = Math.max(0, glow - dt * 2);
   for (const p of sparks) { p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; } sparks = sparks.filter(p => p.life > 0);
   if (snd.ctx) { water.frequency.value = 400 + 500 * Math.min(1.4, s.y / GOAL); waterGain.gain.value = 0.05 + (playing ? 0.14 * Math.max(fall(s, s.y), fall(s, s.y + 0.8)) : 0); droneGain.gain.value = playing ? 0.05 * (1 - s.light) : 0; }
-  draw(now); requestAnimationFrame(frame);
+  try { draw(now); } catch (e) { g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; throw e; } // a bad frame must not leave the next one drawn in a blend mode
 }
 show('menu');
 requestAnimationFrame(frame);
