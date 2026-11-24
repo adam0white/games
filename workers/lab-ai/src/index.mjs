@@ -1,6 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import { handle, takeOne, readSpend, originAllowed } from './core.mjs';
-import { handleBoard, boardTop, boardPut, boardRemove } from './board.mjs';
+import { handleBoard, boardTop, boardPut, boardRemove, boardStart } from './board.mjs';
 import { ROOM, roomName, roomMessage, rateWindow, needsRound, freshRound, freeId } from './room.mjs';
 
 // One instance of this class (named "global") counts model calls per UTC day for the shared daily cap.
@@ -11,9 +11,10 @@ export class DailyCounter extends DurableObject {
 
 // One instance per game (named by the game) holds that game's shared leaderboard. See board.mjs.
 export class Board extends DurableObject {
-  top(limit) { return boardTop(this.ctx.storage.sql, limit); }
-  put(q, now) { return boardPut(this.ctx.storage.sql, q, now); }
+  top(limit, day) { return boardTop(this.ctx.storage.sql, limit, day); }
+  put(q, now, need, day) { return boardPut(this.ctx.storage.sql, q, now, undefined, need, day); }
   remove(id) { return boardRemove(this.ctx.storage.sql, id); }
+  start(r, now) { return boardStart(this.ctx.storage.sql, r, now); }
 }
 
 // One instance per <game>/<code>. No storage writes, timers or logging: attachments survive hibernation,
