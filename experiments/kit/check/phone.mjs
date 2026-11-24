@@ -415,6 +415,14 @@ const GAMES = {
       assert.match(await page.textContent('#rows'), /Rio/, `${m}: the phone's board shows`); assert.match(await page.textContent('#boardHint'), /stay on this phone/); await page.click('#board .back');
     }
     mode = 'ok'; await openBoard(); assert.equal(await page.isVisible('#tabs'), true, 'tabs when the shared board answers'); assert.match(await page.textContent('#rows'), /Zed/, 'all players come first');
+    // The daily board's stand-in (Today's river, below). Stopping sharing posts a removal to it too.
+    const dposts = [], dstarts = [], dkept = new Map([['day', { n: 'Day', s: 77777 }]]), dlisted = () => [...dkept.values()].sort((x, y) => y.s - x.s);
+    await page.route('**/lab-api/board/lantern-daily', async route => {
+      const r = route.request(); if (r.method() !== 'POST') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ rows: dlisted() }) });
+      const b = r.postDataJSON(); if (b.start) { dstarts.push(b); return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' }); }
+      dposts.push(b); if (b.remove) dkept.delete(b.id); else dkept.set(b.id, { n: b.n, s: Math.max(b.s, dkept.get(b.id)?.s ?? 0) });
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ place: b.remove ? 0 : dlisted().indexOf(dkept.get(b.id)) + 1, rows: dlisted() }) });
+    });
     await page.click('#tabAll'); assert.match(await page.textContent('#rows'), /Zed99999/); assert.doesNotMatch(await page.textContent('#rows'), /Rio/); assert.match(await page.textContent('#shareNote'), /A tick sends your name and your best score/);
     // The yes sends nothing by itself. A score goes up with a run ticket: the page tells the server when a sharing player's endless run starts.
     assert.equal(starts.length, 0, 'no ticket is asked for before the yes');
@@ -439,6 +447,23 @@ const GAMES = {
     await page.fill('#askName', 'Rio'); await page.click('#askYes'); await until(page, () => /Your next run goes up/.test(document.querySelector('#sub').textContent), 'the card says the next run goes up'); assert.equal(posts.length, 2); assert.equal(starts.length, 1); assert.equal(await page.isVisible('#ask'), false); assert.equal((await saved())['lantern-share'], '1');
     await page.click('#toMenu'); await openBoard(); await page.uncheck('#share'); for (let i = 0; i < 40 && posts.length < 3; i++) await sleep(50); assert.equal(posts.length, 3); await page.click('#board .back');
     await page.evaluate(() => localStorage.setItem('lantern-name', 'Rio <b>river</b')); // as the lines below expect
+    // Today's river: the same seed for the whole UTC day, its own shared board, and nothing on the endless boards.
+    const d0 = dposts.length; assert.ok(dposts.every(b => b.remove === true), 'only removals reached the daily board so far');
+    const rows0 = (await state()).board.length, best0 = (await saved())['lantern-best-endless'], seedNow = () => page.evaluate(() => window.lanternSim().seed);
+    await page.click('#daily'); assert.equal((await state()).daily, true, 'daily on from the menu'); const seed1 = await seedNow(); await endlessRun();
+    assert.match(await page.textContent('#line'), /Today's river: your best today is \d+/); assert.equal(dposts.length - d0 + dstarts.length, 0, 'not sharing: nothing is sent');
+    const kept1 = JSON.parse((await saved())['lantern-daily']); assert.match(kept1.d, /^\d{4}-\d\d-\d\d$/); assert.ok(kept1.s >= 30);
+    assert.equal((await state()).board.length, rows0, 'a daily run stays off the phone\'s endless board'); assert.equal((await saved())['lantern-best-endless'], best0);
+    await page.click('#go'); assert.equal(await seedNow(), seed1, 'the same river again'); assert.equal((await state()).daily, true, 'daily kept on play again'); await endlessRun(); await page.click('#toMenu');
+    await page.click('#endless'); assert.notEqual(await seedNow(), seed1, 'the endless river is a new river'); assert.equal((await state()).daily, false);
+    await page.evaluate(() => { const s = window.lanternSim(); s.t = -1; s.extra = 0; s.light = 0.0001; s.warm = 0; }); await until(page, () => window.lanternState().screen === 'card' && !window.lanternState().playing, 'a run of 0 ends'); await page.click('#toMenu'); // 0 stays off the board
+    await openBoard(); await page.check('#share'); await page.click('#tabDay'); await until(page, () => /Day77777/.test(document.querySelector('#rows').textContent), 'today\'s board'); assert.match(await page.textContent('#boardHint'), /same river for every player/);
+    const mainSent = posts.length; await page.click('#boardPlay'); assert.equal((await state()).daily, true, 'daily on from the Today tab'); assert.equal(await seedNow(), seed1); for (let i = 0; i < 40 && dstarts.length < 1; i++) await sleep(50);
+    await endlessRun(); await until(page, () => /Number 2 today among all players/.test(document.querySelector('#sub').textContent), 'the place on today\'s board');
+    assert.equal(dposts.length, d0 + 1); assert.equal(dposts[d0].r, dstarts[0].r); assert.equal(posts.length, mainSent, 'nothing goes to the endless board');
+    await page.click('#toMenu'); await openBoard(); await page.uncheck('#share'); for (let i = 0; i < 40 && dposts.length < d0 + 2; i++) await sleep(50);
+    assert.deepEqual(dposts[d0 + 1], { id: dposts[d0].id, remove: true }, 'stop sharing takes the row off today\'s board too'); await page.click('#board .back');
+    await page.unroute('**/lab-api/board/lantern-daily');
     await page.unroute('**/lab-api/board/lantern');
     await sleep(400); await page.reload(); st = await state(); assert.equal(st.name, 'Rio <b>river</b'); assert.equal(st.board.length, 5, 'the board is kept');
     await page.evaluate(() => localStorage.setItem('hf-lab-recording-off', '1')); await page.reload(); // recording off again, as the steps below expect
@@ -707,7 +732,7 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
     page.on('requestfailed', r => errors.push(`request failed: ${r.url()}`)); page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
     // Lantern's check is the longest: its seven ability showings (note #123) took it past 150 s on WebKit.
     try { await within(run(page), game === 'lantern' ? 240000 : 150000, 'the whole check'); assert.deepEqual(errors.filter(e => !(context.labDown && /human\.adamwhite\.work|Load failed|Failed to fetch|ERR_CONNECTION_REFUSED/.test(e))).filter(e => !(context.boardBad && /\/lab-api\/board\/|status of 401/.test(e))).filter(e => !(context.badFrame && /lab check: one bad frame/.test(e))), [], 'page errors'); console.log(`ok   ${game} on ${phone}`); }
-    catch (e) { failed++; console.log(`FAIL ${game} on ${phone}: ${e.message}`); if (errors.length) console.log('     ' + errors.join('\n     ')); }
+    catch (e) { failed++; console.log(`FAIL ${game} on ${phone}: ${e.message}`); if (process.env.CHECK_STACK) console.log(e.stack); if (errors.length) console.log('     ' + errors.join('\n     ')); }
     try { await within(context.close(), 15000, 'closing the page'); }
     catch (e) { console.log(`     ${e.message}; starting the browser again`); browser.close().catch(() => {}); browser = await engine.launch(); }
   }

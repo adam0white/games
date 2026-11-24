@@ -180,3 +180,9 @@ chosen to share.
 existed can still post. Add `'lantern'` and deploy once the page with tickets is live. Other games on the board are not
 affected: the 18 points a second is Lantern's rule and applies only to a post that carries a ticket.
 
+### Daily boards (2026-11-24)
+
+`DAILY` lists board names that keep one UTC day's rows (`lantern-daily`, Lantern's "Today's river"). They are read and
+posted like any other board. The first read or post of a new UTC day deletes the day before's rows, and the read cache
+is keyed by the day. What is stored is the same as for the main board.
+

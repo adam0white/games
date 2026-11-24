@@ -569,3 +569,12 @@ the shop while a pack spun left the caption at "…"; (5) the shop's long openin
 (about a fifth of a phone screen); now only a short text stays in view. Left alone: a heart picked up at three hearts
 gives nothing (sim rule; only with the Hearts stat at its top).
 
+## 2026-11-24: Today's river (an idea of the agent's, not from a note)
+
+One river a day, the same for every player: the seed is a hash of the UTC date, so "Today's river" on the menu gives
+everyone the same rocks and gifts until midnight UTC. It has its own shared board (`lantern-daily` on the server, the
+"Today" tab on the leaderboard), which starts empty each UTC day. A daily run stays off the endless boards and off
+`lantern-best-endless`, because a river that can be learned is a different contest. New save key: `lantern-daily`,
+`{ d, s }`, this phone's best of the day. Sharing follows the one yes; stopping sharing removes the row from both boards.
+Known gaps: a run that crosses midnight UTC counts for the new day; abilities a player owns still differ between players.
+
