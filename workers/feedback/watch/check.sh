@@ -19,6 +19,23 @@ tell() {
   osascript -e "display notification \"$2\" with title \"Game notes watcher\"" >/dev/null 2>&1
 }
 
+# Each run's clone is a full copy of the repository. Remove it when the run ends, unless it still holds
+# work that is nowhere else: uncommitted files, a stash, a linked worktree, or a commit missing from
+# GitHub. The fetch comes first because a remote-tracking ref outlives a branch deleted on GitHub.
+finish_clone() {
+  local run="$1"
+  [ -d "$run/.git" ] || return 0
+  perl -e 'alarm 120; exec @ARGV' git -C "$run" fetch -q --prune origin 2>/dev/null || { log "kept $(basename "$run"): could not reach GitHub"; return 0; }
+  if [ -n "$(git -C "$run" status --porcelain 2>/dev/null)" ] || [ -n "$(git -C "$run" stash list 2>/dev/null)" ] \
+    || [ -n "$(git -C "$run" log --oneline --branches HEAD --not --remotes 2>/dev/null)" ] \
+    || [ "$(git -C "$run" worktree list 2>/dev/null | wc -l | tr -d ' ')" != 1 ]; then
+    log "kept $(basename "$run"): it holds work that is not on GitHub"
+    return 0
+  fi
+  git -C "$run" fsmonitor--daemon stop >/dev/null 2>&1
+  cd "$STATE" && rm -rf "$run"
+}
+
 # One run at a time. A lock older than three hours belongs to a run that died.
 LOCK="$STATE/lock"
 if ! mkdir "$LOCK" 2>/dev/null; then
@@ -56,7 +73,8 @@ if [ "$login" != "adam0white" ]; then
   tell "gh-login" "GitHub login is not adam0white. Notes are waiting."
   exit 1
 fi
-find "$STATE/work" -mindepth 1 -maxdepth 1 -type d -mtime +7 -exec rm -rf {} + 2>/dev/null
+# A clone that was kept (see finish_clone) is removed after two days, so the disk does not fill.
+find "$STATE/work" -mindepth 1 -maxdepth 1 -type d -mtime +2 -exec rm -rf {} + 2>/dev/null
 RUN="$STATE/work/games-$(date +%s)"
 SOURCE="$(git -C "$HERE" rev-parse --show-toplevel)"
 if ! { git clone -q --no-hardlinks "$SOURCE" "$RUN" && git -C "$RUN" remote set-url origin git@github.com:adam0white/games.git \
@@ -78,6 +96,7 @@ result="$(grep -E '^RESULT ' "$STATE/last-run.txt" | tail -1)"
 if [ "$status" -eq 0 ] && [ "${result:0:9}" = "RESULT ok" ]; then
   for id in $new; do echo "$id" >> "$STATE/fired"; done
   log "done for$new: ${result:0:200}"
+  finish_clone "$RUN"
 elif grep -q 'Failed to authenticate' "$STATE/last-run.txt"; then
   # The command-line Claude on this computer is signed out. Not counted as a try; the next run tries again.
   log "claude is signed out; run 'claude' in a terminal and sign in. Waiting:$new"
