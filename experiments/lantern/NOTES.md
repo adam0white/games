@@ -467,3 +467,32 @@ Not checked: sound and feel on a real phone. Magnet and Flare show only their ri
 ### Left as a proposal (2026-11-23, note #112)
 - **A drawing error stops the game for good.** Any error thrown in `draw` ends the frame loop, since `requestAnimationFrame` is called after it. Calling it first, or catching the error, would keep a rare bad frame from freezing the screen.
 - **A setting for showing on tap.** The note's "a button to enable and disable the feature" is read as the on/off button for each thing. If the tester meant a setting that turns the whole-screen showing itself off, that is a new saved setting. A question was sent.
+
+## 2026-11-23: fair endless river, hearts and force field as abilities, a random first ability, showings that show (tester t1, notes #119 to #123)
+
+The notes, in short: the tester shared the game with friends and wants the endless river fair for competition, so no stats there and a warning that says so (#119, "only on endless" #120). Hearts and the force field should not be free; they should be in the Abilities pack (#121). A new player, and a rebirth, should start with a random ability, not Boost (#122). The ability showings in the shop were confusing: slow and boost showed no change of speed, the magnet had no embers to pull, the flare did not brighten anything; make them clear with real examples (#123).
+
+### Done
+| Note | What changed |
+| --- | --- |
+| #119, #120 | An endless run neither uses stats nor spends them; they wait for the next night or tower climb. The shop's stat warning, the menu's stat line and the leaderboard say stats never work on the endless river. Starting the endless river with stats waiting says "No stats here: they wait for your next night or climb". Nights and the tower are unchanged. |
+| #121 | The Abilities pack holds seven: the five powers, Heart and Force field. A heart or force field lies in the river only when it is found and switched on, and it takes one of the two places. The gifts keep their places and their random draws, so with both switched on a seed's river is the same as before (960 of 960 rivers identical); with one off, its pickups are laid down and left out. The Hearts stat (start with more hearts) is unchanged. |
+| #122 | A new player, and every rebirth, starts with one of the seven abilities at random. New key `lantern-start`, the id, text; it is not in `lantern-owned`. A save from before this key (any of `lantern-bank`, `-owned`, `-night`, `-stats`, `-off`) keeps Boost. "Erase everything" makes a new player, with a new random start. The rebirth message names the new first ability. |
+| #123 | Each ability is shown on a short stretch of real river, run by the game's own rules, at the size and darkness of a run, with a line saying what to watch and then what happened. Boost and slow water: rocks line both banks so the change of speed shows, and boost goes through a rock in its path. Size: a gap too narrow for the usual boat. Magnet: five embers out of reach swim in, and the ember count rises. Flare: the flame starts low on a dark river and fills. Heart: one heart, take the heart (two), a rock hits, back to one and still going. Force field: three rocks in the way are pushed aside. The hearts and ember count show during a showing. It still changes no save and sends nothing. |
+| (Lab) | The shop's rows of things wrap on a narrow phone; seven abilities did not fit in one row at 360 px. Heart and force field have their own marks on the shop button. The ability event sounds and captions of a run now live in one function, `react`, used by the run and by the showings. |
+
+**Rebirth goal.** It now counts 35 things, not 33: a player who had found everything must find Heart and Force field before the next rebirth.
+
+Effect on play: a player with neither Heart nor Force field switched on gets no spare hearts in the river. This makes nights harder, which matches the tester's earlier wish for a harder game (note #69), but it was not measured with the bots.
+
+Checks:
+- Phone check, Chromium Pixel 7: all Lantern lines pass, with new lines for: an old save keeps Boost; the stat warning on the menu and shop; an endless run with a stat waiting starts with one heart and leaves the stat saved, and the next night uses it; a rebirth's random start; a new player's random start after Erase; each of the seven showings doing its work, with no save changed and nothing sent. With stats put back on the endless river the check fails at "no stats on the endless river" (tried).
+- Node: 100 rivers on night 5 for each ability set: no heart or field pickups with neither on, hearts only with Heart on, fields only with Force field on. `bots.mjs 30 audit`: no closed river, no buried pickup.
+- Phone check, WebKit iPhone 13: all Lantern lines pass (159 s). The Lantern check now has 240 s, not 150 s, because the seven showings took it past 150 s on WebKit. One line that this change does not touch, "vbow ends" (the victory showing), fails about one run in two on WebKit on the lab Mac, on clean `main` as well (2 of 4 runs, 2026-11-23). Unresolved.
+- Full phone check: 31 passing on this branch and 31 on clean `main`, run on the same machine. On both, the WebKit hint lines ("hidden under the pause card") and the kit self-test fail; those failures were already on `main`.
+
+Not checked: a real phone; whether the friends' leaderboard is fair in other ways (the page still reports its own score, as noted before).
+
+### Left as a proposal (2026-11-23, notes #119 to #123)
+- **Abilities on the endless river.** The tester asked only about stats. Abilities still work there. If the competition should be plainer still, the endless river could run with no abilities, or with the same fixed two for everyone.
+- **A showing for the bigger boat.** The size showing always shrinks the boat; the one-in-five bigger boat is only told in words.

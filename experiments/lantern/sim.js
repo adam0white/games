@@ -10,6 +10,10 @@ export const NIGHTS = 50;
 // magnet (embers swim to the boat) and flare (the flame is filled and does not fade) are the lab's own two.
 export const POWERS = ['boost', 'slow', 'size', 'magnet', 'flare'];
 export const LAST = { boost: 2.5, slow: 5, size: 6, magnet: 7, flare: 6 };
+// Hearts and the force field are abilities too (tester t1, note #121): they lie in the river only when found in the Abilities pack and switched on.
+// They keep their own places in the river (the gifts below); a gift that is not switched on is laid down and left out, so a seed's river does not change.
+export const GIFTS = ['heart', 'shield'];
+export const ABILITIES = [...POWERS, ...GIFTS];
 // Stats are bought with embers for one run. Each is a level from 0: hearts (start with more), barrier (the force field lasts 1.5 s longer a level; it was hits a shield takes),
 // calm (the river runs 4% slower a level), wick (the flame fades 8% slower a level), pull (pickups are taken from further away).
 // The force field (tester t1, answer to question #72): a blue pickup that for FIELD seconds pushes rocks out of the boat's way. A heart stays the spare life.
@@ -78,11 +82,11 @@ export function dazzle(s) { if (level(s) < 19) return 0; const p = (s.t + 2) % 9
 // How far the boat can see: the flame's reach, cut by fog and by the moments after lightning.
 export function sight(s) { return reach(s.light) * (fog(s, s.y) ? 0.6 : 1) * (dazzle(s) > 0 ? 0.6 : 1); }
 
-export function create(seed, stage = 1, mode = false, powers = POWERS, stats = {}, climb = 1, reborn = 0) { // reborn: rebirths so far; story nights only // mode: false for a story night, true for the endless river, 'tower' for the climb; climb: the tower level
+export function create(seed, stage = 1, mode = false, powers = ABILITIES, stats = {}, climb = 1, reborn = 0) { // reborn: rebirths so far; story nights only // mode: false for a story night, true for the endless river, 'tower' for the climb; climb: the tower level
   const endless = mode === true, tower = mode === 'tower';
   const st = Object.fromEntries(Object.entries(STATS).map(([k, top]) => [k, Math.max(0, Math.min(top, Math.floor(stats[k] || 0)))]));
   const r = rng(seed), q = rng(seed ^ 0x9e3779b9); // powers draw from their own stream, so the rocks and embers of a seed never change
-  const s = { seed, stage, endless, tower, climb: Math.max(1, Math.min(LEVELS * SECTORS, Math.floor(climb) || 1)), q, st, calm: 1 - 0.04 * st.calm, take: 0.05 + 0.012 * st.pull, on: powers, powers: [], nextPower: 10 + q() * 10, boost: 0, slow: 0, size: 0, magnet: 0, flare: 0, big: false, bonus: 0, extra: 0, hearts: 1 + st.hearts, ice: -9, iceSide: 1, isle: -9, warm: 0, shield: 0, field: 0, hard: mode ? 1 : 1 + REBORN_PACE * Math.max(0, Math.min(5, Math.floor(reborn) || 0)), safe: 0, nextGift: 9 + r() * 5, r, p1: r() * 6.28, p2: r() * 6.28, t: 0, y: 0, x: 0.5, light: 0.8, rocks: [], embers: [], next: 2.2, events: [], over: null, taken: 0, grazes: 0 };
+  const s = { seed, stage, endless, tower, climb: Math.max(1, Math.min(LEVELS * SECTORS, Math.floor(climb) || 1)), q, st, calm: 1 - 0.04 * st.calm, take: 0.05 + 0.012 * st.pull, on: powers.filter(k => POWERS.includes(k)), gifts: powers.filter(k => GIFTS.includes(k)), powers: [], nextPower: 10 + q() * 10, boost: 0, slow: 0, size: 0, magnet: 0, flare: 0, big: false, bonus: 0, extra: 0, hearts: 1 + st.hearts, ice: -9, iceSide: 1, isle: -9, warm: 0, shield: 0, field: 0, hard: mode ? 1 : 1 + REBORN_PACE * Math.max(0, Math.min(5, Math.floor(reborn) || 0)), safe: 0, nextGift: 9 + r() * 5, r, p1: r() * 6.28, p2: r() * 6.28, t: 0, y: 0, x: 0.5, light: 0.8, rocks: [], embers: [], next: 2.2, events: [], over: null, taken: 0, grazes: 0 };
   s.x = centre(s, 0);
   return s;
 }
@@ -197,7 +201,7 @@ function spawn(s) {
     if (y > s.nextGift) {
       // Gifts are rare and sit in open water. Blue is a force field that pushes rocks aside for a few seconds; red is a heart, a spare life.
       const gy = y + 0.5, gc = centre(s, gy), gx = gc + (s.r() * 2 - 1) * (half(s, gy) - 0.07), kind = s.r() < 0.4 ? 'heart' : 'shield';
-      if (clear(s, gx, gy)) { s.embers.push({ x: gx, y: gy, got: false, kind }); s.nextGift = y + 16 + s.r() * 8; }
+      if (clear(s, gx, gy)) { if (s.gifts.includes(kind)) s.embers.push({ x: gx, y: gy, got: false, kind }); s.nextGift = y + 16 + s.r() * 8; }
     }
     if (lv >= 10) open(s, y, 'wisp', 0.1); // night 10: false embers that steal light
     power(s, y);
