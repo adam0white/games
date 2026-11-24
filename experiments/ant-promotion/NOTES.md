@@ -454,3 +454,39 @@ The rival section of `bots.mjs` passes after that. One number moved: the bot tha
 
   Ask the tester which one before building.
 - **More species (#148).** Add one extra choice at some promotions, so the tree branches more. It costs art time (each animal is drawn in code in `art.js`, in all four looks).
+
+## 2026-11-24: a power for every animal (tester t1, note #148)
+
+Every animal after the Ant has one power, used with a round button at the bottom right (Space on a keyboard). The button shows the power's name and fills up again while it waits. `POWER` and `POWERS` in `sim.js` hold the numbers and the 49 names.
+
+| Kind | Who (examples) | What it does | Wait |
+|---|---|---|---|
+| sting | Wasp, Spider, Snake, Hydra | The nearest animal within 120 units cannot move, notice or bite for 3 s. Works on stronger animals. Nothing in reach: not spent, 1 s wait. | 10 s |
+| leap | Frog, Rabbit, Cat, Raptor | Jumps 150 units plus three body sizes the way you face; nothing can bite for 0.35 s. | 6 s |
+| shell | Turtle, Beetle, Mole, Crocodile | Nothing can bite or notice you for 3 s. | 16 s |
+| roar | Dog, Bear, Lion, Dragon | Every weaker animal within 230 units freezes for 2.5 s. | 14 s |
+| dive | Bat, Owl, Eagle, Griffin | 1.9 times the speed for 1.2 s, and nothing notices you; animals already chasing give up. | 10 s |
+| sprint | Cheetah, Fox, Lizard, Zebra | 1.6 times the speed for 2 s. | 8 s |
+
+Reach grows 2% per level. A promotion or a revive resets the wait. A game played without pressing the button is the same game as before: the earlier bot rows did not move.
+
+Careful bot that uses its power when a hunter has noticed it within 130 units (roar: when two weaker animals are within 200), 6 seeds, 12 minutes, median top level / median deaths, against the same bot without powers:
+
+| | no power | with power |
+|---|---|---|
+| classic strong | 9 / 1 | 7 / 0 |
+| classic fast | 13 / 4 | 13 / 3 |
+| classic sneaky | 18 / 0 | 18 / 0 |
+| Wild strong | 6 / 2 | 7 / 1 |
+| Wild fast | 11 / 10 | 11 / 7 |
+| Wild sneaky | 12 / 4 | 18 / 1 |
+
+Powers are mostly an escape, so they cut deaths, most in Wild. Wild sneaky now reaches the top band; that may be too easy and is the first number to tune.
+
+### Checks
+`bots.mjs` has a direct check of each kind (a stunned stronger animal on top of the player does not bite; the shell holds for its time and then does not; roar spares stronger and far animals; dive and sprint are exactly their speed and then the plain speed; a diving bird is not noticed), of the wait, and that the Ant has no power and every other animal has one. WebKit iPhone 13, Cartoon and 3D: the button is hidden for the Ant, shows "Sting / ready" for a Wasp, a tap stuns a Dog 70 units away and the button shows the wait, no page errors. The steering stick's numbers in the shared phone check are unchanged.
+
+### Not verified
+- A real phone and a person: whether the button sits well under the right thumb while the left steers, and whether the powers are fun or only safe.
+- The roar is the only power that helps hunting. The others are escapes. A hunting use for each kind is a next step.
+- Other animals do not use powers.
