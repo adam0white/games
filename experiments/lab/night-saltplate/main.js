@@ -6,6 +6,7 @@ import { isPauseKey, onLeave } from '../../kit/pause.js';
 import { readJson, writeJson } from '../../kit/save.js';
 import { screens } from '../../kit/screens.js';
 import { noZoom } from '../../kit/zoom.js';
+import { lab } from '../../kit/lab.js';
 
 noZoom();
 const byId = id => document.getElementById(id);
@@ -74,7 +75,16 @@ const show = screens(['paused', 'result'], name => {
 });
 const two = number => String(number).padStart(2, '0');
 
+// Play recording for the game lab (kit/lab.js): one run for each plate the player starts to tune.
+const rec = lab('night-saltplate');
+let runOpen = false;
+function runEnd(outcome) {
+  if (!runOpen) return;
+  runOpen = false;
+  rec.end(outcome, { level: state.level, match: Math.round(state.match * 100), grains: state.grains.length, cleared });
+}
 function begin(level) {
+  if (state) runEnd('quit');
   state = createPlate(level, 0x5517 + level * 177);
   drive = 0;
   active = false;
@@ -97,6 +107,8 @@ function finish() {
   cleared = Math.max(cleared, state.level);
   save();
   active = false;
+  rec.event('plate-printed', { level: state.level });
+  runEnd('won');
   const final = state.level === LEVELS.length;
   instruction.textContent = pitch() + ' Hz · ' + state.grains.length + ' grains of salt.';
   byId('result-label').textContent = 'Impression ' + two(state.level) + ' / ' + two(LEVELS.length);
@@ -119,6 +131,7 @@ function resume() {
 }
 function tune() {
   if (screen !== 'play') return;
+  if (!runOpen) { runOpen = true; rec.start({ level: state.level, look }); }
   active = true;
   drive = tuner.valueAsNumber / 1000;
   byId('frequency').value = pitch();
@@ -187,6 +200,9 @@ function frame(now) {
   }
   requestAnimationFrame(frame);
 }
+// The recording notice is on the page from the first look; its switch is on the pause card.
+rec.notice(document.querySelector('header'));
+rec.toggle(document.querySelector('#paused .card'));
 settings();
 begin(cleared % LEVELS.length + 1);
 resize();

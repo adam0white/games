@@ -1,4 +1,5 @@
 // Exercise the served page through its controls. The state hook is read-only.
+import { answerLab, assertNotice, assertRun, assertOffSendsNothing, waitForRuns } from '../../kit/check/lab-record.mjs';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -250,9 +251,11 @@ async function run(name, engine, profile, origin) {
     await context.route('**/*', route => {
       const { origin: host, pathname } = new URL(route.request().url());
       if (host !== origin) { outside.push(host); return route.abort(); }
-      if (pathname === '/kit/lab.js' || route.request().method() !== 'GET') telemetry.push(pathname);
+      if (route.request().method() !== 'GET') telemetry.push(pathname);
       return route.continue();
     });
+    // The lab endpoint is answered here (registered after the catch-all, so it takes lab requests first).
+    const lab = await answerLab(context, origin);
     // Fixed calendar date; browser timers, animation frames and physics run in real time.
     await page.clock.setFixedTime(new Date('2026-11-24T18:00:00Z'));
     if (name === 'webkit') {
@@ -406,6 +409,26 @@ async function run(name, engine, profile, origin) {
     await waitForPlay(page);
     await page.tap('#daily');
     assert.equal((await view(page)).best, digs, 'reloading after the worse replay keeps the cheaper result');
+    // Play recording: the notice is on the page before the first cut; the finished daily garden sends one run
+    // record under 'night-channels'; with the switch off in the pause card a replay sends nothing.
+    assert.equal(lab.sent.length, 0, 'no record was sent by the checks above (nothing sends from localhost unless allowed)');
+    await page.evaluate(() => localStorage.setItem('hf-lab-send-localhost', '1'));
+    await page.goto(url + '?labRunSource=agent');
+    await waitForPlay(page);
+    await assertNotice(page);
+    await page.tap('#daily');
+    for (const ids of routes) await draw(page, session, ids);
+    await page.waitForFunction(() => window.channelView().screen === 'won', null, { timeout: 60000 });
+    await waitForRuns(lab, 'night-channels', 1);
+    const recorded = assertRun(lab, 'night-channels', { outcomes: ['won'], summaryKeys: ['garden', 'cuts', 'budget'] });
+    assert.equal(recorded.data.summary.daily, true);
+    assert.deepEqual(recorded.data.events.map(e => e.type), ['garden-complete', 'daily-finished']);
+    await page.tap('#retry'); await page.tap('#pause');
+    await assertOffSendsNothing(page, lab, 'night-channels', { play: async () => {
+      await page.tap('#resume');
+      for (const ids of routes) await draw(page, session, ids);
+      await page.waitForFunction(() => window.channelView().screen === 'won', null, { timeout: 60000 });
+    } });
     await page.clock.setFixedTime(new Date('2026-11-25T18:00:00Z'));
     await page.reload();
     await page.waitForFunction(() => !!window.channelView);

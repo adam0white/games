@@ -5,6 +5,7 @@ import { sound } from '../../kit/audio.js';
 import { hint } from '../../kit/hint.js';
 import { screens } from '../../kit/screens.js';
 import { onLeave, isPauseKey } from '../../kit/pause.js';
+import { lab } from '../../kit/lab.js';
 import { noZoom } from '../../kit/zoom.js';
 
 noZoom();
@@ -50,7 +51,17 @@ function updateFooter() {
     mark.className = i === state.level - 1 ? 'current' : i < save.next - 1 || save.complete ? 'done' : '';
   });
 }
+// Play recording for the game lab: one run is one plate, from the first pull of the wire to all pods open,
+// a restart, or leaving it for another plate.
+const rec = lab('night-podwire');
+let running = false;
+function recEnd(outcome) {
+  if (!running) return;
+  running = false;
+  rec.end(outcome, { plate: state.level, plucks: state.plucks, opened: knownOpened, pods: state.pods.length, secs: Math.round(state.time * 10) / 10 });
+}
 function start(level) {
+  recEnd('quit');
   state = create(level, level * 417);
   pointer = null; last = 0; carry = 0; knownOpened = 0; winTime = null;
   lastPluck = -Infinity;
@@ -146,8 +157,11 @@ function frame(now) {
       audio.tone(440 * 2 ** (opened / 5), .35, .065);
       updateFooter();
     }
+    if (!running && winTime === null && state.plucks > 0 && screen === 'play') { running = true; rec.start({ plate: state.level, pods: state.pods.length }); }
     if (state.won && winTime === null) {
       winTime = state.time;
+      rec.event('plate-complete', { plate: state.level, plucks: state.plucks });
+      recEnd('won');
       save.next = Math.max(save.next, Math.min(plates.length, state.level + 1));
       save.complete ||= state.level === plates.length;
       store();
@@ -175,3 +189,7 @@ window.podwireView = () => ({
   plucks: state.plucks, time: state.time, cue: inWorldCue(), sound: save.sound, wire: state.u.slice(),
   pods: state.pods.map(({x,height,open}) => ({x,height,open})), zones: state.zones.map(z => [...z]),
 });
+
+// The notice is under the plate from the first moment (this page has no start card); the switch is on the pause card.
+rec.notice(document.querySelector('footer'));
+rec.toggle(document.querySelector('#paused .sheet'));

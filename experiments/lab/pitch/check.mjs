@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { create, restore, snapshot, botTurn, mulberry32, daily, legal, apply, clone } from './sim.js';
 import { tables } from './words.js';
+import { answerLab, allowLocalSend, withAgent, assertNotice, assertRun, assertNoLeak, assertOffSendsNothing, waitForRuns, runRecords } from '../../kit/check/lab-record.mjs';
 import { TABLE, tableName, tableMessage, freshTable, sit, move, again, shown } from '../../../workers/lab-ai/src/table.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -55,10 +56,12 @@ async function open(browser, device, friend = false) {
     if (url.startsWith(base) || url.startsWith('data:') || url.startsWith('blob:')) return route.continue();
     outside.push(url); return route.abort();
   });
+  // The lab endpoint is answered here (registered after the catch-all above, so it takes the request first).
+  const lab = await answerLab(context, base);
   page.on('pageerror', e => errors.push(String(e)));
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
-  return { context, page, errors, outside };
+  return { context, page, errors, outside, lab };
 }
 async function tapPoint(page, x, y) {
   const before = await P(page, () => __pitch.segments);
@@ -201,17 +204,44 @@ function tableWire() {
   };
 }
 
+// Play recording: the notice is on the menu before Play, a played match sends one run record under 'pitch',
+// and with the switch off in the pause card the next match sends nothing.
+async function recording(browser, device, phone) {
+  const test = await open(browser, device), { page, lab } = test;
+  try {
+    await allowLocalSend(test.context);
+    await page.goto(withAgent(URL_));
+    await until(page, () => window.__pitch?.ready && __pitch.screen === 'menu', 'menu');
+    await assertNotice(page, '#play');
+    assert.equal(lab.sent.length, 0, 'nothing is sent before Play');
+    await page.click('#play');
+    await until(page, () => __pitch.mode === 'bot' && __pitch.canTap, 'match starts');
+    await playMatch(page, phone, null);
+    await waitForRuns(lab, 'pitch', 1);
+    const run = assertRun(lab, 'pitch', { outcomes: ['won', 'lost'], summaryKeys: ['mode', 'goals', 'level'] });
+    assert.equal(run.data.summary.mode, 'bot'); assert.ok(run.data.events.some(e => e.type === 'goal'), 'goals are events');
+    await page.click('#endMenu');
+    await until(page, () => __pitch.screen === 'menu', 'menu again');
+    await page.click('#play');
+    await until(page, () => __pitch.mode === 'bot' && __pitch.canTap, 'second match');
+    await page.click('#pauseBtn');
+    await assertOffSendsNothing(page, lab, 'pitch', { play: async () => { await page.click('#resume'); await playMatch(page, phone, null); } });
+    assert.deepEqual(test.outside, [], 'nothing reached outside'); assert.deepEqual(test.errors, []);
+    console.log(`ok   pitch recording on ${phone}`);
+  } finally { await test.context.close(); }
+}
 async function playFriend(browser, device, phone) {
   const tests = [], wire = tableWire();
   const friendShot = (page, name) => page.screenshot({ path: join(TABLE_SHOTS, `${phone}-${name}.png`), timeout: 25000 });
   async function friendPage() {
     const test = await open(browser, device, true);
     tests.push(test);
-    return { page: test.page, socket: await wire.attach(test.page) };
+    await allowLocalSend(test.context);
+    return { page: test.page, socket: await wire.attach(test.page), lab: test.lab };
   }
   const oldSave = { played: 3, level: 2, lossStreak: 1, wins: 2, sound: false, daily: { [DATE]: { used: 2, solved: false } } };
   try {
-    const { page: a, socket: aSocket } = await friendPage(), { page: b, socket: bSocket } = await friendPage();
+    const { page: a, socket: aSocket, lab: aLab } = await friendPage(), { page: b, socket: bSocket } = await friendPage();
     const pages = [a, b], names = ['Ada', 'Ben'];
     await Promise.all(pages.map(async page => {
       await page.goto(URL_);
@@ -371,6 +401,13 @@ async function playFriend(browser, device, phone) {
       assert.ok(played === wasPlayed || played === wasPlayed + 1);
       assert.deepEqual(other, untouched, 'no change to bot and daily progress');
     }
+    // Play recording at a table: one run for the match, a table-joined event, and no name or code in anything sent.
+    await waitForRuns(aLab, 'pitch', 1);
+    const tableRun = runRecords(aLab, 'pitch').find(r => r.data.start?.mode === 'table');
+    assert.ok(tableRun, 'the table match was recorded');
+    assert.ok(['won', 'lost'].includes(tableRun.data.outcome)); assert.equal(tableRun.data.summary.mode, 'table');
+    assert.ok(tableRun.data.events.some(e => e.type === 'table-joined') || runRecords(aLab, 'pitch').some(r => r.data.events?.some(e => e.type === 'table-joined')), 'a table-joined event');
+    assertNoLeak(aLab, ['Ada', 'Ben', code]);
     await a.click('#again');
     await until(a, () => document.querySelector('#endLine').textContent.includes('Waiting for Ben'), 'own rematch vote waits');
     await until(b, () => document.querySelector('#endLine').textContent.includes('Ada wants a rematch'), 'friend sees the first vote');
@@ -903,10 +940,12 @@ try {
     if (only && only !== phone) continue;
     const browser = await engine.launch(), test = await open(browser, device);
     try {
+      if (process.argv.includes('--recording-only')) { await recording(browser, device, phone); continue; }
       if (!process.argv.includes('--friends-only')) {
         await run(test, phone); console.log(`ok   pitch on ${phone} (${device.viewport.width}x${device.viewport.height})`);
         if (phone === 'chromium') for (const [w, h] of [[360, 640], [390, 844]]) { await small(browser, w, h); console.log(`ok   pitch on chromium ${w}x${h}`); }
       }
+      if (!process.argv.includes('--friends-only')) await recording(browser, device, phone);
       await playFriend(browser, device, phone);
       if (!process.argv.includes('--friends-only')) {
         await turkish(browser, device, phone, `${phone}-${device.viewport.width}x${device.viewport.height}`);

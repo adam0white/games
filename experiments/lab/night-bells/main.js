@@ -2,6 +2,7 @@ import { create, step, view, LEVELS, DT } from './sim.js';
 import { readJson, writeJson } from '../../kit/save.js';
 import { sound } from '../../kit/audio.js';
 import { onLeave, isPauseKey } from '../../kit/pause.js';
+import { lab } from '../../kit/lab.js';
 import { noZoom } from '../../kit/zoom.js';
 import { screens } from '../../kit/screens.js';
 import { hint } from '../../kit/hint.js';
@@ -46,7 +47,12 @@ function applyPalette(){
   document.querySelector('meta[name="theme-color"]').content=palette.sky;
   for(const b of document.querySelectorAll('[data-look]')) b.setAttribute('aria-pressed',String(b.dataset.look===save.look));
 }
+// Play recording for the game lab: one run is one try at a night (or the endless mode).
+const rec=lab('night-bells');let running=false;
+function recStart(level,endless){running=true;rec.start({level,endless,look:save.look});}
+function recEnd(outcome,extra){if(!running)return;running=false;rec.end(outcome,{level:s.level,endless:!!s.endless,t:Math.round(s.t*10)/10,hits:s.hits,harmony:s.harmony,misses:s.misses,score:Math.floor(s.score),...extra});}
 function menu(){
+  recEnd('quit');
   queue=[];activePointer=null;snd.hold();show('menu');
   s=create(3,17);selected=Math.min(selected,unlocked());$('levels').replaceChildren();
   for(let i=1;i<=LEVELS;i++){
@@ -58,9 +64,10 @@ function menu(){
   $('play').setAttribute('aria-label',`Play level ${selected}`);soundLabels();layout();
 }
 function start(level,endless){
+  recEnd('quit');
   const seed=Number(query.get('seed'))||((save.tries+1)*9137);
   s=create(level,seed,endless);save.tries++;store();queue=[];activePointer=null;fx=[];burst=0;accumulator=0;last=performance.now();
-  snd.unlock();snd.release();show('play');layout();
+  snd.unlock();snd.release();recStart(level,!!endless);show('play');layout();
 }
 function pause(){if(mode!=='play')return;queue=[];activePointer=null;accumulator=0;snd.hold();show('paused');}
 function resume(){if(mode!=='paused')return;queue=[];last=performance.now();accumulator=0;snd.unlock();snd.release();show('play');}
@@ -68,7 +75,11 @@ function finish(){
   queue=[];activePointer=null;
   if(s.endless){save.best=Math.max(save.best,Math.floor(s.score));}
   else if(s.won){save.stars[s.level-1]=Math.max(save.stars[s.level-1],s.misses===0?3:s.misses<4?2:1);selected=Math.min(LEVELS,s.level+1);}
-  store();show('end');
+  store();
+  if(s.won&&!s.endless)rec.event('level-complete',{level:s.level,stars:save.stars[s.level-1]});
+  if(s.endless)rec.event('endless-finished',{score:Math.floor(s.score),best:save.best});
+  recEnd(s.won?'won':'lost',s.won&&!s.endless?{stars:save.stars[s.level-1]}:{});
+  show('end');
   $('endMark').textContent=s.won?'✦ '.repeat(save.stars[s.level-1]).trim():'☾';
   $('endLabel').textContent=s.endless?'Endless · on this device':s.won?`Night ${s.level} complete`:'The bells fell quiet';
   $('endTitle').textContent=s.endless?`${Math.floor(s.score)} lights`:s.won?(s.level===8?'The village is awake.':'A little brighter.'):'One more swing?';
@@ -242,3 +253,6 @@ window.bellsState=()=>({
 });
 if(query.get('test')==='1')window.bellsAdvance=seconds=>{if(mode==='play'){for(let i=0;i<Math.ceil(Math.min(120,Math.max(0,seconds))/DT)&&mode==='play';i++)update();}return window.bellsState();};
 applyPalette();menu();requestAnimationFrame(frame);
+
+// The notice is on the menu card, seen before Play; the switch is on the pause card.
+rec.notice($('menu').firstElementChild);rec.toggle($('paused').firstElementChild);
