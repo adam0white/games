@@ -689,6 +689,7 @@ const GAMES = {
   ducklings: page => started(page, 'ducklings', 'ducklingsState', '#pauseMenu'),
   fixit: page => started(page, 'fixit', 'fixitState', '#quit'),
   borrowed: page => started(page, 'borrowed', 'borrowedState', '#toMenu'),
+  alibi: page => started(page, 'alibi', 'alibiState', '#toMenu'),
   // Lab pages (/lab/<name>/): an old save survives, a finger steers, pause stops time, one audio context after the first tap.
   'lab/ant-nemesis': page => antLab(page, 'ant-nemesis', '?ai=0', { nem: null, trophies: [{ name: 'Old Scar the Beetle' }], gens: 1 }, async () => {
     assert.match(await page.textContent('#trophies'), /Old Scar the Beetle/, 'old save: trophies');
@@ -721,6 +722,19 @@ const GAMES = {
     const at = await page.evaluate(() => window.__pitch.legal[0]);
     await page.mouse.click(at.sx, at.sy); await until(page, () => window.__pitch.segments > 0, 'a tap on a legal point draws a line');
     await page.evaluate(() => dispatchEvent(new Event('blur'))); await until(page, () => window.__pitch.paused, 'leaving the page pauses');
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no sideways scroll');
+  },
+  async 'lab/ring'(page) {
+    // Firefly Ring: an old save survives, a dragged finger lays thread, leaving the page pauses.
+    await page.goto(`${base}/notes/button.js`); await page.evaluate(() => { localStorage.clear(); localStorage.setItem('ring:v1', '{"v":1,"sound":true,"nights":2,"dawns":1,"best":412,"bestRing":16,"endless":false,"endlessBest":0,"daily":{}}'); localStorage.setItem('ring:hint', '1'); });
+    await page.goto(`${base}/lab/ring/`); await until(page, () => window.__ring, 'game script');
+    const kept = await page.evaluate(() => window.__ring.save());
+    assert.equal(kept.best, 412, 'old save: best score survives'); assert.equal(kept.nights, 2, 'old save: nights survive'); assert.equal(kept.bestRing, 16, 'old save: best ring survives');
+    await page.click('#play'); await until(page, () => window.__ring.phase === 'play', 'the night is in play', 8000);
+    const box = await page.evaluate(() => { const r = document.getElementById('c').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height * 0.6 }; });
+    await page.mouse.move(box.x, box.y); await page.mouse.down(); await page.mouse.move(box.x + 60, box.y + 20, { steps: 8 });
+    await until(page, () => window.__ring.threadPoints > 0, 'a dragged finger lays thread'); await page.mouse.up();
+    await page.evaluate(() => dispatchEvent(new Event('blur'))); await until(page, () => window.__ring.mode !== 'play', 'leaving the page pauses');
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no sideways scroll');
   },
   async 'lab/ant-nest'(page) {
@@ -813,6 +827,7 @@ const GAMES = {
     await page.goto(`${base}/notes/button.js`); await page.evaluate(() => { localStorage.clear(); localStorage.setItem('pitch:v1', '{"played":1,"level":1,"lossStreak":0,"wins":1,"sound":true,"daily":{}}'); });
     await page.goto(`${base}/lab/pitch/`); await page.click('#play'); await sleep(4500); assert.equal(await on(), false, 'hint: never shown to a returning player');
   },
+  'hint lab/ring': page => hinted(page, { path: '/lab/ring/', play: '#play', resume: '#resume', key: 'ring:hint', delay: 3000, before: () => window.__ring.threadPoints, moved: n => window.__ring.threadPoints > n || window.__ring.fingerDown, legacy: { 'ring:v1': '{"v":1,"sound":true,"nights":2,"dawns":1,"best":412,"bestRing":16,"endless":false,"endlessBest":0,"daily":{}}' } }),
   'hint lab/lantern-3d': page => hinted(page, { path: '/lab/lantern-3d/', play: '#play', resume: '#go', key: 'lantern-3d:hint', delay: 1500, before: () => window.lanternState().target, moved: t => window.lanternState().target !== t, alive: () => { const s = window.lanternSim(); s.safe = 60; s.light = 1; } }),
   // Old /proto/ links move to the top level with their query; the new URL plays to its first frame.
   async 'old links'(page) {

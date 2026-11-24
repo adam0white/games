@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#020306">
+<title>Lantern Rhythm</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #020306; overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  body { font: 16px/1.5 Georgia, 'Times New Roman', serif; color: #f3e6cf; }
+  canvas { display: block; width: 100vw; height: 100dvh; }
+  a { color: #ffd9a0; }
+  .screen { position: fixed; inset: 0; display: none; place-items: center; text-align: center; pointer-events: none; }
+  .screen.on { display: grid; }
+  .screen > div { max-width: 21em; width: calc(100% - 2em); padding: 1em; pointer-events: auto; }
+  #card > div { pointer-events: none; } #card button, #card a { pointer-events: auto; }
+  .veil { background: #020306c0; }
+  h1 { font-weight: normal; font-size: 2.4em; letter-spacing: .12em; margin: 0 0 .2em; color: #ffd9a0; text-shadow: 0 0 28px #ff9a3c88; }
+  p { margin: .4em 0; opacity: .88; }
+  button { font: inherit; color: #ffe6bd; background: #ffffff10; border: 1.5px solid #ffd9a088; border-radius: 999px; padding: .55em 1.2em; margin: .3em; min-width: 9em; min-height: 46px; touch-action: manipulation; }
+  button.main { background: #ffb45a; color: #2a1606; border-color: #ffb45a; font-size: 1.2em; min-width: 9.5em; }
+  button.line { background: none; border: 0; min-width: 0; min-height: 44px; padding: .3em .6em; text-decoration: underline; color: #ffd9a0; }
+  .dot { display: inline-block; width: .7em; height: .7em; border-radius: 50%; background: radial-gradient(#fff2c8, #ff9a3c); box-shadow: 0 0 10px #ff9a3c; margin-right: .35em; vertical-align: baseline; }
+  #hud { position: fixed; top: calc(8px + env(safe-area-inset-top)); left: calc(12px + env(safe-area-inset-left)); display: none; text-align: left; pointer-events: none; text-shadow: 0 1px 6px #000; }
+  #hearts { font: 26px/1 sans-serif; color: #ff4d5e; letter-spacing: 2px; }
+  #tune { font-size: 22px; line-height: 1.3; color: #ffd9a0; font-variant-numeric: tabular-nums; }
+  #streak { font-size: 16px; color: #ffe6bd; min-height: 1.4em; }
+  #streak.harm { color: #bfe3ff; text-shadow: 0 0 10px #6fb6ff; }
+  #big { position: fixed; top: calc(6px + env(safe-area-inset-top)); left: 0; right: 0; display: none; text-align: center; font-size: 40px; line-height: 1.1; color: #fff3dc; pointer-events: none; text-shadow: 0 1px 8px #000; font-variant-numeric: tabular-nums; }
+  #say { position: fixed; left: 0; right: 0; top: 31%; text-align: center; pointer-events: none; opacity: 0; transition: opacity .3s; text-shadow: 0 1px 8px #000; padding: 0 1em; font-size: 22px; color: #ffe6bd; }
+  #pause { position: fixed; top: calc(10px + env(safe-area-inset-top)); right: calc(10px + env(safe-area-inset-right)); width: 44px; height: 44px; min-width: 0; min-height: 0; margin: 0; padding: 0; border: 0; border-radius: 50%; background: #ffffff14; display: none; place-items: center; touch-action: none; }
+  #pause::before { content: ''; width: 4px; height: 16px; border: solid #ffd9a0aa; border-width: 0 5px; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud"><div id="hearts"></div><div id="tune" aria-label="Share of the tune played"><span class="dot"></span>♪ <span id="pct">100%</span></div><div id="streak"></div></div>
+<div id="big"></div>
+<div id="say"></div>
+<button id="pause" aria-label="Pause"></button>
+<div id="menu" class="screen veil on"><div>
+  <h1>Lantern Rhythm</h1>
+  <p>An experiment: the river is the music. Rocks sit on the beat and drum as you pass them. Each ember you take plays the next note of the tune; miss one and the tune has a hole. Play with sound on.</p>
+  <p id="which"></p>
+  <p><button id="play" class="main">Play</button></p>
+  <p><button id="sound" class="line"></button></p>
+  <p><a href="/lantern/">Back to Lantern</a></p>
+</div></div>
+<div id="card" class="screen"><div><h1 id="title"></h1><p id="line"></p><p id="sub"></p><p><button id="go" class="main">Play again</button></p><p><a href="/lantern/">Back to Lantern</a></p></div></div>
+<script type="module">
+import { create, step, centre, half, progress, sight, melody, speed, beatOf, chord, bpm, DT, BEAT, BARS, GOAL, NIGHTS, BOAT } from './sim.js';
+import { music } from './music.js';
+import { hull, wake, reeds, shine } from '../../lantern/looks.js';
+import { sound } from '../../kit/audio.js';
+import { onLeave, isPauseKey } from '../../kit/pause.js';
+import { screens } from '../../kit/screens.js';
+import { drag } from '../../kit/drag.js';
+import { hint } from '../../kit/hint.js';
+import { readJson, writeJson } from '../../kit/save.js';
+
+const $ = id => document.getElementById(id);
+const query = new URLSearchParams(location.search);
+const gain = Number(query.get('gain')) || 1.3; // boat travel per finger travel, as on the main page
+const KEY = 'lantern-rhythm:v1';
+const save = { sound: true, runs: 0, best: {}, ...readJson(KEY, {}) }; // best: per night, the most of the tune played on a run that reached dawn
+let stage = Math.min(NIGHTS, Math.max(1, Math.floor(Number(query.get('night')) || 1)));
+const ahead = n => n === 1 ? 'Slide your thumb to steer. The faint lines across the water are the beats; rocks sit on them and blink in time.' : `Night ${n}: ${Math.round(bpm(n))} beats a minute, and busier bars.`;
+
+const canvas = $('c'), g = canvas.getContext('2d');
+let W = 0, H = 0, unit = 1, left = 0, dpr = 1;
+function resize() {
+  dpr = Math.min(2, devicePixelRatio || 1);
+  W = canvas.width = Math.round(innerWidth * dpr); H = canvas.height = Math.round(innerHeight * dpr);
+  unit = Math.min(W, H * 0.62); left = (W - unit) / 2; // the river is one unit wide, framed as on the main page
+}
+addEventListener('resize', resize); resize();
+const sx = x => left + x * unit, sy = y => H * 0.74 - (y - s.y) * unit;
+
+// At a start or a resume, the river waits up to waitAudio (ms) for the audio clock to run again, to have moved on 30 ms
+// (past the jumps of a restarting device) and for the score to have settled its anchor, so both start together on beat.
+let waitAudio = 0, heldClock = 0, gap = 0; const steady = { n: 0, c: 0, w: 0 }; const slow = []; // gap: the longest frame of this run (ms); slow: [beat, ms] of frames over 50 ms; both for the browser check
+let s = create(1, stage), playing = false, paused = false, target = 0.5, acc = 0, last = 0, shake = 0, flash = 0, ended = -1e9, screen = 'menu', sayTimer = 0, shown = '';
+const sparks = [];
+window.lanternState = () => ({ x: s.x, y: s.y, t: s.t, over: s.over, playing, paused, stage, hearts: s.hearts, light: s.light, taken: s.taken, missed: s.missed, streak: s.streak, best: s.best, melody: melody(s), beat: beatOf(s), target, screen, unit: unit / dpr, sound: save.sound });
+window.lanternSim = () => s;
+// The beat now, from the sim's position plus the part of a tick since the last step, read with the audio clock in the
+// same call, and everything the score has scheduled. The browser check compares the two.
+const beatNow = () => (s.y + (playing && !paused && !waitAudio ? acc + Math.max(0, performance.now() - last) / 1000 : 0) * speed(s)) / BEAT;
+window.lanternBeat = () => ({ beat: beatNow(), now: snd.ctx ? snd.ctx.currentTime : null, state: snd.ctx?.state ?? null, spb: 60 / bpm(s.stage), playing, paused, waiting: !!waitAudio, jumps: song ? song.jumps.slice() : [], gap, slow: slow.slice(), scheduled: song ? song.log.slice() : [] });
+
+const cards = screens(['menu', 'card']);
+function show(name) {
+  screen = name; cards(name);
+  const play = name === 'play';
+  $('hud').style.display = $('big').style.display = play ? 'block' : 'none'; pauseButton.style.display = play ? 'grid' : 'none';
+  if (!play) { clearTimeout(sayTimer); $('say').style.opacity = 0; } // a passing line never sits over a card
+  if (name === 'menu') { $('play').textContent = `Play night ${stage}`; $('which').textContent = ahead(stage); }
+}
+function say(text, ms = 2200) { const el = $('say'); el.textContent = text; el.style.opacity = 1; clearTimeout(sayTimer); sayTimer = setTimeout(() => { el.style.opacity = 0; }, ms); }
+function soundLine() { $('sound').textContent = save.sound ? 'Sound on. This one is made for sound.' : 'Sound off. The beat lines still show the rhythm.'; }
+$('sound').addEventListener('click', () => { save.sound = !save.sound; writeJson(KEY, save); if (save.sound) snd.unlock(); else snd.ctx?.suspend(); soundLine(); });
+soundLine();
+
+// Sound: started by the Play tap through the kit. The score lives in music.js and is driven from the sim each frame.
+let song = null;
+const snd = sound({ on: () => save.sound, setup: ac => { song = music(ac, plan); } });
+// What sits on a whole beat, for the score: the rocks there (a gate counts once), the bar's chord, the first beat of a bar.
+function plan(beat) {
+  if (beat >= BARS * 4) return null;
+  const here = s.rocks.filter(k => k.beat === beat), rocks = here.some(k => k.gate) ? [{ gate: true }] : here.map(k => ({ big: k.big, pan: k.side * 0.7 }));
+  return { rocks, chord: chord(Math.floor(beat / 4)), accent: beat % 4 === 0 };
+}
+const panOf = x => Math.max(-1, Math.min(1, (x - centre(s, s.y)) / 0.3));
+
+function begin() {
+  snd.unlock();
+  s = create((Math.random() * 2 ** 31) | 0, stage); target = s.x; playing = true; paused = false; acc = 0; waitAudio = performance.now() + 1500; heldClock = snd.ctx ? snd.ctx.currentTime : 0; gap = 0; slow.length = 0; flash = 0; sparks.length = 0; passed.clear(); last = performance.now(); steer.reset();
+  song?.start(60 / bpm(stage));
+  save.runs++; writeJson(KEY, save);
+  shown = ''; show('play'); hud();
+  say(`Night ${stage}`, 1600);
+  setTimeout(() => { if (playing && s.t < 4) say('Rocks drum on the beat. Embers play the tune.', 2600); }, 1700);
+}
+function finish() {
+  playing = false; ended = performance.now(); steer.drop();
+  $('hud').style.display = $('big').style.display = pauseButton.style.display = 'none';
+  const won = s.over === 'dawn', why = { bank: 'You ran onto the bank.', log: 'You struck a gate.' }[s.over] ?? 'You struck a rock.';
+  song?.end(chord(BARS - 1), won);
+  const pct = Math.round(melody(s) * 100), laid = s.taken + s.missed;
+  $('title').textContent = won ? 'Dawn' : `Night ${stage}`;
+  if (won) { save.best[stage] = Math.max(save.best[stage] ?? 0, pct); writeJson(KEY, save); }
+  if (won && stage < NIGHTS) { $('line').textContent = `You reached dawn on night ${stage}.`; stage++; $('go').textContent = `Play night ${stage}`; }
+  else if (won) { $('line').textContent = 'You reached dawn on the last night of this experiment.'; $('go').textContent = `Play night ${stage} again`; }
+  else { $('line').textContent = `${why} ${Math.floor(progress(s) * 100)}% of the way to dawn.`; $('go').textContent = 'Play again'; }
+  $('sub').textContent = `You played ${pct}% of the melody (${s.taken} of ${laid} embers). Best streak ${s.best}.`;
+  setTimeout(() => { if (!playing && screen === 'play') show('card'); }, won ? 2600 : 900);
+}
+function hud() {
+  const big = `${Math.floor(progress(s) * 100)}%`, pct = Math.round(melody(s) * 100), now = `${s.hearts}|${pct}|${s.streak}|${big}`;
+  if (now === shown) return; shown = now; // touch the page only when a number changes
+  $('hearts').textContent = '♥'.repeat(Math.max(0, s.hearts)); $('pct').textContent = `${pct}%`; $('big').textContent = big;
+  $('streak').textContent = s.streak >= 2 ? `${s.streak} in a row${s.streak >= 4 ? ': harmony' : ''}` : '';
+  $('streak').classList.toggle('harm', s.streak >= 4);
+}
+
+// Steering, the same as the main page. A finger steers by how far it has moved since it touched down; a mouse by position.
+const pauseButton = $('pause');
+function aim(x) { const c = centre(s, s.y), h = half(s, s.y) + 0.02; target = Math.max(c - h, Math.min(c + h, x)); }
+const steer = drag(canvas, { playing: () => playing, paused: () => paused, resume: () => resume(), from: () => s.x, travel: dx => dx * dpr / unit * gain, aim, mouse: e => aim((e.clientX * dpr - left) / unit), settle: 12 });
+hint(canvas, { kind: 'drag', key: 'lantern-rhythm:hint', delay: 1500, bottom: 56, when: () => playing && !paused && screen === 'play', played: save.runs > 0 });
+
+$('play').addEventListener('click', begin);
+$('go').addEventListener('click', () => { if (paused) resume(); else if (performance.now() - ended > 600) begin(); });
+
+// Pause: the button, P or Escape, and whenever the page loses the screen. The score stops with the river.
+function pause() {
+  if (!playing || paused) return; paused = true; steer.drop(); keys.clear();
+  $('title').textContent = 'Paused'; $('line').textContent = `Night ${stage}, ${Math.floor(progress(s) * 100)}% of the way to dawn.`; $('sub').textContent = 'Touch the river to go on.'; $('go').textContent = 'Go on';
+  show('card'); song?.cut(); snd.hold();
+}
+function resume() {
+  if (!paused) return; paused = false; acc = 0; last = performance.now(); target = s.x;
+  show('play'); snd.release(); waitAudio = performance.now() + 600; heldClock = snd.ctx ? snd.ctx.currentTime : 0;
+}
+pauseButton.addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); pause(); });
+onLeave(pause);
+const keys = new Set();
+addEventListener('keydown', e => {
+  if (isPauseKey(e)) { paused ? resume() : pause(); return; }
+  if (paused) { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); resume(); } return; }
+  keys.add(e.key);
+});
+addEventListener('keyup', e => keys.delete(e.key));
+
+const passed = new Map(); // beat -> the time (s.t) the boat crossed it, for the pulse of the line and the rocks on it
+function tick() {
+  if (keys.has('ArrowLeft') || keys.has('a')) target = s.x - 0.1;
+  if (keys.has('ArrowRight') || keys.has('d')) target = s.x + 0.1;
+  const before = Math.floor(beatOf(s));
+  step(s, target);
+  if (Math.floor(beatOf(s)) > before) passed.set(Math.floor(beatOf(s)), s.t);
+  for (const e of s.embers) if (e.got && !e.sung) { // the melody note for this off-beat, on its off-beat
+    e.sung = true; song?.ember(e.beat, e.note, panOf(e.x), s.streak >= 4); flash = 1;
+    for (let i = 0; i < 8; i++) sparks.push({ x: e.x, y: e.y, vx: (Math.random() - 0.5) * 0.5, vy: (Math.random() - 0.2) * 0.5, life: 0.6 });
+    if (s.streak === 4) say('Harmony', 1000);
+  }
+  for (const ev of s.events) {
+    if (ev === 'hurt') { snd.noise(0.25, 0.35, 500); snd.tone(150, 0.4, 0.25, 'square'); shake = 0.8; target = s.x; steer.rebase(); say('A heart lost. The music drops back to the beat.', 1800); }
+    if (ev === 'hit') { snd.noise(0.4, 0.4, 400); snd.tone(70, 0.6, 0.3, 'sawtooth'); shake = 1; }
+    if (ev === 'miss' && s.missed === 1) say('A missed ember is a missing note', 1500);
+    if (ev === 'dawn') say('Dawn!', 2000);
+  }
+  hud();
+  if (s.over) finish();
+}
+
+// Drawing: the main game's framing and darkness, with the beat grid laid over the water.
+function draw(now) {
+  const dawn = Math.max(0, (progress(s) - 0.86) / 0.14), day = s.over === 'dawn' ? Math.min(1, (now - ended) / 2500) : 0, b = beatOf(s);
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  if (shake) g.translate((Math.random() - 0.5) * shake * 14 * dpr, (Math.random() - 0.5) * shake * 14 * dpr);
+  g.fillStyle = '#1a2a20'; g.fillRect(-20, -20, W + 40, H + 40); // the banks
+  const top = s.y + 0.74 * H / unit + 0.1, bot = s.y - 0.3 * H / unit - 0.1;
+  g.beginPath();
+  for (let y = bot; y <= top; y += 0.05) g.lineTo(sx(centre(s, y) - half(s, y)), sy(y));
+  for (let y = top; y >= bot; y -= 0.05) g.lineTo(sx(centre(s, y) + half(s, y)), sy(y));
+  g.closePath(); g.fillStyle = '#173a63'; g.fill(); g.strokeStyle = '#5c8468'; g.lineWidth = 2.5 * dpr; g.stroke();
+  const edge = (y, side) => sx(centre(s, y) + side * half(s, y));
+  reeds(g, edge, sy, unit, bot, top, now / 1000);
+  g.strokeStyle = '#5a95cc'; g.lineWidth = 1.5 * dpr; g.globalAlpha = 0.5; // current streaks
+  for (let i = Math.floor(bot * 3); i < top * 3; i++) { const y = i / 3, k = (Math.sin(i * 12.9898) * 43758.5453) % 1, c = centre(s, y), h = half(s, y), x = c + (Math.abs(k) * 2 - 1) * (h - 0.03); g.beginPath(); g.moveTo(sx(x), sy(y)); g.lineTo(sx(x + (centre(s, y + 0.14) - c)), sy(y + 0.14)); g.stroke(); }
+  g.globalAlpha = 1;
+  for (const k of s.rocks) {
+    const x = sx(k.x), y = sy(k.y), R = k.rad * unit;
+    if (k.kind === 'log') { g.fillStyle = '#7a5632'; g.beginPath(); if (g.roundRect) g.roundRect(x - (k.len + k.rad) * unit, y - R, 2 * (k.len + k.rad) * unit, 2 * R, R); else g.rect(x - (k.len + k.rad) * unit, y - R, 2 * (k.len + k.rad) * unit, 2 * R); g.fill(); g.fillStyle = '#b08a5a'; g.fillRect(x - k.len * unit, y - R * 0.35, 2 * k.len * unit, R * 0.3); continue; }
+    g.fillStyle = '#2b2f36'; g.beginPath(); g.ellipse(x, y, R, R * 0.86, 0, 0, 7); g.fill();
+    g.fillStyle = '#59606b'; g.beginPath(); g.ellipse(sx(k.x - k.rad * 0.25), sy(k.y + k.rad * 0.3), R * 0.45, R * 0.3, -0.5, 0, 7); g.fill();
+    g.strokeStyle = '#9fc6e0'; g.globalAlpha = 0.35; g.lineWidth = 2 * dpr; g.beginPath(); g.arc(x, y, R * 1.18, 0.2, 2.9); g.stroke(); g.globalAlpha = 1;
+  }
+  const bx = sx(s.x), by = sy(s.y);
+  g.save(); g.translate(bx, by); g.rotate(Math.max(-0.25, Math.min(0.25, (target - s.x) * 2))); g.scale(1.2, 1.2);
+  if (playing) wake(g, unit, now / 1000); hull(g, 'oak', unit, '#6b5a48', now / 1000); g.restore();
+  // darkness with a hole of light, as on the main page
+  const flick = 1 + Math.sin(now / 90) * 0.015 + Math.sin(now / 37) * 0.01, r = (sight(s) + flash * 0.09) * unit * flick, dark = Math.max(0, 0.97 - dawn * 0.75 - day);
+  const m = g.createRadialGradient(bx, by - 0.05 * unit, r * 0.15, bx, by - 0.05 * unit, r);
+  m.addColorStop(0, 'rgba(4,6,12,0)'); m.addColorStop(0.7, `rgba(4,6,12,${dark * 0.55})`); m.addColorStop(1, `rgba(4,6,12,${dark})`);
+  g.fillStyle = m; g.fillRect(-20, -20, W + 40, H + 40);
+  g.globalCompositeOperation = 'lighter';
+  const w = g.createRadialGradient(bx, by, 0, bx, by, r * 0.8); w.addColorStop(0, `rgba(255,170,80,${0.22 + flash * 0.2})`); w.addColorStop(1, 'rgba(255,170,80,0)');
+  g.fillStyle = w; g.fillRect(bx - r, by - r, r * 2, r * 2);
+  // The beat grid, over the dark: a faint line across the water on every beat, brighter on the first beat of a bar.
+  // A line flares as the boat crosses it; the line about to be crossed warms as it comes.
+  for (let j = Math.ceil(bot / BEAT); j * BEAT < top; j++) {
+    if (j * BEAT > GOAL + 0.01) break;
+    const y = j * BEAT, c = centre(s, y), h = half(s, y), since = passed.has(j) ? s.t - passed.get(j) : Infinity, d = j - b;
+    let a = (j % 4 ? 0.16 : 0.34) + (d > 0 && d < 1 ? 0.35 * (1 - d) : 0);
+    if (since < 0.6) a += 0.7 * (1 - since / 0.6);
+    g.strokeStyle = `rgba(${since < 0.6 ? '255,214,150' : '170,205,240'},${Math.min(1, a)})`; g.lineWidth = (j % 4 ? 1.5 : 2.5) * dpr * (1 + (since < 0.6 ? 1.5 * (1 - since / 0.6) : 0));
+    g.beginPath(); g.moveTo(sx(c - h), sy(y)); g.lineTo(sx(c + h), sy(y)); g.stroke();
+  }
+  // Rocks blink in time: on every beat, the rocks on that beat of the bar in the next two bars blink, so the coming
+  // pattern can be read in the dark by its rhythm. A rock flares when the boat crosses its beat.
+  const frac = b - Math.floor(b), cur = Math.floor(b) & 3;
+  for (const k of s.rocks) {
+    const d = k.beat - b, since = passed.has(k.beat) ? s.t - passed.get(k.beat) : Infinity;
+    let a = 0;
+    if (d > 0 && d <= 8 && (k.beat & 3) === cur) a = 0.75 * Math.max(0, 1 - frac / 0.4) * (d < 4.5 ? 1 : 0.55);
+    if (since < 0.5) a = Math.max(a, 1 - since / 0.5);
+    if (d > 0) a = Math.max(a, 0.14); // a faint outline always
+    if (a <= 0.01) continue;
+    const x = sx(k.x), y = sy(k.y), R = k.rad * unit, col = k.gate ? '255,200,140' : k.big ? '190,225,255' : '230,240,255';
+    g.strokeStyle = `rgba(${col},${a})`; g.lineWidth = (k.big ? 2.5 : 1.8) * dpr;
+    g.beginPath();
+    if (k.len) { const L = k.len * unit; g.moveTo(x - L, y - R); g.lineTo(x + L, y - R); g.arc(x + L, y, R, -Math.PI / 2, Math.PI / 2); g.lineTo(x - L, y + R); g.arc(x - L, y, R, Math.PI / 2, Math.PI * 1.5); }
+    else g.arc(x, y, R * (1 + (since < 0.5 ? 0.5 * since : 0)), 0, 7);
+    g.stroke();
+  }
+  // embers show through the dark, as on the main page
+  for (const e of s.embers) if (!e.got) {
+    const ex = sx(e.x), ey = sy(e.y) + Math.sin(now / 300 + e.y * 9) * 2 * dpr, er = 0.05 * unit, eg = g.createRadialGradient(ex, ey, 0, ex, ey, er);
+    eg.addColorStop(0, 'rgba(255,214,140,.95)'); eg.addColorStop(0.25, 'rgba(255,150,60,.55)'); eg.addColorStop(1, 'rgba(255,120,40,0)');
+    g.fillStyle = eg; g.fillRect(ex - er, ey - er, er * 2, er * 2); shine(g, ex, ey, unit, '255,150,60', 0.45, now / 1000, e.y);
+  }
+  for (const p of sparks) { g.fillStyle = `rgba(255,200,120,${p.life})`; g.fillRect(sx(p.x), sy(p.y), 3 * dpr, 3 * dpr); }
+  if (s.safe > 0 && Math.floor(now / 90) % 2) { g.strokeStyle = 'rgba(255,120,120,.5)'; g.lineWidth = 3 * dpr; g.beginPath(); g.arc(bx, by, 0.06 * unit, 0, 7); g.stroke(); }
+  g.globalCompositeOperation = 'source-over';
+  g.fillStyle = 'rgba(255,217,160,.5)'; g.fillRect(0, 0, W * progress(s), 3 * dpr);
+}
+
+function frame(now) {
+  // Time steps come from performance.now(), the same clock beatNow() and begin() read: a frame's own stamp can lag it by seconds (seen in headless Chromium).
+  const clock = performance.now(), dt = Math.max(0, Math.min(0.25, (clock - last) / 1000 || 0)); last = clock; // up to a quarter second is caught up, so a slow frame does not pull the river off the music
+  let released = false;
+  // While held, count the frames in a row in which the audio clock moved on as far as the page clock did (within 8 ms):
+  // a restarting audio device can run its clock fast for a moment (seen in Chromium after a resume, up to about 0.1 s).
+  if (waitAudio && snd.ctx) { const c = snd.ctx.currentTime, dc = c - steady.c, dw = (clock - steady.w) / 1000; steady.n = snd.ctx.state === 'running' && dc > 0 && Math.abs(dc - dw) < 0.008 ? steady.n + 1 : 0; steady.c = c; steady.w = clock; }
+  if (waitAudio && !(save.sound && snd.ctx && song && (snd.ctx.state !== 'running' || snd.ctx.currentTime < heldClock + 0.03 || steady.n < 3 || !song.ready) && clock < waitAudio)) { waitAudio = 0; released = true; steady.n = 0; }
+  if (playing && !paused && !waitAudio) { if (!released) acc += dt; gap = Math.max(gap, dt * 1000); if (dt > 0.05 && slow.length < 50) slow.push([+beatOf(s).toFixed(2), Math.round(dt * 1000)]); } // the frame that lets the river go starts it from exactly where it was held
+  // The score is told the beat before the river steps: the beat now is s.y plus the time not yet stepped (acc).
+  if (playing && !paused && song) song.sync(beatNow(), { bare: beatOf(s) < s.bare, harmony: s.streak >= 4 }, !!waitAudio);
+  if (playing && !paused && !waitAudio) while (acc >= DT && playing) { tick(); acc -= DT; }
+  shake = Math.max(0, shake - dt * 3); flash = Math.max(0, flash - dt * 2);
+  for (const p of sparks) { p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt * 1.5; }
+  while (sparks.length && sparks[0].life <= 0) sparks.shift();
+  for (const [j] of passed) if (j < beatOf(s) - 4) passed.delete(j);
+  draw(now);
+  requestAnimationFrame(frame);
+}
+show('menu');
+requestAnimationFrame(frame);
+</script>
+<script src="/notes/button.js" defer></script>
+</body>
+</html>

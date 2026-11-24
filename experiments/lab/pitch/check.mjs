@@ -6,11 +6,13 @@ import { createRequire } from 'node:module';
 import { dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
-import { restore, botTurn, mulberry32, daily, legal, apply, clone } from './sim.js';
+import { create, restore, snapshot, botTurn, mulberry32, daily, legal, apply, clone } from './sim.js';
+import { TABLE, tableName, tableMessage, freshTable, sit, move, again, shown } from '../../../workers/lab-ai/src/table.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const SHOTS = process.env.SHOTS || '/private/tmp/claude-504/-Users-abdul-code/e727a231-6be3-4081-a695-31f6b5ca1a96/scratchpad/pitch-shots';
-await mkdir(SHOTS, { recursive: true });
+const TABLE_SHOTS = join(dirname(SHOTS), 'pitch-table-shots');
+await Promise.all([mkdir(SHOTS, { recursive: true }), mkdir(TABLE_SHOTS, { recursive: true })]);
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
 const server = createServer(async (req, res) => {
   const pathname = new URL(req.url, 'http://localhost').pathname;
@@ -31,17 +33,21 @@ const DATE = '2026-11-24', URL_ = `${base}/lab/pitch/?date=${DATE}`;
 const sleep = ms => new Promise(done => setTimeout(done, ms));
 const P = (page, expr, arg) => page.evaluate(expr, arg);
 const shot = (page, phone, name) => page.screenshot({ path: join(SHOTS, `${phone}-${name}.png`) });
-async function until(page, fn, label, timeout = 15000) {
+async function until(page, fn, label, timeout = 25000) {
   try { await page.waitForFunction(fn, null, { timeout }); }
   catch { throw new Error(`timed out: ${label}; state=${JSON.stringify(await P(page, () => window.__pitch && { screen: __pitch.screen, mode: __pitch.mode, canTap: __pitch.canTap, busy: __pitch.busy, turn: __pitch.turn, winner: __pitch.winner }).catch(() => null))}`); }
 }
-async function open(browser, device) {
+async function open(browser, device, friend = false) {
   const context = await browser.newContext({ ...device, acceptDownloads: true }), page = await context.newPage();
+  page.setDefaultTimeout(25000);
   const errors = [], outside = [];
-  await context.addInitScript(() => {
+  await context.addInitScript(friend => {
     window.__shared = [];
-    if (navigator.share) navigator.share = async data => { window.__shared.push((data.files || []).length); };
-  });
+    if (friend || navigator.share) Object.defineProperty(navigator, 'share', { configurable: true, value: async data => {
+      window.__shared.push((data.files || []).length);
+      window.__sharedLink = data.url ? { url: data.url, text: data.text } : null;
+    } });
+  }, friend);
   await context.route('**/*', route => {
     const url = route.request().url();
     if (url.startsWith(base) || url.startsWith('data:') || url.startsWith('blob:')) return route.continue();
@@ -74,6 +80,354 @@ async function noOverflow(page, label) {
 }
 const visibleIn = async (page, sel) => P(page, s => { const r = document.querySelector(s).getBoundingClientRect(); return r.width > 0 && r.top >= 0 && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth; }, sel);
 
+// The actual table state and frame parsers run in Node. Only the socket transport and storage are in memory.
+function tableWire() {
+  const rooms = new Map();
+  let nextId = 0, nextSeed = 24;
+  const live = room => [...room.sockets.values()].filter(s => s.seat !== null);
+  const seats = room => shown(room.state, live(room).map(s => s.seat));
+  const deliver = (socket, event, data) => P(socket.page, ({ id, event, data }) => window.__pitchWireReceive?.(id, event, data), { id: socket.id, event, data });
+  const send = (socket, frame) => deliver(socket, 'message', JSON.stringify(frame));
+  const broadcast = (room, frame) => Promise.all(live(room).map(socket => send(socket, frame)));
+  const announce = room => broadcast(room, { t: 'seats', seats: seats(room) });
+  function you(socket) {
+    const { room, seat } = socket, { v, game, seed, log, again } = room.state;
+    return send(socket, { t: 'you', seat, v, game, seed, log, again, seats: seats(room) });
+  }
+  async function close(socket, code, notify) {
+    const { room, id, seat } = socket;
+    if (!room.sockets.delete(id)) return;
+    if (notify) await deliver(socket, 'close', code);
+    if (seat !== null) await announce(room);
+  }
+  async function acceptMove(room, seat, frame) {
+    const result = move(room.state, seat, frame, Date.now());
+    if (result === 'ok') await broadcast(room, { t: 'm', i: frame.i, s: seat, m: frame.m });
+    return result;
+  }
+  return {
+    async attach(page) {
+      let socket = null, reconnectGate = null, openGate = null, sendGate = null, sawSend = null;
+      await page.exposeFunction('__pitchWireOpen', async addr => {
+        const url = new URL(addr);
+        assert.equal(url.origin, base.replace(/^http/, 'ws'), 'table socket is same-origin');
+        const named = tableName(url.pathname);
+        assert.equal(named?.game, 'pitch');
+        if (reconnectGate) await reconnectGate;
+        if (!rooms.has(named.name)) rooms.set(named.name, { state: freshTable(TABLE.games[named.game].seats, nextSeed++, Date.now()), sockets: new Map() });
+        const room = rooms.get(named.name), id = ++nextId;
+        socket = { page, id, room, seat: null };
+        room.sockets.set(id, socket);
+        return id;
+      });
+      await page.exposeFunction('__pitchWireSend', async (id, text) => {
+        if (!socket || id !== socket.id || !socket.room.sockets.has(id)) return;
+        const current = socket, { room } = current, frame = tableMessage(text);
+        assert.ok(frame, `invalid client frame ${text.replace(/"k":"[^"]+"/, '"k":"…"')}`);
+        if (frame.t === 'hi') {
+          const result = sit(room.state, frame, live(room).map(s => s.seat), nextSeed, Date.now());
+          if (result.refuse) { await close(current, result.refuse === 'full' ? 4001 : 4002, true); return; }
+          const other = live(room).find(s => s !== current && s.seat === result.seat);
+          current.seat = result.seat;
+          if (other) await close(other, 4003, true);
+          await you(current);
+          await announce(room);
+        } else if (frame.t === 'm') {
+          if (sendGate) { sawSend(); await sendGate; }
+          const result = await acceptMove(room, current.seat, frame);
+          if (result === 'stale' || result === 'long') await you(current);
+        } else if (frame.t === 'again') {
+          const started = again(room.state, current.seat, nextSeed, Date.now());
+          if (started) nextSeed++;
+          await broadcast(room, started ? { t: 'game', game: room.state.game, seed: room.state.seed } : { t: 'again', s: current.seat });
+        }
+      });
+      await page.exposeFunction('__pitchWireClose', id => socket?.id === id ? close(socket, 1000, false) : undefined);
+      await page.addInitScript(() => {
+        const sockets = new Map();
+        window.__pitchWireReceive = (id, event, data) => {
+          const socket = sockets.get(id);
+          if (!socket) return;
+          if (event === 'message') socket.onmessage?.({ data });
+          else {
+            sockets.delete(id);
+            socket.readyState = 3;
+            socket.onclose?.({ code: data });
+          }
+        };
+        window.__pitchSocket = class {
+          constructor(addr) {
+            this.readyState = 0;
+            window.__pitchWireOpen(addr).then(id => {
+              if (this.readyState === 3) return window.__pitchWireClose(id);
+              this.id = id;
+              this.readyState = 1;
+              sockets.set(id, this);
+              this.onopen?.();
+            });
+          }
+          send(text) { void window.__pitchWireSend(this.id, text); }
+          close() {
+            if (this.readyState === 3) return;
+            this.readyState = 3;
+            sockets.delete(this.id);
+            if (this.id !== undefined) void window.__pitchWireClose(this.id);
+          }
+        };
+      });
+      return {
+        async cut() {
+          reconnectGate = new Promise(resolve => { openGate = resolve; });
+          await close(socket, 1006, true);
+        },
+        reconnect() { reconnectGate = null; openGate(); },
+        navigateAway: () => close(socket, 1000, false),
+        holdMove() {
+          let release;
+          const sent = new Promise(resolve => { sawSend = resolve; });
+          sendGate = new Promise(resolve => { release = resolve; });
+          return { sent, release() { sendGate = null; release(); } };
+        },
+        async inject(seat, directions) {
+          const { room } = socket, i = room.state.log.length;
+          const frame = tableMessage(JSON.stringify({ t: 'm', i, m: directions }));
+          assert.ok(frame, 'the illegal game move is valid wire data');
+          assert.equal(await acceptMove(room, seat, frame), 'ok', 'server broadcasts it');
+        },
+      };
+    },
+  };
+}
+
+async function playFriend(browser, device, phone) {
+  const tests = [], wire = tableWire();
+  const friendShot = (page, name) => page.screenshot({ path: join(TABLE_SHOTS, `${phone}-${name}.png`), timeout: 25000 });
+  async function friendPage() {
+    const test = await open(browser, device, true);
+    tests.push(test);
+    return { page: test.page, socket: await wire.attach(test.page) };
+  }
+  const oldSave = { played: 3, level: 2, lossStreak: 1, wins: 2, sound: false, daily: { [DATE]: { used: 2, solved: false } } };
+  try {
+    const { page: a, socket: aSocket } = await friendPage(), { page: b, socket: bSocket } = await friendPage();
+    const pages = [a, b], names = ['Ada', 'Ben'];
+    await Promise.all(pages.map(async page => {
+      await page.goto(URL_);
+      await P(page, data => localStorage.setItem('pitch:v1', JSON.stringify(data)), oldSave);
+      await page.reload();
+      await page.click('#friend');
+      assert.equal(await page.locator('#friendName').inputValue(), '', 'old saves default to an empty name');
+      assert.equal(await page.locator('#friendName').getAttribute('maxlength'), '24');
+    }));
+    await friendShot(a, 'friend-card');
+    await Promise.all(pages.map((page, seat) => page.fill('#friendName', names[seat])));
+    await a.click('#newTable');
+    await until(a, () => __pitch.room?.seat === 0 && document.querySelector('#lobbyStatus').textContent.includes('Waiting for your friend'), 'creator seated and waiting');
+    assert.ok(await a.isVisible('#lobbyStatus'), 'the waiting message is visible');
+    const code = (await a.textContent('#roomCode')).trim();
+    assert.match(code, /^[A-HJ-NP-Z]{4}$/);
+    await friendShot(a, 'waiting');
+    await aSocket.navigateAway();
+    await a.reload();
+    await until(a, () => __pitch.room?.seat === 0 && document.querySelector('#lobbyStatus').textContent.includes('Waiting for your friend'), 'host reload keeps the waiting seat');
+    assert.equal((await a.textContent('#roomCode')).trim(), code);
+    await a.click('#shareLink');
+    await until(a, () => !!window.__sharedLink, 'Share link supplies a URL');
+    const link = await P(a, () => window.__sharedLink);
+    assert.deepEqual(link, { text: 'Play Paper Pitch with me', url: `${base}/lab/pitch/?room=${code}` });
+    await b.goto(link.url);
+
+    async function bothSeated() {
+      await Promise.all(pages.map((page, seat) => page.waitForFunction(seat =>
+        __pitch.room?.seat === seat && __pitch.room.status === 'live' && document.querySelectorAll('#score .seat-light.on').length === 2,
+      seat, { timeout: 25000 })));
+      for (const page of pages) {
+        assert.deepEqual(await page.locator('#score .seat-name').allTextContents(), names);
+        for (const seat of [0, 1]) assert.ok(await page.isVisible(`#score [data-seat="${seat}"] .seat-light.on`));
+      }
+    }
+    await bothSeated();
+    for (const [seat, page] of pages.entries()) {
+      const goals = await P(page, () => __pitch.goalEnds);
+      assert.ok(goals[seat].y > goals[1 - seat].y, `${names[seat]} has their own goal at the bottom`);
+    }
+    const aTargets = await P(a, () => __pitch.legal), bTargets = await P(b, () => __pitch.legal);
+    const goals = await P(a, () => __pitch.goalEnds);
+    for (const point of aTargets) {
+      const rotated = bTargets.find(p => p.d === point.d);
+      assert.ok(rotated);
+      assert.equal(rotated.sx + point.sx, goals[0].x + goals[1].x, 'horizontal targets are mirrored');
+      assert.equal(rotated.sy + point.sy, goals[0].y + goals[1].y, 'vertical targets are mirrored');
+    }
+
+    const initialRoom = await P(a, () => __pitch.room), first = initialRoom.seed % 2;
+    let state = create(8, 10, first), frames = 0, taps = 0;
+    const score = [0, 0];
+    async function sameMatch(active = pages) {
+      for (const page of active) {
+        await page.waitForFunction(count => __pitch.room?.moves === count, frames, { timeout: 25000 });
+        assert.deepEqual(await P(page, () => __pitch.state()), snapshot(state), `sheet after frame ${frames}`);
+        assert.deepEqual(await P(page, () => __pitch.score), score, `score after frame ${frames}`);
+      }
+    }
+    await sameMatch();
+
+    async function takeSegment({ direction, active = pages, hold } = {}) {
+      const seat = state.turn, player = pages[seat];
+      await until(player, () => __pitch.canTap, `${names[seat]}'s turn on move ${taps + 1}`);
+      assert.equal(await P(pages[1 - seat], () => __pitch.canTap), false, 'input locked for the other seat');
+      const d = direction ?? botTurn(state, seat === 0 ? 1 : 0, mulberry32(31 + taps))[0];
+      const point = (await P(player, () => __pitch.legal)).find(p => p.d === d);
+      assert.ok(point, `direction ${d} appears on ${names[seat]}'s screen`);
+      try {
+        if (hold) await P(player, () => document.querySelector('#c').addEventListener('pointerup', () => {
+          window.__pitchPendingAtTap = { waiting: __pitch.room.waiting, hidden: document.querySelector('#roomStatus').hidden };
+        }, { once: true }));
+        await player.touchscreen.tap(point.sx, point.sy);
+        if (hold) {
+          await until(player, () => __pitch.room.waiting, 'waiting for our own segment echo');
+          await hold.sent;
+          await sameMatch(active);
+          assert.deepEqual(await P(player, () => window.__pitchPendingAtTap), { waiting: true, hidden: true }, 'ordinary move latency is hidden');
+          assert.equal(await P(player, () => __pitch.canTap), false, 'no second move until the echo');
+          await until(player, () => !document.querySelector('#roomStatus').hidden && document.querySelector('#roomStatus').textContent.includes('Sending move'), 'a slow echo gets a status');
+        }
+      } finally { hold?.release(); }
+      apply(state, d);
+      frames++; taps++;
+      if (state.winner >= 0) {
+        score[state.winner]++;
+        if (Math.max(...score) < 2) state = create(8, 10, (first + score[0] + score[1]) % 2);
+      }
+      await sameMatch(active);
+      if (hold) assert.equal(await player.isVisible('#roomStatus'), false, 'the status clears on the echo');
+    }
+
+    const firstSocket = first === 0 ? aSocket : bSocket;
+    await takeSegment({ hold: firstSocket.holdMove() });
+    await aSocket.inject(state.turn, [99]);
+    frames++;
+    await sameMatch();
+
+    function passesToRed() {
+      if (state.turn !== 0) return;
+      return legal(state).find(d => {
+        const next = clone(state);
+        apply(next, d);
+        return next.winner < 0 && next.turn === 1;
+      });
+    }
+    while (taps < 4 || passesToRed() === undefined) {
+      assert.ok(taps < 30 && Math.max(...score) === 0, 'find a mid-sheet move that passes to Ben');
+      await takeSegment();
+    }
+    await Promise.all(pages.map(page => until(page, () => !__pitch.busy, 'ink settled on the mid-match sheet')));
+    await friendShot(a, 'mid-blue');
+    await friendShot(b, 'mid-red');
+    await bSocket.cut();
+    await until(a, () => document.querySelector('#roomStatus').textContent.includes('Ben dropped. Waiting for them to come back.'), 'the dropped friend message');
+    assert.ok(await a.isVisible('#roomStatus'), 'the dropped friend message is visible');
+    assert.equal(await a.locator('#score .seat-light.on').count(), 1, 'only the remaining seat is lit');
+    await until(b, () => __pitch.room.status === 'waiting' && document.querySelector('#roomStatus').textContent.includes('Reconnecting'), 'the dropped page is reconnecting');
+    assert.ok(await b.isVisible('#roomStatus'), 'the reconnecting message is visible');
+    await friendShot(a, 'dropped-friend');
+    await takeSegment({ direction: passesToRed(), active: [a] });
+    bSocket.reconnect();
+    await bothSeated();
+    await sameMatch();
+    assert.equal(state.turn, 1, 'the move while Ben was away passed the turn to Ben');
+    await takeSegment();
+
+    while (score[0] + score[1] === 0) {
+      assert.ok(taps < 100, 'first sheet finishes');
+      await takeSegment();
+    }
+    assert.equal(await a.isVisible('#next'), false, 'friend matches have no Next kick-off card');
+    await takeSegment();
+    await bSocket.navigateAway();
+    await b.reload();
+    await bothSeated();
+    await sameMatch();
+    assert.equal(new URL(b.url()).searchParams.get('room'), code, 'reload is still on the same link');
+
+    const { page: c } = await friendPage();
+    await c.goto(link.url);
+    await until(c, () => __pitch.room?.status === 'full' && document.querySelector('#lobbyStatus').textContent.includes('This table is full'), 'third visitor is refused');
+    assert.ok(await c.isVisible('#lobbyStatus'), 'the full-table message is visible');
+
+    while (Math.max(...score) < 2) {
+      assert.ok(taps < 300, 'the table match finishes within 300 valid segments');
+      await takeSegment();
+    }
+    await Promise.all(pages.map(page => until(page, () => __pitch.screen === 'end', 'table end card')));
+    for (const [seat, page] of pages.entries()) {
+      assert.equal(await page.textContent('#endTitle'), state.winner === seat ? 'You win!' : `${names[state.winner]} wins!`);
+      assert.equal(await page.textContent('#again'), 'Rematch');
+      const { played, name, ...other } = await P(page, () => __pitch.save());
+      const { played: wasPlayed, ...untouched } = oldSave;
+      assert.equal(name, names[seat]);
+      assert.ok(played === wasPlayed || played === wasPlayed + 1);
+      assert.deepEqual(other, untouched, 'no change to bot and daily progress');
+    }
+    await a.click('#again');
+    await until(a, () => document.querySelector('#endLine').textContent.includes('Waiting for Ben'), 'own rematch vote waits');
+    await until(b, () => document.querySelector('#endLine').textContent.includes('Ada wants a rematch'), 'friend sees the first vote');
+    await sameMatch();
+    for (const page of pages) {
+      assert.equal(await P(page, () => __pitch.room.game), initialRoom.game, 'one vote does not start another game');
+      assert.equal(await P(page, () => __pitch.screen), 'end');
+    }
+    await friendShot(a, 'rematch-wait');
+    await b.click('#again');
+    await Promise.all(pages.map(page => until(page, () => __pitch.room.game === 1 && __pitch.screen === 'play', 'both votes start the rematch')));
+    const seed = await P(a, () => __pitch.room.seed);
+    assert.equal(seed, await P(b, () => __pitch.room.seed));
+    assert.notEqual(seed, initialRoom.seed, 'rematch uses its new server seed');
+    state = create(8, 10, seed % 2);
+    score.fill(0);
+    frames = 0;
+    await sameMatch();
+
+    // Check a narrow viewport with real friend content, including the join input and waiting card.
+    await a.setViewportSize({ width: 360, height: 640 });
+    await noOverflow(a, '360x640 friend pitch');
+    await c.setViewportSize({ width: 360, height: 640 });
+    await noOverflow(c, '360x640 full table card');
+    await c.click('#roomLeave');
+    await c.click('#friend');
+    await noOverflow(c, '360x640 friend card');
+    await c.fill('#joinCode', code.toLowerCase());
+    await c.click('#joinTable');
+    await until(c, () => __pitch.room?.status === 'full', 'entering the same code reaches the same table');
+    await c.click('#roomLeave');
+    await c.click('#friend');
+    await c.click('#newTable');
+    await until(c, () => __pitch.room?.seat === 0 && document.querySelector('#lobbyStatus').textContent.includes('Waiting for your friend'), 'new table is waiting');
+    await noOverflow(c, '360x640 waiting card');
+    const secondCode = (await c.textContent('#roomCode')).trim();
+    await c.click('#roomLeave');
+    await until(c, () => __pitch.screen === 'menu' && !new URL(location.href).searchParams.has('room'), 'creator leaves the waiting table');
+    async function joinByCode(page) {
+      await page.click('#friend');
+      await page.fill('#joinCode', secondCode.toLowerCase());
+      await page.click('#joinTable');
+    }
+    await joinByCode(c);
+    await until(c, () => __pitch.room?.seat === 0 && __pitch.room.status === 'live', 'code recovers the host seat');
+    await bSocket.navigateAway();
+    await b.goto(URL_);
+    await joinByCode(b);
+    await until(b, () => __pitch.room?.seat === 1 && __pitch.screen === 'play', 'a friend joins successfully by code');
+    assert.equal(await P(b, () => __pitch.room.code), secondCode);
+
+    for (const { errors, outside } of tests) {
+      assert.deepEqual(outside, [], 'friend play makes no external network requests');
+      assert.deepEqual(errors, [], 'friend play raises no page, console or network errors');
+    }
+    console.log(`ok   pitch friends on ${phone}: ${taps} segments, replay, reconnect, full table, rematch and 360x640`);
+  } finally { await Promise.all(tests.map(test => test.context.close())); }
+}
+
 async function playMatch(page, phone, name, mine = 1) {
   let taps = 0;
   for (let i = 0; i < 600; i++) {
@@ -99,7 +453,6 @@ async function run(test, phone) {
   await until(page, () => window.__pitch?.ready && __pitch.screen === 'menu', 'menu');
   for (const id of ['#play', '#daily', '#two']) assert.ok(await visibleIn(page, id), `${id} visible on the menu`);
   await noOverflow(page, 'menu');
-  await sleep(1500);
   await shot(page, phone, '1-menu');
 
   // First match: small pitch, Easy bot.
@@ -169,9 +522,9 @@ async function run(test, phone) {
   assert.equal(await page.locator('#tag .dots i').count(), 3, 'three attempt dots');
   await shot(page, phone, '4-daily');
   for (let i = 0; i < 40; i++) {
+    await until(page, () => __pitch.canTap, 'daily input opens');
     const st = await P(page, () => ({ used: __pitch.daily.used, at: __pitch.segments, start: __pitch.daily.attemptStart, canTap: __pitch.canTap }));
     if (st.used === 1 && st.at === st.start && st.canTap) break;
-    if (!st.canTap) { await sleep(100); continue; }
     const s = restore(await P(page, () => __pitch.state()));
     const ends = m => { const t = clone(s); apply(t, m); return t.turn === 1 || (t.winner >= 0 && t.how !== 'goal'); };
     const safe = m => { const t = clone(s); apply(t, m); return t.winner < 0; };
@@ -270,8 +623,9 @@ async function small(browser, width, height) {
     // The last daily try: one miss shows the answer in pencil.
     await page.click('#daily');
     await until(page, () => __pitch.mode === 'daily' && __pitch.canTap, 'last daily try');
-    for (let i = 0; i < 40 && (await P(page, () => __pitch.screen)) === 'play'; i++) {
-      if (!(await P(page, () => __pitch.canTap))) { await sleep(100); continue; }
+    for (let i = 0; i < 40; i++) {
+      await until(page, () => __pitch.canTap || __pitch.screen === 'end', 'last daily input or result');
+      if (await P(page, () => __pitch.screen === 'end')) break;
       const s = restore(await P(page, () => __pitch.state()));
       const ends = m => { const q = clone(s); apply(q, m); return q.turn === 1 || (q.winner >= 0 && q.how !== 'goal'); };
       const safe = m => { const q = clone(s); apply(q, m); return q.winner < 0; };
@@ -294,8 +648,11 @@ try {
     if (only && only !== phone) continue;
     const browser = await engine.launch(), test = await open(browser, device);
     try {
-      await run(test, phone); console.log(`ok   pitch on ${phone} (${device.viewport.width}x${device.viewport.height})`);
-      if (phone === 'chromium') for (const [w, h] of [[360, 640], [390, 844]]) { await small(browser, w, h); console.log(`ok   pitch on chromium ${w}x${h}`); }
+      if (!process.argv.includes('--friends-only')) {
+        await run(test, phone); console.log(`ok   pitch on ${phone} (${device.viewport.width}x${device.viewport.height})`);
+        if (phone === 'chromium') for (const [w, h] of [[360, 640], [390, 844]]) { await small(browser, w, h); console.log(`ok   pitch on chromium ${w}x${h}`); }
+      }
+      await playFriend(browser, device, phone);
     } catch (e) {
       failed++; console.error(`FAIL pitch on ${phone}: ${e.stack}`);
       if (test.errors.length) console.error(test.errors.join('\n'));
@@ -305,4 +662,5 @@ try {
 } finally { await new Promise(done => server.close(done)); }
 if (usedMouse) console.log('note: some taps fell back to mouse clicks');
 console.log(`screenshots in ${SHOTS}`);
+console.log(`friend screenshots in ${TABLE_SHOTS}`);
 process.exitCode = failed ? 1 : 0;

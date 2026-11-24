@@ -406,10 +406,12 @@ onLeave(() => { if (mode === 'play') show('paused'); }); // another app, a call,
 addEventListener('contextmenu', e => e.preventDefault());
 // The power button (and Space): asks the sim to use the animal's power on the next step.
 let wantPower = false, powerShown = '';
-$('power').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if (mode === 'play') wantPower = true; });
+let powerTap = 0;
+$('power').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); powerTap = performance.now(); if (mode === 'play') wantPower = true; });
+$('power').addEventListener('click', () => { if (mode === 'play' && performance.now() - powerTap > 700) wantPower = true; }); // Enter, or a screen reader's activate
 addEventListener('keydown', e => { if (e.key === ' ' && mode === 'play') { wantPower = true; e.preventDefault(); } });
 // What each kind of skill does, said once after a promotion. The button pulses when the skill would help right now.
-const SKILL_DOES = { sting: 'stops the nearest animal', leap: 'a long jump, safe in the air', shell: 'nothing can bite you', roar: 'stops weaker animals near you', dive: 'fast, and nothing sees you', sprint: 'a burst of speed' };
+const SKILL_DOES = { sting: 'stops the nearest animal', leap: 'a long jump that pins the prey you land by', shell: 'a bite does nothing, and dazes the biter', roar: 'stops weaker animals near you', dive: 'fast, and nothing sees you', sprint: 'a burst of speed that catches faster prey' };
 let skillTip = 0;
 function powerHelps(W) {
   const p = s.player, F = me(s); let prey = 0;
@@ -422,8 +424,9 @@ function powerButton() { // once a frame while playing
   const cd = Math.max(0, s.player.cd || 0), key = W.label + (cd > 0 ? Math.ceil(cd) : '');
   b.style.background = cd > 0 ? `conic-gradient(#ffd23a ${(1 - cd / W.cd) * 360}deg, #00000088 0)` : '#ffd23a';
   b.classList.toggle('now', cd <= 0 && powerHelps(W)); if (skillTip > 0 && (skillTip -= 1 / 60) <= 0) say(`${W.label}: ${SKILL_DOES[W.kind]}`);
+  b.style.display = 'block'; // every frame: a pause hides the button and the text below may not have changed
   if (key === powerShown) return; powerShown = key;
-  b.style.display = 'block'; b.classList.toggle('wait', cd > 0); $('powerName').textContent = W.label; $('powerWait').textContent = cd > 0 ? Math.ceil(cd) + ' s' : 'ready';
+  b.classList.toggle('wait', cd > 0); $('powerName').textContent = W.label; $('powerWait').textContent = cd > 0 ? Math.ceil(cd) + ' s' : 'ready';
 }
 function input() {
   let { x, y } = pad.vector();
@@ -758,7 +761,7 @@ function frame(now) {
           else blip(400, 0.35, 'sine', 0.09, 1200);
         }
         if (e.t === 'powerMiss') { say('Nothing is close enough'); blip(160, 0.12, 'sine', 0.06); }
-        if (e.t === 'stun') { bits.push({ x: e.x, y: e.y, r: 14, c: '#cfe8ff', age: 0, life: 0.5, ring: true }); }
+        if (e.t === 'stun') { if (e.shell) { floats.push({ x: e.x, y: e.y - 24, text: 'ouch!', age: 0, c: '#cfe8ff' }); blip(180, 0.15, 'square', 0.08, 90); } bits.push({ x: e.x, y: e.y, r: 14, c: '#cfe8ff', age: 0, life: 0.5, ring: true }); }
         if (e.t === 'tired') { floats.push({ x: e.x, y: e.y - 20, text: 'phew...', age: 0, c: '#cfe8ff', big: 1.1 }); say(`${article(e.name).replace(/^a/, 'A')} got tired and gave up`); blip(520, 0.25, 'sine', 0.08, 780); }
         if (e.t === 'pounce') { floats.push({ x: e.x, y: e.y - 18, text: 'Pounce!', age: 0, c: '#ff8a3a', big: 1.3 }); burst(e.x, e.y, ['#e8d8a8', '#c8b070'], 8, 120, 4); blip(240, 0.18, 'sawtooth', 0.1, 420); buzz(30); }
         if (e.t === 'notice') {
@@ -797,7 +800,7 @@ function frame(now) {
         }
         if (e.t === 'nemRise' && save.nem) { riseNow = true; remember('rise'); keepNem(); store(); hud(); }
         if (e.t === 'nemKill' && save.nem) { remember('kill'); keepNem(); store(); speak(fill(save.nem.persona.lines.kill, e.kills), 'kill', 2500); hud(); }
-        if (e.t === 'win') { store(); $('winSay').textContent = `You climbed all ${TOP} levels and became ${article(me(s).name)}. Nothing here can eat you.`; blip(660, 0.6, 'triangle', 0.14, 600); show('win'); }
+        if (e.t === 'win') { store(); $('winSay').textContent = `You climbed all ${TOP} levels and became ${article(me(s).name)}. You are at the top.`; blip(660, 0.6, 'triangle', 0.14, 600); show('win'); }
       }
     }
     if (s.wild && hideReady(s) !== hideWas) { hideWas = hideReady(s); hud(); }

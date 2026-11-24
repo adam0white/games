@@ -1,7 +1,6 @@
 // Phone check for Follow Me: node experiments/ducklings/check.mjs
 // Serves experiments/ (so ../kit/ resolves), answers /notes/button.js with an empty script, and plays stage 1
-// to the end card with real touch pointer events on WebKit (iPhone 13) and Chromium (Pixel 7), plus a small
-// 360x640 phone for layout. Screenshots go to $SHOTS (default: a folder in the system temp dir).
+// to the end card with touch pointer events on WebKit (iPhone 13), Chromium (Pixel 7), and Chromium 360x640. Screenshots go to $SHOTS (default: a folder in the system temp dir).
 import { createServer } from 'node:http';
 import { readFile, mkdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -27,7 +26,7 @@ const server = createServer(async (req, res) => {
 await new Promise(done => server.listen(0, '127.0.0.1', done));
 const base = `http://127.0.0.1:${server.address().port}`;
 
-const require = createRequire(process.env.PLAYWRIGHT ? join(resolve(process.env.PLAYWRIGHT), 'x.js') : '/Users/abdul/code/human-framework/node_modules/x.js');
+const require = createRequire(process.env.PLAYWRIGHT ? join(resolve(process.env.PLAYWRIGHT), 'x.js') : import.meta.url);
 const { webkit, chromium, devices } = require('playwright');
 
 const sleep = ms => new Promise(done => setTimeout(done, ms));
@@ -51,7 +50,7 @@ async function drive(page, ms, shotAt) {
     const dx = goal.sx - st.mom.sx, dy = goal.sy - st.mom.sy, d = Math.hypot(dx, dy) || 1, k = Math.min(1, 120 / d);
     const x = Math.max(10, Math.min(vp.width - 10, st.mom.sx + dx * k)), y = Math.max(80, Math.min(vp.height - 10, st.mom.sy + dy * k + 70));
     await finger(page, [[down ? 'pointermove' : 'pointerdown', x, y]]); down = true;
-    if (shotAt && !shot && st.t > shotAt.t) { shot = true; await page.screenshot({ path: shotAt.path }); }
+    if (shotAt && !shot && st.t >= shotAt.t) { shot = true; await page.screenshot({ path: shotAt.path, scale: 'css' }); }
     await sleep(60);
   }
   if (down) await finger(page, [['pointerup', 0, 0]]);
@@ -65,133 +64,176 @@ async function assertTargets(page) {
   }
 }
 
-async function run(name, engine, device, full) {
-  const browser = await engine.launch(), context = await browser.newContext({ ...device }), page = await context.newPage(), errors = [], sent = [];
+async function run(name, engine, device) {
+  const browser = await engine.launch();
+  const context = await browser.newContext({ ...device });
+  const page = await context.newPage();
+  const errors = [], sent = [];
+  page.setDefaultTimeout(12000);
   await context.route('https://human.adamwhite.work/**', async route => {
-    const req = route.request(), cors = { 'access-control-allow-origin': base, 'access-control-allow-methods': 'POST, OPTIONS', 'access-control-allow-headers': 'Content-Type' };
+    const req = route.request();
+    const cors = { 'access-control-allow-origin': base, 'access-control-allow-headers': 'Content-Type' };
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
-    try { sent.push(JSON.parse(gunzipSync(req.postDataBuffer()).toString())); } catch {}
-    return route.fulfill({ status: 200, headers: { ...cors, 'content-type': 'application/json' }, body: '{"ok":true}' });
+    sent.push(JSON.parse(gunzipSync(req.postDataBuffer()).toString()));
+    return route.fulfill({ status: 200, headers: cors, contentType: 'application/json', body: '{"ok":true}' });
   });
   await page.addInitScript(() => {
-    const Real = window.AudioContext || window.webkitAudioContext; if (!Real) return;
-    window.audioLog = { made: 0, suspend: 0, resume: 0 };
-    window.AudioContext = window.webkitAudioContext = class extends Real { constructor(...a) { super(...a); window.audioLog.made++; } suspend() { window.audioLog.suspend++; return super.suspend(); } resume() { window.audioLog.resume++; return super.resume(); } };
+    const Real = window.AudioContext || window.webkitAudioContext;
+    window.audioMade = 0;
+    if (Real) window.AudioContext = window.webkitAudioContext = class extends Real {
+      constructor(...args) { super(...args); window.audioMade++; }
+    };
   });
-  page.on('pageerror', e => errors.push(String(e))); page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+  page.on('pageerror', e => errors.push(String(e)));
+  page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
-  const shot = file => page.screenshot({ path: join(SHOTS, `${name}-${file}.png`) });
+  const shot = async label => {
+    await page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))));
+    await page.screenshot({ path: join(SHOTS, `${name}-${label}.png`), scale: 'css' });
+  };
+  const goto = suffix => page.goto(`${base}/ducklings/${suffix}`);
+  const leave = async () => {
+    await tap(page, '#pause');
+    await tap(page, '#pauseMenu');
+    assert.equal((await state(page)).screen, 'menu');
+  };
+  const end = () => until(page, () => window.ducklingsState().screen === 'end', 'end card');
+  const save = () => page.evaluate(() => JSON.parse(localStorage.getItem('ducklings-save')));
   try {
-    await page.goto(`${base}/ducklings/?fast=3`);
-    await page.evaluate(() => localStorage.setItem('hf-lab-send-localhost', '1'));
-    await page.reload();
-    let st = await state(page);
-    assert.equal(st.screen, 'menu', 'opens on the menu');
-    assert.match(await page.textContent('#menu'), /The game lab records play/, 'lab notice on the menu');
-    assert.match(await page.textContent('#play'), /Play stage 1/);
-    await page.waitForTimeout(200); await shot('1-menu');
+    await goto('?fast=2');
+    await until(page, () => window.ducklingsState?.().screen === 'menu', 'menu ready');
+    if (!process.env.VISUAL_ONLY) await page.evaluate(() => localStorage.setItem('hf-lab-send-localhost', '1'));
+    assert.match(await page.textContent('#menu'), /The game lab records play/);
+    assert.equal(await page.evaluate(() => window.audioMade), 0);
     await assertTargets(page);
-    if (!full) {
-      // small phone: the menu fits and play starts; then a few seconds of stage 4 for the look
-      await assertTargets(page);
-      const box = await page.locator('#play').boundingBox(); assert.ok(box && box.y + box.height <= device.viewport.height, 'Play button on screen');
-      await page.goto(`${base}/ducklings/?level=4`); await page.click('#play');
-      await drive(page, 6000); await shot('2-stage4');
-      // Quack: the ripple and the recharge count on the button, which stays a full-size target
-      await until(page, () => window.ducklingsState().quackCool <= 0 && window.ducklingsState().line > 0, 'quack is ready', 8000);
-      await page.keyboard.press('q');
-      await until(page, () => /^[1-6]s$/.test(document.querySelector('#quackLabel').textContent), 'Quack shows its recharge time', 3000);
-      await page.waitForTimeout(150); await shot('2b-quack');
-      await assertTargets(page);
-      await tap(page, '#pause'); await page.click('#pauseMenu');
-      // bikes warn often: a warning under the HUD is repeated below it
-      await page.goto(`${base}/ducklings/?level=5&seed=5`); await page.click('#play');
-      await drive(page, 12000, { t: 6, path: join(SHOTS, `${name}-3-stage5.png`) });
-      assert.ok((await state(page)).hudPeeks > 0, 'a warning under the HUD shows below it');
-      await tap(page, '#pause'); await page.click('#pauseMenu');
-      assert.deepEqual(errors, [], 'page errors'); console.log(`ok   ${name}`); return true;
-    }
-    // Play: audio starts in the tap; stage 1 waits for the first touch with a ghost finger
-    assert.equal(await page.evaluate(() => window.audioLog?.made ?? 0), 0, 'no audio before the first tap');
+    await shot('map');
+    await page.locator('#chapters button').nth(3).click();
+    assert.equal(await page.locator('#nodes button:disabled').count(), 9);
+    await assertTargets(page);
+    await shot('river-map');
+    await page.locator('#chapters button').first().click();
+    assert.match(await page.textContent('#play'), /Play 1/);
     await page.click('#play');
-    st = await state(page);
-    assert.equal(st.screen, 'play'); assert.ok(st.waiting, 'stage 1 waits for a touch'); assert.equal(st.line, 1, 'one duckling follows from the start');
-    assert.equal(await page.evaluate(() => window.audioLog?.made ?? 1), 1, 'Play starts audio');
-    await page.waitForTimeout(400); await shot('2-teach');
-    // the first touch starts her moving toward a point above the finger
+    let st = await state(page);
+    assert.equal(st.stage, 1);
+    assert.ok(st.waiting && st.line === 1);
+    assert.equal(await page.evaluate(() => window.audioMade), 1);
+    await shot('first-swim');
+    assert.ok(await page.locator('#c').evaluate(canvas => {
+      const pixel = canvas.getContext('2d').getImageData(Math.floor(canvas.width * .58), Math.floor(canvas.height * .35), 1, 1).data;
+      return pixel[1] > pixel[0];
+    }), 'the opening pond is rendered without a hit flash');
     const y0 = st.mom.y;
     await finger(page, [['pointerdown', st.mom.sx, st.mom.sy - 20]]);
-    await until(page, y => window.ducklingsState().mom.y > y + 0.05, 'she swims up toward the finger', 5000, y0);
-    st = await state(page); assert.ok(!st.waiting && st.t > 0, 'the sim runs after the touch');
-    assert.ok(st.rollCalls >= 1, 'the first touch starts the roll call');
-    await page.waitForTimeout(700); await shot('2b-rollcall');
-    await finger(page, [['pointerup', st.mom.sx, st.mom.sy]]);
-    // a second finger while one steers is a quack
-    await finger(page, [['pointerdown', st.mom.sx, st.mom.sy + 90], ['pointerdown', 40, 300, 8], ['pointerup', 40, 300, 8]]);
-    await until(page, () => window.ducklingsState().quackCool > 0, 'second finger quacks', 3000);
-    await finger(page, [['pointerup', 0, 0]]);
-    // pause freezes the sim; resume continues it
-    await tap(page, '#pause');
-    st = await state(page); assert.ok(st.paused && st.screen === 'paused', 'pause button pauses');
-    await assertTargets(page);
-    const tp = st.t; await sleep(400); assert.equal((await state(page)).t, tp, 'time stands still while paused');
-    await shot('3-paused');
-    await page.click('#resume'); await until(page, t => window.ducklingsState().t > t + 0.2, 'resume continues', 4000, tp);
-    await page.evaluate(() => dispatchEvent(new Event('blur'))); assert.ok((await state(page)).paused, 'losing focus pauses');
-    await page.keyboard.press('p'); assert.ok(!(await state(page)).paused, 'P resumes');
-    // play to the nest
-    await drive(page, 40000, { t: 4, path: join(SHOTS, `${name}-4-play.png`) });
-    await until(page, () => window.ducklingsState().screen === 'end', 'end card', 20000);
-    await page.waitForTimeout(1400); await shot('5-end');
-    await assertTargets(page);
+    await until(page, y => window.ducklingsState().mom.y > y + .048, 'thumb steers', 5000, y0);
     st = await state(page);
-    assert.equal(st.over, 'nest', 'stage 1 ends at the nest'); assert.ok(st.arrived >= 1, 'at least one duckling home');
-    const blob = await page.evaluate(() => JSON.parse(localStorage.getItem('ducklings-save')));
-    assert.ok(blob && blob.stars['1'] >= 1 && blob.opened >= 2 && blob.taught && blob.home >= 1, 'progress saved');
-    await page.waitForTimeout(300);
-    const runs = sent.filter(r => r.game === 'ducklings' && r.kind === 'run');
-    assert.ok(runs.some(r => r.data.outcome === 'nest' && r.data.summary.stage === 1 && r.data.summary.arrived === st.arrived), 'lab run sent with its summary');
-    assert.ok(runs[0].data.events.some(e => e.type === 'join'), 'join recorded');
-    // reload keeps it
-    await page.reload(); st = await state(page);
-    assert.equal(st.opened, blob.opened, 'opened stage survives a reload'); assert.ok(st.taught, 'the lesson is not shown twice');
-    assert.match(await page.textContent('#play'), /Play stage 2/, 'menu offers the next stage');
-    // sound off is saved
-    await page.click('#sound'); await page.reload(); assert.equal((await state(page)).sound, false, 'sound setting saved');
-    await page.click('#sound');
-    // a later stage mid-play for the look
-    // leave each one through the pause menu, as a player would. Navigating away mid-run instead makes WebKit report
-    // "Cannot load blob ... access control checks" from the kit lab's flush on hide (see NOTES.md, Kit candidates).
-    const leave = async () => { await tap(page, '#pause'); await page.click('#pauseMenu'); await until(page, () => window.ducklingsState().screen === 'menu', 'back on the menu', 4000); };
-    // keyboard on the buttons, on its own stage 2 run: idling stage 1 here would shift the stage 1 drive against the log
-    await page.goto(`${base}/ducklings/?fast=3&level=2`); await page.click('#play');
-    await page.focus('#pause'); await page.keyboard.press('Enter');
-    assert.ok((await state(page)).paused, 'keyboard activates the pause button');
+    assert.ok(st.rollCalls >= 1);
+    await finger(page, [['pointerdown', 40, 300, 8], ['pointerup', 40, 300, 8], ['pointerup', 0, 0]]);
+    await until(page, () => window.ducklingsState().quackCool > 0, 'second finger quacks');
+    await tap(page, '#pause');
+    st = await state(page);
+    assert.ok(st.paused && st.screen === 'paused');
+    await sleep(260);
+    assert.equal((await state(page)).t, st.t, 'pause freezes simulation');
     await page.click('#resume');
-    await until(page, () => window.ducklingsState().quackCool <= 0, 'quack is ready', 8000);
-    await page.focus('#quack'); await page.keyboard.press('Enter');
-    await until(page, () => window.ducklingsState().quackCool > 0, 'keyboard activates Quack', 3000);
-    await until(page, () => /^[1-6]s$/.test(document.querySelector('#quackLabel').textContent), 'Quack shows its recharge time', 3000);
-    await page.waitForTimeout(250); await shot('3b-quack');
+    await until(page, t => window.ducklingsState().t > t + .15, 'resume continues', 4000, st.t);
+    await page.evaluate(() => dispatchEvent(new Event('blur')));
+    assert.ok((await state(page)).paused, 'blur pauses');
+    await page.keyboard.press('p');
+    await drive(page, 13000);
+    await end();
+    st = await state(page);
+    assert.equal(st.over, 'nest');
+    assert.equal(st.stars, 3);
+    await sleep(550);
+    await shot('home');
+    await assertTargets(page);
+    assert.equal((await save()).opened, 2);
+
+    await page.click('#next');
+    assert.equal((await state(page)).stage, 2);
+    await shot('rescue');
+    await drive(page, 14000, { t: .85, path: join(SHOTS, `${name}-mid-swim.png`) });
+    await end();
+    st = await state(page);
+    assert.equal(st.stars, 3);
+    assert.equal(st.arrived, 2);
+    const blob = await save();
+    assert.equal(blob.opened, 3);
+    assert.equal(blob.home, 3);
+    assert.deepEqual(blob.stars, { 1: 3, 2: 3 });
+    await page.reload();
+    assert.deepEqual(await save(), blob);
+    assert.match(await page.textContent('#play'), /Play 3/);
+    await page.locator('#nodes button[data-level="1"]').click();
+    assert.equal((await state(page)).stage, 1, 'map replays an unlocked level');
     await leave();
-    // the shared first-time hint (kit/hint.js), forced on with ?hint=hand: a finger holding and moving shows after 3 s of
-    // idle play; a real touch removes it
-    await page.goto(`${base}/ducklings/?hint=hand`); await page.click('#play'); await sleep(1000);
-    assert.equal(await page.evaluate(() => !!document.querySelector('.kit-hint.on')), false, 'hint: not before 3 s of idle play');
-    await until(page, () => !!document.querySelector('.kit-hint.on'), 'hint: shown after idle play', 8000);
-    assert.equal(await page.evaluate(() => document.querySelector('.kit-hint').dataset.kind), 'hold-and-move', 'hint: a hold and move');
-    st = await state(page); await finger(page, [['pointerdown', st.mom.sx, st.mom.sy + 90]]);
-    assert.equal(await page.evaluate(() => document.querySelector('.kit-hint')), null, 'hint: a real touch removes it');
-    await finger(page, [['pointerup', 0, 0]]); await leave();
-    await page.goto(`${base}/ducklings/?level=7`); await page.click('#play'); await drive(page, 7000); await shot('6-stage7'); await leave();
-    await page.goto(`${base}/ducklings/?level=5&seed=5`); await page.click('#play'); await drive(page, 9000); await shot('7-stage5'); await leave();
-    await page.waitForTimeout(300);
-    assert.ok(sent.some(r => r.game === 'ducklings' && r.kind === 'run' && r.data.outcome === 'left'), 'leaving mid-run is recorded');
+    if (!process.env.VISUAL_ONLY) {
+      await sleep(350);
+      const runs = sent.filter(e => e.game === 'ducklings' && e.kind === 'run');
+      assert.ok(runs.some(e => e.data.outcome === 'nest' && e.data.summary.stage === 2 &&
+        e.data.summary.arrived === 2 && e.data.events.some(item => item.type === 'join')));
+      assert.ok(runs.some(e => e.data.outcome === 'left'));
+    }
+
+    await goto('?level=5');
+    await tap(page, '#play');
+    assert.equal((await state(page)).lesson, 'car');
+    await shot('road');
+    await leave();
+    await goto('?level=9');
+    await tap(page, '#play');
+    await shot('catnap');
+    await leave();
+    await goto('?level=16');
+    await tap(page, '#play');
+    await shot('folding-leaves');
+    await leave();
+    await goto('?level=20&fast=2');
+    await tap(page, '#play');
+    await shot('dash');
+    await drive(page, 8000);
+    await end();
+    assert.equal((await state(page)).stars, 3, 'touch dash clears the moving current');
+    assert.equal((await save()).opened, 3, 'preview did not unlock the map');
+
+    if (!process.env.VISUAL_ONLY) {
+      const legacy = { v: 1, sound: false, opened: 8, stars: {1: 2, 7: 3}, best: {1: 140}, endless: 8210, home: 56, album: {Pip: 1}, taught: true };
+      await page.evaluate(old => localStorage.setItem('ducklings-save', JSON.stringify(old)), legacy);
+      await goto('?hint=hand');
+      assert.deepEqual(await save(), legacy);
+      assert.equal((await state(page)).opened, 8);
+      assert.match(await page.textContent('#endless'), /8210/);
+      assert.match(await page.textContent('#sound'), /off/);
+      await page.click('#sound');
+      await tap(page, '#play');
+      await until(page, () => document.querySelector('.kit-hint.on')?.dataset.kind === 'hold-and-move', 'shared hint');
+      st = await state(page);
+      await finger(page, [['pointerdown', st.mom.sx, st.mom.sy - 20]]);
+      assert.equal(await page.locator('.kit-hint').count(), 0);
+      await finger(page, [['pointerup', 0, 0]]);
+      await leave();
+      await tap(page, '#endless');
+      st = await state(page);
+      assert.equal(st.mode, 'endless');
+      await finger(page, [['pointerdown', st.mom.sx, st.mom.sy - 90]]);
+      await until(page, () => window.ducklingsState().t > 1, 'endless advances from touch');
+      await shot('endless');
+      await finger(page, [['pointerup', 0, 0]]);
+      await leave();
+      await goto('?level=20&fast=5');
+      await tap(page, '#play');
+      st = await state(page);
+      await finger(page, [['pointerdown', st.mom.sx, st.mom.sy + 70], ['pointerup', 0, 0]]);
+      await end();
+      assert.equal((await state(page)).over, 'lost-all');
+    }
     assert.deepEqual(errors, [], 'page errors');
     console.log(`ok   ${name}`);
     return true;
   } catch (e) {
-    console.log(`FAIL ${name}: ${e.message}`); if (errors.length) console.log('     ' + errors.join('\n     '));
+    console.log(`FAIL ${name}: ${e.stack}`);
+    if (errors.length) console.log(errors.join('\n'));
     await shot('fail').catch(() => {});
     return false;
   } finally { await browser.close(); }
@@ -199,13 +241,17 @@ async function run(name, engine, device, full) {
 
 const only = process.argv[2];
 const runs = [
-  ['webkit-iphone13', webkit, devices['iPhone 13'], true],
-  ['chromium-pixel7', chromium, devices['Pixel 7'], true],
-  ['chromium-390x844', chromium, { ...devices['Pixel 7'], viewport: { width: 390, height: 844 }, screen: { width: 390, height: 844 } }, false],
-  ['chromium-360x640', chromium, { ...devices['Pixel 7'], viewport: { width: 360, height: 640 }, screen: { width: 360, height: 640 } }, false],
+  ['webkit-iphone13', webkit, devices['iPhone 13']],
+  ['chromium-pixel7', chromium, devices['Pixel 7']],
+  ...[
+    ['chromium-390x664', 390, 664],
+    ['chromium-360x640', 360, 640],
+  ].map(([name, width, height]) => [name, chromium, {
+    ...devices['Pixel 7'], viewport: { width, height }, screen: { width, height },
+  }]),
 ];
 let ok = true;
-for (const [name, engine, device, full] of runs) if (!only || name.includes(only)) ok = (await run(name, engine, device, full)) && ok;
+for (const [name, engine, device] of runs) if (!only || name.includes(only)) ok = (await run(name, engine, device)) && ok;
 server.close();
 console.log(ok ? `all passed; screenshots in ${SHOTS}` : 'FAILED');
-process.exit(ok ? 0 : 1);
+process.exitCode = ok ? 0 : 1;

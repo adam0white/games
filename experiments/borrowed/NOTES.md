@@ -8,6 +8,61 @@ You have forgotten who you were. A run is one life in three chapters (the child,
 
 The idea comes from tester t1, note #107, a request for a game where you have abilities, uncover a forgotten identity, and every use of an ability shortens your lifespan. It is not a rebuild of an archived game. Nothing was copied, ported or imported from `archive/`.
 
+## 2026-11-24: linked photographs and keepsakes
+
+A life still unfolds through three rainy islands, six possible faces at each age and one candle. The player can now bring evidence from an earlier photograph to a later one, match torn prints and keep the parts of each life they recovered.
+
+| Chapter | New form | Evidence |
+| --- | --- | --- |
+| Child | Compare photographs | The free photograph supplies one fact. Compare later prints with that fact and the six faces. |
+| Grown-up | Match torn halves | Put the matching half under the fixed edge. Push reveals a fact the free print cannot supply. That fact lets you reject the lie at Light. |
+| Old | Signed photographs | Push supplies the entry fact. Leap and Light carry the same false witness's seal. Exposing the first puts the crossed-out seal above the second pair. |
+
+For each later chapter, the generator chooses a rival who agrees with the entry fact. At least two faces share each value, and every face has a distinct combination of the four values. The rival therefore differs on another kind. The dependent pair uses that kind so the rival can make the opposite photograph look true until the new fact arrives. Its true print also contributes a fresh kind. Rewind can supply the same distinguishing fact through an alternate route. Paying or guessing can open a memory early.
+
+Wrong photo taps still cost 12 years, Show me costs 5, and naming the wrong face costs 30 in the puzzle game. With `?lies=0`, the original 15-year naming cost, memory contents, island and face deals remain. The album and first-run practice use `album` and `practice` in the existing `borrowed-save` blob. Missing fields default to an empty album and unseen practice. The original teaching bits, sound, scores, daily results and role gallery still load. Practice uses independent drawings, takes no years, and marks no live clues or attempts. Only paid Show me points at a real answer.
+
+**Builder** · The end card prints the recovered life. The Album button reopens the latest 12 pages, including unfinished lives. Only recovered prints and correctly named portraits enter the album. The album uses local storage and stays out of lab payloads.
+
+**Builder** · The signed pair shows the exposed seal separately from the photographs so the player can recognize the witness again. The tear profiles have the same scale on all three pieces, and the selected piece slides into place on success.
+
+### Verification
+
+Proofs cover 400 seeds × six answer positions, all three chapters. The dependent Light photo must be ambiguous with the entry facts alone and decidable after the parent. The audit also checks the recurring witness, exactly one false photograph, puzzle-form progression, a deliberately broken entry and the closure over every memory. A route test walks the six island orders and opens every lock. The balance test uses the same 1,080 forced-answer runs for careful play and early guessing. The careful policy favors an available deduction and counts the cost of unlocking each memory.
+
+| Chapter | Careful years spent, min / mean / max | Mean abilities | Mean puzzles |
+| --- | --- | --- | --- |
+| Child | 11 / 14 / 27 | 1.13 | 2.13 |
+| Grown-up | 14 / 20 / 31 | 1.34 | 2.33 |
+| Old | 17 / 30 / 45 | 1.89 | 1.89 |
+
+| Bot | Mean score | All three correct | Wrong photo taps per run |
+| --- | --- | --- | --- |
+| Careful | 1158 | 100% | 0 |
+| Gambler | 823 | 31% | 0 |
+| Random photo taps | 792 | 99% | 3.10 |
+| First photo first | 776 | 99% | 3.23 |
+| Always buy help | 848 | 100% | 0 |
+| Spender | 200 | 0% | 0 |
+
+The restored assertions pass. The gambler scores 71.1% of careful, and careful averages 4.36 abilities per run and spends nothing on hints. Careful finishes with 49.7 years minimum and 85.3 years on average. Without old-chapter Rewind, 540 of 540 careful runs still finish. The final rule and balance run finished in 9.4 seconds elapsed and 8.6 seconds of CPU. During overlapping browser and builder work, the same checks took 83.9 seconds elapsed and 10.2 seconds of CPU.
+
+The browser suite passed on WebKit iPhone 13, Chromium Pixel 7, Chromium at 360 × 640 and 390 × 844, and Chromium desktop. Coverage includes practice, torn halves, both signed memories, Later and reopening, paid help, wrong taps, lethal spending, chapter and pause exits, the notes recording stub, the kit hint, desktop keys, album paging, save reload and old save defaults. First visual pass tightened the practice layout and added paper corners and room for all five grown-up prints. The second added a separate practice lineup, clarified the witness label and tightened the album page height.
+
+### Known weaknesses
+
+- Some faces can be identified before the whole trail is explored. Rewind or paying can bypass the first witness, and the album only shows the evidence the player collected.
+- A policy willing to purchase an answer early can save an ability. The hasty buyer averaged 1209 points and 90.5 years left, versus the deduction-first bot's 1158 points and 85.3 years. Buying every answer on the same route scores 848.
+- The torn print is a visual matching task. Its edge alone is sufficient.
+- The album retains the latest 12 lives. Clearing browser storage clears the album.
+- The browser checks use device emulation and a local lab endpoint stub. Human comprehension, real phones and audio, live lab delivery and the deployed page were not verified.
+
+The shared Borrowed Time and tap-hint cases passed on both browser engines. A later exact-command run stopped at the shared registry preflight because the sibling experiment `alibi` was unlisted. The Borrowed Time cases still passed when the in-memory preflight was scoped to Borrowed Time. No kit file changed.
+
+### Kit candidates
+
+None. The existing save, pause, audio, screens, recording and tap hint are sufficient.
+
 ## 2026-11-24: memories that lie (tester t1, notes #137 and #140, built)
 
 Notes #137 and #140 are built. Every memory is now won by a puzzle: two (or three) photographs of the memory disagree, and you tap the one that lies. `?lies=0` plays the game as it was before; the bots check that it deals the same islands, faces and answers.

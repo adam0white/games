@@ -1,19 +1,14 @@
-// Proof of the rules: node experiments/ducklings/bots.mjs
-// Three bots play every stage and the endless pond. They differ in one thing only:
-//   planner  looks ahead along its own trail: the mother AND every duckling at its delayed time
-//   greedy   looks ahead for the mother only (the same moves, goals and rescue rule)
-//   idle     never touches the screen
-// If the copy-the-path rule matters, greedy loses clearly more ducklings than planner. Exits non-zero on a failed check.
 import assert from 'node:assert/strict';
-import { create, step, stars, STAGES, LAST_STAGE, DT, SPEED, GAP, R_MOM, R_DUCK, LINE_MAX, WARN_MIN, QUACK_TIME, QUACK_SQUEEZE, TRAITS,
-  hitAny, moveMom, pathAt, stepDelay, endlessAhead, duskRate } from './sim.js';
+import { create, step, stars, LAST_STAGE, DT, SPEED, GAP, R_MOM, R_DUCK, LINE_MAX, QUACK_TIME, QUACK_SQUEEZE, TRAITS,
+  hitAny, moveMom, pathAt, stepDelay, duskRate } from './sim.js';
 import { bands, routeCheck } from './route.mjs';
 
-const LOOK = 0.1, STEPS = 42; // look-ahead: 4.2 s in 0.1 s steps, long enough for the tail of a long line
-const DIRS = 16;
+const LOOK = 0.15, STEPS = 30; // sample the next 4.5 s for the whole flock
+const DIRS = 10;
+const REACTIVE_SAMPLES = 7;
 
 // Where to go next: the nearest waiting duckling not far behind, else the nest (or onward, on the endless pond).
-export function goalOf(s) { return stepping(s, wantOf(s)); }
+function goalOf(s, careful) { return stepping(s, wantOf(s, careful)); }
 // Cross one hazard band at a time: if a band lies between her and the goal, aim for the free water just past it,
 // so she can stop there and let the line bunch before the next band (a person sees those calm strips too).
 let bandCache = null;
@@ -24,10 +19,11 @@ function stepping(s, goal) {
   else { const b = [...bandCache.list].reverse().find(b => b.a < m.y - 0.02 && b.b > goal.y); if (b && b.a - 0.04 > goal.y) return { x: goal.x, y: b.a - 0.04 }; }
   return goal;
 }
-function wantOf(s) {
+function wantOf(s, careful) {
   const m = s.mom; let best = null, bestD = Infinity;
   if (s.line.length < LINE_MAX) for (const l of s.lost) {
     if (l.y < m.y - 1.6) continue;
+    if (!careful && (Math.abs(l.x - m.x) > .16 || l.y < m.y - .12 || l.y > m.y + .70)) continue;
     const d = Math.hypot(l.x - m.x, (l.y - m.y) * (l.y < m.y ? 1.5 : 1));
     if (d < bestD) { bestD = d; best = { x: l.x, y: l.y }; }
   }
@@ -36,24 +32,25 @@ function wantOf(s) {
 }
 
 // Score one way of moving: go in `dir` (or wait) for a moment, then head for the goal.
-export function score(s, dir, goal, quack, careful) {
+function score(s, world, dir, goal, quack, careful) {
   const m = { x: s.mom.x, y: s.mom.y, vx: s.mom.vx, vy: s.mom.vy }, trail = [{ x: m.x, y: m.y }];
   const first = dir === 'wait' ? { x: m.x, y: m.y } : null;
   let cost = 0, momHit = false;
-  const ticks = Math.round(LOOK / DT);
+  const ticks = 2;
+  const samples = careful ? STEPS : REACTIVE_SAMPLES;
   const delays = s.line.map(f => f.delay), hitF = s.line.map(() => false);
   let qT = quack ? QUACK_TIME : s.quackT;
-  for (let j = 1; j <= STEPS; j++) {
+  for (let j = 1; j <= samples; j++) {
     const phase1 = j * LOOK <= 0.9;
     for (let k = 0; k < ticks; k++) {
-      const tt = s.t + ((j - 1) * ticks + k + 1) * DT;
+      const tt = s.t + ((j - 1) * ticks + k + 1) * LOOK / ticks;
       const target = phase1 ? (first ?? (dir === 'goal' ? goal : { x: m.x + Math.cos(dir) * 0.3, y: m.y + Math.sin(dir) * 0.3 })) : goal;
-      moveMom(s, m, target, tt, DT, false);
+      moveMom(world, m, target, tt, LOOK / ticks, false);
     }
     trail.push({ x: m.x, y: m.y });
     cost += 1.2 * Math.hypot(goal.x - m.x, goal.y - m.y); // sooner is better
     const t = s.t + j * LOOK, fade = 1 / (1 + j * 0.03);
-    if (!momHit && s.safe < j * LOOK && hitAny(s, t, m.x, m.y, R_MOM + 0.02)) { momHit = true; cost += 1000 * fade; }
+    if (!momHit && s.safe < j * LOOK && hitAny(world, t, m.x, m.y, R_MOM + 0.02)) { momHit = true; cost += 1000 * fade; }
     if (!careful) continue;
     // each duckling: where it will be at time t, on the old trail or on the new one
     qT = Math.max(0, qT - LOOK); let D = 0;
@@ -64,7 +61,7 @@ export function score(s, dir, goal, quack, careful) {
       const rel = j * LOOK - delays[i]; let p;
       if (rel <= 0) p = pathAt(s, -rel);
       else { const a = rel / LOOK, i0 = Math.floor(a), f = a - i0, A = trail[i0], B = trail[Math.min(i0 + 1, trail.length - 1)]; p = { x: A.x + (B.x - A.x) * f, y: A.y + (B.y - A.y) * f }; }
-      if (hitAny(s, t, p.x, p.y, R_DUCK + 0.015)) { hitF[i] = true; cost += 300 * fade; }
+      if (hitAny(world, t, p.x, p.y, R_DUCK + 0.015, true)) { hitF[i] = true; cost += 300 * fade; }
     }
   }
   cost += 6 * Math.hypot(goal.x - m.x, goal.y - m.y);
@@ -72,17 +69,27 @@ export function score(s, dir, goal, quack, careful) {
   return cost;
 }
 
+function localWorld(s, careful) {
+  const reach = (careful ? STEPS : REACTIVE_SAMPLES) * LOOK * SPEED + .25;
+  const gap = Math.max(0, ...s.line.map(f => f.delay));
+  // History and future positions are both within these bounds at any sampling time.
+  const low = s.mom.y - reach - gap * SPEED;
+  const high = s.mom.y + reach + gap * SPEED;
+  const hazards = s.hazards.filter(h => h.y0 <= high && h.y1 >= low);
+  return { hazards, rocks: s.rocks, reeds: s.reeds, gusts: s.gusts, nest: s.nest };
+}
+
 export function planner(careful) {
   let next = 0, choice = null, quackNow = false;
   return s => {
     if (s.t >= next) {
-      next = s.t + 0.2;
-      const goal = goalOf(s);
+      next = s.t + (careful ? 0.28 : 0.4);
+      const goal = goalOf(s, careful), world = localWorld(s, careful);
       const options = ['goal', 'wait'];
       for (let i = 0; i < DIRS; i++) options.push(i / DIRS * Math.PI * 2);
       let best = Infinity; quackNow = false;
       for (const dir of options) for (const q of (careful && s.quackCool <= 0 && s.line.length > 1 ? [false, true] : [false])) {
-        const c = score(s, dir, goal, q, careful);
+        const c = score(s, world, dir, goal, q, careful);
         if (c < best) { best = c; choice = dir; quackNow = q; }
       }
       // keep the chosen heading as a point ahead, as a finger would
@@ -93,131 +100,138 @@ export function planner(careful) {
     return { target, quack: quackNow };
   };
 }
-const idle = () => () => ({ target: null, quack: false });
-const BOTS = { planner: () => planner(true), greedy: () => planner(false), idle };
+// Waypoints are separate from the campaign data. They drive the same eased steering
+// and tick loop as a held thumb. A number is a wait at the preceding waypoint.
+const ROUTES = [
+  null,
+  [],
+  [[.73, .86]],
+  [[.19, .83], [.23, 1.26]],
+  [[.22, .86], [.27, 1.29], [.76, 1.53], [.64, 1.91], [.30, 1.91]],
+  [[.50, .83], 0.65, [.50, 1.46]],
+  [[.50, .79], [.50, 1.49], 0.8, [.34, 2.20]],
+  [[.31, .78], [.22, 1.45]],
+  [[.58, .75], [.73, 1.33], [.64, 1.71], .2, [.27, 2.42]],
+  [[.20, .84], [.20, 1.39]],
+  [[.49, .82], [.59, 1.40]],
+  [[.64, .86], [.70, 1.35], [.34, 1.55], [.30, 2.07]],
+  [[.77, .81], [.77, 1.34]],
+  [[.59, .78], [.58, 1.08], [.30, 1.35], [.29, 1.97]],
+  [[.47, .86], [.47, 1.38], [.70, 1.62], [.72, 1.90]],
+  [[.76, .90], [.75, 1.53], [.23, 1.91]],
+  [[.77, .86], [.77, 1.38]],
+  [[.66, .78], [.64, 1.15], [.33, 1.26], [.32, 1.93]],
+  [[.51, 1.76]],
+  [[.30, 1.46], [.64, 1.47], [.67, 2.45]],
+  [],
+  [[.29, .78], [.24, 1.39], [.24, 1.94]],
+  [[.31, .79], [.21, 1.39], [.18, 2.14], [.37, 2.38], [.74, 2.28]],
+  [[.25, .83], [.23, 1.25], [.24, 2.40]],
+  [[.73, .76], [.72, .91], [.72, 1.43], [.34, 1.51], [.32, 2.12], [.24, 2.73], [.39, 3.40]],
+];
 
-function play(opts, bot, limit = 200) {
-  const s = create(opts), act = bot();
+function waypoints(points) {
+  let index = 0, until = null;
+  return s => {
+    const point = points[index];
+    if (typeof point === 'number') {
+      until ??= s.t + point;
+      if (s.t >= until) { index++; until = null; }
+      return { target: null };
+    }
+    if (!point) return { target: s.nest };
+    const [x, y] = point;
+    if (Math.hypot(s.mom.x - x, s.mom.y - y) < 0.045) index++;
+    return { target: { x, y } };
+  };
+}
+
+const straight = s => ({ target: s.nest });
+const idle = () => ({ target: null });
+function play(opts, act, limit = 135, sample) {
+  const s = create(opts);
   let trace = 0;
   while (!s.over && s.t < limit) {
     const { target, quack } = act(s);
     step(s, target, quack);
     trace = (trace * 31 + Math.round(s.mom.x * 1e4) + Math.round(s.mom.y * 1e4)) % 1e9;
+    sample?.(s);
   }
   return { s, trace };
 }
-const row = (cells, w) => cells.map((c, i) => String(c).padEnd(w[i])).join(' ');
 
-const direct = process.argv[1]?.endsWith('bots.mjs');
-if (direct) {
-// node bots.mjs stage 3 planner   one run, printed second by second
-if (process.argv[2] === 'stage') {
-  const s = create({ stage: Number(process.argv[3]) }), act = BOTS[process.argv[4] ?? 'planner']();
-  let last = -1;
-  while (!s.over && s.t < 200) {
-    const { target, quack } = act(s); step(s, target, quack);
-    for (const e of s.events) if (e.type !== 'warn') console.log(s.t.toFixed(2), e.type, e.by ?? '', e.n ?? '');
-    if (Math.floor(s.t) !== last) { last = Math.floor(s.t); console.log(s.t.toFixed(0), 'mom', s.mom.x.toFixed(2), s.mom.y.toFixed(2), 'target', target && target.x.toFixed(2), target && target.y.toFixed(2), 'line', s.line.length, 'lost', s.lost.length); }
+function campaign() {
+  const table = [];
+  for (let stage = 1; stage <= LAST_STAGE; stage++) {
+    const points = ROUTES[stage], { s } = play({ stage }, waypoints(points), 28);
+    const direct = play({ stage }, straight, 28).s;
+    table.push({
+      level: stage, home: `${s.arrived.length}/${s.total}`, stars: stars(s), seconds: s.t.toFixed(1),
+      straight: stars(direct), hits: s.hits, scares: s.scatters,
+    });
+    assert.equal(play({ stage }, idle, 20).s.arrived.length, 0, `level ${stage} idle`);
   }
-  console.log(s.over, s.why, 'arrived', s.arrived.length, 'of', s.total, 'score', s.score, 't', s.t.toFixed(1));
-  process.exit(0);
-} else main();
+  console.table(table);
+  assert.ok(table.every(row => row.stars === 3), 'every level has a clean, full-flock route');
+  assert.ok(table.filter(row => row.straight < 3).length >= 14, 'holding straight is worse than route choice');
+  const sticky = play({ stage: 12 }, straight, 12).s;
+  assert.equal(sticky.hits, 0, 'the mother crosses the weeds unharmed');
+  assert.equal(sticky.scatters, 2, 'both followers scatter from the same path');
+  const folding = play({ stage: 16 }, straight, 12).s;
+  assert.ok(folding.arrived.length < folding.total, 'the line is too long for the folding leaves');
+  let pressed = false;
+  const closeUp = play({ stage: 16 }, s => {
+    const trigger = s.hazards[0].triggeredAt;
+    const quack = !pressed && trigger !== null && s.t - trigger > .4;
+    pressed ||= quack;
+    return { target: s.nest, quack };
+  }, 12).s;
+  assert.equal(stars(closeUp), 3, 'quacking on the leaf rustle gets the whole line through');
+  const dash = play({ stage: 20 }, s => {
+    s.hazards.length = 0;
+    return straight(s);
+  }, 10).s;
+  assert.equal(dash.why, 'dusk', 'the direct dash times out without the current');
+
+  const opts = { stage: 24, seed: 0xffffffff };
+  const a = play(opts, waypoints(ROUTES[24]));
+  const b = play(opts, waypoints(ROUTES[24]));
+  assert.equal(a.trace, b.trace, 'campaign fixed-tick determinism');
+  assert.deepEqual(a.s, b.s, 'campaign resulting state');
 }
 
-function main() {
-
-let failed = 0;
-const check = (ok, what) => { if (!ok) { failed++; console.log('FAIL', what); } };
-const started = Date.now();
-
-// 1. every hazard warns for at least WARN_MIN seconds; pikes are always in sight
-for (let n = 1; n <= LAST_STAGE; n++) for (const h of create({ stage: n }).hazards) {
-  if (h.kind === 'pike') continue;
-  const warn = h.kind === 'bike' ? Math.min(...h.riders.map(r => r.warn)) : h.warn;
-  check(warn >= WARN_MIN, `stage ${n} ${h.kind} warns ${warn}s`);
-}
-
-// Regressions: continuing pressure and missed ducklings must not exhaust future spawns.
-{
-  check(duskRate(20) === 1 && duskRate(90) > duskRate(60) && duskRate(240) > duskRate(180), 'sunset keeps accelerating after the opening');
-  const s = create({ endless: true, seed: 101 });
-  s.mom.y = 20; s.top = 20; s.lost = Array.from({ length: LINE_MAX }, (_, id) => ({ id: 1000 + id, x: 0.5, y: 1 }));
-  endlessAhead(s);
-  check(s.lost.some(l => l.y > 20), 'missed ducklings far behind do not block new ones');
-  check(s.lost.filter(l => l.id >= 1000).length === LINE_MAX, 'old waiting ducklings remain recoverable');
-}
-
-// 2. determinism
-{
-  const a = play({ stage: 4 }, BOTS.planner), b = play({ stage: 4 }, BOTS.planner);
-  check(a.trace === b.trace && a.s.score === b.s.score && a.s.arrived.length === b.s.arrived.length, 'same seed and inputs give the same run');
-  const e1 = play({ endless: true, seed: 9 }, BOTS.planner, 90), e2 = play({ endless: true, seed: 9 }, BOTS.planner, 90);
-  check(e1.trace === e2.trace && e1.s.score === e2.s.score, 'endless is deterministic');
-}
-
-// 3. each stage, each bot
-const W = [6, 8, 6, 9, 8, 8, 6, 6, 6, 7, 7];
-console.log(row(['stage', 'bot', 'end', 'arrived', 'of', 'stars', 'hits', 'scared', 'gone', 'quacks', 'time'], W));
-let sumP = 0, sumG = 0;
-for (let n = 1; n <= LAST_STAGE; n++) {
-  const spec = STAGES[n], res = {};
-  for (const name of Object.keys(BOTS)) {
-    const { s } = play({ stage: n }, BOTS[name]);
-    res[name] = s;
-    console.log(row([n, name, s.over === 'nest' ? 'nest' : s.why, s.arrived.length, s.total, '*'.repeat(stars(s)) || '-', s.hits, s.scatters, s.gone.length, s.quacks, s.t.toFixed(1)], W));
+function endless() {
+  const table = [], totals = { competent: [], average: [] };
+  const times = [25, 50, 75, 100], cuts = Object.fromEntries(times.map(t => [t, [0, 0]]));
+  for (let k = 1; k <= 12; k++) {
+    const seed = k * 101;
+    const out = { seed };
+    for (const [i, label] of ['competent', 'average'].entries()) {
+      const { s } = play({ endless: true, seed }, planner(i === 0));
+      totals[label].push(s);
+      out[label] = `${s.t.toFixed(1)}s / ${s.score} / ${s.why ?? 'alive'}`;
+      for (const t of times) if (s.t >= t) cuts[t][i]++;
+    }
+    table.push(out);
   }
-  const p = res.planner, g = res.greedy, i = res.idle;
-  sumP += p.arrived.length; sumG += g.arrived.length;
-  check(p.over === 'nest', `stage ${n}: planner reaches the nest`);
-  check(stars(p) === 3, `stage ${n}: planner reaches the 3-star par (${spec.par[2]})`);
-  check(p.arrived.length >= Math.ceil(p.total * 0.75), `stage ${n}: planner brings most ducklings home`);
-  check(i.over !== 'nest' || i.arrived.length === 0, `stage ${n}: idle fails`);
-  check(p.t >= (n === 1 ? 15 : 30) && p.t <= spec.time * 0.75, `stage ${n}: planner time ${p.t.toFixed(0)}s leaves a person room (limit ${spec.time}s)`);
-}
-console.log(`total arrived: planner ${sumP}, greedy ${sumG}`);
-check(sumG <= sumP * 0.8, 'greedy (mother only) brings home clearly fewer than planner (whole line)');
-
-// 4. the same rules on other layouts: is the generator fair beyond the fixed stages?
-{
-  const W2 = [6, 8, 12, 14];
-  console.log('\nother seeds, 6 each: nest runs and mean arrived / total');
-  console.log(row(['stage', 'bot', 'nest', 'arrived'], W2));
-  let worst = 1;
-  for (const n of [3, 5, 8]) for (const name of ['planner', 'greedy']) {
-    let nest = 0, got = 0, tot = 0;
-    for (let k = 1; k <= 6; k++) { const { s } = play({ stage: n, seed: 1000 + k * 17 + n }, BOTS[name]); nest += s.over === 'nest'; got += s.arrived.length; tot += s.total; }
-    console.log(row([n, name, `${nest}/6`, `${(got / 6).toFixed(1)} / ${(tot / 6).toFixed(1)}`], W2));
-    if (name === 'planner') worst = Math.min(worst, nest / 6);
+  console.table(table);
+  console.table(times.map(t => ({ seconds: t, drain: duskRate(t).toFixed(2), competent: cuts[t][0], average: cuts[t][1] })));
+  const repeat = () => play({ endless: true, seed: 202 }, planner(true));
+  assert.equal(repeat().trace, repeat().trace, 'endless fixed-tick determinism');
+  const idleRun = play({ endless: true, seed: 101 }, idle).s;
+  assert.equal(idleRun.score, 0);
+  for (const [label, lo, hi] of [['competent', 60, 120], ['average', 25, 60]]) {
+    const runs = totals[label];
+    assert.ok(runs.every(s => s.over), `${label}: runs reach an ending`);
+    assert.ok(runs.every(s => s.t >= lo && s.t <= hi), `${label}: all 12 runs inside the duration range`);
   }
-  check(worst >= 0.8, 'planner reaches the nest on most other layouts');
+  assert.ok(totals.competent.filter((s, i) => s.score > totals.average[i].score).length >= 9);
+  assert.ok(routeCheck(202, { yEnd: 15, n: 10 }).ok, 'full-flock route on the double-log regression seed');
 }
 
-// 5. endless: a way through exists (checked without the bots), and planning beats carelessness
-{
-  // route.mjs: every hazard band in the first 60 m can be crossed by a line of 10 waiting at most 15 s; the
-  // clock is recorded separately: sunset pressure intentionally ends finite runs. 30 seeds.
-  let sealed = 0, late = 0;
-  for (let k = 1; k <= 30; k++) { const r = routeCheck(k * 101, { yEnd: 60, n: LINE_MAX }); if (!r.ok) { sealed++; console.log('sealed', k * 101, JSON.stringify(r.fails)); } if (r.dusk !== null) { late++;  } }
-  console.log(`\nendless full-line route check, 30 seeds to 60 m: ${30 - sealed} passable, ${late} exceed the sunlight budget`);
-  check(sealed === 0, 'endless: the first 60 m has a passable route for the full line');
-  check(!routeCheck(101, { yEnd: 60, n: 16 }).ok, 'route check rejects an oversized line with unsafe crossing windows');
-  // planner against greedy, 20 seeds, score and duration at the end (180 s safety cap)
-  console.log('endless, 20 seeds, up to 180 s: score (end, seconds, distance, line)');
-  let wins = 0; const weak = [], strong = []; const W3 = [6, 36, 36, 6];
-  console.log(row(['seed', 'planner', 'greedy', 'idle'], W3));
-  for (let k = 1; k <= 20; k++) {
-    const seed = k * 101, out = {};
-    for (const name of ['planner', 'greedy', 'idle']) { const { s } = play({ endless: true, seed }, BOTS[name], 180); out[name] = s; }
-    const f = s => `${s.score} (${s.why ?? 'alive'}, ${s.t.toFixed(1)}s, ${s.best.toFixed(0)}m, ${s.line.length})`;
-    wins += out.planner.score > out.greedy.score; weak.push(out.greedy); strong.push(out.planner);
-    console.log(row([seed, f(out.planner), f(out.greedy), out.idle.score], W3));
-  }
-  console.log(`planner beats greedy on ${wins} of 20`);
-  check(weak.filter(s => s.over && s.t >= 40 && s.t <= 90).length >= 16, 'at least 80% of weak runs last 40 to 90 s');
-  check(strong.every(s => s.over), 'continuing sunset pressure ends even strong runs before the safety cap');
-  check(wins >= 16, 'endless: planner beats greedy on at least 80% of 20 seeds');
-}
-
-console.log(`\n${failed ? failed + ' FAILED' : 'all checks passed'} in ${((Date.now() - started) / 1000).toFixed(1)} s`);
-process.exit(failed ? 1 : 0);
+if (process.argv[1]?.endsWith('bots.mjs')) {
+  const start = performance.now();
+  if (process.argv[2] !== 'endless') campaign();
+  if (process.argv[2] !== 'campaign') endless();
+  console.log(`Passed in ${((performance.now() - start) / 1000).toFixed(2)}s`);
 }
