@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#160f2c">
-<title>Borrowed Time</title>
+<title></title>
 <style>
   html, body { margin: 0; height: 100%; background: #160f2c; overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
   body { font: 17px/1.4 ui-rounded, 'SF Pro Rounded', system-ui, -apple-system, 'Segoe UI', sans-serif; color: #fff3dc; }
@@ -18,14 +18,20 @@
   h1 { font-size: 2.6em; line-height: 1; margin: .1em 0 .15em; color: #ffd98a; letter-spacing: .01em; text-shadow: 0 3px 0 #7a3b5e, 0 0 26px #ff9a3a99; }
   h2 { font-size: 1.9em; line-height: 1.1; margin: 0 0 .25em; color: #ffd98a; text-shadow: 0 3px 0 #7a3b5e; }
   p { margin: .35em 0; }
-  .sub { opacity: .9; margin-bottom: .6em; }
   button { font: inherit; font-weight: 600; color: #fff3dc; background: #ffffff14; border: 2px solid #ffd98a88; border-radius: 999px; padding: .45em 1.2em; margin: .25em; min-width: 8em; min-height: 46px; touch-action: manipulation; cursor: pointer; }
   button.main { background: #ffb347; color: #3a1a10; border-color: #ffb347; font-size: 1.25em; min-width: 9em; box-shadow: 0 4px 0 #b8642a; }
   #continueRun { font-size: 1.05em; }
   button.main:active { transform: translateY(2px); box-shadow: 0 2px 0 #b8642a; }
-  button small { font-weight: 500; opacity: .85; }
-  #powerTip { position: fixed; z-index: 1; left: 50%; transform: translateX(-50%); width: max-content; max-width: 90vw; box-sizing: border-box; padding: 7px 14px; background: #201730; color: #fff3dc; border: 1px solid #edd0a5; border-radius: 12px; text-align: center; font-weight: 650; pointer-events: none; }
-  #powerTip:empty { display: none; }
+  .quiet { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .language { min-width: 64px; min-height: 44px; margin: 0; padding: 0 9px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; font-size: 14px; }
+  .globe { display: inline-grid; width: 17px; height: 17px; border: 1.5px solid; border-radius: 50%; place-items: center; box-sizing: border-box; }
+  .globe::before, .globe::after { content: ''; grid-area: 1 / 1; box-sizing: border-box; }
+  .globe::before { height: 100%; width: 8px; border: solid; border-width: 0 1px; border-radius: 50%; }
+  .globe::after { width: 100%; border-top: 1px solid; }
+  .controls { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; align-items: center; }
+  .controls button { margin: 0; }
+  .controls .language { min-width: 64px; }
+  .controls button:not(.language) { min-width: 0; padding-inline: 12px; }
   #shareImage { display: block; width: 100%; height: auto; border-radius: 14px; }
   #saveCard { display: inline-grid; min-height: 44px; padding: 0 16px; border-radius: 99px; place-items: center; color: #391d10; background: #ffb347; text-decoration: none; font-weight: 700; touch-action: manipulation; }
   #done .album-actions button { padding-left: .75em; padding-right: .75em; }
@@ -34,7 +40,7 @@
   .small { font-size: .85em; opacity: .85; }
   #doneArt, #albumArt { display: block; width: 100%; height: 204px; margin: .65em auto; }
   #albumArt { height: clamp(200px, 40dvh, 300px); }
-  .album-actions { display: flex; justify-content: center; align-items: center; gap: 8px; }
+  .album-actions { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px; }
   .album-actions button { min-width: 48px; margin: 0; }
   .album-actions button:disabled { opacity: .36; cursor: default; }
   #albumCount { min-width: 5em; color: #ffe9a8; }
@@ -42,69 +48,72 @@
   #done > div, #album > div { background: #1c1429e8; border: 1px solid #8b6c5877; border-radius: 18px; }
   #doneWho { font-weight: 700; color: #ffe9a8; }
   #doneScore { font-size: 1.3em; font-weight: 800; }
+  #doneBest.new-role { color: #ffd98a; font-weight: 700; }
+  #doneBest.new-role::before { content: ''; display: inline-block; width: .9em; height: .9em; margin-inline-end: .4em; background: currentColor;
+    clip-path: polygon(50% 0, 62% 34%, 100% 38%, 71% 62%, 81% 100%, 50% 79%, 19% 100%, 29% 62%, 0 38%, 38% 34%); }
   #doneChose { white-space: pre-line; }
   #pause { position: fixed; top: calc(10px + env(safe-area-inset-top)); right: max(calc(8px + env(safe-area-inset-right)), calc((100vw - 460px) / 2 + 8px)); width: 46px; height: 46px; min-width: 0; min-height: 0; margin: 0; padding: 0;
     border: 2px solid #ffd98a66; border-radius: 50%; background: #120a26e6; display: none; place-items: center; touch-action: none; }
   #pause::before { content: ''; width: 4px; height: 16px; border: solid #ffd98a; border-width: 0 5px; }
   .lab-notice a { display: inline-grid; min-width: 52px; min-height: 44px; place-items: center; touch-action: manipulation; }
   .kit-hint[data-kind="tap"] { left: var(--memory-hint-x, 50%); }
+  .kit-hint[data-kind="tap"] .label { left: calc(50vw - var(--memory-hint-x, 50vw)); transform: translateX(-50%); width: min(18em, 90vw); }
   @media (max-height: 720px) { #menu:has(#continueRun:not([hidden])) #hero { height: 52px; } }
   .lab-notice { max-width: 26em; margin-left: auto !important; margin-right: auto !important; }
-  @media (max-height: 660px) { #hero { height: 72px; } #gallery { height: 80px; } h1 { font-size: 2.1em; } .sub { margin-bottom: .3em; } button { min-height: 44px; } #doneArt { height: 181px; } #done h2 { font-size: 1.7em; } #done p { margin: .25em 0; } }
+  @media (max-height: 660px) { #hero { height: 72px; } #gallery { height: 80px; } h1 { font-size: 2.1em; } button { min-height: 44px; } #doneArt { height: 181px; } #done h2 { font-size: 1.7em; } #done p { margin: .25em 0; } }
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
-<output id="powerTip" aria-live="polite"></output>
-<button id="pause" aria-label="Pause"></button>
+<output id="powerTip" class="quiet" aria-live="polite"></output>
+<button id="pause" data-i18n-aria="pause"></button>
 <div id="menu" class="screen veil on"><div>
   <canvas id="hero" aria-hidden="true"></canvas>
-  <h1>Borrowed Time</h1>
-  <p class="sub">You forgot who you were: as a child, grown up and old. Tap a glowing memory. Name all three before the candle goes out.</p>
-  <button id="continueRun" class="main" hidden>Continue</button>
-  <p><button id="play" class="main">Play</button></p>
-  <p><button id="daily">Daily <small></small></button></p>
-  <canvas id="gallery" aria-label="Who you have been"></canvas>
+  <h1 data-i18n="title"></h1>
+  <button id="continueRun" class="main" hidden></button>
+  <p><button id="play" class="main"></button></p>
+  <p><button id="daily" data-i18n="daily"></button></p>
+  <canvas id="gallery" data-i18n-aria="gallery"></canvas>
   <p class="small" id="bestLine"></p>
-  <p class="album-actions"><button id="menuAlbum" hidden>Album</button><button id="sound">Sound: on</button></p>
+  <p class="controls"><button id="menuAlbum" hidden data-i18n="album"></button><button id="sound"></button><button type="button" class="language" data-i18n-aria="language"><span class="globe" aria-hidden="true"></span><span data-i18n="languageCode" aria-hidden="true"></span></button></p>
 </div></div>
 <div id="paused" class="screen veil"><div>
-  <h2>Paused</h2>
-  <p class="small">Time stands still.</p>
-  <p class="small">Each right name: 100 + years left × 10 ÷ 3.</p>
-  <p><button id="resume" class="main">Resume</button></p>
-  <p><button id="toMenu">Menu</button></p>
-  <p><button id="sound2">Sound: on</button></p>
+  <h2 data-i18n="paused"></h2>
+  <p id="scoring" class="small"></p>
+  <p><button id="resume" class="main" data-i18n="resume"></button></p>
+  <p><button id="toMenu" data-i18n="menu"></button></p>
+  <p class="controls"><button id="sound2"></button><button type="button" class="language" data-i18n-aria="language"><span class="globe" aria-hidden="true"></span><span data-i18n="languageCode" aria-hidden="true"></span></button></p>
 </div></div>
 <div id="done" class="screen veil"><div>
-  <h2 id="doneTitle">You remember!</h2>
-  <canvas id="doneArt" aria-label="Photographs you recovered in this life"></canvas>
+  <h2 id="doneTitle"></h2>
+  <canvas id="doneArt" data-i18n-aria="albumArt"></canvas>
   <p id="doneWho"></p>
   <p class="small" id="doneChose"></p>
   <p id="doneScore"></p>
   <p class="small" id="doneBest"></p>
-  <p><button id="again" class="main">Play again</button></p>
-  <p class="album-actions"><button id="doneAlbum">Album</button><button id="shareCard">Share card</button><button id="doneMenu">Menu</button></p>
+  <span id="newRole" class="quiet" data-i18n="newRole" hidden></span>
+  <p><button id="again" class="main" data-i18n="again"></button></p>
+  <p class="album-actions"><button id="doneAlbum" data-i18n="album"></button><button id="shareCard" data-i18n="share"></button><button id="doneMenu" data-i18n="menu"></button></p>
 </div></div>
 <div id="share" class="screen veil"><div>
-  <h2>Your share card</h2>
+  <h2 data-i18n="share"></h2>
   <img id="shareImage" alt="">
-  <p class="album-actions"><a id="saveCard" download="borrowed-time.png">Save image</a><button id="shareBack">Back</button></p>
+  <p class="album-actions"><a id="saveCard" download data-i18n="saveImage"></a><button id="shareBack" data-i18n="back"></button></p>
 </div></div>
 <div id="album" class="screen veil"><div>
-  <h2>Keepsake album</h2>
+  <h2 data-i18n="keepsakeAlbum"></h2>
   <p id="albumCaption" class="small"></p>
-  <canvas id="albumArt" aria-label="Recovered photographs grouped by age"></canvas>
+  <canvas id="albumArt" data-i18n-aria="albumArt"></canvas>
   <p class="album-actions">
-    <button id="albumPrev" aria-label="Earlier life">←</button>
+    <button id="albumPrev" data-i18n-aria="earlier">←</button>
     <output id="albumCount" aria-live="polite"></output>
-    <button id="albumNext" aria-label="Later life">→</button>
+    <button id="albumNext" data-i18n-aria="laterLife">→</button>
   </p>
-  <p><button id="albumBack">Back</button></p>
+  <p><button id="albumBack" data-i18n="back"></button></p>
 </div></div>
 <script type="module">
 import {
-  newRun, step, walkTo, use, ready, guess, nextChapter, consistent, tileOf, dailySeed, roleId, roleName, ROLES,
+  newRun, step, walkTo, use, ready, guess, nextChapter, consistent, tileOf, dailySeed, roleId,
   ABILITIES, COST, LIFE, LEAP_TICKS, DT, FACES, wrongCost, CHAPTERS, SELF_POINTS, PICK, SHOW, pickLie, showMe, later, keepsake,
 } from './sim.js';
 import { place, person, pet, portrait, value, kindIcon, abilityIcon, hand, candle, flame, star, hat, tool, roundRect, INK, CREAM, GOLD, ABILITY_COLOUR } from './art.js';
@@ -114,10 +123,14 @@ import { onLeave, isPauseKey } from '../kit/pause.js';
 import { screens } from '../kit/screens.js';
 import { lab } from '../kit/lab.js';
 import { hint } from '../kit/hint.js';
+import { t, lang, apply, setLang, num, dateLabel } from './words.js';
 import { noZoom } from '../kit/zoom.js'; noZoom(); // no double-tap or pinch zoom (note #74)
 
 const $ = id => document.getElementById(id);
 const query = new URLSearchParams(location.search);
+const ageLabel = index => t(CHAPTERS[index].id);
+const minus = n => '−' + num(n);
+const count = (n, total) => num(n) + ' / ' + num(total);
 // A rainy night (tester t1, note #115: "more dark and gloomy ... a night raining with dead flowers around"). ?gloom=0 shows the old
 // look, so the two can be compared; remove GLOOM and its branches to go back for good.
 const GLOOM = query.get('gloom') !== '0';
@@ -154,8 +167,21 @@ const voice = {
 
 // ---------------------------------------------------------------- lab recording
 const rec = lab('borrowed');
-rec.notice($('menu').firstElementChild);
-rec.toggle($('paused').firstElementChild);
+const recordingNotice = rec.notice($('menu').firstElementChild);
+const recordingToggle = rec.toggle($('paused').firstElementChild);
+recordingNotice?.querySelector('a').setAttribute('data-i18n', 'privacy');
+
+function localizeNotes() {
+  const link = $('notes-button');
+  if (!link) return false;
+  link.setAttribute('aria-label', t('feedback'));
+  return true;
+}
+// The deferred feedback script only adds a button for a linked tester.
+if (!localizeNotes()) {
+  const observer = new MutationObserver(() => { if (localizeNotes()) observer.disconnect(); });
+  observer.observe(document.body, { childList: true });
+}
 
 // ---------------------------------------------------------------- canvas and layout
 const canvas = $('c'), g = canvas.getContext('2d');
@@ -209,11 +235,16 @@ let vignette = null, selected = -1, reveal = null, flash = null, nope = null, he
 const hints = { ability: {} };
 
 // Session storage is scoped to the tab. The permanent gallery save keeps its original format.
+function checkpointAddress(address) {
+  const url = new URL(address);
+  url.searchParams.delete('lang');
+  return url.href;
+}
 function readCheckpoint() {
   try {
     const record = JSON.parse(sessionStorage.getItem(KEY));
     if (performance.getEntriesByType('navigation')[0]?.type === 'reload' &&
-        record?.url === location.href && record.version === 1) return record;
+        record?.version === 1 && checkpointAddress(record.url) === checkpointAddress(location.href)) return record;
     sessionStorage.removeItem(KEY);
   } catch { /* Storage can be unavailable. */ }
   return null;
@@ -245,7 +276,10 @@ function continueRun() {
   snd.unlock(); snd.release(); paused = false;
   enterChapter();
   selected = life.selected; vignette = life.vignette; pz = life.pz;
-  if (pz) pz.spot = s.spots.find(spot => spot.lock === pz.spot);
+  if (pz) {
+    pz.spot = s.spots.find(spot => spot.lock === pz.spot);
+    pz.repeat = null; // transient feedback, including the old boolean form
+  }
   if (s.status === 'named') { chapterCard = { t: 1 }; show('chapter'); }
   else if (life.screen === 'puzzle') { show('puzzle'); layoutPuzzle(); }
   else if (life.screen === 'lineup') { show('lineup'); layoutLineup(); }
@@ -322,19 +356,77 @@ function aim(x, y, first) {
 }
 function powerAdvice(id) {
   const spot = s.spots.find(p => p.lock === (id === 'glow' ? 'dark' : id));
-  if (id === 'rewind' && !spot) return 'No mirror on this island';
-  if (id === 'leap') return s.bridge ? 'Walk across the stepping stones' : 'Stand on a blue shore stone';
-  if (id === 'push') return s.grid.includes('B') ? 'Walk beside a cracked rock' : 'The cracked rock is already open';
-  if (spot?.open) return spot.taken ? 'You have this memory' : 'Walk to the open memory';
-  return id === 'glow' ? 'Walk near the patch of darkness' : 'Walk beside the broken mirror';
+  if (!spot) return { key: 'noMirror', mark: 'absent' };
+  if (id === 'leap') {
+    const distance = point => Math.hypot(s.px - point.x - .5, s.py - point.y - .5);
+    const at = distance(s.pad) <= distance(s.landing) ? s.pad : s.landing;
+    return s.bridge ? { key: 'useBridge', at, icon: 'bridge' } : { key: 'findStone', at, icon: 'stone' };
+  }
+  if (id === 'push') {
+    const rock = s.grid.indexOf('B');
+    return rock < 0 ? { key: 'rockOpen', mark: 'done' }
+      : { key: 'findRock', at: { x: rock % s.w, y: Math.floor(rock / s.w) }, icon: 'rock' };
+  }
+  if (spot.open) return spot.taken ? { key: 'memoryTaken', mark: 'done' } : { key: 'findOpen', at: spot, icon: 'memory' };
+  return { key: id === 'glow' ? 'findDark' : 'findMirror', at: spot, icon: id === 'glow' ? 'dark' : 'mirror' };
+}
+function powerCue(time) {
+  const { at, icon, mark, id } = nope;
+  const button = bar.find(b => b.id === id);
+  const color = ABILITY_COLOUR[id];
+  const rawX = at ? sx(at.x + .5) : button.x + button.w / 2;
+  const rawY = at ? sy(at.y + .5) : barRect.y - 37;
+  const y = Math.max(viewTop + 32, Math.min(viewBottom - 34, rawY));
+  const pulse = reduced ? 0 : 2 * Math.sin(nope.t * 9);
+  g.save();
+  g.beginPath(); g.arc(rawX, y, (at && y === rawY ? T * .43 : 23) + pulse, 0, TAU);
+  g.strokeStyle = color; g.lineWidth = 3;
+  if (!at || y !== rawY) { g.fillStyle = '#261a35'; g.fill(); }
+  g.stroke();
+  if (at && rawY === y) {
+    arrow(g, rawX, y - T * .5 - 8, Math.PI / 2, color);
+    if (id === 'leap' && icon === 'stone') hand(g, rawX, y, reduced ? .5 : time % 1);
+  } else if (at) {
+    if (icon === 'rock') {
+      g.beginPath(); g.moveTo(rawX - 14, y + 8); g.lineTo(rawX - 10, y - 9); g.lineTo(rawX + 8, y - 12);
+      g.lineTo(rawX + 14, y + 8); g.closePath(); g.fillStyle = '#8f8aab'; g.fill();
+      g.beginPath(); g.moveTo(rawX + 4, y - 11); g.lineTo(rawX - 3, y - 2); g.lineTo(rawX + 2, y + 1);
+      g.lineTo(rawX - 4, y + 8); g.strokeStyle = INK; g.lineWidth = 2.5; g.stroke();
+    } else if (icon === 'stone' || icon === 'bridge') {
+      g.fillStyle = color;
+      for (let i = 0; i < (icon === 'stone' ? 1 : 3); i++) {
+        g.beginPath(); g.ellipse(rawX + (icon === 'stone' ? 0 : (i - 1) * 9), y + i * 2 - 2, icon === 'stone' ? 12 : 5, 5, 0, 0, TAU); g.fill();
+      }
+    } else if (icon === 'memory') {
+      g.beginPath(); g.arc(rawX, y, 11, 0, TAU); g.strokeStyle = GOOD; g.stroke();
+      kindIcon(g, s.spots.find(p => p.x === at.x && p.y === at.y).dims[0], rawX, y, 7, GOOD);
+    } else if (icon === 'mirror') {
+      abilityIcon(g, 'who', rawX, y, 15, color);
+      g.beginPath(); g.moveTo(rawX + 4, y - 10); g.lineTo(rawX - 3, y - 1); g.lineTo(rawX + 2, y + 5);
+      g.strokeStyle = color; g.stroke();
+    } else {
+      g.beginPath(); g.ellipse(rawX, y, 15, 9, 0, 0, TAU); g.fillStyle = '#0d091c'; g.fill();
+      g.setLineDash([3, 3]); g.stroke(); g.setLineDash([]);
+    }
+    arrow(g, rawX, y + Math.sign(rawY - y) * 26, Math.sign(rawY - y) * Math.PI / 2, color);
+  } else {
+    abilityIcon(g, id === 'rewind' ? 'who' : id, rawX, y, 14, color, time);
+    if (mark === 'done') trueMark(rawX + 13, y + 13, 9);
+    else {
+      g.beginPath(); g.moveTo(rawX - 16, y + 16); g.lineTo(rawX + 16, y - 16); g.strokeStyle = BAD; g.lineWidth = 4; g.stroke();
+    }
+    candleCost(0, rawX, y - 37, time);
+  }
+  g.restore();
 }
 function press(id) {
   if (id === 'who') { openLineup(); return; }
   nope = null;
+  $('powerTip').textContent = '';
   const ok = use(s, id);
   if (!ok) {
-    nope = { id, t: 0 };
-    $('powerTip').textContent = powerAdvice(id);
+    nope = { id, t: 0, ...powerAdvice(id) };
+    $('powerTip').textContent = t(nope.key);
     tone(150, 0.14, 0.06, 'square', -30);
   }
 }
@@ -347,7 +439,6 @@ const PRACTICE = {
   signed: { form: 'signed', frags: [{ dims: [1], vals: [2], seal: 2 }, { dims: [1], vals: [1], seal: 0 }], pick: 0, seal: 2 },
 };
 const practiceFaces = [[0, 2, 0, 1], [3, 3, 2, 3], [1, 0, 3, 2]];
-const promptFor = { lie: 'Which photo lies?', torn: 'Which half fits?', signed: 'Which photo lies?' };
 let puzzleCards = [], puzzleButtons = {}, puzzleFaces = null, puzzleTop = 0, reference = null;
 const FX_TEAR = 1.05;
 const targetOf = z => z.form === 'torn' ? 1 - z.liar : z.liar;
@@ -370,7 +461,7 @@ function selectPhoto(i) {
   const z = pz.spot.puzzle;
   const reject = z.form === 'torn' ? 1 - i : i;
   if (z.tried[reject]) {
-    pz.repeat = true;
+    pz.repeat = { i, t: 0 };
     tone(150, 0.1, 0.05, 'square');
     return;
   }
@@ -381,7 +472,7 @@ function openPuzzle() {
   if (!spot) return;
   const form = spot.puzzle.form;
   const practice = (save.practice & PRACTICED[form]) ? null : { t: 0, wrong: -1, result: false };
-  pz = { spot, practice, wrong: [], repeat: false, fx: null, then: null };
+  pz = { spot, practice, wrong: [], repeat: null, fx: null, then: null };
   layoutPuzzle();
   screen = 'puzzle'; finger = null; selected = -1;
   tone(440, 0.25, 0.05, 'sine', 120); setTimeout(() => tone(330, 0.3, 0.04, 'sine', -60), 120);
@@ -403,7 +494,8 @@ function puzzleTick() {
     }
     return;
   }
-  for (const w of pz.wrong) w.t += 1 / 60;
+  for (const w of pz.wrong) w.t += DT;
+  if (pz.repeat && (pz.repeat.t += DT) >= 1.1) pz.repeat = null;
   if (pz.fx) {
     pz.fx.t += 1 / 60;
     if (pz.fx.t >= FX_TEAR) { screen = 'play'; vignette = pz.then; pz = null; }
@@ -427,19 +519,19 @@ function layoutPuzzle() {
     later: { x: cx - bw - 6, y: by, w: bw, h: bh },
     show: { x: cx + 6, y: by, w: bw, h: bh },
   };
-  const gap = 12, top = puzzleTop + (form === 'signed' ? 120 : practice ? 64 : 86);
+  const gap = 12, top = puzzleTop + (form === 'signed' ? 104 : practice ? 56 : 75);
   const limit = practice ? bottom : by - 12;
   const cw = Math.min((cw0 - 32 - gap) / 2, 190);
   const available = limit - top;
   const ch = form === 'torn' ? Math.min(94, available * 0.24)
-    : Math.min(cw * 1.06, available * (practice ? 0.58 : 0.53));
+    : Math.min(cw * 1.06, available * (practice ? 0.52 : 0.48));
   const refH = form === 'torn' ? ch * 0.73 : practice && form === 'lie' ? 62 : 0;
   const refY = top + (practice ? Math.min(76, available * 0.15) : 0)
     + (!practice && form === 'lie' ? 10 : 0);
   reference = refH ? { x: cx - cw / 2, y: refY, w: cw, h: refH } : null;
   const y = refY + (refH ? refH + 23 : 0);
   puzzleCards = [0, 1].map(i => ({ x: cx + (i ? gap / 2 : -gap / 2 - cw), y, w: cw, h: ch }));
-  const fy = y + ch + 34, fg = 8;
+  const fy = y + ch + 39, fg = 8;
   const pw3 = Math.min(106, (cw0 - 42 - 2 * fg) / 3, (limit - fy - fg) / 2);
   const cols = pw3 >= 68 ? 3 : FACES;
   const pw = cols === 3 ? pw3 : Math.min(64, (cw0 - 30 - 5 * fg) / FACES, limit - fy);
@@ -546,14 +638,46 @@ function puzzleText(text, x, y, size, color = '#ffd98a', align = 'center') {
   g.fillText(text, x, y);
 }
 
+function arrow(ctx, x, y, angle, color = CREAM) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(angle);
+  ctx.beginPath(); ctx.moveTo(-7, 0); ctx.lineTo(6, 0); ctx.moveTo(1, -5); ctx.lineTo(6, 0); ctx.lineTo(1, 5);
+  ctx.strokeStyle = color; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.lineWidth = 2.5; ctx.stroke();
+  ctx.restore();
+}
+
+function outline(r, color, inset = 0, dash = []) {
+  g.save(); g.beginPath(); roundRect(g, r.x - inset, r.y - inset, r.w + 2 * inset, r.h + 2 * inset, 8);
+  g.lineWidth = 2.5; g.strokeStyle = color; g.setLineDash(dash); g.stroke(); g.restore();
+}
+
+const GOOD = '#ffe398', BAD = '#ff8c80';
+function candleCost(cost, x, y, time) {
+  const label = cost ? minus(cost) : num(0);
+  g.save();
+  g.font = '800 16px system-ui';
+  const w = g.measureText(label).width;
+  candle(g, x - w / 2 - 4, y + 8, 8, 12, time);
+  puzzleText(label, x + 6, y + 1, 16, cost ? BAD : GOOD);
+  g.restore();
+}
+
+function pictureCue(a, b, color, time) {
+  g.save();
+  g.beginPath(); g.moveTo(a.x, a.y); g.quadraticCurveTo(a.x, b.y, b.x, b.y);
+  g.lineWidth = 2.5; g.strokeStyle = color; g.setLineDash([4, 5]); g.lineDashOffset = reduced ? 0 : -time * 22; g.stroke();
+  g.restore();
+}
+
+function edgeCue(card, edge, top, color) {
+  g.save(); tearPath(card, edge, top); g.strokeStyle = color; g.lineWidth = 3.5; g.stroke(); g.restore();
+}
+
 function puzzleScene(time) {
   layoutPuzzle();
   const actual = pz.spot.puzzle, practice = pz.practice;
   const z = practice ? PRACTICE[actual.form] : actual;
   const torn = z.form === 'torn', signed = z.form === 'signed';
   const target = practice ? z.pick : targetOf(z), fx = pz.fx;
-  const lastWrong = pz.wrong.at(-1);
-  const warning = lastWrong && lastWrong.t < 1.2;
   const cx = W / 2, ty = puzzleTop + 20;
   g.save();
   const veil = g.createRadialGradient(cx, H * 0.38, 25, cx, H * 0.42, H * 0.64);
@@ -566,19 +690,18 @@ function puzzleScene(time) {
       g.beginPath(); g.moveTo(x, y); g.lineTo(x - 3, y + 14); g.stroke();
     }
   }
-  const title = practice?.result ? 'Practice complete' : fx?.how === 'shown' ? 'Answer revealed'
-    : fx ? (torn ? 'Photo mended' : 'You found the lie!') : practice && practice.wrong >= 0 ? 'Try the other photo'
-    : pz.repeat ? 'Already checked · no cost' : warning ? (torn ? 'That edge doesn’t fit' : 'That photo is true') : practice ? 'Free practice' : promptFor[z.form];
-  puzzleText(title, cx, ty, 24, warning && !fx ? '#ffb0a0' : '#ffd98a');
-  if (practice) {
-    const instruction = torn ? 'Tap the half that fits the torn edge.' : signed ? 'Tap the photo with this seal.' : 'Your pet is the cat. Tap the other photo.';
-    puzzleText(practice.result ? 'Keep the true photo as a clue.' : instruction, cx, ty + 28, 14, '#decce8');
-  } else if (fx) {
-    puzzleText('Keep the true photo as a clue.', cx, ty + 28, 14, '#decce8');
+  if (!practice && !fx) {
+    puzzleText(t(torn ? 'matchEdge' : 'findLie'), cx, ty, 23);
+    puzzleText(t('wrongTap'), cx - 13, ty + 28, 13, BAD);
+    candleCost(PICK, cx + 60, ty + 28, time);
+  } else if (practice) {
+    if (practice.result) trueMark(cx - 23, ty + 2, 11);
+    candleCost(0, cx + (practice.result ? 14 : 0), ty + 2, time);
+  } else if (fx.how === 'shown') {
+    abilityIcon(g, 'who', cx - 33, ty + 3, 14, CREAM);
+    candleCost(SHOW, cx + 11, ty + 4, time);
   } else {
-    const instruction = torn ? 'Match the torn edges.' : signed && s.exposed.length ? 'Find the seal that marked a lie.' : 'Compare both photos with the possible faces.';
-    puzzleText(instruction, cx, ty + 24, 14, '#decce8');
-    puzzleText(`Wrong tap costs ${PICK} years`, cx, ty + 44, 13, '#f7b29d');
+    trueMark(cx, ty + 5, 13);
   }
 
   if (reference && torn) {
@@ -600,23 +723,38 @@ function puzzleScene(time) {
     g.beginPath(); g.arc(cx, y + 27, 31, 0, TAU); g.fill();
     value(g, ...z.clue, cx, y + 27, 24, time);
   }
-  if (practice && reference) {
-    const c = reference, fromY = c.y + c.h + 2;
-    g.strokeStyle = '#e4c48a90'; g.lineWidth = 1.5;
-    g.setLineDash([2, 4]);
-    for (const card of puzzleCards) {
-      g.beginPath(); g.moveTo(cx, fromY);
-      g.quadraticCurveTo(cx, fromY + 12, card.x + card.w / 2, card.y - 5); g.stroke();
-    }
-    g.setLineDash([]);
-  }
   const exposed = practice && signed ? [z.seal] : s.exposed;
-  if (signed && exposed.length) {
-    const label = 'Seal from a false photo';
-    g.font = '700 13px system-ui, sans-serif';
-    const start = cx - (30 + g.measureText(label).width) / 2;
-    sealMark(exposed[0], start + 10, ty + (practice ? 62 : 76), 14);
-    puzzleText(label, start + 30, ty + (practice ? 62 : 76), 13, '#decce8', 'left');
+  const sealY = ty + (practice ? 52 : 60);
+  if (signed && exposed.length) sealMark(exposed[0], cx, sealY, 17, true);
+  const comparing = !practice?.result && !fx;
+  const cueSide = Math.floor((time * 0.68) % 2);
+  if (comparing && practice && !torn) {
+    if (signed || reference) {
+      const from = { x: cx, y: signed ? sealY + 20 : reference.y + 56 };
+      for (const [i, card] of puzzleCards.entries()) {
+        const related = signed ? i === target : i !== target;
+        if (signed && !related) continue;
+        const x = card.x + card.w / 2, y = card.y - 9;
+        pictureCue(from, { x, y: y - 6 }, signed || !related ? BAD : GOOD, time);
+        if (signed || !related) cross(x, y, 5, BAD, 2.5);
+        else trueMark(x, y, 7);
+      }
+    }
+  }
+  // Live comparisons point at visible evidence. Only the independent practice can demonstrate an answer.
+  const compared = !practice && comparing && !torn && !(signed && exposed.length) ? z.frags[cueSide] : null;
+  const shownKinds = reduced && compared ? new Set(z.frags.flatMap(f => f.dims)) : compared?.dims ?? [];
+  for (const d of shownKinds) if (s.known[d] !== null) {
+    const slot = slots[d];
+    g.beginPath(); g.arc(slot.x, slot.y, slot.r + 4, 0, TAU); g.strokeStyle = GOOD; g.lineWidth = 2.5; g.stroke();
+  }
+  if (comparing && torn) {
+    const color = practice ? GOOD : '#d9b8ef';
+    edgeCue(reference, z.edge, true, color);
+    for (const [i, card] of puzzleCards.entries()) {
+      if (practice && i !== target) continue;
+      pictureCue({ x: cx, y: reference.y + reference.h + 6 }, { x: card.x + card.w / 2, y: card.y - 2 }, color, time);
+    }
   }
 
   const finishing = practice?.result || !!fx;
@@ -648,58 +786,81 @@ function puzzleScene(time) {
       photo(fr, x, y, w, h, time, frame);
     }
     if (signed) sealMark(fr.seal, x + w - 22, y + h - 19, 16, rejected);
-    if (proved && torn) trueMark(x + w - 13, y + h - 12, 11);
-    if (proved && !torn) trueMark(x + 13, y + 13, 11);
+    if (proved && torn) trueMark(x + w - 13, y + h - 12, 12);
+    if (proved && !torn) trueMark(x + 13, y + 13, 12);
     const tried = !practice && actual.tried[torn ? 1 - i : i];
     if (rejected || (!finishing && torn && practice?.wrong === i)) cross(x + w / 2, y + h / 2, 25, '#e34b61', 5);
     if (tried || (!finishing && !torn && practice?.wrong === i)) {
       if (torn) cross(x + w - 13, y + 19, 8, '#e34b61', 4);
       else trueMark(x + 13, y + 13, 11);
     }
-    if (finishing) {
-      g.fillStyle = rejected ? '#682435' : '#20382d';
-      g.fillRect(x + w / 2 - 22, y + 14, 44, 20);
-      puzzleText(rejected ? 'False' : 'True', x + w / 2, y + 24, 13, '#fff5dd');
+    if (comparing && torn) edgeCue(paint, fr.edge, false, practice && i === target ? GOOD : '#d9b8ef');
+    if (comparing && signed && exposed.length && (practice ? i === target : reduced || cueSide === i)) {
+      g.beginPath(); g.arc(x + w - 22, y + h - 19, 20, 0, TAU); g.strokeStyle = GOOD; g.lineWidth = 2.5; g.stroke();
     }
-    if (wrong && wrong.t < 0.85 && !pz.repeat) puzzleText(`−${PICK}`, x + w / 2, y - 12 - wrong.t * 15, 20, '#ffbea9');
+    if (compared && (reduced || i === cueSide)) outline(card, GOOD, 3);
+    if (wrong && wrong.t < 0.85 && !pz.repeat) candleCost(PICK, x + w * 0.73, y - 13, time);
+    if (pz.repeat?.i === i) {
+      outline(card, GOOD, 4, [4, 4]);
+      candleCost(0, x + w * 0.73, y - 13, time);
+    }
     g.restore();
   });
 
   if (practice) {
+    if (torn && comparing && !reduced) {
+      const card = puzzleCards[target], f = ease(Math.min(1, (practice.t % 2.6) / 1.35));
+      const ghost = { ...card, x: card.x + (reference.x - card.x) * f, y: card.y + (reference.y + reference.h - 14 - card.y) * f };
+      g.save(); g.globalAlpha = .25 + .22 * f;
+      if (f > .05) tornPaper(ghost, z.frags[target].edge, false, () => {});
+      g.restore();
+    }
     if (z.form === 'lie') {
       const bottom = puzzleCards[0].y + puzzleCards[0].h;
       const p = Math.min(92, (Math.min(W, 440) - 56) / 3, H - safe.b - bottom - 57), gap = 10;
       const start = cx - (3 * p + 2 * gap) / 2, y = bottom + 44;
-      puzzleText('Who could be you?', cx, y - 16, 13, '#decce8');
       practiceFaces.forEach((f, i) => {
-        const x = start + i * (p + gap);
-        portrait(g, f, x, y, p, p, 0, { age: 0 });
+        const x = start + i * (p + gap), fits = f[z.clue[0]] === z.clue[1];
+        portrait(g, f, x, y, p, p, 0, { age: 0, dim: !fits });
+        if (fits) trueMark(x + p - 9, y + 9, 7);
+        else cross(x + p - 9, y + 9, 4, BAD, 2.5);
       });
     }
     const card = puzzleCards[target];
-    if (!practice.result && practice.t >= 3) hand(g, card.x + card.w * 0.73, card.y + card.h * 0.76, reduced ? 0.5 : time % 1);
+    if (comparing && (practice.t >= 3 || practice.wrong >= 0)) hand(g, card.x + card.w * 0.73, card.y + card.h * 0.76, reduced ? 0.5 : time % 1);
     g.restore();
     return;
   }
 
   const F = puzzleFaces, C = consistent(s.faces, s.known);
-  puzzleText('Who could be you?', cx, F.y - 16, 13, '#decce8');
+  if (compared) for (const [i, card] of puzzleCards.entries()) if (reduced || i === cueSide) {
+    arrow(g, card.x + card.w / 2, F.y - 20, Math.PI / 2, GOOD);
+  }
   s.faces.forEach((face, i) => {
     const x = F.x0 + (i % F.cols) * (F.pw + F.gap), y = F.y + Math.floor(i / F.cols) * (F.pw + F.gap);
     const out = !C.includes(i);
     portrait(g, face, x, y, F.pw, F.pw, time + i, { age: s.chapter, dim: out });
+    if (compared && !out) {
+      outline({ x, y, w: F.pw, h: F.pw }, GOOD, 1, [3, 3]);
+    }
     if (out) {
       g.strokeStyle = '#ff8c80'; g.lineWidth = 2.5;
       g.beginPath(); g.moveTo(x + 4, y + F.pw - 4); g.lineTo(x + F.pw - 4, y + 4); g.stroke();
     }
   });
   if (!fx) {
-    for (const [key, label] of [['later', '← Later'], ['show', `Reveal · −${SHOW} years`]]) {
-      const b = puzzleButtons[key];
+    for (const key of ['later', 'show']) {
+      const b = puzzleButtons[key], middle = b.x + b.w / 2;
       g.beginPath(); roundRect(g, b.x, b.y, b.w, b.h, 18);
       g.fillStyle = key === 'show' ? '#523867' : '#2c233b'; g.fill();
       g.strokeStyle = key === 'show' ? '#c39bff' : '#81738d'; g.lineWidth = 1.5; g.stroke();
-      puzzleText(label, b.x + b.w / 2, b.y + b.h / 2, 16, key === 'show' && SHOW >= s.life ? '#ff9a86' : CREAM);
+      if (key === 'show') {
+        puzzleText(t('reveal'), middle - 26, b.y + b.h / 2, 16, SHOW >= s.life ? BAD : CREAM);
+        candleCost(SHOW, middle + 38, b.y + b.h / 2, time);
+      } else {
+        arrow(g, middle - 40, b.y + b.h / 2, Math.PI);
+        puzzleText(t('later'), middle + 8, b.y + b.h / 2, 16);
+      }
     }
   }
   g.restore();
@@ -758,7 +919,7 @@ function drain() {
       if (e.id === 'leap') puff(e.x, e.y + 0.3, 'rgba(255,243,220,.7)', 10);
       // the years leave the candle as falling wax
       for (let k = 0; k < Math.min(14, e.cost); k++) sfx.push({ x: hudL + 30 + (Math.random() - 0.5) * 10, y: safe.t + 66 - 46 * (s.life + e.cost) / LIFE, vx: (Math.random() - 0.5) * 2.2, vy: -Math.random() * 2, life: 1, col: '#fff0cf', size: 2 + Math.random() * 3, g: 0.25 });
-      sfx.push({ word: `−${e.cost}`, x: hudL + 12, y: viewTop + 26, t: 0, col: '#ff8a6a' });
+      sfx.push({ spent: e.cost, x: hudL + 12, y: viewTop + 26, t: 0, col: '#ff8a6a' });
       if (hints.ability[e.id] === undefined) hints.ability[e.id] = 2; // used: no more pointing
     } else if (e.type === 'nope') {
       // handled by press(); nothing to do here
@@ -808,7 +969,7 @@ function drain() {
 // Years leave the candle as falling wax, and the price floats by it.
 function dripYears(cost) {
   for (let k = 0; k < Math.min(14, cost); k++) sfx.push({ x: hudL + 30 + (Math.random() - 0.5) * 10, y: safe.t + 66 - 46 * (s.life + cost) / LIFE, vx: (Math.random() - 0.5) * 2.2, vy: -Math.random() * 2, life: 1, col: '#fff0cf', size: 2 + Math.random() * 3, g: 0.25 });
-  sfx.push({ word: `−${cost}`, x: hudL + 12, y: viewTop + 26, t: 0, col: '#ff8a6a' });
+  sfx.push({ spent: cost, x: hudL + 12, y: viewTop + 26, t: 0, col: '#ff8a6a' });
 }
 function burst(x, y, col, n) {
   if (reduced) n = Math.ceil(n / 4);
@@ -856,25 +1017,28 @@ function startReveal(outcome) {
     chapters: s.chapters.map(c => ({ id: c.id, right: c.right, years: Math.round(c.yearsSpent), uses: c.uses, found: c.found, seconds: Math.round(c.seconds) })),
   });
 }
-const TITLES = { remembered: 'You remember your life!', mistaken: 'A life, mostly remembered', faded: 'Your candle went out' };
 function lifeTitle(outcome, recovered) {
-  if (outcome === 'mistaken' && recovered === 0) return 'No names remembered';
-  if (outcome === 'mistaken' && recovered === 1) return 'One name remembered';
-  return outcome === 'left' ? 'Life left unfinished' : TITLES[outcome];
+  if (outcome === 'mistaken') return t(['none', 'one', 'mostly'][recovered] ?? 'remembered');
+  return t(outcome === 'left' ? 'unfinished' : outcome);
 }
+const yearsLeft = () => t('yearsLeft', { n: num(Math.ceil(Math.max(0, s.life))) });
+const result = () => t('result', { n: num(s.right), total: num(CHAPTERS.length) });
+const points = () => t('points', { n: num(s.score) });
+const details = (...parts) => parts.join(' · ');
 function showEnd() {
   const o = s.status;
   $('doneTitle').textContent = lifeTitle(o, s.right);
-  $('doneWho').textContent = s.chapters.filter(c => c.portrait).map(c => roleName(c.portrait)).join(' · ');
+  $('doneWho').textContent = s.chapters.filter(c => c.portrait).map(c => t('role' + roleId(c.portrait))).join(' · ');
   const wrong = s.chapters.filter(c => c.right === false).length;
-  // A perfect run keeps its one-line summary. After a wrong name, a second line shows the years share it still earned.
   const bonus = s.score - s.right * SELF_POINTS;
-  $('doneChose').textContent = wrong ? `${wrong} wrong name${wrong > 1 ? 's' : ''} · −${wrong * wrongCost(s)} years` + (bonus > 0 ? `\n${Math.ceil(s.life)} years left · +${bonus} year points` : '') : '';
-  $('doneScore').textContent = o === 'remembered' ? `${Math.ceil(s.life)} years left · ${s.score} points` : `${s.right} of 3 right · ${s.score} points`;
-  const found = Object.keys(save.gallery).length;
-  $('doneBest').textContent = `${newRoles ? 'New in your gallery! ' : ''}Found ${found} of 16 · Best ${save.best}`;
+  $('doneChose').textContent = wrong ? details(t(wrong === 1 ? 'wrongOne' : 'wrongMany', { n: num(wrong) }),
+    minus(wrong * wrongCost(s)) + ' ' + t('years')) +
+    (bonus > 0 ? '\n' + details(yearsLeft(), t('bonus', { n: num(bonus) })) : '') : '';
+  $('doneScore').textContent = details(o === 'remembered' ? yearsLeft() : result(), points());
+  $('doneBest').textContent = details(t('found', { n: num(Object.keys(save.gallery).length), total: num(16) }), t('best', { score: num(save.best) }));
+  $('doneBest').classList.toggle('new-role', newRoles > 0);
+  $('newRole').hidden = newRoles === 0;
   show('done');
-
 }
 
 // ---------------------------------------------------------------- the fixed tick
@@ -912,10 +1076,10 @@ function tick() {
   for (const p of wfx) { p.x += p.vx; p.y += p.vy; p.vy += p.g; p.life -= 1 / 40; }
   wfx = wfx.filter(p => p.life > 0);
   for (const p of sfx) {
-    if (p.word || p.pop !== undefined) { p.t += 1 / 60; continue; }
+    if (p.spent || p.pop !== undefined) { p.t += 1 / 60; continue; }
     p.x += p.vx; p.y += p.vy; p.vy += p.g; p.life -= 1 / 50;
   }
-  sfx = sfx.filter(p => (p.word || p.pop !== undefined) ? p.t < 1 : p.life > 0);
+  sfx = sfx.filter(p => (p.spent || p.pop !== undefined) ? p.t < 1 : p.life > 0);
   for (const r of rings) r.t += 1 / 24;
   rings = rings.filter(r => r.t < 1);
   if (nope) { nope.t += 1 / 60; if (nope.t > 2.8) nope = null; }
@@ -930,8 +1094,7 @@ function frame(now) {
   const dt = Math.min(0.25, (now - last) / 1000); last = now;
   if (!paused) { acc += dt; while (acc >= DT) { tick(); acc -= DT; } }
   const tip = $('powerTip');
-  tip.hidden = paused || screen !== 'play' || !nope || !!vignette;
-  if (!tip.hidden) tip.style.bottom = (H - barRect.y + 8) + 'px';
+  if ((screen !== 'play' || !nope) && tip.textContent) tip.textContent = '';
   draw(paused ? 0 : acc / DT);
   if (screen === 'done') drawAlbum($('doneArt'), save.album.at(-1));
   if (screen === 'album') drawAlbum($('albumArt'), save.album[albumIndex]);
@@ -978,6 +1141,7 @@ function draw(alpha) {
   }
   hud(time);
   abilityBar(time);
+  if (nope && screen === 'play' && !vignette) powerCue(time);
   for (const r of rings) {
     if (!r.screen) continue;
     g.beginPath(); g.arc(r.x, r.y, 10 + r.t * 26, 0, TAU); g.strokeStyle = `rgba(255,243,220,${0.6 * (1 - r.t)})`; g.lineWidth = 3; g.stroke();
@@ -1214,7 +1378,7 @@ const waiting = p => !!(p.puzzle && p.puzzle.seen && !p.taken);
 function unsolved(X, Y, time) {
   const r = Math.max(9, T * 0.16) * (1 + 0.06 * Math.sin(time * 5));
   g.beginPath(); g.arc(X, Y, r, 0, TAU); g.fillStyle = '#ff8a6a'; g.fill(); g.strokeStyle = INK; g.lineWidth = 2; g.stroke();
-  g.font = `800 ${Math.round(r * 1.4)}px ui-rounded, system-ui, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = INK; g.fillText('?', X, Y + 1);
+  g.font = `800 ${Math.round(r * 1.4)}px ui-rounded, system-ui, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = INK; g.fillText(t('unknownMark'), X, Y + 1);
   g.beginPath(); g.moveTo(X - r * 0.9, Y - r * 0.2); g.lineTo(X - r * 0.45, Y + r * 0.05); g.lineTo(X - r * 0.6, Y + r * 0.5); g.strokeStyle = INK; g.lineWidth = 1.5; g.stroke();
 }
 // The kinds of memory a lock holds. A kind you already know shows its picture, dimmed: nothing new there.
@@ -1294,9 +1458,9 @@ function hud(time) {
   // years left
   const low = s.life < 12;
   g.font = '800 24px ui-rounded, system-ui, sans-serif'; g.textAlign = 'left'; g.textBaseline = 'middle';
-  g.lineWidth = 4; g.strokeStyle = INK; g.strokeText(String(Math.max(0, Math.ceil(s.life))), cx + 16, safe.t + 34);
-  g.fillStyle = low ? (Math.sin(time * 8) > 0 ? '#ff6a5a' : '#ffd0c8') : '#ffe9a8'; g.fillText(String(Math.max(0, Math.ceil(s.life))), cx + 16, safe.t + 34);
-  g.font = '600 11px ui-rounded, system-ui, sans-serif'; g.fillStyle = 'rgba(255,243,220,.7)'; g.fillText('years', cx + 16, safe.t + 54);
+  g.lineWidth = 4; g.strokeStyle = INK; g.strokeText(num(Math.max(0, Math.ceil(s.life))), cx + 16, safe.t + 34);
+  g.fillStyle = low ? (Math.sin(time * 8) > 0 ? '#ff6a5a' : '#ffd0c8') : '#ffe9a8'; g.fillText(num(Math.max(0, Math.ceil(s.life))), cx + 16, safe.t + 34);
+  g.font = '600 11px ui-rounded, system-ui, sans-serif'; g.fillStyle = 'rgba(255,243,220,.7)'; g.fillText(t('years'), cx + 16, safe.t + 54);
   // memories found: four slots, one per kind
   for (let d = 0; d < 4; d++) {
     const sl = slots[d], pop = sfx.find(p => p.pop === d);
@@ -1323,14 +1487,14 @@ function hud(time) {
   if (into < 150 && screen === 'play') {
     const a = Math.min(1, (150 - into) / 40);
     g.globalAlpha = a; g.font = '800 22px ui-rounded, system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-    const word = `${CHAPTERS[s.chapter].name} · ${s.chapter + 1} of 3`;
+    const word = details(ageLabel(s.chapter), count(s.chapter + 1, CHAPTERS.length));
     g.lineWidth = 5; g.strokeStyle = INK; g.strokeText(word, W / 2, viewTop + 26); g.fillStyle = '#ffe9a8'; g.fillText(word, W / 2, viewTop + 26);
     g.globalAlpha = 1;
   }
   for (const p of sfx) {
-    if (p.word) {
+    if (p.spent) {
       g.globalAlpha = 1 - p.t; g.font = '800 18px ui-rounded, system-ui, sans-serif'; g.textAlign = 'left';
-      g.lineWidth = 4; g.strokeStyle = INK; g.strokeText(p.word, p.x, p.y - p.t * 24); g.fillStyle = p.col; g.fillText(p.word, p.x, p.y - p.t * 24); g.globalAlpha = 1;
+      g.lineWidth = 4; g.strokeStyle = INK; g.strokeText(minus(p.spent), p.x, p.y - p.t * 24); g.fillStyle = p.col; g.fillText(minus(p.spent), p.x, p.y - p.t * 24); g.globalAlpha = 1;
     } else if (p.pop === undefined) { g.globalAlpha = Math.max(0, p.life); g.fillStyle = p.col; g.beginPath(); g.arc(p.x, p.y, p.size, 0, TAU); g.fill(); g.globalAlpha = 1; }
   }
 }
@@ -1347,16 +1511,15 @@ function abilityBar(time) {
     g.fillStyle = hot ? col : 'rgba(255,243,220,.07)'; g.fill();
     g.lineWidth = hot ? 3 : 2; g.strokeStyle = hot ? '#fff3dc' : col + '99'; g.stroke();
     const ink = hot ? INK : col;
-    abilityIcon(g, b.id, 0, -b.h * 0.17, Math.min(b.w, b.h) * 0.24, ink, time);
+    abilityIcon(g, b.id, 0, -b.h * 0.14, Math.min(b.w, b.h) * 0.24, ink, time);
     g.textAlign = 'center'; g.textBaseline = 'middle';
     if (isWho) {
-      g.font = '800 15px ui-rounded, system-ui, sans-serif'; g.fillStyle = ink; g.fillText('Who?', 0, b.h * 0.29);
+      g.font = '800 15px ui-rounded, system-ui, sans-serif'; g.fillStyle = ink; g.fillText(t('who'), 0, b.h * 0.29);
     } else {
       const cost = COST[b.id], deadly = cost >= s.life;
-      g.font = '700 12px ui-rounded, system-ui, sans-serif'; g.fillStyle = ink; g.fillText(ABILITIES.find(a => a.id === b.id).name, 0, b.h * 0.15);
       g.font = '800 14px ui-rounded, system-ui, sans-serif'; g.fillStyle = deadly ? '#ff5a4a' : hot ? INK : '#fff3dc';
-      g.fillText(`−${cost}`, 4, b.h * 0.35);
-      flame(g, -g.measureText(`−${cost}`).width / 2 - 3, b.h * 0.41, 4, time);
+      g.fillText(minus(cost), 4, b.h * 0.31);
+      flame(g, -g.measureText(minus(cost)).width / 2 - 3, b.h * 0.37, 4, time);
     }
     g.restore();
   }
@@ -1404,9 +1567,12 @@ function memoryScene(time) {
     value(g, d, v.values[i], x, y, r, time);
   });
   if (fly === 0) {
-    g.font = '800 22px ui-rounded, system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-    const word = v.fresh ? 'I remember!' : 'I knew that…';
-    g.globalAlpha = show; g.lineWidth = 5; g.strokeStyle = INK; g.strokeText(word, cx, cy + ch * 0.55); g.fillStyle = '#ffe9a8'; g.fillText(word, cx, cy + ch * 0.55);
+    if (v.fresh) trueMark(cx, cy + ch * .51, 13);
+    else {
+      const y = cy + ch * .51;
+      g.beginPath(); g.arc(cx, y, 10, -.8, 4.2); g.strokeStyle = GOOD; g.lineWidth = 2.5; g.stroke();
+      arrow(g, cx + 5, y - 8, .25, GOOD);
+    }
     const fits = consistent(s.faces, s.known), pw = Math.min(44, (W - 54) / FACES), gap = 4;
     const x0 = (W - (pw * FACES + gap * (FACES - 1))) / 2;
     s.faces.forEach((face, i) => {
@@ -1424,8 +1590,11 @@ function lineup(time) {
   g.fillStyle = 'rgba(14,8,30,.93)'; g.fillRect(0, 0, W, H);
   const rv = screen === 'reveal' ? reveal : null;
   g.font = '800 24px ui-rounded, system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-  const title = rv ? (rv.outcome === 'right' ? 'Yes! That is you!' : `No… this was you  −${wrongCost(s)}`) : 'Who were you?';
-  g.lineWidth = 5; g.strokeStyle = INK; g.strokeText(title, W / 2, safe.t + 34); g.fillStyle = '#ffd98a'; g.fillText(title, W / 2, safe.t + 34);
+  if (rv?.outcome === 'right') trueMark(W / 2, safe.t + 34, 15);
+  else if (rv) {
+    cross(W / 2 - 36, safe.t + 34, 8, BAD, 4);
+    candleCost(wrongCost(s), W / 2 + 12, safe.t + 34, time);
+  } else puzzleText(t('whoWereYou'), W / 2, safe.t + 34, 24);
   // what you remember, so you can match it
   const n = 4, step = Math.min(60, (W - 40) / n), r = Math.min(23, step * 0.42);
   for (let d = 0; d < 4; d++) {
@@ -1435,9 +1604,11 @@ function lineup(time) {
   }
   const candidates = consistent(s.faces, s.known);
   if (!rv) {
-    g.font = '700 14px ui-rounded, system-ui, sans-serif';
-    g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#ffe2ad';
-    g.fillText(`Ends this chapter · Wrong name −${wrongCost(s)} years`, W / 2, safe.t + 117);
+    const y = safe.t + 117, x = W / 2;
+    cross(x - 118, y, 5, BAD, 3);
+    candleCost(wrongCost(s), x - 82, y, time);
+    arrow(g, x - 45, y, 0, CREAM);
+    puzzleText(t('endsChapter'), x - 30, y + 1, 14, CREAM, 'left');
   }
   cards.forEach((c, i) => {
     const excluded = !rv && !candidates.includes(i);
@@ -1460,6 +1631,7 @@ function lineup(time) {
       g.strokeStyle = '#ff5a4a'; g.lineWidth = 7; g.lineCap = 'round';
       g.beginPath(); g.moveTo(-c.w * 0.25, -c.h * 0.25); g.lineTo(c.w * 0.25, c.h * 0.25); g.moveTo(c.w * 0.25, -c.h * 0.25); g.lineTo(-c.w * 0.25, c.h * 0.25); g.stroke();
     }
+    if (isAnswer && rv) trueMark(c.w / 2 - 18, -c.h / 2 + 18, 14);
     if (!rv && isPick) { // a tick: tap again or press "That's me!"
       g.beginPath(); g.arc(c.w / 2 - 18, -c.h / 2 + 18, 14, 0, TAU); g.fillStyle = GOLD; g.fill(); g.strokeStyle = INK; g.lineWidth = 2.5; g.stroke();
       g.beginPath(); g.moveTo(c.w / 2 - 25, -c.h / 2 + 18); g.lineTo(c.w / 2 - 20, -c.h / 2 + 24); g.lineTo(c.w / 2 - 11, -c.h / 2 + 12); g.strokeStyle = INK; g.lineWidth = 3; g.stroke();
@@ -1469,7 +1641,7 @@ function lineup(time) {
       sfx.push({ x: c.x + Math.random() * c.w, y: c.y, vx: (Math.random() - 0.5) * 3, vy: -2 - Math.random() * 3, life: 1, col: ['#ffd34d', '#ff8ab8', '#6fd3ff', '#c39bff'][Math.floor(Math.random() * 4)], size: 3 + Math.random() * 3, g: 0.15 });
     }
   });
-  for (const p of sfx) if (!p.word && p.pop === undefined && p.y > viewTop) { g.globalAlpha = Math.max(0, p.life); g.fillStyle = p.col; g.fillRect(p.x, p.y, p.size, p.size); g.globalAlpha = 1; }
+  for (const p of sfx) if (!p.spent && p.pop === undefined && p.y > viewTop) { g.globalAlpha = Math.max(0, p.life); g.fillStyle = p.col; g.fillRect(p.x, p.y, p.size, p.size); g.globalAlpha = 1; }
   if (rv) return;
   // buttons: back to looking, or name yourself
   const bb = lineupButtons.back, bs = lineupButtons.sure, ok = selected >= 0;
@@ -1477,16 +1649,19 @@ function lineup(time) {
   const fl = flash && flash.what === 'pick' ? Math.sin(flash.t * 30) * 4 * (1 - flash.t) : 0;
   g.beginPath(); roundRect(g, bs.x + fl, bs.y, bs.w, bs.h, 26); g.fillStyle = ok ? '#ffb347' : 'rgba(255,179,71,.25)'; g.fill(); g.strokeStyle = ok ? '#fff3dc' : 'rgba(255,179,71,.5)'; g.lineWidth = 2; g.stroke();
   g.font = '700 17px ui-rounded, system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.fillStyle = '#fff3dc'; g.fillText('← Look more', bb.x + bb.w / 2, bb.y + bb.h / 2);
-  g.fillStyle = ok ? '#3a1a10' : 'rgba(255,243,220,.6)'; g.fillText("That's me!", bs.x + fl + bs.w / 2, bs.y + bs.h / 2);
+  g.fillStyle = '#fff3dc'; g.fillText('← ' + t('lookMore'), bb.x + bb.w / 2, bb.y + bb.h / 2);
+  g.fillStyle = ok ? '#3a1a10' : 'rgba(255,243,220,.6)'; g.fillText(t('thatsMe'), bs.x + fl + bs.w / 2, bs.y + bs.h / 2);
 }
 function fadedScene(time) {
   const k = Math.min(1, reveal.t / 1.6);
   g.fillStyle = `rgba(6,4,14,${0.75 * k})`; g.fillRect(0, 0, W, H);
   if (k > 0.5) {
     const a = (k - 0.5) * 2;
-    g.globalAlpha = a; g.font = '800 24px ui-rounded, system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.lineWidth = 5; g.strokeStyle = INK; g.strokeText('Your candle went out', W / 2, H * 0.3); g.fillStyle = '#ffd0c8'; g.fillText('Your candle went out', W / 2, H * 0.3);
+    g.globalAlpha = a;
+    candle(g, W / 2, H * .32, 23, 11, time, true);
+    g.beginPath(); g.moveTo(W / 2 - 3, H * .28); g.quadraticCurveTo(W / 2 + 11, H * .25, W / 2 + 2, H * .22);
+    g.strokeStyle = '#cab1c8'; g.lineWidth = 2.5; g.stroke();
+    puzzleText(num(0), W / 2 + 25, H * .308, 20, BAD);
     const cw = Math.min(200, W * 0.5);
     portrait(g, s.faces[s.answer], W / 2 - cw / 2, H * 0.36, cw, cw * 0.9, time, { mood: 'sad', age: s.chapter });
     g.globalAlpha = 1;
@@ -1494,41 +1669,69 @@ function fadedScene(time) {
 }
 
 // Between chapters: the selves named so far, what changes next, and a button to go on.
-const NEXT_LINE = LIES
-  ? ['', 'Match torn photos. An early clue can settle a later photo.', 'The candle burns faster. One witness signs two false photos.']
-  : ['', 'Faces are closer now: some differ in one thing only. A broken mirror holds two memories.', 'The candle burns faster. Push now holds two memories. You can solve this island without Rewind.'];
+function previewCard(x, y, paint) {
+  const card = { x: x - 23, y: y - 24, w: 46, h: 48 };
+  g.beginPath(); roundRect(g, card.x, card.y, card.w, card.h, 6); g.fillStyle = '#513b58'; g.fill();
+  g.strokeStyle = '#e5caad'; g.lineWidth = 2; g.stroke();
+  paint(card);
+}
+
+function chapterPreview(next, x, y, time) {
+  const left = x - 72, right = x + 76;
+  if (next === 2) {
+    const cycle = reduced ? .5 : (chapterCard.t * CHAPTERS[next].burn) % 1;
+    candle(g, left - 21, y + 12, 13, 25, time);
+    g.beginPath(); g.ellipse(left - 5, y - 10 + cycle * 21, 2.8, 4, 0, 0, TAU); g.fillStyle = GOOD; g.fill();
+    puzzleText('×' + num(CHAPTERS[next].burn), left + 20, y, 15, GOOD);
+    if (LIES) {
+      for (const offset of [-28, 28]) previewCard(right + offset, y, c => {
+        sealMark(2, c.x + c.w / 2, c.y + c.h * .56, 12, true);
+      });
+    } else {
+      abilityIcon(g, 'push', right - 32, y, 20, ABILITY_COLOUR.push, time);
+      puzzleText('×' + num(2), right, y, 16);
+      abilityIcon(g, 'rewind', right + 39, y, 17, ABILITY_COLOUR.rewind, time);
+      puzzleText(t('optional'), right + 39, y + 24, 11, CREAM);
+    }
+  } else if (LIES) {
+    const top = { x: left - 27, y: y - 30, w: 54, h: 30 }, bottom = { ...top, y: y - 14 + (reduced ? 0 : 8 * Math.sin(time * 3) ** 2) };
+    tornPaper(top, 2, true, () => {});
+    tornPaper(bottom, 2, false, () => {});
+    edgeCue(top, 2, true, GOOD);
+    previewCard(right - 42, y, c => thing(2, 0, c.x + 23, y + 2, 15, time));
+    arrow(g, right - 12, y, 0, GOOD);
+    previewCard(right + 21, y, c => thing(2, 0, c.x + 23, y + 2, 15, time));
+    trueMark(right + 40, y - 17, 8);
+  } else {
+    const example = [[0, 2, 0, 1], [0, 2, 0, 2]];
+    example.forEach((face, i) => portrait(g, face, left - 45 + i * 49, y - 22, 44, 44, time, { age: next }));
+    puzzleText('≠' + num(1), left + 68, y, 14, GOOD);
+    abilityIcon(g, 'who', right - 19, y, 20, ABILITY_COLOUR.rewind);
+    puzzleText('×' + num(2), right + 17, y, 16);
+  }
+}
 function chapterScene(time) {
   const k = ease(Math.min(1, chapterCard.t / 0.4)), next = s.chapter + 1;
   g.fillStyle = `rgba(14,8,30,${0.94 * k})`; g.fillRect(0, 0, W, H);
   g.globalAlpha = k;
   const top = safe.t + Math.max(24, (H - safe.t - safe.b - 520) / 2);
   g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.font = '700 15px ui-rounded, system-ui, sans-serif'; g.fillStyle = 'rgba(255,243,220,.75)'; g.fillText(`Chapter ${next + 1} of 3`, W / 2, top + 10);
-  g.font = '800 32px ui-rounded, system-ui, sans-serif'; g.lineWidth = 6; g.strokeStyle = INK; g.strokeText(CHAPTERS[next].name, W / 2, top + 44); g.fillStyle = '#ffd98a'; g.fillText(CHAPTERS[next].name, W / 2, top + 44);
+  puzzleText(count(next + 1, CHAPTERS.length), W / 2, top + 10, 15, CREAM);
+  puzzleText(ageLabel(next), W / 2, top + 44, 32);
   lifeRow(g, Math.min(W - 32, 340), W / 2, top + 76, 150, time, next);
-  // what changes
-  g.font = '600 16px ui-rounded, system-ui, sans-serif'; g.fillStyle = '#fff3dc';
-  wrap(g, NEXT_LINE[next], W / 2, top + 260, Math.min(W - 48, 320), 22);
-  // years carried over
-  g.font = '800 20px ui-rounded, system-ui, sans-serif'; g.fillStyle = '#ffe9a8';
-  g.fillText(`${Math.max(0, Math.ceil(s.life))} years left on your candle`, W / 2, top + 330);
+  chapterPreview(next, W / 2, top + 264, time);
+  candle(g, W / 2 - 70, top + 339, 12, 18, time);
+  puzzleText(yearsLeft(), W / 2 + 10, top + 330, 20);
   const bw = Math.min(160, (W - 60) * 0.58), mw = Math.min(112, (W - 60) * 0.42), gap = 12;
   const by = Math.min(H - safe.b - 76, top + 370), bx = (W - bw - mw - gap) / 2;
   nextBtn = { x: bx, y: by, w: bw, h: 54 };
   chapterMenuBtn = { x: bx + bw + gap, y: by, w: mw, h: 54 };
   const ok = chapterCard.t >= 0.5;
   g.beginPath(); roundRect(g, nextBtn.x, nextBtn.y, bw, 54, 27); g.fillStyle = ok ? '#ffb347' : 'rgba(255,179,71,.4)'; g.fill(); g.strokeStyle = '#fff3dc'; g.lineWidth = 2; g.stroke();
-  g.font = '800 19px ui-rounded, system-ui, sans-serif'; g.fillStyle = '#3a1a10'; g.fillText('Go on', nextBtn.x + bw / 2, by + 28);
+  g.font = '800 19px ui-rounded, system-ui, sans-serif'; g.fillStyle = '#3a1a10'; puzzleText(t('goOn'), nextBtn.x + bw / 2, by + 28, 19, '#3a1a10');
   g.beginPath(); roundRect(g, chapterMenuBtn.x, by, mw, 54, 27); g.fillStyle = 'rgba(255,243,220,.1)'; g.fill(); g.strokeStyle = '#ffd98a99'; g.stroke();
-  g.fillStyle = '#fff3dc'; g.fillText('Menu', chapterMenuBtn.x + mw / 2, by + 28);
+  g.fillStyle = '#fff3dc'; puzzleText(t('menu'), chapterMenuBtn.x + mw / 2, by + 28, 19, CREAM);
   g.globalAlpha = 1;
-}
-function wrap(c, text, x, y, w, lh) {
-  const words = text.split(' '), lines = [];
-  let line = '';
-  for (const word of words) { const t2 = line ? line + ' ' + word : word; if (c.measureText(t2).width > w && line) { lines.push(line); line = word; } else line = t2; }
-  if (line) lines.push(line);
-  lines.forEach((l, i) => c.fillText(l, x, y + (i - (lines.length - 1) / 2) * lh));
 }
 // One life in three pictures: the self of each chapter, framed gold when named right; a red mark when named wrong;
 // a dark card with a question mark for a chapter not reached (or, between chapters, still to come).
@@ -1548,10 +1751,10 @@ function lifeRow(c, w, cx, y, h, time, upTo = 3) {
       c.beginPath(); roundRect(c, x, y, pw, ph, Math.min(16, pw * 0.1)); c.fillStyle = 'rgba(255,243,220,.06)'; c.fill();
       c.setLineDash([5, 5]); c.strokeStyle = 'rgba(255,233,168,.4)'; c.lineWidth = 2; c.stroke(); c.setLineDash([]);
       c.font = `800 ${Math.round(pw * 0.36)}px ui-rounded, system-ui, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
-      c.fillStyle = 'rgba(255,233,168,.4)'; c.fillText('?', x + pw / 2, y + ph / 2);
+      c.fillStyle = 'rgba(255,233,168,.4)'; c.fillText(t('unknownMark'), x + pw / 2, y + ph / 2);
     }
     c.font = '700 12px ui-rounded, system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
-    c.fillStyle = named ? '#fff3dc' : 'rgba(255,243,220,.5)'; c.fillText(CHAPTERS[k].name, x + pw / 2, y + ph + 11);
+    c.fillStyle = named ? '#fff3dc' : 'rgba(255,243,220,.5)'; c.fillText(ageLabel(k), x + pw / 2, y + ph + 11);
     if (k < 2) { // the thread of one life
       c.strokeStyle = 'rgba(255,233,168,.6)'; c.lineWidth = 2; c.beginPath(); c.moveTo(x + pw + 2, y + ph / 2); c.lineTo(x + pw + gap - 2, y + ph / 2); c.stroke();
     }
@@ -1567,20 +1770,15 @@ function menuScene(time) {
   if (heroC.width !== Math.round(rect.width * dpr) || heroC.height !== Math.round(rect.height * dpr)) { heroC.width = Math.round(rect.width * dpr); heroC.height = Math.round(rect.height * dpr); }
   const w = rect.width, h = rect.height;
   hg.setTransform(dpr, 0, 0, dpr, 0, 0); hg.clearRect(0, 0, w, h);
-  const r = Math.min(24, h * 0.22), x = w / 2, y = h - 10;
-  hg.beginPath(); hg.ellipse(x, y + 3, r * 3.4, r * 0.5, 0, 0, TAU); hg.fillStyle = GLOOM ? '#26362c' : '#3f8f5a'; hg.fill(); hg.strokeStyle = INK; hg.lineWidth = 2; hg.stroke();
-  const orbs = front => { for (let i = 0; i < 4; i++) { // memories drifting round the head, just out of reach
-    const a = time * 0.6 + i * TAU / 4;
-    if ((Math.sin(a) > 0) !== front) continue;
-    const ox = Math.cos(a) * r * 3.3, oy = Math.sin(a) * r * 0.4 - r * 2.9;
-    hg.globalAlpha = 0.55 + 0.45 * (Math.sin(a) + 1) / 2;
-    hg.beginPath(); hg.arc(x + ox, y + oy, r * 0.5, 0, TAU); hg.fillStyle = 'rgba(60,40,110,.9)'; hg.fill(); hg.strokeStyle = '#ffe9a8'; hg.lineWidth = 2; hg.stroke();
-    kindIcon(hg, i, x + ox, y + oy, r * 0.28, '#ffe9a8');
-    hg.globalAlpha = 1;
-  } };
-  orbs(false);
-  person(hg, x, y, r, { t: time, blink: blinkAt(time, 1), candle: 0.55 + 0.1 * Math.sin(time * 0.2), lost: true, face: Math.sin(time * 0.4) > 0 ? 1 : -1 });
-  orbs(true);
+  const r = Math.min(16, h * 0.19), x = w / 2, y = h - 8, spacing = 52;
+  hg.beginPath(); hg.ellipse(x, y + 2, spacing * 1.52, r * 0.52, 0, 0, TAU);
+  hg.fillStyle = GLOOM ? '#26362c' : '#3f8f5a'; hg.fill(); hg.strokeStyle = INK; hg.lineWidth = 2; hg.stroke();
+  for (let i = 0; i < CHAPTERS.length; i++) {
+    person(hg, x + (i - 1) * spacing, y, r, { t: time, blink: blinkAt(time, i), lost: true, age: i, candle: 0 });
+    if (i < 2) arrow(hg, x + (i - .5) * spacing, y - 17, 0, '#d7b997');
+  }
+  candle(hg, x + 104, y, 11, Math.min(26, h * .33), time);
+
 }
 const gal = $('gallery'), gg = gal.getContext('2d');
 function drawGallery() {
@@ -1602,7 +1800,7 @@ function drawGallery() {
       gg.restore();
     } else {
       gg.beginPath(); gg.arc(x, y, r, 0, TAU); gg.fillStyle = 'rgba(255,243,220,.06)'; gg.fill(); gg.setLineDash([3, 3]); gg.strokeStyle = 'rgba(255,233,168,.35)'; gg.lineWidth = 1.5; gg.stroke(); gg.setLineDash([]);
-      gg.font = `700 ${Math.round(r * 0.9)}px ui-rounded, system-ui, sans-serif`; gg.textAlign = 'center'; gg.textBaseline = 'middle'; gg.fillStyle = 'rgba(255,233,168,.35)'; gg.fillText('?', x, y + 1);
+      gg.font = `700 ${Math.round(r * 0.9)}px ui-rounded, system-ui, sans-serif`; gg.textAlign = 'center'; gg.textBaseline = 'middle'; gg.fillStyle = 'rgba(255,233,168,.35)'; gg.fillText(t('unknownMark'), x, y + 1);
     }
   }
 }
@@ -1633,7 +1831,7 @@ function drawAlbum(canvas, page) {
   paper.addColorStop(0, '#281b30'); paper.addColorStop(.11, '#4f3745');
   paper.addColorStop(.14, '#493343'); paper.addColorStop(1, '#342438');
   ctx.fillStyle = paper; ctx.fill();
-  CHAPTERS.forEach((ch, i) => {
+  CHAPTERS.forEach((_, i) => {
     const c = page.chapters[i], y = 6 + i * row;
     const count = 1 + (c?.photos.length ?? 0);
     const width = Math.min((w - 20 - gap * (count - 1)) / count, row - 8);
@@ -1642,11 +1840,14 @@ function drawAlbum(canvas, page) {
     if (c?.portrait) portrait(ctx, c.portrait, 7, top, width, width, 0, { age: i });
     else {
       ctx.fillStyle = '#dfc0a7'; ctx.font = '600 10px system-ui'; ctx.textAlign = 'center';
-      ctx.fillText(ch.name, 7 + width / 2, y + row / 2 + 4);
+      ctx.fillText(ageLabel(i), 7 + width / 2, y + row / 2 + 4, width);
     }
     if (!c?.photos.length) {
-      ctx.fillStyle = '#c7b1c6'; ctx.font = '13px system-ui'; ctx.textAlign = 'center';
-      ctx.fillText('No photos recovered', w * 0.59, y + row / 2 + 4);
+      const x = w * .59, cy = y + row / 2;
+      ctx.beginPath(); roundRect(ctx, x - 17, cy - 12, 34, 24, 3); ctx.setLineDash([3, 3]);
+      ctx.strokeStyle = '#c7a8b7'; ctx.lineWidth = 1.5; ctx.stroke(); ctx.setLineDash([]);
+      ctx.font = '600 13px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#d4bccd';
+      ctx.fillText(num(0), x, cy + 5);
     }
     for (const [j, fr] of (c?.photos ?? []).entries()) {
       const x = 17 + width + j * (width + gap);
@@ -1661,9 +1862,10 @@ function drawAlbum(canvas, page) {
 }
 function updateAlbum(index) {
   albumIndex = index;
-  $('albumCount').textContent = `${index + 1} / ${save.album.length}`;
+  $('albumCount').textContent = count(index + 1, save.album.length);
   const page = save.album[index];
-  $('albumCaption').textContent = lifeTitle(page.outcome, page.chapters.filter(c => c.portrait).length);
+  const n = page.chapters.filter(c => c.portrait).length;
+  $('albumCaption').textContent = details(lifeTitle(page.outcome, n), t('result', { n: num(n), total: num(CHAPTERS.length) }));
   $('albumPrev').disabled = index === 0;
   $('albumNext').disabled = index === save.album.length - 1;
 }
@@ -1682,25 +1884,25 @@ $('shareCard').addEventListener('click', () => {
   ctx.fillStyle = '#221831'; ctx.fillRect(0, 0, card.width, card.height);
   ctx.textAlign = 'center';
   ctx.fillStyle = '#ffe0a1'; ctx.font = '800 62px system-ui';
-  ctx.fillText('Borrowed Time', 360, 102);
+  ctx.fillText(t('title'), 360, 102, 650);
   ctx.font = '600 28px system-ui'; ctx.fillStyle = '#ecdbd2';
-  ctx.fillText(mode === 'daily' ? 'Daily · ' + dayKey : 'A life in three chapters', 360, 158);
-  CHAPTERS.forEach((chapter, i) => {
+  if (mode === 'daily') ctx.fillText(t('dailyDate', { date: dateLabel(dayKey) }), 360, 158);
+  CHAPTERS.forEach((_, i) => {
     const x = 27 + i * 225, face = s.chapters[i]?.portrait;
     if (face) portrait(ctx, face, x, 220, 216, 216, 0, { age: i });
     else {
       ctx.fillStyle = '#362842'; ctx.beginPath(); roundRect(ctx, x, 220, 216, 216, 14); ctx.fill();
       ctx.fillStyle = '#e1cbaa'; ctx.font = '700 32px system-ui'; ctx.textAlign = 'center';
-      ctx.fillText('Unknown', x + 108, 338);
+      ctx.fillText(t('unknownMark'), x + 108, 338);
     }
     ctx.textAlign = 'center'; ctx.font = '650 28px system-ui'; ctx.fillStyle = '#fff3dc';
-    ctx.fillText(chapter.name, x + 108, 481);
+    ctx.fillText(ageLabel(i), x + 108, 481);
   });
-  const score = s.right + ' of 3 right · ' + s.score + ' points';
-  ctx.fillStyle = '#ffe0a1'; ctx.font = '800 42px system-ui'; ctx.fillText(score, 360, 580);
+  const score = details(result(), points());
+  ctx.fillStyle = '#ffe0a1'; ctx.font = '800 42px system-ui'; ctx.fillText(score, 360, 580, 650);
   const png = card.toDataURL('image/png');
-  $('shareImage').alt = 'Borrowed Time. ' + score;
-  $('shareImage').src = png; $('saveCard').href = png;
+  $('shareImage').alt = t('shareAlt', { title: t('title'), score });
+  $('shareImage').src = png; $('saveCard').href = png; $('saveCard').download = t('shareFile');
   show('share');
 });
 $('shareBack').addEventListener('click', () => show('done'));
@@ -1718,22 +1920,47 @@ function show(name) {
 }
 function menu() {
   finger = null;
+  menuLabels();
+}
+function menuLabels() {
   $('continueRun').hidden = !interrupted;
   if (interrupted) {
     const life = interrupted.s;
     const chapter = life.status === 'named' ? life.chapter + 1 : life.chapter;
-    $('continueRun').textContent = `Continue ${interrupted.mode === 'daily' ? 'Daily · ' : '· '}${CHAPTERS[chapter].name}`;
+    $('continueRun').textContent = t(interrupted.mode === 'daily' ? 'continueDaily' : 'continueRun', { age: ageLabel(chapter) });
   }
-  $('play').textContent = interrupted ? 'New life' : 'Play';
+  $('play').textContent = t(interrupted ? 'newLife' : 'play');
   $('play').classList.toggle('main', !interrupted);
   $('menuAlbum').hidden = !save.album.length;
   const ds = save.daily[today()];
-  $('daily').querySelector('small').textContent = ds === undefined ? '· new today' : `· today ${ds}`;
-  const found = Object.keys(save.gallery).length;
-  $('bestLine').textContent = `Role gallery · Found ${found} of 16` + (save.runs ? ` · Best ${save.best}` : '');
-  soundLabel();
+  $('daily').textContent = ds === undefined ? t('daily') : t('dailyScore', { score: num(ds) });
+  const found = t('galleryCount', { n: num(Object.keys(save.gallery).length), total: num(16) });
+  $('bestLine').textContent = save.runs ? details(found, t('best', { score: num(save.best) })) : found;
 }
-const soundLabel = () => { $('sound').textContent = $('sound2').textContent = `Sound: ${save.sound ? 'on' : 'off'}`; };
+const soundLabel = () => { $('sound').textContent = $('sound2').textContent = t(save.sound ? 'soundOn' : 'soundOff'); };
+
+function localize() {
+  apply();
+  document.title = t('title');
+  menuLabels();
+  soundLabel();
+  $('scoring').textContent = t('scoring', { base: num(SELF_POINTS), years: t('remainingYears'), rate: num(10), count: num(CHAPTERS.length) });
+  if (recordingNotice) recordingNotice.firstChild.nodeValue = t('notice', { days: num(180) }) + ' ';
+  if (recordingToggle) recordingToggle.lastChild.nodeValue = ' ' + t('record');
+  const hintLabel = document.querySelector('.kit-hint[data-kind="tap"] .label');
+  if (hintLabel) hintLabel.textContent = t('tapMemory');
+  if (nope) $('powerTip').textContent = t(nope.key);
+  localizeNotes();
+}
+for (const button of document.querySelectorAll('.language')) {
+  button.addEventListener('click', () => {
+    setLang(lang() === 'en' ? 'tr' : 'en');
+    // An explicit switch takes precedence over the initial link on subsequent reloads.
+    const address = checkpointAddress(location.href);
+    if (address !== location.href) history.replaceState(history.state, '', address);
+    localize();
+  });
+}
 const toggleSound = () => { save.sound = !save.sound; store(); soundLabel(); if (save.sound) { snd.unlock(); snd.release(); tone(660, 0.1, 0.06); } else snd.hold(); };
 $('sound').addEventListener('click', toggleSound);
 $('sound2').addEventListener('click', toggleSound);
@@ -1845,14 +2072,14 @@ function firstMemoryBottom() {
 const help = hint(canvas, {
   kind: 'tap',
   key: 'borrowed:hint',
-  label: 'Tap the glowing memory',
+  label: t('tapMemory'),
   bottom: firstMemoryBottom,
   when: () => screen === 'play' && !paused && !vignette && s?.status === 'play',
   played: readJson(KEY) !== null,
 });
 
 resize();
-menu();
+localize();
 requestAnimationFrame(frame);
 </script>
 <script src="/notes/button.js" defer></script>

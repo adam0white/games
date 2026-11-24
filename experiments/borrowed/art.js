@@ -1,6 +1,8 @@
 // Borrowed Time: everything drawn in code. Each function draws on a 2D context `g` and keeps no state.
 // Kinds of memory: 0 hat, 1 held thing, 2 pet, 3 place. Values index VALUES in sim.js.
 
+import { t as word } from './words.js';
+
 export const INK = '#1b1430';
 export const CREAM = '#fff3dc';
 export const GOLD = '#ffd34d';
@@ -282,8 +284,8 @@ export function person(g, x, y, r, o = {}) {
   else if (o.lost) { // a small question mark floating above a forgotten head
     g.font = `800 ${Math.round(r * 0.9)}px ui-rounded, system-ui, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
     g.globalAlpha = 0.6 + 0.3 * Math.sin(t * 3);
-    g.lineWidth = w * 1.6; g.strokeStyle = INK; g.strokeText('?', x + r * 0.1, hy - r * 1.35 + Math.sin(t * 2) * r * 0.1);
-    g.fillStyle = CREAM; g.fillText('?', x + r * 0.1, hy - r * 1.35 + Math.sin(t * 2) * r * 0.1);
+    g.lineWidth = w * 1.6; g.strokeStyle = INK; g.strokeText(word('unknownMark'), x + r * 0.1, hy - r * 1.35 + Math.sin(t * 2) * r * 0.1);
+    g.fillStyle = CREAM; g.fillText(word('unknownMark'), x + r * 0.1, hy - r * 1.35 + Math.sin(t * 2) * r * 0.1);
     g.globalAlpha = 1;
   }
   g.restore();

@@ -1,9 +1,10 @@
-// Phone smoke test for Borrowed Time: node experiments/borrowed/check.mjs [webkit|chromium]
+// Phone smoke test for Borrowed Time: node experiments/borrowed/check.mjs [webkit|chromium] [--words]
 // Serves experiments/ on a free port, answers /notes/button.js with an empty script and the lab endpoint itself,
 // and plays real three-chapter runs with touch pointer events on WebKit (iPhone 13) and Chromium (Pixel 7).
 // The answers of a fixed seed, and which picture of each puzzle lies, are worked out here in Node from sim.js; the page
 // never exposes either.
-// Screenshots go to $SHOTS (default: a folder in the system temp directory, not the repo).
+// Screenshots go to $SHOTS, with language screenshots in $WORDS_SHOTS or its words subdirectory.
+// The default is in the system temp directory. Use --words to run only the language and layout tour.
 import { createServer } from 'node:http';
 import { readFile, mkdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -99,7 +100,7 @@ async function checkKnownFaces(page) {
   const problems = [];
   if ((await state(page)).selected !== -1) problems.push('a contradicted face could be selected');
   const words = (await canvasWords(page)).map(w => w.text);
-  if (!words.some(w => w.includes('Ends this chapter') && w.includes('−30 years'))) {
+  if (!words.includes('Ends this chapter') || !words.includes('−30')) {
     problems.push('the choice hid its cost or finality');
   }
   assert.deepEqual(problems, [], 'naming uses the evidence and discloses the stakes');
@@ -125,9 +126,9 @@ async function canvasWords(page) {
   return page.evaluate(() => new Promise(resolve => {
     const canvas = document.querySelector('#c').getContext('2d'), words = [];
     const fill = canvas.fillText;
-    canvas.fillText = function(text, x, ...args) {
-      words.push({ text, x });
-      return fill.call(this, text, x, ...args);
+    canvas.fillText = function(text, x, y, ...args) {
+      words.push({ text, x, y });
+      return fill.call(this, text, x, y, ...args);
     };
     requestAnimationFrame(() => requestAnimationFrame(() => {
       canvas.fillText = fill;
@@ -136,20 +137,47 @@ async function canvasWords(page) {
   }));
 }
 // Observe before input so a slow browser round trip cannot miss transient feedback.
-async function tapShowing(page, point, label, side = null) {
-  const paint = await page.evaluateHandle(({ label, side }) => {
+async function tapShowing(page, point, label, range) {
+  const paint = await page.evaluateHandle(({ label, range }) => {
     const canvas = document.querySelector('#c').getContext('2d');
     const fill = canvas.fillText;
     const mark = { seen: false, restore() { canvas.fillText = fill; } };
-    canvas.fillText = function(text, x, ...args) {
-      if (text === label && (side === null || (x < innerWidth / 2) === (side === 0))) mark.seen = true;
-      return fill.call(this, text, x, ...args);
+    canvas.fillText = function(text, x, y, ...args) {
+      if (text === label && y >= range[0] && y <= range[1]) mark.seen = true;
+      return fill.call(this, text, x, y, ...args);
     };
     return mark;
-  }, { label, side });
+  }, { label, range });
   try {
     await tap(page, point);
     await until(page, mark => mark.seen, `painted feedback "${label}"`, 8000, paint);
+  } finally {
+    await paint.evaluate(mark => mark.restore());
+    await paint.dispose();
+  }
+}
+// Observe the drawn marks on the actual practice cards, independent of the result flag.
+async function practiceInk(page, action, test, side = null) {
+  const paint = await page.evaluateHandle(side => {
+    const ctx = document.querySelector('#c').getContext('2d'), seen = [];
+    const arc = ctx.arc, fill = ctx.fill, stroke = ctx.stroke;
+    let circle;
+    ctx.arc = function(x, y, radius, ...rest) { circle = { x, y, radius }; return arc.call(this, x, y, radius, ...rest); };
+    ctx.fill = function(...args) {
+      if (circle?.radius === 12 && this.fillStyle === '#ffd34d') seen.push({ type: 'check', ...circle });
+      circle = null;
+      return fill.apply(this, args);
+    };
+    ctx.stroke = function(...args) {
+      const dash = this.getLineDash();
+      if (dash[0] === 4 && dash[1] === 5) seen.push({ type: 'connector', color: this.strokeStyle });
+      return stroke.apply(this, args);
+    };
+    return { seen, side, restore() { Object.assign(ctx, { arc, fill, stroke }); } };
+  }, side);
+  try {
+    await action();
+    await until(page, test, 'the practice cue or check is drawn', 4000, paint);
   } finally {
     await paint.evaluate(mark => mark.restore());
     await paint.dispose();
@@ -164,14 +192,18 @@ async function finishPractice(page, o = {}) {
   assert.equal(pz.show, null, 'practice has no paid hint');
   assert.equal(pz.later, null, 'practice has no live puzzle controls');
   const pick = practicePick[pz.form];
-  const instructions = { lie: 'Your pet is the cat. Tap the other photo.', torn: 'Tap the half that fits the torn edge.', signed: 'Tap the photo with this seal.' };
-  assert.ok((await canvasWords(page)).some(w => w.text === instructions[pz.form]), 'practice explains the evidence to use');
+  if (!pz.practiceResult) {
+    await practiceInk(page, async () => {}, paint => paint.seen.some(mark => mark.type === 'connector'));
+    assert.ok((await canvasWords(page)).some(w => w.text === '0'), 'practice shows a zero candle cost');
+  }
   if (o.shot) { await sleep(750); await o.shot(); }
   if (!pz.practiceResult) {
     await tap(page, pz.cards[1 - pick]);
     assert.equal((await state(page)).puzzle.practiceResult, false, 'a wrong practice tap is free and leaves practice open');
     const trueSide = pz.form === 'torn' ? pick : 1 - pick;
-    await tapShowing(page, pz.cards[pick], 'True', trueSide);
+    await practiceInk(page, () => tap(page, pz.cards[pick]),
+      paint => paint.seen.some(mark => mark.type === 'check' && mark.y > 135 && (paint.side === null || (mark.x < innerWidth / 2) === (paint.side === 0))),
+      pz.form === 'torn' ? null : trueSide);
   }
   await until(page, () => window.borrowedState().puzzle?.practice === false, 'practice closes and the real puzzle opens');
   const after = await state(page);
@@ -198,12 +230,13 @@ async function solve(page, phone, seed, k, lock, o = {}) {
     assert.ok(Math.abs(y0 - st.life - PICK) < 1e-6, `a wrong tap costs ${PICK} years`);
     assert.ok(st.puzzle.tried[other] && st.screen === 'puzzle', 'the wrong pick is marked and the puzzle stays open');
     if (o.shots?.wrong) { await sleep(200); await shot(page, phone, o.shots.wrong); }
-    await tapShowing(page, pz.cards[other], 'Already checked · no cost');
+    await tapShowing(page, pz.cards[other], '0', [130, vp.height - 65]);
     assert.equal((await state(page)).life, st.life, 'repeated wrong tap is free');
   }
   if (o.show) {
     const y0 = (await state(page)).life;
-    await tapShowing(page, pz.show, 'Answer revealed');
+    await tapShowing(page, pz.show, '−5', [85, 128]);
+    assert.equal((await state(page)).puzzle?.how, 'shown', 'the candle-and-mirror cue belongs to paid reveal');
     assert.ok(Math.abs(y0 - (await state(page)).life - SHOW) < 1e-6, `Show me costs ${SHOW} years`);
     if (o.shots?.shown) await shot(page, phone, o.shots.shown);
   } else {
@@ -710,12 +743,227 @@ async function auditFeedback(page) {
   assert.deepEqual(failures, [], 'cold play regressions');
 }
 
-const only = process.argv[2];
+// Language and layout use real painting and DOM text, including the offscreen PNG canvas.
+const WORDS_SHOTS = process.env.WORDS_SHOTS || join(SHOTS, 'words');
+async function languageTour(browser, device, phone) {
+  const viewport = phone === 'webkit' ? device.viewport : { width: 360, height: 640 };
+  for (const language of ['en', 'tr']) {
+    const context = await browser.newContext({ ...device, viewport, locale: 'en-US' });
+    const page = await context.newPage(), errors = [];
+    page.on('pageerror', e => errors.push(String(e)));
+    const folder = language === 'tr' ? WORDS_SHOTS : join(WORDS_SHOTS, 'english');
+    await mkdir(folder, { recursive: true });
+    const seed = 28, decks = [0, 1, 2].map(k => chapterOf(seed, k));
+    await page.route('**/notes/button.js', route => route.fulfill({
+      path: resolve(root, '../workers/feedback/public/notes/button.js'), contentType: 'text/javascript',
+    }));
+    await page.addInitScript(() => {
+      localStorage.setItem('notes.k', 'check');
+      window.paintText = [];
+      for (const method of ['fillText', 'strokeText']) {
+        const original = CanvasRenderingContext2D.prototype[method];
+        CanvasRenderingContext2D.prototype[method] = function(value, x, y, maxWidth) {
+          if (window.paintText.length < 4000) {
+            const m = this.measureText(value), p = new DOMPoint(x, y).matrixTransform(this.getTransform());
+            const matrix = this.getTransform();
+            const shrink = maxWidth ? Math.min(1, maxWidth / m.width) : 1;
+            window.paintText.push({
+              value: String(value), id: this.canvas.id, width: this.canvas.width,
+              spill: p.x - m.actualBoundingBoxLeft * Math.abs(matrix.a) * shrink < -2 ||
+                p.x + m.actualBoundingBoxRight * Math.abs(matrix.a) * shrink > this.canvas.width + 2 ||
+                p.y - m.actualBoundingBoxAscent * Math.abs(matrix.d) < -2 ||
+                p.y + m.actualBoundingBoxDescent * Math.abs(matrix.d) > this.canvas.height + 2,
+            });
+          }
+          return original.apply(this, arguments);
+        };
+      }
+    });
+    try {
+      await page.goto(`${base}/borrowed/?seed=${seed}&hint=hand&lang=${language}`);
+      await until(page, () => window.borrowedState?.().screen === 'menu', 'localized menu');
+      const tables = await page.evaluate(async () => (await import('/borrowed/words.js')).tables);
+      assert.deepEqual(Object.keys(tables.en).sort(), Object.keys(tables.tr).sort(), 'both dictionaries have every key');
+      const placeholders = value => [...value.matchAll(/\{\w+\}/g)].map(match => match[0]).sort();
+      for (const key of Object.keys(tables.en)) {
+        assert.ok(tables.en[key] && tables.tr[key], key + ' has both translations');
+        assert.deepEqual(placeholders(tables.tr[key]), placeholders(tables.en[key]), key + ' uses the same variables');
+      }
+      async function inspect(name, expected, before) {
+        if (expected) await until(page, s => window.borrowedState().screen === s, name, 8000, expected);
+        await page.evaluate(() => { window.paintText.length = 0; });
+        if (before) await before();
+        await page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))));
+        const seen = await page.evaluate(() => {
+          const visible = [...document.body.querySelectorAll('*')].filter(el => {
+            const r = el.getBoundingClientRect(), css = getComputedStyle(el);
+            return r.width && r.height && css.visibility === 'visible';
+          });
+          const strings = [document.title, ...visible.flatMap(el => [
+            ...Array.from(el.childNodes).filter(n => n.nodeType === Node.TEXT_NODE).map(n => n.textContent.trim()),
+            ...['aria-label', 'title', 'alt', 'download'].map(attr => el.getAttribute(attr)),
+          ])].filter(Boolean);
+          const spill = visible.flatMap(el => {
+            const r = el.getBoundingClientRect();
+            return r.left < -1 || r.top < -1 || r.right > innerWidth + 1 || r.bottom > innerHeight + 1
+              || (el.matches('.screen > div') && el.scrollHeight > el.clientHeight + 1)
+              ? [(el.id || el.className || el.tagName) + ' ' + [r.x, r.y, r.width, r.height].map(Math.round).join(',')] : [];
+          });
+          return { strings, spill, lang: document.documentElement.lang, paint: window.paintText };
+        });
+        assert.equal(seen.lang, language);
+        assert.deepEqual(seen.spill, [], language + ' ' + name + ' has no DOM overflow');
+        assert.deepEqual([...new Set(seen.paint.filter(mark => mark.spill).map(mark => mark.id + ' ' + mark.value))], [], language + ' ' + name + ' has no canvas text overflow');
+        if (language === 'tr') {
+          const actual = [...new Set([...seen.strings, ...seen.paint.map(mark => mark.value)])];
+          const escaped = RegExp.escape;
+          const transl = Object.entries(tables.en).filter(([key, word]) => word !== tables.tr[key] &&
+            /[a-z]/i.test(word.replace(/\{\w+\}/g, '')));
+          const leaks = actual.filter(value => transl.some(([, word]) => {
+            const pattern = word.split(/\{\w+\}/).map(escaped).join('.*?');
+            return new RegExp(String.raw`(?<![\p{L}])${pattern}(?![\p{L}])`, 'u').test(value);
+          }));
+          assert.deepEqual(leaks, [], name + ' has no English UI text');
+        }
+        await page.screenshot({ scale: 'css', path: join(folder, `${phone}-${name}.png`) });
+        return seen;
+      }
+      const menu = page.locator('#menu .language');
+      const pauseLanguage = page.locator('#paused .language');
+      const bounds = await menu.boundingBox();
+      assert.ok(bounds.width >= 44 && bounds.height >= 44, 'menu language tap target');
+      await inspect('menu', 'menu');
+      const other = language === 'tr' ? 'en' : 'tr';
+      await menu.tap();
+      assert.equal(await page.locator('html').getAttribute('lang'), other);
+      await page.reload();
+      await until(page, () => window.borrowedState?.().screen === 'menu', 'remembered language after reload');
+      assert.equal(await page.locator('html').getAttribute('lang'), other);
+      await menu.tap();
+      await page.locator('#daily').tap();
+      await inspect('first-island', 'play');
+      if (language === 'tr') {
+        await page.emulateMedia({ reducedMotion: 'reduce' });
+        await page.locator('.kit-hint.still .label').waitFor();
+        assert.equal(await page.locator('.kit-hint .label').textContent(), tables.tr.tapMemory);
+        await inspect('still-hint', 'play');
+        await page.emulateMedia({ reducedMotion: 'no-preference' });
+      }
+
+      async function visit(k, lock, practice, screen) {
+        // Set a starting tile near each lock to isolate localization and layout from camera travel.
+        await page.evaluate(lock => {
+          const s = window.borrowedSim(), spot = s.spots.find(p => p.lock === lock);
+          let at = spot;
+          if (lock === 'leap') at = s.pad;
+          if (lock === 'push') {
+            const rock = s.grid.indexOf('B');
+            const x = rock % s.w, y = Math.floor(rock / s.w);
+            at = [[0, 1], [0, -1], [1, 0], [-1, 0]].map(([dx, dy]) => ({ x: x + dx, y: y + dy }))
+              .find(p => s.grid[p.y * s.w + p.x] === '.');
+          }
+          s.px = at.x + .5; s.py = at.y + .5; s.path = [];
+        }, lock);
+        if (lock !== 'free') await tap(page, (await state(page)).buttons[lock === 'dark' ? 'glow' : lock]);
+        if (lock === 'leap') {
+          await until(page, () => !window.borrowedState().player.moving, 'the jump lands');
+        }
+        if (lock !== 'free') {
+          const p = (await state(page)).spots.find(p => p.lock === lock);
+          await goTo(page, p.tx, p.ty, atMemory(lock));
+        }
+        const pz = await waitPuzzle(page);
+        assert.equal(pz.practice, practice);
+        assert.equal(pz.lock, lock);
+        if (practice) {
+          await inspect(screen, 'puzzle');
+          await tap(page, pz.cards[practicePick[pz.form]]);
+          await until(page, () => window.borrowedState().puzzle?.practice === false, 'live puzzle');
+        }
+        await inspect(screen + '-live', 'puzzle');
+        await tap(page, (await state(page)).puzzle.cards[correctTap(puzzleOf(seed, k, lock))]);
+        await until(page, () => window.borrowedState().memoryShowing, 'earned photo');
+        if (k === 0) await inspect('memory', 'play');
+        await skipMemory(page, phone, null);
+      }
+
+      await tap(page, (await state(page)).buttons.rewind);
+      await inspect('power-no-mirror', 'play');
+      await tap(page, (await state(page)).buttons.push);
+      await inspect('power-cracked-rock', 'play');
+      await visit(0, 'free', true, 'teaching');
+      await page.locator('#pause').tap();
+      const pauseBounds = await pauseLanguage.boundingBox();
+      assert.ok(pauseBounds.width >= 44 && pauseBounds.height >= 44, 'pause language tap target');
+      const frozen = await state(page);
+      await pauseLanguage.tap();
+      assert.equal(await page.locator('html').getAttribute('lang'), other);
+      await pauseLanguage.tap();
+      const still = await state(page);
+      assert.deepEqual([still.screen, still.paused], [frozen.screen, true]);
+      assert.equal((await state(page)).life, frozen.life);
+      await inspect('pause', 'play');
+      await page.reload();
+      await until(page, () => window.borrowedState?.().screen === 'menu', 'localized continue');
+      assert.equal(await page.locator('html').getAttribute('lang'), language, 'the pause choice survives reload');
+      await inspect('continue', 'menu');
+      await page.locator('#continueRun').tap();
+      for (let k = 0; k < 3; k++) {
+        if (k === 1) await visit(k, 'push', true, 'torn');
+        if (k === 2) {
+          await visit(k, 'leap', true, 'signed');
+          await visit(k, 'dark', false, 'recurring-seal');
+        }
+        const lineup = await pick(page, decks[k].answer);
+        if (k === 0) await inspect('lineup', 'lineup');
+        await tap(page, lineup.sure);
+        if (k === 0) await inspect('right-reveal', 'reveal');
+        if (k < 2) {
+          await until(page, () => window.borrowedState().nextReady, 'chapter buttons');
+          await inspect(k === 0 ? 'chapter-grown' : 'chapter-old', 'chapter');
+          await tap(page, (await state(page)).next);
+        }
+      }
+      await inspect('win', 'done');
+      assert.equal((await state(page)).status, 'remembered');
+      await page.locator('#doneAlbum').tap();
+      await inspect('album', 'album');
+      await page.locator('#albumBack').tap();
+      const share = await inspect('share', null, () => page.locator('#shareCard').tap());
+      const sharePaint = share.paint.filter(mark => mark.width === 720 && !mark.id).map(mark => mark.value);
+      assert.ok(sharePaint.includes(tables[language].title), 'the exported PNG paints the title in the selected language');
+      const day = await page.evaluate(() => new Intl.DateTimeFormat(document.documentElement.lang, { dateStyle: 'medium' }).format(new Date()));
+      assert.ok(sharePaint.includes(tables[language].dailyDate.replace('{date}', day)), 'the exported PNG formats the date in the selected language');
+      await page.locator('#shareBack').tap();
+      await page.locator('#doneMenu').tap();
+      await page.locator('#play').tap();
+      await page.evaluate(() => { window.borrowedSim().life = 0.08; });
+      await until(page, () => window.borrowedState().outcome === 'faded', 'loss reveal');
+      await sleep(1200);
+      await inspect('loss-reveal', 'reveal');
+      await inspect('loss', 'done');
+      assert.equal((await state(page)).status, 'faded');
+      assert.deepEqual(errors, [], 'localized page errors');
+      console.log(`ok   borrowed ${language} on ${phone} ${viewport.width}x${viewport.height}`);
+    } finally {
+      await context.close();
+    }
+  }
+}
+
+const args = process.argv.slice(2), only = args.find(arg => arg !== '--words');
+const wordsOnly = args.includes('--words');
 let failed = 0;
 for (const [phone, [engine, device]] of Object.entries(PHONES)) {
   if (only && only !== phone) continue;
   const browser = await engine.launch();
-  const context = await browser.newContext({ ...device }), page = await context.newPage(), errors = [];
+  if (wordsOnly) {
+    try { await languageTour(browser, device, phone); }
+    catch (e) { failed++; console.error(`FAIL borrowed languages on ${phone}:`, e); }
+    finally { await browser.close(); }
+    continue;
+  }
+  const context = await browser.newContext({ ...device, locale: 'en-US' }), page = await context.newPage(), errors = [];
   context.labSent = [];
   await context.route('https://human.adamwhite.work/**', async route => {
     const req = route.request(), cors = { 'access-control-allow-origin': base, 'access-control-allow-methods': 'POST, OPTIONS', 'access-control-allow-headers': 'Content-Type' };
@@ -754,7 +1002,7 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
     // The small phone, 360 x 640, then 390 x 844. The menu fits; the island, the bar and the six faces fit on screen.
     for (const [vw, vh] of [[360, 640], [390, 844]]) {
     const tag = vw === 360 ? 'small' : `${vw}x${vh}`;
-    const small = await browser.newContext({ viewport: { width: vw, height: vh }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+    const small = await browser.newContext({ viewport: { width: vw, height: vh }, isMobile: true, hasTouch: true, deviceScaleFactor: 2, locale: 'en-US' });
     const p2 = await small.newPage(), errs = [];
     p2.on('pageerror', e => errs.push(String(e))); p2.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
     try {
@@ -832,7 +1080,7 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
     await small.close();
     }
     // Desktop: 1280 x 800 with a mouse and keys. Arrow keys walk, 1 to 4 use abilities, Enter opens the lineup.
-    const desk = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const desk = await browser.newContext({ viewport: { width: 1280, height: 800 }, locale: 'en-US' });
     const p3 = await desk.newPage(), errs3 = [];
     p3.on('pageerror', e => errs3.push(String(e))); p3.on('console', m => { if (m.type() === 'error') errs3.push(m.text()); });
     try {
@@ -900,6 +1148,8 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
     } catch (e) { failed++; console.log(`FAIL borrowed on chromium desktop: ${e.message}`); if (errs3.length) console.log('     ' + errs3.join('\n     ')); await shot(p3, 'desktop', 'fail').catch(() => {}); }
     await desk.close();
   }
+  try { await languageTour(browser, device, phone); }
+  catch (e) { failed++; console.error(`FAIL borrowed languages on ${phone}:`, e); }
   await browser.close();
 }
 async function reloadTour(page) {
