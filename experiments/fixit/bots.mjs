@@ -1,7 +1,7 @@
 // Proves the rules of Fix-It Stall: node experiments/fixit/bots.mjs
 // Bots play through the same input interface the page uses (down/move/up in object-local units), one step per tick,
 // with finger speeds capped at what a thumb can do (moves.js SKILLS). Exits non-zero when a claim fails.
-import { create, step, input, guide, rand, stars, chooseTicket, selectLane, goalState, DT, KINDS, TUTOR, PATIENCE, LEVELS, HIT, RAMP, TWO_PATIENCE } from './sim.js';
+import { create, step, input, guide, rand, stars, chooseTicket, selectLane, goalState, DT, KINDS, TUTOR, PATIENCE, LEVELS, HIT, RAMP, TWO_PATIENCE, THREAD_UP, THREAD_EYE, COIN } from './sim.js';
 import { ghost, plan, SKILLS, THUMB_MAX } from './moves.js';
 import { drawGhost } from './art.js';
 import { MAP, COUNT, INTRO, BUSY_END, OPEN_ORDER, levelDef, goalLine, canAssist, levelReward } from './levels.js';
@@ -150,6 +150,66 @@ claim(goalLine(opening[2].goal).includes('One walk-off ends the level'),
     claim(arcs.includes(4.6), `the ${kind} demonstration shows that the finger must stay down at the end`);
   }
 
+  // Open items 2026-11-24: touch players pressed the drawn thread tip (or the tile pen's nozzle) and dragged it onto the
+  // target, which missed: only the knob or pen body took hold, and the thread's tip stood 26 units right of the thumb.
+  // Now a press anywhere on the thread or pen takes hold, and the tip stands straight above the thumb.
+  {
+    const needle = create({ only: 'thread' }), r = needle.rep;
+    input(needle, { type: 'down', x: r.tx, y: r.ty });
+    claim(r.grab, 'a press on the drawn thread tip takes hold of the thread');
+    input(needle, { type: 'up', x: r.tx, y: r.ty });
+    const below = create({ only: 'thread' }), b = below.rep;
+    input(below, { type: 'down', x: b.tx, y: b.ty + THREAD_UP });
+    for (let i = 0; i < 40; i++) { input(below, { type: 'move', x: 64, y: b.ey + THREAD_UP }); step(below); }
+    for (let i = 0; i < 120 && !below.served; i++) { input(below, { type: 'move', x: 64, y: b.ey + THREAD_UP }); step(below); }
+    claim(below.served === 1, 'holding the thumb straight below the needle eye threads it');
+    const wide = create({ only: 'thread' }), w = wide.rep;
+    input(wide, { type: 'down', x: w.tx, y: w.ty + THREAD_UP });
+    for (let i = 0; i < 160 && !wide.served; i++) { input(wide, { type: 'move', x: 57, y: w.ey + THREAD_UP }); step(wide); }
+    claim(wide.served === 1, 'a tip held 7 units beside the swaying eye still goes through');
+    const g = guide(create({ only: 'thread' }).rep);
+    claim(g.to[0] === g.eye[0] && g.to[1] - g.eye[1] - THREAD_EYE >= 16, `the thumb holds ${g.to[1] - g.eye[1] - THREAD_EYE} units below the eye's catch ring, not on it`);
+    const tile = create({ only: 'trace' }), t = tile.rep, [nx, ny] = t.samples[0];
+    input(tile, { type: 'down', x: nx, y: ny });
+    claim(t.grab, 'a press on the tile pen nozzle takes hold of the pen');
+  }
+
+  // Open items 2026-11-24: on two-repair jobs the first circle round the screw was sometimes ignored. Reproduced: when the
+  // first repair ends with the finger still down (rubbing, sewing, sliding, holding), the sim blocked that finger until it
+  // lifted, so a circle that went straight on did nothing. A fresh circle after lifting worked in every case tried.
+  {
+    const twoStep = kind => {
+      const s = create({ seed: 1, unlocked: KINDS, only: kind, two: 1, golden: 0 });
+      let steps = plan(guide(s.rep), { ...SKILLS.average, react: 0 }), i = 0, last = null;
+      for (let n = 0; n < 1800 && s.stepN === 0; n++) {
+        if (i >= steps.length) { steps = plan(guide(s.rep), { ...SKILLS.average, react: 0 }, [50, 50]); i = 0; }
+        const st = steps[i++];
+        if (st) { input(s, st); last = st; }
+        step(s);
+      }
+      return { s, last };
+    };
+    let carried = 0, tried = 0;
+    for (const kind of ['rub', 'sew', 'balance', 'sharpen', 'glue', 'zip']) {
+      const { s, last } = twoStep(kind);
+      if (s.stepN !== 1 || !s.finger.down) continue;
+      tried++;
+      const { cx, cy } = s.rep;
+      for (let i = 1; i <= 10; i++) { input(s, { type: 'move', x: last.x + (cx + 20 - last.x) * i / 10, y: last.y + (cy - last.y) * i / 10 }); step(s); }
+      for (let i = 1; i <= 36; i++) { input(s, { type: 'move', x: cx + 20 * Math.cos(i * Math.PI / 12), y: cy + 20 * Math.sin(i * Math.PI / 12) }); step(s); }
+      if (s.rep.p >= 0.25) carried++;
+    }
+    claim(tried >= 4 && carried === tried, `a circle that goes straight on from the first repair turns the screw (${carried} of ${tried})`);
+    // ...but a finger left down from the last customer still does nothing to the next customer's job until it lifts.
+    const s = create({ seed: 2, unlocked: KINDS, only: 'sharpen', two: 0, golden: 0 });
+    const g = guide(s.rep);
+    input(s, { type: 'down', x: g.from[0], y: g.from[1] });
+    for (let i = 0; i < 600 && s.served === 0; i++) { input(s, { type: 'move', x: i % 20 < 10 ? g.from[0] : g.to[0], y: g.from[1] }); step(s); }
+    for (let i = 0; i < 60; i++) step(s);
+    for (let i = 0; i < 60; i++) { input(s, { type: 'move', x: i % 20 < 10 ? g.from[0] : g.to[0], y: g.from[1] }); step(s); }
+    claim(s.served === 1 && s.rep.best === 0, 'a finger still down from the last customer does nothing to the next job until it lifts');
+  }
+
   // Middle and late game audit: in both browsers the clock hand stopped just short of the star after the finger was lifted
   // on it, and needed a second push. A release within 20 degrees of the star now finishes the turn.
   {
@@ -235,12 +295,16 @@ for (const kind of KINDS) {
 // Golden customers: with every eligible customer golden, a competent bot at the top level loses none of them,
 // and they pay four times over. In ordinary shifts they are rare: about one shift in three or four meets one.
 {
-  let lost = 0, golden = 0, paidOk = true, worst = 0;
+  let lost = 0, golden = 0, paidOk = true, worst = 0, wageOk = true;
   for (let seed = 1; seed <= 10; seed++) {
     const { s, paid } = play({ seed, ...ALL, golden: 1, startLevel: LEVELS - 1, day: TOP + 60, hearts: 99 }, skilled(SKILLS.competent), 90);
     for (const l of s.log.filter(l => l.golden)) { golden++; if (!l.ok) lost++; else worst = Math.max(worst, l.ms); }
     for (const e of paid) if (e.golden && e.coins < 4 * e.kinds.length * 2) paidOk = false;
+    // the page shows the goal's share of each pay apart from the wallet's: the event must say what that share is
+    for (const e of paid) if (e.wage !== e.kinds.reduce((a, k) => a + COIN[k], 0) || (e.golden && !(e.wage < e.coins))) wageOk = false;
+    if (paid.reduce((a, e) => a + e.wage, 0) !== s.goalCoins) wageOk = false;
   }
+  claim(wageOk, 'each pay names its goal share (the repairs\' prices), the shares add up to the goal count, and a golden pay is more than its share');
   claim(golden >= 20 && lost === 0, `golden jobs at the top level: competent bot fixes all ${golden} (worst ${(worst / 1000).toFixed(2)} s)`);
   claim(paidOk, 'a golden job pays four times over (at least 8 coins a repair)');
   let met = 0;

@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os';
 import { gunzipSync } from 'node:zlib';
 import assert from 'node:assert/strict';
 import { plan, SKILLS } from './moves.js';
-import { KINDS } from './sim.js';
+import { KINDS, THREAD_EYE } from './sim.js';
 import { COUNT, levelReward } from './levels.js';
 
 const here = dirname(fileURLToPath(import.meta.url)), root = resolve(here, '..');
@@ -450,8 +450,22 @@ async function run(page, phone) {
     st = await state();
     assert.ok(st.kind === kind && st.mode === 'open' && st.card === 0, `only=${kind}`);
     if (kind === 'thread') {
-      const { to, eye } = st.guide;
-      assert.ok(Math.abs(to[0] - eye[0]) * st.box.unit >= 55, 'steering keeps the thumb at least 55 px to the side of the needle eye');
+      // The thumb holds a knob with the thread tip drawn straight above it, so the thumb stays well below the eye.
+      // (This replaced a check that the thumb stayed 55 px to the side: the side offset was what made the tip hard to aim.)
+      const { to, eye, tipUp } = st.guide;
+      assert.ok((to[1] - eye[1] - THREAD_EYE) * st.box.unit >= 50 && to[0] === eye[0] && tipUp > 0, `steering keeps the thumb at least 50 px below the needle eye's catch ring (${((to[1] - eye[1] - THREAD_EYE) * st.box.unit).toFixed(0)} px)`);
+    }
+    if (kind === 'thread' || kind === 'trace') {
+      // While the tip is steered, a magnified view shows the tip and its target, clear of both the target and the thumb.
+      const { box, guide } = st, at = ([x, y]) => [box.x + x * box.unit, box.y + y * box.unit];
+      const press = at(guide.from ?? guide.pts[0]), target = kind === 'thread' ? at(guide.eye) : at([guide.pts[0][0], guide.pts[0][1] - guide.tipUp]);
+      await page.evaluate(([x, y]) => { const el = document.getElementById('c'); const send = (t, dy) => el.dispatchEvent(new PointerEvent('pointer' + t, { pointerId: 8, pointerType: 'touch', isPrimary: true, clientX: x, clientY: y + dy, bubbles: true, cancelable: true })); send('down', 0); send('move', 4); }, press);
+      await until(page, () => window.fixitState().loupe, `the magnified view while steering the ${kind}`, 3000);
+      const { loupe } = await state();
+      const far = ([x, y], gap) => Math.hypot(x - loupe.x, y - loupe.y) >= loupe.r + gap;
+      assert.ok(loupe.kind === kind && loupe.r * 2 >= 80 && far(target, 8) && far([press[0], press[1] + 4], 30), `the ${kind} magnifier is big and clear of the target and the thumb (${JSON.stringify(loupe)})`);
+      await page.evaluate(([x, y]) => document.getElementById('c').dispatchEvent(new PointerEvent('pointerup', { pointerId: 8, pointerType: 'touch', isPrimary: true, clientX: x, clientY: y + 4, bubbles: true, cancelable: true })), press);
+      await until(page, () => window.fixitState().loupe === null, 'the magnifier to go when the thumb lifts', 2000);
     }
     if (['oil', 'zip', 'spring', 'thread', 'wind', 'balance', 'trace'].includes(kind)) { await sleep(400); await page.screenshot({ path: join(SHOTS, `${phone}-job-${kind}.png`) }); }
     await playJob(page, kind);
@@ -472,6 +486,15 @@ async function run(page, phone) {
   await page.click('#open');
   st = await state();
   assert.equal(st.steps, 2, 'a job with two repairs');
+  // A two-step job shows both steps as pictures from the start, on the bench and on the customer's slip, big enough to
+  // see on a phone; when the first is done it is ticked and the second is lit, and a beat marks the change.
+  await until(page, () => { const s = window.fixitState(); return s.chips?.length === 2 && s.chips[0].now && !s.chips[1].now && s.slip?.steps === 2; }, 'a two-step job showing its two steps as pictures on the bench and on the slip', 3000);
+  st = await state();
+  assert.ok(st.chips.every(c => c.r * 2 >= 28), `step pictures at least 28 px across (${st.chips.map(c => Math.round(c.r * 2))})`);
+  await doJob(page, 'two: first step', 'touch', true);
+  await until(page, () => { const s = window.fixitState(); return s.step === 1 && s.chips?.[0].done && s.chips[1].now && s.stepBeat !== null; }, 'the first step ticked, the second lit, and the step beat playing');
+  await page.screenshot({ path: join(SHOTS, `${phone}-two-step.png`) });
+  st = await state();
   await playJob(page, `two: ${st.customer.kinds.join('+')}`);
   await leave(page);
   // A golden customer (?golden=1 makes every customer golden): two repairs, four times the pay.
@@ -483,6 +506,15 @@ async function run(page, phone) {
   await playJob(page, `golden ${st.customer.kinds.join('+')}`);
   st = await state();
   assert.ok(st.coins - coins0 >= 16, `a golden job pays four times over (${st.coins - coins0} coins)`);
+  await leave(page);
+  // A coin-goal level splits each pay where it is seen: the repair's price goes to the goal, the whole pay to the wallet.
+  await setSave(page, { levels: { 1: 1, 2: 1, 3: 1 }, sound: false });
+  st = await startAt(page, 4);
+  assert.ok(st.goal.parts.some(p => p.kind === 'coins'), 'level 4 has a coin goal');
+  await playJob(page, 'coin goal: first job');
+  st = await state();
+  const goalPart = st.goal.parts.find(p => p.kind === 'coins');
+  assert.ok(st.pay?.toGoal && st.pay.wage === goalPart.have && st.pay.coins >= st.pay.wage, `the pay names the goal share apart from the wallet's (${JSON.stringify(st.pay)}, goal ${goalPart.have})`);
   await leave(page);
 
   // An old save from before the map: coins and shop kept, the levels that teach its jobs done, once.
@@ -623,8 +655,32 @@ async function small(browser) {
     await page.screenshot({ path: join(SHOTS, `small-job-${kind}.png`) });
     await leave(page);
   }
+  // At 360 px the magnifier opens over the bench corner where the stall cat sits: the cat must not cover it.
+  for (const kind of ['thread', 'trace']) {
+    await page.goto(`${base}/fixit/?seed=3&only=${kind}`);
+    await setSave(page, { owned: ['cat'], shifts: 1, sound: false }); await page.reload();
+    await page.click('#play'); await sleep(500);
+    st = await state(page);
+    const at = ([x, y]) => [st.box.x + x * st.box.unit, st.box.y + y * st.box.unit], press = at(st.guide.from ?? st.guide.pts[0]);
+    await page.evaluate(([x, y]) => { const el = document.getElementById('c'); for (const [t, dy] of [['down', 0], ['move', 4]]) el.dispatchEvent(new PointerEvent('pointer' + t, { pointerId: 9, pointerType: 'touch', isPrimary: true, clientX: x, clientY: y + dy, bubbles: true, cancelable: true })); }, press);
+    await until(page, () => window.fixitState().loupe && window.fixitState().cat, `the ${kind} magnifier with the cat in the stall`, 3000);
+    st = await state(page);
+    const { loupe: L, cat: c } = st, gap = Math.hypot(Math.max(c.x - L.x, 0, L.x - c.x - c.w), Math.max(c.y - c.h - L.y, 0, L.y - c.y));
+    assert.ok(c.hidden || gap >= L.r, `360 px: the cat does not cover the ${kind} magnifier (${JSON.stringify({ L, c })})`);
+    await page.screenshot({ path: join(SHOTS, `small-loupe-${kind}.png`) });
+    await page.evaluate(([x, y]) => document.getElementById('c').dispatchEvent(new PointerEvent('pointerup', { pointerId: 9, pointerType: 'touch', isPrimary: true, clientX: x, clientY: y + 4, bubbles: true, cancelable: true })), press);
+    await leave(page);
+  }
   await page.goto(`${base}/fixit/?level=1`);
   await page.click('#play'); await startLevel(page);
+  // At 360 px every person in the queue stands fully on the screen and the stall cat sits clear of them.
+  await until(page, () => window.fixitState().people.filter(p => p.who === 'queue').length >= 2, 'two people in the queue', 8000);
+  await sleep(1200);
+  st = await state(page);
+  const queue = st.people.filter(p => p.who === 'queue' && p.x - 1.5 * p.R > -20);
+  assert.ok(queue.length >= 2 && queue.every(p => p.x - 1.5 * p.R >= 0 && p.x + 1.5 * p.R <= 360), `360 px: the queue is fully on screen (${JSON.stringify(queue)})`);
+  assert.ok(st.cat && queue.every(p => st.cat.y - st.cat.h > p.base || st.cat.x > p.x + 1.5 * p.R || st.cat.x + st.cat.w < p.x - 1.5 * p.R), `360 px: the cat sits clear of the queue (${JSON.stringify(st.cat)})`);
+  await page.screenshot({ path: join(SHOTS, 'small-queue.png') });
   await playOut(page, 'small level 1');
   await page.screenshot({ path: join(SHOTS, 'small-4-cleared.png') });
   await page.goto(`${base}/fixit/?level=19`);
@@ -634,6 +690,11 @@ async function small(browser) {
   await until(page, () => window.fixitState().screen === 'end', 'level 19 to fail', 20000);
   await sleep(300);
   await page.screenshot({ path: join(SHOTS, 'small-5-failed.png') });
+  // A level lost to a walk-off ends with the sim still in the walk-off and its time a hair below zero. The object must
+  // stay on the bench, faded, not slide off the screen (an out-of-range alpha is ignored by Chromium's canvas).
+  st = await state(page);
+  const bo = st.benchObject;
+  assert.ok(bo && bo.alpha >= 0 && bo.alpha <= 1 && bo.dy <= 0.1 * 100 * st.box.unit, `the walked-off object stays on the bench (${JSON.stringify(bo)})`);
   assert.deepEqual(errors, [], 'page errors on the small screen');
   await context.close();
 }

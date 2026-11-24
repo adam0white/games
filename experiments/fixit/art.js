@@ -1,7 +1,7 @@
 // Fix-It Stall: every picture, drawn in code. Objects are drawn in object-local units (the bench box is 100 x 100);
 // people, the stall and the cat in CSS pixels. Nothing here changes game state.
 import { ghost } from './moves.js';
-import { SEAM_POINTS, seamAt, oilReady, zipStuck, THREAD_SIDE, THREAD_UP } from './sim.js';
+import { SEAM_POINTS, seamAt, oilReady, zipStuck, THREAD_UP, THREAD_EYE } from './sim.js';
 import { crankPoint, SCALE_BAND, SCALE_HOLD, TRACE_OFFSET, WIND_STOPS } from './repairs.js';
 
 export const C = {
@@ -404,8 +404,9 @@ const OBJ = {
     }
     if (r.kind === 'spring' && !r.done && !r.grab) { circle(g, x - 8, y, 7 + Math.sin(t * 6) * 0.8, 'rgba(255,255,255,0)', 1.6); } // grab here
   },
-  // A needle on a pincushion. The stiff thread tip sits above and to the right of the thumb.
+  // A needle on a pincushion. The thread is held by its blue knob; its stiff end stands straight up above the thumb.
   thread(g, r, t, w) {
+    const live = r.kind === 'thread' && !r.done;
     const ex = r.kind === 'thread' ? r.ex : 64, ey = r.kind === 'thread' ? r.ey : 28, tx = r.kind === 'thread' ? r.tx : ex, ty = r.kind === 'thread' ? r.ty : ey;
     const inEye = r.kind === 'thread' ? r.inEye : 1;
     // pincushion
@@ -413,23 +414,25 @@ const OBJ = {
     // the needle
     g.beginPath(); g.moveTo(ex - 2.5, ey - 12); g.quadraticCurveTo(ex, ey - 16, ex + 2.5, ey - 12); g.lineTo(ex + 1.6, 84); g.lineTo(ex, 88); g.lineTo(ex - 1.6, 84); g.closePath(); shape(g, C.steelLt, 1.6);
     g.fillStyle = '#4a3a30'; g.beginPath(); g.ellipse(ex, ey, 1.4, 5, 0, 0, TAU); g.fill(); // the eye
-    // the target ring round the eye, filling as the thread goes through
-    g.strokeStyle = 'rgba(255,255,255,.6)'; g.lineWidth = 1.6; g.beginPath(); g.arc(ex, ey, 8, 0, TAU); g.stroke();
-    if (inEye > 0) { g.strokeStyle = '#7fe0a0'; g.lineWidth = 3; g.beginPath(); g.arc(ex, ey, 8, -Math.PI / 2, -Math.PI / 2 + TAU * inEye); g.stroke(); }
-    // the spool, bottom left, and the thread from it to the tip
+    // the target ring round the eye (as wide as the zone that catches the tip), filling as the thread goes through
+    const near = live && Math.hypot(tx - ex, ty - ey) <= THREAD_EYE;
+    g.strokeStyle = near ? 'rgba(127,224,160,.9)' : 'rgba(255,255,255,.6)'; g.lineWidth = 1.6; g.beginPath(); g.arc(ex, ey, THREAD_EYE, 0, TAU); g.stroke();
+    if (inEye > 0) { g.strokeStyle = '#7fe0a0'; g.lineWidth = 3; g.beginPath(); g.arc(ex, ey, THREAD_EYE, -Math.PI / 2, -Math.PI / 2 + TAU * inEye); g.stroke(); }
+    // the spool, bottom left, and the thread from it to the knob, then stiff up to the tip
     rrect(g, 15, 78, 16, 17, 3, C.woodLt, 1.6);
     rrect(g, 16, 81, 14, 11, 2, '#4f7fd0', 1.2);
     for (const y of [84, 87, 90]) strokePath(g, [[17, y], [29, y - 1]], '#9cc5f9', 0.8);
+    const [kx, ky] = live && r.grab ? [r.fx, r.fy] : [tx, ty + THREAD_UP];
     g.strokeStyle = '#6a9be4'; g.lineWidth = 2.2; g.lineCap = 'round'; g.beginPath(); g.moveTo(16, 85);
-    if (r.kind === 'thread' && !r.done) {
-      const fx = tx - THREAD_SIDE, fy = ty + THREAD_UP;
-      g.bezierCurveTo(7, 88, Math.max(7, fx - 8), fy + 7, fx, fy); g.lineTo(tx, ty);
-    }
+    if (live) g.bezierCurveTo(7, 92, Math.max(7, kx - 10), ky + 12, kx, ky);
     else { g.quadraticCurveTo(40, 70, ex - 4, ey + 4); g.lineTo(ex + 8, ey - 2); g.quadraticCurveTo(ex + 18, ey + 10, ex + 14, ey + 30); }
     g.stroke();
-    if (r.kind === 'thread' && !r.done) {
-      circle(g, tx, ty, 2.6, '#bbdcff', 1.2);
-      if (!r.grab) circle(g, tx - THREAD_SIDE, ty + THREAD_UP, 6.5, '#4f7fd0', 1.8);
+    if (live) {
+      // the stiff end: a straight stalk from the knob up to the tip (it bends a little while the tip catches up)
+      g.strokeStyle = C.ink; g.lineWidth = 3.6; g.beginPath(); g.moveTo(kx, ky); g.quadraticCurveTo(kx, (ky + ty) / 2, tx, ty); g.stroke();
+      g.strokeStyle = '#9cc5f9'; g.lineWidth = 2.2; g.stroke();
+      circle(g, tx, ty, 2.8, near ? '#7fe0a0' : '#e8f4ff', 1.2);
+      if (!r.grab) circle(g, kx, ky, 6.5, '#4f7fd0', 1.8);
     }
     if (w) star(g, ex, ey, 10 * (1 - w), '#fff', 1 - w);
   },
@@ -565,6 +568,16 @@ export function drawJob(g, reps, stepN, t, works) {
   }
 }
 
+// A small picture of one step of a job, drawn in a 100 x 100 box: the object for the first repair, the part itself for
+// the second (a screw head or a dent), so a two-step job reads as "this, then that".
+export function stepIcon(g, rep, i, t = 0) {
+  if (i === 0) return OBJ[rep.kind](g, { ...rep, grab: false }, t, 0);
+  if (rep.kind === 'screw') { circle(g, 50, 50, 44, '#c98a5a'); return screwHead(g, 50, 62, 0, 30, 2.4); }
+  circle(g, 50, 50, 44, C.brassLt); shine(g, 34, 34, 10, 0.5); // a dent in bright metal
+  g.save(); g.translate(50, 50); g.scale(2.6, 2.6); g.translate(-50, -50);
+  dents(g, { dents: [{ x: 50, y: 50, out: false }] }, t); g.restore();
+}
+
 // Silly things the regular's object wears, more of them each visit.
 const SILLY = ['eyes', 'tache', 'hat', 'bow', 'shades', 'flower'];
 export function sillyList(visits) { const n = Math.min(3, 1 + Math.floor(visits / 2)); return Array.from({ length: n }, (_, i) => SILLY[(visits + i * 2) % SILLY.length]); }
@@ -618,9 +631,9 @@ export function drawGhost(g, gd, t, alpha, still = false) {
   if (tap && gd.all) for (const a of gd.all) { g.strokeStyle = `rgba(255,255,255,${0.5 + 0.4 * Math.sin(t * 8)})`; g.lineWidth = 2.5; g.beginPath(); g.arc(a[0], a[1], 13 + 2 * Math.sin(t * 8), 0, TAU); g.stroke(); }
   // the fingertip itself
   const [x, y] = p;
-  if (gd.trace && press) {
-    strokePath(g, [[x, y - TRACE_OFFSET], [x, y - 5]], 'rgba(255,243,168,.8)', 1.7);
-    star(g, x, y - TRACE_OFFSET, 4, '#fff3a8');
+  if (gd.tipUp && press) { // the tip stands above the fingertip: show the stalk and the tip, not just the finger
+    strokePath(g, [[x, y - gd.tipUp], [x, y - 5]], 'rgba(255,243,168,.8)', 1.7);
+    star(g, x, y - gd.tipUp, 4, '#fff3a8');
   }
   if (press) { g.fillStyle = 'rgba(255,255,255,.35)'; g.beginPath(); g.arc(x, y, 12 + (tap ? 6 * ((t * 4) % 1) : 0), 0, TAU); g.fill(); }
   ghostFinger(g, x, press || still ? y : y - 6, press ? 1 : 0.74);
@@ -734,7 +747,7 @@ export function starShape(g, x, y, r, fill) {
 }
 // The goal icons: fix (a wrench), list (a ticket), coins, time (a clock face) and safe (a heart).
 export function goalIcon(g, kind, x, y, r, t = 0) {
-  if (kind === 'coins') return coin(g, x, y, r);
+  if (kind === 'coins') return wage(g, x, y, r);
   if (kind === 'safe') return heart(g, x, y - r, r * 1.8, true);
   if (kind === 'time') { circle(g, x, y, r, C.cream, Math.max(1.4, r * 0.16)); g.strokeStyle = C.ink; g.lineWidth = Math.max(1.4, r * 0.15); g.lineCap = 'round'; g.beginPath(); g.moveTo(x, y); g.lineTo(x, y - r * 0.65); g.moveTo(x, y); g.lineTo(x + r * 0.5, y + r * 0.15); g.stroke(); return; }
   if (kind === 'list') { rrect(g, x - r * 0.75, y - r, r * 1.5, r * 2, r * 0.2, C.cream, Math.max(1.4, r * 0.15)); g.strokeStyle = C.ink; g.lineWidth = Math.max(1, r * 0.12); for (let i = 0; i < 3; i++) { g.beginPath(); g.moveTo(x - r * 0.4, y - r * 0.45 + i * r * 0.45); g.lineTo(x + r * 0.45, y - r * 0.45 + i * r * 0.45); g.stroke(); } return; }
@@ -742,6 +755,16 @@ export function goalIcon(g, kind, x, y, r, t = 0) {
   g.save(); g.translate(x, y); g.rotate(-Math.PI / 4);
   g.beginPath(); g.roundRect(-r * 0.22, -r * 0.3, r * 0.44, r * 1.25, r * 0.2); shape(g, C.steelLt, Math.max(1.2, r * 0.14));
   g.beginPath(); g.arc(0, -r * 0.55, r * 0.5, rad(-60), rad(240)); g.lineTo(-r * 0.12, -r * 0.75); g.lineTo(r * 0.12, -r * 0.75); g.closePath(); shape(g, C.steelLt, Math.max(1.2, r * 0.14));
+  g.restore();
+}
+// A repair's price, the coins that count toward a level's coin goal: a green token with a wrench on it, so it is never
+// mistaken for the gold coins of tips and bonuses, which go to the wallet only.
+export function wage(g, x, y, r) {
+  circle(g, x, y, r, '#3f9e6a', Math.max(1.2, r * 0.18));
+  circle(g, x, y, r * 0.66, '#9ff0b0', 0);
+  g.save(); g.translate(x, y); g.rotate(-Math.PI / 4); g.fillStyle = '#23664a';
+  g.fillRect(-r * 0.11, -r * 0.1, r * 0.22, r * 0.6);
+  g.beginPath(); g.arc(0, -r * 0.3, r * 0.26, rad(-50), rad(230)); g.lineTo(-r * 0.06, -r * 0.42); g.lineTo(r * 0.06, -r * 0.42); g.closePath(); g.fill();
   g.restore();
 }
 export function coin(g, x, y, r) {

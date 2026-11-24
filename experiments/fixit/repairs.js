@@ -2,6 +2,10 @@
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(v, hi));
 const distance = (x, y, a, b) => Math.hypot(x - a, y - b);
 const radians = a => a * Math.PI / 180;
+const segmentDistance = (x, y, ax, ay, bx, by) => {
+  const dx = bx - ax, dy = by - ay, k = clamp(((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy || 1), 0, 1);
+  return distance(x, y, ax + k * dx, ay + k * dy);
+};
 
 export const REPAIR_META = {
   wind: { object: 'winding drum', coin: 3, hit: 23 },
@@ -19,8 +23,8 @@ const bearing = (r, x, y) => Math.atan2(y - r.cy, x - r.cx) * 180 / Math.PI;
 
 export const SCALE_HOLD = 0.45;
 export const SCALE_BAND = 6;
-export const TRACE_OFFSET = 23;
-const TRACE_RADIUS = 5;
+export const TRACE_OFFSET = 26; // the nozzle stands this far above the touch
+export const TRACE_RADIUS = 6.5; // how close the nozzle must pass each point of the crack
 const CRACKS = [
   [[13, 37], [25, 48], [39, 30], [53, 49], [66, 36], [78, 50], [86, 37]],
   [[13, 46], [25, 33], [37, 50], [50, 38], [62, 52], [74, 32], [86, 43]],
@@ -105,7 +109,8 @@ export const REPAIRS = {
     guide: r => ({ type: 'balance', from: [r.handle, r.y], targets: r.loads.slice(r.stage), hold: SCALE_HOLD, rate: 140 }),
   },
 
-  // Lay a bead along the crack. Each next sample must be crossed in sequence, with the tip above the thumb.
+  // Lay a bead along the crack. Each next sample must be crossed in sequence, with the nozzle straight above the thumb.
+  // A press on the pen's body, its shaft or the nozzle takes hold; the nozzle then stands above the touch.
   trace: {
     make: s => {
       const k = (s.r >>> 4) % CRACKS.length;
@@ -114,7 +119,7 @@ export const REPAIRS = {
     },
     down(r, x, y) {
       const [a, b] = r.samples[r.next - 1];
-      if (distance(x, y, a, b + TRACE_OFFSET) > REPAIR_META.trace.hit) return false;
+      if (segmentDistance(x, y, a, b + TRACE_OFFSET, a, b) > REPAIR_META.trace.hit) return false;
       r.grab = true;
       r.tx = x;
       r.ty = y - TRACE_OFFSET;
@@ -143,6 +148,6 @@ export const REPAIRS = {
       [r.tx, r.ty] = r.samples[r.next - 1];
     },
     tick() {},
-    guide: r => ({ type: 'path', pts: r.samples.slice(r.next - 1).map(([x, y]) => [x, y + TRACE_OFFSET]), trace: true }),
+    guide: r => ({ type: 'path', pts: r.samples.slice(r.next - 1).map(([x, y]) => [x, y + TRACE_OFFSET]), trace: true, tipUp: TRACE_OFFSET }),
   },
 };
