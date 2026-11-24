@@ -466,7 +466,7 @@ Not checked: sound and feel on a real phone. Magnet and Flare show only their ri
 
 ### Left as a proposal (2026-11-23, note #112)
 - **A drawing error stops the game for good.** Any error thrown in `draw` ends the frame loop, since `requestAnimationFrame` is called after it. Calling it first, or catching the error, would keep a rare bad frame from freezing the screen.
-- **A setting for showing on tap.** The note's "a button to enable and disable the feature" is read as the on/off button for each thing. If the tester meant a setting that turns the whole-screen showing itself off, that is a new saved setting. A question was sent.
+- **A setting for showing on tap.** The note's "a button to enable and disable the feature" is read as the on/off button for each thing. If the tester meant a setting that turns the whole-screen showing itself off, that is a new saved setting. A question was sent. **Closed 2026-11-23:** the tester answered "It is good as it is" (note #134); no setting is built.
 
 ## 2026-11-23: fair endless river, hearts and force field as abilities, a random first ability, showings that show (tester t1, notes #119 to #123)
 
@@ -496,3 +496,7 @@ Not checked: a real phone; whether the friends' leaderboard is fair in other way
 ### Left as a proposal (2026-11-23, notes #119 to #123)
 - **Abilities on the endless river.** The tester asked only about stats. Abilities still work there. If the competition should be plainer still, the endless river could run with no abilities, or with the same fixed two for everyone.
 - **A showing for the bigger boat.** The size showing always shrinks the boat; the one-in-five bigger boat is only told in words.
+
+## 2026-11-23: the shop's showings are good as they are (tester t1, note #134)
+
+The lab asked (#118) what should come next for looking at effects in the shop: a test night with the effect, a switch to turn the full-screen look off, all switched-on effects one after another, or nothing. The tester tapped "It is good as it is". No change. This closes the proposal "A setting for showing on tap" under note #112.
