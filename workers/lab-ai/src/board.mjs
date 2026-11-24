@@ -6,10 +6,10 @@
 import { originAllowed, utcDay } from './core.mjs';
 
 // maxScore: Lantern's endless score is ten points a second, so one million is more than a day of play.
-export const BOARD = { games: ['lantern'], top: 20, keep: 500, name: 16, maxScore: 1_000_000, body: 256, dailyNew: 2000, cacheSeconds: 20, cacheVersion: 1,
-  // Run tickets. perSecond: the endless score grows by 10 a second, 18 during a boost. slack covers clock and network delay.
-  // requireTicket false: a score without a ticket is still accepted, for pages loaded before tickets existed.
-  perSecond: 18, slack: 50, runHours: 6, runs: 20000, requireTicket: false };
+export const BOARD = { games: ['lantern'], top: 20, keep: 500, name: 16, maxScore: 1_000_000, body: 256, dailyNew: 2000, cacheSeconds: 20, cacheVersion: 1 };
+// Run tickets. perSecond: Lantern's endless score grows by 10 a second, 18 during a boost. slack covers clock and network delay.
+// need: the games whose scores are refused without a ticket. A game joins it once its page with tickets is live everywhere.
+export const RUN = { perSecond: 18, slack: 50, hours: 6, keep: 20000, need: [] };
 
 // Stricter than the game's own name field: letters, digits, space and _ . - only, at most 16 characters. Markup characters never reach another player's screen as typed.
 export const tidyName = v => (typeof v === 'string' ? v.normalize('NFKC').replace(/[^\p{L}\p{N} _.-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, BOARD.name).trim() : '');
@@ -49,8 +49,8 @@ function tables(sql) {
 /** A run ticket: the run's random id and the time it started. Old tickets go; a full table refuses new ones. */
 export function boardStart(sql, r, now) {
   tables(sql);
-  sql.exec('DELETE FROM runs WHERE t < ?', now - BOARD.runHours * 3600_000);
-  if (sql.exec('SELECT COUNT(*) AS c FROM runs').toArray()[0].c >= BOARD.runs) return { ok: false };
+  sql.exec('DELETE FROM runs WHERE t < ?', now - RUN.hours * 3600_000);
+  if (sql.exec('SELECT COUNT(*) AS c FROM runs').toArray()[0].c >= RUN.keep) return { ok: false };
   sql.exec('INSERT OR IGNORE INTO runs (r, t) VALUES (?, ?)', r, now);
   return { ok: true };
 }
@@ -61,11 +61,11 @@ export function boardTop(sql, limit = BOARD.top) {
 }
 /** Keep the player's best score and newest name. A new player counts against the day's cap. Returns { ok, place, rows };
  * a refusal carries why: 'run' (no ticket, or more score than the run's time allows) or 'cap'. A ticket works once. */
-export function boardPut(sql, { id, n, s, r }, now, cap = BOARD.dailyNew, need = BOARD.requireTicket) {
+export function boardPut(sql, { id, n, s, r }, now, cap = BOARD.dailyNew, need = false) {
   tables(sql);
   if (r) {
     const run = sql.exec('SELECT t FROM runs WHERE r = ?', r).toArray()[0];
-    if (!run || now < run.t || s > (now - run.t) / 1000 * BOARD.perSecond + BOARD.slack) return { ok: false, why: 'run', place: 0, rows: [] };
+    if (!run || now < run.t || s > (now - run.t) / 1000 * RUN.perSecond + RUN.slack) return { ok: false, why: 'run', place: 0, rows: [] };
   } else if (need) return { ok: false, why: 'run', place: 0, rows: [] };
   const old = sql.exec('SELECT s FROM scores WHERE id = ?', id).toArray()[0];
   if (!old) {
@@ -136,7 +136,7 @@ export async function handleBoard(request, env, ctx = { waitUntil() {} }, deps =
     try { return (await board().start(q.r, now)).ok ? json(200, { ok: true }, origin) : json(503, { error: 'runs' }, origin); } catch { return json(503, { error: 'board' }, origin); }
   }
   let out;
-  try { out = q.remove ? await board().remove(q.id) : await board().put(q, now); } catch { return json(503, { error: 'board' }, origin); }
+  try { out = q.remove ? await board().remove(q.id) : await board().put(q, now, RUN.need.includes(game)); } catch { return json(503, { error: 'board' }, origin); }
   if (!out.ok) return out.why === 'run' ? json(422, { error: 'run' }, origin) : json(503, { error: 'daily cap' }, origin);
   if (cache) ctx.waitUntil(cache.delete(cacheKey(game)));
   return json(200, { place: out.place, rows: out.rows }, origin);

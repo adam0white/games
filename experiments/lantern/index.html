@@ -110,7 +110,7 @@
   <p><button class="back">Back</button></p>
 </div></div>
 <div id="card" class="screen"><div><h1 id="title"></h1><p id="line"></p><p id="sub"></p>
-  <div id="ask" hidden><p>Show your endless scores to everyone on the leaderboard? After a yes, every run goes up by itself.</p><p><input id="askName" maxlength="16" autocomplete="nickname" enterkeyhint="done" placeholder="Type a name"></p><p class="hint" id="askNote">Only your name and your best score are sent.</p><p><button id="askYes">Yes, show them</button><button id="askNo">No</button></p></div>
+  <div id="ask" hidden><p>Show your endless scores to everyone on the leaderboard? After a yes, every run from the next one goes up by itself.</p><p><input id="askName" maxlength="16" autocomplete="nickname" enterkeyhint="done" placeholder="Type a name"></p><p class="hint" id="askNote">Only your name and your best score are sent.</p><p><button id="askYes">Yes, show them</button><button id="askNo">No</button></p></div>
   <p><button id="go" class="main">Play again</button></p><p><button id="toMenu">Menu</button></p></div></div>
 <script type="module">
 import { create, step, centre, half, sight, fall, fog, wind, rain, dazzle, level, score, boat, progress, DT, GOAL, BOAT, NIGHTS, STATS, POWERS, LAST, FLOORS, LEVELS, SECTORS, towerStage, climbPace, FIELD, REBORN_PACE, GIFTS, ABILITIES, startAt } from './sim.js?v=14'; // raise v when sim.js changes its exports, so a cached copy cannot break the page
@@ -507,6 +507,7 @@ function begin() {
   const waiting = endless && Object.values(stats).some(v => v > 0);
   s = create((Math.random() * 2 ** 31) | 0, tower ? towerStage(climb) : endless ? 1 : stage, tower ? 'tower' : endless, powersOwned(), runStats, climb, reborn); // after a rebirth the story nights run faster
   if (!tower) fromFloor = 0; else if (fromFloor) startAt(s, fromFloor); // part-way up the level (note #142)
+  if (endless && !tower) boardTicket(); else ticket = null; // the shared board's run ticket, only for a player who shares
   const boosted = fresh && Object.values(runStats).some(v => v > 0);
   target = s.x; crash = null; victory = null; playing = true; paused = false; acc = 0; streak = 0; sparks = []; lastLevel = 1; size = 1; fire0 = flame(); nearFall = false; weather = ''; steer.reset();
   shown = ''; show('play'); hud();
@@ -538,7 +539,7 @@ function finish() {
   } else if (endless) {
     const pts = score(s), best = Math.max(pts, store.get('lantern-best-endless')); store.set('lantern-best-endless', best);
     const place = onBoard(pts);
-    boardSend(pts);
+    boardSend(pts, ticket); ticket = null;
     if (!decided && pts > 0) { $('ask').hidden = false; $('askName').value = playerName(); $('askNote').textContent = 'Only your name and your best score are sent.'; }
     $('title').textContent = `${pts}`; $('line').textContent = `${why} Best ${best}.${place ? ` Number ${place} on this phone's leaderboard.` : ''}`; $('go').textContent = 'Play again';
   } else {
@@ -566,7 +567,7 @@ function onBoard(pts) {
 // absent before the player has chosen; lantern-board-id holds the id. Any bad answer (no server, an error, a slow network, not JSON) gives null, and the screen
 // stays the phone's own board, with no tabs and no tick. The server allows fewer characters in a name than this phone does.
 const BOARD_URL = '/lab-api/board/lantern', BOARD_WAIT = 4000;
-let decided = read('lantern-share') !== null, sharing = read('lantern-share', '') === '1', boardId = read('lantern-board-id', ''), shared = null, tab = 'all', mine = 0, asked = 0;
+let decided = read('lantern-share') !== null, sharing = read('lantern-share', '') === '1', boardId = read('lantern-board-id', ''), shared = null, tab = 'all', mine = 0, asked = 0, ticket = null;
 async function boardCall(body) {
   const stop = new AbortController(), timer = setTimeout(() => stop.abort(), BOARD_WAIT);
   try {
@@ -577,11 +578,20 @@ async function boardCall(body) {
     return { place: Number.isInteger(out.place) ? out.place : 0, rows: out.rows.filter(r => r && Number.isFinite(r.s) && r.s > 0).map(r => ({ n: cleanName(r.n), s: Math.floor(r.s) })).slice(0, 20) };
   } catch { return null; } finally { clearTimeout(timer); }
 }
+// A run ticket: when a sharing player starts an endless run, the page tells the server a random id for the run. The score
+// goes up with that id, and the server takes it only if the run's time allows that many points. The id is new each run and
+// is not the player's id. No ticket is asked for before the player has said yes, so nothing is sent before that.
+function boardTicket() {
+  ticket = null; if (!sharing || !boardId) return;
+  const r = crypto.randomUUID(), stop = new AbortController(), timer = setTimeout(() => stop.abort(), BOARD_WAIT);
+  ticket = { r, ok: fetch(BOARD_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ start: true, r }), signal: stop.signal }).then(res => res.ok, () => false).finally(() => clearTimeout(timer)) };
+}
 // Send a score when the player shares and has a name. The server keeps each player's best.
-async function boardSend(pts) {
+async function boardSend(pts, run) {
   if (!sharing || !boardId || !playerName() || !(pts > 0)) return;
-  const sent = boardId;
-  const out = await boardCall({ id: boardId, n: playerName(), s: Math.min(Math.floor(pts), 1000000) });
+  const sent = boardId, r = run && await run.ok ? run.r : null;
+  if (!sharing || boardId !== sent) return;
+  const out = await boardCall({ id: boardId, n: playerName(), s: Math.min(Math.floor(pts), 1000000), ...(r ? { r } : {}) });
   if (!out || !sharing || !boardId) { if (out && !sharing) boardCall({ id: sent, remove: true }); return; } // a no given while this was on its way takes the row away again
   shared = out.rows; mine = out.place; if (screen === 'board') boardShow();
   if (mine && !playing && endless && s.over && (screen === 'play' || screen === 'card')) $('sub').textContent += ` Number ${mine} of all players.`;
@@ -590,8 +600,9 @@ async function boardSend(pts) {
 async function share(yes) {
   decided = true;
   if (!yes) { const id = boardId; sharing = false; boardId = ''; mine = 0; store.set('lantern-share', ''); store.set('lantern-board-id', ''); boardShow(); if (id) { const out = await boardCall({ id, remove: true }); if (out) shared = out.rows; } boardShow(); return; }
-  boardId = crypto.randomUUID(); sharing = true; store.set('lantern-share', '1'); store.set('lantern-board-id', boardId); boardShow();
-  await boardSend(Math.max(board[0]?.s ?? 0, 0));
+  // The yes sends nothing by itself: a score goes up only with a ticket from the start of its run, so the first one is the next run.
+  boardId = crypto.randomUUID(); sharing = true; mine = 0; store.set('lantern-share', '1'); store.set('lantern-board-id', boardId); boardShow();
+  if (!playing && endless && s.over && (screen === 'play' || screen === 'card')) $('sub').textContent += ' Your next run goes up.';
 }
 function boardShow() {
   if (document.activeElement !== $('name')) $('name').value = playerName();
@@ -600,7 +611,7 @@ function boardShow() {
   $('tabs').hidden = $('shareRow').hidden = !shared; $('tabPhone').className = all ? '' : 'on'; $('tabAll').className = all ? 'on' : '';
   $('boardHint').textContent = (all ? 'Endless river, best runs of the players who share.' : shared ? 'Endless river, best runs on this phone.' : 'Endless river, best runs on this phone. Your name and scores stay on this phone.') + ' No stats on the endless river: everyone plays it the same way.';
   $('share').checked = sharing;
-  $('shareNote').textContent = sharing ? (playerName() ? `Every endless run goes up by itself, as ${playerName()}. Untick to take your row away.` : 'Type a name above and your runs go up by themselves.') : 'A tick sends your name and your best score to this game\'s server, after every endless run. Nothing else is sent.';
+  $('shareNote').textContent = sharing ? (playerName() ? `Every endless run from now on goes up by itself, as ${playerName()}. Untick to take your row away.` : 'Type a name above and your runs go up by themselves.') : 'A tick sends your name and your best score to this game\'s server, after every endless run. Nothing else is sent.';
   if (!list.length) { const li = document.createElement('li'); li.textContent = all ? 'Nobody has shared a run yet.' : 'No runs yet. Play the endless river to get on the board.'; ol.append(li); return; }
   list.forEach((r, i) => {
     const li = document.createElement('li'); if (all ? i + 1 === mine : r === lastRun) li.className = 'me';

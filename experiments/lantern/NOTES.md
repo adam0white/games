@@ -549,3 +549,14 @@ Note #155, in short: an endless game should share its score with everyone by its
 Checks: the phone check passes on WebKit iPhone 13 and Chromium Pixel 7 with new lines for the question, no name, a yes, a no, and an unticked row. With the choice removed from the send, it fails. Phone-sized screenshots of the card and the board. Not checked: a real phone's keyboard over the card.
 
 `workers/lab-ai/README.md` still says "Share my best run" and "Stop sharing". A note's work may not edit it; the next working session should.
+
+## 2026-11-24: run tickets on the shared leaderboard
+
+The shared board took any score the page reported. Now a sharing player's endless run asks the server for a ticket at
+its start, and the score goes up with it; the server refuses more points than the run's time allows (see
+`workers/lab-ai/README.md`, "Run tickets"). Two things changed for the player. The yes (card or tick) sends nothing by
+itself, because an old best has no ticket; the card says "Your next run goes up." And no ticket is asked for before the
+yes, so the rule "nothing is sent before the player chooses to share" holds. Limit, stated plainly: this caps the rate
+of a false score; it does not prove a run was played. Rejected: replaying the run on the server from its inputs
+(floating-point differences between engines, and Worker CPU limits).
+

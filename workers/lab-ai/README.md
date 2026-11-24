@@ -160,3 +160,23 @@ npx wrangler delete -c workers/lab-ai/wrangler.jsonc
 ```
 
 Either way the game keeps working.
+
+### Run tickets (2026-11-24)
+
+The page reports its own score, so an edited page could post any number. A run ticket limits that. When a player who
+shares starts an endless run, the page posts `{ start: true, r }`, where `r` is a random id for that run (not the
+player's id). The server stores `r` and the time in a `runs` table. The score post carries `r`, and the server takes the
+score only if it is at most `seconds since the start * 18 + 50` (the endless score grows by 10 a second, 18 during a
+boost). A ticket works once, is dropped after 6 hours, and the table holds at most 20,000. A refused score gets 422
+`{ error: 'run' }` and changes nothing. Starts are limited per address under their own key (`boardrun:<address>`).
+
+What this does and does not do: it caps how fast a false score can grow. A person who waits an hour can still post an
+hour's worth of points without playing. It does not prove a run.
+
+Stored for a ticket: the run id and a time. Nothing about the player. No ticket is asked for before the player has
+chosen to share.
+
+`RUN.need` lists the games whose scores are refused without a ticket. It starts empty, so pages loaded before tickets
+existed can still post. Add `'lantern'` and deploy once the page with tickets is live. Other games on the board are not
+affected: the 18 points a second is Lantern's rule and applies only to a post that carries a ticket.
+

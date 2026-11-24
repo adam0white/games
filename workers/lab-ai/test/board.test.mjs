@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
-import { handleBoard, validateScore, tidyName, rudeName, shownName, boardTop, boardPut, boardRemove, boardStart, BOARD } from '../src/board.mjs';
+import { handleBoard, validateScore, tidyName, rudeName, shownName, boardTop, boardPut, boardRemove, boardStart, BOARD, RUN } from '../src/board.mjs';
 
 const ID = n => `player-${String(n).padStart(4, '0')}-0123456789abcdef`;
 // A stand-in for ctx.storage.sql (exec returning a cursor with toArray) over a real SQLite database.
@@ -15,7 +15,7 @@ function fakeEnv({ perIp = 100, broken = false } = {}) {
   return {
     objects, keys,
     PER_IP: { limit: async ({ key }) => { keys.push(key); counts[key] = (counts[key] || 0) + 1; return { success: counts[key] <= perIp }; } },
-    BOARD: { idFromName: n => n, get: id => { if (broken) throw new Error('down'); if (!objects.has(id)) { const sql = fakeSql(); objects.set(id, { sql, top: async l => boardTop(sql, l), put: async (q, now) => boardPut(sql, q, now), remove: async i => boardRemove(sql, i), start: async (r, now) => boardStart(sql, r, now) }); } return objects.get(id); } },
+    BOARD: { idFromName: n => n, get: id => { if (broken) throw new Error('down'); if (!objects.has(id)) { const sql = fakeSql(); objects.set(id, { sql, top: async l => boardTop(sql, l), put: async (q, now, need) => boardPut(sql, q, now, undefined, need), remove: async i => boardRemove(sql, i), start: async (r, now) => boardStart(sql, r, now) }); } return objects.get(id); } },
   };
 }
 function fakeCache() {
@@ -148,16 +148,16 @@ test('run tickets, storage: a score needs the time it claims; a ticket works onc
   assert.equal(out.why, 'run', 'a used ticket is gone'); assert.deepEqual(boardTop(sql), [{ n: 'Ada', s: 230 }], 'and a refused post does not rename');
   assert.equal(boardPut(sql, { id: ID(2), n: 'Bo', s: 1, r: R(9) }, t0).why, 'run', 'an unknown ticket');
   boardStart(sql, R(2), t0); assert.equal(boardPut(sql, { id: ID(2), n: 'Bo', s: 1, r: R(2) }, t0 - 5).why, 'run', 'a clock that ran backwards');
-  // Without a ticket: accepted while requireTicket is false, refused once it is true.
-  assert.equal(BOARD.requireTicket, false);
+  // Without a ticket: accepted for a game outside RUN.need, refused for one inside it.
+  assert.deepEqual(RUN.need, []);
   assert.equal(boardPut(sql, { id: ID(3), n: 'Cy', s: 77 }, t0).ok, true);
   assert.equal(boardPut(sql, { id: ID(4), n: 'Di', s: 77 }, t0, BOARD.dailyNew, true).why, 'run');
   // The first start after six hours removes the old tickets.
-  boardStart(sql, R(3), t0 + BOARD.runHours * 3600_000 + 1);
+  boardStart(sql, R(3), t0 + RUN.hours * 3600_000 + 1);
   assert.deepEqual(sql.db.prepare('SELECT r FROM runs').all().map(x => x.r), [R(3)]);
   assert.deepEqual(Object.keys(sql.db.prepare('SELECT * FROM runs').all()[0]).sort(), ['r', 't'], 'a ticket holds the run id and a time only');
-  const keep = BOARD.runs; BOARD.runs = 2;
-  try { assert.equal(boardStart(sql, R(4), t0 + BOARD.runHours * 3600_000 + 2).ok, true); assert.equal(boardStart(sql, R(5), t0 + BOARD.runHours * 3600_000 + 3).ok, false); } finally { BOARD.runs = keep; }
+  const keep = RUN.keep; RUN.keep = 2;
+  try { assert.equal(boardStart(sql, R(4), t0 + RUN.hours * 3600_000 + 2).ok, true); assert.equal(boardStart(sql, R(5), t0 + RUN.hours * 3600_000 + 3).ok, false); } finally { RUN.keep = keep; }
 });
 
 test('run tickets, the endpoint: a start, a score in time, a score too soon; starts are limited apart and leave the cache alone', async () => {
@@ -175,4 +175,6 @@ test('run tickets, the endpoint: a start, a score in time, a score too soon; sta
   assert.equal((await handleBoard(req({ start: true, r: R(2) }), env, ctx(), deps)).status, 200);
   assert.equal((await handleBoard(req({ start: true, r: R(3) }), env, ctx(), deps)).status, 429, 'the third start in the window');
   assert.equal((await handleBoard(req({ start: true, r: R(4) }, { origin: 'https://evil.example' }), env, ctx(), deps)).status, 403);
+  const open = fakeEnv(); assert.equal((await handleBoard(req({ id: ID(5), n: 'Old', s: 9 }), open, ctx(), deps)).status, 200, 'an old page, no ticket: accepted');
+  RUN.need.push('lantern'); try { assert.equal((await handleBoard(req({ id: ID(6), n: 'Old', s: 9 }), open, ctx(), deps)).status, 422, 'refused once the game needs tickets'); } finally { RUN.need.length = 0; }
 });
