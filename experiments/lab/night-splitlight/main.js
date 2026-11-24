@@ -22,13 +22,15 @@ let nextTickSound = 0;
 const pitches = [261.63, 293.66, 329.63, 392, 440, 523.25];
 const litCount = () => state.targets.filter(target => target.lit).length;
 const show = screens(['paused', 'result'], name => {
+  const returningToPlay = name === 'play' && (screen === 'paused' || screen === 'result');
   screen = name;
   document.querySelector('.instrument').inert = name === 'paused';
   el('pause').disabled = name === 'result';
   slider.disabled = name === 'result';
   document.body.classList.toggle('finished', name === 'result');
   previous = performance.now();
-  if (name !== 'play') el(name === 'paused' ? 'resume' : 'next').focus({ preventScroll: true });
+  if (returningToPlay) slider.focus({ preventScroll: true });
+  else if (name !== 'play') el(name === 'paused' ? 'resume' : 'next').focus({ preventScroll: true });
 });
 function startPlate(level) {
   steering.reset();
@@ -118,7 +120,12 @@ canvas.addEventListener('pointerdown', event => {
 canvas.addEventListener('lostpointercapture', event => { if (event.isPrimary) steering.drop(); });
 const steering = drag(canvas, {
   playing: () => screen === 'play' && !state.won, paused: () => false, resume,
-  from: () => state.position, travel: dx => dx / (canvas.clientWidth * .7), aim, settle: 0,
+  from: () => state.position, travel: dx => dx / (canvas.clientWidth * .7),
+  aim: position => {
+    aim(position);
+    if (position < 0 || position > 1) steering.rebase();
+  },
+  settle: 0,
   mouse: event => {
     if ((event.buttons & 1) && mouseX !== null) {
       aim(state.position + (event.clientX - mouseX) / (canvas.clientWidth * .7));
@@ -126,10 +133,9 @@ const steering = drag(canvas, {
     }
   },
 });
-const help = hint(canvas, {
+const help = hint(document.querySelector('.cue'), {
   kind: 'drag', key: key + 'hint', played: high > 1, delay: 2200, reach: 37,
   when: () => screen === 'play' && state.level === 1 && !state.started,
-  bottom: () => Math.max(48, innerHeight - slider.getBoundingClientRect().top + 55),
   label: 'Slide right to turn the prism',
 });
 

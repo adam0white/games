@@ -99,3 +99,29 @@ Each pass below is a separate `phone.mjs lab/<slug> <profile>` invocation coveri
 Inspected the 40 shared captures from the last pass on each profile and compared the hint captures to earlier frames where needed. Some captures landed during the hint's fade-in. Earlier WebKit runs hit compositor stalls and a 150-second whole-section deadline. The scoped kit self-test and shared Wild Pour saved-play and hint cases passed on both profiles. All six normal bot suites exited 0 and all six mutations exited 1. Syntax checks on the three edited modules and the scoped whitespace check passed.
 
 Physical phones, audible sound, windowed Pour, and a full run of every registered shared check remain unverified in this pass. All new verification images and logs were written outside the worktree.
+
+## 2026-11-24 — Kite, Loaves, Splitlight and Tide
+
+Added 4 saved-play sections and 4 first-visit hint sections across 2 phone profiles. The seeds exercise 10 storage keys. Each saved-play case checks pause, resume, blur, pagehide and sound persistence after reload.
+
+| Page | Seeded progress | Input checked | Hint delay |
+| --- | --- | --- | ---: |
+| night-kite | Flight 2 unlocked and selected, best 157, copper ink | Tap logical point (220, 440). The spool moves past x=200. | 6500 ms |
+| night-loaves | Morning 2, Milk bread, best 240 on the pause card | A fold travels from (x−38, y+8) to (x+39, y−7) relative to the dough center. Kneading work and the play clock advance. | 3800 ms |
+| night-splitlight | Plate 2, sound on | A tap 12% from the left of the range changes prism position and starts the exposure clock. | 2200 ms |
+| lantern-tide | Night 2, sound on | A 40 CSS px drag moves the steering target right by more than the equivalent of 24 CSS px and the boat by more than 4 CSS px. | 1500 ms |
+
+Kite, Loaves and Splitlight start hint timing on the opening board. A document-start observer timestamps the hint mount and first visible frame. Tide measures from the launch tap and uses its existing `check=1` state hook. Loaves reads its simulation state from the bakery canvas dataset. The timing assertions use the existing 250 ms first-frame allowance. The hint cases wait on visibility and input state, verify dismissal and returning-player suppression, and check the reduced-motion presentation. Hint captures wait for full opacity. Kite and Splitlight use trusted touch taps on both profiles. Loaves and Tide use native touch drags in Chromium and browser mouse drags in WebKit, where the automation for touch is limited to taps.
+
+| Page | Consecutive WebKit passes | Consecutive Chromium passes |
+| --- | ---: | ---: |
+| night-kite | 3 | 3 |
+| night-loaves | 3 | 3 |
+| night-splitlight | 3 | 3 |
+| lantern-tide | 3 | 3 |
+
+Each pass invokes `phone.mjs lab/<slug> <profile>` separately with Node 26.12.0. The required streaks cover 24 invocations and 48 passing sections. Kit, Bells and Podwire passed 10/10 regression sections across the two profiles. All 4 normal bot checks exited 0 and all 4 mutation runs exited 1.
+
+Repeated the affected streaks after concurrent page updates. Inspected 112 shared screenshots, including 32 opening, play, pause and hint captures from the final pass for each page and profile. Browser logs and images are in `/private/tmp/night-r3-phone-four.VXhW4h/`.
+
+The latest standalone `check.mjs` runs passed 7/8 profile cases. Kite, Loaves and Splitlight passed on both profiles. Tide passed in WebKit, reaching dawn on nights 1 and 2 in 23.63 and 34.47 simulated seconds. Its Chromium run hit a rock at y=51.39 on night 2 and exited 1. The previous Chromium run hit the bank at y=64.78 on night 2. These crossings are outside the shared cases. All three shared modules passed syntax checks, and the scoped diff passed the whitespace check. Physical phones, audible sound and a full run of the shared catalogue remain unverified.

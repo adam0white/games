@@ -13,6 +13,7 @@ const recipes = [
 ];
 export const GOLD = 0.66;
 export const BURNT = 1.13;
+export const GUEST_ARRIVAL = 1;
 export const inOven = (x, y) => x >= 185 && x <= 306 && y >= 105 && y <= 175;
 
 function random(g) {
@@ -105,9 +106,13 @@ export function move(g, x, y) {
       }
     }
   } else {
-    let tx = clamp(h.ox + x - h.sx, 44, 316), ty = clamp(h.oy + y - h.sy, 102, 437);
-    if (g.stage === 'rise') ty = Math.max(ty, 243);
-    translate(g, tx, ty);
+    const tx = h.ox + x - h.sx, ty = h.oy + y - h.sy;
+    if (g.stage === 'rise') {
+      // Leave room for the risen rim, proof meter and the next fold guide.
+      translate(g, clamp(tx, 67, 293), clamp(ty, 243, 416));
+      return;
+    }
+    translate(g, clamp(tx, 44, 316), clamp(ty, 102, 437));
   }
 }
 
@@ -145,7 +150,7 @@ export function up(g) {
     }
   } else if (g.stage === 'serve') {
     const hit = (x, y) => Math.hypot(g.x - x, g.y - y) < 38;
-    const gift = g.remaining === 1 && g.age >= 1 && hit(136, 216);
+    const gift = g.remaining === 1 && g.age >= GUEST_ARRIVAL && hit(136, 216);
     if (gift || hit(67, 214)) {
       g.last = gift ? 'gift' : 'sale';
       const crust = Math.abs(g.brown - .82) < .13 ? 2 : 0;

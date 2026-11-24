@@ -22,7 +22,7 @@ const clamp = (n, low, high) => Math.max(low, Math.min(high, n));
 
 // Both policies issue the same relative-drag targets at 10 Hz, using the same
 // visible rocks, embers and banks. Only the reader scores water along a route.
-export function steer(game, readsWater) {
+export function steer(game, readsWater, { bankMargin = .026, rockMargin = .034, samples = 12 } = {}) {
   const s = game.river;
   const base = lantern.speed(s);
   const rate = game.flow?.rate ?? (game.tide ? 1.52 : 1);
@@ -35,7 +35,7 @@ export function steer(game, readsWater) {
     const goal = clamp(s.x + i * 0.04, 0, 1);
     let quality = -0.11 * Math.abs(goal - s.x);
     let y = s.y, x = s.x, lastEmber = null;
-    for (let sample = 1; sample <= 12; sample++) {
+    for (let sample = 1; sample <= samples; sample++) {
       const at = sample * 0.045;
       const flow = readsWater ? current(s, x, y) : null;
       y += (flow ? base * flow.rate : v) * 0.045;
@@ -43,12 +43,12 @@ export function steer(game, readsWater) {
       x += clamp(goal - x, -reach * 0.045, reach * 0.045);
       const bank = lantern.half(s, y) - Math.abs(x - lantern.centre(s, y)) - lantern.BOAT;
       const weight = 1 - at * 0.85;
-      if (bank < 0.026) quality -= weight * (0.026 - bank) * (bank < 0 ? 55 : 10);
+      if (bank < bankMargin) quality -= weight * (bankMargin - bank) * (bank < 0 ? 55 : 10);
       for (const rock of rocks) {
         const rx = rock.a ? rock.x0 + rock.a * Math.sin((s.t + at) * rock.w + rock.ph) : rock.x;
         const ry = rock.y + rock.vy * at * rate;
         const distance = Math.hypot(x - rx, y - ry) - rock.rad - lantern.BOAT;
-        if (distance < 0.034) quality -= weight * (0.034 - distance) * (distance < 0 ? 65 : 12);
+        if (distance < rockMargin) quality -= weight * (rockMargin - distance) * (distance < 0 ? 65 : 12);
       }
       for (const ember of embers) {
         if (ember !== lastEmber && Math.hypot(x - ember.x, y - ember.y) < 0.047) {
@@ -64,7 +64,7 @@ export function steer(game, readsWater) {
   return chosen;
 }
 
-function ride(seed, readsWater, night = 1, delay = 0) {
+export function ride(seed, readsWater, night = 1, delay = 0) {
   const game = create(seed, night);
   let target = game.river.x;
   const commands = [];

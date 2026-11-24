@@ -9,7 +9,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const shots = process.env.SHOTS || '/private/tmp/night-r4-new3';
+const shots = process.env.SHOTS || '/private/tmp/night-r5-review/kite';
 const saveKey = 'night-kite:save';
 const path = '/lab/night-kite/';
 const notesButton = '/notes/button.js';
@@ -52,15 +52,14 @@ const stored = page => page.evaluate(key => JSON.parse(localStorage.getItem(key)
 const screen = (page, name) => page.waitForFunction(name => window.kiteState?.().screen === name, name, { polling: 50, timeout: 8000 });
 const later = (page, target) => page.waitForFunction(target => window.kiteState().t >= target, target, { polling: 30, timeout: 5000 });
 
-async function controls(page, ids) {
+async function controls(page, ids, additional = []) {
   const viewport = page.viewportSize();
-  for (const id of ids) {
-    const button = page.locator(`#${id}`);
-    assert.ok(await button.isVisible(), `${id} is visible`);
+  for (const button of [...ids.map(id => page.locator(`#${id}`)), ...additional]) {
+    assert.ok(await button.isVisible(), `${button} is visible`);
     const { x, y, width, height } = await button.boundingBox();
-    assert.ok(width >= 44 && height >= 44, `${id} has a 44 × 44 CSS-pixel target`);
+    assert.ok(width >= 44 && height >= 44, `${button} has a 44 × 44 CSS-pixel target`);
     assert.ok(x >= 0 && y >= 0 && x + width <= viewport.width + 0.5 && y + height <= viewport.height + 0.5,
-      `${id} stays within the viewport`);
+      `${button} stays within the viewport`);
   }
 }
 
@@ -90,6 +89,15 @@ async function fieldCoordinates(page) {
   const field = await page.locator('#field').boundingBox();
   assert.ok(field?.width > 0 && field.height > 0, 'the canvas has a displayed area');
   return (x, y) => ({ x: field.x + field.width * x / 360, y: field.y + field.height * y / 520 });
+}
+
+async function fieldFits(page) {
+  const fits = await page.evaluate(() => {
+    const field = document.getElementById('field').getBoundingClientRect();
+    return field.left >= 0 && field.top >= 0 && field.right <= innerWidth && field.bottom <= innerHeight
+      && document.documentElement.scrollWidth === innerWidth && document.documentElement.scrollHeight === innerHeight;
+  });
+  assert.ok(fits, 'the landscape field fits without scrolling');
 }
 
 // WebKit exposes touch taps. Use its trusted mouse for the sustained gesture,
@@ -129,9 +137,10 @@ async function firstResult(page, start) {
 // Follow each visible objective through the spool, allowing offset for line tension.
 async function followGoals(page, input, complete, observe = async () => {}) {
   const destination = ({ goal }) => [goal.x, 520 - (488 - goal.y - 8 - 120) / 0.62];
-  await input.down(...destination(await state(page)));
+  const initial = await state(page);
+  await input.down(...destination(initial));
   try {
-    const deadline = Date.now() + 18000;
+    const deadline = Date.now() + (initial.level > 5 ? 27000 : 18000);
     while (Date.now() < deadline) {
       const flight = await state(page);
       if (complete(flight)) return flight;
@@ -176,8 +185,10 @@ async function run({ name, engine, device }) {
       if (location.protocol !== 'http:') return;
       localStorage.setItem('hf-lab-send-localhost', '1');
       window.kiteCheckFrames = 0;
-      requestAnimationFrame(function countFrame() {
+      window.kiteCheckFrameTimes = [];
+      requestAnimationFrame(function countFrame(now) {
         window.kiteCheckFrames++;
+        window.kiteCheckFrameTimes.push(now);
         requestAnimationFrame(countFrame);
       });
       window.kiteCheckPointers = [];
@@ -204,11 +215,24 @@ async function run({ name, engine, device }) {
     assert.equal(opening.started, false);
     assert.equal(opening.t, 0);
     await capture('01-opening');
+    const openingCoordinates = await fieldCoordinates(page);
+    const kiteTap = openingCoordinates(opening.kite.x, opening.kite.y);
+    await page.touchscreen.tap(kiteTap.x, kiteTap.y);
+    await later(page, .25);
+    assert.equal((await state(page)).done, 0, 'a stationary tap on the kite leaves the first goal open');
+    assert.equal(await page.locator('#counter').textContent(), 'Drag the spool',
+      'the opening cue survives a stationary tap that misses the first goal');
+    await capture('01b-after-kite-tap');
+    await page.tap('#pause');
+    await page.tap('#chart-open');
+    await page.locator('#levels [data-level="1"]').tap();
+    await screen(page, 'play');
     let input = await steering(page, name);
     const firstStart = Date.now();
-    await input.down(180, 440);
+    await input.down(180, 470);
     try {
       await input.move(245, 399);
+      await page.waitForFunction(() => document.getElementById('counter').textContent === 'Goal 1 / 1');
       await awaitFirstResult(page);
     } finally {
       await input.up();
@@ -250,6 +274,70 @@ async function run({ name, engine, device }) {
     const reeledIn = await state(page);
     assert.ok(reeledIn.line < paidOut.line, 'downward finger motion reels in line');
     await input.up();
+    const portrait = page.viewportSize();
+    await page.setViewportSize({ width: portrait.height, height: portrait.width });
+    await controls(page, ['pause']);
+    await fieldFits(page);
+    const landscapePause = await page.locator('#pause').boundingBox();
+    input = await steering(page, name);
+    const beforeLandscapeInput = await state(page);
+    await input.down(108, 435);
+    await later(page, beforeLandscapeInput.t + .2);
+    await input.up();
+    assert.ok((await state(page)).hand.x < beforeLandscapeInput.hand.x, 'the spool responds to steering in landscape');
+    await capture('02b-landscape');
+    await page.setViewportSize({ width: 568, height: 320 });
+    await controls(page, ['pause']);
+    await fieldFits(page);
+    await page.tap('#pause');
+    await controls(page, ['resume', 'chart-open', 'look', 'sound']);
+    await page.tap('#chart-open');
+    await controls(page, ['endless', 'chart-back'], await page.locator('#levels button').all());
+    await capture('02c-compact-chart');
+    await page.tap('#chart-back');
+    assert.equal((await state(page)).level, 2, 'rotation keeps the current flight');
+    await page.setViewportSize(portrait);
+    await screen(page, 'paused');
+    const beforeLeave = await stored(page);
+    await page.tap('#resume');
+    await page.evaluate(() => {
+      // Headless automation tabs remain visible behind other tabs.
+      Object.defineProperty(document, 'hidden', { configurable: true, value: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+      delete document.hidden;
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await screen(page, 'paused');
+    const backgrounded = await state(page);
+    await sleep(250);
+    assert.deepEqual(await state(page), backgrounded, 'returning to a backgrounded flight keeps it paused');
+    await page.tap('#resume');
+    await later(page, backgrounded.t + .15);
+    await page.goto('about:blank');
+    await page.goBack();
+    await page.waitForFunction(() => Boolean(window.kiteState));
+    if ((await state(page)).screen === 'paused') await page.tap('#resume');
+    await readyToPaint(page, name);
+    assert.equal((await state(page)).level, 2, 'leaving and returning keeps the selected flight');
+    assert.deepEqual(await stored(page), beforeLeave, 'leaving does not change saved settings or unlocks');
+    input = await steering(page, name);
+    await input.down(180, 440);
+    await input.move(115, 315);
+    await later(page, .25);
+    await input.up();
+    await page.reload();
+    await screen(page, 'play');
+    await readyToPaint(page, name);
+    const reloaded = await state(page);
+    assert.equal(reloaded.level, 2, 'mid-flight reload retries the same flight');
+    assert.equal(reloaded.t, 0, 'mid-flight reload starts with a fresh clock');
+    assert.equal(reloaded.done, 0, 'mid-flight reload resets current goals');
+    assert.equal(reloaded.started, false);
+    input = await steering(page, name);
+    await input.down(180, 380);
+    await input.move(165, 366);
+    await later(page, .25);
+    await input.up();
     await page.tap('#pause');
     await screen(page, 'paused');
     const paused = await state(page);
@@ -280,10 +368,12 @@ async function run({ name, engine, device }) {
     await page.locator('#levels [data-level="2"]').tap();
     await screen(page, 'play');
     const lateFlights = [];
-    for (const level of [2, 3, 4, 5]) {
+    const campaignFrameStart = await page.evaluate(() => window.kiteCheckFrameTimes.length);
+    for (let level = 2; level <= 10; level++) {
       assert.equal((await state(page)).level, level);
       let pickedUp = false;
       let sawSquall = false;
+      let sawFinalDelivery = false;
       input = await steering(page, name);
       const result = await followGoals(page, input, flight => flight.screen === 'result', async flight => {
         if (level === 3 && flight.goal.carrying && !pickedUp) {
@@ -295,20 +385,43 @@ async function run({ name, engine, device }) {
           sawSquall = true;
           await capture('06-squall');
         }
+        if (level === 10 && flight.goal.carrying && !sawFinalDelivery) {
+          sawFinalDelivery = true;
+          await capture('flight-10-return');
+        }
       });
       assert.equal(result.done, result.total, `flight ${level} clears all objectives`);
       if (level === 3) assert.ok(pickedUp, 'the lantern is visibly carried before delivery');
       if (level === 5) assert.ok(sawSquall, 'the wind rises during the timed hold');
       lateFlights.push(result.t);
-      if (level < 5) {
+      if (level >= 6) await capture('flight-' + level);
+      if (level < 10) {
         await page.tap('#next');
         await screen(page, 'play');
       }
     }
+    const frameIntervals = await page.evaluate(start => window.kiteCheckFrameTimes.slice(start + 1)
+      .map((time, index) => time - window.kiteCheckFrameTimes[start + index]), campaignFrameStart);
+    const orderedFrames = frameIntervals.toSorted((a, b) => a - b);
+    const frameP95 = orderedFrames[Math.floor(orderedFrames.length * .95)];
+    const framesOver34ms = orderedFrames.filter(time => time > 34).length;
     assert.equal((await state(page)).screen, 'result', 'releasing the flight pointer keeps the result card open');
     await page.tap('#result-chart', { timeout: 4000 });
     await screen(page, 'chart');
-    assert.equal(await page.locator('#levels button:enabled').count(), 6);
+    assert.equal(await page.locator('#levels button:enabled').count(), 10);
+    assert.equal(await page.locator('#result-title').textContent(), 'All ten flown');
+    await page.tap('#chart-back');
+    await screen(page, 'result');
+    await page.tap('#next');
+    await screen(page, 'play');
+    assert.equal((await state(page)).level, 0, 'the last flight leads to endless play');
+    await page.setViewportSize({ width: 568, height: 320 });
+    await page.tap('#pause');
+    await controls(page, ['resume', 'chart-open', 'look', 'sound', 'finish']);
+    await capture('07b-compact-endless-pause');
+    await page.setViewportSize(portrait);
+    await page.tap('#chart-open');
+    await screen(page, 'chart');
     await page.tap('#endless');
     await screen(page, 'play');
     input = await steering(page, name);
@@ -331,7 +444,7 @@ async function run({ name, engine, device }) {
     await screen(page, 'play');
     await readyToPaint(page, name);
     assert.equal((await state(page)).best, beforeReload.best);
-    assert.equal((await state(page)).unlocked, 6);
+    assert.equal((await state(page)).unlocked, 10);
     assert.deepEqual(await stored(page), beforeReload);
     assert.equal(beforeReload.v, 1);
     assert.deepEqual(await page.evaluate(() => Object.keys(localStorage)
@@ -339,8 +452,9 @@ async function run({ name, engine, device }) {
     assert.deepEqual(errors, [], 'browser errors');
     assert.deepEqual(outside, [], 'external requests');
     assert.deepEqual(telemetry, [], 'telemetry requests');
-    console.log(JSON.stringify({ browser: name, device, first, firstTap, lateFlights, paidOut: paidOut.line, reeledIn: reeledIn.line,
-      best: beforeReload.best, errors: errors.length, externalRequests: outside.length, telemetry: telemetry.length }));
+    console.log(JSON.stringify({ browser: name, device, first, firstTap, lateFlights, paidOut: paidOut.line, reeledIn: reeledIn.line, landscapePause,
+      frameP95, framesOver34ms, sampledFrames: orderedFrames.length, best: beforeReload.best,
+      errors: errors.length, externalRequests: outside.length, telemetry: telemetry.length }));
   } finally {
     await browser.close();
   }

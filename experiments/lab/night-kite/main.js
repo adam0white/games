@@ -32,7 +32,7 @@ function store() {
 }
 const audio = sound({ on: () => saved.sound });
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
-let flight, screen, chartFrom, started, control, frameTime, debt = 0, artTime = 0;
+let flight, screen, chartFrom, started, steered, control, frameTime, debt = 0, artTime = 0;
 let spoolOffset = 0, pressedButton = null, celebration = null, revealAt = 0, lastPaint = -Infinity;
 const heldKeys = new Set();
 const display = screens(['paused', 'chart', 'result'], name => {
@@ -65,6 +65,7 @@ function setText(id, value) {
   if (node.textContent !== value) node.textContent = value;
 }
 const flightLabel = () => flight.level ? 'Flight ' + String(flight.level).padStart(2, '0') + ' / 10' : 'Endless evening';
+const showSpoolCue = () => flight.level === 1 && !steered && flight.status === 'play';
 function instruments() {
   const { goal, level, done, total, score, storm, kite } = flight;
   setText('edition', flightLabel());
@@ -74,7 +75,7 @@ function instruments() {
   if (goal.kind === 'squall') counter += ' · ' + Math.floor(goal.progress * 100) + '%';
   if (conditions.remaining !== null) counter += ' · ' + Math.ceil(conditions.remaining) + ' s';
   if (conditions.exposure > .45) counter += ' · Seek shelter';
-  setText('counter', counter);
+  setText('counter', showSpoolCue() ? 'Drag the spool' : counter);
   setText('objective', goal.kind === 'ring' ? 'Thread the birds' : goal.kind === 'squall' ? 'Hold in the squall' : goal.carrying ? 'Lift to the rooftop' : 'Catch the lantern');
   const w = windAt(flight, kite.x, kite.y);
   const labels = { steady: 'Breeze', gust: 'Gust', lull: 'Lull', thermal: 'Thermal', squall: 'Squall' };
@@ -91,6 +92,7 @@ function begin(level) {
   const seed = level ? 171 + (level - 1) * 157 : crypto.getRandomValues(new Uint32Array(1))[0];
   flight = createFlight(level, seed);
   started = false;
+  steered = false;
   control = { ...flight.control };
   pad.drop();
   heldKeys.clear();
@@ -192,15 +194,17 @@ function grip() {
   audio.tone(330, .12, .035, 'triangle', 46);
 }
 function readHand(initial = false) {
-  if (!pad.touch || screen !== 'play') return;
+  const touch = pad.touch;
+  if (!touch || screen !== 'play') return;
   const bounds = field.getBoundingClientRect();
-  const y = 520 * (pad.touch.y - bounds.top) / bounds.height;
+  const y = 520 * (touch.y - bounds.top) / bounds.height;
   // In flight one, a beginner may put a finger on the pictured kite or birds.
   // Start a sky grip at the current payout. Further vertical travel winds or
   // unwinds the spool at the usual rate, with no force applied to the kite.
   if (initial) spoolOffset = flight.level === 1 && y < 335 ? flight.control.y - y : 0;
+  if (Math.hypot(touch.x - touch.ox, touch.y - touch.oy) >= 8) steered = true;
   control = {
-    x: 360 * (pad.touch.x - bounds.left) / bounds.width,
+    x: 360 * (touch.x - bounds.left) / bounds.width,
     y: y + spoolOffset
   };
 }
@@ -218,6 +222,7 @@ addEventListener('keydown', e => {
   } else if (screen === 'play' && ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) {
     e.preventDefault();
     grip();
+    steered = true;
     heldKeys.add(e.key);
   }
 });
@@ -252,7 +257,7 @@ function paint() {
   const h = Math.max(1, Math.round(w * 520 / 360));
   if (field.width !== w || field.height !== h) { field.width = w; field.height = h; }
   ctx.setTransform(w / 360, 0, 0, h / 520, 0, 0);
-  draw(ctx, flight, { look: saved.look, intro: !started && flight.level === 1, time: artTime, celebration });
+  draw(ctx, flight, { look: saved.look, intro: showSpoolCue(), time: artTime, celebration });
 }
 function frame(now) {
   if (screen === 'play') {

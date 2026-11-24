@@ -40,7 +40,7 @@ Run the same bots with `--mutate`. A constant heat field makes both proof fracti
 
 The kit supplies save, audio, pause, zoom, screens and the first-use drag hint. The deformable contact uses one captured pointer in canvas coordinates. A cancelled touch returns a carried loaf to its pickup point. The shared private feedback button loads from `/notes/button.js`. There is no lab recorder or leaderboard. `night-loaves:save` stores the highest unlocked morning, endless points record and sound preference. The kit uses `night-loaves:hint` for first use. A reload opens the most advanced unlocked campaign morning.
 
-Run `fnm exec --using=26.12.0 node experiments/lab/night-loaves/check.mjs`. It serves the page, kit and feedback script from this checkout. Playwright resolves from `$PLAYWRIGHT` or `~/code/human-framework/node_modules`. The captures go to `/private/tmp/night-r4-new4/`. The browser check times a complete morning through ordinary controls. A separate replay captures the intermediate gestures so screenshot encoding and transfer do not consume the player's time budget. The original 60-second acceptance threshold is unchanged.
+Run `fnm exec --using=26.12.0 node experiments/lab/night-loaves/check.mjs`. It serves the page, kit and feedback script from this checkout. Playwright resolves from `$PLAYWRIGHT` or `~/code/human-framework/node_modules`. Captures from this pass went to `/private/tmp/night-r4-new4/`. The browser check times a complete morning through ordinary controls. A separate replay captures the intermediate gestures so screenshot encoding and transfer do not consume the player's time budget. The original 60-second acceptance threshold is unchanged.
 
 The standalone shared-kit check passed on Chromium before and after the changes. On WebKit the default runner timed out at 150 seconds on this host. The final shared check passed after bringing its blank page to the front, resizing it by one pixel and restoring the iPhone 13 viewport before navigation. The kit source and assertions stayed unchanged. The game's own screenshot call uses a 45-second capture timeout (initially 15 seconds) and wakes a stalled viewport before retrying. This timeout applies only to image capture.
 
@@ -54,3 +54,35 @@ Both profile runs exited 0. Both unlocked morning 2, served a paid loaf for 5 po
 Ten final phone screenshots were inspected, five per profile: opening, held fold, loaded hearth, the choice of two hands, and receipt. The held fold stays in one piece. A separate art plate shows the mulberry opening and a four-loaf batch.
 
 A first-time stranger's unaided completion, physical-phone feel and sound by ear remain unverified. Checks served the local folder. No deployment was performed.
+
+## 2026-11-24 · Phone play review
+
+- The morning picker measured 24 CSS pixels high in WebKit. It now measures 44 in both profiles and still uses the native picker.
+- Dragging proofing dough to the lower right put its center at (316, 437). The rim, proof meter and following tuck cue were cut off. The same drag now stops at (293, 416) with the rim and meter inside the frame.
+- The shape rail showed 5% on opening. It now starts at 0% and fills when the tuck is complete.
+- The final-loaf guide pointed to the paying hand for the first second, before the guest appeared. The guide now waits while the footer says “Wait to share”. The existing one-second arrival opens the gift and changes the footer to “Sell or share”. The paid hand remains available during the wait. Across both phone profiles a golden paid loaf earned 5 points and the final gift earned 10.
+
+`check.mjs` asserts all four fixes. The browser check also rotates to landscape, pauses a held pull, and checks reload and browser Back. A trusted `pagehide` event confirms the page enters its pause screen when leaving a partially folded morning. The blur check verifies independently that pausing during a pull returns the bread to its pickup point and freezes the bake.
+
+All 40 campaign and 15 endless bot cases passed. The heat mutation exited 1 at the original heat assertion and produced identical warm/cool proof fractions of 0.51. The existing acceptance thresholds stayed in place.
+
+The standalone check passed with zero page errors, failed responses or unexpected requests in both profiles. Morning 1 took 14.851 wall seconds / 14.633 simulated on WebKit and 19.109 / 17.000 on Chromium. The shared kit self-check also passed in both profiles.
+
+A separate run in each fresh browser played through all eight mornings using the production pointer handlers. Morning 2 was completed in landscape. Each route served 23 loaves for 155 points, completed two endless batches of four loaves each and retained an endless best of 50 on reload. The same run verified that a partially folded batch restarted on reload at the latest unlocked morning.
+
+| Morning | Loaves | Points | WebKit wall s | Chromium wall s |
+| ---: | ---: | ---: | ---: | ---: |
+| 1 | 2 | 15 | 18.813 | 19.653 |
+| 2 | 2 | 15 | 19.322 | 20.147 |
+| 3 | 2 | 15 | 17.020 | 16.879 |
+| 4 | 3 | 20 | 15.105 | 14.911 |
+| 5 | 3 | 20 | 12.746 | 13.613 |
+| 6 | 3 | 20 | 11.456 | 13.277 |
+| 7 | 4 | 25 | 13.784 | 14.322 |
+| 8 | 4 | 25 | 16.273 | 17.281 |
+| Endless batch 1 | 4 | 25 | 12.641 | 13.775 |
+| Endless batch 2 | 4 | 25 | 13.709 | 13.882 |
+
+The active serving scene sampled 60 animation-frame gaps per profile. The median / 95th percentile / maximum gaps were 14.0 / 16.0 / 28.0 ms on WebKit and 16.7 / 16.7 / 16.8 ms on Chromium.
+
+Inspected 26 PNGs across the two profiles, including the fold, hot oven, proof edge, final choice, landscape pause, Morning 8 and endless receipts. Captures are under `/private/tmp/night-r5-review/night-loaves/`. Both profiles used touch taps. Chromium used touch drags and WebKit used mouse drags in the phone viewport. Physical touch on WebKit, physical-phone frame timing, audible sound and unaided human discovery remain unverified.

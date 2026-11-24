@@ -24,6 +24,8 @@ const saves = {
   channels: { unlocked: 3, completed: false, sound: true },
   flock: { v: 1, unlocked: 2, best: 17, sound: true, played: true },
   podwire: { v: 1, next: 2, complete: false, sound: true },
+  kite: { v: 1, unlocked: 2, level: 2, best: 157, sound: true, look: 'copper' },
+  loaves: { unlocked: 2, best: 240, sound: true },
 };
 
 function pageEntry(key, value, hintKey, rest, secondary = {}) {
@@ -113,27 +115,31 @@ async function guideDog(page, { finger, until }) {
   await finger(page, '#field', [['pointerup', x, y - height * .1]]);
 }
 
-async function pluckWire(page, { until }, depth = 12) {
-  const { zones, plucks } = await page.evaluate(() => window.podwireView());
-  const [low, high] = zones[0];
-  const { left, top, width, height } = await page.locator('#board').evaluate(el => el.getBoundingClientRect().toJSON());
-  const x = left + width * (low + high) / 720, y = top + height * 250 / 380;
-  const endY = y + height * depth / 380;
+async function pointerDrag(page, start, end, beforeMove) {
   const chromium = page.context().browser().browserType().name() === 'chromium';
   const session = chromium ? await page.context().newCDPSession(page) : null;
   const touch = (type, touchPoints) => session.send('Input.dispatchTouchEvent', { type, touchPoints });
   try {
-    // The wire uses native pointer capture. WebKit exposes only single-touch taps.
-    if (session) await touch('touchStart', [{ x, y }]);
-    else { await page.mouse.move(x, y); await page.mouse.down(); }
-    await until(page, () => window.podwireView().grip !== null, 'pointer grips the wire');
-    if (session) await touch('touchMove', [{ x, y: endY }]);
-    else await page.mouse.move(x, endY, { steps: 4 });
+    // These controls use native pointer capture. WebKit exposes only single-touch taps.
+    if (session) await touch('touchStart', [start]);
+    else { await page.mouse.move(start.x, start.y); await page.mouse.down(); }
+    if (beforeMove) await beforeMove();
+    if (session) await touch('touchMove', [end]);
+    else await page.mouse.move(end.x, end.y, { steps: 4 });
   } finally {
     if (session) {
       try { await touch('touchEnd', []); } finally { await session.detach(); }
     } else await page.mouse.up();
   }
+}
+
+async function pluckWire(page, { until }, depth = 12) {
+  const { zones, plucks } = await page.evaluate(() => window.podwireView());
+  const [low, high] = zones[0];
+  const { left, top, width, height } = await page.locator('#board').evaluate(el => el.getBoundingClientRect().toJSON());
+  const x = left + width * (low + high) / 720, y = top + height * 250 / 380;
+  await pointerDrag(page, { x, y }, { x, y: y + height * depth / 380 },
+    () => until(page, () => window.podwireView().grip !== null, 'pointer grips the wire'));
   await until(page, n => window.podwireView().plucks === n + 1, 'releasing the wire plucks it', 4000, plucks);
 }
 
@@ -143,6 +149,51 @@ async function openFirstPod(page, checks) {
   await pluckWire(page, checks, 83);
   await checks.until(page, () => window.podwireView().screen === 'won', 'first pod opens');
 }
+
+async function moveKiteSpool(page, { until }) {
+  const { x, y, width, height } = await page.locator('#field').boundingBox();
+  await page.touchscreen.tap(x + width * 220 / 360, y + height * 440 / 520);
+  await until(page, () => {
+    const { started, hand } = window.kiteState();
+    return started && hand.x > 200;
+  }, 'touch moves the kite spool right');
+}
+
+async function foldDough(page, { until }) {
+  const bakery = page.locator('#bakery');
+  const { x, y, work } = await bakery.evaluate(el => Object.fromEntries(
+    ['x', 'y', 'work'].map(key => [key, Number(el.dataset[key])]),
+  ));
+  const box = await bakery.boundingBox();
+  const point = (u, v) => ({ x: box.x + box.width * u / 360, y: box.y + box.height * v / 490 });
+  await pointerDrag(page, point(x - 38, y + 8), point(x + 39, y - 7));
+  await until(page, before => {
+    const dough = document.querySelector('#bakery').dataset;
+    return dough.stage === 'knead' && Number(dough.work) > before && Number(dough.time) > 0;
+  }, 'drag kneads the dough', 8000, work);
+}
+
+async function turnPrism(page, { until }) {
+  const { x, y, width, height } = await page.locator('#angle').boundingBox();
+  const previous = await page.evaluate(() => window.splitlightState().position);
+  await page.touchscreen.tap(x + width * .12, y + height / 2);
+  await until(page, position => {
+    const s = window.splitlightState();
+    return s.started && s.position !== position && s.elapsed > 0;
+  }, 'touch turns the prism and starts exposure', 8000, previous);
+}
+
+async function steerTide(page, { until }) {
+  const { point: [x, y], game: { river }, target, scale } = await page.evaluate(() => window.tideState());
+  await pointerDrag(page, { x, y }, { x: x + 40, y });
+  await until(page, ({ minimumTarget, minimumX }) => {
+    const s = window.tideState();
+    return s.target > minimumTarget && s.game.river.x > minimumX;
+  }, 'drag steers the boat right', 8000, { minimumTarget: target + 24 / scale, minimumX: river.x + 4 / scale });
+}
+
+const splitlightLegacy = { 'night-splitlight:plate': '2', 'night-splitlight:sound': 'on' };
+const tideLegacy = { 'lantern-tide:night': '2', 'lantern-tide:sound': '1' };
 
 export const labPages = {
   'lab/lantern-fp': pageEntry('lantern-fp-save', saves.fp, 'lantern-fp:hint', {
@@ -291,4 +342,62 @@ export const labPages = {
         await until(page, () => window.podwireView().level === 2 && window.podwireView().screen === 'play', 'Next opens the second plate');
       } },
   }),
+  'lab/night-kite': pageEntry('night-kite:save', saves.kite, 'night-kite:hint', {
+    startsOnBoard: true, sound: '#sound',
+    state: () => window.kiteState?.(),
+    verify: () => {
+      const { level, unlocked, best, sound, look } = window.kiteState();
+      return { level, unlocked, best, sound, look };
+    },
+    expect: { level: 2, unlocked: 2, best: 157, sound: true, look: 'copper' },
+    touch: moveKiteSpool,
+    hint: { delay: 6500, play: '#field', timing: { board: true }, input: moveKiteSpool },
+  }),
+  'lab/night-loaves': pageEntry('night-loaves:save', saves.loaves, 'night-loaves:hint', {
+    startsOnBoard: true, sound: '#sound',
+    state: () => {
+      const dough = document.querySelector('#bakery')?.dataset;
+      if (!dough?.stage) return null;
+      const screen = document.querySelector('#paused.on, #result.on')?.id ?? 'play';
+      return { screen, t: Number(dough.time) };
+    },
+    verify: () => [document.querySelector('#chapter').textContent, document.querySelector('#flour').textContent],
+    expect: ['Morning 02 / 08', 'Milk bread'],
+    verifyPaused: async page => assert.equal(await page.textContent('#record'), 'Best on this device · 240'),
+    touch: foldDough,
+    hint: { delay: 3800, play: '#bakery', timing: { board: true }, input: foldDough },
+  }),
+  'lab/night-splitlight': {
+    startsOnBoard: true, sound: '#sound', soundKey: 'night-splitlight:sound', soundOff: 'off',
+    seeds: { ...splitlightLegacy, 'night-splitlight:hint': '1' },
+    state: () => {
+      const s = window.splitlightState?.();
+      return s && { screen: s.screen, t: s.elapsed };
+    },
+    verify: () => {
+      const { level, sound } = window.splitlightState();
+      return { level, sound, plate: document.querySelector('#plate').textContent };
+    },
+    expect: { level: 2, sound: true, plate: 'Plate 02 / 06' },
+    touch: turnPrism,
+    hint: { key: 'night-splitlight:hint', delay: 2200, play: '#angle', timing: { board: true },
+      input: turnPrism, legacy: splitlightLegacy },
+  },
+  'lab/lantern-tide': {
+    query: 'check=1', play: '#start', sound: '#sound', soundKey: 'lantern-tide:sound', soundOff: '0',
+    start: page => page.tap('#start'),
+    seeds: { ...tideLegacy, 'lantern-tide:hint': '1' },
+    state: () => {
+      const s = window.tideState?.();
+      return s && { screen: s.screen, t: s.game.river.t };
+    },
+    verify: () => {
+      const { night, screen } = window.tideState();
+      return { night, screen };
+    },
+    expect: { night: 2, screen: 'ready' },
+    touch: steerTide,
+    hint: { key: 'lantern-tide:hint', delay: 1500, timing: { start: '#start' },
+      input: steerTide, legacy: tideLegacy },
+  },
 };

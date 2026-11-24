@@ -132,6 +132,12 @@ canvas {
 
 .control { position: relative; }
 
+.control > .kit-hint {
+  position: absolute;
+  inset: -55px auto auto 50%;
+  z-index: 2;
+}
+
 .control::before {
   content: "";
   position: absolute;
@@ -388,7 +394,8 @@ button:disabled { opacity: .45; cursor: default; }
   }
 
   .readout, .dial, #result { background: var(--metal); border: 1px solid var(--rule); }
-  .readout { grid-column: 1; grid-row: 3; border-radius: 8px 8px 0 0; }
+  .readout { grid-column: 1; grid-row: 3; gap: 8px; padding-inline: 10px; border-radius: 8px 8px 0 0; }
   .dial, #result { grid-column: 1; grid-row: 4; align-self: start; border-top: 0; border-radius: 0 0 8px 8px; }
+  .control > .kit-hint { top: 100%; }
   #result.on { padding-inline: 9px; }
 }

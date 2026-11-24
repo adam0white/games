@@ -2,7 +2,7 @@ import * as lantern from '../../lantern/sim.js';
 
 export const { DT, GOAL, boat, centre, half } = lantern;
 export const FIRST_SEED = 11;
-export const SECOND_SEED = 3;
+export const SECOND_SEED = 255;
 export const VIEW_AHEAD = 2.2;
 const clamp = (n, min = 0, max = 1) => Math.min(max, Math.max(min, n));
 const smooth = n => { n = clamp(n); return n * n * (3 - 2 * n); };

@@ -67,7 +67,7 @@ button:focus-visible { outline: 2px solid #f9be83; outline-offset: 4px; }
 }
 .launch {
   position: absolute;
-  top: 79%;
+  top: min(79%, calc(100% - 76px - env(safe-area-inset-bottom)));
   pointer-events: auto;
   width: 64px;
   height: 64px;
@@ -75,6 +75,9 @@ button:focus-visible { outline: 2px solid #f9be83; outline-offset: 4px; }
   color: #ffe9cc;
   background: #384638;
   box-shadow: 0 0 0 6px #e4af7330, 0 5px 18px #070e1c99;
+}
+@media (orientation: landscape) {
+  .opening h1 { font-size: clamp(42px, 14dvh, 72px); }
 }
 .launch svg { fill: currentColor; stroke-width: 1.2; }
 .shade { background: #060f19a8; }

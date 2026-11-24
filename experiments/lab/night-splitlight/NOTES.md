@@ -67,3 +67,21 @@ Fourteen captures in `/private/tmp/night-r4-wild/` were inspected: five per phon
 Unverified: first-time discovery by a person, sustained frame rate and sound on a physical phone, and live serving. The page was tested from the local checkout.
 
 The shared kit self-check passed on Chromium before and after the change. The shared WebKit runner timed out at 150 seconds before and after the change. With the display kept awake via `caffeinate -diu`, the same WebKit command and assertions passed. A separate iPhone 13 run that woke the viewport first also passed all 65 original kit assertions. The experiment's own two-profile check passed without the external display-awake command.
+
+## 2026-11-24 — phone play review
+
+- The tutorial hand stayed in the middle of the viewport after rotation. On Pixel 7 it was 187.80 CSS px right of the landscape dial centre. On iPhone 13 it was 176.17 px right. It now follows the dial in both orientations. A stationary tap on the glass and a mouse hover over the dial leave it visible. The browser check rotates with the hand visible, checks its track against the dial column and verifies that turning the dial dismisses it.
+- The iPhone 13 landscape readout split the plate number across 2 lines. Narrower gaps and padding fit it on 1 line on both profiles. The rotated check measures the text rectangles.
+- A held Chromium touch reached the right end stop and stayed at 1.000 after reversing by 5% of the canvas width. The drag now resets its reference point at either limit. The same reversal moved the dial to 0.92598. The browser check reverses once from each stop without lifting.
+- Pause and restart could leave focus on a hidden button or the document body. Resume, restart and advance now focus the dial. The browser check verifies each transition and turns the dial with one arrow key.
+
+Both fresh profiles cleared all 6 plates and all 17 receivers using the live controls. The opening was a rightward bench drag. Later plates used known receiver positions on the native dial. Chromium used trusted touch throughout. WebKit used trusted mouse for sustained drags and trusted touch taps. Both paused, resumed, restarted and played plate 3 in landscape. Actual navigation away delivered `pagehide` and paused the outgoing game. History return and mid-plate reload restarted the highest unlocked plate at 0.080 dial travel. The final result's replay opened plate 1, and reload restored plate 6.
+
+| Profile | Opening / finale wall s | Frame intervals during plates 2–6 | Median / 95th percentile / max ms |
+| --- | ---: | ---: | ---: |
+| WebKit iPhone 13 | 1.591 / 3.951 | 897 | 14.0 / 15.0 / 44.0 |
+| Chromium Pixel 7 | 1.930 / 4.443 | 612 | 16.7 / 33.4 / 50.1 |
+
+The frame samples include Playwright input and screenshot captures on the same host. Both playthroughs logged zero browser errors. Inspected 52 before-and-after screenshots covering the opening, hint, rotated controls, pause, partial exposures and every result. The images are under `/private/tmp/night-r5-review/`. The updated `check.mjs` exited 0 on both profiles with 0 browser errors, outside requests, lab requests or lab storage writes. Its opening tap cleared in 1.502 s on WebKit and 1.611 s on Chromium. The bots aim successfully on 294/294 runs and check 36,036 rays. The equal-index mutation exits 1, with 0.00° opening separation against the 45° requirement.
+
+Unaided discovery by a new person, app switching on a physical phone, physical-device frame timing and audible sound remain unverified.

@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const notesButton = resolve(root, '../workers/feedback/public/notes/button.js');
 const mount = '/lab/night-splitlight/';
-const shots = '/private/tmp/night-r4-wild';
+const shots = process.env.SHOTS || '/private/tmp/night-r5-review';
 const saveKey = 'night-splitlight:plate';
 const types = {
   '.css': 'text/css',
@@ -150,11 +150,71 @@ async function turnByTouch(page, fraction) {
   await page.touchscreen.tap(box.x + fraction * box.width, box.y + box.height / 2);
 }
 
+async function checkHandAfterRotation(page, name) {
+  const hand = page.locator('.kit-hint.on');
+  await waitUntil(() => hand.count(), count => count === 1, 'waiting for the first-use hand');
+  const portrait = page.viewportSize();
+  await page.setViewportSize({ width: portrait.height, height: portrait.width });
+  await readyToPaint(page, name);
+  await controls(page, ['pause', 'angle']);
+  const plateLines = await page.locator('#plate').evaluate(plate => {
+    const text = document.createRange();
+    text.selectNodeContents(plate);
+    return text.getClientRects().length;
+  });
+  assert.equal(plateLines, 1, 'the plate and total stay on one line in landscape');
+  const dial = await page.locator('#angle').boundingBox();
+  const track = await hand.locator('.track').boundingBox();
+  assert.ok(track.x >= dial.x && track.x + track.width <= dial.x + dial.width,
+    'the rotated hand stays in the dial column');
+  assert.ok(track.y >= dial.y && track.y + track.height <= portrait.width,
+    'the landscape hand is visible beside the dial');
+  await page.tap('#field');
+  await page.mouse.move(dial.x + dial.width / 2, dial.y + dial.height / 2);
+  assert.equal((await state(page)).started, false, 'a stationary bench tap does not turn the prism');
+  assert.equal(await hand.count(), 1, 'the first-use hand survives a stationary bench tap and dial hover');
+  await screenshot(page, name, '06-landscape-hint');
+  await page.setViewportSize(portrait);
+}
+
+async function checkBenchEndStops(context, page, name) {
+  const box = await page.locator('#field').boundingBox();
+  const point = fraction => ({ x: Math.round(box.x + fraction * box.width), y: Math.round(box.y + box.height * .56) });
+  const session = name === 'chromium' ? await context.newCDPSession(page) : null;
+  async function move(type, fraction) {
+    const { x, y } = point(fraction);
+    if (session) {
+      await session.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
+    } else if (type === 'touchStart') {
+      await page.mouse.move(x, y);
+      await page.mouse.down();
+    } else if (type === 'touchMove') {
+      await page.mouse.move(x, y);
+    } else {
+      await page.mouse.up();
+    }
+  }
+  for (const [from, far, back, limit] of [[.12, .88, .83, 1], [.88, .12, .17, 0]]) {
+    await move('touchStart', from);
+    try {
+      await move('touchMove', far);
+      await waitUntil(() => state(page), value => value.position === limit, 'drag reaches the dial end stop', 2000);
+      await move('touchMove', back);
+      await waitUntil(() => state(page), value => value.position > 0 && value.position < 1,
+        `a single reversal moves off end stop ${limit}`, 2000);
+    } finally {
+      await move('touchEnd', back);
+    }
+  }
+  await session?.detach();
+}
+
 async function clearOpening(page) {
   const start = performance.now();
   const previousTouches = await page.evaluate(() => window.splitlightCheckTouches.length);
   await turnByTouch(page, .79);
   assert.equal((await state(page)).started, true, 'a single ordinary slider tap starts play');
+  assert.equal(await page.locator('.kit-hint.on').count(), 0, 'turning the dial dismisses the first-use hand');
   try {
     await waitForScreen(page, 'result', 59000);
   } catch (error) {
@@ -269,6 +329,7 @@ async function run({ name, engine, device }) {
     assert.equal(idle.won, false, 'the untouched plate is not solved');
     assert.ok(idle.targets.every(target => target.charge === 0 && !target.lit), 'the untouched receivers stay empty');
     await screenshot(page, name, '01-first-plate');
+    await checkHandAfterRotation(page, name);
 
     const first = await clearOpening(page);
     assert.equal(Number(await stored(page)), 2, 'exposing plate 1 earns plate 2 in storage');
@@ -300,13 +361,18 @@ async function run({ name, engine, device }) {
     const resumed = await state(page);
     assert.equal(resumed.sound, sound, 'resume keeps the sound preference');
     assert.equal(resumed.position, paused.position, 'resume keeps the prism position');
+    assert.equal(await page.evaluate(() => document.activeElement?.id), 'angle', 'resume restores dial focus');
     await page.tap('#pause');
     await page.tap('#restart');
     await waitForScreen(page, 'play');
     const restarted = await state(page);
     assert.equal(restarted.sound, sound, 'restart keeps the sound preference');
     assert.deepEqual(restarted, { ...second, sound }, 'restart resets the same plate');
+    assert.equal(await page.evaluate(() => document.activeElement?.id), 'angle', 'restart restores dial focus');
     await screenshot(page, name, '03-second-plate');
+    await page.keyboard.press('ArrowRight');
+    assert.ok((await state(page)).position > restarted.position, 'the dial responds to the next keyboard action');
+    await checkBenchEndStops(context, page, name);
     await checkLabStorage(page);
 
     await page.reload();
@@ -333,6 +399,7 @@ async function run({ name, engine, device }) {
     await page.tap('#next');
     await waitForScreen(page, 'play');
     assert.equal((await state(page)).level, 3, 'the earned third plate opens');
+    assert.equal(await page.evaluate(() => document.activeElement?.id), 'angle', 'advancing restores dial focus');
     await page.tap('#pause');
     await page.tap('#first');
     await waitForScreen(page, 'play');

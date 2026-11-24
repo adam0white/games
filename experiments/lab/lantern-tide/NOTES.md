@@ -31,7 +31,7 @@ The fixed night 2 seed reached dawn in 34.53 s with the reader.
 
 ### Browser verification
 
-`check.mjs` runs headless and writes PNGs to `/private/tmp/night-r4-tide/`. It checks the icon-only start, animated drag cue, steering, pause and resume, saved sound and progression, dawn, the tide-off launch and private notes. It checks for page errors and outside requests. The crossings feed regular pointer handlers while observing the running game. Chromium uses touch drag. WebKit uses touch taps and mouse steering.
+The initial headless `check.mjs` runs wrote PNGs to `/private/tmp/night-r4-tide/`. They checked the icon-only start, animated drag cue, steering, pause and resume, saved sound and progression, dawn, the tide-off launch and private notes. They checked for page errors and outside requests. The crossings fed regular pointer handlers while observing the running game. Chromium used touch drag. WebKit used touch taps and mouse steering.
 
 | Phone profile | Simulated crossing | Wall time | Steering commands | Embers | Hull lives left | Flame regained |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -43,3 +43,36 @@ Both profiles passed in the same `check.mjs` run. Inspected openings in both pal
 The 150 s shared kit WebKit check timed out during the baseline run, alongside unrelated page timeouts. The experiment's WebKit check uses full-page snapshots to avoid blank or stalled viewport captures on this host. The shared kit self-test passed on Chromium after the change.
 
 No cold human playtest, physical-phone or audible-sound test. The phone browser runs show that level 1 is completable without interacting with written instructions. A stranger's ability to infer the route remains open.
+
+## 2026-11-24 — phone play review
+
+Two clean browser profiles opened the game with no save. A canvas tap launched the boat. A second stationary tap used to mark the steering hint as complete while the boat held its course. The guide now stays eligible after the tap and goes away on a drag. The browser check verifies that the second tap leaves the hint key unset and that steering sets it to `1`.
+
+The portrait title took up too much of the approach to the boat in landscape. The landscape type now scales with height. Both landscape profiles have at least 24 CSS pixels between the bottom of the title box and the centre of the lantern. At 568 × 280 the 64-pixel launch button now ends 12 pixels above the bottom. It previously extended about 5 pixels past the viewport. Rotation during a drag releases the old target and keeps the crossing in progress.
+
+The paused canvas used to issue 2,405 fill operations in 500 ms on WebKit and 1,690 on Chromium in the review sample. It now keeps its last frame, with zero full-canvas fills during a 240 ms pause on each engine. Rotating while paused redraws the canvas at the new size without advancing the simulation. Navigating away from a live crossing pauses it at page exit. A mid-crossing reload starts the unlocked night from its launch screen.
+
+Dawn now saves the unlock on the terminal tick. Previously a reload during the 650 ms arrival animation could lose it. The pause menu can switch between either unlocked night, so replaying the opening keeps the second night available in the same session.
+
+The first WebKit finale attempt hit a rock at 62.25 of 78 river units. The original fixed seed also failed isolated playback with a small input delay. The replacement authored seed clears the same 78-unit course with the same two starting hull lives at all three delays below. A separate probe tested 20 repeatable schedules with input intervals of 5–8 ticks and delays of 0–3 ticks. The original seed cleared 7/20 and the replacement cleared 15/20. The 100 ms delay case is now a regression assertion in `check.mjs`. Restoring seed 3 in memory fails the new assertion with exit 1.
+
+| Fixed delay at 10 Hz | Original seed 3 | Replacement seed 255 |
+| ---: | --- | --- |
+| 0 ms | Dawn in 34.53 s | Dawn in 34.07 s |
+| 50 ms | Rock at 62.32 units | Dawn in 32.58 s |
+| 100 ms | Rock at 46.28 units | Dawn in 31.95 s |
+
+Chromium's original check sampled the drag anchor before the browser received the press. A trace after a hit showed target offsets up to 0.143 river units persisting for about a second. Before the driver fix, two Chromium opening runs lost at 41.39 and 32.22 of 44 units. The check now observes the trusted press when it reaches the canvas and uses a fixed 10 Hz simulation schedule. Both profiles wait 10 ms between live polls instead of 35 ms. WebKit keeps its interval-based command schedule. Its finale mouse driver looks 0.675 s ahead instead of 0.540 s and leaves more space around rocks and banks. This finale driver cleared 28/30 jittered trials versus 23/30 with the default bot steering. The one-minute wall and simulation limits stay in place.
+
+The ordinary simulation checks exit 0 with 48/48 opening dawns per policy, 22/48 reader versus 9/48 plain finale dawns, and 63,679 tide-off parity ticks. Mutated burn exits 1 at the fast-water flame assertion.
+
+Both profiles cleared both nights through the live pointer handlers. The browser driver assisted with the route after the opening taps and drags. Chromium used trusted touch drags. WebKit used trusted touch taps and mouse steering. Each profile navigated away and back, reloaded during Night 2, switched between the unlocked nights, completed Dawn, sailed again, lost and retried. Both recorded zero page errors, failed HTTP responses and outside requests.
+
+| Profile | Night | Simulated / wall seconds | Commands | Embers | Hull lives left | Flame regained |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| WebKit, iPhone 13 | 1 | 23.53 / 24.24 | 236 | 18 | 3 | 0.105 |
+| WebKit, iPhone 13 | 2 | 36.13 / 36.82 | 362 | 15 | 2 | 0.379 |
+| Chromium, Pixel 7 | 1 | 23.27 / 23.99 | 232 | 16 | 3 | 0.090 |
+| Chromium, Pixel 7 | 2 | 32.27 / 32.98 | 321 | 9 | 2 | 0.210 |
+
+Inspected 12 baseline captures and 22 final captures in `/private/tmp/night-r5-review/lantern-tide/`. The final set shows both prints, the opening and pause in landscape, the short launch viewport, the steering hint, the current, both dawns and the loss card on both profiles. Unaided human route discovery, physical-phone timing and sound by ear remain unverified.
