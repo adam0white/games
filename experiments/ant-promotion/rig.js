@@ -132,7 +132,7 @@ export function update(c, x, y, a, dt, look = null) {
 
   // legs
   c.reach = c.legs.length ? c.legs[0].len * 0.98 : 0;
-  const thr = (l) => l.len * (c.speed > 2.2 * r ? 0.42 : 0.32);
+  const thr = (l) => l.len * (c.speed > 2.2 * r ? 0.42 : 0.32) / clamp(c.hurry || 1, 0.6, 2); // hurrying: shorter, quicker steps; creeping: longer, slower ones
   let anyNeed = false, anyStep = false;
   for (const l of c.legs) {
     const { hip, target, reach } = legAt(c, l); l.hip = hip; l.target = target; l.reach = reach;
