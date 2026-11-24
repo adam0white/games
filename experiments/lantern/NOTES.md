@@ -607,3 +607,13 @@ chime inside the chord while music is on. The switch is on the menu and on the c
 It is on at first. Checked by machine: the song's clock advances during a run, and the switch is kept. Not checked: how
 it sounds on a phone, and how loud it is against the river and the crash sounds. Nobody has listened to it in this game.
 
+
+## 2026-11-24 — shared board, fixes from an independent review
+
+Codex (gpt-6.2-sol) read the board code and found eleven faults; `workers/lab-ai/README.md` ("Review fixes") lists the
+server side. In the page: a removal is kept in `lantern-board-gone` until both boards have answered, and is tried again
+at the next load or when the leaderboard opens, also after "Erase everything". The score post carries its ticket even
+when the ticket's own answer was lost. A run on Today's river that ends after midnight UTC counts for neither day and is
+not sent; the card says so. A name the server would empty (only symbols or emoji) is refused at the yes, with "Use
+letters or numbers in the name." The two boards count their answers apart. Checked by the Worker tests (46 pass). Not
+checked on a phone.
