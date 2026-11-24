@@ -1,6 +1,6 @@
 # Pişti (lab experiment)
 
-The Turkish fishing card game for two, on a phone: one hand against a bot, a match to 51, Today's deal, or two players passing one phone. Static page at `/lab/pisti/`. No network calls, no images, no fonts, no build step.
+The Turkish fishing card game for two, on a phone: one hand against a bot, a match to 51, Today's deal, two players passing one phone, or two friends playing by link. Static page at `/lab/pisti/`. Only friend tables use the network. The page uses no images or external fonts and needs no build step.
 
 Files: `sim.js` (rules, pure, seeded), `brain.js` (the bot, pure), `main.js` + `index.html` (the page), `bots.mjs` (rules and bot checks), `check.mjs` (phone check).
 
@@ -28,6 +28,16 @@ Source: https://www.pagat.com/fishing/pishti.html (read 2026-11-24). Pagat descr
 Other choices: bot strength rises one level after a won hand (a won match in match mode) and falls one level after two losses in a row; a new device starts at Easy. Four-colour suits (clubs green, diamonds blue) are on the pause card, off by default. Save key `pisti:v1` (JSON: level, losses, hands, length choice, sound, four colours, one entry per daily date for the last 60 days).
 
 Query options for testing: `?seed=` fixes the Play deal, `?date=YYYY-MM-DD` sets Today's date, `?speed=` divides every delay except the pişti moment, `?hint=0|hand|ring` is the kit's.
+
+## Play a friend
+
+Enter an optional name, then tap **New table** and share the link or the four-letter code. A friend can open the link or enter the code under **Play a friend**. The page remembers the name in `pisti:v1`. Old saves default to an empty name. The room kit keeps each seat's key in browser storage and uses it to restore the seat and hand on reload or reconnect. The server expires idle tables after 24 hours.
+
+The room uses the version 1 Pişti protocol. The server supplies the seed and the ordered log. Seed parity selects the dealer. Both pages replay the log from the seed and apply each valid echoed card once. The screen renders the new position immediately, with the local hand face up and the friend's hand face down. Both names appear on the score card in seat order. **Deal again** starts a fresh hand when both seats vote. The table keeps no running match score.
+
+Both pages know the seed, so a table result proves nothing for shared scoring. It never counts toward bot progression, the loss or played-hand counts, Today's deal, or a shared board. The only network transport is the kit's same-origin room WebSocket. The page sends no lab recording.
+
+The bot suite passed. A Node check ran the actual page code and room client with a simulated DOM and in-memory sockets backed by the real server protocol functions. It checked both seats' hands and scores across 48 plays, held and illegal moves, host and mid-hand reloads, disconnect and catch-up, a full table, rematch votes, and save isolation. The Playwright checks also cover touch, connection lights, code entry, layout at 360×640, and errors. The lab ran `check.mjs` on 2026-11-24 outside the builder's sandbox: the friend checks pass on WebKit iPhone 13 and Chromium Pixel 7, and the screenshots were looked at (two name-label faults found and fixed: the score header wrapped a long name, and WebKit cut a short name because the seat light had no width of its own). The native phone share sheet was not exercised.
 
 ## Bots
 
@@ -59,10 +69,9 @@ Strength hands are 1000 fixed deals played twice with seats swapped. The asserts
 - A real phone: touch feel, frame rate of the brazier, sound, the share sheet (headless WebKit took the share path; no sheet was seen).
 - The level falling after two losses in a row (the code path exists; no check reaches it). The default date without `?date=` (it is `new Date().toISOString()`, so UTC; every check passes `?date=`).
 - A person: whether a stranger captures within twenty seconds and finishes the hand; whether the glow and the shimmer teach without words; whether the bot levels feel different.
-- Lab notes and phone check outside this folder: `kit/check/phone.mjs` has no seed line for `pisti:v1` / `pisti:hint`, `lab/NOTES.md` has no row and `lab/index.html` has no link. The brief limited edits to this folder.
 
 ## Open ideas
 
 - A shared board for Today's deal (margins only; the deal is the same for everyone, so the margin compares fairly).
-- Live tables of four in partnerships on a room server, as pagat's main game.
+- Four-player tables in partnerships, as in pagat's main game.
 - Okey-style tile games as a follow-on in the same style.
