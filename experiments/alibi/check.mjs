@@ -657,13 +657,17 @@ async function runAdvanced(page, profile, url) {
 // check can see which training marks a case draws.
 function countDraws() {
   let now = {};
+  let hands = [];
   let last = -1;
   window.alibiDraws = {};
+  window.alibiHands = [];
   const frame = window.requestAnimationFrame.bind(window);
   window.requestAnimationFrame = callback => frame(time => {
     if (time !== last) {
       window.alibiDraws = now;
+      window.alibiHands = hands;
       now = {};
+      hands = [];
       last = time;
     }
     callback(time);
@@ -674,6 +678,13 @@ function countDraws() {
     proto[kind] = function (...args) {
       const key = kind === 'fill' ? `fill|${this.fillStyle}` : `stroke|${this.strokeStyle}|${this.lineWidth}`;
       now[key] = (now[key] || 0) + 1;
+      // The ghost hand's fingertip, in CSS pixels (art.js draws it at -1,-3).
+      if (kind === 'fill' && this.fillStyle === '#fff0cc') {
+        const m = this.getTransform();
+        const box = this.canvas.getBoundingClientRect();
+        const scale = box.width / this.canvas.width;
+        hands.push({ x: box.left + (m.a * -1 + m.c * -3 + m.e) * scale, y: box.top + (m.b * -1 + m.d * -3 + m.f) * scale });
+      }
       return original.apply(this, args);
     };
   }
@@ -715,9 +726,13 @@ async function checkGuides(page, url) {
   await open(16);
   await choose(1);
   assert.equal(await draws(page, halo), 0, 'chapter III leaves the chosen suspect unmarked in the scene');
-  for (const [level, shown] of [[15, true], [16, false]]) {
+  // Second cold play: after the lesson the mask-on mark (4) keeps its tags,
+  // because a cold player lost a star guessing who put on which mask. The
+  // exchange mark (6) is tagged in the lesson only. This replaced "case 16
+  // shows no tags at mark 4".
+  for (const [level, onMark, exchange] of [[15, true, true], [16, true, false]]) {
     await open(level);
-    for (const beat of [3, 5]) {
+    for (const [beat, shown] of [[3, onMark], [5, exchange]]) {
       await scrub(page, beat);
       const tags = await draws(page, tag);
       assert.equal(tags > 0, shown, `case ${level} mask tags at mark ${beat + 1}`);
@@ -726,16 +741,36 @@ async function checkGuides(page, url) {
     assert.equal(await draws(page, tag), 0, `case ${level} has no mask tags between mask changes`);
   }
   // A player who has not reached the mask lesson meets masks first in the
-  // Daily, so the Daily shows the tags until the campaign teaches them.
+  // Daily, so the Daily also tags the exchange until the campaign teaches it.
+  // A returning player's Daily tags the mask-on mark only (this replaced "no
+  // tags at mark 4 for a player at case 20").
   // bots.mjs asserts that every Daily puts its masks on at mark 4.
-  for (const [level, shown] of [[5, true], [20, false]]) {
+  for (const [level, exchange] of [[5, true], [20, false]]) {
     await page.evaluate(level => localStorage.setItem('alibi-save', JSON.stringify({ level, campaignVersion: 2, stars: {} })), level);
     await page.goto(url.replace('level=1', 'level=0'));
     await see(page, 'menu');
     await press(page, '#daily');
     await see(page, 'play');
     await scrub(page, 3);
-    assert.equal(await draws(page, tag) > 0, shown, `Daily mask tags for a player at case ${level}`);
+    assert.ok(await draws(page, tag) > 0, `Daily mask tags at mark 4 for a player at case ${level}`);
+    await scrub(page, 5);
+    assert.equal(await draws(page, tag) > 0, exchange, `Daily exchange tags for a player at case ${level}`);
+  }
+  // After a miss, the hand points only at a suspect not yet inspected. With
+  // every face seen, a hand on a portrait read as "accuse this one" and walked
+  // a cold player into a loss, so no portrait hand is drawn.
+  const ring = ['fill', '#fff1ce18'];
+  for (const [inspectAll, want] of [[false, true], [true, false]]) {
+    await open(16);
+    const c16 = createCase({ seed, level: 16 });
+    const innocent = c16.cast.filter(person => person.id !== c16.culprit);
+    if (inspectAll) for (const person of c16.cast) await choose(person.id);
+    else await choose(innocent[1].id);
+    await accuse(page, innocent[0].id);
+    await delay(900);
+    assert.equal((await state(page)).stars, 2, 'the miss cost a star');
+    assert.equal(await draws(page, ring) > 0, want,
+      `after a miss with ${inspectAll ? 'every' : 'one'} suspect inspected, a portrait hand is ${want ? '' : 'not '}drawn`);
   }
   // Case 23 became the floor-sound lesson, which brackets the floor sound, so
   // the case without the bracket is now case 24.
@@ -748,6 +783,21 @@ async function checkGuides(page, url) {
     bracket[level] = await draws(page, cream) - before;
   }
   assert.equal(bracket[22] - bracket[24], 4, `the sound bracket shows in the blackout lesson only: ${JSON.stringify(bracket)}`);
+  // Second cold play: in the blackout and floor lessons the ghost finger sat on
+  // the portrait's sound symbol, the symbol being taught. Its tip must now stay
+  // off every portrait's sound strip.
+  for (const level of [22, 23]) {
+    await open(level);
+    await scrub(page, createCase({ level }).blackoutBeat);
+    await draws(page, tag);
+    const { suspects } = (await state(page)).points;
+    const tips = await page.evaluate(() => window.alibiHands);
+    assert.ok(tips.length > 0, `case ${level} blackout shows the ghost finger`);
+    for (const tip of tips) {
+      const covered = suspects.some(s => Math.abs(tip.x - s.x) <= 12 && tip.y >= s.y + 7 && tip.y <= s.y + 23);
+      assert.ok(!covered, `case ${level}: the ghost finger covers a sound symbol at ${tip.x.toFixed(0)},${tip.y.toFixed(0)}`);
+    }
+  }
 }
 
 // The items left open by the middle and late game audit: the claimed-room
@@ -935,6 +985,8 @@ async function checkProgress(page, profile, url) {
   };
 
   await begin(36, { 1: 3, 2: 2, 36: 3 });
+  // Second cold play: the Play button read "36 /36" with a stray space.
+  assert.equal(await page.locator('#progress').innerText(), '36/36', 'Play shows the case count without a stray space');
   await press(page, '#pickCase');
   await see(page, 'cases');
   assert.equal(await page.locator('#caseStars').innerText(), 'Stars 8 of 108');
