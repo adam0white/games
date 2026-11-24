@@ -68,9 +68,9 @@ async function drive(page, options = {}) {
       .sort((a, b) => b.progress - a.progress);
     const a = active.find(other => other.id === lock) ?? active[0];
     lock = a?.id ?? null;
-    const aim = s.level === 13 || s.level === 15 || s.level >= 17
-      ? !s.fused && s.time < 2.5 ? FUSE : a && targetFor(a)
-      : a && targetFor(a);
+    // The breaker trips again on these nights, so mend it whenever no exhibit is near a door.
+    const mend = [13, 15, 16, 17, 18].includes(s.level) && !s.fused && (s.time < 2.5 || !(a?.progress > 0.55));
+    const aim = mend ? FUSE : a && targetFor(a);
     await finger(page, 'pointermove', aim ?? REST);
     await tick(page, 340);
     if (options.mid && !shot && (await state(page)).actors.some(actor => actor.lit && actor.hold > .25)) {
@@ -318,11 +318,13 @@ async function run(page, name, records) {
 
   await page.tap('#long');
   assert.equal((await state(page)).mode, 'long');
+  const firstLongSeed = (await state(page)).seed;
   await tick(page, 2840);
   await page.tap('#pause');
   await page.tap('#toMenu');
   assert.ok((await save(page)).best >= 2);
   await page.tap('#long');
+  assert.notEqual((await state(page)).seed, firstLongSeed, 'each Long Night run draws a new floor');
   await tick(page, 5600);
   const seconds = Math.floor((await state(page)).time);
   assert.ok(seconds >= 5);
@@ -335,6 +337,13 @@ async function run(page, name, records) {
   assert.equal((await state(page)).outcome, 'escaped');
   const longResult = await page.locator('#result').innerText();
   assert.ok(longResult.includes('Survived') && longResult.includes('Best'), 'Long Night distinguishes survival time and personal best');
+  assert.ok(longResult.includes('New record'), 'a run longer than the old best is announced as a new record');
+  if (name === 'small-360') {
+    await open(page, '&level=6');
+    await page.tap('#play');
+    await drive(page);
+    assert.equal(await page.textContent('#outcome'), 'Wing safe', 'clearing a wing ends on its own heading');
+  }
   assert.equal(await page.evaluate(() => Object.keys(localStorage).filter(key => key.includes('nightshift') && key.endsWith('-save')).length), 1);
   for (const outcome of ['dawn', 'escaped', 'left']) {
     assert.ok(records.some(r => r.kind === 'run' && r.data.outcome === outcome && r.game === 'nightshift' && r.runSource === 'agent'), `mocked lab run contains ${outcome}`);

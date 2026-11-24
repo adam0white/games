@@ -52,6 +52,9 @@ let pauseRules = [];
 let effects = [];
 let day = '';
 let nextLevel = null;
+let bestBefore = 0;
+// Long Night draws a new floor each run unless a seed is given in the address.
+const freshSeed = () => crypto.getRandomValues(new Uint32Array(1))[0];
 let cardFile = null;
 let accumulator = 0;
 let previous = null;
@@ -213,8 +216,9 @@ function updateHud() {
 function start(mode = 'story', level = levelOverride ?? profile.unlocked) {
   clearInput();
   day = mode === 'daily' ? dailyKey() : '';
-  const options = mode === 'daily' ? dailyNight(day) : { level: mode === 'long' ? LAST : level, seed: seedOverride ?? DEFAULT_SEED };
+  const options = mode === 'daily' ? dailyNight(day) : { level: mode === 'long' ? LAST : level, seed: seedOverride ?? (mode === 'long' ? freshSeed() : DEFAULT_SEED) };
   state = create({ ...options, mode });
+  bestBefore = profile.best;
   aim = { ...REST };
   waitForAim = mode === 'story' && state.level === 1 && !profile.played;
   showFirstDrag = waitForAim;
@@ -288,14 +292,15 @@ function finish() {
 }
 
 function renderResult() {
-  $('outcome').textContent = t(state.outcome);
+  const milestone = state.mode === 'story' && state.outcome === 'dawn' && state.level % 6 === 0;
+  $('outcome').textContent = t(milestone ? (state.level === LAST ? 'museumSafe' : 'wingSafe') : state.outcome);
   const stars = 3 - state.escapes;
   const escapes = count('escapedCount', state.escapes);
   $('medals').setAttribute('aria-hidden', String(state.mode !== 'long'));
   if (state.mode === 'long') {
     $('medals').textContent = [
       t('survived', { time: time(Math.floor(state.time)) }),
-      t('best', { time: time(profile.best) }),
+      t(Math.floor(state.time) > bestBefore ? 'newBest' : 'best', { time: time(profile.best) }),
     ].join(' · ');
     $('resultDetail').textContent = [count('returnedCount', state.returned), escapes].join(' · ');
   } else {
@@ -510,6 +515,7 @@ function react(event, now) {
     rec.event('escape', { exhibit: actor.kind });
   }
   if (type === 'cat') snd.tone(655, .19, .061, 'sine', -210);
+  if (type === 'trip') snd.tone(160, .32, .1, 'sawtooth', -60);
   if (type === 'fuse') {
     snd.tone(475, .26, .09, 'sine', 243);
     rec.event('fuse', {});
