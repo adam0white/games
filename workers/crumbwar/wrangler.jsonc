@@ -27,5 +27,13 @@
   "version_metadata": { "binding": "VERSION" },
   // Secret, set with `wrangler secret put`: LOADTEST_KEY (lets the load test skip the origin and per-address limits).
   // Logs hold no player data: there are no accounts, names are generated, and addresses are not logged.
-  "observability": { "enabled": true }
+  // Logs, traces and Issues: see workers/OBSERVABILITY.md. scripts/observability.test.mjs requires this block.
+  "upload_source_maps": true,
+  "observability": {
+    "enabled": true,
+    "redact_query_string": true,
+    "logs": { "enabled": true, "invocation_logs": true, "head_sampling_rate": 1 },
+    "traces": { "enabled": true, "head_sampling_rate": 0.1 },
+    "issues": { "enabled": true }
+  }
 }

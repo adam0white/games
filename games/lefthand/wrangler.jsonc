@@ -20,10 +20,12 @@
     ]
   },
   "main": "worker/index.ts",
+  "upload_source_maps": true,
   "observability": {
     "enabled": true,
-    "traces": {
-      "enabled": true
-    }
+    "redact_query_string": true,
+    "logs": { "enabled": true, "invocation_logs": true, "head_sampling_rate": 1 },
+    "traces": { "enabled": true, "head_sampling_rate": 0.1 },
+    "issues": { "enabled": true }
   }
 }
