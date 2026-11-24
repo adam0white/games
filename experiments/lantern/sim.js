@@ -208,6 +208,18 @@ function spawn(s) {
   }
 }
 
+// A tower try that starts part-way up a level (tester t1, note #142): the boat sets off just past floor f's ledge.
+// The water ahead is left empty for as long as a fresh run's (2.2 units at the start's speed), and a start on a
+// waterfall moves to just below it. Rows are still drawn in order from the seed, so the rest of the river is unchanged.
+export function startAt(s, f) {
+  f = Math.max(0, Math.min(FLOORS - 1, Math.floor(f) || 0)); if (!f) return s;
+  let y = f * GOAL / FLOORS + 0.3;
+  for (let d = 0; d < 8 && (fall(s, y) > 0 || fall(s, y + 2) > 0); d += 0.5) y += 0.5; // past the fast water and its lip
+  s.y = y + 2.2 * (1 + Math.min(1, y / GOAL)) - 2.4; spawn(s);
+  s.rocks = []; s.embers = []; s.powers = []; s.y = y; s.x = centre(s, y); s.from = f;
+  return s;
+}
+
 // A blow: a shield left from an old save takes it, else a spare heart does, else the run ends. Returns true when the run ended.
 function blow(s, cause) {
   if (s.shield) { s.shield--; s.safe = 1.2; s.events.push('break'); return false; }

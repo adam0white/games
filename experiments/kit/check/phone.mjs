@@ -310,15 +310,23 @@ const GAMES = {
     await page.click('#go'); assert.equal((await state()).climb, 2, 'after a loss the level is tried again');
     await finger(page, '#pause', [['pointerdown', 0, 0]]); await page.click('#toMenu'); assert.match(await page.textContent('#tower'), /go on at level 2/);
     await page.click('#tower'); assert.equal((await state()).climb, 2, 'the menu climb goes on at level 2');
+    // A lost level is tried again three floors below the floor reached, saved under lantern-tower-floor (note #142).
+    const fromFloor = () => page.evaluate(() => { const s = window.lanternSim(); return { floor: Math.floor(window.lanternState().progress * 10), clear: s.rocks.every(k => k.y0 > s.y + 1.5), climb: s.climb }; });
+    await page.evaluate(() => { const s = window.lanternSim(); s.y = 7 * 7.8 + 0.5; s.rocks = []; s.next = s.y + 2; }); await sleep(300);
+    await page.evaluate(() => { window.lanternSim().light = 0.0001; }); await until(page, () => window.lanternState().screen === 'card', 'lost card on floor 7');
+    assert.match(await page.textContent('#line'), /goes on from level 2, floor 4: three floors below floor 7/); assert.equal(await page.textContent('#go'), 'Try again from floor 4'); assert.equal((await saved())['lantern-tower-floor'], '4');
+    await page.click('#go'); assert.deepEqual(await fromFloor(), { floor: 4, clear: true, climb: 2 }, 'the try starts on floor 4 with open water ahead');
+    await finger(page, '#pause', [['pointerdown', 0, 0]]); await page.click('#toMenu'); assert.match(await page.textContent('#tower'), /go on at level 2, floor 4/);
+    await page.click('#tower'); assert.deepEqual(await fromFloor(), { floor: 4, clear: true, climb: 2 }, 'the menu climb starts on floor 4 too');
     await finger(page, '#pause', [['pointerdown', 0, 0]]); await page.click('#toMenu');
     await page.click('#anew'); assert.equal((await state()).screen, 'menu', 'one tap on new climb only asks'); assert.equal((await saved())['lantern-tower-at'], '2');
-    await page.click('#anew'); assert.equal((await state()).climb, 1, 'a new climb starts at level 1'); assert.equal((await saved())['lantern-tower-at'], '1');
+    await page.click('#anew'); assert.equal((await state()).climb, 1, 'a new climb starts at level 1'); assert.equal((await saved())['lantern-tower-at'], '1'); assert.equal((await saved())['lantern-tower-floor'], '0'); assert.equal((await fromFloor()).floor, 0, 'a new climb starts at the bottom');
     await finger(page, '#pause', [['pointerdown', 0, 0]]); await page.click('#toMenu'); assert.equal(await page.isVisible('#anew'), false);
     // Sector 2 (note #73): level 50 cleared opens 50 more levels, numbered 51 to 100 inside and shown as "sector 2, level N".
-    await page.evaluate(() => localStorage.setItem('lantern-tower-at', '50')); await page.reload();
+    await page.evaluate(() => { localStorage.setItem('lantern-tower-at', '50'); localStorage.setItem('lantern-tower-floor', '5'); }); await page.reload();
     await page.click('#tower'); assert.equal((await state()).climb, 50);
     await page.evaluate(() => { const s = window.lanternSim(); s.y = 77.9; s.safe = 99; }); await until(page, () => window.lanternState().screen === 'card', 'sector card', 12000);
-    assert.equal(await page.textContent('#title'), 'Sector 1 cleared'); assert.equal(await page.textContent('#go'), 'Climb on to sector 2');
+    assert.equal(await page.textContent('#title'), 'Sector 1 cleared'); assert.equal(await page.textContent('#go'), 'Climb on to sector 2'); assert.equal((await saved())['lantern-tower-floor'], '0', 'a cleared level clears the start floor');
     await page.click('#go'); assert.equal((await state()).climb, 51, 'sector 2 is climb 51');
     await page.evaluate(() => { window.lanternSim().light = 0.0001; }); await until(page, () => window.lanternState().screen === 'card', 'sector 2 lost card');
     assert.match(await page.textContent('#line'), /Best 50 of 50\. Your climb goes on from sector 2, level 1/);
