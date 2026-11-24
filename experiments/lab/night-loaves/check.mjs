@@ -8,7 +8,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const shots = '/private/tmp/night-r4-new4';
+const shots = '/private/tmp/night-r5-review/night-loaves';
 const load = createRequire(join(resolve(process.env.PLAYWRIGHT || join(homedir(), 'code/human-framework/node_modules')), 'check.cjs'));
 const { devices, chromium, webkit } = load('playwright');
 const { PNG } = createRequire(load.resolve('playwright'))('playwright-core/lib/utilsBundle');
@@ -90,7 +90,7 @@ async function photograph(page, name, scene) {
   assert.fail('blank photograph: ' + scene);
 }
 
-async function prepare(page, drag, capture) {
+async function prepare(page, drag, capture, captureProofEdge) {
   let s;
   for (let i = 0; i < 20; i++) {
     s = await state(page);
@@ -100,6 +100,14 @@ async function prepare(page, drag, capture) {
       i === 0 && capture ? () => capture('02-fold') : null);
   }
   await stage(page, 'rise');
+  if (captureProofEdge) {
+    s = await state(page);
+    await drag(+s.x, +s.y, 355, 487);
+    const edge = await state(page);
+    assert.equal(edge.stage, 'rise');
+    assert.ok(+edge.x + 66 <= 360 && +edge.y + 68 <= 490, 'the rim and proof meter stay on the bench');
+    await captureProofEdge('08-proof-edge');
+  }
   await stage(page, 'shape');
   s = await state(page);
   await drag(+s.x - 40, +s.y + 4, +s.x + 6, +s.y - 1);
@@ -125,8 +133,10 @@ async function bakeBatch(page, drag, capture) {
   for (let i = 0; i < loafCount; i++) {
     const last = i === loafCount - 1;
     if (last) {
+      assert.equal(await page.locator('#instruction').textContent(), 'Wait to share');
       const arrival = +s.time + 1.3;
       await page.waitForFunction(t => +document.querySelector('#bakery').dataset.time >= t, arrival, {polling: 50, timeout: 8000});
+      assert.equal(await page.locator('#instruction').textContent(), 'Sell or share');
       if (capture) await capture('04-last-loaf');
     }
     s = await state(page);
@@ -173,6 +183,8 @@ try {
       await page.bringToFront();
       if (name === 'webkit') await wakeDisplay(page);
       await stage(page, 'knead');
+      const shapeFill = await page.locator('#track span').nth(2).evaluate(el => +el.style.getPropertyValue('--fill'));
+      assert.equal(shapeFill, 0, 'the shape indicator starts empty');
       const capture = scene => photograph(page, name, scene);
       await capture('01-opening');
       const drag = await touchDrag(page, name);
@@ -191,12 +203,20 @@ try {
       await page.locator('#next').waitFor({state:'visible'});
       await page.tap('#next');
       await stage(page, 'knead');
+      const portrait = page.viewportSize();
+      await page.setViewportSize({ width: portrait.height, height: portrait.width });
+      await capture('06-landscape');
       await page.tap('#pause');
       await page.locator('#resume').waitFor({state:'visible'});
+      const selector = await page.locator('#mornings').boundingBox();
+      assert.ok(selector.height >= 44, 'the morning picker has a 44 CSS pixel tap target');
+      console.log(name, 'landscape morning picker height', selector.height);
+      await capture('07-landscape-pause');
       const paused = await state(page);
       await sleep(420);
       assert.deepEqual(await state(page), paused, 'pause freezes the scene');
       await page.tap('#sound');
+      await page.setViewportSize(portrait);
       await page.tap('#resume');
       await page.tap('#pause');
       await page.tap('#endless');
@@ -207,14 +227,47 @@ try {
       assert.equal(best, endless.score, 'the first endless score is the device best');
       await page.tap('#next');
       await stage(page, 'knead');
+      await drag(126, 364, 203, 349);
+      assert.ok(+(await state(page)).work > 0, 'the batch has started before reload');
       await page.reload();
       await stage(page, 'knead');
+      assert.equal((await state(page)).work, '0.000', 'reload starts a fresh unlocked morning');
       assert.equal((await stored(page)).best, best);
-      await prepare(page, drag);
+      await prepare(page, drag, null, capture);
+      const loaded = await state(page);
+      await drag(+loaded.x, +loaded.y, 165, 350, async () => {
+        assert.ok(+(await state(page)).y > 240, 'the loaf is held away from the oven');
+        await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+        await page.locator('#resume').waitFor({state:'visible'});
+      });
+      const away = await state(page);
+      assert.equal(away.x, loaded.x, 'leaving restores the held loaf to its pickup point');
+      assert.equal(away.y, loaded.y, 'leaving restores the held loaf to its pickup point');
+      await sleep(420);
+      assert.deepEqual(await state(page), away, 'leaving freezes the bake');
+      await page.tap('#resume');
       await stage(page, 'burnt');
       await page.tap('#retry');
       await stage(page, 'knead');
       assert.equal((await stored(page)).best, best, 'burning a batch preserves the device best');
+      await drag(126, 364, 203, 349);
+      const beforeLeaving = await state(page);
+      assert.ok(+beforeLeaving.work > 0);
+      await page.evaluate(() => {
+        window.addEventListener('pagehide', event => {
+          sessionStorage.setItem('check-pagehide', JSON.stringify({
+            trusted: event.isTrusted,
+            paused: document.querySelector('#paused').classList.contains('on'),
+            work: document.querySelector('#bakery').dataset.work,
+          }));
+        }, { once: true });
+      });
+      await page.goto('about:blank');
+      await page.goBack();
+      await stage(page, 'knead');
+      const pagehide = await page.evaluate(() => JSON.parse(sessionStorage.getItem('check-pagehide')));
+      assert.deepEqual(pagehide, {trusted:true, paused:true, work:beforeLeaving.work}, 'leaving the tab pauses the current work');
+      assert.equal((await stored(page)).best, best, 'returning to the bakery preserves the device best');
       assert.deepEqual(errors, [], 'page errors, failed responses and unexpected requests');
       console.log(JSON.stringify({name, morning, endless, best, errors:errors.length}));
     } finally { await browser.close(); }

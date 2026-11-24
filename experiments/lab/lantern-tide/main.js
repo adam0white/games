@@ -25,7 +25,7 @@ let playingSound = read(keys.sound) !== '0';
 const audio = sound({ on: () => playingSound });
 const arrows = new Set();
 let width = 0, height = 0, screen, game, target, previousFrame, accum = 0, clock = 0, ending = 0, turn = 0;
-const unlocked = readNumber(keys.night, 1) === LAST_NIGHT;
+let unlocked = readNumber(keys.night, 1) === LAST_NIGHT;
 let night = tide && unlocked ? LAST_NIGHT : 1;
 
 const show = screens(['ready', 'paused', 'end'], name => {
@@ -41,6 +41,8 @@ function prepare() {
   game = create(night === 1 ? FIRST_SEED : SECOND_SEED, night, tide);
   target = game.river.x;
   accum = ending = turn = 0;
+  el('other-night').hidden = !tide || !unlocked;
+  el('other-night').textContent = night === 1 ? 'Sail second night' : 'Sail first night';
   el('hull').replaceChildren(...Array.from({ length: game.river.hearts }, () => document.createElement('i')));
   updateHud();
 }
@@ -87,7 +89,6 @@ function finish() {
   const { over, t } = game.river;
   const win = over === 'dawn';
   const next = win && night < LAST_NIGHT;
-  if (next && tide) write(keys.night, LAST_NIGHT);
   el('result').textContent = win ? 'Dawn' : over === 'dark' ? 'The flame went out' : 'Boat lost';
   el('reading').textContent = win ? Math.ceil(t) + ' s across the river' : Math.floor(progress(game) * 100) + '% to dawn';
   el('next').hidden = !next;
@@ -99,6 +100,7 @@ el('start').onclick = launch;
 el('pause').onclick = pause;
 el('resume').onclick = resume;
 el('restart').onclick = restart;
+el('other-night').onclick = () => { night = night === 1 ? LAST_NIGHT : 1; restart(); };
 el('again').onclick = restart;
 el('next').onclick = () => { night++; restart(); };
 el('sound').onclick = () => {
@@ -123,10 +125,14 @@ const steering = drag(canvas, {
   from: () => game.river.x,
   travel: dx => dx * GAIN / view.pixelsPerUnit(),
   aim: x => { target = x; help.done(); },
-  mouse: event => { target = game.river.x + (event.clientX - view.boatPosition()[0]) / view.pixelsPerUnit(); },
+  mouse: event => {
+    target = game.river.x + (event.clientX - view.boatPosition()[0]) / view.pixelsPerUnit();
+    if (event.type === 'pointermove') help.done();
+  },
   settle: 12,
 });
-const help = hint(canvas, {
+// Steering dismisses the hint. A tap on the river only launches or places a finger.
+const help = hint(el('ready'), {
   kind: 'drag',
   key: keys.hint,
   when: () => screen === 'play' && !game.river.over,
@@ -169,6 +175,10 @@ function tick() {
     }
     if (event === 'out') audio.tone(135, .45, .04, 'sine', -62);
     if (event === 'dawn') {
+      if (tide && night < LAST_NIGHT) {
+        unlocked = true;
+        write(keys.night, LAST_NIGHT);
+      }
       audio.tone(493.88, .70, .07);
       audio.tone(739.99, .85, .04);
     }
@@ -176,13 +186,23 @@ function tick() {
   if (s.over) steering.reset();
 }
 
+function draw() {
+  view.draw(game, width, height, calm.matches ? 0 : clock, turn, ending);
+}
 function resize() {
-  width = canvas.clientWidth;
-  height = canvas.clientHeight;
+  const nextWidth = canvas.clientWidth;
+  const nextHeight = canvas.clientHeight;
   const dpr = Math.min(devicePixelRatio || 1, 2);
+  if (screen === 'play' && width !== nextWidth) {
+    steering.reset();
+    target = game.river.x;
+  }
+  width = nextWidth;
+  height = nextHeight;
   canvas.width = width * dpr;
   canvas.height = height * dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  draw();
 }
 function frame(now) {
   requestAnimationFrame(frame);
@@ -199,13 +219,12 @@ function frame(now) {
       updateHud();
     }
   }
-  view.draw(game, width, height, calm.matches ? 0 : clock, turn, ending);
+  if (screen !== 'paused') draw();
 }
 addEventListener('resize', resize);
 prepare();
 show('ready');
 resize();
-view.draw(game, width, height, 0, 0, 0);
 requestAnimationFrame(frame);
 
 if (query.get('check') === '1') {

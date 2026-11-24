@@ -1,4 +1,4 @@
-import { heatAt } from './sim.js';
+import { GUEST_ARRIVAL, heatAt } from './sim.js';
 
 const ink = '#302a2c', flax = '#fff0bf', TAU = Math.PI * 2;
 const palettes = {
@@ -268,8 +268,8 @@ export function draw(c,g,t,look='indigo'){
   if(g.stage==='serve'||g.stage==='done'){
     visitor(c,59,216,false,t,g.served ? 1 : g.age,g.served);
     oval(c,69,205,4.5,4.5,'#9a663b');oval(c,69,204,3.8,3.8,'#f3ce7c');
-    if(g.remaining===1&&g.age>=1||g.gifts>0){
-      visitor(c,127,218,true,t,g.gifts?1:g.age-1,0);heart(c,139,190+Math.sin(t*2));
+    if((g.remaining===1&&g.age>=GUEST_ARRIVAL)||g.gifts>0){
+      visitor(c,127,218,true,t,g.gifts?1:g.age-GUEST_ARRIVAL,0);heart(c,139,190+Math.sin(t*2));
     }
   }
   if((g.stage==='serve'||g.stage==='done')&&g.served>0&&g.age<1.25){
@@ -301,7 +301,7 @@ export function draw(c,g,t,look='indigo'){
     if(g.stage==='shape'&&!g.shaped)gesture(c,g.x+44,g.y-6,g.x+2,g.y+1,t,8);
     if(g.stage==='shape'&&g.shaped)gesture(c,g.x,g.y-10,246,145,t,16);
     if(g.stage==='bake'&&g.brown>=.66)gesture(c,g.x,g.y+2,164,350,t,-22);
-    if(g.stage==='serve')gesture(c,g.x,g.y-7,g.remaining===1&&g.age>=1?136:67,214,t,-7);
+    if(g.stage==='serve'&&(g.remaining>1||g.age>=GUEST_ARRIVAL))gesture(c,g.x,g.y-7,g.remaining===1?136:67,214,t,-7);
   }
   c.restore();
 }

@@ -1,4 +1,4 @@
-import { createGame, down, move, up, cancel, step, GOLD, BURNT } from './sim.js';
+import { createGame, down, move, up, cancel, step, GOLD, BURNT, GUEST_ARRIVAL } from './sim.js';
 import { draw } from './art.js';
 import { readJson, writeJson } from '../../kit/save.js';
 import { sound } from '../../kit/audio.js';
@@ -151,14 +151,15 @@ const copy = {
 function put(el, text) { if (el.textContent !== text) el.textContent = text; }
 function update() {
   const golden = g.brown >= GOLD;
+  const lastLoaf = g.stage === 'serve' && g.remaining === 1;
   const action = g.stage === 'bake' && golden ? 'Pull it out' :
     g.stage === 'shape' && g.shaped ? (g.last === 'pale' ? 'A little longer in the oven' : 'Slide it into the oven') :
-    g.stage === 'serve' && g.remaining === 1 ? 'One loaf left' : copy[g.stage];
+    lastLoaf ? (g.age < GUEST_ARRIVAL ? 'Wait to share' : 'Sell or share') : copy[g.stage];
   put($('instruction'), action);
   put($('loaves'), g.remaining + (g.remaining === 1 ? ' loaf' : ' loaves'));
   put($('points'), (carried + g.score) + ' points');
   const stageIndex = stages.indexOf(g.stage);
-  const progress = [g.work, g.proof, g.shaped ? 1 : .05, g.brown / BURNT, g.served / g.batchSize];
+  const progress = [g.work, g.proof, Number(g.shaped), g.brown / BURNT, g.served / g.batchSize];
   for (const [i, bar] of [...$('track').children].entries()) {
     const fill = String(Math.min(1,progress[i]).toFixed(2));
     if (bar.style.getPropertyValue('--fill') !== fill) bar.style.setProperty('--fill',fill);

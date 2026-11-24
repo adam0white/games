@@ -37,7 +37,7 @@ The endless bot completed **12 successive goals on each of 10 seeds**, scoring *
 
 ### Reproduce
 
-Run from the repository root. The phone check resolves Playwright from `$PLAYWRIGHT` or `~/code/human-framework/node_modules` and starts its own local server. Images go under `/private/tmp/night-r4-new3/`.
+Run from the repository root. The phone check resolves Playwright from `$PLAYWRIGHT` or `~/code/human-framework/node_modules` and starts its own local server. Images from this run went under `/private/tmp/night-r4-new3/`.
 
 ```sh
 fnm exec --using=26.12.0 node experiments/lab/night-kite/bots.mjs
@@ -59,3 +59,18 @@ The sustained drag used trusted mouse input on WebKit and trusted touch on Chrom
 A Chromium touch exposed a result-card bug. A finger still on the field at the end of a flight could activate the newly appeared Next button when lifted. A pointer click on a card now requires the press to have started on that button. The check asserts that releasing the finishing gesture leaves the result open. Idle rendering was reduced to 24 frames per second during investigation of intermittent headless WebKit stalls. The final run used the normal 2D canvas on both engines.
 
 The shared kit self-test passed on both profiles. The broader pre-change catalogue run had WebKit timeouts on existing pages, including Lantern and Ant Promotion, and was stopped. The new page's own check covers its controls and saves. Real-device frame rate, audio by ear and first-time play by a stranger remain unverified.
+
+## 2026-11-24 — phone play review
+
+- A stationary tap on the illustrated kite started flight 1 with zero goals and removed the only steering cue. The opening now says “Drag the spool” and keeps the animated path visible until the player moves the captured finger 8 CSS pixels, presses a steering key or clears the goal. The 8-pixel distance lets small movements during a tap preserve the cue. The check taps the kite, reads the unchanged instruction after 0.25 simulated seconds, and clears the flight by dragging from the pictured guide origin (180, 470) to (245, 399). It then retries and clears by tapping the birds.
+- The landscape title squeezed Pause to 35.89 × 44 CSS pixels on both phone profiles. At 568 × 320 the page extended to 337 CSS pixels on WebKit and 335 on Chromium. The Flight book's Back button ended at y=354.14 on both. The landscape title now fits on one line at 44 px and Pause retains 44 × 44. Compact landscape puts the pause actions and Flight book controls in columns. The check steers after rotation, requires a 568 × 320 document with no scroll, and verifies the buttons, all ten flight targets and the endless Land control fit with 44 × 44 minimum targets.
+- Both clean profiles played through all ten flights and 21 goals, including every delivery and squall, then entered endless from both the final receipt and the Flight book. Both paused, returned from a background lifecycle event, navigated away and back, reloaded during flight 2 and retained a best of 152 after landing and reloading. A separate navigation probe observed trusted `pagehide` with the flight paused at 0.283 s on WebKit and 0.317 s on Chromium. Back opened the saved flight. The lifecycle check also simulates hiding the document because a second headless test tab leaves the first tab visible on this host.
+
+| Phone profile | Opening drag (sim / wall s) | Opening retry tap (sim / wall s) | Flights 2–10 (sim s) | Animation-frame interval p95 | Intervals above 34 ms |
+| --- | ---: | ---: | --- | ---: | ---: |
+| WebKit iPhone 13 | 1.317 / 2.087 | 1.167 / 1.924 | 4.917, 2.517, 7.867, 3.233, 8.750, 9.483, 7.600, 9.467, 15.167 | 20.0 ms | 61 / 5,622 |
+| Chromium Pixel 7 | 1.283 / 2.113 | 1.167 / 1.945 | 5.033, 2.550, 8.083, 3.217, 8.750, 9.450, 7.633, 9.450, 16.583 | 16.8 ms | 2 / 4,965 |
+
+Frame intervals include the headless browser, result transitions and captures during the campaign. Both checks exited 0 and observed zero browser errors, external requests and telemetry requests. The opening limit is still 60 wall seconds, and the earlier flights 2–5 keep their 18-second automation budget. Newly covered flights 6–10 get 27 wall seconds to accommodate flight 10's 15–17 simulated seconds and the result animation. The shared kit self-test passed before and after on both engines.
+
+The bot run exited 0, cleared 100/100 seeded campaign flights and all 10 built-in flights, and cleared 12 endless goals on each of 10 seeds. The mutation exited 1 at the opening-ring assertion. The review inspected 34 final captures and six landscape baseline captures in `/private/tmp/night-r5-review/kite/`. Chromium used trusted touch drags. WebKit used trusted mouse drags in the iPhone viewport. Both used trusted touch taps. First-time discovery by an unaided player, frame pacing and sound on physical phones, and live delivery remain unverified.

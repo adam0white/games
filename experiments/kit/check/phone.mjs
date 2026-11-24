@@ -101,7 +101,9 @@ async function savedPhone(page, g) {
     }
     await wait(s => s.screen === 'play', 'play');
   };
-  await page.goto(`${base}${g.path}?labRunSource=agent`);
+  const url = new URL(g.path, base);
+  url.searchParams.set('labRunSource', 'agent');
+  await page.goto(url.href);
   await until(page, g.state, 'game script');
   await page.evaluate(seeds => { for (const [k, v] of Object.entries(seeds)) localStorage.setItem(k, v); localStorage.setItem('notes.k', 'check'); }, g.seeds);
   await page.reload(); await until(page, g.state, 'game script after seeded reload');
@@ -115,6 +117,7 @@ async function savedPhone(page, g) {
   if (g.startsOnBoard) assert.equal(await page.evaluate(() => window.audioLog.made), 1, 'first input starts one audio context');
   await shot(page, 'play');
   await pause();
+  await g.verifyPaused?.(page);
   const t = (await state()).t; await sleep(300);
   assert.equal((await state()).t, t, 'time stands still while paused'); await shot(page, 'paused');
   const toggleSound = async () => {
@@ -233,6 +236,21 @@ async function noZoomed(page) {
   });
   assert.match(r.meta, /maximum-scale=1/); assert.deepEqual(r.loose, [], 'no visible element at touch-action auto'); assert.ok(r.cancelled, 'a double tap does not zoom');
 }
+function observeHintTiming({ board, start, result }) {
+  let eligible, shown;
+  const observer = new MutationObserver(() => {
+    const hint = document.querySelector('.kit-hint');
+    if ((board && hint) || (result && document.querySelector(result))) eligible ??= performance.now();
+    if (hint?.classList.contains('on')) {
+      shown = performance.now();
+      observer.disconnect();
+    }
+  });
+  if (start) document.querySelector(start).addEventListener('click', () => { eligible = performance.now(); }, { capture: true, once: true });
+  observer.observe(board ? document : document.body, { childList: !!board, attributes: true, attributeFilter: ['class'], subtree: true });
+  window.checkHintDelay = () => shown - eligible;
+}
+
 // The first-time help (kit/hint.js). On a fresh save: not on the menu, not before the delay, shown after it, hidden while the
 // pause card covers the game, and a real press on it reaches the game (it never takes input). The press ends it for good and
 // writes its key. A returning player (the game's own save, or the hint's key alone) never sees it. With reduced motion it stands
@@ -240,6 +258,8 @@ async function noZoomed(page) {
 // press reach the game), alive (keep the run going while the check waits), legacy (a save in the game's existing format).
 async function hinted(page, g) {
   if (g.prepare) await g.prepare(page);
+  // These boards start counting at launch. Observe the mounted hint before navigation can finish.
+  if (g.timing?.board) await page.addInitScript(observeHintTiming, g.timing);
   const on = () => page.evaluate(() => !!document.querySelector('.kit-hint.on'));
   // Leave the game first: a game may save as its page goes away (Ant Promotion does), which would make this player a returning one.
   const fresh = async (seed = {}) => {
@@ -249,32 +269,27 @@ async function hinted(page, g) {
     await readyRenderer(page, g);
     await page.waitForSelector(g.play);
   };
-  const play = async () => { if (g.start) await g.start(page, { finger, until }); else await page.click(g.play); if (g.alive) await page.evaluate(g.alive); };
+  const play = async () => {
+    if (g.start) await g.start(page, { finger, until });
+    else if (!g.timing?.board) await page.click(g.play);
+    if (g.alive) await page.evaluate(g.alive);
+  };
   const idle = async ms => { for (let t = 0; t < ms; t += 500) { if (g.alive) await page.evaluate(g.alive); await sleep(500); } };
   await fresh();
   if (!g.timing) await sleep(g.delay + 500);
-  assert.equal(await on(), false, 'hint: hidden before the tutorial starts');
-  if (g.timing) {
-    // Record the transition in the page so cross-process delays cannot skip the early assertion.
-    await page.evaluate(({ start, result }) => {
-      let eligible, shown;
-      const observer = new MutationObserver(() => {
-        if (result && document.querySelector(result)) eligible ??= performance.now();
-        if (document.querySelector('.kit-hint.on')) {
-          shown = performance.now();
-          observer.disconnect();
-        }
-      });
-      if (start) document.querySelector(start).addEventListener('click', () => { eligible = performance.now(); }, { capture: true, once: true });
-      observer.observe(document.body, { attributes: true, attributeFilter: ['class'], subtree: true });
-      window.checkHintDelay = () => shown - eligible;
-    }, g.timing);
+  if (!g.timing?.board) {
+    assert.equal(await on(), false, 'hint: hidden before the tutorial starts');
+    if (g.timing) await page.evaluate(observeHintTiming, g.timing);
   }
   await play();
   if (!g.timing) { await sleep(g.delay / 2); assert.equal(await on(), false, 'hint: not before the delay'); }
   await until(page, () => !!document.querySelector('.kit-hint.on'), 'hint: shown after the delay', g.delay + 8000); // CI's software WebGL draws lantern-3d at a few frames a second
   // The kit can count up to 250 ms from the frame just before the start action.
   if (g.timing) assert.ok(await page.evaluate(() => window.checkHintDelay()) >= g.delay - 250, 'hint: not before the delay');
+  if (shots && g.timing) await until(page, () => {
+    const hint = document.querySelector('.kit-hint.on');
+    return hint && getComputedStyle(hint).opacity === '1';
+  }, 'hint: entrance animation finished');
   await shot(page, 'hint');
   assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.kit-hint .label')).display), 'none', 'hint: no words while it moves');
   if (!g.timing?.result) {
@@ -949,8 +964,9 @@ const GAMES = {
 
 // Every new page has its own save seed, controls and first-time help contract beside its registration.
 for (const [slug, g] of Object.entries({ ...pages, ...labPages })) {
-  GAMES[slug] = page => savedPhone(page, { ...g, path: `/${slug}/` });
-  if (g.hint) GAMES[`hint ${slug}`] = page => hinted(page, { path: `/${slug}/`, play: g.play ?? '#play', resume: g.resume ?? '#resume', prepare: g.prepare, start: g.start, waitInput: true, waitHintState: true, ...g.hint });
+  const path = `/${slug}/${g.query ? `?${g.query}` : ''}`;
+  GAMES[slug] = page => savedPhone(page, { ...g, path });
+  if (g.hint) GAMES[`hint ${slug}`] = page => hinted(page, { path, play: g.play ?? '#play', resume: g.resume ?? '#resume', prepare: g.prepare, start: g.start, waitInput: true, waitHintState: true, ...g.hint });
 }
 
 const [onlyGame, onlyPhone] = process.argv.slice(2);

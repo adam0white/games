@@ -7,10 +7,15 @@ import { homedir } from 'node:os';
 import { dirname, extname, join, resolve } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
-import { steer } from './bots.mjs';
+import { ride, steer } from './bots.mjs';
+import { SECOND_SEED } from './sim.js';
+
+const delayed = ride(SECOND_SEED, true, 2, 1);
+assert.equal(delayed.over, 'dawn', 'the last night tolerates a 100 ms steering delay');
+console.log('Night 2 with 100 ms steering delay:', +delayed.t.toFixed(2), 's');
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const shots = '/private/tmp/night-r4-tide';
+const shots = '/private/tmp/night-r5-review/lantern-tide';
 const prefix = '/lab/lantern-tide/';
 const fallback = join(homedir(), 'code/human-framework/node_modules');
 const requirePlaywright = createRequire(join(resolve(process.env.PLAYWRIGHT || fallback), 'check.cjs'));
@@ -52,14 +57,13 @@ async function touchDriver(page, browser) {
       const [x, y] = view.point;
       if (!session) return page.mouse.move(x + (target - view.game.river.x) * view.scale, y);
       // A hit re-anchors the shared drag. Begin a fresh gesture there.
-      if (held && (hearts !== view.game.river.hearts || Math.abs(target - startBoat) * view.scale / 1.3 > x * .8)) {
+      if (held && (hearts !== view.game.river.hearts || Math.abs(target - startBoat) * view.scale / 1.3 > startX * .8)) {
         await this.release();
       }
       if (!held) {
-        startX = page.viewportSize().width / 2;
-        startBoat = view.game.river.x;
-        hearts = view.game.river.hearts;
-        await event('touchStart', startX, y);
+        await event('touchStart', page.viewportSize().width / 2, y);
+        const anchor = await page.evaluate(() => window.checkTouchAnchor);
+        ({ x: startX, boat: startBoat, hearts } = anchor);
         held = true;
       }
       const next = startX + (target - startBoat) * view.scale / 1.3;
@@ -71,34 +75,40 @@ async function touchDriver(page, browser) {
   };
 }
 
-async function crossing(page, input) {
-  // Feed the normal pointer handlers. The controller has the same update rate
-  // and the same lookahead as the seeded water reader in the bot check.
+async function crossing(page, input, night, browserName) {
+  // Feed the normal pointer handlers at 10 Hz. Mouse steering on the longer
+  // course leaves more room around rocks when browser input arrives late.
   const started = Date.now();
-  let moves = 0, last = -1;
+  const touch = browserName === 'chromium';
+  const margin = !touch && night === 2 ? { bankMargin: .038, rockMargin: .055, samples: 15 } : undefined;
+  let moves = 0, next = 0;
   try {
     while (Date.now() - started < 60000) {
       const view = await state(page);
       const { game, screen: showing } = view;
       const s = game.river;
       if (s.over) {
+        if (s.over === 'dawn' && night === 1) {
+          assert.equal(await page.evaluate(() => localStorage.getItem('lantern-tide:night')), '2',
+            'the unlock is saved at dawn, before the result card');
+        }
         await screen(page, 'end');
-        assert.equal(s.over, 'dawn', `level 1 through pointer input (reached ${s.y.toFixed(2)})`);
-        assert.ok(s.t < 60, 'level 1 finishes in under a simulated minute');
-        assert.ok(Date.now() - started < 60000, 'level 1 finishes in under a wall-clock minute');
+        assert.equal(s.over, 'dawn', `night ${night} through pointer input (reached ${s.y.toFixed(2)})`);
+        assert.ok(s.t < 60, `night ${night} finishes in under a simulated minute`);
+        assert.ok(Date.now() - started < 60000, `night ${night} finishes in under a wall-clock minute`);
         assert.ok(game.rested > 0, 'an eddy relit the wick');
         return { seconds: +s.t.toFixed(2), wall: +((Date.now() - started) / 1000).toFixed(2), moves,
           embers: s.taken, lives: s.hearts, relit: +game.rested.toFixed(3) };
       }
       assert.equal(showing, 'play');
-      if (s.t - last >= .097) {
-        await input.drag(view, steer(game, true));
-        last = s.t;
+      if (s.t >= next) {
+        await input.drag(view, steer(game, true, margin));
+        next = touch ? (Math.floor((s.t + .003) * 10) + 1) / 10 - .003 : s.t + .097;
         moves++;
       }
-      await sleep(35);
+      await sleep(10);
     }
-    assert.fail('the first crossing did not end within one minute');
+    assert.fail(`night ${night} did not end within one minute`);
   } finally {
     await input.release();
   }
@@ -168,6 +178,21 @@ async function check(engine, browserName, device) {
     await page.addInitScript(() => {
       window.checkFrames = 0;
       requestAnimationFrame(function count() { window.checkFrames++; requestAnimationFrame(count); });
+      window.checkRiverPaints = null;
+      const { fillRect } = CanvasRenderingContext2D.prototype;
+      CanvasRenderingContext2D.prototype.fillRect = function (x, y, width, height) {
+        if (window.checkRiverPaints !== null && this.canvas.id === 'river' && x === 0 && y === 0
+            && width === this.canvas.clientWidth && height === this.canvas.clientHeight) {
+          window.checkRiverPaints++;
+        }
+        return fillRect.call(this, x, y, width, height);
+      };
+      // The kit anchors at pointerdown. The boat may move between a host poll and touch dispatch.
+      addEventListener('pointerdown', event => {
+        if (!event.isTrusted || !event.isPrimary || event.pointerType !== 'touch' || event.target.id !== 'river') return;
+        const { x, hearts } = window.tideState().game.river;
+        window.checkTouchAnchor = { x: event.clientX, boat: x, hearts };
+      }, true);
     });
     const bad = [], outside = [];
     page.on('pageerror', error => bad.push(error.message));
@@ -189,40 +214,106 @@ async function check(engine, browserName, device) {
     await shot('opening');
     assert.equal((await state(page)).game.river.t, 0, 'the river waits for the player');
 
+    const landscape = { width: viewport.height, height: viewport.width };
+    await page.setViewportSize(landscape);
+    await paint(page, browserName);
+    const title = await page.locator('#title').boundingBox();
+    assert.ok(title.y + title.height + 24 <= (await state(page)).point[1], 'the landscape title clears the lantern');
+    await shot('landscape-opening');
+    await page.setViewportSize({ width: 568, height: 280 });
+    const shortLaunch = await page.locator('#start').boundingBox();
+    assert.ok(shortLaunch.y + shortLaunch.height <= 272, 'the launch button fits a short landscape viewport');
+    await shot('short-landscape-opening');
+    await page.setViewportSize(viewport);
+    await paint(page, browserName);
+
     await page.locator('#start').tap();
+    await page.touchscreen.tap(viewport.width / 2, viewport.height * .8);
+    assert.equal(await page.evaluate(() => localStorage.getItem('lantern-tide:hint')), null,
+      'a stationary tap does not count as steering');
     await page.locator('.kit-hint.on .knob').waitFor({ state: 'visible' });
     await shot('steering-hint');
     const input = await touchDriver(page, browserName);
     const before = await state(page);
     await input.drag(before, before.game.river.x + .12);
     await page.waitForFunction(x => window.tideState().target > x + .08, before.game.river.x);
+    await page.evaluate(() => {
+      addEventListener('resize', () => {
+        const { game, target } = window.tideState();
+        window.checkResize = [target, game.river.x];
+      }, { once: true });
+    });
+    await page.setViewportSize(landscape);
+    await page.waitForFunction(() => window.checkResize, null, { polling: 40 });
+    const [rotatedTarget, rotatedBoat] = await page.evaluate(() => window.checkResize);
+    assert.equal(rotatedTarget, rotatedBoat, 'rotation releases the old steering target');
     await input.release();
+    await page.setViewportSize(viewport);
+    await paint(page, browserName);
     await shot('current');
     assert.equal(await page.evaluate(() => localStorage.getItem('lantern-tide:hint')), '1');
     await page.keyboard.press('Escape');
     await screen(page, 'paused');
     const paused = (await state(page)).game.river;
+    const pausedPaints = await page.evaluate(() => (window.checkRiverPaints = 0));
     await sleep(240);
     assert.deepEqual((await state(page)).game.river, paused, 'pause freezes the river');
+    assert.equal(await page.evaluate(() => window.checkRiverPaints), pausedPaints, 'the paused canvas does not repaint');
     await page.locator('#sound').tap();
     assert.equal(await page.locator('#sound').getAttribute('aria-pressed'), 'false');
     await shot('paused');
+    await page.setViewportSize(landscape);
+    await paint(page, browserName);
+    assert.ok(await page.evaluate(() => window.checkRiverPaints) > pausedPaints, 'rotation repaints the paused river');
+    await page.evaluate(() => { window.checkRiverPaints = null; });
+    assert.deepEqual((await state(page)).game.river, paused, 'rotation preserves the paused simulation');
+    await shot('landscape-paused');
+    await page.setViewportSize(viewport);
     await page.locator('#resume').tap();
     await page.waitForFunction(t => window.tideState().game.river.t > t, paused.t);
+    await page.evaluate(() => {
+      addEventListener('pagehide', () => sessionStorage.setItem('lantern-tide:check-left', window.tideState().screen), { once: true });
+    });
+    await page.goto(url + '?check=1&look=mauve');
+    assert.equal(await page.evaluate(() => sessionStorage.getItem('lantern-tide:check-left')), 'paused',
+      'leaving the page through navigation pauses live play');
+    await page.goBack();
+    if ((await state(page)).screen === 'ready') await page.locator('#start').tap();
+    else await page.locator('#resume').tap();
     await page.locator('#pause').tap();
     await page.locator('#restart').tap();
-    const result = await crossing(page, input);
+    const result = await crossing(page, input, 1, browserName);
     assert.equal(await page.locator('#result').textContent(), 'Dawn');
     await shot('dawn');
     await page.locator('#next').tap();
     assert.equal((await state(page)).night, 2);
     assert.equal(await page.evaluate(() => localStorage.getItem('lantern-tide:night')), '2');
+    await page.waitForFunction(() => window.tideState().game.river.t >= .3);
     await page.reload();
     await screen(page, 'ready');
     assert.equal((await state(page)).night, 2, 'the second night is saved');
+    assert.equal((await state(page)).game.river.t, 0, 'reloading mid-crossing restarts at launch');
     await page.locator('#start').tap();
     await page.locator('#pause').tap();
     assert.equal(await page.locator('#sound').getAttribute('aria-pressed'), 'false', 'mute is saved');
+    await page.locator('#other-night').tap();
+    assert.equal((await state(page)).night, 1, 'the opening remains playable after unlocking night 2');
+    assert.equal(await page.evaluate(() => localStorage.getItem('lantern-tide:night')), '2', 'replaying preserves the unlock');
+    await page.locator('#pause').tap();
+    await page.getByRole('button', { name: 'Sail second night' }).tap();
+    assert.equal((await state(page)).night, 2, 'replaying does not strand the player on the first night');
+    const second = await crossing(page, input, 2, browserName);
+    assert.equal(await page.locator('#result').textContent(), 'Dawn');
+    assert.ok(await page.locator('#next').isHidden(), 'the last night has no further level');
+    await shot('last-dawn');
+    await page.locator('#again').tap();
+    assert.equal((await state(page)).night, 2, 'sail again repeats the last night');
+    await screen(page, 'end');
+    assert.equal(await page.locator('#again').textContent(), 'Try again', 'a loss offers a retry');
+    await shot('lost');
+    await page.locator('#again').tap();
+    await screen(page, 'play');
+    assert.equal((await state(page)).night, 2, 'retry repeats the lost night');
     await page.goto(url + '?check=1&tide=0');
     await screen(page, 'ready');
     assert.equal((await state(page)).game.tide, false);
@@ -233,7 +324,7 @@ async function check(engine, browserName, device) {
     assert.equal(feedback.searchParams.get('game'), 'lab');
     assert.deepEqual(bad, []);
     assert.deepEqual(outside, [], 'no outside requests in play');
-    console.log(`${browserName} / ${device}`, result);
+    console.log(`${browserName} / ${device}`, { first: result, second });
   } finally {
     await browser?.close();
     awake?.kill();
