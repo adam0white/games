@@ -35,12 +35,24 @@ try {
     verifyDeployBundle({ dist: join(checkout, 'dist'), output: process.env.GAMES_DEPLOY_BUNDLE_DIR, receipt: bundle });
     verifyDeployBundle({ dist: uploaded, output: process.env.GAMES_DEPLOY_BUNDLE_DIR, receipt: bundle });
   }
+  // The new version takes a few seconds to reach every Cloudflare location. Reading at once sometimes returned
+  // the previous release and failed a deploy that had worked. Each game must match exactly within 90 seconds.
+  const deadline = Date.now() + 90_000;
   for (const game of registry.games) {
     const expected = JSON.parse(readFileSync(join(checkout, 'dist', game.slug, 'release.json'), 'utf8'));
     const url = `https://play.adamwhite.work/${game.slug}/release.json`;
-    const response = await fetch(url, { cache: 'no-store', redirect: 'manual' });
-    if (!response.ok || response.url !== url) throw new Error(`${game.slug}: release fetch failed`);
-    checkRelease(expected, await response.json(), response.redirected || response.status >= 300);
+    for (;;) {
+      try {
+        const response = await fetch(url, { cache: 'no-store', redirect: 'manual' });
+        if (!response.ok || response.url !== url) throw new Error(`${game.slug}: release fetch failed`);
+        checkRelease(expected, await response.json(), response.redirected || response.status >= 300);
+        break;
+      } catch (error) {
+        if (Date.now() > deadline) throw error;
+        console.log(`${game.slug}: live release is not this one yet (${error.message}); reading again`);
+        await new Promise(done => setTimeout(done, 3000));
+      }
+    }
   }
 } finally {
   if (added) run('git', ['worktree', 'remove', '--force', checkout], { stdio: 'inherit' });

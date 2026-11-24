@@ -1,0 +1,19 @@
+{
+  "note": "Every game a tester can open, in the order the notes page lists them. The notes page (workers/feedback/public/notes/app.js) builds its games menu and its game picker from this file, so a game added here appears there once the site deploys. \"fresh\": true marks a game the page should point out as new. The phone check fails when an experiment directory is missing from this list.",
+  "games": [
+    { "slug": "lantern", "name": "Lantern" },
+    { "slug": "ant-promotion", "name": "Ant Promotion" },
+    { "slug": "boat", "name": "Paper Boat", "fresh": true },
+    { "slug": "crumbwar", "name": "Crumbwar", "fresh": true },
+    { "slug": "duel", "name": "Thumb Duel", "fresh": true },
+    { "slug": "harvest", "name": "Harvest Morning", "fresh": true },
+    { "slug": "breath", "name": "Hold Your Breath", "fresh": true },
+    { "slug": "matchmaker", "name": "Good Match", "fresh": true },
+    { "slug": "sling", "name": "Seed Sling", "fresh": true },
+    { "slug": "alibi", "name": "Alibi", "fresh": true },
+    { "slug": "borrowed", "name": "Borrowed Time", "fresh": true },
+    { "slug": "grapevine", "name": "Grapevine", "fresh": true },
+    { "slug": "fixit", "name": "Fix-It Stall", "fresh": true },
+    { "slug": "ducklings", "name": "Follow Me", "fresh": true }
+  ]
+}

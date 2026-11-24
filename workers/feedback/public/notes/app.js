@@ -2,36 +2,36 @@
 // server; it is kept in localStorage and sent only as a request header.
 (() => {
   const KEY = 'notes.k';
-  // Games offered for a new note. Older notes about a dropped game still show under their own name.
-  const GAMES = [['lantern', 'Lantern'], ['ant-promotion', 'Ant Promotion'], ['grapevine', 'Grapevine'], ['fixit', 'Fix-It Stall'], ['ducklings', 'Follow Me'], ['borrowed', 'Borrowed Time'], ['crumbwar', 'Crumbwar'], ['breath', 'Hold Your Breath'], ['matchmaker', 'Good Match'], ['sling', 'Seed Sling'], ['duel', 'Thumb Duel'], ['harvest', 'Harvest Morning'], ['boat', 'Paper Boat']];
-  // Shown as a row of links above the thread until each has been opened once on this device.
-  const FRESH = ['boat', 'duel', 'harvest', 'breath', 'matchmaker', 'sling', 'crumbwar', 'borrowed', 'grapevine', 'fixit', 'ducklings'];
+  // Games offered for a new note and linked from the games menu: [slug, name] pairs, read from the site's shared
+  // list (experiments/kit/games.json). Older notes about a dropped game still show under their own name.
+  let GAMES = [];
+  let FRESH = [];
   const NAMES = { 'long-road': 'The Long Road', 'copper-afternoon': 'Copper Afternoon' };
   const MAX_SECONDS = 180;
   const STRINGS = {
     tr: {
-      title: 'Oyun notları', lead: 'Aklına geleni yaz ya da sesli söyle. Cevaplar burada görünür.',
-      game: 'Hangi oyun?', general: 'Genel / başka bir şey', placeholder: 'Notunu buraya yaz…',
-      send: 'Gönder', mic: '🎤 Sesli not', stop: 'Bitir ve gönder', cancel: 'Vazgeç',
-      earlier: 'Önceki mesajlar', fresh: 'Yeni oyunlar, bir dene:', empty: 'Henüz not yok. İlk notunu gönder!', sending: 'Gönderiliyor…', working: 'Ses yazıya çevriliyor…',
+      title: 'Oyun notları',
+      game: 'Hangi oyun?', general: 'Genel / başka bir şey', placeholder: 'Notunu yaz…',
+      send: 'Gönder', mic: '🎤', games: 'Oyunlar', fresh: 'yeni', lab: 'Deneyler', stop: 'Bitir ve gönder', cancel: 'Vazgeç',
+      earlier: 'Önceki mesajlar', empty: 'Henüz not yok. İlk notunu gönder!', sending: 'Gönderiliyor…', working: 'Ses yazıya çevriliyor…',
       voice: 'Sesli not', failedVoice: 'Sesli not alındı, ama yazıya çevrilemedi. Kaydın bizde, tekrar deneyeceğiz.',
       failedText: 'Not alındı.', retry: 'Tekrar dene', notSent: 'Gönderilemedi. İnternetini kontrol et.',
       noKey: 'Bu sayfa özel bir bağlantıyla açılır. Sana gönderilen bağlantıyı kullan.',
       badKey: 'Bağlantı geçerli değil. Yeni bir bağlantı iste.', limit: 'Bugünlük not sınırına ulaşıldı. Yarın tekrar dene.',
       noMic: 'Mikrofon açılamadı. Tarayıcıya mikrofon izni ver ya da yazarak gönder.', original: 'İngilizce aslı', heard: 'Anladığımız',
-      question: 'Sana bir sorumuz var', open: 'Oyunu aç ▶', answer: 'Yazarak ya da sesle cevapla', answering: 'Cevaplanan soru', answered: 'Cevaplandı ✓', to: 'Soruya cevap',
+      question: 'Sana bir sorumuz var', open: 'Oyunu aç ▶', answer: 'Yazarak cevapla', answering: 'Cevaplanan soru', answered: 'Cevaplandı ✓', to: 'Soruya cevap',
     },
     en: {
-      title: 'Game notes', lead: 'Type or say whatever comes to mind. Replies show up here.',
-      game: 'Which game?', general: 'General / something else', placeholder: 'Write your note here…',
-      send: 'Send', mic: '🎤 Voice note', stop: 'Stop and send', cancel: 'Cancel',
-      earlier: 'Earlier messages', fresh: 'New games to try:', empty: 'No notes yet. Send the first one!', sending: 'Sending…', working: 'Turning speech into text…',
+      title: 'Game notes',
+      game: 'Which game?', general: 'General / something else', placeholder: 'Write a note…',
+      send: 'Send', mic: '🎤', games: 'Games', fresh: 'new', lab: 'Lab experiments', stop: 'Stop and send', cancel: 'Cancel',
+      earlier: 'Earlier messages', empty: 'No notes yet. Send the first one!', sending: 'Sending…', working: 'Turning speech into text…',
       voice: 'Voice note', failedVoice: 'Voice note received, but we could not turn it into text. We kept the recording and will retry.',
       failedText: 'Note received.', retry: 'Try again', notSent: 'Could not send. Check your connection.',
       noKey: 'This page opens with a private link. Use the link that was sent to you.',
       badKey: 'This link is not valid. Ask for a new one.', limit: 'Daily note limit reached. Try again tomorrow.',
       noMic: 'Could not open the microphone. Allow microphone access, or type instead.', original: 'Original', heard: 'What we heard',
-      question: 'A question for you', open: 'Open the game ▶', answer: 'Answer by typing or voice', answering: 'Answering', answered: 'Answered ✓', to: 'Answer to',
+      question: 'A question for you', open: 'Open the game ▶', answer: 'Type an answer', answering: 'Answering', answered: 'Answered ✓', to: 'Answer to',
     },
   };
   const $ = id => document.getElementById(id);
@@ -64,11 +64,9 @@
     document.documentElement.lang = lang;
     document.title = t.title;
     $('title').textContent = t.title;
-    $('lead').textContent = t.lead;
-    $('game-label').textContent = t.game;
+    $('game').setAttribute('aria-label', t.game);
     $('text').placeholder = t.placeholder;
     $('send').textContent = t.send;
-    $('mic').textContent = t.mic;
     $('stop').textContent = t.stop;
     $('cancel').textContent = t.cancel;
     const select = $('game');
@@ -79,23 +77,39 @@
     for (const [slug, name] of [...list, ['', t.general]]) select.append(new Option(name, slug, false, slug === chosen));
     const empty = document.querySelector('.empty');
     if (empty) empty.textContent = t.empty;
+    showGames();
   }
 
-  function showFresh() {
-    if (!$('fresh')) return;
+  // The games menu in the header: one line when closed, every game as a link when open.
+  function showGames() {
+    const menu = $('games');
+    if (!menu || !GAMES.length) return;
     const tried = new Set((store.get('notes.tried') || '').split(',').filter(Boolean));
-    $('fresh-label').textContent = t.fresh;
-    $('fresh-list').replaceChildren(...FRESH.map(slug => {
+    const fresh = FRESH.filter(slug => !tried.has(slug)).length;
+    $('games-summary').textContent = `🎮 ${t.games}${fresh ? ` · ${fresh} ${t.fresh}` : ''}`;
+    $('games-summary').classList.toggle('fresh', fresh > 0);
+    $('games-list').replaceChildren(...[...GAMES, ['lab', t.lab]].map(([slug, name]) => {
       const link = document.createElement('a');
       link.href = `/${slug}/`;
       link.target = '_blank';
       link.rel = 'noopener';
-      link.textContent = `${tried.has(slug) ? '✓ ' : ''}${GAMES.find(([s]) => s === slug)[1]}`;
-      if (tried.has(slug)) link.className = 'tried';
-      link.addEventListener('click', () => { tried.add(slug); store.set('notes.tried', [...tried].join(',')); setTimeout(showFresh, 500); });
+      link.textContent = `${tried.has(slug) ? '✓ ' : ''}${name}`;
+      if (FRESH.includes(slug) && !tried.has(slug)) link.className = 'fresh';
+      link.addEventListener('click', () => { tried.add(slug); store.set('notes.tried', [...tried].join(',')); setTimeout(() => { menu.open = false; showGames(); }, 500); });
       return link;
     }));
-    $('fresh').hidden = false;
+    menu.hidden = false;
+  }
+
+  async function loadGames() {
+    try {
+      const response = await fetch('/kit/games.json', { cache: 'no-store', signal: AbortSignal.timeout?.(4000) });
+      const list = (await response.json()).games.filter(game => /^[a-z0-9-]{1,40}$/.test(game.slug) && typeof game.name === 'string');
+      GAMES = list.map(game => [game.slug, game.name.slice(0, 40)]);
+      FRESH = list.filter(game => game.fresh).map(game => game.slug);
+    } catch { /* the page still takes notes; the picker offers only "general" */ }
+    applyLanguage();
+    showGames();
   }
 
   function notice(text) {
@@ -256,7 +270,6 @@
       const data = await api(`thread?after=${waiting.size ? Math.min(...waiting) - 1 : lastId}`);
       if (data.lang && data.lang !== lang && STRINGS[data.lang]) { lang = data.lang; store.set('notes.lang', lang); applyLanguage(); }
       $('composer').hidden = false;
-      showFresh();
       show(data.messages);
     } catch { /* shown by api(), or a network blip: the next poll retries */ }
   }
@@ -374,14 +387,21 @@
     const text = $('text').value.trim();
     if (!text) return;
     $('text').value = '';
+    $('text').style.height = '';
     queue({ text });
   });
-  $('mic').addEventListener('click', startRecording);
+  // The tester never used voice notes (0 of 64 by 2026-11-24), so the page has no microphone button. An older cached
+  // page may still have one; the recording code and the server side stay so it can come back.
+  $('mic')?.addEventListener('click', startRecording);
   $('answering-clear').addEventListener('click', () => answer(null));
   $('stop').addEventListener('click', () => recorder?.stop());
   $('cancel').addEventListener('click', () => recorder?.cancel());
-  if (!navigator.mediaDevices || typeof MediaRecorder === 'undefined') $('mic').hidden = true;
-  refresh();
+  if ($('mic') && (!navigator.mediaDevices || typeof MediaRecorder === 'undefined')) $('mic').hidden = true;
+  // The box starts one line high and grows with the note.
+  const grow = () => { $('text').style.height = 'auto'; $('text').style.height = `${Math.min($('text').scrollHeight + 2, 160)}px`; };
+  $('text').addEventListener('input', grow);
+  document.addEventListener('click', event => { if ($('games')?.open && !$('games').contains(event.target)) $('games').open = false; });
+  loadGames().then(refresh);
   setInterval(() => { if (!document.hidden) refresh(); }, 15000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
 })();

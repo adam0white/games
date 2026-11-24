@@ -5,7 +5,7 @@
 // duckling on her trail at its delay) stays clear until the last duckling is above the band.
 // The forward pass also keeps a clock: the earliest moment each band is cleared, so a caller can compare
 // it with the time the checkpoints give.
-import { create, endlessAhead, hitAny, moveMom, DT, GAP, R_MOM, R_DUCK, SPEED, checkGain, duskRate } from './sim.js';
+import { create, endlessAhead, hitAny, moveMom, DT, GAP, R_MOM, R_DUCK, SPEED, checkGain, duskRate, ENDLESS_TIME, DUSK_ONSET } from './sim.js';
 
 const LANES = []; for (let x = 0.1; x <= 0.9001; x += 0.05) LANES.push(+x.toFixed(2));
 const PAD = 0.04; // a hazard's reach beyond its bounds: the largest hit radius plus a body, beyond what bounds() already adds
@@ -43,7 +43,7 @@ function cross(world, x, ya, yb, t0, delays) {
     for (const D of delays) {
       const k = Math.max(0, tick - Math.round(D / DT)), p = trail[k];
       if (p.y < yb) allOver = false;
-      if (hitAny(world, t, p.x, p.y, R_DUCK)) return null;
+      if (hitAny(world, t, p.x, p.y, R_DUCK, true)) return null;
     }
     if (allOver) return { done: t, x: m.x };
   }
@@ -76,13 +76,13 @@ export function routeCheck(seed, { yEnd = 60, n = 6, wait = 15, step = 0.1 } = {
     clock = found.done; x = found.x; y = yb;
   }
   // time budget: does the clock stay ahead of dusk at every checkpoint with a line of n?
-  let time = 40, dusk = null; const gain = checkGain(n);
+  let time = ENDLESS_TIME, dusk = null; const gain = checkGain(n);
   const cps = s.checkpoints.filter(c => c.y < yEnd);
   for (const c of cps) {
     const at = times.find(q => q.y >= c.y)?.at ?? clock; // first band cleared past the checkpoint: an upper bound
     const reached = at - Math.max(0, (times.find(q => q.y >= c.y)?.y ?? c.y) - c.y) / SPEED;
-    // Integral of duskRate: ordinary seconds, then accelerating sunset after 20 s.
-    const spent = reached + Math.max(0, reached - 20) * (duskRate(reached) - 1) / 2;
+    // Integral of duskRate: ordinary seconds, then accelerating sunset after the opening.
+    const spent = reached + Math.max(0, reached - DUSK_ONSET) * (duskRate(reached) - 1) / 2;
     if (spent > time && dusk === null) dusk = c.y;
     time += gain;
   }

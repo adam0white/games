@@ -88,7 +88,7 @@
   <p><button id="toShop">Shop</button><button id="toBoard">Leaderboard</button></p>
   <p id="views"><button data-view="2d">2D</button><button data-view="3d">3D</button><button data-view="first">First person</button></p>
   <p class="hint" id="viewNote" hidden></p>
-  <p><button id="toCredits">Credits</button></p>
+  <p><button id="toCredits">Credits</button><button class="music"></button></p>
 </div></div>
 <div id="shop" class="screen veil"><div>
   <h2>Shop</h2>
@@ -115,12 +115,13 @@
   <p><button class="back">Back</button></p>
 </div></div>
 <div id="card" class="screen"><div><h1 id="title"></h1><p id="line"></p><p id="sub"></p>
-  <div id="ask" hidden><p>Show your endless scores to everyone on the leaderboard? After a yes, every run from the next one goes up by itself.</p><p><input id="askName" maxlength="16" autocomplete="nickname" enterkeyhint="done" placeholder="Type a name"></p><p class="hint" id="askNote">Only your name and your best score are sent.</p><p><button id="askYes">Yes, show them</button><button id="askNo">No</button></p></div>
-  <p><button id="go" class="main">Play again</button></p><p><button id="toMenu">Menu</button></p><p><button id="viewNext" hidden></button></p></div></div>
+  <div id="ask" hidden><p>Show your endless scores to everyone on the leaderboard? After a yes, every run from the next one goes up by itself.</p><p><input id="askName" maxlength="16" autocomplete="nickname" enterkeyhint="done" placeholder="Type a name"></p><p class="hint" id="askNote">Your name and your score are sent, and a signal when a run starts. Nothing else.</p><p><button id="askYes">Yes, show them</button><button id="askNo">No</button></p></div>
+  <p><button id="go" class="main">Play again</button></p><p><button id="toMenu">Menu</button><button class="music"></button></p><p><button id="viewNext" hidden></button></p></div></div>
 <script type="module">
 import { create, step, centre, half, sight, fall, fog, wind, rain, dazzle, level, score, boat, progress, DT, GOAL, BOAT, NIGHTS, STATS, POWERS, LAST, FLOORS, LEVELS, SECTORS, towerStage, climbPace, FIELD, REBORN_PACE, GIFTS, ABILITIES, startAt } from './sim.js?v=14'; // raise v when sim.js changes its exports, so a cached copy cannot break the page
 import { read, readNumber, readJson, write } from '../kit/save.js';
 import { sound } from '../kit/audio.js';
+import { music } from './music.js';
 import { onLeave, isPauseKey } from '../kit/pause.js';
 import { screens } from '../kit/screens.js';
 import { drag } from '../kit/drag.js';
@@ -205,6 +206,7 @@ let winOn = [].concat(store.json('lantern-win', [])).filter(k => typeof k === 's
 // local and says so. lantern-name: the player's name, text up to 16 characters. lantern-board: a JSON list of up to 10
 // endless runs, best first, each { n: name, s: score, d: 'YYYY-MM-DD' }. Neither is sent anywhere, and neither goes into the lab recording.
 const BOARD = 10, cleanName = t => String(t ?? '').replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 16);
+const boardName = t => cleanName(t).normalize('NFKC').replace(/[^\p{L}\p{N} _.-]/gu, '').trim(); // what the shared board keeps of a name: letters, numbers, space, _ . -
 let board = [].concat(store.json('lantern-board', [])).filter(r => r && typeof r.s === 'number' && Number.isFinite(r.s)).map(r => ({ n: cleanName(r.n), s: r.s, d: typeof r.d === 'string' ? r.d.slice(0, 10) : '' })).slice(0, BOARD);
 if (read('lantern-board') === null && store.get('lantern-best-endless') > 0) { board = [{ n: cleanName(read('lantern-name', '')), s: store.get('lantern-best-endless'), d: '' }]; store.set('lantern-board', JSON.stringify(board)); } // a best from before the board
 const skin = kind => { if (looking === kind && peek) return peek; const pack = PACKS.find(p => p.id === kind); return pack.items.find(i => i[0] === worn[kind]) ?? pack.items[0]; };
@@ -249,7 +251,7 @@ addEventListener('resize', () => { resize(); size3(); }); resize();
 
 let s = create(1, stage), playing = false, paused = false, target = 0.5, acc = 0, last = 0, shake = 0, glow = 0, sparks = [], ended = -1e9, screen = 'menu', lastLevel = 1, nearFall = false, sayTimer = 0, shown = '', weather = '';
 const sx = x => left + x * unit, sy = y => H * 0.74 - (y - s.y) * unit;
-window.lanternState = () => ({ daily, view, viewReady: !!R3, sharing, tab, asked, shared: shared ? shared.length : -1, x: s.x, y: s.y, t: s.t, over: s.over, target, playing, paused, stage, opened, endless, tower, climb, screen, hearts: s.hearts, shield: s.shield, light: s.light, taken: s.taken, stats, on: s.on, busy, boost: s.boost, slow: s.slow, size: s.size, big: s.big, progress: progress(s), score: score(s), bank, owned: [...owned], worn, looking, towerAt: towerAt(), reborn, peek: peek && peek[0], field: s.field, crashOn, crash: crash && crash.how, winOn, win: victory && victory.how, name: playerName(), board, unit: unit / dpr, start, magnet: s.magnet, flare: s.flare, scene: scene && scene.kind }); // read by the browser checks
+window.lanternState = () => ({ music: musicOn, songStep: song ? song.step : -1, daily, view, viewReady: !!R3, sharing, tab, asked, shared: shared ? shared.length : -1, x: s.x, y: s.y, t: s.t, over: s.over, target, playing, paused, stage, opened, endless, tower, climb, screen, hearts: s.hearts, shield: s.shield, light: s.light, taken: s.taken, stats, on: s.on, busy, boost: s.boost, slow: s.slow, size: s.size, big: s.big, progress: progress(s), score: score(s), bank, owned: [...owned], worn, looking, towerAt: towerAt(), reborn, peek: peek && peek[0], field: s.field, crashOn, crash: crash && crash.how, winOn, win: victory && victory.how, name: playerName(), board, unit: unit / dpr, start, magnet: s.magnet, flare: s.flare, scene: scene && scene.kind }); // read by the browser checks
 window.lanternSim = () => s; // the browser checks use this to reach late stretches quickly
 
 const cards = screens(['menu', 'shop', 'credits', 'card', 'board']);
@@ -383,8 +385,9 @@ function shop(text) {
       if (busy) return;
       if (wipe.dataset.sure !== '1') { wipe.dataset.sure = '1'; wipe.textContent = 'Tap again to erase'; $('got').textContent = 'This erases embers, nights, finds, stats and bests on this phone.'; return; }
       rec.event('test', { tool: 'reset', bank });
-      if (sharing && boardId) { boardCall({ id: boardId, remove: true }); boardCall({ id: boardId, remove: true }, DAY_URL); }
+      const left = sharing && boardId ? [...gone(), boardId] : gone();
       for (const k of Object.keys(localStorage)) if (k.startsWith('lantern-')) localStorage.removeItem(k);
+      if (left.length) { store.set('lantern-board-gone', JSON.stringify(left)); boardForget(); } // the rows still to take away outlive the erase
       location.reload();
     });
     t.append(wipe);
@@ -511,7 +514,9 @@ function playScene() {
 function say(text, ms = 2200) { const el = $('say'); el.textContent = text; el.style.opacity = 1; clearTimeout(sayTimer); sayTimer = setTimeout(() => { el.style.opacity = 0; }, ms); }
 
 // Sound: all synthesized, started by the first touch.
-let water, waterGain, drone, droneGain, streak = 0;
+// Music (from the lab's Lantern Song, music.js): a score made as the run goes, a new tune for each river from its seed. It fills out
+// towards dawn, a low pulse comes in with danger, and embers chime inside the chord. lantern-music is '0' when the player turned it off.
+let water, waterGain, drone, droneGain, streak = 0, song = null, musicOn = localStorage.getItem('lantern-music') !== '0';
 const snd = sound({ setup: ac => { // the river and the low drone, built once
   const len = ac.sampleRate * 2, buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0);
   for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
@@ -520,6 +525,7 @@ const snd = sound({ setup: ac => { // the river and the low drone, built once
   waterGain = ac.createGain(); waterGain.gain.value = 0.05; n.connect(water).connect(waterGain).connect(ac.destination); n.start();
   drone = ac.createOscillator(); drone.type = 'sine'; drone.frequency.value = 55;
   droneGain = ac.createGain(); droneGain.gain.value = 0; drone.connect(droneGain).connect(ac.destination); drone.start();
+  song = music(ac); song.volume(0.8);
 } });
 const audio = () => snd.unlock();
 const tone = (freq, dur, vol, type = 'sine', slide = 0) => { if (snd.ctx) snd.tone(freq, dur, vol, type, slide); }; // slide was dropped here before, so the crash sounds never slid
@@ -531,8 +537,9 @@ function begin() {
   // leaderboard is fair: an endless run neither uses them nor spends them, and they wait for the next night or climb.
   const fresh = !tower || !onward; onward = false; if (fresh) { runStats = endless ? {} : stats; if (!endless) { stats = {}; store.set('lantern-stats', '{}'); } }
   const waiting = endless && Object.values(stats).some(v => v > 0);
-  s = create(daily && endless && !tower ? daySeed(today()) : (Math.random() * 2 ** 31) | 0, tower ? towerStage(climb) : endless ? 1 : stage, tower ? 'tower' : endless, powersOwned(), runStats, climb, reborn); // after a rebirth the story nights run faster
+  s = create(daily && endless && !tower ? daySeed(ranDay = today()) : (Math.random() * 2 ** 31) | 0, tower ? towerStage(climb) : endless ? 1 : stage, tower ? 'tower' : endless, powersOwned(), runStats, climb, reborn); // after a rebirth the story nights run faster
   if (!tower) fromFloor = 0; else if (fromFloor) startAt(s, fromFloor); // part-way up the level (note #142)
+  song?.start(s.seed); // a new tune for each river; today's river has the same tune for everyone
   if (endless && !tower) boardTicket(); else ticket = null; // the shared board's run ticket, only for a player who shares
   const boosted = fresh && Object.values(runStats).some(v => v > 0);
   target = s.x; crash = null; victory = null; playing = true; paused = false; acc = 0; streak = 0; sparks = []; lastLevel = 1; size = 1; fire0 = flame(); nearFall = false; weather = ''; steer.reset(); pads.drop(); snap3 = true;
@@ -563,15 +570,16 @@ function finish() {
       $('go').textContent = `Climb on to ${tag(climb + 1)}`; $('toMenu').textContent = 'Stop';
     } else { $('title').textContent = head(climb); $('line').textContent = `${why} Best ${best > LEVELS ? tag(best) : `${best} of ${LEVELS}`}. Your climb goes on from ${tag(climb)}${back ? `, floor ${back}: three floors below floor ${at}, where you fell` : ''}.`; $('go').textContent = back ? `Try again from floor ${back}` : `Try ${tag(climb)} again`; }
   } else if (endless && daily) {
-    const pts = score(s), was = plain(store.json('lantern-daily', {})), best = Math.max(pts, was.d === today() ? Math.floor(was.s) || 0 : 0); store.set('lantern-daily', JSON.stringify({ d: today(), s: best }));
-    boardSend(pts, ticket); ticket = null;
-    if (!decided && pts > 0) { $('ask').hidden = false; $('askName').value = playerName(); $('askNote').textContent = 'Only your name and your best score are sent.'; }
-    $('title').textContent = `${pts}`; $('line').textContent = `${why} Today's river: your best today is ${best}. Everyone plays this same river until midnight UTC.`; $('go').textContent = 'Try today\'s river again';
+    // A run that ends after midnight UTC was on yesterday's river: it counts for neither day and is not sent.
+    const late = ranDay !== today(), pts = score(s), was = plain(store.json('lantern-daily', {})), best = Math.max(late ? 0 : pts, was.d === today() ? Math.floor(was.s) || 0 : 0); if (!late) store.set('lantern-daily', JSON.stringify({ d: today(), s: best }));
+    if (!late) boardSend(pts, ticket); ticket = null;
+    if (!decided && pts > 0) { $('ask').hidden = false; $('askName').value = playerName(); $('askNote').textContent = 'Your name and your score are sent, and a signal when a run starts. Nothing else.'; }
+    $('title').textContent = `${pts}`; $('line').textContent = late ? `${why} Midnight UTC passed during this run, so it was yesterday's river and does not count. A new river is ready.` : `${why} Today's river: your best today is ${best}. Everyone plays this same river until midnight UTC.`; $('go').textContent = 'Try today\'s river again';
   } else if (endless) {
     const pts = score(s), best = Math.max(pts, store.get('lantern-best-endless')); store.set('lantern-best-endless', best);
     const place = onBoard(pts);
     boardSend(pts, ticket); ticket = null;
-    if (!decided && pts > 0) { $('ask').hidden = false; $('askName').value = playerName(); $('askNote').textContent = 'Only your name and your best score are sent.'; }
+    if (!decided && pts > 0) { $('ask').hidden = false; $('askName').value = playerName(); $('askNote').textContent = 'Your name and your score are sent, and a signal when a run starts. Nothing else.'; }
     $('title').textContent = `${pts}`; $('line').textContent = `${why} Best ${best}.${place ? ` Number ${place} on this phone's leaderboard.` : ''}`; $('go').textContent = 'Play again';
   } else {
     const pct = Math.floor(progress(s) * 100), key = `lantern-best-${stage}`, best = Math.max(pct, store.get(key)); store.set(key, best);
@@ -597,14 +605,14 @@ function onBoard(pts) {
 // id made here. After that yes, every endless run is sent by itself (note #155). lantern-share is '1' while sharing, '' after a no and
 // absent before the player has chosen; lantern-board-id holds the id. Any bad answer (no server, an error, a slow network, not JSON) gives null, and the screen
 // stays the phone's own board, with no tabs and no tick. The server allows fewer characters in a name than this phone does.
-const BOARD_URL = '/lab-api/board/lantern', BOARD_WAIT = 4000;
+const BOARD_URL = '/lab-api/board/lantern', BOARD_WAIT = 4000, BOARD_RETRY = 6000;
 // Today's river: one river a day, the same for every player, from a seed made of the UTC date. It has its own shared board
 // (lantern-daily on the server), which starts empty each UTC day. A run on it stays off the endless boards, because a river
 // that can be learned is a different contest. lantern-daily holds this phone's best of the day: { d, s }.
 const DAY_URL = '/lab-api/board/lantern-daily', today = () => new Date().toISOString().slice(0, 10);
 const daySeed = d => { let h = 2166136261; for (const c of `lantern ${d}`) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return (h >>> 0) % 2147483647 || 1; };
-let daily = false, sharedDay = null, mineDay = 0;
-let decided = read('lantern-share') !== null, sharing = read('lantern-share', '') === '1', boardId = read('lantern-board-id', ''), shared = null, tab = 'all', mine = 0, asked = 0, ticket = null, sends = 0;
+let daily = false, ranDay = '', sharedDay = null, mineDay = 0;
+let decided = read('lantern-share') !== null, sharing = read('lantern-share', '') === '1', boardId = read('lantern-board-id', ''), shared = null, tab = 'all', mine = 0, asked = 0, ticket = null, sends = [0, 0];
 async function boardCall(body, url = BOARD_URL) {
   const stop = new AbortController(), timer = setTimeout(() => stop.abort(), BOARD_WAIT);
   try {
@@ -623,14 +631,31 @@ function boardTicket() {
   const r = crypto.randomUUID(), stop = new AbortController(), timer = setTimeout(() => stop.abort(), BOARD_WAIT);
   ticket = { r, ok: fetch(daily ? DAY_URL : BOARD_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ start: true, r }), signal: stop.signal }).then(res => res.ok, () => false).finally(() => clearTimeout(timer)) };
 }
+// Taking a row away. The id stays saved (lantern-board-gone) until both boards have answered, so a removal that failed is
+// tried again when the page next loads or the leaderboard opens. The server also refuses later scores under that id.
+const gone = () => [].concat(store.json('lantern-board-gone', []) ?? []).filter(x => typeof x === 'string').slice(-8);
+async function boardForget(id) {
+  if (id) store.set('lantern-board-gone', JSON.stringify([...new Set([...gone(), id])]));
+  for (const g of gone()) {
+    const [a, d] = await Promise.all([boardCall({ id: g, remove: true }), boardCall({ id: g, remove: true }, DAY_URL)]);
+    if (a) shared = a.rows; if (d) { sharedDay = d.rows; mineDay = 0; }
+    if (a && d) store.set('lantern-board-gone', JSON.stringify(gone().filter(x => x !== g)));
+  }
+  if (screen === 'board') boardShow();
+}
+if (gone().length) boardForget();
 // Send a score when the player shares and has a name. The server keeps each player's best.
 async function boardSend(pts, run) {
-  if (!sharing || !boardId || !playerName() || !(pts > 0)) return;
-  const sent = boardId, ran = s, day = daily, k = ++sends, r = run && await run.ok ? run.r : null; // ran: the run this score is from
+  if (!sharing || !boardId || !boardName(playerName()) || !(pts > 0)) return;
+  // ran: the run this score is from. The ticket goes along even when its own answer was lost: the server may hold it all the same.
+  const sent = boardId, ran = s, day = daily, k = ++sends[+day], r = run ? run.r : null; if (run) await run.ok;
   if (!sharing || boardId !== sent) return;
-  const out = await boardCall({ id: boardId, n: playerName(), s: Math.min(Math.floor(pts), 1000000), ...(r ? { r } : {}) }, day ? DAY_URL : BOARD_URL);
-  if (!out || !sharing || !boardId) { if (out && !sharing) boardCall({ id: sent, remove: true }, day ? DAY_URL : BOARD_URL); return; } // a no given while this was on its way takes the row away again
-  if (k !== sends) return; // a later run's answer already came or is on its way
+  const body = { id: boardId, n: playerName(), s: Math.min(Math.floor(pts), 1000000), ...(r ? { r } : {}) }, url = day ? DAY_URL : BOARD_URL;
+  let out = await boardCall(body, url);
+  // One more try after a bad answer (a slow network, or too many posts in a minute): the ticket is still good, and without this the run would never go up.
+  if (!out && sharing && boardId === sent) { await new Promise(done => setTimeout(done, BOARD_RETRY)); if (sharing && boardId === sent) out = await boardCall(body, url); }
+  if (!out || !sharing || boardId !== sent) return; // after a no given meanwhile, the removal and the server's memory of the id keep the row away
+  if (k !== sends[+day]) return; // a later run's answer already came or is on its way
   if (day) { sharedDay = out.rows; mineDay = out.place; if (screen === 'board') boardShow(); if (mineDay && s === ran && !playing && s.over && (screen === 'play' || screen === 'card')) $('sub').textContent += ` Number ${mineDay} today among all players.`; return; }
   shared = out.rows; mine = out.place; if (screen === 'board') boardShow();
   if (mine && s === ran && !playing && endless && s.over && (screen === 'play' || screen === 'card')) $('sub').textContent += ` Number ${mine} of all players.`;
@@ -638,7 +663,7 @@ async function boardSend(pts, run) {
 // The one choice to show scores to everyone. Yes needs a name; a name typed under the old promise to stay on this phone is not a yes.
 async function share(yes) {
   decided = true;
-  if (!yes) { const id = boardId; sharing = false; boardId = ''; mine = 0; store.set('lantern-share', ''); store.set('lantern-board-id', ''); boardShow(); if (id) { boardCall({ id, remove: true }, DAY_URL).then(o => { if (o) { sharedDay = o.rows; mineDay = 0; if (screen === 'board') boardShow(); } }); const out = await boardCall({ id, remove: true }); if (out) shared = out.rows; } boardShow(); return; }
+  if (!yes) { const id = boardId; sharing = false; boardId = ''; mine = 0; store.set('lantern-share', ''); store.set('lantern-board-id', ''); boardShow(); if (id) await boardForget(id); boardShow(); return; }
   // The yes sends nothing by itself: a score goes up only with a ticket from the start of its run, so the first one is the next run.
   boardId = crypto.randomUUID(); sharing = true; mine = 0; store.set('lantern-share', '1'); store.set('lantern-board-id', boardId); boardShow();
   if (!playing && endless && s.over && (screen === 'play' || screen === 'card')) $('sub').textContent += ' Your next run goes up.';
@@ -651,7 +676,7 @@ function boardShow() {
   const playText = day ? 'Play today\'s river' : 'Play the endless river'; if ($('boardPlay').textContent !== playText) $('boardPlay').textContent = playText; // WebKit drops a tap on a button whose text is rewritten under the finger
   $('boardHint').textContent = day ? 'Today\'s river: the same river for every player until midnight UTC. Best runs today of the players who share.' : (all ? 'Endless river, best runs of the players who share.' : shared ? 'Endless river, best runs on this phone.' : 'Endless river, best runs on this phone. Your name and scores stay on this phone.') + ' No stats on the endless river: everyone plays it the same way.';
   $('share').checked = sharing;
-  $('shareNote').textContent = sharing ? (playerName() ? `Every endless run from now on goes up by itself, as ${playerName()}. Untick to take your row away.` : 'Type a name above and your runs go up by themselves.') : 'A tick sends your name and your best score to this game\'s server, after every endless run. Nothing else is sent.';
+  $('shareNote').textContent = sharing ? (boardName(playerName()) ? `Every endless run from now on goes up by itself, as ${boardName(playerName())}. Untick to take your row away.` : 'Type a name with letters or numbers above and your runs go up by themselves.') : 'A tick sends your name and your score to this game\'s server after every endless run, and a signal when a run starts. Nothing else is sent.';
   if (!list.length) { const li = document.createElement('li'); li.textContent = day ? (sharedDay ? 'Nobody has shared a run on today\'s river yet.' : '…') : all ? 'Nobody has shared a run yet.' : 'No runs yet. Play the endless river to get on the board.'; ol.append(li); return; }
   list.forEach((r, i) => {
     const li = document.createElement('li'); if (day ? i + 1 === mineDay : all ? i + 1 === mine : r === lastRun) li.className = 'me';
@@ -755,18 +780,20 @@ for (const b of document.querySelectorAll('#views button')) b.addEventListener('
 $('viewNext').addEventListener('click', () => setView(VIEWS[(VIEWS.indexOf(view) + 1) % 3]));
 $('toShop').addEventListener('click', () => show('shop'));
 $('toCredits').addEventListener('click', () => show('credits'));
-$('toBoard').addEventListener('click', async () => { show('board'); const out = await boardCall(); shared = out ? out.rows : null; asked++; tab = shared ? 'all' : 'phone'; if (screen === 'board') boardShow(); });
+$('toBoard').addEventListener('click', async () => { show('board'); if (gone().length) boardForget(); const out = await boardCall(); shared = out ? out.rows : null; asked++; tab = shared ? 'all' : 'phone'; if (screen === 'board') boardShow(); });
+const musicShow = () => { for (const b of document.querySelectorAll('button.music')) b.textContent = musicOn ? 'Music: on' : 'Music: off'; }; musicShow();
+for (const b of document.querySelectorAll('button.music')) b.addEventListener('click', () => { musicOn = !musicOn; store.set('lantern-music', musicOn ? '1' : '0'); musicShow(); });
 $('tabPhone').addEventListener('click', () => { tab = 'phone'; boardShow(); });
 $('tabAll').addEventListener('click', () => { tab = 'all'; boardShow(); });
 $('tabDay').addEventListener('click', async () => { tab = 'day'; boardShow(); const out = await boardCall(null, DAY_URL); if (out) sharedDay = out.rows; else sharedDay = sharedDay || []; if (screen === 'board') boardShow(); });
 $('share').addEventListener('change', () => {
   if (!$('share').checked) { share(false); return; }
-  tab = 'all'; if (!playerName()) { boardShow(); $('shareNote').textContent = 'Type a name above first. Then tick.'; return; }
+  tab = 'all'; if (!boardName(playerName())) { boardShow(); $('shareNote').textContent = 'Type a name with letters or numbers above first. Then tick.'; return; }
   share(true);
 });
 $('askName').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') $('askName').blur(); });
 $('askYes').addEventListener('click', () => {
-  const n = cleanName($('askName').value); if (!n) { $('askNote').textContent = 'Type a name first.'; $('askName').focus(); return; }
+  const n = cleanName($('askName').value); if (!boardName(n)) { $('askNote').textContent = n ? 'Use letters or numbers in the name.' : 'Type a name first.'; $('askName').focus(); return; }
   store.set('lantern-name', n); $('ask').hidden = true; if (lastRun) { lastRun.n = n; store.set('lantern-board', JSON.stringify(board)); } share(true);
 });
 $('askNo').addEventListener('click', () => { $('ask').hidden = true; share(false); });
@@ -804,7 +831,7 @@ addEventListener('keyup', e => keys.delete(e.key));
 
 // What each event of a run sounds and looks like; the shop's showings of an ability use it too.
 function react(e) {
-  if (e === 'ember') { tone(scale[Math.min(streak++, scale.length - 1)], 0.5, 0.12, 'triangle'); glow = 1; for (let i = 0; i < 8; i++) sparks.push({ x: s.x, y: s.y, vx: (Math.random() - 0.5) * 0.4, vy: Math.random() * 0.5, life: 0.6 }); }
+  if (e === 'ember') { tone(song && musicOn ? song.chime(Math.min(streak++, 7)) : scale[Math.min(streak++, scale.length - 1)], 0.5, 0.12, 'triangle'); glow = 1; for (let i = 0; i < 8; i++) sparks.push({ x: s.x, y: s.y, vx: (Math.random() - 0.5) * 0.4, vy: Math.random() * 0.5, life: 0.6 }); }
   if (e === 'graze') { tone(1320, 0.12, 0.05); glow = Math.max(glow, 0.5); }
   if (e === 'shield') { tone(880, 0.5, 0.1); setTimeout(() => tone(1320, 0.7, 0.08), 110); glow = 1; say('Force field: rocks are pushed aside', 1700); }
   if (e === 'push') { tone(300, 0.15, 0.08, 'triangle', 220); snd.ctx && snd.noise(0.08, 0.1, 900); }
@@ -1090,7 +1117,9 @@ function frame(now) {
   if (!paused && !(s.over && s.over !== 'dawn')) burn(fire0, skin('flame')[0], dt, Math.max(-0.5, Math.min(0.5, (target - s.x) * 4)), s.light);
   shake = Math.max(0, shake - dt * 3); glow = Math.max(0, glow - dt * 2);
   for (const p of sparks) { p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; } sparks = sparks.filter(p => p.life > 0);
-  if (snd.ctx) { water.frequency.value = 400 + 500 * Math.min(1.4, s.y / GOAL); waterGain.gain.value = 0.05 + (playing ? 0.14 * Math.max(fall(s, s.y), fall(s, s.y + 0.8)) : 0); droneGain.gain.value = playing ? 0.05 * (1 - s.light) : 0; }
+  if (snd.ctx) { water.frequency.value = 400 + 500 * Math.min(1.4, s.y / GOAL); waterGain.gain.value = 0.05 + (playing ? 0.14 * Math.max(fall(s, s.y), fall(s, s.y + 0.8)) : 0); droneGain.gain.value = playing ? 0.05 * (1 - s.light) : 0;
+    // The endless river has no dawn, so its music fills out over two and a half minutes and stays in the night's key.
+    song.set({ on: musicOn && playing && !paused, progress: endless && !tower ? Math.min(0.8, s.t / 150) : Math.max(0, Math.min(1, progress(s))), light: s.light, danger: playing ? Math.min(1, Math.max(fall(s, s.y + 0.8), fall(s, s.y), 1 - s.light * 2.5)) : 0 }); }
   try { draw(now); } catch (e) { g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; throw e; } // a bad frame must not leave the next one drawn in a blend mode
 }
 views(); if (read('lantern-view', '2d') !== '2d') setView(read('lantern-view'), false);

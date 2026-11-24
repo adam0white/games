@@ -38,6 +38,22 @@
   .lab-notice, .lab-toggle { font-size: 12px !important; }
   #newjob { color: #1d5e5b; font-weight: bold; }
   .desk { display: none; font-size: .85em; }
+  .st { color: #d9a93e; -webkit-text-stroke: .6px #3a2216; }
+  .map { margin: .3em 0 .4em; text-align: left; }
+  .chap { font-size: .8em; font-weight: bold; color: #8a4a22; margin: .5em 2px .25em; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 6px; }
+  .lv { min-width: 0; min-height: 48px; margin: 0; padding: 2px 0 0; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1; font-size: 1.05em; box-shadow: 0 3px 0 #3a2216; background: #fbe6c2; }
+  .grid.late .lv { background: #f6cfb0; }
+  .lv .ss { font-size: .62em; letter-spacing: -.5px; color: #c99a2e; margin-top: 3px; min-height: 1em; }
+  .lv.done { background: #e9f3dc; }
+  .lv.next { background: #2f8f8a; color: #fff6e4; animation: nudge 1.6s ease-in-out infinite; }
+  .lv.next .ss { color: #ffe08a; }
+  .lv:disabled { opacity: 1; background: #e3cfae; color: #3a221666; box-shadow: 0 2px 0 #3a221666; border-color: #3a221688; }
+  @keyframes nudge { 50% { box-shadow: 0 3px 0 #3a2216, 0 0 0 5px #62c6b8; } }
+  @media (prefers-reduced-motion: reduce) { .lv.next { animation: none; } }
+  .stars { font-size: 2.6em; line-height: 1; margin: .1em 0 0; color: #f0b830; -webkit-text-stroke: 1.5px #3a2216; letter-spacing: .05em; }
+  .stars.none { color: #e3cfae; }
+  @media (max-height: 700px) { h1 { font-size: 1.8em; } .card { padding: 12px 14px 10px; } }
   @media (pointer: fine) { .desk { display: block; } }
 </style>
 </head>
@@ -48,10 +64,13 @@
 
 <div id="menu" class="screen on"><div class="card">
   <h1>Fix-It Stall</h1>
-  <p class="sub">Fix things fast. Get paid.</p>
-  <div class="stats"><span><span class="coin"></span><b id="bank">0</b></span><span>Best <b id="best">0</b></span><span>Jobs <b id="jobs">3</b>/<span id="jobsAll">11</span></span></div>
+  <div class="stats"><span><span class="coin"></span><b id="bank">0</b></span><span><span class="st">★</span> <b id="starsAll">0</b>/<span id="starsMax">96</span></span><span>Jobs <b id="jobs">3</b>/<span id="jobsAll">15</span></span></div>
   <p><button id="play" class="main">Play</button></p>
-  <p><button id="daily">Daily stall</button></p>
+  <p id="playLine" class="sub"></p>
+  <p id="migrated" class="sub"></p>
+  <div id="map" class="map"></div>
+  <p><button id="open">Open stall</button><button id="daily">Daily stall</button></p>
+  <p id="openLine" class="sub"></p>
   <p id="dailyLine" class="sub"></p>
   <p class="desk sub">On a computer: drag with the mouse, or hold Space.</p>
   <p><button id="toShop">Stall shop</button><button id="sound1" class="small">Sound: on</button></p>
@@ -72,12 +91,13 @@
 
 <div id="end" class="screen"><div class="card">
   <h2 id="endTitle">Closed!</h2>
+  <p id="endStars" class="stars"></p>
   <p class="big"><span class="coin"></span><span id="earned">0</span></p>
-  <div class="stats"><span>Fixed <b id="served">0</b></span><span>Best streak <b id="streak">0</b></span><span>Best <b id="best2">0</b></span></div>
+  <div id="endStats" class="stats"></div>
   <p id="endLine" class="sub"></p>
   <p id="newjob"></p>
-  <p><button id="again" class="main">Play again</button></p>
-  <p><button id="toMenu">Menu</button></p>
+  <p><button id="next" class="main">Next level</button></p>
+  <p><button id="again" class="main">Play again</button><button id="toMenu">Menu</button></p>
 </div></div>
 
 <script type="module" src="./main.js"></script>

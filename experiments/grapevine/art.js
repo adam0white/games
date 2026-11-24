@@ -9,6 +9,7 @@ export const COLOUR_DARK = ['#9c2219', '#b3861a', '#1e5bb0', '#23893a'];
 export const BODY = {
   teller: '#f4a259', listener: '#c58fd8', honest: '#a8d99a', paint: '#f59bb0', more: '#ffbf5e', less: '#9aaec4',
   swap: '#b8a2e8', carve: '#d3ad83', flip: '#7fd8cc', timid: '#f9e6a8', parrot: '#5fca78',
+  bell: '#8fc3f0', keeper: '#e6c3a3',
 };
 
 // ---------------------------------------------------------------- the message token
@@ -115,7 +116,7 @@ function arrowSmall(g, x, y, w) {
 
 // The badge under a villager: a cream plate with the picture of what they do.
 // `copy` is the change a parrot would copy right now (or null when it is not on the route).
-export function badge(g, node, x, y, w, h, { copy = null, dim = false } = {}) {
+export function badge(g, node, x, y, w, h, { copy = null, dim = false, memo = null, rung = 0 } = {}) {
   const k = node.kind;
   if (k === 'teller' || k === 'listener') return;
   g.save(); if (dim) g.globalAlpha *= 0.45;
@@ -130,6 +131,15 @@ export function badge(g, node, x, y, w, h, { copy = null, dim = false } = {}) {
   } else if (k === 'parrot') {
     if (copy !== null) change(g, copy, x, y, w * 0.92, h * 0.92);
     else echo(g, x, y, h * 0.5);
+  } else if (k === 'bell') { // a bell, then a gate swinging: "rings, and the gates swap"
+    const u = h * 0.5;
+    bellShape(g, x - w * 0.24, y + u * 0.05, u * 0.62, rung);
+    arrowSmall(g, x + w * 0.02, y, u * 0.75);
+    barrier(g, x + w * 0.24, y + u * 0.55, u * 0.5, 0.5, -Math.PI / 2);
+  } else if (k === 'keeper') { // swap arrows and the news they hold now
+    const u = h * 0.5;
+    swapArrows(g, x - w * 0.25, y, u * 0.8);
+    if (memo) token(g, memo, x + w * 0.2, y, u * 0.78);
   } else {
     const ids = { honest: 0, paint: 1 + node.arg, more: 5, less: 6, swap: 7 + node.arg, carve: 9 + node.arg, flip: 13 };
     change(g, ids[k] ?? 0, x, y, w * 0.92, h * 0.92);
@@ -139,6 +149,39 @@ export function badge(g, node, x, y, w, h, { copy = null, dim = false } = {}) {
     g.beginPath(); g.arc(mx, my, mr, 0, Math.PI * 2); g.fillStyle = '#ffe9a0'; g.fill(); g.lineWidth = 1.5; g.strokeStyle = INK; g.stroke();
     g.beginPath(); g.arc(mx + mr * 0.45, my - mr * 0.3, mr * 0.8, 0, Math.PI * 2); g.fillStyle = '#33244a'; g.fill();
   }
+  g.restore();
+}
+
+// A bell, mouth down, centred on x, y with half-height u; swing rocks it (0..1).
+export function bellShape(g, x, y, u, swing = 0) {
+  g.save(); g.translate(x, y - u * 0.75); g.rotate(Math.sin(swing * Math.PI * 4) * 0.5 * swing);
+  g.beginPath();
+  g.moveTo(-u * 0.25, u * 0.15); g.quadraticCurveTo(-u * 0.35, u * 1.1, -u * 0.85, u * 1.35); g.lineTo(u * 0.85, u * 1.35);
+  g.quadraticCurveTo(u * 0.35, u * 1.1, u * 0.25, u * 0.15); g.quadraticCurveTo(0, -u * 0.1, -u * 0.25, u * 0.15); g.closePath();
+  g.fillStyle = '#f4c542'; g.fill(); g.lineWidth = Math.max(1.3, u * 0.14); g.strokeStyle = INK; g.lineJoin = 'round'; g.stroke();
+  g.beginPath(); g.arc(0, u * 1.45, u * 0.2, 0, Math.PI * 2); g.fillStyle = INK; g.fill();
+  g.restore();
+}
+// A barrier across a path, like a level crossing: a post at one side and a striped bar. In the frame of the path
+// (x along it), the bar lies across the path when shut (open 0) and swings aside, along the path edge, when open (1).
+// u is half the bar's length.
+export function barrier(g, x, y, u, open, ang = 0) {
+  g.save(); g.translate(x, y); g.rotate(ang);
+  g.translate(0, -u); g.rotate(-open * Math.PI * 0.5); // the bar turns on the post
+  const th = Math.max(3.5, u * 0.36);
+  g.beginPath(); roundRect(g, -th / 2, 0, th, u * 2, th / 2); g.fillStyle = CREAM; g.fill();
+  g.save(); g.clip();
+  g.fillStyle = '#e8483b';
+  for (let k = 0; k < 4; k++) g.fillRect(-th, u * 2 * (k / 4) + u * 0.12, th * 2, u * 0.25);
+  g.restore();
+  g.lineWidth = Math.max(1.5, u * 0.09); g.strokeStyle = INK; g.stroke();
+  g.beginPath(); g.arc(0, 0, th * 0.75, 0, Math.PI * 2); g.fillStyle = INK; g.fill();
+  g.restore();
+}
+function swapArrows(g, x, y, u) {
+  g.save(); g.strokeStyle = INK; g.lineWidth = Math.max(1.3, u * 0.17); g.lineCap = 'round'; g.lineJoin = 'round';
+  g.beginPath(); g.moveTo(x - u * 0.45, y - u * 0.25); g.lineTo(x + u * 0.45, y - u * 0.25); g.lineTo(x + u * 0.25, y - u * 0.45); g.stroke();
+  g.beginPath(); g.moveTo(x + u * 0.45, y + u * 0.25); g.lineTo(x - u * 0.45, y + u * 0.25); g.lineTo(x - u * 0.25, y + u * 0.45); g.stroke();
   g.restore();
 }
 // The parrot's picture before it is on a route: a "do it again" loop arrow.
@@ -171,6 +214,11 @@ export function villager(g, node, x, y, r, mood) {
   const tall = k === 'timid' ? 1.12 : k === 'less' ? 0.9 : 1;
   // arms behind the body (the exaggerator throws them wide)
   if (k === 'more' || k === 'flip' || k === 'teller') arms(g, k, r, react, body);
+  if (k === 'bell' && react > 0) { // sound rings
+    g.save(); g.globalAlpha *= react; g.strokeStyle = '#fff3c4'; g.lineWidth = 2;
+    for (const s of [-1, 1]) for (let i = 1; i <= 2; i++) { g.beginPath(); g.arc(0, -r * 1.25, r * (0.45 + i * 0.3 + (1 - react) * 0.3), s < 0 ? Math.PI * 0.95 : -Math.PI * 0.25, s < 0 ? Math.PI * 1.25 : Math.PI * 0.05); g.stroke(); }
+    g.restore();
+  }
   if (k === 'listener') { for (const s of [-1, 1]) { g.beginPath(); g.ellipse(s * r * 0.95, -r * 0.05, r * 0.3, r * 0.42, s * 0.3, 0, Math.PI * 2); g.fillStyle = body; g.fill(); g.lineWidth = 2.5; g.strokeStyle = INK; g.stroke(); g.beginPath(); g.ellipse(s * r * 0.98, -r * 0.05, r * 0.13, r * 0.24, s * 0.3, 0, Math.PI * 2); g.fillStyle = '#f2b5c8'; g.fill(); } }
   // body
   g.beginPath(); g.ellipse(0, 0, r, r * tall, 0, 0, Math.PI * 2);
@@ -237,7 +285,9 @@ function face(g, k, r, mood, tall) {
       g.beginPath(); g.moveTo(x - s * er * 1.6, ey - er * 2.2); g.lineTo(x + s * er * 1.2, ey - er * 1.3); g.lineWidth = 2.2; g.strokeStyle = INK; g.stroke();
     }
     if (k === 'more') { g.beginPath(); g.arc(x, ey - er * 2.4, er * 1.2, Math.PI * 1.15, Math.PI * 1.85); g.lineWidth = 2; g.stroke(); }
+    if (k === 'keeper') { g.beginPath(); g.arc(x, ey, er * 2.1, 0, Math.PI * 2); g.lineWidth = 1.8; g.strokeStyle = INK; g.stroke(); }
   }
+  if (k === 'keeper') { g.beginPath(); g.moveTo(-ex + er * 2.1, ey); g.lineTo(ex - er * 2.1, ey); g.lineWidth = 1.8; g.stroke(); }
   // cheeks
   g.fillStyle = 'rgba(255,110,120,.35)';
   for (const s of [-1, 1]) { g.beginPath(); g.ellipse(s * r * 0.55, r * 0.15, r * 0.14, r * 0.09, 0, 0, Math.PI * 2); g.fill(); }
@@ -283,6 +333,11 @@ function hat(g, node, r, t, react, tall) {
     for (let i = -1; i <= 1; i++) { g.beginPath(); g.ellipse(i * r * 0.18, top - r * 0.12, r * 0.1, r * 0.3, i * 0.4, 0, Math.PI * 2); g.fillStyle = ['#ff6b5a', '#ffd23f', '#4aa8ff'][i + 1]; g.fill(); g.stroke(); }
   } else if (k === 'teller') { // a scarf
     g.beginPath(); g.ellipse(0, r * 0.62, r * 0.7, r * 0.16, 0, 0, Math.PI * 2); g.fillStyle = '#d64550'; g.fill(); g.stroke();
+  } else if (k === 'bell') { // a bell for a hat, which rocks when they ring it
+    bellShape(g, 0, top + r * 0.05, r * 0.34, react);
+  } else if (k === 'keeper') { // a grey bun of hair and round glasses
+    g.beginPath(); g.ellipse(0, top + r * 0.08, r * 0.62, r * 0.3, 0, Math.PI, Math.PI * 2); g.closePath(); g.fillStyle = '#d9d4e4'; g.fill(); g.stroke();
+    g.beginPath(); g.arc(0, top - r * 0.22, r * 0.24, 0, Math.PI * 2); g.fillStyle = '#d9d4e4'; g.fill(); g.stroke();
   } else if (k === 'timid') { // a bow
     for (const s of [-1, 1]) { g.beginPath(); g.ellipse(s * r * 0.2, top + r * 0.05, r * 0.2, r * 0.13, 0, 0, Math.PI * 2); g.fillStyle = '#ff8fb3'; g.fill(); g.stroke(); }
   }
@@ -322,27 +377,54 @@ export function hand(g, x, y, press, scale = 1, flip = false) {
   g.restore();
 }
 
-// The evening village behind the board: sky, roofs, a string of lanterns, grass.
-export function backdrop(g, W, H, top) {
+// Each chapter has its own look: a summer evening with lanterns, a snowy winter night, an autumn sunset.
+// sky: the sky gradient top, middle, bottom; walls and roof: houses; path: the path's dark edge, its colour and its dashes;
+// glow: the warm light in the middle of the square.
+export const LOOKS = {
+  1: { sky: ['#241a46', '#3b2a5c', '#2a3b3a'], walls: ['#4a3352', '#3e3a5e', '#523a3f', '#3b4a4f', '#463a55'], roof: '#2a1d33', trees: ['#2f5a45', '#355f4a', '#2b4f43'],
+    path: ['#2a1d2e', '#8a6a52', '#b89474'], glow: 'rgba(255,190,120,', stars: 40, theme: '#241a46' },
+  2: { sky: ['#13213f', '#2c4470', '#34506a'], walls: ['#46557a', '#3e4a6a', '#56506e', '#3f5a6a', '#4a4f72'], roof: '#1f2840', trees: ['#1f4a44', '#24524a', '#1b403c'],
+    path: ['#1d2538', '#8c9ab3', '#dfe8f4'], glow: 'rgba(190,220,255,', stars: 30, snow: true, theme: '#13213f' },
+  3: { sky: ['#3a1b35', '#a8483a', '#4a3324'], walls: ['#6a4436', '#5a3a46', '#704a2e', '#4e3f3a', '#64412f'], roof: '#33201e', trees: ['#c4572a', '#d98a2b', '#a8402a'],
+    path: ['#2e1d18', '#9a7049', '#cfa77a'], glow: 'rgba(255,170,90,', stars: 8, sun: true, theme: '#3a1b35' },
+};
+export const look = chapter => LOOKS[chapter] ?? LOOKS[1];
+
+// The village behind the board: sky, roofs, the chapter's lights or weather, ground.
+export function backdrop(g, W, H, top, chapter = 1) {
+  const L = look(chapter);
   const sky = g.createLinearGradient(0, 0, 0, H);
-  sky.addColorStop(0, '#241a46'); sky.addColorStop(0.35, '#3b2a5c'); sky.addColorStop(1, '#2a3b3a');
+  sky.addColorStop(0, L.sky[0]); sky.addColorStop(0.35, L.sky[1]); sky.addColorStop(1, L.sky[2]);
   g.fillStyle = sky; g.fillRect(0, 0, W, H);
+  if (L.sun) { // a low sun behind the far houses
+    const sun = g.createRadialGradient(W * 0.84, top + 22, 4, W * 0.84, top + 22, Math.max(W, H) * 0.5);
+    sun.addColorStop(0, 'rgba(255,214,140,.55)'); sun.addColorStop(0.08, 'rgba(255,190,110,.35)'); sun.addColorStop(1, 'rgba(255,150,90,0)');
+    g.fillStyle = sun; g.fillRect(0, 0, W, H);
+    g.beginPath(); g.arc(W * 0.84, top + 22, 22, 0, Math.PI * 2); g.fillStyle = 'rgba(255,224,160,.85)'; g.fill();
+  }
   // ground glow in the middle of the square
   const glow = g.createRadialGradient(W / 2, H * 0.55, 10, W / 2, H * 0.55, Math.max(W, H) * 0.7);
-  glow.addColorStop(0, 'rgba(255,190,120,.16)'); glow.addColorStop(1, 'rgba(255,190,120,0)');
+  glow.addColorStop(0, L.glow + '.16)'); glow.addColorStop(1, L.glow + '0)');
   g.fillStyle = glow; g.fillRect(0, 0, W, H);
   // stars
   let seed = 7; const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   g.fillStyle = 'rgba(255,240,210,.7)';
-  for (let i = 0; i < 40; i++) { const x = rand() * W, y = rand() * top * 0.9; g.beginPath(); g.arc(x, y, rand() * 1.2 + 0.3, 0, Math.PI * 2); g.fill(); }
-  // cobbles
-  g.fillStyle = 'rgba(255,230,200,.04)';
-  for (let i = 0; i < 160; i++) { const x = rand() * W, y = top + rand() * (H - top); g.beginPath(); g.ellipse(x, y, 6 + rand() * 8, 4 + rand() * 4, rand(), 0, Math.PI * 2); g.fill(); }
+  for (let i = 0; i < 40; i++) { const x = rand() * W, y = rand() * top * 0.9, r = rand() * 1.2 + 0.3; if (i < L.stars) { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); } }
+  if (chapter === 2) { // a moon
+    g.beginPath(); g.arc(W * 0.2, top * 0.55, 13, 0, Math.PI * 2); g.fillStyle = '#eef4ff'; g.fill();
+    g.beginPath(); g.arc(W * 0.2 + 6, top * 0.55 - 3, 11, 0, Math.PI * 2); g.fillStyle = L.sky[0]; g.fill();
+  }
+  // cobbles, snow drifts or fallen leaves on the ground
+  for (let i = 0; i < 160; i++) {
+    const x = rand() * W, y = top + rand() * (H - top), rx = 6 + rand() * 8, ry = 4 + rand() * 4, a = rand();
+    g.fillStyle = chapter === 2 ? 'rgba(225,238,255,.035)' : chapter === 3 && i % 3 === 0 ? ['rgba(230,120,50,.22)', 'rgba(240,180,60,.2)', 'rgba(190,70,40,.22)'][i % 9 / 3 | 0] : 'rgba(255,230,200,.04)';
+    g.beginPath(); g.ellipse(x, y, chapter === 3 && i % 3 === 0 ? rx * 0.45 : rx, chapter === 3 && i % 3 === 0 ? ry * 0.4 : ry, a * 3, 0, Math.PI * 2); g.fill();
+  }
   // On a wide screen the board stays a phone-wide column (see BOARD_HALF); the street fills both sides.
   if (W >= WIDE) {
     const inner = BOARD_HALF + 30;
-    street(g, 0, W / 2 - inner, top, H, rand, 0);
-    street(g, W / 2 + inner, W, top, H, rand, 1);
+    street(g, 0, W / 2 - inner, top, H, rand, 0, L);
+    street(g, W / 2 + inner, W, top, H, rand, 1, L);
     return;
   }
   // houses along both sides
@@ -350,9 +432,10 @@ export function backdrop(g, W, H, top) {
     for (let i = 0; i < 4; i++) {
       const hw = 34 + rand() * 10, hh = 40 + rand() * 20;
       const x = side ? W - hw * 0.45 : -hw * 0.55, y = top + 40 + i * (H - top - 60) / 4 + rand() * 20;
-      g.fillStyle = ['#4a3352', '#3e3a5e', '#523a3f', '#3b4a4f'][(i + side) % 4];
+      g.fillStyle = L.walls[(i + side) % 4];
       g.fillRect(x, y, hw, hh);
-      g.beginPath(); g.moveTo(x - 4, y); g.lineTo(x + hw / 2, y - 18); g.lineTo(x + hw + 4, y); g.closePath(); g.fillStyle = '#2a1d33'; g.fill();
+      g.beginPath(); g.moveTo(x - 4, y); g.lineTo(x + hw / 2, y - 18); g.lineTo(x + hw + 4, y); g.closePath(); g.fillStyle = L.roof; g.fill();
+      if (L.snow) snowCap(g, x - 4, y, hw + 8, 18);
       const wx = side ? x + 6 : x + hw - 16;
       const win = g.createRadialGradient(wx + 5, y + 16, 1, wx + 5, y + 16, 22); win.addColorStop(0, 'rgba(255,200,110,.45)'); win.addColorStop(1, 'rgba(255,200,110,0)');
       g.fillStyle = win; g.fillRect(wx - 20, y - 6, 50, 46);
@@ -360,11 +443,18 @@ export function backdrop(g, W, H, top) {
     }
   }
 }
+// Snow lying on a roof whose eaves run from (x, y) for w px and whose peak is h px up.
+function snowCap(g, x, y, w, h) {
+  g.beginPath(); g.moveTo(x - 1, y + 1); g.lineTo(x + w / 2, y - h - 2); g.lineTo(x + w + 1, y + 1);
+  g.lineTo(x + w * 0.82, y - h * 0.3); g.quadraticCurveTo(x + w * 0.7, y + 3, x + w * 0.6, y - h * 0.45);
+  g.lineTo(x + w * 0.5, y - h * 0.62); g.lineTo(x + w * 0.38, y - h * 0.4); g.quadraticCurveTo(x + w * 0.25, y + 4, x + w * 0.15, y - h * 0.2); g.closePath();
+  g.fillStyle = '#eef4ff'; g.fill();
+}
 // Wide screens: the board keeps this half-width, and the rest is street.
 export const WIDE = 700, BOARD_HALF = 300;
 // Rows of houses facing the square, with lit windows, doors, trees and lamp posts, between x0 and x1.
 // side 0 is the left street, 1 the right; the house nearest the board is the lowest.
-function street(g, x0, x1, top, H, rand, side) {
+function street(g, x0, x1, top, H, rand, side, L) {
   if (x1 - x0 < 40) return;
   const rows = Math.max(3, Math.round((H - top) / 150));
   const step = (H - top - 90) / rows;
@@ -374,14 +464,16 @@ function street(g, x0, x1, top, H, rand, side) {
     while (x < x1) {
       const hw = 54 + rand() * 46, hh = 52 + rand() * 46, far = side ? (x - x0) / (x1 - x0 + 1) : 1 - (x - x0) / (x1 - x0 + 1);
       const shade = 0.6 + 0.25 * far; // houses further from the square sit a little darker
-      const wall = ['#4a3352', '#3e3a5e', '#523a3f', '#3b4a4f', '#463a55'][Math.floor(rand() * 5)];
+      const wall = L.walls[Math.floor(rand() * 5)];
       g.save(); g.globalAlpha = shade;
       g.fillStyle = wall; g.fillRect(x, base - hh, hw, hh);
       // roof
-      g.beginPath(); g.moveTo(x - 5, base - hh); g.lineTo(x + hw / 2, base - hh - 16 - rand() * 12); g.lineTo(x + hw + 5, base - hh); g.closePath();
-      g.fillStyle = '#2a1d33'; g.fill();
+      const peak = 16 + rand() * 12;
+      g.beginPath(); g.moveTo(x - 5, base - hh); g.lineTo(x + hw / 2, base - hh - peak); g.lineTo(x + hw + 5, base - hh); g.closePath();
+      g.fillStyle = L.roof; g.fill();
+      if (L.snow) snowCap(g, x - 5, base - hh, hw + 10, peak);
       // chimney, sometimes
-      if (rand() < 0.4) { g.fillStyle = '#2a1d33'; g.fillRect(x + hw * 0.7, base - hh - 22, 7, 14); }
+      if (rand() < 0.4) { g.fillStyle = L.roof; g.fillRect(x + hw * 0.7, base - hh - 22, 7, 14); }
       // windows: some lit, with a glow
       const cols = Math.max(1, Math.floor(hw / 28));
       for (let c = 0; c < cols; c++) {
@@ -398,7 +490,7 @@ function street(g, x0, x1, top, H, rand, side) {
         }
       }
       // door
-      g.fillStyle = '#2a1d33'; g.beginPath(); roundRect(g, x + hw / 2 - 6, base - 18, 12, 18, 4); g.fill();
+      g.fillStyle = L.roof; g.beginPath(); roundRect(g, x + hw / 2 - 6, base - 18, 12, 18, 4); g.fill();
       g.restore();
       // a tree or a lamp post in the gap
       const gap = 10 + rand() * 26;
@@ -406,10 +498,11 @@ function street(g, x0, x1, top, H, rand, side) {
         const tx = x + hw + gap / 2;
         if (rand() < 0.5) {
           g.fillStyle = '#3a2a2a'; g.fillRect(tx - 2, base - 16, 4, 16);
-          g.fillStyle = ['#2f5a45', '#355f4a', '#2b4f43'][Math.floor(rand() * 3)];
+          g.fillStyle = L.trees[Math.floor(rand() * 3)];
           g.beginPath(); g.arc(tx, base - 24, 12, 0, Math.PI * 2); g.arc(tx - 7, base - 18, 8, 0, Math.PI * 2); g.arc(tx + 7, base - 18, 8, 0, Math.PI * 2); g.fill();
+          if (L.snow) { g.fillStyle = '#eef4ff'; g.beginPath(); g.ellipse(tx, base - 33, 9, 4, 0, 0, Math.PI * 2); g.fill(); }
         } else {
-          g.fillStyle = '#2a1d33'; g.fillRect(tx - 1.5, base - 40, 3, 40);
+          g.fillStyle = L.roof; g.fillRect(tx - 1.5, base - 40, 3, 40);
           const glow = g.createRadialGradient(tx, base - 42, 1, tx, base - 42, 26);
           glow.addColorStop(0, 'rgba(255,214,140,.5)'); glow.addColorStop(1, 'rgba(255,214,140,0)');
           g.fillStyle = glow; g.fillRect(tx - 26, base - 68, 52, 52);
@@ -420,43 +513,83 @@ function street(g, x0, x1, top, H, rand, side) {
     }
   }
 }
-// The strings of lanterns across each street on a wide screen, between the rows of houses.
-function sideStrings(g, W, H, top, t) {
-  const inner = BOARD_HALF + 30, rows = Math.max(3, Math.round((H - top) / 150)), step = (H - top - 90) / rows;
-  for (const [x0, x1] of [[0, W / 2 - inner], [W / 2 + inner, W]]) {
-    if (x1 - x0 < 80) continue;
-    for (let row = 0; row < rows; row++) {
-      const y = top + 120 + row * step - step * 0.55, sag = 18;
-      g.strokeStyle = 'rgba(30,20,30,.7)'; g.lineWidth = 1.2;
-      g.beginPath(); g.moveTo(x0 - 4, y); g.quadraticCurveTo((x0 + x1) / 2, y + sag * 2, x1 + 4, y); g.stroke();
-      const n = Math.max(3, Math.round((x1 - x0) / 60));
-      for (let i = 0; i < n; i++) {
-        const p = (i + 0.5) / n, x = x0 + p * (x1 - x0), yy = y + sag * 2 * 2 * p * (1 - p) + 1;
-        g.save(); g.translate(x, yy); g.rotate(Math.sin(t * 1.1 + i + row * 2) * 0.09);
-        const glow = g.createRadialGradient(0, 7, 1, 0, 7, 18); glow.addColorStop(0, 'rgba(255,170,90,.45)'); glow.addColorStop(1, 'rgba(255,170,90,0)');
-        g.fillStyle = glow; g.fillRect(-18, -11, 36, 36);
-        g.fillStyle = ['#ff8a5c', '#ffcf5c', '#ff6f8a', '#9be07a'][(i + row) % 4];
-        g.beginPath(); g.ellipse(0, 7, 5, 6.5, 0, 0, Math.PI * 2); g.fill();
-        g.restore();
-      }
+// A string across from x0 to x1 at y, sagging; `hang(x, y, i)` draws each thing hung on it.
+function string(g, x0, x1, y, sag, n, hang) {
+  g.strokeStyle = 'rgba(30,20,30,.8)'; g.lineWidth = 1.5;
+  g.beginPath(); g.moveTo(x0, y); g.quadraticCurveTo((x0 + x1) / 2, y + sag * 2, x1, y); g.stroke();
+  for (let i = 0; i < n; i++) { const p = (i + 0.5) / n; hang(x0 + p * (x1 - x0), y + 4 * sag * p * (1 - p) + 1, i); }
+}
+function lantern(g, t, i, x, y, big) {
+  g.save(); g.translate(x, y); g.rotate(Math.sin(t * 1.3 + i) * 0.08);
+  const s = big ? 1 : 0.7;
+  const glow = g.createRadialGradient(0, 10 * s, 1, 0, 10 * s, 26 * s); glow.addColorStop(0, 'rgba(255,170,90,.55)'); glow.addColorStop(1, 'rgba(255,170,90,0)');
+  g.fillStyle = glow; g.fillRect(-26 * s, -16 * s, 52 * s, 52 * s);
+  g.fillStyle = ['#ff8a5c', '#ffcf5c', '#ff6f8a', '#9be07a'][i % 4];
+  g.beginPath(); g.ellipse(0, 10 * s, 7 * s, 9 * s, 0, 0, Math.PI * 2); g.fill();
+  g.fillStyle = 'rgba(40,20,20,.6)'; g.fillRect(-4 * s, 0, 8 * s, 2); g.fillRect(-4 * s, 18 * s, 8 * s, 2);
+  g.restore();
+}
+// Winter: small bulbs and icicles.
+function bulb(g, t, i, x, y) {
+  const on = 0.6 + 0.4 * Math.sin(t * 2 + i * 1.7);
+  const col = ['#bfe3ff', '#fff6d0', '#8fc3f0'][i % 3];
+  const glow = g.createRadialGradient(x, y + 6, 1, x, y + 6, 16); glow.addColorStop(0, `rgba(200,230,255,${0.45 * on})`); glow.addColorStop(1, 'rgba(200,230,255,0)');
+  g.fillStyle = glow; g.fillRect(x - 16, y - 10, 32, 32);
+  g.fillStyle = col; g.beginPath(); g.ellipse(x, y + 6, 4, 5.5, 0, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#eef4ff'; g.beginPath(); g.moveTo(x + 9, y + 1); g.lineTo(x + 11, y + 1); g.lineTo(x + 10, y + 9 + (i % 3) * 3); g.closePath(); g.fill();
+}
+// Autumn: bunting.
+function flag(g, t, i, x, y) {
+  g.save(); g.translate(x, y); g.rotate(Math.sin(t * 1.6 + i) * 0.1);
+  g.beginPath(); g.moveTo(-8, 0); g.lineTo(8, 0); g.lineTo(0, 16); g.closePath();
+  g.fillStyle = ['#e8603b', '#f2b33d', '#c9412f', '#e9d38a'][i % 4]; g.fill(); g.lineWidth = 1; g.strokeStyle = 'rgba(40,20,20,.5)'; g.stroke();
+  g.restore();
+}
+// The strings across the top of the screen (and the side streets on a wide screen), and the weather.
+export function lanterns(g, W, y, t, H = 0, top = 0, chapter = 1) {
+  const hang = chapter === 2 ? (x, yy, i) => bulb(g, t, i, x, yy) : chapter === 3 ? (x, yy, i) => flag(g, t, i, x, yy) : (x, yy, i) => lantern(g, t, i, x, yy, true);
+  const small = chapter === 2 ? (x, yy, i) => bulb(g, t, i, x, yy) : chapter === 3 ? (x, yy, i) => flag(g, t, i, x, yy) : (x, yy, i) => lantern(g, t, i, x, yy, false);
+  if (W >= WIDE && H) {
+    const inner = BOARD_HALF + 30, rows = Math.max(3, Math.round((H - top) / 150)), step = (H - top - 90) / rows;
+    for (const [x0, x1] of [[0, W / 2 - inner], [W / 2 + inner, W]]) {
+      if (x1 - x0 < 80) continue;
+      for (let row = 0; row < rows; row++) string(g, x0 - 4, x1 + 4, top + 120 + row * step - step * 0.55, 18, Math.max(3, Math.round((x1 - x0) / 60)), (x, yy, i) => small(x, yy, i + row));
+    }
+  }
+  string(g, -10, W + 10, y, 13, Math.max(5, Math.round(W / (chapter === 1 ? 70 : 40))), hang);
+  if (H) weather(g, W, H, t, chapter);
+}
+// Falling snow in winter, falling leaves in autumn. Positions come from the time alone, so pause freezes them.
+export function weather(g, W, H, t, chapter) {
+  if (chapter === 2) {
+    g.fillStyle = 'rgba(240,246,255,.75)';
+    for (let i = 0; i < 46; i++) {
+      const sp = 18 + (i * 37) % 23, x = ((i * 97.3) % W + Math.sin(t * 0.8 + i) * 12 + W) % W, y = ((i * 151.7) % H + t * sp) % H, r = 1 + (i % 3) * 0.7;
+      g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+    }
+  } else if (chapter === 3) {
+    for (let i = 0; i < 16; i++) {
+      const sp = 22 + (i * 29) % 19, x = ((i * 131.1) % W + Math.sin(t * 0.9 + i * 2) * 26 + W) % W, y = ((i * 173.3) % H + t * sp) % H;
+      g.save(); g.translate(x, y); g.rotate(t * (1 + i % 3) + i);
+      g.beginPath(); g.ellipse(0, 0, 5, 2.6, 0, 0, Math.PI * 2); g.fillStyle = ['#e8703b', '#f0b13d', '#c4472f'][i % 3]; g.globalAlpha = 0.8; g.fill();
+      g.restore();
     }
   }
 }
-// A string of lanterns across the top, swaying. On a wide screen, more strings across the side streets.
-export function lanterns(g, W, y, t, H = 0, top = 0) {
-  if (W >= WIDE && H) sideStrings(g, W, H, top, t);
-  g.strokeStyle = 'rgba(30,20,30,.8)'; g.lineWidth = 1.5;
-  g.beginPath(); g.moveTo(-10, y); g.quadraticCurveTo(W / 2, y + 26, W + 10, y); g.stroke();
-  const n = Math.max(5, Math.round(W / 70));
-  for (let i = 0; i < n; i++) {
-    const p = (i + 0.5) / n, x = p * W, yy = y + 26 * 2 * p * (1 - p) * 2 * 0.5 + 2, sw = Math.sin(t * 1.3 + i) * 0.08;
-    g.save(); g.translate(x, yy); g.rotate(sw);
-    const glow = g.createRadialGradient(0, 10, 1, 0, 10, 26); glow.addColorStop(0, 'rgba(255,170,90,.55)'); glow.addColorStop(1, 'rgba(255,170,90,0)');
-    g.fillStyle = glow; g.fillRect(-26, -16, 52, 52);
-    g.fillStyle = ['#ff8a5c', '#ffcf5c', '#ff6f8a', '#9be07a'][i % 4];
-    g.beginPath(); g.ellipse(0, 10, 7, 9, 0, 0, Math.PI * 2); g.fill();
-    g.fillStyle = 'rgba(40,20,20,.6)'; g.fillRect(-4, 0, 8, 2); g.fillRect(-4, 18, 8, 2);
-    g.restore();
+// The chapter's sign: a moon for summer evenings, a snowflake for winter, a leaf for autumn. Drawn in r.
+export function emblem(g, chapter, x, y, r) {
+  g.save(); g.translate(x, y); g.lineCap = 'round'; g.lineJoin = 'round';
+  if (chapter === 2) {
+    g.strokeStyle = '#eef4ff'; g.lineWidth = Math.max(2, r * 0.14);
+    for (let i = 0; i < 6; i++) { g.save(); g.rotate(i * Math.PI / 3); g.beginPath(); g.moveTo(0, 0); g.lineTo(0, -r); g.moveTo(0, -r * 0.55); g.lineTo(-r * 0.25, -r * 0.78); g.moveTo(0, -r * 0.55); g.lineTo(r * 0.25, -r * 0.78); g.stroke(); g.restore(); }
+  } else if (chapter === 3) {
+    g.rotate(-0.5); g.beginPath(); g.moveTo(0, -r); g.quadraticCurveTo(r * 0.9, -r * 0.2, 0, r * 0.8); g.quadraticCurveTo(-r * 0.9, -r * 0.2, 0, -r); g.closePath();
+    g.fillStyle = '#e8703b'; g.fill(); g.lineWidth = Math.max(1.5, r * 0.1); g.strokeStyle = INK; g.stroke();
+    g.beginPath(); g.moveTo(0, -r * 0.7); g.lineTo(0, r * 1.05); g.stroke();
+  } else {
+    g.beginPath(); g.arc(0, 0, r * 0.9, 0, Math.PI * 2); g.fillStyle = '#ffe08a'; g.fill();
+    g.beginPath(); g.arc(r * 0.4, -r * 0.25, r * 0.75, 0, Math.PI * 2); g.fillStyle = 'rgba(36,26,70,1)'; g.fill();
   }
+  g.restore();
 }
 export { SHAPES };

@@ -9,7 +9,7 @@ and lines, and only swaps in the model's text when this Worker answers within 4 
 ## What it does
 
 Model endpoints: `POST /lab-api/persona` and `POST /lab-api/quest` on `play.adamwhite.work`.
-The persona request and response are described first; quest, spend, boards and rooms follow below.
+The persona request and response are described first; quest, spend, boards, rooms and friends' tables follow below.
 
 Request body (JSON, at most 2 KB, every field checked; any other field gives 400):
 
@@ -177,6 +177,48 @@ per socket. The class uses `ctx.acceptWebSocket`, `webSocketMessage`, `webSocket
 Hibernation avoids idle duration charges; active rooms and upgrade attempts still incur charges and
 are not subject to the model daily cap.
 
+## Friends' tables (2026-11-24)
+
+`GET /lab-api/table/<game>/<CODE>` upgrades to a WebSocket. `<game>` must be listed in `TABLE.games`
+in `src/table.mjs` (now `pitch` and `pisti`, two seats each); `<CODE>` is four uppercase ASCII letters.
+One SQLite-backed `Table` Durable Object, named `<game>/<CODE>` through binding `TABLE`, serves each
+table. Migration `v4` adds the class. It is for turn-based games between friends who share a code or
+a link (`?room=CODE`), with no account. The page side is `experiments/kit/room.js`.
+
+The server keeps the one ordered list of moves and does not know any game's rules. A move is 1 to 8
+integers that mean something to the game's own `sim.js`; each page checks and applies moves itself,
+and applies its own move only when the server sends it back. So a wrong or dishonest page can send
+a move that is illegal in the game: tables are for friends, and nothing from a table may feed a
+shared board.
+
+What is stored (one record per table, in the object's storage): the rules version, a game number, a
+uint32 seed, each seat's cleaned name (board `shownName`, empty becomes `Friend`) and seat key, the
+move list (at most 800 moves) and the rematch votes. A seat key is 16 to 40 random letters and digits
+made by the page, kept in that browser's `localStorage`, sent only in the `hi` frame and never sent
+to anyone else; it is what lets a dropped player take the same seat back. No address is stored and
+nothing from a table is logged. An alarm deletes the whole record 24 hours after the last seat,
+move or vote, and closes any socket still open with code 4004.
+
+| Client text frame | Server action |
+|---|---|
+| `{t:'hi', n, k, v}` | Seat the player: the same key gets its own seat back, else the first empty seat. Answer `{t:'you', seat, v, game, seed, seats, log, again}` (the whole game so far) and send `{t:'seats', seats}` to the others. A full table closes the socket with 4001. A rules version other than the table's closes with 4002 while anyone else is connected; alone, it restarts the table on the new version. A second socket with the same key takes the seat and the first closes with 4003. |
+| `{t:'m', i, m}` | Accept only when every seat is taken and `i` is the next place in the list. Then store it and send `{t:'m', i, s, m}` to everyone, the sender included. The same move resent for a place it already holds is ignored; any other index gets the sender a fresh `you` with the whole list. |
+| `{t:'again'}` | Record a vote and send `{t:'again', s}`. When every seat has voted: clear the list, add one to the game number, draw a new seed and send `{t:'game', game, seed}`. |
+
+`seats` is `[{n, on} | null]`: the name and whether that seat has a live socket. A disconnect sends
+`seats` again with `on: false`; the seat stays that player's until the table expires.
+
+Guards: Origin must be the game site or an allowed localhost Origin. Non-GET gets 405; a GET without
+WebSocket Upgrade gets 426; an unknown game or code gets 404. `TABLE_JOIN` limits upgrades to 60 per
+minute per address per Cloudflare location (a phone that reconnects on every wake needs more than the
+race rooms' 6). A limiter failure refuses with 429. At most 16 sockets per table. Each frame must be
+JSON text of at most 300 UTF-8 bytes with exactly the expected fields; anything else is ignored. More
+than 12 frames in a rolling second closes the socket with 1008.
+
+Cost: no model calls. One storage write per seat taken, move and vote, bounded by the frame rate and
+the 800-move list; one alarm per table. Sockets hibernate, so an idle table costs nothing while
+phones sleep.
+
 ## Spend guards
 
 - Origin check: only `https://play.adamwhite.work`, `http://localhost[:port]` and `http://127.0.0.1[:port]`.
@@ -229,6 +271,10 @@ allow-lists and required fields, rejection of free text, Origins, limits, cache,
 shared spend and legacy-count upgrades. Room tests cover the pure protocol, rolling rate window,
 round membership, relays, slot reuse and reconstruction from attachments. A regression test covers
 a close that wakes the object after the runtime has omitted the disconnected socket.
+Table tests join the real `experiments/kit/room.js` to the real `Table` class through in-memory
+sockets: same seed for both, moves in one order, a dropped player gets the whole game back, an unsent
+move goes out again after a reconnect, full and wrong-version refusals, no seat key in any frame, the
+rematch vote, and expiry by alarm.
 
 Verified for these additions (2026-11-23): **41/41 tests pass**. The production entry bundles with
 `npx wrangler deploy --dry-run -c workers/lab-ai/wrangler.jsonc` at its configured compatibility date;
@@ -298,3 +344,24 @@ affected: the 18 points a second is Lantern's rule and applies only to a post th
 posted like any other board. The first read or post of a new UTC day deletes the day before's rows, and the read cache
 is keyed by the day. What is stored is the same as for the main board.
 
+
+### Review fixes (2026-11-24)
+
+An independent review (Codex, gpt-6.2-sol, read-only) found eleven faults in the board. Fixed here:
+
+- A used ticket is kept for `RUN.hours` in `done (r, id, s, t)`. The same post sent twice gets the same answer and changes
+  nothing; a different score or player on a used ticket is refused, and a start does not open a used ticket again.
+- A removal records the id in `gone (id, t)` for `RUN.hours`. A score under that id answers 410 `gone`, so a score still
+  on its way cannot put a removed row back. The page makes a new id when the player shares again.
+- A ticket older than `RUN.hours` is refused at the post, whether or not a start has swept it.
+- A daily board's day only moves forward. A request stamped before midnight that arrives late no longer empties the new
+  day. A removal also moves the day. A ticket from another UTC day is refused on a daily board.
+
+What is stored is still a random id, a name, a score and times. The two new tables hold run ids and player ids only.
+
+Reading a board is a plain GET with no id, name or score in it. The page sends that GET when the player opens the
+leaderboard, also before a yes. "Sends nothing before the player chooses to share" means nothing about the player.
+
+Known and left: the per-address limit counts starts apart from score posts, so one address gets six of each a minute;
+a score refused by the limit is retried once after 6 s and may be refused again. A low score on a full board is trimmed
+at once and still counts against the day's new-player cap. A cached read can be up to `BOARD.cacheSeconds` old.

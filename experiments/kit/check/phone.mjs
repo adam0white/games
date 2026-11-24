@@ -11,11 +11,19 @@ import { fileURLToPath } from 'node:url';
 import { dirname, extname, join, normalize, resolve } from 'node:path';
 import assert from 'node:assert/strict';
 import { gunzipSync } from 'node:zlib';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { experimentPath } from '../../../src/worker.mjs';
 import { experimentRoots } from '../../../scripts/experiments.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
+// The notes page builds its games menu and game picker from kit/games.json, so every experiment has to be in it.
+{
+  const listed = new Set(JSON.parse(readFileSync(join(root, 'experiments/kit/games.json'), 'utf8')).games.map(game => game.slug));
+  const missing = readdirSync(join(root, 'experiments'), { withFileTypes: true })
+    .filter(entry => entry.isDirectory() && !['kit', 'lab'].includes(entry.name) && existsSync(join(root, 'experiments', entry.name, 'index.html')) && !listed.has(entry.name))
+    .map(entry => entry.name);
+  assert.deepEqual(missing, [], `add these experiments to experiments/kit/games.json so testers can find them: ${missing.join(', ')}`);
+}
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
 const server = createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x'), moved = experimentPath(url.pathname);
@@ -423,7 +431,7 @@ const GAMES = {
       dposts.push(b); if (b.remove) dkept.delete(b.id); else dkept.set(b.id, { n: b.n, s: Math.max(b.s, dkept.get(b.id)?.s ?? 0) });
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ place: b.remove ? 0 : dlisted().indexOf(dkept.get(b.id)) + 1, rows: dlisted() }) });
     });
-    await page.click('#tabAll'); assert.match(await page.textContent('#rows'), /Zed99999/); assert.doesNotMatch(await page.textContent('#rows'), /Rio/); assert.match(await page.textContent('#shareNote'), /A tick sends your name and your best score/);
+    await page.click('#tabAll'); assert.match(await page.textContent('#rows'), /Zed99999/); assert.doesNotMatch(await page.textContent('#rows'), /Rio/); assert.match(await page.textContent('#shareNote'), /A tick sends your name and your score .* and a signal when a run starts/);
     // The yes sends nothing by itself. A score goes up with a run ticket: the page tells the server when a sharing player's endless run starts.
     assert.equal(starts.length, 0, 'no ticket is asked for before the yes');
     await page.check('#share'); await until(page, () => /from now on goes up by itself/.test(document.querySelector('#shareNote').textContent), 'the tick is kept'); await sleep(300);
@@ -465,6 +473,10 @@ const GAMES = {
     assert.deepEqual(dposts[d0 + 1], { id: dposts[d0].id, remove: true }, 'stop sharing takes the row off today\'s board too'); await page.click('#board .back');
     await page.unroute('**/lab-api/board/lantern-daily');
     await page.unroute('**/lab-api/board/lantern');
+    // The Music switch (the score from the lab's Lantern Song): on at first, kept when turned off, and the same switch on the menu and the card.
+    assert.equal((await state()).music, true); assert.equal(await page.textContent('#menu button.music'), 'Music: on');
+    await page.click('#menu button.music'); assert.equal((await state()).music, false); assert.equal((await saved())['lantern-music'], '0'); assert.equal(await page.textContent('#card button.music'), 'Music: off');
+    await page.reload(); assert.equal((await state()).music, false, 'off is kept'); await page.click('#menu button.music'); assert.equal((await saved())['lantern-music'], '1'); assert.equal((await state()).music, true);
     await sleep(400); await page.reload(); st = await state(); assert.equal(st.name, 'Rio <b>river</b'); assert.equal(st.board.length, 5, 'the board is kept');
     await page.evaluate(() => localStorage.setItem('hf-lab-recording-off', '1')); await page.reload(); // recording off again, as the steps below expect
     // Views (notes #158, #159): 2D, 3D and first person, saved under lantern-view. First person steers by pressing a side; a drag does not.
@@ -599,6 +611,7 @@ const GAMES = {
   ducklings: page => started(page, 'ducklings', 'ducklingsState', '#pauseMenu'),
   fixit: page => started(page, 'fixit', 'fixitState', '#quit'),
   borrowed: page => started(page, 'borrowed', 'borrowedState', '#toMenu'),
+  alibi: page => started(page, 'alibi', 'alibiState', '#toMenu'),
   // Lab pages (/lab/<name>/): an old save survives, a finger steers, pause stops time, one audio context after the first tap.
   'lab/ant-nemesis': page => antLab(page, 'ant-nemesis', '?ai=0', { nem: null, trophies: [{ name: 'Old Scar the Beetle' }], gens: 1 }, async () => {
     assert.match(await page.textContent('#trophies'), /Old Scar the Beetle/, 'old save: trophies');
@@ -620,6 +633,18 @@ const GAMES = {
     assert.equal(await page.evaluate(() => window.__thankful.state.days['2026-11-23'].length), 3, 'the fourth thanks did not change today');
     const picture = await page.evaluate(() => window.__thankful.picture());
     assert.equal(picture.width, 1080); assert.equal(picture.height, 1350); assert.ok(picture.bytes > 20000, 'picture has PNG image data');
+  },
+  async 'lab/pitch'(page) {
+    // Paper Pitch: an old save survives, a tap on a pulsing point draws a line, leaving the page pauses.
+    await page.goto(`${base}/notes/button.js`); await page.evaluate(() => { localStorage.clear(); localStorage.setItem('pitch:v1', '{"played":1,"level":1,"lossStreak":0,"wins":1,"sound":true,"daily":{}}'); localStorage.setItem('pitch:hint', '1'); });
+    await page.goto(`${base}/lab/pitch/`); await until(page, () => window.__pitch?.ready, 'game script');
+    const kept = await page.evaluate(() => window.__pitch.save());
+    assert.equal(kept.played, 1, 'old save: games played survive'); assert.equal(kept.wins, 1, 'old save: wins survive'); assert.equal(kept.level, 1, 'old save: level survives');
+    await page.click('#play'); await until(page, () => window.__pitch.canTap, 'the player may move');
+    const at = await page.evaluate(() => window.__pitch.legal[0]);
+    await page.mouse.click(at.sx, at.sy); await until(page, () => window.__pitch.segments > 0, 'a tap on a legal point draws a line');
+    await page.evaluate(() => dispatchEvent(new Event('blur'))); await until(page, () => window.__pitch.paused, 'leaving the page pauses');
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no sideways scroll');
   },
   async 'lab/ant-nest'(page) {
     const KEY = 'ant-nest:v1', nest = () => page.evaluate(() => { const n = window.__nest; return { mode: n.mode, t: n.s?.t, marks: n.s ? n.s.mark.reduce((a, b) => a + b, 0) : 0 }; });
@@ -697,6 +722,20 @@ const GAMES = {
   'hint borrowed': page => hinted(page, { path: '/borrowed/', play: '#play', resume: '#resume', key: 'borrowed:hint', delay: 3000, moved: () => window.borrowedState().touched, legacy: { 'borrowed-save': '{"v":1,"sound":true,"best":530,"runs":4,"gallery":{"busker":1},"daily":{},"taught":1}' } }),
   'hint ducklings': page => hinted(page, { path: '/ducklings/', play: '#play', resume: '#resume', key: 'ducklings:hint', delay: 3000, before: () => window.ducklingsState().rollCalls, moved: n => window.ducklingsState().rollCalls > n, legacy: { 'ducklings-save': '{"v":1,"sound":true,"opened":2,"stars":{"1":2},"best":{"1":140},"endless":0,"home":2,"album":{},"taught":true}' } }),
   'hint grapevine': page => hinted(page, { path: '/grapevine/', play: '#play', resume: '#resume', key: 'grapevine:hint', delay: 3000, moved: () => window.grapevineState().touched, legacy: { 'grapevine-save': '{"v":1,"sound":true,"best":{"1":3},"opened":2,"daily":{}}' } }),
+  // Paper Pitch acts when the finger lifts (a press may become a drag from the ball), so it has its own first-time help check: `hinted` asserts before the lift.
+  async 'hint lab/pitch'(page) {
+    const on = () => page.evaluate(() => !!document.querySelector('.kit-hint.on'));
+    await page.goto(`${base}/notes/button.js`); await page.evaluate(() => localStorage.clear());
+    await page.goto(`${base}/lab/pitch/`); await page.waitForSelector('#play'); await sleep(3500); assert.equal(await on(), false, 'hint: not on the menu');
+    await page.click('#play'); await until(page, () => !!document.querySelector('.kit-hint.on'), 'hint: shown after the delay', 11000);
+    const { x, y, top } = await page.evaluate(() => { const r = document.querySelector('.kit-hint .knob').getBoundingClientRect(), x = r.x + r.width / 2, y = r.y + r.height / 2; return { x, y, top: document.elementFromPoint(x, y)?.id }; });
+    assert.equal(top, 'c', 'hint: the game canvas is what a finger on the hint touches');
+    await page.mouse.click(x, y); await until(page, () => window.__pitch.segments > 0, 'hint: a tap where the hint points draws a line', 3000);
+    assert.equal(await page.evaluate(() => document.querySelector('.kit-hint')), null, 'hint: gone on the first input');
+    assert.equal(await page.evaluate(() => localStorage.getItem('pitch:hint')), '1', 'hint: the player is remembered');
+    await page.goto(`${base}/notes/button.js`); await page.evaluate(() => { localStorage.clear(); localStorage.setItem('pitch:v1', '{"played":1,"level":1,"lossStreak":0,"wins":1,"sound":true,"daily":{}}'); });
+    await page.goto(`${base}/lab/pitch/`); await page.click('#play'); await sleep(4500); assert.equal(await on(), false, 'hint: never shown to a returning player');
+  },
   'hint lab/lantern-3d': page => hinted(page, { path: '/lab/lantern-3d/', play: '#play', resume: '#go', key: 'lantern-3d:hint', delay: 1500, before: () => window.lanternState().target, moved: t => window.lanternState().target !== t, alive: () => { const s = window.lanternSim(); s.safe = 60; s.light = 1; } }),
   // Old /proto/ links move to the top level with their query; the new URL plays to its first frame.
   async 'old links'(page) {

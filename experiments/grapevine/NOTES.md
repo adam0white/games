@@ -21,7 +21,7 @@ The idea comes from the archived game Hearsay. In Hearsay, news changes each tim
   - The longest route is 14 hops (`MAX_HOPS`).
 - **Input.**
   - Drag with one finger, or tap villagers one by one.
-  - Touching a villager already on the route cuts the route back to it.
+  - Touching a villager already on the route cuts the route back to it, unless the route can step on to that villager from its end (a loop back); then the touch extends the route. So a loop can be made by taps alone.
   - Touching the teller clears the route.
   - Lifting the finger on the listener sends the message.
   - A ghost token next to each villager on the route shows the message after that villager.
@@ -40,6 +40,16 @@ The idea comes from the archived game Hearsay. In Hearsay, news changes each tim
   | timid | bow | refuses any red message (the route cannot enter) |
   | parrot | bird | repeats the change of the previous speaker. After the teller or an honest villager it does nothing. After a change that did nothing (for example +1 at count 3), it repeats that change, which again does nothing. The badge shows the copied change live. |
   | sleepy (flag on any villager) | nightcap, moon | speaks once, then goes home and cannot be revisited |
+  | bell ringer (chapter 2) | light blue, a bell for a hat | changes nothing, but rings: every gate on the board swaps, open to shut and shut to open. A second ring swaps them back. |
+  | keeper (chapter 3) | grey bun, round glasses | hands on the news they hold now, and keeps the news they were given. Their badge shows what they hold. A parrot after a keeper repeats nothing. |
+
+- **Paths** (chapter 2 on; `edges` entries `[a, b, type]` in `levels.js`):
+
+  | Path | Look | Rule |
+  | --- | --- | --- |
+  | path (type 0, or no type) | dashed lane | both ways |
+  | one-way lane (1) | no dashes; yellow arrows that walk along it | only from a to b. A drag against it stops and the lane flashes red. |
+  | gate (2 starts open, 3 starts shut) | a red and cream striped barrier in the middle of the path | Across the path: shut, the route cannot cross. Swung aside along the path: open. Every bell ring swaps every gate. |
 
 - **Win and stars.**
   - Right message: celebration, stars, and an end card with a "what they heard" strip.
@@ -63,7 +73,7 @@ The idea comes from the archived game Hearsay. In Hearsay, news changes each tim
   - Villager radius is 15–30 CSS px, set by the screen.
 - **Levels** (`make-levels.mjs` writes `levels.js`).
   - Levels 1–3 are hand-made:
-    - L1: one path. A ghost finger draws it. A player with no save first sees the shared kit hint (`../kit/hint.js`, kind `path`, key `grapevine:hint`) after 3 s of idle play; the ghost finger waits while it shows. It sits between the teller's row and the next row up on level 1; on boards with 4–5 rows it can overlap a villager. `check.mjs` asserts that `?hint=hand` shows it and a tap removes it.
+    - L1: one path. A ghost finger draws it. A player with no save first sees the shared kit hint (`../kit/hint.js`, kind `path`, key `grapevine:hint`) after 3 s of idle play; the ghost finger waits while it shows. Since round 3 the game picks the hint's height each time it appears (`hintBottom` in `index.html`, the kit's `bottom` as a function), so it covers no villager on 4–5 row boards either; see round 3 below. `check.mjs` asserts that `?hint=hand` shows it and a tap removes it.
     - L2: two paths, one painter wrong.
     - L3: the short path is wrong and the long one is right.
   - Levels 4–30: each new villager kind gets 3 levels, in this order: exaggerator, grump, muddler, sculptor, contrarian, timid, sleepy, parrot. The last 3 levels mix every kind.
@@ -72,8 +82,8 @@ The idea comes from the archived game Hearsay. In Hearsay, news changes each tim
     - the new villager kind is essential: with those villagers removed, no route of the shortest length solves it. For timid and sleepy levels, the rule itself is essential: with the rule switched off, a shorter route would solve it.
   - "Round again" (L9) and "Lantern night" (L30) require a loop.
   - From 8 seeds per level, the curator keeps the one whose random-walker win rate (`wanderRate`) is closest to the target `0.75 − 0.6·(n − 4)/26`. The target falls from 75% at L4 to 15% at L30.
-- **Save.** One key `grapevine-save`: `{v, sound, best: {level: stars}, opened, daily: {date: stars}}`.
-- **URL parameters.** `?level=n` opens level n, even if it is locked. `?seed=n` replaces the daily seed.
+- **Save.** One key `grapevine-save`: `{v, sound, best: {level: stars}, opened, daily: {date: stars}}`. Round 3 added three fields to the same blob, with defaults, so old saves load unchanged: `dailyHops: {date: fewest hops}`, `dailyTier: {date: tier}` and `bestStreak`.
+- **URL parameters.** `?level=n` opens level n, even if it is locked. `?seed=n` replaces the daily seed. `?tier=n` (0–3) picks the daily tier without pinning it, for checks.
 
 ## Bot results (`fnm exec --using=26.12.0 node bots.mjs`, exit 0, 0.1 s)
 
@@ -190,9 +200,8 @@ Labelled: these go beyond the brief.
 - **Villager reactions.** Each kind has its own silhouette and voice. Timid villagers shake when they refuse red. Sleepy villagers show "z z" after they speak.
 - **Proposals not built:**
   - A sandbox where the player places changers to make a route work.
-  - One-way gossip lanes (directed edges).
-  - A daily streak.
   - Two listeners who want different news from one teller.
+  - (One-way lanes and a daily streak were built in round 3; see below.)
 
 ## Kit candidates
 
@@ -256,3 +265,142 @@ The game went live less than an hour before this round. Changes:
 ## 2026-11-23: understood at once (tester t1, note #138)
 
 The lab asked (#127) whether the tester understood what to do without anyone explaining. Answer: "Evet, hemen" (yes, right away). Recorded; no change. This is the first sign that Grapevine's first minute works for a newcomer. Whether it is fun was not asked.
+
+
+## Round 3, 2026-11-24: chapters 2 and 3
+
+### What changed
+
+- **New board elements, each taught by doing on its own short level** (four on the board: the teller, the listener and two villagers; the short way is wrong, and the right way needs the new element):
+
+  | Level | Element | What the player has to think |
+  | --- | --- | --- |
+  | 31 One way | one-way lane | the board is directed: where a route can go depends on which way it travels, and the obvious return path does not exist |
+  | 36 Ding dong | bell ringer and gates | the board changes while you walk it: a detour to the bell opens the way, and a second ring shuts it again (order matters, not only the set of villagers) |
+  | 46 Old news | keeper | a villager with memory: what comes out is what went in last time. A loop through a keeper (in, round, in again) hands on news from earlier in the same route. |
+
+  The keeper is the one that makes new thinking most: the message is no longer a function of the villagers on the route alone. The bell is the second: the route has a state beyond the message. The one-way lane mostly prunes; on its own it is the gentlest of the three, which is why it comes first.
+- **Chapters.** `CHAPTERS = [[1, 30], [31, 45], [46, 60]]` in `levels.js`. Levels 1–30 are byte-identical to before (`bots.mjs` checks the hash of `LEVELS.slice(0, 30)`).
+  - Chapter 2 "Winter" (31–45): one-way lanes (31–35), the bell and gates (36–40), then mixes with sleepy villagers and parrots (41–45). Night blue sky, a moon, snow on the roofs and trees, falling snow, a string of bulbs with icicles, pale paths.
+  - Chapter 3 "Autumn" (46–60): the keeper (46–50), then keepers with lanes, bells and parrots (51–55), then everything (56–60). Sunset sky with a low sun, orange trees, falling leaves, bunting.
+  - Chapter 1 keeps its summer evening with lanterns.
+  - Each chapter's first level shows "Chapter n: Name" under the top bar for 2.5 s. The new element pulses with a ring until the first touch.
+  - The last level of a chapter (30, 45, 60) ends on a "Chapter done!" card with the chapter's stars and fireworks behind the card; Next becomes "Next chapter".
+  - The menu has a tab per chapter with its stars; a chapter opens when its first level opens. A finished old save (`opened: 31`) now lands on chapter 2 with "Play 31".
+- **"What they heard" strip.** Each villager has a speech bubble with the news as they passed it on and a line under them from what they did ("Psst!", "Splash!", "And more!", "Swapsies!", "Snip!", "Opposite day!", "Ding dong!", "Old news!", "Phew, not red", "Same again!", "Er... same?" for a parrot with nothing to copy, "Heard it!"). Long routes wrap to two rows. A Share button hands over a PNG postcard (chapter sky, name, stars, the strip with every bubble) with a text version: the level, stars, the chain of lines and "One blue square became two green stars in 7 hops." The card is drawn when the end card opens, so the tap calls `navigator.share` without waiting. Fallbacks: text share, then clipboard, then "Could not share". No link is included (see "For the lead").
+- **Daily village.** Still one per date. New in the save: fewest hops per date, the tier the date showed, and the best streak. The streak counts days in a row with a solved daily, ending today or yesterday; the daily button shows it from 2 days. Tiers by progress (`TIER_AT`): from level 32 the daily has one-way lanes, from 37 bells and gates, from 47 keepers; each tier requires its newest element to be essential. The tier is pinned per date the first time it opens, so finishing a chapter does not change today's village; a date already played before tiers existed stays on tier 0. The daily wears the look of its tier's chapter.
+- **Kit hint placement.** The kit centres the copy across the screen, so only its height can move. `hintBottom` scores every height in 4 px steps by the area it covers: villagers (hat to badge) count four times, the teller's news, the listener's bubble and the top bar once, and picks the least, nearest the old height. The hint's `reach` went from 46 to 40 (the dots are 38 px apart instead of 44). Probe at 390x664 and 360x640 on levels 5, 8, 12, 20, 24, 30, 33, 40, 45, 52, 55 and 60: the old fixed height covered a villager in 18 of 24 cases; the new one in 0 of 24. `check.mjs` asserts it on levels 20, 30 and 52 and the tier 3 daily on every phone.
+- **Taps make loops.** Touching a villager already on the route used to always cut the route back to it, so a loop could only be dragged. Now, if the route can step on to that villager, the touch extends it. `check.mjs` plays levels 34, 40 and 50 (whose best routes loop) by taps alone.
+
+### Bot results (`bots.mjs`, 3.0 s)
+
+Solver 60/60 levels, 180/180 stars. Random bot 44.0% of 24,000 attempts (1.08 stars per attempt). Do-nothing bot 0/60. Straight-path solves: levels 1, 2 and 46 (46 is the keeper's first level, where the keeper is the straight way by design). 40 random villages with every element: brute force over `walk()` agrees with the solver. Hand-made unit cases for the lane, the gate, the bell (twice), the keeper (old news, loop, parrot after keeper, timid after keeper, sleepy keeper).
+
+| Level | Name | Villagers | Paths | Lanes | Gates | Shortest | Random bot | Must use |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 31 | One way | 4 | 5 | 1 | 0 | 3 | 88% | lane |
+| 32 | Downhill | 7 | 8 | 2 | 0 | 4 | 51% | lane |
+| 33 | Ice road | 8 | 12 | 2 | 0 | 5 | 56% | lane |
+| 34 | Roundabout | 8 | 8 | 3 | 0 | 6 | 55% | lane (loop) |
+| 35 | Sledges | 9 | 12 | 4 | 0 | 5 | 47% | lane |
+| 36 | Ding dong | 4 | 4 | 0 | 1 | 3 | 88% | bell |
+| 37 | Gatehouse | 7 | 9 | 0 | 1 | 4 | 47% | bell |
+| 38 | Open, shut | 7 | 8 | 0 | 2 | 4 | 39% | bell |
+| 39 | Two bells | 7 | 8 | 0 | 2 | 6 | 34% | bell |
+| 40 | Back for the bell | 8 | 11 | 0 | 1 | 7 | 30% | bell (loop) |
+| 41 | Frost | 7 | 9 | 1 | 1 | 6 | 26% | bell + lane |
+| 42 | Snowed in | 9 | 14 | 0 | 2 | 7 | 36% | bell + sleepy |
+| 43 | Icicles | 9 | 10 | 2 | 0 | 5 | 19% | lane + parrot |
+| 44 | Winter market | 9 | 13 | 1 | 1 | 7 | 18% | bell |
+| 45 | Midwinter | 9 | 12 | 3 | 1 | 7 | 13% | bell + lane |
+| 46 | Old news | 4 | 4 | 0 | 0 | 2 | 87% | keeper |
+| 47 | Last week | 7 | 9 | 0 | 0 | 4 | 61% | keeper |
+| 48 | Two keepers | 8 | 10 | 0 | 0 | 5 | 50% | keeper |
+| 49 | Tea and cake | 8 | 11 | 0 | 0 | 4 | 43% | keeper |
+| 50 | Swap shop | 6 | 6 | 0 | 0 | 6 | 51% | keeper (loop) |
+| 51 | Leaf lanes | 8 | 10 | 3 | 0 | 6 | 31% | keeper + lane |
+| 52 | Harvest bell | 8 | 8 | 0 | 2 | 7 | 38% | keeper + bell |
+| 53 | Old and new | 8 | 9 | 0 | 0 | 6 | 34% | keeper + parrot |
+| 54 | Scarecrow | 9 | 13 | 0 | 0 | 6 | 12% | keeper |
+| 55 | Bonfire | 9 | 11 | 1 | 0 | 8 | 20% | keeper |
+| 56 | Apple picking | 8 | 10 | 2 | 0 | 6 | 24% | keeper |
+| 57 | Windy day | 8 | 9 | 0 | 1 | 6 | 22% | keeper |
+| 58 | Pumpkins | 9 | 12 | 2 | 0 | 8 | 15% | keeper |
+| 59 | Long shadows | 9 | 13 | 2 | 1 | 7 | 15% | keeper + bell |
+| 60 | Harvest moon | 9 | 12 | 2 | 1 | 8 | 10% | keeper |
+
+"Must use": with that element removed (or for a lane, with lanes made two-way), no route of the shortest length solves it. Random-bot rates vary a little from run to run of `make-levels.mjs` versus `bots.mjs` (different seeds).
+
+Ramp, by group (random-bot win rate): chapter 2 52% 37% 22% (32–35, 37–40, 41–45); chapter 3 51% 27% 17% (47–50, 51–55, 56–60). `bots.mjs` asserts each level is within 12 points of the median of its 5 neighbours inside its chapter, group means do not rise by more than 5 points, and every teaching level (1, 2, 3, 31, 36, 46) is at least 50%. Each chapter starts easier than the last one ended, on purpose: a new idea gets an easy start.
+
+`make-levels.mjs` targets: chapter 2 `0.6 − 0.48·(n − 32)/13`, chapter 3 `0.55 − 0.47·(n − 47)/13`. Levels 48 and 50 swapped specs ("Two keepers" and "Swap shop") because "Swap shop" came out easier than its place in the ramp.
+
+Daily tiers, all 365 days of 2026 for tier 0 and every second day for tiers 1–3: every village solvable, its newest element essential every day, 0 dropped to a lower tier, 0 fallbacks, shortest route 5–8 hops. Generation is at most about 130 ms on this machine (while a browser check ran beside it; 13 ms when idle).
+
+### What the browser check adds (`check.mjs`, round 3)
+
+On WebKit (iPhone 13, 390 wide), Chromium (Pixel 7) and Chromium at 360x640, after the old passes:
+1. A finished round-2 save (`opened: 31`, 30 levels at 3 stars, one old daily) loads: progress kept, the menu opens on chapter 2, "Play 31", "90/90" on the chapter 1 tab.
+2. Level 31 by touch: a drag against the lane stops at it (route `[teller, painter]`), then the best route by drag wins.
+3. Level 36: a drag through the shut gate stops at it and the gate reads shut; after the best route rings the bell, the bell parity is 1 and the gate reads open within half a second; the level is won.
+4. Level 46: mid-route, the keeper holds the teller's news.
+5. Levels 34, 40 and 50 (best routes loop) by taps alone, 3 stars each.
+6. Level 45 won: "Chapter done!", payoff 2, "Next chapter" on screen without scrolling, and it opens 46. Level 60 screenshot.
+7. The tier 3 daily (`?tier=3`): won; fewest hops and a streak of 1 saved; the share text has the chain of lines; the daily card fits; Share runs with no page error; `?tier=` does not pin; old save fields are kept.
+8. Level 40's end card with a two-row strip (screenshot).
+9. The kit hint on levels 1, 2, 3, 20, 30 and 52 and on the tier 3 daily: no dot or hand rect overlaps a villager's head-to-badge box.
+10. Share with a stubbed `navigator.share` that can share files: it receives one non-empty `image/png` and the text. With no `navigator.share`, the text goes to a stubbed clipboard and the button reads "Copied!".
+11. Streaks: with yesterday and the day before solved, the menu shows a streak of 2 ("2 days"); with a gap, 1.
+12. Level 33 (six villagers) won on each screen: the strip is tall enough for the rows it draws (this caught a clipped second row at 360 and 390 wide; fixed).
+13. Desktop 1280x800 also opens levels 45 and 60 (winter and autumn on the wide street) and checks the column stays phone-wide.
+
+### Known weaknesses
+
+- **The random bot understates difficulty on directed and gated boards.** It dead-ends at lanes and shut gates and wastes sends, but it also never "gets" the bell or keeper; humans may find 36–40 and 46–50 harder or easier than the numbers say. Untested with people.
+- **Tap ambiguity.** A tap on a villager already on the route now extends the route when it can. To cut back to such a villager, the player taps the villager after it, or drags back.
+- **Lanes on short paths** show one arrow, sometimes half hidden by the villagers. The lane's missing dashes still mark it.
+- **The share card** has not been seen in a real share sheet. The check stubs `navigator.share` and the clipboard; which branch a real browser takes was not observed.
+- **The chapter card's firework sound** plays for about 4 s, then stops; the fireworks keep going without sound.
+- **`bots.mjs` takes about 3 s**, up from 0.1 s, because it solves 30 more levels and four daily tiers over a year of dates.
+- **Hint placement** is judged against boxes for villagers; it may still sit over a path or the teller's ghost token on a crowded board.
+
+### Last runs (round 3)
+
+- `bots.mjs`: all checks passed. With level 4's stored shortest changed from 3 to 4 it fails on the levels 1–30 hash and on that level (mutation run, then restored).
+- `make-levels.mjs` rebuilds `levels.js` byte for byte.
+- `check.mjs` (last run, after the strip fix and the added checks): ok on webkit, chromium, chromium 360x640, colour cues, chromium desktop 1280x800.
+- `experiments/kit/check/phone.mjs`: grapevine and hint grapevine ok on webkit and chromium; its grapevine entries need no change. In the same run `lab/lantern-3d` and `hint lab/lantern-3d` failed on chromium ("needs WebGL2"); this game does not touch them.
+- Hint placement probe (a scratch script, not in the repo): the old fixed height covers a villager in 18 of 24 board and screen cases, the new placement in 0 of 24.
+
+### Not verified (round 3)
+
+- No person has played chapters 2 or 3. Whether the bell and the keeper are understood without words, and whether they are fun, is unknown.
+- The share sheet on a real phone. The PNG card was saved from Chromium for levels 40 and 52 and looked at (`window.grapevineCard()` returns it as a data URL); WebKit's rendering of it was not looked at.
+- Sound for the bell and the keeper was not heard.
+- Streaks across real days: the check seeds past dates in the save and reads the count; it never waited for midnight or crossed a time-zone change.
+- Daily generation time on a real phone (it runs a solver for each candidate village).
+- The hint's placement was checked at 390x664 and 360x640 on 12 levels and one daily, not every level or every daily.
+- Whether the `lab/lantern-3d` failures in `phone.mjs` on Chromium happened before this round: only the grapevine entries were run before the changes.
+
+### Builder ideas (round 3)
+
+Labelled "Builder": these go beyond the brief.
+
+- **Builder: villagers talk in the strip.** The lines under each villager come from what they actually did on this route, not from their kind alone (a parrot with nothing to copy says "Er... same?").
+- **Builder: the share card is a picture.** It is the strip itself on the chapter's sky, so a friend sees the joke (the news bending) without the game.
+- **Builder: a shut gate darkens its path,** and a refused lane or gate flashes red along the path, so the "no" is on the path rather than on a villager.
+- **Builder: tiers pinned per date.** See "For the lead".
+- **Proposals not built:**
+  - A weekly "village of the week" with a fixed seed for everyone, ranked by hops on the shared board (needs an owner decision on what is stored).
+  - A rumour mill: two tellers whose news meets at a keeper.
+  - A gate that only the listener's own bell opens, for a last level that asks the player to plan both ways.
+
+### For the lead (round 3)
+
+- **The daily village now differs by player.** A player past level 32, 37 or 47 gets a daily with lanes, bells or keepers; a new player keeps the old kind. Two friends comparing a date may have different villages. The alternative is one village for all with only old villagers; I chose progress, because a finished player would otherwise never see the new elements daily.
+- **The save blob gained three fields** (`dailyHops`, `dailyTier`, `bestStreak`) under the same key. Old saves load unchanged and keep every old field; the check loads a finished round-2 save. AGENTS.md says storage formats never change; this is an addition with defaults, not a change, but it is the lead's call.
+- **Share carries no link.** The text and picture name the game and level only. Adding the URL is one line once the lead wants it.
+- **Levels 48 and 50 swapped specs** before anyone played them (see above).
+- **Level 46 is the one level after 3 where the shortest-by-distance path solves it,** by design: it teaches the keeper with the straightest route.
+- **The kit hint's reach is 40 here, not 46.** No kit file changed.
+- **A tap on a villager already on the route now extends the route when it can** (so loops can be tapped). Before, it cut back to that villager. This changes chapter 1 input too. The other way: keep cut-back and require a drag for loops.
