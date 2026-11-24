@@ -1,5 +1,5 @@
 // Bots fill a room when people are few. A bot is an ordinary ant: it sees the same square a client is sent
-// (VIEW), acts through setInput like a client, and gets no numbers a player lacks. It decides four times a
+// (VIEW) and acts through setInput like a client. Feast bot growth is rules-scaled. It decides four times a
 // second, on a tick staggered by its id, with a small aim error, so it reacts later and steers worse than a
 // practised person. Bots are marked as bots on the wire and the page labels them.
 import { inGrass } from '../public/crumbwar/shared/modes.js';
@@ -133,14 +133,22 @@ function feastThink(w,a) {
   antsNear(w,a.x,a.y,C.VIEW,b=>{
     if(b===a || w.tick<b.protectUntil) return;
     const d=Math.hypot(b.x-a.x,b.y-a.y);
-    if(b.mass>=a.mass*w.rules.eatRatio && d<230 && (!danger || d<danger.d)) danger={a:b,d};
-    if(a.mass>=b.mass*w.rules.eatRatio && d<140 && !inGrass(b.x,b.y) && (!prey || d<prey.d)) prey={a:b,d};
+    if(b.mass>=a.mass*w.rules.eatRatio && d<w.rules.botFleeRadius && (!danger || d<danger.d)) danger={a:b,d};
+    if(a.mass>=b.mass*w.rules.eatRatio && a.mass<=b.mass*w.rules.botPreyRatio && d<w.rules.botHuntRadius && !inGrass(b.x,b.y) && (!prey || d<prey.d)) prey={a:b,d};
   });
-  foodNear(w,a.x,a.y,C.VIEW,id=>{const d=(w.fx[id]-a.x)**2+(w.fy[id]-a.y)**2;if(d<best){best=d;tx=w.fx[id];ty=w.fy[id];}});
-  if(prey && a.id%4===1){tx=prey.a.x;ty=prey.a.y;}
+  if (!danger && !(prey && a.id%4!==2)) foodNear(w,a.x,a.y,C.VIEW,id=>{const d=(w.fx[id]-a.x)**2+(w.fy[id]-a.y)**2;if(d<best){best=d;tx=w.fx[id];ty=w.fy[id];}});
+  if(prey && a.id%4!==2){tx=prey.a.x;ty=prey.a.y;}
   if(danger){tx=a.x+(a.x-danger.a.x)*3;ty=a.y+(a.y-danger.a.y)*3;}
   const close=Math.hypot(tx-a.x,ty-a.y)<8;
   // Stable temperaments: hunter, grazer, wanderer, cautious. All use ordinary inputs.
   const rest=!danger && ((Math.floor(w.tick/20)+a.id)% (a.id%4===2?3:6)===0);
-  setInput(w,a,byteOf(Math.atan2(ty-a.y,tx-a.x)+(w.rand()-.5)*.35),!close&&!rest,!!danger);
+  setInput(w,a,byteOf(Math.atan2(ty-a.y,tx-a.x)+(w.rand()-.5)*.35),!close&&!rest,danger ? feastSprint(w,a) : !!prey && a.id%4!==2);
+}
+
+// A flee burst starts on danger, then must recover even if the threat persists.
+export function feastSprint(w,a) {
+  const cycle = (w.rules.botSprintSeconds + w.rules.botRestSeconds) * C.TICK_HZ;
+  const b = a.brain ??= {};
+  if (b.fleeAt === undefined || w.tick - b.fleeAt >= cycle) b.fleeAt = w.tick;
+  return w.tick - b.fleeAt < w.rules.botSprintSeconds * C.TICK_HZ;
 }

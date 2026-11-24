@@ -312,7 +312,7 @@ Logged 2026-11-24. The gap, burn and rate limit tests used about 250 GB-s of dur
 
 ## Known gaps
 
-- A play record from the live page was accepted by the real lab on 2026-11-24 (two POSTs returned 200 from an agent-marked run). A full round ending with a record, and a record from Feast or Rush, have not been seen.
+- On 2026-11-24 live walks of Feast and Rush each returned 200 from the lab, and a Rush round end with a record was seen; two people joined the same room in each mode on Cloudflare. The net debug line is hidden under 640 px.
 - A 240-client, 10 minute live run on 2026-11-24 (`kick1`) closed all 240 sockets as lagging. The test machine was overloaded (its timer lagged up to 6966 ms), so the run says nothing about the room. The earlier unexplained kicks stay unexplained.
 - No lag compensation for bites.
 - No way for friends to share a room.
@@ -432,7 +432,7 @@ Changed after looking:
 
 - Feast growth was too fast. A food-only player passed all six ranks within 20 to 35 seconds, and 18 to 19 of 23 bots ended as Queen. Growth now comes from the rules object: crumb 1 (was 2), cake 10 (was 14), shrink 1.5% (was 1%), eater's gain 50% (was 25%), ranks at 10, 16, 28, 46, 75 and 120. In headless traces most bots now end as Major and 0 to 5 as Queen. In the browser the scripted player reached Major once and Soldier once in four minutes.
 - Rush goals could stall. In one round "Hold hill 5 seconds" stayed from second 6 to the end. A goal with no progress for 30 seconds now moves on without a reward. The page says "New goal · …".
-- Awards now carry their count on the wire ("Most deliveries · name · 27"). `shared/proto.js`, `net.mjs` and `shared/modes.js` changed. PROTO stays 2 because PROTO 2 was never deployed. The fingerprint is `8b9e99349784bddd`.
+- Awards now carry their count on the wire ("Most deliveries · name · 27"). `shared/proto.js`, `net.mjs` and `shared/modes.js` changed. PROTO stayed 2 because PROTO 2 had not been deployed yet. The fingerprint is `8b9e99349784bddd`.
 - Page effects, with no inline script or style: a pop on each new message, a ring on promotion and on goal completion, a burst on eating, "+N" floats that fly to the bottom left, a hill pulse, event messages (golden crumb, seeds, frenzy, cake, fresh crumbs), an edge arrow with a short label, a growing clock in the last ten seconds, a pulsing frame in the frenzy, and a results panel in the break.
 - Layout: the hill, grass, seed and golden-crumb labels are at least 12 CSS px; names are not drawn under the top HUD or over the own line at the bottom left; the top five has a dim backing; the frenzy clock stays clear of the lists on a 360 px screen.
 
@@ -446,3 +446,71 @@ Measured after the changes, pinned Node 26.12.0:
 - CPU is inconclusive. The host load average was 8 to 104. Classic at 240 ants measured 1.02 to 1.91 ms against the recorded 0.82. Rush at 240 ants measured 1.02 ms at best. A profile puts 34% of Rush time in snapshot building, 14% in `antsNear` and 13% in bot decisions. No optimization was made.
 
 Still unverified: a real phone, touch input (the script used the mouse and the Space key), WebKit and Safari, safe areas on a notched phone, real people's difficulty and enjoyment, the live Cloudflare integration, and Rush CPU on a quiet host. `/notes/button.js` returns 404 under `wrangler dev` because another worker serves it.
+
+
+## Feast fairness, 2026-11-24
+
+This section supersedes the Feast growth, bot policy and dense-room cadence above. Classic and Rush rules, inputs, movement, snapshot cadence and packet layout stay unchanged. No commit, push, deployment, browser or local server was used for this work.
+
+### Rules and recovery
+
+- Bots receive 0.5 times food and meal growth. Food grows a person only while below size 22, and a bot only while below 25. A pickup begun below that threshold can cross it. Eating ants is the route to sustained growth above those sizes. The Feast card explains this rule.
+- Meal gain is 1.5 times the size the victim lost, before the bot growth factor. Retention stays 60%, with the size-10 floor. Person sprint costs 0.1 size/s; bot sprint costs 0.4. The movement formula and sprint speed multiplier stay unchanged.
+- Bots shed 60% of size above 30 per second, in addition to the existing 1.5% shrink above 16. Bot Queen is still possible through a sufficiently large meal; it is not blocked by a timer or a rank cap.
+- Three of four bot temperaments hunt within 350 units. A bot targets prey between half its size and its size divided by 1.25. It therefore passes over much smaller victims. Bots sprint while hunting. Danger within 160 units takes priority. Flee sprint lasts 1.5 seconds, followed by 3 seconds of recovery; a brief gap in danger does not reset that recovery.
+- A new or respawned person gets a floor of 1.1 times the lower median living peer size when at least eight peers are present, capped at 500. The existing seeded safest-of-24 position selection then runs against that size. Bots receive no floor. A new round disables catchup so previous-round sizes cannot carry over. Score, rank and best rank update with catchup. Protection stays four seconds. The card states the size floor and at-least-60% retention.
+- Above 48 ants, Feast snapshots run at 5 Hz and the page interpolates 250 ms behind. At or below 48, snapshots stay at 10 Hz and interpolation stays at 150 ms. Simulation and input stay at 20 Hz. Interest bounds and packet fields do not change. This trades visible delay in crowded Feast rooms for bandwidth and tick cost.
+
+The owner set Feast's byte budgets to **under 1300 bytes/client/s at twelve people and under 2200 at sixty**. Classic and Rush retain 1200 and 1800. `loadtest/bench.mjs` applies those limits per mode.
+
+### Scripted acceptance
+
+`node loadtest/bots.mjs --feast-fairness --assert-targets` runs seeds 1, 7, 42, 73, 101 and 211 with one person and with twelve, the rest labelled bots, for complete 240-second rounds. All twelve people use the sensible controller. Acceptance pools all 72 person-rounds in the twelve-person case; it does not select the first person. A passive control changes only the first person to crumb foraging, with the other eleven still sensible. Every passive control must finish below position 12.
+
+The controller reads only positions, food, protection and conservative size comparisons available in the 390×844 phone viewport. It decides at 4 Hz and writes heading, move/stop and sprint through `setInput`. It hunts the nearest edible ant within 330 units, flees danger and uses nearby grass, and stops to chew visible cake. Passive control never hunts or chooses cake, but may eat incidentally on contact. No simulation state, resource value or position is assigned by the controller. Scoreboard rank uses integer scores and stable ID ties, includes respawn seconds, and samples once per second. Top-five visits count only after ten seconds. Largest-bot ratio includes dead bots' retained size; Queen detection checks persistent best rank every tick.
+
+Before uses source commit `d0b558134414d486d6f88091233026ed0b6d53b6` with the same final controller and assertions. The prior foraging-only acceptance did not test these hunting gates. Results below are paired as one-person / twelve-person:
+
+| Acceptance | Before | After |
+|---|---:|---:|
+| Median eats, at least 4 | 2 / 2 | **19.5 / 12** |
+| Maximum eaten count, at most 6 | 0 / 5 | **0 / 5** |
+| Median of each person's median round position, at most 12 | 21.5 / 17 | **1 / 7** |
+| Top five after ten seconds, at least half of person-rounds | 1/6 / 26/72 | **6/6 / 63/72** |
+| Largest bot/person size at 60 s, maximum at most 2.0 | 11.515 / 11.694 | **1.327 / 1.915** |
+| First bot Queen, not before 150 s | 41.95 / 59.25 s | **None in either configuration** |
+| Passive final position, median; all controls below half | 6; 2/6 / 3; 0/6 | **19.5; 6/6 / 19; 6/6** |
+| Bot eats bot, minimum per round at least 10 | 1 / 0 | **105 / 26** |
+
+All aggregate full-round gates pass. Individual performance still varies: in the twelve-person sample, 3/72 person-rounds had fewer than four eats, 17/72 had median position below the top half, and 9/72 never entered the top five. These are retained in `personFailures`; a median or half-round target is not a guarantee for every player.
+
+A separate `--warmup 10 --assert-targets` run matches the fresh-room bot head start before people join, then measures the remaining 230 seconds. It also passes every aggregate gate. One / twelve people: median eats 16.5 / 9, maximum deaths 1 / 5, median position 1 / 9, top five 6/6 / 68/72, maximum bot/person ratio at sixty seconds after joining 1.254 / 1.519, no bot Queen, passive bottom half 6/6 / 6/6, and minimum bot-to-bot eats 11 / 21. This shorter sensitivity run does not replace the full-round result.
+
+Raw evidence is in `loadtest/results/feast-fairness-before-2026-11-24.jsonl`, `feast-fairness-after-2026-11-24.jsonl` and `feast-fairness-join-2026-11-24.jsonl`.
+
+### Bandwidth and tick cost
+
+The final-source comparison passes both byte limits and the relative 240-ant tick limit:
+
+| Feast workload | Before | After | Requirement |
+|---|---:|---:|---|
+| Bytes/client/s, 12 people | 1157.8 | **1153.2** | <1300 |
+| Bytes/client/s, 60 people | 1772.7 | **2120.4** | <2200 |
+| Mean elapsed tick, 240 ants | 16.8436 ms | **16.7907 ms** | No more than 10% worse: **0.3% faster** |
+| Mean process CPU/tick, 240 ants | 2.0330 ms | **1.3797 ms** | Diagnostic: 32.1% lower |
+
+`node loadtest/compare-feast.mjs --base d0b558134414d486d6f88091233026ed0b6d53b6 --modes feast --out loadtest/results/feast-fairness-final-bench-2026-11-24.json` reproduces the recipe. Each version has three fresh Node processes, 200 warmup ticks and 3000 measured ticks per workload. Order alternates before/after, after/before, before/after. Sources are copied once before measurement; the retained final source-diff SHA-256 was checked against the delivered diff. All three byte counts agree exactly. The benchmark includes decisions, simulation, snapshots, scoreboards and event fanout; its scripted people use the bot brain, with person growth/cost rules. Actual socket send cost is excluded.
+
+Host load samples ranged from 38 to 64 during these runs. Elapsed time includes scheduling stalls; process CPU is retained separately. This establishes the requested relative gate for these paired runs, not an absolute 1 ms tick or Cloudflare performance. All run means and raw rows are retained in `feast-fairness-final-bench-2026-11-24.json`. The completed earlier Classic/Rush rows are retained separately in `feast-fairness-other-modes-2026-11-24.json`; they verify unchanged bytes rather than replacing the final-source Feast repeat. A redundant all-mode repeat was stopped during its last Rush run when host load reached 378. Its incomplete rows are not used.
+
+Classic remains 1040.2 / 1522.9 bytes/client/s at twelve / sixty people. Rush remains 954.5 / 1357.5. The all-mode comparison checks exact unchanged byte totals against the baseline, not rounded values.
+
+Exploratory ten-Hz crowded Feast variants exceeded the sixty-person byte budget and the relative tick limit. The delivered five-Hz crowded lane fixes both measured failures. No aggregate acceptance gate remains failed. Individual play outcomes and unverified live behavior remain separate limits below.
+
+### Protocol and remaining verification
+
+`shared/modes.js` changed (Feast sprint cost, crowded snapshot rate). PROTO is raised from 2 to 3 so a page open across the deploy reloads and does not predict with the old rules. The fingerprint is `0ef04c51a20ccc13`.
+
+`node --test test/` passes 88/88 tests, including new food/meal factors, food ceilings, separate sprint costs, excess bot shrink, exact flee and recovery boundaries, prey choice, catchup, its size-500 boundary and reset recovery, controller inputs and negative acceptance cases. The retained output is `loadtest/results/feast-fairness-tests-2026-11-24.txt`.
+
+Unverified: human enjoyment, real touch play, browser appearance of the new rules and crowded interpolation, actual socket/send overhead, Cloudflare timing and live traffic. No deployment occurred. The earlier live lab and same-room observations above were supplied evidence, not repeated here. The median catchup and safest-position rules address the wall of dangerous ants; no visual spawn census was run.
