@@ -6,7 +6,7 @@
 // If the copy-the-path rule matters, greedy loses clearly more ducklings than planner. Exits non-zero on a failed check.
 import assert from 'node:assert/strict';
 import { create, step, stars, STAGES, LAST_STAGE, DT, SPEED, GAP, R_MOM, R_DUCK, LINE_MAX, WARN_MIN, QUACK_TIME, QUACK_SQUEEZE, TRAITS,
-  hitAny, moveMom, pathAt, stepDelay } from './sim.js';
+  hitAny, moveMom, pathAt, stepDelay, endlessAhead, duskRate } from './sim.js';
 import { bands, routeCheck } from './route.mjs';
 
 const LOOK = 0.1, STEPS = 42; // look-ahead: 4.2 s in 0.1 s steps, long enough for the tail of a long line
@@ -137,6 +137,16 @@ for (let n = 1; n <= LAST_STAGE; n++) for (const h of create({ stage: n }).hazar
   check(warn >= WARN_MIN, `stage ${n} ${h.kind} warns ${warn}s`);
 }
 
+// Regressions: continuing pressure and missed ducklings must not exhaust future spawns.
+{
+  check(duskRate(20) === 1 && duskRate(90) > duskRate(60) && duskRate(240) > duskRate(180), 'sunset keeps accelerating after the opening');
+  const s = create({ endless: true, seed: 101 });
+  s.mom.y = 20; s.top = 20; s.lost = Array.from({ length: LINE_MAX }, (_, id) => ({ id: 1000 + id, x: 0.5, y: 1 }));
+  endlessAhead(s);
+  check(s.lost.some(l => l.y > 20), 'missed ducklings far behind do not block new ones');
+  check(s.lost.filter(l => l.id >= 1000).length === LINE_MAX, 'old waiting ducklings remain recoverable');
+}
+
 // 2. determinism
 {
   const a = play({ stage: 4 }, BOTS.planner), b = play({ stage: 4 }, BOTS.planner);
@@ -146,8 +156,8 @@ for (let n = 1; n <= LAST_STAGE; n++) for (const h of create({ stage: n }).hazar
 }
 
 // 3. each stage, each bot
-const W = [6, 8, 6, 9, 8, 8, 6, 6, 6, 7];
-console.log(row(['stage', 'bot', 'end', 'arrived', 'of', 'stars', 'hits', 'scared', 'quacks', 'time'], W));
+const W = [6, 8, 6, 9, 8, 8, 6, 6, 6, 7, 7];
+console.log(row(['stage', 'bot', 'end', 'arrived', 'of', 'stars', 'hits', 'scared', 'gone', 'quacks', 'time'], W));
 let sumP = 0, sumG = 0;
 for (let n = 1; n <= LAST_STAGE; n++) {
   const spec = STAGES[n], res = {};
@@ -184,24 +194,27 @@ check(sumG <= sumP * 0.8, 'greedy (mother only) brings home clearly fewer than p
 
 // 5. endless: a way through exists (checked without the bots), and planning beats carelessness
 {
-  // route.mjs: every hazard band in the first 60 m can be crossed by a line of 6 waiting at most 15 s, and the
-  // first-crossing clock stays ahead of dusk at every checkpoint. 30 seeds.
+  // route.mjs: every hazard band in the first 60 m can be crossed by a line of 10 waiting at most 15 s; the
+  // clock is recorded separately: sunset pressure intentionally ends finite runs. 30 seeds.
   let sealed = 0, late = 0;
-  for (let k = 1; k <= 30; k++) { const r = routeCheck(k * 101, { yEnd: 60, n: 6 }); if (!r.ok) { sealed++; console.log('sealed', k * 101, JSON.stringify(r.fails)); } if (r.dusk !== null) { late++; console.log('dusk before 60 m', k * 101, r.dusk); } }
-  console.log(`\nendless route check, 30 seeds to 60 m: ${30 - sealed} passable, ${30 - late} on time`);
-  check(sealed === 0 && late === 0, 'endless: the first 60 m always has a passable route in time');
-  // planner against greedy, 20 seeds, score at 90 s or at the end
-  console.log('endless, 20 seeds, up to 90 s: score (end, distance, line)');
-  let wins = 0; const W3 = [6, 26, 26, 6];
+  for (let k = 1; k <= 30; k++) { const r = routeCheck(k * 101, { yEnd: 60, n: LINE_MAX }); if (!r.ok) { sealed++; console.log('sealed', k * 101, JSON.stringify(r.fails)); } if (r.dusk !== null) { late++;  } }
+  console.log(`\nendless full-line route check, 30 seeds to 60 m: ${30 - sealed} passable, ${late} exceed the sunlight budget`);
+  check(sealed === 0, 'endless: the first 60 m has a passable route for the full line');
+  check(!routeCheck(101, { yEnd: 60, n: 16 }).ok, 'route check rejects an oversized line with unsafe crossing windows');
+  // planner against greedy, 20 seeds, score and duration at the end (180 s safety cap)
+  console.log('endless, 20 seeds, up to 180 s: score (end, seconds, distance, line)');
+  let wins = 0; const weak = [], strong = []; const W3 = [6, 36, 36, 6];
   console.log(row(['seed', 'planner', 'greedy', 'idle'], W3));
   for (let k = 1; k <= 20; k++) {
     const seed = k * 101, out = {};
-    for (const name of ['planner', 'greedy', 'idle']) { const { s } = play({ endless: true, seed }, BOTS[name], 90); out[name] = s; }
-    const f = s => `${s.score} (${s.why ?? 'alive'}, ${s.best.toFixed(0)}m, ${s.line.length})`;
-    wins += out.planner.score > out.greedy.score;
+    for (const name of ['planner', 'greedy', 'idle']) { const { s } = play({ endless: true, seed }, BOTS[name], 180); out[name] = s; }
+    const f = s => `${s.score} (${s.why ?? 'alive'}, ${s.t.toFixed(1)}s, ${s.best.toFixed(0)}m, ${s.line.length})`;
+    wins += out.planner.score > out.greedy.score; weak.push(out.greedy); strong.push(out.planner);
     console.log(row([seed, f(out.planner), f(out.greedy), out.idle.score], W3));
   }
   console.log(`planner beats greedy on ${wins} of 20`);
+  check(weak.filter(s => s.over && s.t >= 40 && s.t <= 90).length >= 16, 'at least 80% of weak runs last 40 to 90 s');
+  check(strong.every(s => s.over), 'continuing sunset pressure ends even strong runs before the safety cap');
   check(wins >= 16, 'endless: planner beats greedy on at least 80% of 20 seeds');
 }
 

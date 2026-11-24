@@ -8,7 +8,7 @@ import { readFile, mkdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, extname, join, normalize, resolve } from 'node:path';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { gunzipSync } from 'node:zlib';
 import assert from 'node:assert/strict';
 import { newRun, nextChapter, roleId, LIFE, WRONG } from './sim.js';
@@ -31,8 +31,11 @@ const server = createServer(async (req, res) => {
 await new Promise(done => server.listen(0, '127.0.0.1', done));
 const base = `http://127.0.0.1:${server.address().port}`;
 
-const require = createRequire('/Users/abdul/code/human-framework/node_modules/x.js');
-const { webkit, chromium, devices } = require(process.env.PLAYWRIGHT ? join(resolve(process.env.PLAYWRIGHT), 'playwright') : 'playwright');
+// $PLAYWRIGHT (a node_modules directory or the package itself) wins; then anything Node resolves from here; then the
+// Human Framework checkout's node_modules, which this check used before.
+const from = process.env.PLAYWRIGHT ? [resolve(process.env.PLAYWRIGHT, 'x.js')] : [import.meta.url, join(homedir(), 'code/human-framework/node_modules/x.js')];
+const pw = (() => { for (const f of from) { try { return createRequire(f)('playwright'); } catch (e) { if (e.code !== 'MODULE_NOT_FOUND') throw e; } } throw new Error('playwright not found: set PLAYWRIGHT to a node_modules directory that has it'); })();
+const { webkit, chromium, devices } = pw;
 const PHONES = { webkit: [webkit, devices['iPhone 13']], chromium: [chromium, devices['Pixel 7']] };
 const sleep = ms => new Promise(done => setTimeout(done, ms));
 async function until(page, fn, what, ms = 8000, arg = null) { try { await page.waitForFunction(fn, arg, { timeout: ms }); } catch { throw new Error(`timed out waiting for: ${what}`); } }
@@ -92,9 +95,11 @@ async function nameFace(page, face, again = false) {
 // After a name in chapter 1 or 2: the chapter card, then "Go on".
 async function goOn(page, phone, name) {
   await until(page, () => window.borrowedState().screen === 'chapter', 'the chapter card', 6000);
-  await sleep(700);
+  await until(page, () => window.borrowedState().nextReady, 'the chapter button is ready');
   if (name) await shot(page, phone, name);
   const st = await state(page);
+  assert.ok(st.chapterMenu, 'the chapter card has a Menu button');
+  assert.ok(st.chapterControls.every(b => b.w >= 40 && b.h >= 40 && b.x >= 0 && b.y >= 0 && b.x + b.w <= page.viewportSize().width && b.y + b.h <= page.viewportSize().height), 'chapter controls fit and have 40 px tap targets');
   assert.ok(st.next, 'the chapter card has a Go on button');
   await tap(page, st.next);
   await until(page, () => window.borrowedState().screen === 'play', 'the next chapter starts', 3000);
@@ -218,6 +223,7 @@ async function run(page, phone) {
   await skipMemory(page, phone, '3-memory');
   st = await state(page);
   assert.equal(st.found, 1, 'the free memory is found');
+  assert.ok(st.candidates.length >= 2 && st.candidates.length < 6, 'the first memory narrows the portraits');
   assert.ok(st.known.filter(v => v !== null).length >= 1, 'a kind is known');
 
   // pause while walking: time and place stand still, then go on
@@ -227,6 +233,7 @@ async function run(page, phone) {
   await finger(page, '#pause', [['pointerdown', 0, 0]]);
   st = await state(page); assert.ok(st.paused, 'pause button pauses');
   assert.ok(await page.isVisible('#toMenu'), 'pause card has a Menu button');
+  assert.match(await page.textContent('#paused'), /Each right name: 100.*10 ÷ 3/, 'pause explains scoring');
   await sleep(400);
   const frozen = await state(page);
   assert.equal(frozen.t, st.t, 'time stands still while paused');
@@ -275,12 +282,16 @@ async function run(page, phone) {
   st = await state(page);
   assert.equal(st.chapter, 2, 'chapter 3');
   assert.ok(!st.spots.some(p => p.lock === 'free'), 'the old one has no free memory');
+  assert.equal(new Set(st.spots.filter(p => p.lock !== 'rewind').flatMap(p => p.dims)).size, 4, 'all four kinds are available without Rewind');
   await sleep(300); await shot(page, phone, '8b-chapter-3');
   await nameFace(page, answers[2]);
   await until(page, () => window.borrowedState().screen === 'done', 'end card');
   st = await state(page);
   assert.equal(st.status, 'mistaken'); assert.deepEqual(st.chapters.map(c => c.right), [true, false, true]);
-  assert.ok(st.score === 200 && st.best === 200, `two selves right, no years counted (${st.score})`);
+  const partialScore = 200 + Math.floor(st.years * 10 * 2 / 3);
+  assert.equal(st.score, partialScore, 'two selves keep two thirds of the years bonus');
+  assert.equal(st.best, partialScore);
+  assert.match(await page.textContent('#doneChose'), /years left.*year points/, 'the year bonus is explained after a wrong name');
   assert.match(await page.textContent('#doneTitle'), /mostly/);
   assert.match(await page.textContent('#doneChose'), /1 wrong name/);
   await sleep(500); await shot(page, phone, '9-end-mistaken');
@@ -343,7 +354,7 @@ async function run(page, phone) {
   assert.equal(runs.length, 5, `five runs (${outcomes})`);
   const first = runs.find(r => r.data.outcome === 'mistaken');
   assert.equal(first.data.start.seed, SEED);
-  assert.equal(first.data.summary.score, 200);
+  assert.equal(first.data.summary.score, partialScore);
   assert.deepEqual(first.data.summary.chapters.map(c => c.right), [true, false, true], 'per-chapter results in the summary');
   assert.equal(first.data.events.filter(e => e.type === 'chapter').length, 3, 'a chapter event for each chapter');
   assert.ok(first.data.events.some(e => e.type === 'memory'), 'memory events recorded');
@@ -352,6 +363,25 @@ async function run(page, phone) {
   assert.ok(all.data.summary.score > 300 && all.data.summary.right === 3);
   assert.ok(runs.every(r => r.runSource === 'agent'));
   assert.ok(runs.every(r => r.data.events.length < 300), 'events stay sparse');
+
+  // A chapter card can leave the run and reports exactly one left outcome.
+  const leftBefore = sent.filter(r => r.kind === 'run' && r.data.outcome === 'left').length;
+  await page.click('#play'); await nameFace(page, answers[0]);
+  await until(page, () => window.borrowedState().screen === 'chapter' && window.borrowedState().chapterMenu && window.borrowedState().nextReady, 'chapter Menu');
+  await shot(page, phone, '18-chapter-exit');
+  await tap(page, (await state(page)).chapterMenu);
+  assert.equal((await state(page)).screen, 'menu', 'Menu leaves the chapter card');
+  await until(page, () => window.borrowedState().screen === 'menu', 'menu after chapter exit');
+  for (let i = 0; i < 40 && sent.filter(r => r.kind === 'run' && r.data.outcome === 'left').length === leftBefore; i++) await sleep(100);
+  assert.equal(sent.filter(r => r.kind === 'run' && r.data.outcome === 'left').length, leftBefore + 1, 'chapter exit sends one left run');
+
+  // Lethal Rewind emits a memory and fading together; only the fading scene may remain.
+  await page.click('#play'); await nameFace(page, answers[0]); await goOn(page, phone, null);
+  await page.evaluate(() => { const s = window.borrowedSim(), p = s.spots.find(p => p.lock === 'rewind'); s.px = p.x + 0.5; s.py = p.y + 0.5; s.path = []; s.life = 19; });
+  await tap(page, (await state(page)).buttons.rewind);
+  await until(page, () => window.borrowedState().outcome === 'faded', 'lethal Rewind fades');
+  assert.equal((await state(page)).memoryShowing, false, 'a lethal Rewind does not leave a memory overlay');
+  await until(page, () => window.borrowedState().screen === 'done', 'end card after lethal Rewind');
 }
 
 const only = process.argv[2];
@@ -392,46 +422,64 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
   }
   await context.close();
   if (phone === 'chromium') {
-    // The small phone: 360 x 640. The menu fits; the island, the bar and the six faces fit on screen.
-    const small = await browser.newContext({ viewport: { width: 360, height: 640 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+    // The small phone, 360 x 640, then 390 x 844. The menu fits; the island, the bar and the six faces fit on screen.
+    for (const [vw, vh] of [[360, 640], [390, 844]]) {
+    const tag = vw === 360 ? 'small' : `${vw}x${vh}`;
+    const small = await browser.newContext({ viewport: { width: vw, height: vh }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
     const p2 = await small.newPage(), errs = [];
     p2.on('pageerror', e => errs.push(String(e))); p2.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
     try {
       await p2.goto(`${base}/borrowed/?seed=11`); await until(p2, () => window.borrowedState, 'state hook');
-      assert.ok(await p2.evaluate(() => document.documentElement.scrollWidth <= 360), 'no sideways scroll');
-      const play = await p2.locator('#play').boundingBox(); assert.ok(play.y + play.height <= 640, 'Play is on screen');
-      await sleep(300); await shot(p2, 'small', '1-menu');
+      assert.ok(await p2.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'no sideways scroll');
+      const play = await p2.locator('#play').boundingBox(); assert.ok(play.y + play.height <= vh, 'Play is on screen');
+      await sleep(300); await shot(p2, tag, '1-menu');
       await p2.click('#play'); let st = await state(p2);
-      assert.ok(Object.values(st.buttons).every(b => b.x > 0 && b.x < 360 && b.y < 640), 'the bar is on screen');
-      assert.ok(st.mapX >= 0 && st.mapX + 7 * st.tile <= 360, 'the island fits across');
-      await sleep(500); await shot(p2, 'small', '2-play');
+      assert.ok(Object.values(st.buttons).every(b => b.x > 0 && b.x < vw && b.y < vh), 'the bar is on screen');
+      assert.ok(st.mapX >= 0 && st.mapX + 7 * st.tile <= vw, 'the island fits across');
+      await sleep(500); await shot(p2, tag, '2-play');
+      await finger(p2, '#pause', [['pointerdown', 0, 0]]);
+      assert.ok((await state(p2)).paused, 'pause on the small phone');
+      await sleep(300); await shot(p2, tag, '2a-paused');
+      await p2.click('#resume');
+      // the free memory and its portrait strip
+      const freeSpot = st.spots.find(p => p.lock === 'free');
+      await goTo(p2, freeSpot.tx, freeSpot.ty, s => s.found >= 1 || s.memoryShowing);
+      await skipMemory(p2, tag, '2b-memory');
       const small = [0, 1, 2].map(k => chapterOf(11, k).answer);
       await pick(p2, small[0]);
       st = await state(p2);
-      assert.ok(st.cards.every(c => c.y > 100 && c.y < 590), 'every face on screen');
-      assert.ok(st.sure.y < 640 && st.back.y < 640, 'the lineup buttons on screen');
-      await sleep(300); await shot(p2, 'small', '3-lineup-child');
+      assert.ok(st.cards.every(c => c.y > 100 && c.y < vh - 50), 'every face on screen');
+      assert.ok(st.sure.y < vh && st.back.y < vh, 'the lineup buttons on screen');
+      await sleep(300); await shot(p2, tag, '3-lineup-child');
       await tap(p2, st.sure);
-      await goOn(p2, 'small', '4-chapter-card');
+      await goOn(p2, tag, '4-chapter-card');
       await pick(p2, small[1]);
-      await sleep(300); await shot(p2, 'small', '5-lineup-grown');
+      await sleep(300); await shot(p2, tag, '5-lineup-grown');
       await tap(p2, (await state(p2)).sure);
-      await goOn(p2, 'small', null);
+      await goOn(p2, tag, '5b-chapter-3-card');
       await pick(p2, small[2]);
-      await sleep(300); await shot(p2, 'small', '6-lineup-old');
+      await sleep(300); await shot(p2, tag, '6-lineup-old');
       await tap(p2, (await state(p2)).sure);
       await until(p2, () => window.borrowedState().screen === 'done', 'small end card');
       const box = await p2.locator('#done > div').boundingBox();
-      assert.ok(box.y >= 0 && box.y + box.height <= 640, `end card fits (${Math.round(box.y)} + ${Math.round(box.height)})`);
-      await sleep(500); await shot(p2, 'small', '7-end');
+      assert.ok(box.y >= 0 && box.y + box.height <= vh, `end card fits (${Math.round(box.y)} + ${Math.round(box.height)})`);
+      await sleep(500); await shot(p2, tag, '7-end');
       // Faces that differ only by the held thing (key against flower): seed 2, the old chapter, faces 3 and 4.
       const two = [0, 1, 2].map(k => chapterOf(2, k));
       assert.equal(two[2].faces[3].filter((v, d) => v !== two[2].faces[4][d]).length, 1, 'seed 2 has a tool-only pair');
       await p2.goto(`${base}/borrowed/?seed=2`); await until(p2, () => window.borrowedState?.().screen === 'menu', 'menu');
       await p2.click('#play');
-      for (let k = 0; k < 2; k++) { await nameFace(p2, two[k].answer); await goOn(p2, 'small', null); }
+      for (let k = 0; k < 2; k++) { await nameFace(p2, two[k].answer); await goOn(p2, tag, null); }
       await pick(p2, 3);
-      await sleep(300); await shot(p2, 'small', '8-key-flower');
+      await sleep(300); await shot(p2, tag, '8-key-flower');
+      // a wrong name: the end card with its year-points line still fits
+      if (two[2].answer === 3) { await tap(p2, (await state(p2)).cards[4]); }
+      await tap(p2, (await state(p2)).sure);
+      await until(p2, () => window.borrowedState().screen === 'done', 'mistaken end card');
+      assert.equal((await state(p2)).status, 'mistaken');
+      const mbox = await p2.locator('#done > div').boundingBox();
+      assert.ok(mbox.y >= 0 && mbox.y + mbox.height <= vh, `mistaken end card fits (${Math.round(mbox.y)} + ${Math.round(mbox.height)})`);
+      await sleep(500); await shot(p2, tag, '9-end-mistaken');
       // A save from round 1 (one island a run) still loads.
       await p2.evaluate(() => localStorage.setItem('borrowed-save', JSON.stringify({ v: 1, sound: false, best: 530, runs: 4, gallery: { 5: 2, 9: 1 }, daily: {}, taught: 1 })));
       await p2.goto(`${base}/borrowed/`); await until(p2, () => window.borrowedState?.().screen === 'menu', 'menu after an old save');
@@ -445,9 +493,10 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
       const d = new Date(), daily = (await import('./sim.js')).dailySeed(d.getFullYear(), d.getMonth() + 1, d.getDate());
       assert.equal(st.seed, daily, 'the daily seed comes from the date');
       assert.deepEqual(errs, []);
-      console.log('ok   borrowed on chromium 360x640');
-    } catch (e) { failed++; console.log(`FAIL borrowed on chromium 360x640: ${e.message}`); await shot(p2, 'small', 'fail').catch(() => {}); }
+      console.log(`ok   borrowed on chromium ${vw}x${vh}`);
+    } catch (e) { failed++; console.log(`FAIL borrowed on chromium ${vw}x${vh}: ${e.message}`); await shot(p2, tag, 'fail').catch(() => {}); }
     await small.close();
+    }
     // Desktop: 1280 x 800 with a mouse and keys. Arrow keys walk, 1 to 4 use abilities, Enter opens the lineup.
     const desk = await browser.newContext({ viewport: { width: 1280, height: 800 } });
     const p3 = await desk.newPage(), errs3 = [];

@@ -8,6 +8,41 @@ You have forgotten who you were. A run is one life in three chapters (the child,
 
 The idea comes from tester t1, note #107, a request for a game where you have abilities, uncover a forgotten identity, and every use of an ability shortens your lifespan. It is not a rebuild of an archived game. Nothing was copied, ported or imported from `archive/`.
 
+## 2026-11-23: bug hunt and polish
+
+This section replaces the older scoring and old-chapter tuning below.
+
+- A wrong name used to remove every year point. Two right names always scored 200. Each right name now earns 100 points and one third of the years-left bonus. That bonus is years left times 10. Fractions are rounded down once. A perfect run keeps the old formula. The pause card explains the rule. The end card shows years left and year points, including after a wrong name.
+- The old chapter had one kind found only in the mirror. This failed a new non-mirror coverage check on all 1000 seeds. Push now gives its usual kind and that missing kind. Light, Push and Leap can settle every face. Rewind remains a shortcut with two kinds. The chapter card explains the choice.
+- The chapter card had no exit. It now has a Menu button beside Go on. Both are 54 px high. Menu uses the existing leave-run recording path. No save key or save format changed.
+- A lethal Rewind emits a memory before fading. The page kept that memory overlay over the fading scene. Starting a reveal now clears the overlay. The browser check covers the lethal case.
+- A found memory now shows six small portraits. Faces that disagree are dimmed and crossed out. This gives the first free memory an immediate visible effect. The existing kit sound and reduced-motion handling stay in use.
+- The chapter check now waits for the actual button-ready state. The former fixed 700 ms wait could run before 0.5 seconds of game ticks on a slow browser. This is a test reliability change. Whether it explains the older WebKit failure remains unresolved.
+- `PLAYWRIGHT` now resolves through the same package lookup as the kit check. It accepts the Playwright package directory or its parent directory.
+
+Verification on Node 26.12.0:
+
+- New wrong-name score checks failed before the rule change. The new old-chapter non-mirror coverage check also failed before the change. Both now pass.
+- Careful bot: 1440 of 1440 runs remember all three selves. Mean years left rose from 82.0 to 89.2. Minimum rose from 37.6 to 47.3. Mean score is 1197.
+- Slow bot: 720 of 720 complete. Mean play time is 136 seconds. Minimum years left is 29.2.
+- A separate bot refuses Rewind in the old chapter. It completes all 1440 forced-answer runs, across all island orders. Minimum years left is 47.3.
+- Rewind use fell from 97% to 41% of careful runs. The gambler scores 835. Immediate guesses score 257 to 264. Deduction still scores substantially better.
+- All bot checks pass in 8.8 seconds. The browser checks now cover the partial score, the chapter exit, control bounds and sizes, the alternate clue coverage and lethal Rewind.
+- The browser check could not start here. The sandbox denies the local server with `listen EPERM 127.0.0.1`. A direct Chromium launch also fails with a MachPort permission denial. No new phone screenshots or browser passes were obtained. The added portrait strip and control layout still need visual verification at 360 × 640 and 390 × 844.
+
+The proposed contradiction puzzles, island art and save schema were left alone. Real-phone sound remains unverified.
+
+### Browser verification, same day
+
+- `node check.mjs` without `PLAYWRIGHT` failed with MODULE_NOT_FOUND. This repository has no Playwright install, and the earlier pass dropped the Human Framework fallback. The check now tries `$PLAYWRIGHT`, then Node's own lookup, then `~/code/human-framework/node_modules`.
+- The end card after a wrong name put the year points on the same line as the wrong-name cost. It wrapped badly at 360 px. The year points now take their own line. The score line reads "2 of 3 right · N points" and fits on one line. A perfect run shows "N years left · N points" again, as before the earlier pass.
+- On screens under 660 px tall the end art is 118 px high, the end title is smaller and end-card paragraphs sit closer. At 360x640 the mistaken end card now clears the dimmed ability bar.
+- The pause card's score rule wrapped "points." onto a second line at 360 px. It now reads "Each right name: 100 + years left × 10 ÷ 3." and fits on one line.
+- The chapter card's Menu worked while the card was still fading in and invisible. A stray tap could end the run. Menu now waits for the same 0.5 s as Go on.
+- The small-phone block of the check now runs at 360x640 and at 390x844. Each run also pauses, shows the first memory with its portrait strip, shows the chapter 3 card and ends one run with a wrong name. It asserts that the mistaken end card fits.
+- Screenshots show the chapter 2 and 3 cards with Go on and Menu side by side, 54 px high, with no overlap at 360 and 390 px. The chapter 3 text takes three lines and clears the years line. The portrait strip fits under "I remember!". Crossed-out portraits are clear.
+- Results: `node bots.mjs` passes in 8.7 s. A bot that never uses Rewind in the old chapter names all three selves on 1440 of 1440 runs, minimum 47.3 years left. `node check.mjs` passes on WebKit, Chromium, Chromium 360x640, Chromium 390x844 and desktop 1280x800. Real-phone sound remains unverified.
+
 ## Round 2: the three-chapter run
 
 Round 1 measured 1 to 2 spending decisions a run on a single island and recommended chapters. Round 2 builds them.

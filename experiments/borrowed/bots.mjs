@@ -11,7 +11,7 @@
 // It drives the same newRun / walkTo / use / step / guess / nextChapter the page ticks.
 import {
   newRun, step, walkTo, use, ready, guess, nextChapter, consistent, tileOf, route, hamming, ABILITIES, COST, LOCK_ABILITY,
-  LIFE, BURN, SPEED, FACES, WRONG, CHAPTERS, roleId,
+  LIFE, BURN, SPEED, FACES, WRONG, CHAPTERS, roleId, score,
 } from './sim.js';
 
 const t0 = Date.now();
@@ -77,8 +77,8 @@ function walkYears(s, spot) {
   const goal = spot.lock === 'leap' ? s.pad : spot;
   return (route(s, tileOf(s), goal).length + 2) / SPEED * BURN;
 }
-function plan(s) {
-  const open = s.spots.filter(p => !p.taken);
+function plan(s, opts = {}) {
+  const open = s.spots.filter(p => !p.taken && !(opts.noRewind && s.chapter === 2 && p.lock === 'rewind'));
   const costOf = p => (LOCK_ABILITY[p.lock] ? COST[LOCK_ABILITY[p.lock]] : 0) + walkYears(s, p);
   const memo = new Map();
   function expect(known, left) {
@@ -117,7 +117,7 @@ function careful(seed, opts = {}) {
     let guard = 0;
     while (s.status === 'play') {
       think(s, opts);
-      const spot = plan(s);
+      const spot = plan(s, opts);
       if (!spot) break;
       fetch(s, spot, opts);
       if (++guard > 20) throw new Error('careful bot looped');
@@ -130,7 +130,7 @@ function gambler(seed, opts = {}) {
   return chapters(newRun(seed, opts), s => {
     let guard = 0;
     while (s.status === 'play' && consistent(s.faces, s.known).length > 2) {
-      const spot = plan(s);
+      const spot = plan(s, opts);
       if (!spot) break;
       fetch(s, spot, opts);
       if (++guard > 20) throw new Error('gambler looped');
@@ -201,19 +201,42 @@ const PERMS = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]]
   check(bad === 0, `face rules hold in every chapter on 1000 seeds (${bad} breaks)`);
 }
 
+// Regression: a wrong name still leaves a reason to save years.
+{
+  const s = newRun(7);
+  guess(s, s.answer); nextChapter(s);
+  guess(s, (s.answer + 1) % FACES); nextChapter(s);
+  guess(s, s.answer);
+  check(s.status === 'mistaken' && s.score > 200, 'two right names keep a share of the years bonus');
+  const before = s.score;
+  s.life -= 1;
+  check(score(s) < before, 'saving a year increases score after a wrong name');
+}
+// Regression: all four kinds have a route that does not require Rewind in the old chapter.
+{
+  let missing = 0;
+  for (let seed = 1; seed <= 1000; seed++) {
+    const s = newRun(seed); s.status = 'named'; nextChapter(s); s.status = 'named'; nextChapter(s);
+    if (new Set(s.spots.filter(p => p.lock !== 'rewind').flatMap(p => p.dims)).size !== 4) missing++;
+  }
+  check(missing === 0, `old chapter covers all four kinds without Rewind (${missing} missing)`);
+}
+
 // ---------------------------------------------------------------- 3. coverage: every face as an answer, every order
 const SEEDS = 240;
 const stats = (list, f) => { const v = list.map(f); return { min: Math.min(...v), mean: v.reduce((a, b) => a + b, 0) / v.length, max: Math.max(...v) }; };
-const runs = [], slow = [], spend = [];
+const runs = [], slow = [], spend = [], noRewind = [];
 for (let seed = 1; seed <= SEEDS; seed++) {
   const order = PERMS[seed % 6];
   for (let a = 0; a < FACES; a++) {
     const answers = [a, (a + 2) % FACES, (a + 4) % FACES];
     runs.push(careful(seed, { order, answers }));
+    noRewind.push(careful(seed, { order, answers, noRewind: true }));
     if (a % 2 === 0) slow.push(careful(seed, { order, answers, slow: true, think: 8 }));
   }
   spend.push(spender(seed, { order }));
 }
+check(noRewind.every(s => s.status === 'remembered'), `bot without old-chapter Rewind names all three selves (${noRewind.filter(s => s.status === 'remembered').length}/${noRewind.length})`);
 const won = runs.filter(s => s.status === 'remembered').length, slowWon = slow.filter(s => s.status === 'remembered').length;
 check(won === runs.length, `careful bot names all three selves on every run (${won}/${runs.length})`);
 check(slowWon === slow.length, `slow, hesitant careful bot names all three selves on every run (${slowWon}/${slow.length})`);
@@ -289,6 +312,7 @@ check(still.status === 'faded', 'a bot that does nothing fades');
 
 // ---------------------------------------------------------------- report
 console.table(rows);
+console.log(`bot without old-chapter Rewind: ${noRewind.filter(s => s.status === 'remembered').length}/${noRewind.length} remembered, minimum ${Math.min(...noRewind.map(s => s.life)).toFixed(1)} years left`);
 console.log(`abilities: Light ${COST.glow}, Push ${COST.push}, Leap ${COST.leap}, Rewind ${COST.rewind} years; a wrong name ${WRONG}; candle ${LIFE} years, burning ${BURN} a second while you look (x${CHAPTERS[2].burn} when old), walk ${SPEED} tiles a second`);
 console.log(`careful bot: ${runs.length} runs (every island order, every face forced), all three named on every run, years left min ${carefulMin.toFixed(1)}, mean ${stats(runs, s => s.life).mean.toFixed(1)}, score ${carefulScore.toFixed(0)}`);
 console.log(`careful bot spending decisions a run: mean ${usesMean.toFixed(2)}; ${Object.entries(hist).map(([k, v]) => `${k}: ${(100 * v / runs.length).toFixed(0)}%`).join(', ')}`);
