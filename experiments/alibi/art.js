@@ -5,6 +5,8 @@ export const H = 640;
 export const INK = '#342538';
 export const CREAM = '#fff1ce';
 export const GOLD = '#f7be69';
+// The room sign in each room's top-left corner: centre offset and diameter.
+export const SIGN = { x: 20, y: 20, size: 34 };
 const WOOD = '#744654';
 const roomWalls = ['#ffdbac', '#efb7ae', '#bcd6ac', '#b9cfda', '#d2be9e', '#d0badb'];
 const roomFloors = ['#cb8265', '#ac7184', '#78a18b', '#779eaa', '#ab826a', '#9786af'];
@@ -90,22 +92,37 @@ export function place(g, x, y, size, room, site = 0) {
     path(g, [[-4, -4], [-6, -7], [-4, -10]], null, INK, 1.2);
     path(g, [[3, -4], [1, -7], [3, -10]], null, INK, 1.2);
   } else if (room === 1) {
-    rect(g, -6, -8, 12, 11, 3, '#f5d5ad', INK);
-    rect(g, -9, -1, 18, 7, 2, '#c56f79', INK);
-    path(g, [[-7, 6], [-7, 9], [7, 9], [7, 6]], null, INK);
+    // A low, wide sofa with round arms.
+    rect(g, -9, -5, 18, 8, 3, '#c56f79', INK);
+    rect(g, -9, 1, 18, 6, 2, '#de8a8f', INK);
+    oval(g, -10, 2, 3.4, 5, '#a85465', INK, 1.3);
+    oval(g, 10, 2, 3.4, 5, '#a85465', INK, 1.3);
+    path(g, [[-8, 7], [-8, 9]], null, INK, 1.4);
+    path(g, [[8, 7], [8, 9]], null, INK, 1.4);
   } else if (room === 2) {
     path(g, [[-8, 4], [8, 4], [4, 10], [-4, 10]], GOLD, INK);
     oval(g, -4, -2, 3, 5, '#80a66c', INK);
     oval(g, 4, -4, 3, 6, '#80a66c', INK);
     path(g, [[0, 4], [1, -2]], null, INK);
   } else if (room === 3) {
-    path(g, [[-7, 8], [0, -6], [7, 8]], null, INK);
-    rect(g, -7, -7, 14, 12, 1, CREAM, INK);
-    path(g, [[-5, 2], [1, -4], [5, 2]], '#658994');
+    // A painter's palette with three paints and a brush.
+    g.beginPath();
+    g.ellipse(-1, 1, 10.5, 8, -.3, 0, Math.PI * 2);
+    paint(g, '#f2d39f', INK, 1.5);
+    oval(g, -4, 5, 2.2, 2, sets[site].walls[room], INK, 1);
+    oval(g, -5, -3, 2.1, 2.1, '#d6524f');
+    oval(g, 1, -5, 2.1, 2.1, '#4f86c9');
+    oval(g, 5, -1, 2.1, 2.1, '#5ea860');
+    path(g, [[3, 9], [11, -8]], null, '#7a4a35', 2);
+    path(g, [[10.5, -7], [12, -11]], null, INK, 2.4);
   } else if (room === 4) {
-    path(g, [[-8, -5], [0, -10], [8, -5]], null, INK);
-    rect(g, -6, -5, 12, 13, 1, GOLD, INK);
-    path(g, [[0, -4], [0, 7]], null, INK);
+    // Books upright on a shelf.
+    path(g, [[-10, 8], [10, 8]], null, INK, 1.8);
+    rect(g, -9, -6, 5, 14, 1, '#4f86c9', INK, 1.2);
+    rect(g, -4, -9, 5, 17, 1, GOLD, INK, 1.2);
+    g.save(); g.translate(5, 1); g.rotate(.28);
+    rect(g, -2.5, -8, 5, 15, 1, '#d6524f', INK, 1.2);
+    g.restore();
   } else {
     rect(g, -9, -5, 18, 12, 2, GOLD, INK);
     path(g, [[-8, 0], [8, 0]], null, INK);
@@ -272,6 +289,34 @@ export function eventIcon(g, x, y, size, crime, happened = true) {
       oval(g, 0, -2, 9, 9, '#faecc9', INK);
       path(g, [[-4, 3], [4, -7], [2, 1]], '#bd5958', INK, 1);
     } else oval(g, 0, 7, 8, 2, '#664a4e');
+  } else if (crime === 6) {
+    // A honey jar on a shelf.
+    rect(g, -15, 9, 30, 5, 2, '#a37754', INK);
+    if (!happened) {
+      rect(g, -9, -6, 18, 15, 5, '#f0a93a', INK);
+      rect(g, -10, -11, 20, 6, 2, '#b0704c', INK);
+      oval(g, 0, 2, 5, 3.5, '#fff0c4', INK, 1);
+    } else for (const x of [-6, 1, 7]) oval(g, x, 7 - Math.abs(x) % 3, 2.4, 1.6, '#f0a93a', '#a0662d', .8);
+  } else if (crime === 7) {
+    // A spyglass on a three-legged stand.
+    path(g, [[0, 0], [-9, 14]], null, WOOD, 2);
+    path(g, [[0, 0], [9, 14]], null, WOOD, 2);
+    path(g, [[0, 0], [0, 14]], null, WOOD, 2);
+    if (!happened) {
+      g.save(); g.rotate(-.35);
+      rect(g, -14, -9, 24, 8, 2, '#d3a15b', INK);
+      rect(g, 8, -10.5, 7, 11, 2, '#8b6a3e', INK);
+      path(g, [[-4, -9], [-4, -1]], null, INK, 1);
+      g.restore();
+    } else oval(g, 0, -1, 3, 2, '#8b6a3e');
+  } else if (crime === 8) {
+    // A prize pumpkin on a crate.
+    rect(g, -14, 8, 28, 7, 2, '#a37754', INK);
+    if (!happened) {
+      oval(g, 0, -1, 14, 10, '#e98a3c', INK);
+      for (const x of [-6, 0, 6]) path(g, [[x, -10], [x * 1.3, 8]], null, '#b9592a', 1);
+      path(g, [[0, -10], [2, -15]], null, '#4f7a3f', 2.4);
+    } else for (const x of [-7, 3]) oval(g, x, 6, 4, 1.8, '#7fa66a', '#4f7a3f', .8);
   } else {
     path(g, [[-10, 5], [10, 5], [6, 14], [-6, 14]], '#c47a60', INK);
     path(g, [[0, 5], [0, -9], [7, -13]], null, '#456953', 2);
@@ -288,7 +333,7 @@ export function eventIcon(g, x, y, size, crime, happened = true) {
 }
 
 export function heldItem(g, x, y, size, crime) {
-  if ([1, 2, 5].includes(crime)) {
+  if ([1, 2, 5, 6, 7, 8].includes(crime)) {
     g.save();
     g.translate(x, y);
     g.scale(size / 24, size / 24);
@@ -299,6 +344,16 @@ export function heldItem(g, x, y, size, crime) {
     } else if (crime === 2) {
       rect(g, -6, -9, 12, 13, 3, '#bd566a', INK);
       oval(g, 0, 4, 10, 3.5, '#e78e89', INK);
+    } else if (crime === 6) {
+      rect(g, -6, -5, 12, 12, 4, '#f0a93a', INK);
+      rect(g, -7, -9, 14, 5, 2, '#b0704c', INK);
+    } else if (crime === 7) {
+      g.rotate(-.5);
+      rect(g, -11, -3.5, 19, 7, 2, '#d3a15b', INK);
+      rect(g, 6, -5, 6, 10, 2, '#8b6a3e', INK);
+    } else if (crime === 8) {
+      oval(g, 0, 1, 10, 7.5, '#e98a3c', INK);
+      path(g, [[0, -6], [2, -10]], null, '#4f7a3f', 2.2);
     } else {
       path(g, [[0, 10], [0, -3]], null, '#527851', 2);
       for (const [dx, dy] of [[-4, -3], [0, -8], [4, -3], [0, 1]]) oval(g, dx, dy, 4, 3, '#ed9ab8', INK, .8);
@@ -585,7 +640,7 @@ export function house(g, rooms, frame, crime, claimRoom, site = 0) {
     lamp.addColorStop(0, '#fff1a5bb');
     lamp.addColorStop(1, '#fff1a500');
     rect(g, x + w - 38, y + 4, 35, 41, 3, lamp);
-    place(g, x + 17, y + 17, 24, i, site);
+    place(g, x + SIGN.x, y + SIGN.y, SIGN.size, i, site);
     path(g, [[x + w - 12, y + 5], [x + w - 12, y + 15]], null, WOOD, 1.2);
     path(g, [[x + w - 16, y + 17], [x + w - 14, y + 14], [x + w - 10, y + 14], [x + w - 8, y + 17]], '#b4816c', WOOD, .8);
     oval(g, x + w - 12, y + 19.5, 2.5, 2.7, '#fff3c6', WOOD, .75);
@@ -610,7 +665,7 @@ export function house(g, rooms, frame, crime, claimRoom, site = 0) {
   if (frame.blackout) {
     for (const [i, { x, y, w, h }] of rooms.entries()) {
       rect(g, x + 1, y + 5, w - 2, h - 7, 1, i === claimRoom ? '#382b43' : '#292439', i === claimRoom ? GOLD : WOOD);
-      place(g, x + 17, y + 17, 24, i, site);
+      place(g, x + SIGN.x, y + SIGN.y, SIGN.size, i, site);
     }
   }
 }
@@ -669,6 +724,10 @@ export function trace(g, room, kind) {
     }
   } else if (kind === 'splash') {
     for (let i = 0; i < 4; i++) oval(g, x - 7 + i * 6, y + i % 2 * 4, 4, 1.9, '#e482a8', '#9e496e', .9);
+  } else if (kind === 'honey') {
+    for (let i = 0; i < 4; i++) oval(g, x - 9 + i * 6, y + i % 2 * 3, 2.6, 1.8, '#f0a93a', '#a0662d', .7);
+  } else if (kind === 'leaves') {
+    for (let i = 0; i < 3; i++) oval(g, x + 6 * i - 6, y + i % 2 * 3, 3.6, 1.7, '#7fa66a', '#4f7a3f', .75);
   } else if (kind === 'petals') {
     for (let i = 0; i < 3; i++) oval(g, x + 5 * i - 5, y + i % 2 * 3, 3, 1.6, '#eb9cb5', '#984e70', .75);
   } else if (kind === 'feather') {

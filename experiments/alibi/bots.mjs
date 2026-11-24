@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { performance } from 'node:perf_hooks';
 import {
-  CASES, accuse, createCase, dailyCase, dailyWin, dossiers, freshRun, observe, offsetDay, random,
+  CARRIER_LESSON, CASES, OUTLINE_LESSON, accuse, aids, claims, createCase, dailyCase, dailyWin, dossiers, floorOf,
+  freshRun, observe, offsetDay, random,
 } from './sim.js';
 
 const started = performance.now();
@@ -11,11 +12,13 @@ function reconstruct(cards, snapshots) {
   const identities = new Map();
   const voices = new Map(cards.map(card => [card.sound, card.id]));
   const positions = new Map();
+  const seats = new Map();
   let previous = new Map();
   for (const frame of snapshots) {
     const at = new Map();
     const now = new Map();
     positions.set(frame.beat, at);
+    seats.set(frame.beat, now);
     if (frame.exchange) {
       const [left, right] = frame.exchange;
       assert.ok(identities.has(left) && identities.has(right), 'exchange must show known masks');
@@ -38,21 +41,31 @@ function reconstruct(cards, snapshots) {
       at.set(id, actor.room);
       now.set(seat, id);
     }
+    // A floor case places each sound on a floor only.
+    for (const { floor, sound } of frame.heard ?? []) {
+      const id = voices.get(sound);
+      assert.ok(!at.has(id), 'one sound per suspect per mark');
+      at.set(id, { floor });
+    }
     if (!frame.shutter && (frame.blackout || frame.actors.length)) {
       assert.equal(at.size, cards.length, 'every suspect has a visible identity or sound');
     }
     previous = now;
   }
+  positions.seats = seats;
   return positions;
 }
 
-function compare(cards, positions) {
-  const lies = [];
-  for (const { id, claim } of cards) {
-    const room = positions.get(claim.beat).get(id);
-    assert.notEqual(room, undefined, 'each claim can be checked from public evidence');
-    if (room !== claim.room) lies.push(id);
-  }
+// A claim contradicts the replay when the suspect stood in another room, or,
+// where only a floor was heard, on another floor.
+function contradicts(claim, seen, roomCount) {
+  assert.notEqual(seen, undefined, 'each claim can be checked from public evidence');
+  return typeof seen === 'object' ? floorOf(roomCount, claim.room) !== seen.floor : seen !== claim.room;
+}
+
+function compare(cards, positions, roomCount) {
+  const lies = cards.filter(card => claims(card).some(claim =>
+    contradicts(claim, positions.get(claim.beat).get(card.id), roomCount))).map(card => card.id);
   assert.equal(lies.length, 1, 'exactly one contradiction');
   return lies[0];
 }
@@ -86,7 +99,7 @@ function prove(c) {
   const frames = replay(c);
   const cards = dossiers(c);
   const positions = reconstruct(cards, frames);
-  const answer = compare(cards, positions);
+  const answer = compare(cards, positions, c.spec.rooms);
   assert.equal(accuse(c, freshRun(), answer).outcome, 'solved');
   assert.equal(c.frames[c.incident][answer].room, c.crimeRoom, 'reveal agrees with the private incident');
   return { frames, cards, positions };
@@ -120,7 +133,7 @@ function checkAlternatives(seed, level) {
 const opening = Array.from({ length: 8 }, (_, i) => {
   const c = createCase({ level: i + 1 });
   const cards = dossiers(c);
-  const id = compare(cards, reconstruct(cards, replay(c)));
+  const id = compare(cards, reconstruct(cards, replay(c)), c.spec.rooms);
   return cards[id].species;
 });
 assert.ok(opening.every((species, i) => i === 0 || species !== opening[i - 1]),
@@ -178,25 +191,180 @@ for (let i = 0; i < 366; i++) {
   }
 }
 
-// Masks must matter. After the lesson case, a mask case hides its liar under a
-// mask, and where the tape allows it the false room holds another mask then.
+// Masks must matter without becoming a shortcut. After the lesson a mask case
+// hides its liar under a mask about half the time, so a player can skip
+// neither the masked nor the unmasked suspects. This replaces the earlier rule
+// "the liar is always masked", which let a player ignore unmasked suspects.
 const maskTrials = [];
-for (const [i, spec] of CASES.entries()) {
-  if (spec.masks && !spec.tutorial) maskTrials.push(createCase({ level: i + 1 }));
+const maskLevels = CASES.flatMap((spec, i) => spec.masks && spec.tutorial !== 'masks' ? [i + 1] : []);
+for (const level of maskLevels) {
+  maskTrials.push(createCase({ level }));
+  for (let i = 0; i < 64; i++) maskTrials.push(createCase({ seed: Math.imul(i + 1, 0x9e3779b1) >>> 0, level }));
 }
-for (let i = 0; i < 366; i++) maskTrials.push(dailyCase(offsetDay('2026-01-01', i)));
-const unmasked = maskTrials.filter(c => c.frames.at(-1)[c.culprit].mask === null);
-assert.deepEqual(unmasked.map(c => c.level), [], 'mask cases hide the liar under a mask');
+const dailies = Array.from({ length: 366 }, (_, i) => dailyCase(offsetDay('2026-01-01', i)));
+const wearsMask = (c, id) => c.frames.at(-1)[id].mask !== null;
+// Compare alibis of one group only, then guess within that group.
+function groupBot(c, masked) {
+  const cards = dossiers(c);
+  const positions = reconstruct(cards, replay(c));
+  const group = cards.filter(card => wearsMask(c, card.id) === masked);
+  const lies = group.filter(card => claims(card).some(claim =>
+    contradicts(claim, positions.get(claim.beat).get(card.id), c.spec.rooms)));
+  const draw = random(c.seed ^ c.level);
+  return (lies[0] ?? group[Math.floor(draw() * group.length)])?.id;
+}
+const share = (list, test) => list.filter(test).length / list.length;
+const stats = [];
+for (const [label, list] of [['campaign mask cases', maskTrials], ['standard Dailies', dailies]]) {
+  const masked = share(list, c => wearsMask(c, c.culprit));
+  stats.push([`${label}: liar wears a mask`, masked * list.length, list.length]);
+  assert.ok(masked >= .35 && masked <= .65, `${label}: masked liars ${(100 * masked).toFixed(1)}% must be near half`);
+  for (const group of [true, false]) {
+    const rate = share(list, c => groupBot(c, group) === c.culprit);
+    stats.push([`${label}: check only ${group ? 'masked' : 'unmasked'} suspects`, rate * list.length, list.length]);
+    assert.ok(rate <= .7, `${label}: checking only ${group ? 'masked' : 'unmasked'} suspects solves ${(100 * rate).toFixed(1)}%`);
+  }
+}
+const defaults = maskLevels.map(level => createCase({ level }));
+assert.ok(defaults.some(c => wearsMask(c, c.culprit)) && defaults.some(c => !wearsMask(c, c.culprit)),
+  'the default campaign has both masked and unmasked liars after the mask lesson');
+// A masked liar's false room holds another mask whenever the tape allows it.
 const hidesLie = (c, id) => {
-  const { beat, room } = c.cast[id].claim;
-  return beat !== c.blackoutBeat && c.frames[beat].some((actor, other) => other !== id && actor.room === room && actor.mask !== null);
+  const card = c.cast[id];
+  const lie = claims(card).find(claim => c.frames[claim.beat][id].room !== claim.room);
+  return lie.beat !== c.blackoutBeat && c.frames[lie.beat].some((actor, other) => other !== id && actor.room === lie.room && actor.mask !== null);
 };
-const exposed = maskTrials.filter(c => !hidesLie(c, c.culprit) && c.frames.at(-1).some((actor, id) => actor.mask !== null
-  && hidesLie(createCase({ seed: c.seed, level: c.level, culpritOverride: id }), id)));
+const exposed = [...maskTrials, ...dailies].filter(c => !c.spec.carrier && wearsMask(c, c.culprit) && !hidesLie(c, c.culprit)
+  && c.frames.at(-1).some((actor, id) => actor.mask !== null
+    && hidesLie(createCase({ seed: c.seed, level: c.level, culpritOverride: id }), id)));
 assert.deepEqual(exposed.map(c => c.level), [], 'a masked liar’s false room holds another mask whenever the tape allows it');
 
+// The claimed-room outline teaches the comparison in chapter I and retires in
+// the outline lesson. An outline matcher reads only the drawn aids: the room
+// outlined at the claimed mark and the portraits standing in it. Where no
+// outline is drawn it has nothing to compare and guesses.
+function outlineMatcher(c, view) {
+  const shown = aids(c, view).outline;
+  const draw = random(c.seed ^ Math.imul(c.level, 0x9e3779b1));
+  const inspected = shown === 'lesson' ? c.cast.slice(0, 1) : shown ? c.cast : [];
+  for (const person of inspected) {
+    for (const claim of claims(person)) {
+      const actor = observe(c, claim.beat).actors.find(a => a.portrait === person.id);
+      if (actor && actor.room !== claim.room) return person.id;
+    }
+  }
+  return c.cast[Math.floor(draw() * c.cast.length)].id;
+}
+const matcher = { early: [0, 0], late: [0, 0], chance: 0 };
+for (const [i, spec] of CASES.entries()) {
+  const level = i + 1;
+  if (level < 3 || level === OUTLINE_LESSON) continue;
+  for (let n = 0; n < 64; n++) {
+    const c = createCase({ seed: Math.imul(n + 1, 0x9e3779b1) >>> 0, level });
+    const row = level < OUTLINE_LESSON ? matcher.early : matcher.late;
+    row[0] += Number(outlineMatcher(c, {}) === c.culprit);
+    row[1]++;
+    if (level > OUTLINE_LESSON) matcher.chance += 1 / spec.count;
+    prove(c);
+  }
+}
+for (const [i, c] of dailies.entries()) {
+  const hard = dailyCase(offsetDay('2026-01-01', i), true);
+  matcher.late[0] += Number(outlineMatcher(c, { daily: true, progress: 20 }) === c.culprit);
+  matcher.late[0] += Number(outlineMatcher(hard, { daily: true, hard: true, progress: 20 }) === hard.culprit);
+  matcher.late[1] += 2;
+  matcher.chance += 1 / c.cast.length + 1 / hard.cast.length;
+}
+stats.push(['Outline matcher, cases 3–6', ...matcher.early], ['Outline matcher, cases 8–36 and Dailies', ...matcher.late],
+  ['Chance for the same cases', matcher.chance, matcher.late[1]]);
+assert.equal(matcher.early[0], matcher.early[1], 'with the outline, matching the suspect against it solves chapter I');
+assert.ok(Math.abs(matcher.late[0] - matcher.chance) < 4 * Math.sqrt(matcher.chance),
+  `after the outline lesson the outline matcher is at chance: ${matcher.late[0]} of ${matcher.late[1]}, chance ${matcher.chance.toFixed(1)}`);
+assert.equal(aids(dailies[0], { daily: true, progress: 1 }).outline, 'full', 'a new player’s Daily keeps the outline');
+
+// Chapter V: the carrier is handed the item by someone who stood with them one
+// mark earlier, and the carrier is never the liar. The trail narrows the
+// suspects to three, so the alibis still decide.
+const carrierTrials = [];
+for (const [i, spec] of CASES.entries()) {
+  if (!spec.carrier) continue;
+  carrierTrials.push(createCase({ level: i + 1 }));
+  for (let n = 0; n < 64; n++) carrierTrials.push(createCase({ seed: Math.imul(n + 1, 0x9e3779b1) >>> 0, level: i + 1 }));
+}
+for (let i = 0; i < 366; i++) carrierTrials.push(dailyCase(offsetDay('2026-01-01', i), true));
+function trailBot(c) {
+  const frames = replay(c);
+  const cards = dossiers(c);
+  const positions = reconstruct(cards, frames);
+  // Identify the carrier from the tape: a portrait, or the mask in its place.
+  const holder = frames[c.carryBeat].actors.find(actor => actor.carry);
+  const carrier = positions.seats.get(c.carryBeat).get(`${holder.room}/${holder.slot}`);
+  const room = positions.get(c.carryBeat - 1).get(carrier);
+  const givers = cards.filter(card => card.id !== carrier && positions.get(c.carryBeat - 1).get(card.id) === room);
+  const lies = givers.filter(card => claims(card).some(claim =>
+    contradicts(claim, positions.get(claim.beat).get(card.id), c.spec.rooms)));
+  return { carrier, givers: givers.map(card => card.id), answer: lies.length === 1 ? lies[0].id : null };
+}
+const trail = { solved: 0, carrier: 0, guess: 0 };
+for (const c of carrierTrials) {
+  const { carrier, givers, answer } = trailBot(c);
+  assert.equal(carrier, c.carrier, 'the tape shows who carries the item');
+  assert.ok(givers.length >= 3, `case ${c.level}: the trail leaves at least three suspects`);
+  assert.ok(givers.includes(c.culprit), `case ${c.level}: the liar stood with the carrier before the hand-off`);
+  trail.solved += Number(answer === c.culprit);
+  trail.carrier += Number(carrier === c.culprit);
+  trail.guess += 1 / givers.length;
+}
+stats.push(['Carrier cases: compare the trail suspects only', trail.solved, carrierTrials.length],
+  ['Carrier cases: accuse the carrier', trail.carrier, carrierTrials.length],
+  ['Carrier cases: guess among the trail suspects (expected)', trail.guess, carrierTrials.length]);
+assert.equal(trail.solved, carrierTrials.length, 'comparing only the trail suspects solves every carrier case');
+assert.equal(trail.carrier, 0, 'accusing the carrier never solves a case');
+assert.ok(trail.guess / carrierTrials.length <= .34, 'guessing among the trail suspects without alibis solves at most a third');
+assert.ok(aids(dailyCase('2026-11-24', true), { daily: true, hard: true, progress: 20 }).trail
+  && !aids(dailyCase('2026-11-24', true), { daily: true, hard: true, progress: CARRIER_LESSON + 1 }).trail,
+'Hard Daily shows the trail lesson until the campaign teaches it');
+
+// Two-mark cases: every suspect names two marks and the lie can sit at either,
+// so checking only the first mark misses some liars.
+const twoMark = CASES.flatMap((spec, i) => spec.twoMarks ? [i + 1] : []);
+assert.ok(twoMark.length >= 1, 'a case asks about two clock marks');
+let secondLies = 0;
+let twoTrials = 0;
+for (const level of twoMark) {
+  for (let n = 0; n < 64; n++) {
+    const c = createCase({ seed: Math.imul(n + 1, 0x9e3779b1) >>> 0, level });
+    const cards = dossiers(c);
+    assert.ok(cards.every(card => card.claim2 && card.claim2.beat > card.claim.beat), 'two distinct marks per alibi');
+    const firstOnly = cards.map(({ claim2, ...card }) => card);
+    const positions = reconstruct(cards, replay(c));
+    const caught = firstOnly.filter(card => contradicts(card.claim, positions.get(card.claim.beat).get(card.id), c.spec.rooms));
+    secondLies += Number(caught.length === 0);
+    twoTrials++;
+  }
+}
+stats.push(['Two-mark cases: liar lies at the second mark', secondLies, twoTrials]);
+assert.ok(secondLies / twoTrials > .3 && secondLies / twoTrials < .7, `liars lie at the second mark in ${secondLies} of ${twoTrials}`);
+
+// Floor case: the blackout sound only says which floor. Each suspect's two
+// possible rooms are on different floors, so a floor still exposes the lie,
+// and the room-level sound symbols are absent.
+const floorLevels = CASES.flatMap((spec, i) => spec.floors ? [i + 1] : []);
+assert.ok(floorLevels.length >= 1, 'a case hears sounds by floor');
+for (const level of floorLevels) {
+  for (let n = 0; n < 64; n++) {
+    const c = createCase({ seed: Math.imul(n + 1, 0x9e3779b1) >>> 0, level });
+    const dark = observe(c, c.blackoutBeat);
+    assert.equal(dark.sounds.length, 0, 'no room-level sounds in a floor case');
+    assert.equal(dark.heard.length, c.cast.length);
+    const liar = c.cast[c.culprit];
+    const truth = c.frames[liar.claim.beat][liar.id].room;
+    assert.notEqual(floorOf(c.spec.rooms, liar.claim.room), floorOf(c.spec.rooms, truth), 'the lie crosses floors');
+  }
+}
+
 // check.mjs looks for the Daily mask tags on mark 4 whatever the date.
-for (const c of maskTrials.slice(-366)) {
+for (const c of dailies) {
   const masked = replay(c).map(frame => frame.actors.some(actor => actor.mask !== null));
   assert.equal(masked.indexOf(true), 3, 'every Daily puts its masks on at mark 4');
 }
@@ -205,18 +373,18 @@ const control = createCase({ level: 3 });
 const { cards, positions } = prove(control);
 const innocent = (control.culprit + 1) % cards.length;
 cards[innocent].claim.room = control.crimeRoom;
-assert.throws(() => compare(cards, positions), /exactly one contradiction/, 'a planted second lie must fail');
+assert.throws(() => compare(cards, positions, control.spec.rooms), /exactly one contradiction/, 'a planted second lie must fail');
 
 const dark = createCase({ level: 22 });
 const darkFrames = replay(dark);
 darkFrames[dark.blackoutBeat].sounds = [];
-assert.throws(() => compare(dossiers(dark), reconstruct(dossiers(dark), darkFrames)), /visible identity or sound/);
+assert.throws(() => compare(dossiers(dark), reconstruct(dossiers(dark), darkFrames), dark.spec.rooms), /visible identity or sound/);
 
 const masked = createCase({ level: 15 });
 const noExchange = replay(masked).map(frame => ({ ...frame, exchange: null }));
 assert.throws(() => {
   const cards = dossiers(masked);
-  assert.equal(compare(cards, reconstruct(cards, noExchange)), masked.culprit);
+  assert.equal(compare(cards, reconstruct(cards, noExchange), masked.spec.rooms), masked.culprit);
 }, 'discarding the visible exchange must break this case');
 
 let run = freshRun();
@@ -241,6 +409,9 @@ console.table([
   ['Chance (weighted)', totals.chance, totals.attempts],
   ['Crime room only (balanced)', totals.balancedWins, totals.balancedAttempts],
 ].map(([policy, wins, attempts]) => ({
+  policy, wins: Number(wins.toFixed(2)), attempts, rate: rate(wins, attempts),
+})));
+console.table(stats.map(([policy, wins, attempts]) => ({
   policy, wins: Number(wins.toFixed(2)), attempts, rate: rate(wins, attempts),
 })));
 console.log('Cases 3–36: all suspect assignments preserve the replay in 272 case/seed pairs.');
