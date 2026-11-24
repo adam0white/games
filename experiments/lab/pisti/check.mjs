@@ -9,10 +9,11 @@ import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { deal, play, score, view, rank, isJack, capturesWith, dailySeed } from './sim.js';
 import { choose } from './brain.js';
+import { TABLE, tableName, tableMessage, freshTable, sit, move, again, shown } from '../../../workers/lab-ai/src/table.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const SHOTS = process.env.SHOTS || '/private/tmp/claude-504/-Users-abdul-code/e727a231-6be3-4081-a695-31f6b5ca1a96/scratchpad/pisti-shots';
-await mkdir(SHOTS, { recursive: true });
+const TABLE_SHOTS = join(dirname(SHOTS), 'pisti-table-shots');
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
 const server = createServer(async (req, res) => {
   const pathname = new URL(req.url, 'http://localhost').pathname;
@@ -25,16 +26,23 @@ const server = createServer(async (req, res) => {
     res.writeHead(200, { 'content-type': types[extname(file)] || 'application/octet-stream', 'cache-control': 'no-store' }); res.end(body);
   } catch { res.writeHead(404); res.end('not found'); }
 });
-await new Promise(done => server.listen(0, '127.0.0.1', done));
+await new Promise((done, fail) => {
+  server.once('error', fail);
+  server.listen(0, '127.0.0.1', done);
+}).catch(error => {
+  console.error(`Pişti phone check could not start: ${error.message}`);
+  process.exit(1);
+});
 const base = `http://127.0.0.1:${server.address().port}`;
 const require = createRequire(import.meta.url);
 const { webkit, chromium, devices } = require(process.env.PLAYWRIGHT ? join(resolve(process.env.PLAYWRIGHT), 'playwright') : 'playwright');
+await Promise.all([mkdir(SHOTS, { recursive: true }), mkdir(TABLE_SHOTS, { recursive: true })]);
 const PHONES = { webkit: [webkit, devices['iPhone 13']], chromium: [chromium, devices['Pixel 7']] };
 const DATE = '2026-11-24';
 const sleep = ms => new Promise(done => setTimeout(done, ms));
 const P = page => page.evaluate(() => {
   const p = window.__pisti;
-  return { totals: p.totals, handNo: p.handNo, dealer: p.dealer, matchOver: p.matchOver, screen: p.screen, mode: p.mode, hand: p.hand, pileTop: p.pileTop, pileSize: p.pileSize, scores: p.scores, turn: p.turn, viewer: p.viewer, canPlay: p.canPlay, practice: p.practice, level: p.level, done: p.done, scored: p.scored, ply: p.ply, paused: p.paused, save: p.save, seed: p.seed };
+  return { room: p.room, pile: p.pile, totals: p.totals, handNo: p.handNo, dealer: p.dealer, matchOver: p.matchOver, screen: p.screen, mode: p.mode, hand: p.hand, pileTop: p.pileTop, pileSize: p.pileSize, scores: p.scores, turn: p.turn, viewer: p.viewer, canPlay: p.canPlay, practice: p.practice, level: p.level, done: p.done, scored: p.scored, ply: p.ply, paused: p.paused, save: p.save, seed: p.seed };
 });
 const shot = (page, phone, name) => page.screenshot({ path: join(SHOTS, `${phone}-${name}.png`) });
 async function until(page, fn, label, timeout = 15000, arg = null) {
@@ -74,7 +82,324 @@ async function open(browser, device) {
   page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
   return { context, page, errors, external };
 }
-const noOverflow = page => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth && document.documentElement.scrollHeight <= innerHeight + 1);
+const noOverflow = page => page.evaluate(() => {
+  const screen = document.querySelector('.screen.on');
+  return document.documentElement.scrollWidth <= innerWidth && document.documentElement.scrollHeight <= innerHeight + 1
+    && (!screen || screen.scrollWidth <= screen.clientWidth);
+});
+
+// The actual table state and frame parsers run in Node. Only the socket transport and storage are in memory.
+function tableWire() {
+  const rooms = new Map();
+  let nextId = 0, nextSeed = 24;
+  const live = room => [...room.sockets.values()].filter(s => s.seat !== null);
+  const seats = room => shown(room.state, live(room).map(s => s.seat));
+  const deliver = (socket, event, data) => socket.page.evaluate(({ id, event, data }) => window.__pistiWireReceive?.(id, event, data), { id: socket.id, event, data });
+  const send = (socket, frame) => deliver(socket, 'message', JSON.stringify(frame));
+  const broadcast = (room, frame) => Promise.all(live(room).map(socket => send(socket, frame)));
+  const announce = room => broadcast(room, { t: 'seats', seats: seats(room) });
+  function you(socket) {
+    const { room, seat } = socket, { v, game, seed, log, again } = room.state;
+    return send(socket, { t: 'you', seat, v, game, seed, log, again, seats: seats(room) });
+  }
+  async function close(socket, code, notify) {
+    const { room, id, seat } = socket;
+    if (!room.sockets.delete(id)) return;
+    if (notify) await deliver(socket, 'close', code);
+    if (seat !== null) await announce(room);
+  }
+  async function acceptMove(room, seat, frame) {
+    const result = move(room.state, seat, frame, Date.now());
+    if (result === 'ok') await broadcast(room, { t: 'm', i: frame.i, s: seat, m: frame.m });
+    return result;
+  }
+  return {
+    async attach(page) {
+      let socket = null, reconnectGate = null, openGate = null, sendGate = null, sawSend = null;
+      await page.exposeFunction('__pistiWireOpen', async addr => {
+        const url = new URL(addr);
+        assert.equal(url.origin, base.replace(/^http/, 'ws'), 'table socket is same-origin');
+        const named = tableName(url.pathname);
+        assert.equal(named?.game, 'pisti');
+        if (reconnectGate) await reconnectGate;
+        if (!rooms.has(named.name)) rooms.set(named.name, { state: freshTable(TABLE.games[named.game].seats, nextSeed++, Date.now()), sockets: new Map() });
+        const room = rooms.get(named.name), id = ++nextId;
+        socket = { page, id, room, seat: null };
+        room.sockets.set(id, socket);
+        return id;
+      });
+      await page.exposeFunction('__pistiWireSend', async (id, text) => {
+        if (!socket || id !== socket.id || !socket.room.sockets.has(id)) return;
+        const current = socket, { room } = current, frame = tableMessage(text);
+        assert.ok(frame, `invalid client frame ${text.replace(/"k":"[^"]+"/, '"k":"…"')}`);
+        if (frame.t === 'hi') {
+          const result = sit(room.state, frame, live(room).map(s => s.seat), nextSeed, Date.now());
+          if (result.refuse) { await close(current, result.refuse === 'full' ? 4001 : 4002, true); return; }
+          const other = live(room).find(s => s !== current && s.seat === result.seat);
+          current.seat = result.seat;
+          if (other) await close(other, 4003, true);
+          await you(current);
+          await announce(room);
+        } else if (frame.t === 'm') {
+          if (sendGate) { sawSend(); await sendGate; }
+          const result = await acceptMove(room, current.seat, frame);
+          if (result === 'stale' || result === 'long') await you(current);
+        } else if (frame.t === 'again') {
+          const started = again(room.state, current.seat, nextSeed, Date.now());
+          if (started) nextSeed++;
+          await broadcast(room, started ? { t: 'game', game: room.state.game, seed: room.state.seed } : { t: 'again', s: current.seat });
+        }
+      });
+      await page.exposeFunction('__pistiWireClose', id => socket?.id === id ? close(socket, 1000, false) : undefined);
+      await page.addInitScript(() => {
+        const sockets = new Map();
+        window.__pistiWireReceive = (id, event, data) => {
+          const socket = sockets.get(id);
+          if (!socket) return;
+          if (event === 'message') socket.onmessage?.({ data });
+          else {
+            sockets.delete(id);
+            socket.readyState = 3;
+            socket.onclose?.({ code: data });
+          }
+        };
+        window.__pistiSocket = class {
+          constructor(addr) {
+            this.readyState = 0;
+            window.__pistiWireOpen(addr).then(id => {
+              if (this.readyState === 3) return window.__pistiWireClose(id);
+              this.id = id;
+              this.readyState = 1;
+              sockets.set(id, this);
+              this.onopen?.();
+            });
+          }
+          send(text) { void window.__pistiWireSend(this.id, text); }
+          close() {
+            if (this.readyState === 3) return;
+            this.readyState = 3;
+            sockets.delete(this.id);
+            if (this.id !== undefined) void window.__pistiWireClose(this.id);
+          }
+        };
+      });
+      return {
+        async cut() {
+          reconnectGate = new Promise(resolve => { openGate = resolve; });
+          await close(socket, 1006, true);
+        },
+        reconnect() { reconnectGate = null; openGate(); },
+        navigateAway: () => close(socket, 1000, false),
+        holdMove() {
+          let release;
+          const sent = new Promise(resolve => { sawSend = resolve; });
+          sendGate = new Promise(resolve => { release = resolve; });
+          return { sent, release() { sendGate = null; release(); } };
+        },
+        async inject(seat, cards) {
+          const { room } = socket, i = room.state.log.length;
+          const frame = tableMessage(JSON.stringify({ t: 'm', i, m: cards }));
+          assert.ok(frame, 'the illegal game move is valid wire data');
+          assert.equal(await acceptMove(room, seat, frame), 'ok', 'server broadcasts it');
+        },
+      };
+    },
+  };
+}
+
+async function playFriend(browser, device, phone) {
+  const wire = tableWire();
+  const tests = [];
+  const url = `${base}/lab/pisti/?speed=20&date=${DATE}`;
+  const oldSave = { v: 1, level: 2, losses: 1, hands: 2, len: '51', four: false, sound: false, daily: { [DATE]: { started: true } } };
+  async function friendPage() {
+    const test = await open(browser, device);
+    tests.push(test);
+    await test.context.addInitScript(save => {
+      if (!localStorage.getItem('pisti:v1')) localStorage.setItem('pisti:v1', JSON.stringify(save));
+      Object.defineProperty(navigator, 'share', { configurable: true, value: async data => { window.sharedLink = data; } });
+    }, oldSave);
+    return { page: test.page, socket: await wire.attach(test.page) };
+  }
+  const friendShot = (page, name) => page.screenshot({ path: join(TABLE_SHOTS, `${phone}-${name}.png`), timeout: 25000 });
+  const seatsReady = (page, seat) => until(page, seat => __pisti.room?.seat === seat && __pisti.screen === 'play'
+    && document.querySelectorAll('#table .seat-light.on').length === 2, 'both seats connected', 25000, seat);
+  const tap = (page, selector) => page.locator(selector).tap({ timeout: 25000 });
+  try {
+    const { page: a, socket: aSocket } = await friendPage();
+    const { page: b, socket: bSocket } = await friendPage();
+    const pages = [a, b], sockets = [aSocket, bSocket], names = ['WWWWWWWWWWWWWWWW', 'Ben'];
+    for (const [seat, page] of pages.entries()) {
+      await page.goto(url);
+      await tap(page, '#friend');
+      assert.equal(await page.locator('#friendName').inputValue(), '', 'an old save has no name');
+      await page.locator('#friendName').fill(names[seat]);
+    }
+    await friendShot(a, 'entry');
+    await tap(a, '#newTable');
+    await until(a, () => __pisti.room?.seat === 0 && document.querySelector('#lobbyStatus').textContent === 'Waiting for your friend', 'creator waits for friend');
+    const code = await a.locator('#roomCode').textContent();
+    assert.match(code, /^[A-Z]{4}$/);
+    await friendShot(a, 'invite');
+    await aSocket.navigateAway();
+    await a.reload();
+    await until(a, () => __pisti.room?.seat === 0 && !document.querySelector('#roomInvite').hidden, 'creator can share after reloading');
+    await tap(a, '#shareLink');
+    const link = await a.evaluate(() => window.sharedLink);
+    assert.deepEqual(link, { text: 'Play Pişti with me', url: `${base}/lab/pisti/?room=${code}` });
+    await b.goto(link.url);
+    await Promise.all(pages.map(seatsReady));
+    const initial = (await P(a)).room;
+    let model = deal(initial.seed, initial.seed % 2), frames = 0;
+    const moves = [];
+
+    async function agree(active = pages) {
+      for (const page of active) {
+        await until(page, frame => __pisti.room?.moves === frame, `wire frame ${frames}`, 25000, frames);
+        const actual = await P(page), seat = pages.indexOf(page);
+        assert.equal(actual.seed, model.seed);
+        assert.equal(actual.ply, model.ply);
+        assert.equal(actual.turn, model.turn);
+        assert.equal(actual.viewer, seat);
+        assert.equal(actual.dealer, model.dealer);
+        assert.equal(actual.pileSize, model.pile.length);
+        assert.deepEqual(actual.pile, model.pile.slice(model.hidden));
+        assert.deepEqual(actual.scores, score(model).map(row => row.total));
+        assert.deepEqual(actual.hand, model.hands[seat]);
+        const mine = await page.locator('#hand [data-card]').evaluateAll(cards => cards.map(card => Number(card.dataset.card)));
+        assert.deepEqual(mine, model.hands[seat], 'own cards are face up at the bottom');
+        const top = page.locator('#oppHand');
+        assert.equal(await top.locator('.card').count(), model.hands[1 - seat].length);
+        assert.equal(await top.locator('.card:not(.back), [data-card], button, .r, .s, .b').count(), 0, 'other cards have no faces in the DOM');
+      }
+    }
+
+    async function turn(active = pages, hold = false) {
+      const seat = model.turn, card = pickState(model), page = pages[seat];
+      await until(page, () => __pisti.canPlay, 'active seat can tap', 25000);
+      const held = hold ? sockets[seat].holdMove() : null;
+      try {
+        await tap(page, `#hand [data-card="${card}"]`);
+        if (held) {
+          await until(page, () => __pisti.room.waiting, 'waiting for move echo');
+          await held.sent;
+          assert.equal((await P(page)).canPlay, false);
+          await agree(active);
+          assert.equal(await page.locator('#hand [data-card]').count(), model.hands[seat].length);
+          await until(page, () => document.querySelector('#roomStatus').textContent === 'Sending move…', 'slow move status');
+        }
+      } finally { held?.release(); }
+      moves.push([seat, card]);
+      model = play(model, card);
+      frames++;
+      await agree(active);
+    }
+
+    await agree();
+    for (const [seat, page] of pages.entries()) {
+      assert.equal(await page.locator('#myPlayer .seat-name').textContent(), names[seat]);
+      assert.equal(await page.locator('#oppPlayer .seat-name').textContent(), names[1 - seat]);
+      assert.equal(await page.locator('#hand .card').count(), 4);
+    }
+    await friendShot(a, 'play');
+    await turn(pages, true);
+
+    const invalid = model.hands[1 - model.turn][0];
+    await aSocket.inject(model.turn, [invalid]);
+    frames++;
+    await agree();
+    while (model.ply < 9 || model.turn !== 0) await turn();
+
+    await bSocket.navigateAway();
+    await b.reload();
+    await seatsReady(b, 1);
+    await agree();
+
+    await bSocket.cut();
+    await until(a, () => document.querySelector('#roomStatus').textContent === 'Ben dropped. Waiting for them to come back.', 'friend disconnected');
+    assert.equal(await a.locator('#oppPlayer .seat-light.on').count(), 0);
+    await until(b, () => __pisti.room.status === 'waiting' && document.querySelector('#roomStatus').textContent === 'Reconnecting', 'dropped phone retries');
+    await friendShot(a, 'dropped');
+    await turn([a]);
+    bSocket.reconnect();
+    await seatsReady(b, 1);
+    await agree();
+
+    const { page: c } = await friendPage();
+    await c.goto(link.url);
+    await until(c, () => __pisti.room?.status === 'full' && document.querySelector('#lobbyStatus').textContent === 'This table is full', 'third phone refused');
+    assert.ok(await c.locator('#lobbyStatus').isVisible());
+
+    while (!model.done) await turn();
+    let replay = deal(initial.seed, initial.seed % 2);
+    for (const [seat, card] of moves) {
+      assert.equal(replay.turn, seat);
+      replay = play(replay, card);
+    }
+    assert.equal(moves.length, 48);
+    const finalScores = score(replay).map(row => row.total);
+    await a.setViewportSize({ width: 360, height: 640 });
+    for (const [seat, page] of pages.entries()) {
+      await until(page, () => __pisti.screen === 'score' && __pisti.scored, 'score card counted');
+      assert.deepEqual(await page.locator('#scoreT .head th').allTextContents(), ['', ...names]);
+      assert.deepEqual((await page.locator('#scoreT .total td').allTextContents()).slice(1).map(Number), finalScores);
+      assert.equal(await page.locator('#again').textContent(), 'Deal again');
+      const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('pisti:v1')));
+      assert.deepEqual(saved, { ...oldSave, name: names[seat] }, 'table play leaves the rest of the old save alone');
+    }
+    assert.ok(await noOverflow(a), '360x640 table score fits with a long name');
+    await friendShot(a, 'score');
+    await tap(a, '#again');
+    await until(b, name => document.querySelector('#matchLine').textContent === `${name} wants another hand`, 'friend sees first vote', 25000, names[0]);
+    assert.equal(await a.locator('#matchLine').textContent(), 'Waiting for Ben');
+    for (const page of pages) {
+      assert.equal((await P(page)).room.game, initial.game);
+      assert.equal((await P(page)).screen, 'score');
+    }
+    await tap(b, '#again');
+    for (const page of pages) await until(page, game => __pisti.room.game === game && __pisti.screen === 'play', 'second vote starts a hand', 25000, initial.game + 1);
+    const newSeed = (await P(a)).seed;
+    assert.notEqual(newSeed, initial.seed);
+    frames = 0;
+    model = deal(newSeed, newSeed % 2);
+    await agree();
+
+    await c.setViewportSize({ width: 360, height: 640 });
+    await c.locator('#roomLeave').click();
+    await c.locator('#friend').click();
+    assert.ok(await noOverflow(c), '360x640 friend entry fits');
+    await c.locator('#joinCode').fill(code.toLowerCase());
+    await c.locator('#joinTable').click();
+    await until(c, () => __pisti.room?.status === 'full', 'typing the same code reaches the same room');
+    assert.ok(await noOverflow(a), '360x640 table fits');
+    const cardsFit = await a.locator('#hand .card, #oppHand .card, #myPlayer, #oppPlayer').evaluateAll(els => els.every(el => {
+      const { left, right } = el.getBoundingClientRect();
+      return left >= 0 && right <= innerWidth;
+    }));
+    assert.ok(cardsFit, '360x640 cards and names stay in view');
+    await c.locator('#roomLeave').click();
+    await c.locator('#friend').click();
+    await c.locator('#newTable').click();
+    await until(c, () => __pisti.room?.seat === 0 && document.querySelector('#lobbyStatus').textContent === 'Waiting for your friend', 'second host waits');
+    const secondCode = await c.locator('#roomCode').textContent();
+    await b.locator('#pause').click();
+    await b.locator('#quit').click();
+    assert.equal(new URL(b.url()).searchParams.has('room'), false);
+    await b.locator('#friend').click();
+    await b.locator('#joinCode').fill(secondCode.toLowerCase());
+    await b.locator('#joinTable').click();
+    await seatsReady(b, 1);
+    assert.equal((await P(b)).room.code, secondCode);
+
+    for (const test of tests) {
+      assert.deepEqual(test.external, [], 'table makes no external network requests');
+      assert.deepEqual(test.errors, [], 'table produces no console, page or HTTP errors');
+    }
+    console.log(`ok   pisti friends on ${phone}: 48 cards, replay, reconnect, full table, illegal move, rematch and 360x640`);
+  } finally {
+    await Promise.all(tests.map(test => test.context.close()));
+  }
+}
 
 // Plays the hand on screen by tapping cards until the score card is complete. Returns the plays made.
 async function playHand(page, phone, { shots = false, pistiShot = false, last = false } = {}) {
@@ -343,6 +668,7 @@ try {
     const test = await open(browser, device);
     try {
       await run(test, phone, seed);
+      await playFriend(browser, device, phone);
       console.log(`ok   pisti on ${phone}`);
       if (phone === 'chromium') { await pace(browser); await small(browser, seed + 1); await extras(browser); console.log('ok   pisti extras on chromium'); }
     } catch (e) { failed++; console.error(`FAIL pisti on ${phone}: ${e.stack}`); if (test.errors.length) console.error(test.errors.join('\n')); await shot(test.page, phone, 'failure').catch(() => {}); }
@@ -350,5 +676,6 @@ try {
   }
 } finally { await new Promise(done => server.close(done)); }
 console.log(`screenshots in ${SHOTS}`);
+console.log(`friend screenshots in ${TABLE_SHOTS}`);
 console.log(failed ? `FAILED on ${failed} phone(s)` : 'ALL PASS');
 process.exitCode = failed ? 1 : 0;

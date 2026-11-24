@@ -1,4 +1,4 @@
-import { deal, play, score, view, dailySeed, rank, suit, isJack, capturesWith, RANKS, SUITS, totalPlies } from './sim.js';
+import { deal, play, score, view, dailySeed, rank, suit, isJack, capturesWith, tableMove, RANKS, SUITS, totalPlies } from './sim.js';
 import { choose, LEVELS } from './brain.js';
 import { readJson, writeJson } from '../../kit/save.js';
 import { sound } from '../../kit/audio.js';
@@ -6,6 +6,7 @@ import { onLeave, isPauseKey } from '../../kit/pause.js';
 import { noZoom } from '../../kit/zoom.js';
 import { screens } from '../../kit/screens.js';
 import { hint } from '../../kit/hint.js';
+import { table, newCode, cleanCode, linkFor, codeFromLink, share } from '../../kit/room.js';
 
 noZoom();
 const KEY = 'pisti:v1';
@@ -16,11 +17,12 @@ const BOT_MS = 600;
 const DAILY_LEVEL = 'medium';
 const today = /^\d{4}-\d{2}-\d{2}$/.test(q.get('date') || '') ? q.get('date') : new Date().toISOString().slice(0, 10);
 
-const blank = () => ({ v: 1, level: 0, losses: 0, hands: 0, len: 'one', four: false, sound: true, daily: {} });
+const blank = () => ({ v: 1, level: 0, losses: 0, hands: 0, len: 'one', four: false, sound: true, daily: {}, name: '' });
 const loaded = readJson(KEY);
 const save = { ...blank(), ...(loaded && typeof loaded === 'object' ? loaded : {}) };
 if (!save.daily || typeof save.daily !== 'object') save.daily = {};
 save.level = Math.max(0, Math.min(2, save.level | 0));
+if (typeof save.name !== 'string') save.name = '';
 const store = () => {
   const days = Object.keys(save.daily).sort();
   for (const d of days.slice(0, Math.max(0, days.length - 60))) delete save.daily[d];
@@ -28,7 +30,7 @@ const store = () => {
 };
 
 const snd = sound({ on: () => save.sound });
-const show = screens(['menu', 'paused', 'cover', 'score'], name => { screen = name || 'play'; });
+const show = screens(['menu', 'friendCard', 'paused', 'cover', 'score'], name => { screen = name || 'play'; });
 let screen = 'menu';
 
 // Game state for the page.
@@ -38,10 +40,9 @@ let paused = false;
 let busy = false;
 let anim = { flames: [], heat: 0, shimmer: 0, burst: 0 };
 
-const humanSeats = () => g.mode === 'two' ? [0, 1] : [0];
-const isHuman = seat => humanSeats().includes(seat);
-// The seat shown at the bottom: in two-player mode the player whose turn it is (or was).
-const bottomSeat = () => g.mode === 'two' ? g.viewer : 0;
+const isHuman = seat => g.mode === 'two' || seat === (g.mode === 'table' ? g.seat : 0);
+// Pass-and-play follows the viewer. A table keeps the local seat at the bottom.
+const bottomSeat = () => g.mode === 'two' ? g.viewer : g.mode === 'table' ? g.seat : 0;
 const levelName = () => LEVELS[save.level];
 
 function newGame(mode) {
@@ -87,7 +88,10 @@ async function pause() {
   if (screen !== 'play' || !g || g.s.done) return;
   paused = true; snd.hold(); show('paused');
 }
-function resume() { paused = false; snd.release(); show(null); }
+function resume() {
+  paused = false; snd.release(); show(null);
+  if (g.mode === 'table') { render(); updateRoomView(); }
+}
 
 async function dealIn(myToken) {
   busy = true;
@@ -158,10 +162,7 @@ async function doPlay(card, myToken) {
     g.captures.push({ seat, kind: entry.kind });
     const big = entry.kind === 'pisti' || entry.kind === 'double';
     if (big) {
-      anim.burst = performance.now();
-      $('shout').textContent = entry.kind === 'double' ? 'Pişti × 2!' : 'Pişti!';
-      $('shout').classList.remove('on'); $('shout').getBoundingClientRect(); $('shout').classList.add('on');
-      snd.tone(330, 0.7, 0.13, 'triangle', 660); snd.tone(495, 0.7, 0.08, 'sine', 990); snd.noise(0.6, 0.18, 700);
+      celebratePisti(entry.kind);
       // The pişti moment keeps its full length at any test speed, so it can be seen.
       await wait(1100 * SPEED);
     } else {
@@ -183,6 +184,13 @@ async function doPlay(card, myToken) {
   if (newDeal) await dealIn(myToken);
   busy = false;
   next(myToken);
+}
+
+function celebratePisti(kind) {
+  anim.burst = performance.now();
+  $('shout').textContent = kind === 'double' ? 'Pişti × 2!' : 'Pişti!';
+  $('shout').classList.remove('on'); $('shout').getBoundingClientRect(); $('shout').classList.add('on');
+  snd.tone(330, 0.7, 0.13, 'triangle', 660); snd.tone(495, 0.7, 0.08, 'sine', 990); snd.noise(0.6, 0.18, 700);
 }
 
 // Slide the pile to a seat's captured stack.
@@ -223,21 +231,24 @@ const ROWS = [
 ];
 
 async function showScore(sc, matchOver, myToken) {
-  const names = g.mode === 'two' ? ['Player 1', 'Player 2'] : ['You', 'Bot'];
+  const atTable = g.mode === 'table';
+  const names = atTable ? roomSeats.map(seat => seat.n) : g.mode === 'two' ? ['Player 1', 'Player 2'] : ['You', 'Bot'];
   const tb = $('scoreT').tBodies[0];
-  tb.innerHTML = `<tr class="head"><th></th><th>${names[0]}</th><th>${names[1]}</th></tr>`;
-  for (const [label, k] of ROWS) tb.insertAdjacentHTML('beforeend', `<tr data-k="${k}"><td>${label.replace('♦', '♦︎').replace('♣', '♣︎')}</td><td></td><td></td></tr>`);
-  tb.insertAdjacentHTML('beforeend', '<tr class="total"><td>Total</td><td>0</td><td>0</td></tr>');
+  const body = ROWS.map(([label, k]) => `<tr data-k="${k}"><td>${label.replace('♦', '♦︎').replace('♣', '♣︎')}</td><td></td><td></td></tr>`).join('');
+  tb.innerHTML = '<tr class="head"><th></th><th></th><th></th></tr>' + body
+    + '<tr class="total"><td>Total</td><td>0</td><td>0</td></tr>';
+  names.forEach((name, seat) => { tb.firstElementChild.children[seat + 1].textContent = name; });
   const me = sc[0].total, them = sc[1].total;
   $('scoreTitle').textContent = 'Counting…';
   $('matchLine').textContent = '';
   $('daily').classList.toggle('on', g.mode === 'daily');
-  $('again').textContent = g.match && !matchOver ? 'Next hand' : g.mode === 'daily' ? 'Play it again' : 'Play again';
+  $('again').textContent = atTable ? 'Deal again' : g.match && !matchOver ? 'Next hand' : g.mode === 'daily' ? 'Play it again' : 'Play again';
   if (g.mode === 'daily') drawStrip($('strip'), g.captures);
   const kept = save.daily[today]?.margin;
   $('dailyNote').textContent = g.mode === 'daily' ? (!g.practice ? `Today’s deal ${today} · scored` : kept === undefined ? 'Practice · today’s scored attempt was left unfinished' : `Practice · today’s scored result stays ${fmt(kept)}`) : '';
   $('savePic').style.display = kept === undefined ? 'none' : '';
   show('score');
+  if (atTable) updateRoomView();
   const rows = [...tb.querySelectorAll('tr[data-k]')], total = tb.querySelector('tr.total');
   const run = [0, 0];
   for (const row of rows) {
@@ -257,13 +268,14 @@ async function showScore(sc, matchOver, myToken) {
   await wait(250);
   if (myToken !== token) return;
   const lead = g.match ? g.totals[0] - g.totals[1] : me - them;
-  $('scoreTitle').textContent = g.mode === 'two'
-    ? (lead > 0 ? 'Player 1 wins' : lead < 0 ? 'Player 2 wins' : 'A draw')
+  $('scoreTitle').textContent = atTable || g.mode === 'two'
+    ? (lead > 0 ? `${names[0]} wins` : lead < 0 ? `${names[1]} wins` : 'A draw')
     : (lead > 0 ? 'You win' : lead < 0 ? 'The bot wins' : 'A draw');
   if (g.match) $('matchLine').textContent = matchOver ? `Match ${g.totals[0]}–${g.totals[1]}` : `Match to 51: ${g.totals[0]}–${g.totals[1]}`;
   else if (g.mode === 'daily') $('matchLine').textContent = `Margin ${fmt(me - them)}`;
   if (lead > 0) [523, 659, 784].forEach((f, i) => setTimeout(() => snd.tone(f, 0.25, 0.08, 'triangle'), i * 120));
   g.scored = true;
+  if (atTable) updateRoomView();
 }
 
 const fmt = n => n === undefined ? '' : n > 0 ? `+${n}` : n < 0 ? `−${-n}` : '0';
@@ -386,7 +398,7 @@ function render() {
   hand.innerHTML = '';
   const cards = s.hands[me];
   const gap = 10, total = cards.length * L.cw + (cards.length - 1) * gap;
-  const myTurn = s.turn === me && isHuman(me) && !s.done;
+  const myTurn = s.turn === me && isHuman(me) && !s.done && (g.mode !== 'table' || canPlay());
   cards.forEach((c, i) => {
     const el = g.covered ? cardEl(0, true) : cardEl(c);
     el.style.left = `${L.W / 2 - total / 2 + i * (L.cw + gap)}px`;
@@ -435,7 +447,9 @@ function render() {
   flames($('oppFlames'), s.piCount[them] + 2 * s.doubles[them], false);
   $('myDot').classList.toggle('them', g.mode === 'two' && me === 1);
   $('oppDot').classList.toggle('them', !(g.mode === 'two' && them === 0));
-  $('turnName').textContent = g.mode === 'two' ? `Player ${me + 1}` : '';
+  $('turnName').textContent = g.mode === 'table' && !s.done
+    ? (s.turn === me ? 'Your turn' : `Turn: ${roomSeats[them].n}`)
+    : g.mode === 'two' ? `Player ${me + 1}` : '';
   anim.heat = Math.min(1, s.pile.length / 12);
   anim.lone = s.pile.length === 1;
 }
@@ -478,10 +492,20 @@ $('hand').addEventListener('pointercancel', release);
 // Keyboard: Enter or Space on a focused card (a click with no pointer).
 $('hand').addEventListener('click', e => { if (e.detail === 0) { const el = e.target.closest('.card'); if (el) humanPlay(Number(el.dataset.card)); } });
 
-function canPlay() { return g && screen === 'play' && !busy && !paused && !g.s.done && isHuman(g.s.turn) && g.s.turn === bottomSeat(); }
+function canPlay() {
+  return !!g && screen === 'play' && !busy && !paused && !g.s.done && g.s.turn === bottomSeat()
+    && (g.mode !== 'table' || (room.status === 'live' && !room.waiting));
+}
 function humanPlay(card) {
   if (!canPlay() || !g.s.hands[g.s.turn].includes(card)) return;
   snd.unlock();
+  if (g.mode === 'table') {
+    if (room.move([card])) {
+      $('hand').classList.toggle('wait', !canPlay());
+      watchRoomLag();
+    }
+    return;
+  }
   doPlay(card, token);
 }
 
@@ -498,7 +522,7 @@ function frame(now) {
   const bg = ctx.createRadialGradient(W / 2, H * 0.45, 30, W / 2, H * 0.5, Math.max(W, H) * 0.75);
   bg.addColorStop(0, '#8f3b22'); bg.addColorStop(0.55, '#6a2817'); bg.addColorStop(1, '#3d140c');
   ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
-  if (!g || screen === 'menu') return;
+  if (!g || screen === 'friendCard') return;
   heatShown += ((anim.heat || 0) - heatShown) * 0.06;
   const cx = L.px + L.cw / 2, cy = L.py + L.ch / 2, bw = L.cw * 1.25;
   const t = now / 1000, flick = 0.85 + 0.15 * Math.sin(t * 7.3) * Math.sin(t * 3.1);
@@ -579,8 +603,182 @@ function hero() {
   for (let i = 0; i < 9; i++) { ctx.fillStyle = `rgba(255,${120 + i * 12},40,.9)`; ctx.beginPath(); ctx.arc(cx - 56 + i * 14, by + Math.sin(i) * 2, 3.5, 0, Math.PI * 2); ctx.fill(); }
 }
 
+// Friends' tables.
+let room, roomActive = false, roomInviting = false;
+let roomSeat = null, roomSeats = [], roomGame = 0, roomSeed = 0, roomMoves = 0, roomVotes = [];
+let roomLagTimer = 0, roomLag = false;
+
+function friendCard() {
+  $('friendName').value = save.name;
+  $('joinCode').value = '';
+  $('friendEntry').hidden = false;
+  $('roomInvite').hidden = true;
+  $('roomLinkField').hidden = true;
+  show('friendCard');
+}
+
+function openRoom(code, inviting) {
+  roomActive = true;
+  roomInviting = inviting;
+  roomSeat = null;
+  roomSeats = [];
+  $('friendEntry').hidden = true;
+  $('roomInvite').hidden = !inviting;
+  $('roomCode').textContent = code;
+  $('roomLink').value = linkFor(code);
+  $('roomLinkField').hidden = true;
+  $('shareLink').textContent = 'Share link';
+  show('friendCard');
+  const url = new URL(location.href);
+  url.searchParams.set('room', code);
+  history.replaceState(null, '', url);
+  room ??= table({
+    game: 'pisti', version: 1, Socket: window.__pistiSocket ?? window.WebSocket, name: () => save.name,
+    onState: receiveRoomState, onSeats: receiveRoomSeats, onMove: receiveRoomMove,
+    onGame: ({ game, seed }) => receiveRoomState({ seat: roomSeat, game, seed, seats: roomSeats, log: [], again: [] }),
+    onAgain: recordRoomVote, onStatus: () => { watchRoomLag(); updateRoomView(); },
+  });
+  room.open(code);
+}
+
+function leaveRoom() {
+  if (!roomActive) return;
+  roomActive = false;
+  room.leave();
+  $('table').classList.remove('friends');
+  $('score').classList.remove('friends');
+  $('pause').setAttribute('aria-label', 'Pause');
+  $('pauseTitle').textContent = 'Paused';
+  $('again').disabled = false;
+  const url = new URL(location.href);
+  url.searchParams.delete('room');
+  history.replaceState(null, '', url);
+}
+
+function receiveRoomState(state) {
+  roomSeat = state.seat;
+  roomGame = state.game;
+  roomSeed = state.seed;
+  roomMoves = state.log.length;
+  roomVotes = state.again.slice();
+  let s = deal(state.seed, state.seed % 2);
+  for (const [seat, ...cards] of state.log) s = tableMove(s, seat, cards);
+  token++;
+  busy = false;
+  press = null;
+  anim.burst = 0;
+  $('shout').classList.remove('on');
+  g = { mode: 'table', seed: state.seed, seat: state.seat, s, hints: save.hands < 3 };
+  receiveRoomSeats(state.seats);
+  watchRoomLag();
+  if (s.done) finishRoomHand();
+}
+
+function receiveRoomSeats(seats) {
+  roomSeats = seats;
+  if (screen === 'friendCard' && roomSeat !== null) $('roomInvite').hidden = !!seats[1 - roomSeat];
+  if ((screen === 'friendCard' || (screen === 'score' && !g.s.done)) && seats.every(Boolean)) {
+    $('roomInvite').hidden = true;
+    $('table').classList.add('on', 'friends');
+    $('score').classList.add('friends');
+    $('pause').setAttribute('aria-label', 'Table menu');
+    $('pauseTitle').textContent = 'Table menu';
+    show(null);
+    layout();
+  }
+  updateRoomView();
+  if (screen === 'play' || screen === 'paused') render();
+}
+
+function receiveRoomMove(seat, cards, index) {
+  roomMoves = index + 1;
+  watchRoomLag();
+  const s = tableMove(g.s, seat, cards);
+  if (s === g.s) {
+    updateRoomView();
+    return;
+  }
+  g.s = s;
+  snd.noise(0.05, 0.1, 2600);
+  const { kind } = s.log.at(-1);
+  if (kind === 'pisti' || kind === 'double') celebratePisti(kind);
+  render();
+  if (s.done) finishRoomHand();
+}
+
+function finishRoomHand() {
+  paused = false;
+  snd.release();
+  showScore(score(g.s), true, token);
+}
+
+function watchRoomLag() {
+  if (!room.waiting) {
+    clearTimeout(roomLagTimer);
+    roomLagTimer = 0;
+    roomLag = false;
+  } else if (!roomLagTimer) {
+    roomLagTimer = setTimeout(() => {
+      roomLag = room.waiting;
+      updateRoomNotice();
+    }, 600);
+  }
+  updateRoomNotice();
+}
+
+function roomMessage() {
+  switch (room.status) {
+    case 'connecting': return roomInviting ? 'Waiting for your friend' : 'Connecting';
+    case 'waiting': return 'Reconnecting';
+    case 'full': return 'This table is full';
+    case 'version': return 'Reload the page to get the same version as your friend';
+    case 'closed': return 'This table was opened in another tab, or has ended';
+    case 'live': {
+      const friend = roomSeats[1 - roomSeat];
+      if (!friend) return 'Waiting for your friend';
+      const messages = [];
+      if (!friend.on) messages.push(`${friend.n} dropped. Waiting for them to come back.`);
+      if (roomLag) messages.push('Sending move…');
+      return messages.join(' ');
+    }
+    default: return '';
+  }
+}
+
+function updateRoomNotice() {
+  const message = roomActive ? roomMessage() : '';
+  for (const [id, visible] of [['lobbyStatus', screen === 'friendCard'], ['roomStatus', screen === 'play'], ['roomEndStatus', screen === 'score']]) {
+    const el = $(id);
+    if (visible && el.textContent !== message) el.textContent = message;
+    el.hidden = !visible || !message;
+  }
+}
+
+function updateRoomView() {
+  updateRoomNotice();
+  if (!roomActive || !roomSeats.every(Boolean) || roomSeat === null) return;
+  for (const [id, seat] of [['myPlayer', roomSeat], ['oppPlayer', 1 - roomSeat]]) {
+    const el = $(id), player = roomSeats[seat];
+    const connected = player.on && (seat !== roomSeat || room.status === 'live');
+    el.querySelector('.seat-light').classList.toggle('on', connected);
+    el.querySelector('.seat-name').textContent = player.n;
+    el.setAttribute('aria-label', `${player.n} · ${connected ? 'connected' : 'disconnected'}`);
+  }
+  $('hand').classList.toggle('wait', !canPlay());
+  if (screen !== 'score') return;
+  const friend = roomSeats[1 - roomSeat].n, voted = roomVotes.includes(roomSeat);
+  $('matchLine').textContent = voted ? `Waiting for ${friend}` : roomVotes.includes(1 - roomSeat) ? `${friend} wants another hand` : '';
+  $('again').disabled = !g.scored || voted || room.status !== 'live';
+}
+
+function recordRoomVote(seat) {
+  if (!roomVotes.includes(seat)) roomVotes.push(seat);
+  if (screen === 'score') updateRoomView();
+}
+
 // Menu.
 function menu() {
+  leaveRoom();
   token++;
   paused = false; busy = false;
   snd.release();
@@ -598,13 +796,39 @@ function menu() {
 $('play').addEventListener('click', () => { snd.unlock(); newGame('play'); });
 $('today').addEventListener('click', () => { snd.unlock(); newGame('daily'); });
 $('two').addEventListener('click', () => { snd.unlock(); newGame('two'); });
+$('friend').onclick = friendCard;
+$('friendName').oninput = e => {
+  save.name = e.target.value.slice(0, 24);
+  writeJson(KEY, save);
+};
+$('newTable').onclick = () => { snd.unlock(); openRoom(newCode(), true); };
+$('joinForm').onsubmit = e => {
+  e.preventDefault();
+  const code = cleanCode($('joinCode').value);
+  if (code) { snd.unlock(); openRoom(code, false); }
+};
+$('shareLink').onclick = async () => {
+  const code = room.code;
+  const result = await share(code, 'Play Pişti with me');
+  if (!roomActive || room.code !== code) return;
+  if (result === 'copied') $('shareLink').textContent = 'Link copied';
+  if (result === 'shown') {
+    $('roomLinkField').hidden = false;
+    $('roomLink').select();
+  }
+};
+$('roomLeave').onclick = menu;
 $('length').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; save.len = b.dataset.len; store(); menu(); });
 $('pause').addEventListener('click', () => pause());
 $('resume').addEventListener('click', () => resume());
 $('quit').addEventListener('click', () => menu());
 $('scoreMenu').addEventListener('click', () => menu());
 $('again').addEventListener('click', () => {
-  if (!g.scored) return;
+  if (!g?.scored) return;
+  if (g.mode === 'table') {
+    if (!$('again').disabled && room.again()) recordRoomVote(g.seat);
+    return;
+  }
   g.scored = false;
   if (g.match && !g.matchOver) { g.handNo++; g.dealer = 1 - g.dealer; startHand(); return; }
   if (g.match) { newGame('play'); return; }
@@ -620,18 +844,23 @@ setSound(); setFour();
 addEventListener('keydown', e => {
   if (isPauseKey(e) && g && !g.s.done) { e.preventDefault(); if (screen === 'paused') resume(); else if (screen === 'play') pause(); }
 });
-onLeave(pause);
-addEventListener('resize', () => { if (g) { layout(); render(); } else hero(); });
+onLeave(() => { if (g?.mode !== 'table') pause(); });
+addEventListener('resize', () => {
+  if (g && $('table').classList.contains('on')) { layout(); render(); }
+  else if (screen === 'menu') hero();
+});
 
 hint($('hand'), {
   kind: 'tap', key: 'pisti:hint', look: 'hand', delay: 4000,
-  when: () => !!g && screen === 'play' && canPlay(),
+  when: () => !!g && g.mode !== 'table' && canPlay(),
   played: save.hands > 0,
   label: 'Tap a card to play it',
   bottom: () => (L.ch || 108) / 2 + 14,
 });
 
-menu();
+const linkedRoom = codeFromLink();
+if (linkedRoom) openRoom(linkedRoom, false);
+else menu();
 
 // Read-only state for the browser check.
 window.__pisti = {
@@ -652,7 +881,7 @@ window.__pisti = {
   get date() { return today; },
   get seed() { return g?.seed ?? null; },
   get done() { return !!g?.s.done; },
-  get totals() { return g ? g.totals.slice() : [0, 0]; },
+  get totals() { return g?.totals?.slice() ?? [0, 0]; },
   get handNo() { return g ? g.handNo : 0; },
   get dealer() { return g ? g.s.dealer : -1; },
   get matchOver() { return !!g?.matchOver; },
@@ -660,6 +889,11 @@ window.__pisti = {
   get ply() { return g ? g.s.ply : 0; },
   get log() { return g ? g.s.log.map(e => ({ seat: e.seat, card: e.card, capture: e.capture, kind: e.kind })) : []; },
   get captures() { return g ? g.captures.slice() : []; },
+  get pile() { return g?.s.pile.slice(g.s.hidden) ?? []; },
+  get room() {
+    return roomActive ? { code: room.code, status: room.status, waiting: room.waiting, seat: roomSeat,
+      game: roomGame, seed: roomSeed, moves: roomMoves } : null;
+  },
   get save() { return JSON.parse(JSON.stringify(save)); },
   get layout() { return { ...L }; },
   picture() { const c = picture(); return new Promise(done => c.toBlob(b => done({ width: c.width, height: c.height, bytes: b ? b.size : 0 }), 'image/png')); },
