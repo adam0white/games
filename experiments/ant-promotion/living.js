@@ -14,7 +14,7 @@
 //   fleeing (m.fear)             quick short steps, body stretched
 //   stunned (m.stun)             eyes shut, body still and a little flat
 //   rival temperament            ambusher lies low until it has seen you; stalker creeps long and slow; brute is bigger; coward trembles
-//   player skills                shell: a dome over the body; sprint and dive: quick steps, stretched, a dive lifts; leap: an arc through the air
+//   player skills                shell: a dome over the body (a porcupine raises its quills); sprint and dive: quick steps, stretched, a dive lifts; leap: an arc through the air
 //   Wild hide growing back       scratches on the back; slowed by an old animal's roar: a stagger
 import { FORMS, me, powerOf, tirePace, POUNCE, OLD_SKILL, powerFor, hideReady } from './sim.js';
 import { update, poke } from './rig.js';

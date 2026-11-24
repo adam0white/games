@@ -12,7 +12,7 @@ import { build } from './rig.js';
 const TAU = Math.PI * 2, PI = Math.PI;
 const LX = -0.5, LY = -0.78; // light from the upper left, in world (and screen) axes
 const INK = '#1d1410';
-let LOW = false, SHUT = false, PATTERN = null; // set for the length of one drawCreature call
+let LOW = false, SHUT = false, PATTERN = null, BRISTLE = 0; // set for the length of one drawCreature call
 
 // ---------- species records
 // A spec is in units of the animal's sim radius r. Most records come from the form's kind and drawing flags in sim.js;
@@ -195,9 +195,9 @@ const at = (p, a, fwd, side) => ({ x: p.x + Math.cos(a) * fwd - Math.sin(a) * si
 
 // ---------- drawing a creature
 export function drawCreature(g, c, opt = {}) {
-  LOW = !!opt.low; SHUT = !!opt.sleep; PATTERN = opt.skin?.p || null;
+  LOW = !!opt.low; SHUT = !!opt.sleep; PATTERN = opt.skin?.p || null; BRISTLE = opt.shell && c.look2.f.spikes ? 1 : 0;
   g.save(); body(g, c, opt); g.restore();
-  LOW = SHUT = false; PATTERN = null;
+  LOW = SHUT = false; PATTERN = null; BRISTLE = 0;
 }
 function body(g, c, opt) {
   const lk = c.look2, F = c.F, r = c.r, px = opt.px || 0.5, ow = LOW ? 0 : Math.max(px * 0.9, r * 0.055), S = c.spine, n = S.length;
@@ -247,7 +247,7 @@ function marks(g, c, P, R, opt, a0, px, pant) {
     const h = P[0], hr = R[0], q = c.look2.kind === 'snake' ? 1.45 : c.look2.f.snout || c.look2.f.liz ? 1.7 : 1.05, t0 = at(h, a0, hr * q, 0), wob = Math.sin(c.t * 17) * 0.3;
     limb(g, [t0, at(t0, a0 + wob, r * 0.32 * pant, 0)], Math.max(px * 1.4, r * 0.13), '#e0607a', Math.max(px * 0.6, r * 0.03));
   }
-  if (opt.shell) { // a see-through dome over the whole body
+  if (opt.shell && !BRISTLE) { // a see-through dome (a porcupine raises its quills instead) over the whole body
     const head = P[0], tail = P[n - 1], cx = (head.x + tail.x) / 2, cy = (head.y + tail.y) / 2, len = Math.hypot(head.x - tail.x, head.y - tail.y) / 2 + Math.max(...R) * 1.2, wid = Math.max(...R) * 1.6;
     oval(g, cx, cy, len, wid, ang(head, tail)); g.fillStyle = 'rgba(160,214,255,0.32)'; g.fill(); g.lineWidth = Math.max(px * 2, r * 0.08); g.strokeStyle = '#cfe8ff'; g.stroke();
     oval(g, cx + LX * wid * 0.35, cy + LY * wid * 0.35, len * 0.45, wid * 0.3, ang(head, tail)); g.fillStyle = 'rgba(255,255,255,0.35)'; g.fill();
@@ -447,7 +447,7 @@ function drawQuad(g, c, P, R, lk, col, dark, acc, ow, px, a0) {
   const bodyStart = f.neck ? 1 : 1, body = P.slice(bodyStart), BR = R.slice(bodyStart);
   if (f.spikes) { // quills: drawn before the body, fanned backwards
     const m = P[3], a = ang(P[2], P[4]);
-    for (let i = 0; i < 20; i++) { const t = PI * (0.42 + 1.16 * i / 19), len = r * (1.15 + (i % 3) * 0.12) * (1 + c.squash * 0.25); const b = at(m, a, Math.cos(t) * r * 0.3, Math.sin(t) * r * 0.25); limb(g, [b, at(m, a + 0, Math.cos(t) * len, Math.sin(t) * len * 0.85)], Math.max(px, r * 0.07), i % 2 ? acc : dark, ow * 0.5); }
+    for (let i = 0; i < 20; i++) { const t = PI * (0.42 + 1.16 * i / 19), len = r * (1.15 + (i % 3) * 0.12) * (1 + c.squash * 0.25 + BRISTLE * 0.45); const b = at(m, a, Math.cos(t) * r * 0.3, Math.sin(t) * r * 0.25); limb(g, [b, at(m, a + 0, Math.cos(t) * len, Math.sin(t) * len * 0.85)], Math.max(px, r * 0.07), i % 2 ? acc : dark, ow * 0.5); }
   }
   if (f.mane && !f.neck) {
     const m = P[1], a = ang(P[0], P[2]), k = lk.bigMane ? 1.25 : 1, mc = f.mane === 2 ? acc : dark;
