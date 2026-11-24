@@ -16,7 +16,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { experimentPath } from '../../../src/worker.mjs';
 import { experimentRoots } from '../../../scripts/experiments.mjs';
 import { pages } from './pages.mjs';
-import { labPages } from './lab-pages.mjs';
+import { labPages, labHubs } from './lab-pages.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 // The notes page builds its games menu and game picker from kit/games.json, so every experiment has to be in it.
@@ -933,6 +933,8 @@ for (const [slug, g] of Object.entries({ ...pages, ...labPages })) {
     GAMES[name] = page => hinted(page, { path, play: g.play ?? '#play', resume: g.resume ?? '#resume', prepare: g.prepare, start: g.start, waitInput: true, waitHintState: true, ...hint });
   }
 }
+
+for (const [slug, run] of Object.entries(labHubs)) GAMES[slug] = page => run(page, { base, until }); // the draft homes for the small games
 
 const [onlyGame, onlyPhone] = process.argv.slice(2);
 // The first argument is 'all' or a comma list of experiments. An experiment's name picks its own check, its

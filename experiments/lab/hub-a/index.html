@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0d14">
+<title>Small games · A</title>
+<link rel="stylesheet" href="./hub.css">
+<style>
+  main { max-width: 40em; margin: 0 auto; padding: 1.3em 16px 3em; }
+  .lead { color: var(--dim); margin: .5em 0 0; font-size: .95em; }
+  section { margin-top: 2em; }
+  .shelf-head { display: flex; align-items: baseline; justify-content: space-between; gap: .6em; padding-bottom: .5em; }
+  .shelf-sub { color: var(--dim); font-size: .85em; margin: .15em 0 .9em; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 12px; }
+  .tile { display: flex; flex-direction: column; text-decoration: none; border-radius: 14px; overflow: hidden; background: var(--card); border: 1px solid var(--line); min-width: 0; }
+  .tile:active { transform: scale(.98); }
+  .pic { aspect-ratio: 4 / 3; position: relative; }
+  .pic .mark { position: absolute; left: 8px; top: 8px; box-shadow: 0 1px 6px #0006; }
+  .pic .mark.opened, .pic .mark.played { background: #0b0d14cc; }
+  .txt { padding: .55em .7em .7em; display: flex; flex-direction: column; gap: .25em; flex: 1; }
+  .txt b { font-weight: normal; color: var(--gold); font-size: 1.05em; line-height: 1.2; }
+  .txt span { font-size: .8em; line-height: 1.35; color: var(--ink); opacity: .82; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .txt small { margin-top: auto; padding-top: .3em; font: 11px/1.3 -apple-system, system-ui, sans-serif; color: var(--dim); letter-spacing: .02em; }
+  #solo .tile:last-child:nth-child(odd) { grid-column: span 2; flex-direction: row; }
+  #solo .tile:last-child:nth-child(odd) .pic { width: 48%; flex: none; aspect-ratio: auto; min-height: 120px; }
+  .shelf-board { height: 8px; margin: 14px -4px 0; border-radius: 4px; background: linear-gradient(#5a4326, #3a2a17); box-shadow: 0 6px 12px #0008; }
+  .friend .tile { flex-direction: row; }
+  .friend .grid { grid-template-columns: 1fr; }
+  .friend .pic { width: 42%; flex: none; aspect-ratio: auto; min-height: 112px; }
+  .friend .how { font: 12px/1.3 -apple-system, system-ui, sans-serif; color: var(--green); }
+  .from { font: 10px/1 -apple-system, system-ui, sans-serif; text-transform: uppercase; letter-spacing: .12em; color: var(--dim); }
+</style>
+</head>
+<body>
+<main>
+  <h1 data-i18n="aTitle">Small games</h1>
+  <p class="lead" data-i18n="aLead"></p>
+  <section>
+    <div class="shelf-head"><h2 data-i18n="aSolo"></h2></div>
+    <p class="shelf-sub" data-i18n="aSoloSub"></p>
+    <div class="grid" id="solo"></div>
+    <div class="shelf-board"></div>
+  </section>
+  <section class="friend">
+    <div class="shelf-head"><h2 data-i18n="aFriend"></h2></div>
+    <p class="shelf-sub" data-i18n="aFriendSub"></p>
+    <div class="grid" id="friend"></div>
+    <div class="shelf-board"></div>
+  </section>
+</main>
+<script type="module">
+import { W, t, SMALL, FOR_TWO, artOf, nameOf, lineOf, timeOf, hrefOf, mark, markOpened, englishOnly, strip, onShow, esc } from './hub.js';
+import { noZoom } from '../../kit/zoom.js';
+const solo = SMALL.filter(game => !game.friend), friends = [...SMALL.filter(game => game.friend), ...FOR_TWO];
+function tile(game, friend) {
+  const m = mark(game);
+  const how = friend ? `<span class="how">${esc(t(game.friend))}${game.slug === 'pitch' || game.slug === 'duel' ? ` · ${esc(t('alsoBot'))}` : ''}</span>` : '';
+  return `<a class="tile ${game.slug}" href="${hrefOf(game, 'hub-a')}" data-slug="${game.slug}">
+    <div class="pic">${artOf(game)}${game.slug === 'crumbwar' ? '' : `<span class="mark ${m.cls}">${esc(m.text)}</span>`}</div>
+    <div class="txt"><b>${esc(nameOf(game))}</b><span>${esc(lineOf(game))}</span>${how}<small>${esc(timeOf(game))}${englishOnly(game) ? ' · ' + esc(t('english')) : ''}</small></div></a>`;
+}
+function draw() {
+  W.apply(); document.title = `${t('aTitle')} · A`;
+  document.getElementById('solo').innerHTML = solo.map(game => tile(game, false)).join('');
+  document.getElementById('friend').innerHTML = friends.map(game => tile(game, true)).join('');
+}
+document.addEventListener('click', e => { const a = e.target.closest('a.tile'); if (a) markOpened(a.dataset.slug); });
+strip('a', draw); onShow(draw); noZoom(); draw();
+window.hubState = () => ({ variant: 'a', lang: W.lang(), links: [...document.querySelectorAll('a.tile')].map(a => a.getAttribute('href')) });
+</script>
+</body>
+</html>
