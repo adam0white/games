@@ -137,3 +137,30 @@ The smallest remaining evidence marks are the eight sound badges in Hard Daily. 
 The new regressions failed on the original behavior before the fixes. They exercise the objective, truth comparison, tap accusation and cancel, accidental accusation animation, notebook messages and target edges, shutter and blackout instructions, loss, reload recovery, opening cast variety, consent copy, mode labels, calendar, menu target sizes, Next and PNG download feedback. The click-through assertion failed on the intermediate tap-to-accuse implementation. A native touch trace showed the final canvas release followed by a click on the newly visible Menu button. The corrected release kept the loss visible. The existing suite still loads old saves and intercepts the solved, wrong and left lab outcomes.
 
 Concurrent browser runs on the host caused earlier action and screenshot timeouts. The final game suite runs its menu context before opening its campaign context, uses touch for menu controls and passed all three profiles. The browser confirmed PNG generation and a download event. Native share-sheet delivery remains untested.
+
+## Words and pictures — 2026-11-24
+
+| Cold-play instruction | What the player sees now |
+| --- | --- |
+| Find the lie and inspect a portrait. | The short question “Who lied?” sets the goal. A ghost finger pulses over a portrait. |
+| Tap the alibi to visit its time. | A ghost finger taps the alibi’s chevron while an arrow marks the corresponding replay tick. |
+| Compare the suspect with the outlined room and accuse a liar. | Matching brackets link the alibi’s room icon with the room in the replay. The suspect stays outlined when visible. A circle and square beside the stamp illustrate the general rule. |
+| Tap a portrait to accuse or cancel. | The stamp rises above the portrait strip, the available targets gain corner marks, and the stamp control becomes Cancel with a cross. |
+| Hold to pin, tap to jump, or cross out a note. | The ghost finger holds until its ring fills and a copy of the portrait moves into the notebook. The first note’s clock and replay tick light up together. The crossed chips erase notes. A duplicate marks its matching row with an equals sign. A full book shows all three slots filled and emphasizes erase. |
+| The shutter obscured the incident. Check the stated times. | The replay shows a crossed-out camera over the closed panels. The ghost finger points to a portrait or to its claim time. |
+| Match sound symbols in the blackout. | Matching corners link the selected portrait’s sound symbol, its statement and the same symbol in the replay. If the claim refers to a different time, the ghost finger points to the clock on the claim and the replay tick before the game shows the accusation rule. |
+| A truthful alibi cost a star. After three misses, compare again on retry. | The star falls, the matching room icons and claim time appear together, and a ghost finger moves to another portrait. The loss card repeats the comparison, shows the three crossed-out portraits and all three empty stars. The win card shows the culprit, the two different rooms and the stars earned. |
+| The share action succeeded, was canceled, or started a download. | A check, cross or download arrow appears. The corresponding status is announced. |
+
+The objective stays in words because a portrait and a stamp alone do not say to find a lie. Accuse and Cancel name actions that can spend a star or put the stamp away. Menu and share controls, the Hard Daily unlock condition, the two streaks and sound status retain short labels. The recording notice and toggle retain the disclosure and choice. The share image includes the game, mode, full local-language date and elapsed time. Screen-reader cues and outcome summaries use the same English and Turkish table.
+
+Language changes apply immediately on the menu and pause card. A manual choice supersedes a `lang` query parameter and is saved by the kit. The campaign save, tab checkpoint, lab outcomes and shared drag hint use their existing contracts.
+
+The browser suite checks key and placeholder parity, language persistence, English leaks in rendered Turkish copy, and layout bounds in both languages. The screenshot pass covers the menu, case list, calendar, replay and teaching states, notebook, pause, reveal, win, loss and both share cards at 360×640 and the iPhone 13 viewport. The lab endpoint was simulated. A Turkish speaker has yet to review the wording, and a first-time player has yet to interpret the new pictures. Physical-phone touch and audio, screen-reader announcements on a device, native share delivery and live lab receipt remain unverified.
+
+| Check | Result |
+| --- | --- |
+| WebKit, iPhone 13 viewport at 390×664 | Game and shared phone suites passed |
+| Chromium, Pixel 7 viewport at 412×839 | Game and shared phone suites passed |
+| Chromium, 360×640 | Game suite passed |
+| Rules bots | Passed 36 default cases, 6,912 seeded campaign cases and 732 dailies |

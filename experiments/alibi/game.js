@@ -5,6 +5,7 @@ import { screens } from '../kit/screens.js';
 import { lab } from '../kit/lab.js';
 import { hint } from '../kit/hint.js';
 import { noZoom } from '../kit/zoom.js';
+import { t, lang, setLang, apply } from './words.js';
 import {
   CASES, CHAPTER_TWO_END, CLOCK_START, CLOCK_STEP, createCase, dailyCase, dailyWin, dayKey, offsetDay, dossiers, freshRun, accuse, observe,
 } from './sim.js';
@@ -76,6 +77,18 @@ const homeStamp = { x: 180, y: 605 };
 const notebookButton = { x: 48, y: 605 };
 const HOLD = .46;
 const REVEAL_DURATION = 2.7;
+const chapters = ['Ⅰ', 'Ⅱ', 'Ⅲ', 'Ⅳ', 'Ⅴ'];
+const locales = Object.fromEntries(['en', 'tr'].map(code => {
+  const integers = new Intl.NumberFormat(code);
+  const padded = new Intl.NumberFormat(code, { minimumIntegerDigits: 2, useGrouping: false });
+  const shortDate = new Intl.DateTimeFormat(code, { month: 'short', day: 'numeric', timeZone: 'UTC' });
+  const longDate = new Intl.DateTimeFormat(code, { dateStyle: 'long', timeZone: 'UTC' });
+  return [code, { integers, padded, shortDate, longDate }];
+}));
+const number = n => locales[lang()].integers.format(n);
+const twoDigits = n => locales[lang()].padded.format(n);
+const dateValue = day => new Date(`${day}T00:00:00Z`);
+const dateLabel = (day, style = 'longDate') => locales[lang()][style].format(dateValue(day));
 
 let c = createCase({ seed, level: 1 });
 let board = [];
@@ -110,14 +123,11 @@ let originY = 0;
 
 const beatNow = () => Math.round(time);
 const minute = beat => CLOCK_START + beat * CLOCK_STEP;
-const formatTime = beat => {
-  const m = minute(beat);
-  return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
-};
+const clockLabel = value => `${number(Math.floor(value / 60))}:${twoDigits(value % 60)}`;
+const formatTime = beat => clockLabel(minute(beat));
 const dailyProfile = () => hard ? profile.hardDaily : profile.daily;
 const hardUnlocked = () => profile.level > CHAPTER_TWO_END;
 const activeStreak = (summary, today) => summary.last >= offsetDay(today, -1) ? summary.streak : 0;
-const timeLabel = seconds => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 const tickX = beat => replay.x + (replay.endX - replay.x) * beat / (c.beatCount - 1);
 function syncProfile() {
   const latest = readProfile(save.readJson(KEY));
@@ -144,7 +154,10 @@ const persist = () => save.writeJson(KEY, profile);
 const playing = () => screen === 'play';
 const setScreen = next => {
   stampArmed = false;
-  $('playGuide').hidden = next !== 'play';
+  if (next !== 'play') {
+    $('playGuide').textContent = '';
+    delete $('playGuide').dataset.cue;
+  }
   screen = next;
   showCards(next);
   $('pause').hidden = !playing();
@@ -153,32 +166,53 @@ const setScreen = next => {
 
 function updateMenu() {
   const current = validLevel(forceLevel) ? forceLevel : profile.level;
-  $('progress').textContent = `${current} /${CASES.length}`;
+  $('progress').textContent = `${number(current)} /${number(CASES.length)}`;
   const today = dayKey();
   const streak = activeStreak(profile.daily, today);
-  $('streak').textContent = streak ? `✦${streak}` : '';
-  $('daily').setAttribute('aria-label', `Daily case, streak ${streak}`);
+  $('streak').textContent = streak ? `✦${number(streak)}` : '';
+  $('daily').setAttribute('aria-label', t('dailyStreak', { n: number(streak) }));
   $('hardDaily').disabled = !hardUnlocked();
-  $('hardDaily').textContent = 'Hard Daily';
+  $('hardDaily').textContent = t('hardDaily');
   if (!hardUnlocked()) {
     const unlock = document.createElement('small');
-    unlock.textContent = `Solve case ${CHAPTER_TWO_END}`;
+    unlock.textContent = t('unlockCase', { n: number(CHAPTER_TWO_END) });
     $('hardDaily').append(unlock);
   }
-  $('hardDaily').setAttribute('aria-label', hardUnlocked() ? 'Hard Daily' : `Hard Daily unlocks after case ${CHAPTER_TWO_END}`);
-  $('menuSound').textContent = $('pauseSound').textContent = profile.sound ? 'Sound on' : 'Sound off';
-  noticeLead.textContent = recording.checked ? recordingDisclosure : 'Recording is off. You can turn it on in the pause menu. ';
+  $('menuSound').textContent = $('pauseSound').textContent = t(profile.sound ? 'soundOn' : 'soundOff');
+  updateRecordingNotice();
   for (const id of ['menuSound', 'pauseSound']) $(id).setAttribute('aria-pressed', profile.sound);
 }
 
+function updateRecordingNotice() {
+  if (noticeLead) noticeLead.textContent = t(recording?.checked ? 'recordingOn' : 'recordingOff', { days: number(180) });
+}
+
+function localizeNotesButton() {
+  $('notes-button')?.setAttribute('aria-label', t('notes'));
+}
+
+function switchLanguage() {
+  setLang(lang() === 'tr' ? 'en' : 'tr');
+  // A manual choice supersedes a URL override, including on the next reload.
+  const url = new URL(location.href);
+  if (url.searchParams.has('lang')) {
+    url.searchParams.delete('lang');
+    history.replaceState(history.state, '', url);
+  }
+  apply();
+  localizeNotesButton();
+  updateMenu();
+  draw();
+}
+
 function openCases(chapter = CASES[profile.level - 1].chapter) {
-  const tabs = [...new Set(CASES.map(spec => spec.chapter))].map(number => {
+  const tabs = [...new Set(CASES.map(spec => spec.chapter))].map(index => {
     const button = document.createElement('button');
-    button.textContent = ['Ⅰ', 'Ⅱ', 'Ⅲ', 'Ⅳ', 'Ⅴ'][number - 1];
-    button.classList.toggle('primary', number === chapter);
-    button.setAttribute('aria-label', `Chapter ${number}`);
-    button.setAttribute('aria-pressed', number === chapter);
-    button.onclick = () => openCases(number);
+    button.textContent = chapters[index - 1];
+    button.classList.toggle('primary', index === chapter);
+    button.setAttribute('aria-label', t('chapter', { n: number(index) }));
+    button.setAttribute('aria-pressed', index === chapter);
+    button.onclick = () => openCases(index);
     return button;
   });
   $('chapterTabs').replaceChildren(...tabs);
@@ -188,11 +222,11 @@ function openCases(chapter = CASES[profile.level - 1].chapter) {
     const level = i + 1;
     button.disabled = level > profile.level;
     button.classList.toggle('primary', level === profile.level);
-    button.textContent = level;
+    button.textContent = number(level);
     const stars = document.createElement('span');
     stars.textContent = '★'.repeat(profile.stars[level] ?? 0);
     button.append(stars);
-    button.setAttribute('aria-label', `Chapter ${spec.chapter}, case ${level}`);
+    button.setAttribute('aria-label', t('chapterCase', { chapter: number(spec.chapter), caseNumber: number(level) }));
     button.addEventListener('click', () => start(false, level));
     return button;
   });
@@ -204,8 +238,9 @@ function openCalendar() {
   if (save.readJson(KEY) !== null) syncProfile();
   const today = dayKey();
   const dates = Array.from({ length: 28 }, (_, i) => offsetDay(today, i - 27));
-  $('calendarHeading').textContent = `✦ Daily ${activeStreak(profile.daily, today)} · ◆ Hard Daily ${activeStreak(profile.hardDaily, today)}`;
-  $('calendarDates').textContent = [dates[0], today].map(date => date.slice(5).replace('-', '·')).join(' – ');
+  const count = (mode, summary) => t('streakCount', { mode: t(mode), n: number(activeStreak(summary, today)) });
+  $('calendarHeading').textContent = `✦ ${count('daily', profile.daily)} · ◆ ${count('hardDaily', profile.hardDaily)}`;
+  $('calendarDates').textContent = [dates[0], today].map(date => dateLabel(date, 'shortDate')).join(' – ');
   const cells = dates.map(date => {
     const cell = document.createElement('div');
     const standard = Boolean(profile.daily.days[date]);
@@ -213,8 +248,11 @@ function openCalendar() {
     cell.classList.toggle('marked', standard || advanced);
     cell.dataset.day = date;
     if (date === today) cell.setAttribute('aria-current', 'date');
-    cell.setAttribute('aria-label', `${date}: ${standard ? 'daily solved' : 'daily empty'}, ${advanced ? 'hard solved' : 'hard empty'}`);
-    cell.textContent = date.slice(8);
+    cell.setAttribute('role', 'img');
+    cell.setAttribute('aria-label', t('calendarDay', {
+      date: dateLabel(date), daily: t(standard ? 'dailySolved' : 'dailyEmpty'), hard: t(advanced ? 'hardSolved' : 'hardEmpty'),
+    }));
+    cell.textContent = number(dateValue(date).getUTCDate());
     const marks = document.createElement('span');
     marks.textContent = (standard ? '✦' : '') + (advanced ? '◆' : '');
     cell.append(marks);
@@ -322,14 +360,26 @@ $('again').onclick = () => start(daily, c.level, hard, day);
 $('next').onclick = () => start(false, Math.min(CASES.length, c.level + 1));
 $('menuSound').onclick = toggleSound;
 $('pauseSound').onclick = toggleSound;
+$('menuLanguage').onclick = switchLanguage;
+$('pauseLanguage').onclick = switchLanguage;
 $('share').onclick = openShare;
 $('closeShare').onclick = () => setScreen('done');
 $('sendShare').onclick = shareImage;
-rec.notice($('menu').querySelector('.panel'));
-rec.toggle($('paused').querySelector('.panel'));
-const recording = $('paused').querySelector('.lab-toggle input');
-const noticeLead = $('menu').querySelector('.lab-notice').firstChild;
-const recordingDisclosure = noticeLead.textContent;
+const notice = rec.notice($('menu').querySelector('.panel'));
+const noticeLead = notice?.firstChild;
+const recordingToggle = rec.toggle($('paused').querySelector('.panel'));
+const recording = recordingToggle?.querySelector('input');
+if (notice) notice.querySelector('a').dataset.i18n = 'privacy';
+if (recordingToggle) {
+  const label = document.createElement('span');
+  label.dataset.i18n = 'recordPlay';
+  recordingToggle.lastChild.replaceWith(label);
+  recording.addEventListener('change', updateRecordingNotice);
+  addEventListener('storage', updateRecordingNotice);
+}
+apply();
+localizeNotesButton();
+addEventListener('DOMContentLoaded', localizeNotesButton);
 onLeave(pause);
 noZoom();
 
@@ -348,7 +398,7 @@ layout();
 
 const help = hint(canvas, {
   kind: 'drag', key: 'kit-hint:alibi', played: Boolean(loaded), when: playing,
-  delay: 1700, reach: 64, label: '↔',
+  delay: 1700, reach: 64, label: t('dragHint'),
   bottom: () => {
     const box = canvas.getBoundingClientRect();
     return box.height - originY - replay.y * scale;
@@ -457,15 +507,14 @@ function finishReveal() {
 }
 
 function showResult(solved) {
-  $('result').textContent = solved ? 'Gotcha!' : 'Try again';
+  $('result').textContent = t(solved ? 'caught' : 'retry');
   $('next').hidden = daily || !solved || c.level >= CASES.length;
   $('share').hidden = !daily || !solved;
   $('next').classList.toggle('primary', !$('next').hidden);
   $('again').classList.toggle('primary', !solved);
   $('share').classList.toggle('primary', !$('share').hidden);
   $('endMenu').classList.toggle('primary', solved && $('next').hidden && $('share').hidden);
-  $('resultDetail').hidden = solved;
-  $('resultDetail').textContent = solved ? '' : 'Three wrong accusations. Compare a suspect’s alibi with the room at that time.';
+  $('resultArt').setAttribute('aria-label', solved ? t('result') : t('wrongResult', { n: number(run.rejected.length) }));
   drawResult();
   setScreen('done');
 }
@@ -524,11 +573,11 @@ function markNote(id, actorRoom = null) {
     : { id, room, beat: frame.beat, claim: false };
   const same = entry => entry.id === note.id && entry.beat === note.beat
     && entry.room === note.room && entry.claim === note.claim;
-  const duplicate = notes.some(same);
-  const added = !duplicate && notes.length < 3;
+  const duplicate = notes.findIndex(same);
+  const added = duplicate === -1 && notes.length < 3;
   if (added) notes.push(note);
   notebook = true;
-  noteFlash = { at: phase, full: !added && !duplicate, duplicate };
+  noteFlash = { at: phase, full: !added && duplicate === -1, duplicate };
   snd.tone(added ? 614 : 240, .11, .07, 'triangle', 66);
 }
 
@@ -669,8 +718,11 @@ function line(points, color, width = 1.5) {
 function heading(frame) {
   rect(g, 67, 13, 125, 44, 14, '#412f46', '#b4808180');
   eventIcon(g, 88, 34, 33, c.crime, false);
-  text(g, daily ? (hard ? '◆' : '◇') : ['Ⅰ', 'Ⅱ', 'Ⅲ', 'Ⅳ', 'Ⅴ'][c.spec.chapter - 1], 105, 28, 8, GOLD, 'system-ui', 'left');
-  text(g, daily ? 'Daily' : String(c.level).padStart(2, '0'), 105, 44, daily ? 12 : 15, CREAM, 'Georgia', 'left');
+  if (daily) text(g, hard ? '◆' : '✦', 119, 35, 22, GOLD);
+  else {
+    text(g, chapters[c.spec.chapter - 1], 105, 28, 8, GOLD, 'system-ui', 'left');
+    text(g, twoDigits(c.level), 105, 44, 15, CREAM, 'Georgia', 'left');
+  }
   for (let i = 0; i < 3; i++) star(g, 146 + i * 16, 37, 6.3, i < run.stars ? GOLD : '#594054', '#cf936d', 1);
   rect(g, 208, 13, 140, 44, 14, '#412f46', '#b4808180');
   clock(g, 232, 35, 13, minute(frame.beat));
@@ -704,9 +756,6 @@ function drawClaim(frame) {
   if (frame.beat !== claim.beat) {
     line([[257, 81], [261, 85], [257, 89]], '#a67469', 1.7);
   }
-  if (frame.beat === claim.beat) {
-    rect(g, 85, 63, 190, 45, 13, null, '#c18468', 1);
-  }
 }
 
 function drawReplay(frame) {
@@ -739,14 +788,15 @@ function drawReplay(frame) {
 
   rect(g, 119, 583, 122, 44, 10, stampArmed ? '#885153' : '#403047', stampArmed ? GOLD : '#987184');
   const held = pointer?.type === 'stamp';
-  if (!held) stamp(g, 146, homeStamp.y - 1, .76);
-  text(g, stampArmed ? 'Cancel' : 'Accuse', 201, 605, 15, CREAM);
+  if (stampArmed) text(g, '×', 146, 604, 23, CREAM);
+  else if (!held) stamp(g, 146, homeStamp.y - 1, .76);
+  text(g, t(stampArmed ? 'cancel' : 'accuse'), 201, 605, 15, CREAM);
   const { x, y } = notebookButton;
   rect(g, x - 25, y - 22, 50, 44, 10, notebook ? '#70505c' : '#403047', '#987184');
   bookIcon(x - 3, y, '#ffe1aa');
   if (notes.length) {
     dot(x + 14, y + 9, 6.5, '#e7a66c');
-    text(g, notes.length, x + 14, y + 9, 8, INK);
+    text(g, number(notes.length), x + 14, y + 9, 8, INK);
   }
 
 }
@@ -757,22 +807,24 @@ function bookIcon(x, y, color) {
   for (const dy of [-4, 0, 4]) line([[x - 2, y + dy], [x + 5, y + dy]], '#9d6c68', .9);
 }
 
-function drawNotebook() {
+function drawNotebook(cue) {
   if (!notebook) return;
   const fresh = noteFlash && phase - noteFlash.at < .5;
   rect(g, 73, 113, 214, 161, 13, '#261c30a0');
-  rect(g, 75, 109, 210, 161, 12, '#f9e4be', fresh && noteFlash.full ? '#dc796d' : '#a76d72', fresh ? 3 : 2);
+  rect(g, 75, 109, 210, 161, 12, '#f9e4be', cue === 'full' ? '#dc796d' : '#a76d72', fresh || cue === 'full' ? 3 : 2);
   for (let j = 0; j < 4; j++) {
     const y = 125 + j * 43;
     line([[72, y], [81, y]], '#57364a', 2.6);
     line([[73, y - .5], [80, y - .5]], '#f7c789', .8);
   }
   bookIcon(93, 123, '#f7c787');
-  text(g, 'Notebook', 149, 123, 15, INK);
+  if (cue === 'duplicate') text(g, '=', 180, 123, 17, '#604255');
+  text(g, `${number(notes.length)} / ${number(3)}`, 250, 123, 13, INK);
   for (let i = 0; i < 3; i++) {
     const y = noteRowY(i);
     const entry = notes[i];
-    rect(g, 86, y - 21.5, 189, 44, 6, entry ? '#f4cf9b' : '#efd9ae', '#ca9d85', .85);
+    const same = cue === 'duplicate' && noteFlash.duplicate === i;
+    rect(g, 86, y - 21.5, 189, 44, 6, same ? '#fff2ce' : entry ? '#f4cf9b' : '#efd9ae', same ? '#6d4b5e' : '#ca9d85', same ? 2.2 : .85);
     if (!entry) {
       dot(108, y, 4, '#c79d85');
       line([[123, y], [253, y]], '#cba58a', 1);
@@ -783,7 +835,7 @@ function drawNotebook() {
     clock(g, 178, y, 9, minute(entry.beat));
     text(g, formatTime(entry.beat), 209, y, 13, INK, 'Georgia');
     if (entry.claim) text(g, '“ ”', 131, y - 7, 10, '#87576b');
-    rect(g, 232, y - 21.5, 44, 44, 6, '#e7b68d');
+    rect(g, 232, y - 21.5, 44, 44, 6, cue === 'full' ? '#dc9384' : '#e7b68d');
     text(g, '×', 256, y - .5, 20, '#784e60');
   }
 }
@@ -796,8 +848,9 @@ function drawPortraits() {
     const target = pointer?.type === 'stamp' && pointer.target === id;
     const wrong = run.rejected.includes(id);
     const chosen = selected === id;
+    const armed = stampArmed && !wrong;
     rect(g, x - 24, y - 22, 48, 44, 10, wrong ? '#5c3d51' : chosen ? '#f7d49e' : '#ddac9c',
-      target ? CREAM : chosen ? GOLD : '#9b6375', target || chosen ? 2.5 : 1.2);
+      target || armed ? CREAM : chosen ? GOLD : '#9b6375', target || armed || chosen ? 2.5 : 1.2);
     if (wrong) g.globalAlpha = .62;
     const hurt = lastShot?.id === id && !lastShot.solved && (phase - lastShot.at < .75 || run.outcome === 'wrong');
     animal(g, x, y - (c.spec.blackout ? 3 : 0), 39, person.species, { head: true, mood: hurt ? 'hurt' : null });
@@ -813,6 +866,10 @@ function drawPortraits() {
     if (c.spec.blackout) {
       rect(g, x - 11, y + 10, 22, 9, 5, '#53405b');
       signature(g, x, y + 14.5, 19, person.sound);
+    }
+    if (armed) {
+      line([[x - 19, y - 9], [x - 19, y - 16], [x - 12, y - 16]], INK, 1.8);
+      line([[x + 19, y + 9], [x + 19, y + 16], [x + 12, y + 16]], INK, 1.8);
     }
     if (wrong) {
       dot(x + 18, y - 13, 7, '#603549', '#eaa69a');
@@ -875,60 +932,187 @@ function drawScene(frame, staticScene = false) {
   if (!staticScene) drawExchange(frame, actors);
 }
 
-function updateGuide(frame) {
-  const person = cast[selected];
-  const message = guideText(frame, person);
+function teachingCue(frame) {
+  if (stampArmed) return 'armed';
+  if (notebook) {
+    if (noteFlash && phase - noteFlash.at < 3) {
+      if (noteFlash.duplicate >= 0) return 'duplicate';
+      if (noteFlash.full) return 'full';
+    }
+    return notes.length ? 'note' : 'pin';
+  }
+  if (wrongNotice) return 'wrong';
+  if (frame.shutter) return 'shutter';
+  if (frame.blackout) return selected !== null && frame.beat !== cast[selected].claim.beat ? 'blackoutJump' : 'blackout';
+  if (selected === null) return 'inspect';
+  return frame.beat === cast[selected].claim.beat ? 'compare' : 'jump';
+}
+
+function updateGuide(cue) {
+  const key = cue === 'wrong' ? (run.stars === 1 ? 'wrongOneCue' : 'wrongManyCue') : `${cue}Cue`;
+  const vars = cue === 'jump' ? { time: formatTime(cast[selected].claim.beat) } : { n: number(run.stars) };
+  const message = t(key, vars);
   const guide = $('playGuide');
   if (guide.textContent !== message) guide.textContent = message;
-  guide.classList.toggle('with-alibi', Boolean(person) && !notebook);
+  guide.dataset.cue = cue;
 }
 
-function guideText(frame, person) {
-  if (stampArmed) return 'Tap a portrait to accuse.\nTap Cancel to put the stamp down.';
-  if (notebook) {
-    if (noteFlash?.duplicate && phase - noteFlash.at < 3) return 'Already pinned. Choose a different observation.';
-    if (noteFlash?.full && phase - noteFlash.at < 3) return 'Notebook full. Tap × to remove a note.';
-    return notes.length ? 'Tap a note to revisit its time. Tap × to erase.' : 'Hold a portrait to pin what you see.';
-  }
-  if (wrongNotice) return `The ${cast[lastShot.id].species} told the truth.\n${run.stars} ${run.stars === 1 ? 'star' : 'stars'} left. Check another alibi.`;
-  if (frame.shutter) return 'The shutter closed during the crime.\nCheck the alibis at their stated times.';
-  if (frame.blackout) return 'Lights out. Match a portrait’s sound symbol\nto the symbol in a room.';
-  if (person) {
-    if (frame.beat !== person.claim.beat) return `Tap the alibi to visit ${formatTime(person.claim.beat)}.`;
-    return `Is the ${person.species} in the outlined room?\nIf the alibi is false, tap Accuse.`;
-  }
-  return 'Who lied about their room?\nTap a portrait to read an alibi.';
+function ghostTap(x, y, pulse) {
+  dot(x, y, 9 + pulse * 7, '#fff1ce18', '#fff1ce', 1.6);
+  hand(g, x + 5, y + pulse * 7);
 }
 
-function drawTutorial() {
+function corners(x, y, w, h, color = CREAM) {
+  for (const dx of [-1, 1]) for (const dy of [-1, 1]) {
+    line([[x + dx * (w - 5), y + dy * h], [x + dx * w, y + dy * h], [x + dx * w, y + dy * (h - 5)]], color, 2.1);
+  }
+}
+
+function markTick(beat) {
+  const x = tickX(beat);
+  line([[x - 5, 537], [x, 542], [x + 5, 537]], CREAM, 2.1);
+}
+
+function drawNotebookHint(cue, pulse) {
+  if (cue === 'pin') {
+    const { x, y } = portraitPoints()[0];
+    const travel = calm.matches ? 1 : Math.min(1, Math.max(0, (phase % 2.5 - 1.05) / .65));
+    const progress = calm.matches ? .85 : Math.min(1, phase % 2.5 / .9);
+    g.beginPath();
+    g.arc(x, y, 23, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress);
+    g.strokeStyle = CREAM;
+    g.lineWidth = 2;
+    g.stroke();
+    hand(g, x + 6, y + 11);
+    if (travel > 0) {
+      g.save();
+      g.globalAlpha = .8;
+      const toX = x + (108 - x) * travel;
+      const toY = y + (noteRowY(0) - y) * travel;
+      dot(toX, toY, 14, '#ffe6b9', '#87576b');
+      animal(g, toX, toY, 24, cast[0].species, { head: true });
+      g.restore();
+    }
+    return;
+  }
+  if (cue === 'duplicate') return;
+  if (cue === 'note') {
+    markTick(notes[0].beat);
+    corners(178, noteRowY(0), 12, 12, '#7b4d56');
+    if (pulse > .6 || calm.matches) hand(g, 182, noteRowY(0) + 5);
+  }
+  if (cue === 'full' || pulse > .6 || calm.matches) corners(254, noteRowY(0), 15, 15, '#7b4d56');
+}
+
+function drawEvidencePair(context, x, y, id) {
+  const { claim } = cast[id];
+  animal(context, x - 63, y, 23, cast[id].species, { head: true });
+  rect(context, x - 47, y - 13, 25, 26, 5, '#fff0d2', '#ac7680');
+  place(context, x - 34, y, 22, claim.room, c.spec.site);
+  text(context, '=', x - 13, y, 15, CREAM);
+  rect(context, x - 4, y - 13, 25, 26, 5, '#654b60', '#f9d8aa');
+  place(context, x + 9, y, 22, c.frames[claim.beat][id].room, c.spec.site);
+  clock(context, x + 34, y, 9, minute(claim.beat));
+  text(context, formatTime(claim.beat), x + 65, y, 13, CREAM, 'Georgia');
+}
+
+function drawWrongCue() {
+  rect(g, 68, 116, 224, 42, 12, '#3d2d46', '#e9b18e', 1.4);
+  drawEvidencePair(g, 151, 137, lastShot.id);
+  line([[237, 124], [237, 150]], '#ae7b83', 1);
+  text(g, number(run.stars), 252, 137, 15, CREAM);
+  star(g, 271, 137, 8, GOLD, '#80566d');
+  if (!calm.matches) {
+    const fall = (phase - lastShot.at) / .65;
+    if (fall < 1) {
+      g.save();
+      g.globalAlpha = 1 - fall;
+      star(g, 146 + run.stars * 16, 37 + 42 * fall, 8, GOLD, '#80566d');
+      g.restore();
+    }
+  }
+}
+
+function drawTeaching(frame, cue) {
+  if (!cue || pointer) return;
+  const pulse = calm.matches ? .55 : .5 - .5 * Math.cos(phase * 5);
+  if (notebook) { drawNotebookHint(cue, pulse); return; }
+  if (cue === 'wrong') {
+    drawWrongCue();
+    if (phase - lastShot.at > .65 || calm.matches) {
+      const others = cast.filter(person => !run.rejected.includes(person.id));
+      const next = others.find(person => !seen.has(person.id)) ?? others[0];
+      const p = portraitPoints()[next.id];
+      ghostTap(p.x, p.y, pulse);
+    }
+    return;
+  }
+  if (cue === 'armed') {
+    stamp(g, 180, 411, .67, true);
+    return;
+  }
+  if (cue === 'inspect') {
+    rect(g, 89, 63, 182, 35, 12, '#3b2c43', '#c39480');
+    text(g, t('objective'), 180, 81, 17, CREAM, 'Georgia');
+  }
+  if (selected === null) {
+    if (help.shown || drawTimelineLesson()) return;
+    const id = c.spec.tutorial === 'cast' && !seen.size ? cast.length - 1 : cast.findIndex(person => !seen.has(person.id) && !run.rejected.includes(person.id));
+    const p = portraitPoints()[id < 0 ? 0 : id];
+    ghostTap(p.x + (cue === 'blackout' ? 4 : 0), p.y + (cue === 'blackout' ? 12 : 0), pulse);
+    return;
+  }
+  const person = cast[selected];
+  if (cue === 'jump' || cue === 'shutter') {
+    ghostTap(259, 87, pulse);
+    markTick(person.claim.beat);
+    if (cue === 'jump' && !help.shown) drawTimelineLesson();
+    return;
+  }
+  if (frame.blackout) {
+    const p = portraitPoints()[selected];
+    corners(p.x, p.y + 14, 15, 8);
+    corners(110, 102, 14, 7, '#8e5562');
+    const match = frame.sounds.find(item => item.sound === person.sound);
+    if (match) {
+      const { x, y } = roomPoint(rooms[match.room], match.slot);
+      corners(x, y, 16 + pulse * 2, 13 + pulse * 2);
+    }
+    if (cue === 'blackoutJump') {
+      ghostTap(259, 87, pulse);
+      markTick(person.claim.beat);
+      return;
+    }
+  } else {
+    corners(150, 85, 18, 18, '#8e5562');
+    const room = rooms[person.claim.room];
+    corners(room.x + 17, room.y + 17, 13 + pulse * 2, 13 + pulse * 2);
+    if (!help.shown) drawTimelineLesson();
+  }
+  // A general rule beside the comparison. It does not mark any suspect as guilty.
+  rect(g, 119, 117, 122, 33, 10, '#3d2d46', '#bf8b84');
+  dot(136, 133, 5, '#f1c288');
+  text(g, '≠', 154, 133, 15, CREAM);
+  rect(g, 168, 128, 10, 10, 1, '#f1c288');
+  text(g, '→', 191, 133, 18, CREAM);
+  stamp(g, 219, 132, .54);
+}
+
+function drawTimelineLesson() {
   const lesson = c.spec.tutorial;
-  if (daily || !lesson || help.shown || pointer || stampArmed || run.rejected.length) return;
+  if (daily || run.rejected.length) return false;
   const age = Math.max(0, phase - hintReady);
-  if (age < .45) return;
+  if (age < .45) return false;
   const wave = calm.matches ? .62 : .5 - .5 * Math.cos(age * 3.6);
   const tickHand = (from, to) => hand(g, tickX(from + (to - from) * wave), replay.y + 4, -.19);
-  if (lesson === 'compare' && !seen.size) {
-    const p = portraitPoints()[0];
-    dot(p.x, p.y, 22 + wave * 2, '#fff1ce10', CREAM, 1.4);
-    hand(g, p.x, p.y + 7);
-  } else if ((lesson === 'compare' || lesson === 'basics') && selected !== null && beatNow() !== cast[selected].claim.beat) {
-    hand(g, 232, 86 + wave * 7);
-  } else if ((lesson === 'basics' || lesson === 'cast' || lesson === 'times') && !seen.size) {
-    const p = portraitPoints()[lesson === 'cast' ? cast.length - 1 : 0];
-    dot(p.x, p.y, 22 + wave * 3, '#fff1ce10', CREAM, 1.4);
-    hand(g, p.x, p.y + 4 + wave * 5);
-  } else if (lesson === 'times' && selected !== null && !scrolled.has(cast[selected].claim.beat)) {
-    const tick = cast[selected].claim.beat;
-    tickHand(tick, tick);
-  } else if (lesson === 'masks' && !scrolled.has(c.exchangeBeat)) {
+  if (lesson === 'masks' && !scrolled.has(c.exchangeBeat)) {
     if (scrolled.has(2) && scrolled.has(3)) tickHand(c.exchangeBeat - 1, c.exchangeBeat);
     else tickHand(2, 3);
-  }
-  else if (lesson === 'blackout' && !scrolled.has(c.blackoutBeat)) tickHand(c.blackoutBeat, c.blackoutBeat);
-  else if (lesson === 'blackout' && !seen.size) {
-    const p = portraitPoints()[0];
-    hand(g, p.x, p.y + 13 + wave * 5);
+  } else if (lesson === 'blackout' && !scrolled.has(c.blackoutBeat)) {
+    tickHand(c.blackoutBeat, c.blackoutBeat);
   } else if (lesson === 'carrier' && !scrolled.has(c.carryBeat)) tickHand(c.carryBeat, c.carryBeat);
+  else return false;
+  return true;
 }
 
 function drawShutter() {
@@ -942,8 +1126,11 @@ function drawShutter() {
   const room = rooms[c.crimeRoom];
   const x = room.x + room.w / 2;
   const y = room.y + 55;
-  dot(x, y, 27, '#251c32', '#dba97e', 1.7);
+  rect(g, x - 29, y - 24, 58, 48, 8, '#251c32', '#dba97e', 1.7);
+  rect(g, x - 16, y - 29, 18, 6, 2, '#dba97e');
   pathShutter(x, y);
+  line([[x - 22, y + 16], [x + 22, y - 16]], '#251c32', 7);
+  line([[x - 22, y + 16], [x + 22, y - 16]], '#f7c77e', 3);
 }
 
 function pathShutter(x, y) {
@@ -1044,27 +1231,18 @@ function draw() {
   g.lineJoin = 'round';
   g.lineCap = 'round';
   const frame = board[beatNow()];
+  const cue = playing() ? teachingCue(frame) : null;
   sky(g, c.spec.site, calm.matches ? 0 : phase);
   if (screen === 'reveal') { drawReveal(); return; }
   if (screen === 'menu' || screen === 'cases' || screen === 'calendar') { drawMenu(); return; }
   drawScene(frame);
   heading(frame);
-  if (playing()) updateGuide(frame);
+  if (cue) updateGuide(cue);
   drawClaim(frame);
   drawPortraits();
   drawReplay(frame);
-  drawNotebook();
-  if (!notebook) drawTutorial();
-  else if (!notes.length && !pointer) {
-    const { x, y } = portraitPoints()[0];
-    const progress = calm.matches ? .8 : phase % 1.2 / 1.2;
-    g.beginPath();
-    g.arc(x, y, 23, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress);
-    g.strokeStyle = CREAM;
-    g.lineWidth = 2;
-    g.stroke();
-    hand(g, x + 6, y + 11);
-  }
+  drawNotebook(cue);
+  drawTeaching(frame, cue);
   drawShot();
   if (pointer?.type === 'stamp') {
     g.save();
@@ -1090,12 +1268,29 @@ function drawResult() {
     place(context, 157, 47, 27, c.frames[person.claim.beat][person.id].room, c.spec.site);
     clock(context, 201, 47, 13, minute(person.claim.beat));
   } else {
-    eventIcon(context, 120, 45, 47, c.crime);
+    for (const [i, id] of run.rejected.entries()) {
+      const x = 82 + i * 38;
+      rect(context, x - 15, 16, 30, 29, 7, '#734d61', '#bd8790');
+      animal(context, x - 1, 30, 25, cast[id].species, { head: true });
+      rect(context, x + 5, 31, 13, 13, 7, '#603549', '#eaa69a');
+      text(context, '×', x + 11.5, 37, 12, CREAM);
+    }
+    drawEvidencePair(context, 120, 62, run.rejected.at(-1));
   }
-  for (let i = 0; i < 3; i++) star(context, (run.outcome === 'solved' ? 132 : 96) + i * 24, 76, 8, i < run.stars ? GOLD : '#6e4b64', '#dc9d81');
+  const solved = run.outcome === 'solved';
+  for (let i = 0; i < 3; i++) star(context, (solved ? 132 : 96) + i * 24, solved ? 76 : 87, 8, i < run.stars ? GOLD : '#6e4b64', '#dc9d81');
 }
 
 let shareFile = null;
+const shareFilename = () => `${t('title').toLocaleLowerCase(lang())}.png`;
+
+function showShareStatus(key, icon) {
+  const status = $('shareStatus');
+  status.querySelector('span').textContent = key ? t(key) : '';
+  status.querySelector('path').setAttribute('d', icon || '');
+  status.querySelector('svg').toggleAttribute('hidden', !icon);
+}
+
 function openShare() {
   const card = $('shareArt');
   const context = card.getContext('2d');
@@ -1103,20 +1298,26 @@ function openShare() {
   rect(context, 0, 0, 240, 168, 0, '#36263e');
   rect(context, 6, 6, 228, 156, 14, '#51364d', '#e2ab83', 2);
   rect(context, 13, 13, 214, 142, 10, null, '#ae7985');
-  text(context, hard ? 'Alibi · Hard Daily' : 'Alibi · Daily', 120, 31, 20, CREAM, 'Georgia');
+  const title = `${t('title')} · ${t(hard ? 'hardDaily' : 'daily')}`;
+  text(context, title, 120, 31, 20, CREAM, 'Georgia');
   star(context, 51, 68, 6, GOLD);
   star(context, 189, 62, 4, GOLD);
   rect(context, 94, 47, 52, 44, 10, '#ead2b5', '#a6737a', 1.7);
   eventIcon(context, 120, 69, 42, c.crime, false);
   for (const i of [0, 1, 2]) star(context, 93 + i * 27, 108, 10, i < run.stars ? GOLD : '#6c4a63', '#e7ac89');
-  text(context, `${day}   ·   ${timeLabel(solvedSeconds)}`, 120, 136, 16, CREAM, 'Georgia');
-  card.setAttribute('aria-label', `Alibi ${hard ? 'hard ' : ''}daily ${day}. ${run.stars} stars. Time ${timeLabel(solvedSeconds)}.`);
+  const date = dateLabel(day);
+  const time = clockLabel(solvedSeconds);
+  text(context, date, 120, 132, 14, CREAM, 'Georgia');
+  text(context, time, 120, 146, 12, CREAM, 'Georgia');
+  card.setAttribute('aria-label', t('shareCardLabel', {
+    title, date, time, stars: t(run.stars === 1 ? 'oneStar' : 'manyStars', { n: number(run.stars) }),
+  }));
   shareFile = null;
-  $('shareStatus').textContent = '';
+  showShareStatus();
   $('sendShare').disabled = true;
   card.toBlob(blob => {
-    if (blob) shareFile = new File([blob], 'alibi.png', { type: 'image/png' });
-    $('sendShare').textContent = canShareImage() ? 'Share image' : 'Save image';
+    if (blob) shareFile = new File([blob], shareFilename(), { type: 'image/png' });
+    $('sendShare').textContent = t(canShareImage() ? 'shareImage' : 'saveImage');
     $('sendShare').disabled = false;
   });
   setScreen('sharing');
@@ -1130,20 +1331,20 @@ async function shareImage() {
   try {
     if (canShareImage()) {
       await navigator.share({ files: [shareFile] });
-      $('shareStatus').textContent = 'Image shared.';
+      showShareStatus('imageShared', 'm4 12 5 5 11-11');
       return;
     }
   } catch (error) {
     if (error.name === 'AbortError') {
-      $('shareStatus').textContent = 'Sharing canceled.';
+      showShareStatus('shareCanceled', 'm7 7 10 10m0-10L7 17');
       return;
     }
   }
   const link = document.createElement('a');
   link.href = $('shareArt').toDataURL('image/png');
-  link.download = 'alibi.png';
+  link.download = shareFilename();
   link.click();
-  $('shareStatus').textContent = 'Download started.';
+  showShareStatus('downloadStarted', 'M12 4v10m-4-4 4 4 4-4M5 15v5h14v-5');
 }
 
 function cssPoint(p) {

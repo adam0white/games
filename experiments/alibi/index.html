@@ -4,14 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#272036">
-<title>Alibi</title>
+<title data-i18n="title"></title>
 <style>
   :root { color-scheme: dark; background: #272036; color: #fff1ce; font: 600 15px/1.25 system-ui, sans-serif; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; touch-action: none; overscroll-behavior: none; user-select: none; -webkit-user-select: none; }
   #stage { position: fixed; inset: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
-  #playGuide { position: absolute; top: 62px; inset-inline: 14px; margin: 0 auto; width: fit-content; max-width: 332px; padding: 5px 12px; border-radius: 11px; background: #332538f2; color: #ffedce; font-size: 14px; text-align: center; white-space: pre-line; line-height: 1.25; }
-  #playGuide.with-alibi { top: 116px; }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   #c { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
   #layout { position: absolute; width: 360px; height: 640px; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(var(--scale, 1)); pointer-events: none; }
   [hidden] { display: none !important; }
@@ -33,6 +32,10 @@
   button:focus-visible { outline: 3px solid #ffe6a9; outline-offset: 3px; }
   .row button { flex: 1; }
   button.primary { background: #f6c17b; border-color: #ffdda1; color: #39253a; }
+  .language { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: max(62px, calc(44px / var(--scale, 1))); min-height: max(44px, calc(44px / var(--scale, 1))); padding-inline: 8px; }
+  #menuLanguage { position: absolute; inset: 13px 12px auto auto; }
+  #paused h2 { font-size: 35px; line-height: 1.05; }
+  #paused .language { flex: 0 0 68px; }
   #play { font-size: 19px; min-height: 51px; width: 100%; margin-bottom: 8px; }
   #progress { font-size: .82em; padding-left: 7px; }
   #pause { position: absolute; top: 13px; left: 12px; width: 44px; padding: 0; pointer-events: auto; border-radius: 15px; color: #ffe5b3; }
@@ -40,7 +43,7 @@
   #paused .row { margin-top: 12px; }
   .lab-toggle { margin: 10px 0 0; color: #ecd8c7; font-size: 12px; }
   .lab-toggle input { accent-color: #f7be69; }
-  #resultArt { width: 240px; height: 107px; display: block; margin: 3px auto 10px; }
+  #resultArt { width: 266px; height: auto; display: block; margin: 0 auto 10px; }
   #share { width: 100%; margin: 9px 0 0; }
   #shareArt { width: 240px; height: 168px; display: block; margin: 0 auto 10px; }
   #caseGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 10px 0 15px; }
@@ -53,11 +56,11 @@
   #calendarGrid .marked { background: #654b51; }
   #calendar h2 { font-size: 30px; }
   #calendarDates { display: block; margin: 4px 0; font: 700 13px Georgia, serif; color: #eed6bc; }
-  #calendarHeading { margin-top: 4px; font: 700 19px Georgia, serif; color: #f9d6a1; }
+  #calendarHeading { margin-top: 4px; font: 700 17px Georgia, serif; color: #f9d6a1; }
   #hardDaily { line-height: 1.15; }
   #hardDaily small { display: block; margin-top: 2px; font-size: 12px; }
-  #resultDetail, #shareStatus { margin: 0 auto 12px; font-size: 14px; color: #f5d9b5; }
-  #shareStatus:empty { display: none; }
+  #shareStatus { margin: 0; color: #f5d9b5; }
+  #shareStatus svg { display: block; margin: 0 auto 12px; }
   #menuSound { padding-inline: 3px; }
   #menu .lab-notice a { display: block; min-height: 44px; width: max-content; min-width: 44px; margin: auto; align-content: center; }
   #menu .panel { padding-bottom: 0; }
@@ -70,64 +73,67 @@
 </head>
 <body>
 <main id="stage">
-  <canvas id="c" aria-label="Evening replay, suspects and time controls" aria-keyshortcuts="ArrowLeft ArrowRight"></canvas>
+  <canvas id="c" data-i18n-aria="replay" aria-keyshortcuts="ArrowLeft ArrowRight"></canvas>
   <div id="layout">
-    <p id="playGuide" role="status" hidden></p>
-    <button id="pause" aria-label="Pause" hidden><svg width="19" height="20" viewBox="0 0 19 20" aria-hidden="true"><path d="M6 4v12m7-12v12" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/></svg></button>
+    <p id="playGuide" class="sr-only" role="status"></p>
+    <button id="pause" data-i18n-aria="pause" hidden><svg width="19" height="20" viewBox="0 0 19 20" aria-hidden="true"><path d="M6 4v12m7-12v12" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/></svg></button>
     <section id="menu" class="screen">
-      <h1>Alibi</h1>
+      <h1 data-i18n="title"></h1>
+      <button id="menuLanguage" class="language" data-i18n-aria="switchLanguage"><svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="10" cy="10" r="8"/><ellipse cx="10" cy="10" rx="3.5" ry="8"/><path d="M2 10h16"/></svg><span data-i18n="languageCode"></span></button>
       <div class="panel">
-        <button id="play" class="primary">Play <span id="progress"></span></button>
+        <button id="play" class="primary"><span data-i18n="play"></span> <span id="progress"></span></button>
         <div class="row">
-          <button id="daily">Daily <span id="streak"></span></button>
-          <button id="pickCase">Cases</button>
+          <button id="daily"><span data-i18n="daily"></span> <span id="streak"></span></button>
+          <button id="pickCase" data-i18n="cases"></button>
           <button id="menuSound"></button>
         </div>
         <div class="row">
-          <button id="hardDaily" aria-label="Hard daily">Hard Daily</button>
-          <button id="openCalendar" aria-label="Streak calendar">Calendar</button>
+          <button id="hardDaily"></button>
+          <button id="openCalendar" data-i18n="calendar" data-i18n-aria="streakCalendar"></button>
         </div>
       </div>
     </section>
-    <button id="skipReveal" aria-label="Continue to result" hidden>»</button>
+    <button id="skipReveal" data-i18n-aria="skipReveal" hidden><span aria-hidden="true">»</span></button>
     <section id="cases" class="screen">
       <div class="panel">
-        <h2>Cases</h2>
-        <div id="chapterTabs" aria-label="Chapters"></div>
+        <h2 data-i18n="cases"></h2>
+        <div id="chapterTabs" role="group" data-i18n-aria="chapters"></div>
         <div id="caseGrid"></div>
-        <button id="caseMenu">Menu</button>
+        <button id="caseMenu" data-i18n="menu"></button>
       </div>
     </section>
     <section id="paused" class="screen">
       <div class="panel">
-        <h2>Paused</h2>
-        <div class="row"><button id="resume" class="primary">Resume</button><button id="toMenu">Menu</button></div>
-        <div class="row"><button id="pauseSound"></button></div>
+        <h2 data-i18n="paused"></h2>
+        <div class="row"><button id="resume" class="primary" data-i18n="resume"></button><button id="toMenu" data-i18n="menu"></button></div>
+        <div class="row">
+          <button id="pauseSound"></button>
+          <button id="pauseLanguage" class="language" data-i18n-aria="switchLanguage"><svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="10" cy="10" r="8"/><ellipse cx="10" cy="10" rx="3.5" ry="8"/><path d="M2 10h16"/></svg><span data-i18n="languageCode"></span></button>
+        </div>
       </div>
     </section>
-    <section id="done" class="screen">
+    <section id="done" class="screen" aria-labelledby="result">
       <div class="panel">
-        <h2 id="result"></h2>
-        <p id="resultDetail" hidden></p>
-        <canvas id="resultArt" width="480" height="214" aria-label="Case result"></canvas>
-        <div class="row"><button id="again" class="primary">Again</button><button id="next">Next</button><button id="endMenu">Menu</button></div>
-        <button id="share" hidden>Share</button>
+        <h2 id="result" class="sr-only"></h2>
+        <canvas id="resultArt" role="img" width="480" height="214" data-i18n-aria="result"></canvas>
+        <div class="row"><button id="again" class="primary" data-i18n="again"></button><button id="next" data-i18n="next"></button><button id="endMenu" data-i18n="menu"></button></div>
+        <button id="share" data-i18n="share" hidden></button>
       </div>
     </section>
     <section id="calendar" class="screen">
       <div class="panel">
-        <h2>Daily streaks</h2>
+        <h2 data-i18n="dailyStreaks"></h2>
         <div id="calendarHeading"></div>
         <span id="calendarDates"></span>
         <div id="calendarGrid"></div>
-        <div class="row"><button id="calendarMenu">Menu</button></div>
+        <div class="row"><button id="calendarMenu" data-i18n="menu"></button></div>
       </div>
     </section>
     <section id="sharing" class="screen">
       <div class="panel">
-        <canvas id="shareArt" width="720" height="504" aria-label="Daily share card"></canvas>
-        <p id="shareStatus" role="status"></p>
-        <div class="row"><button id="sendShare" class="primary">Save image</button><button id="closeShare">Back</button></div>
+        <canvas id="shareArt" role="img" width="720" height="504" data-i18n-aria="shareCard"></canvas>
+        <div id="shareStatus" role="status"><span class="sr-only"></span><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" hidden><path/></svg></div>
+        <div class="row"><button id="sendShare" class="primary" data-i18n="saveImage"></button><button id="closeShare" data-i18n="back"></button></div>
       </div>
     </section>
   </div>

@@ -11,6 +11,7 @@ import { createCase, dailyCase, observe } from './sim.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const shots = process.env.SHOTS || join(tmpdir(), 'alibi-shots');
+const wordsShots = process.env.WORDS_SHOTS;
 const require = createRequire(join(
   process.env.PLAYWRIGHT || join(homedir(), 'code/human-framework/node_modules'),
   'alibi-check.js',
@@ -26,6 +27,7 @@ const profiles = [
 
 const profilesToRun = process.argv.find(arg => arg.startsWith('--profile='))?.split('=')[1];
 const shotsOnly = process.argv.includes('--shots-only');
+const wordsOnly = process.argv.includes('--words-only');
 const seed = 391;
 const campaign = createCase({ seed, level: 1 });
 const labEndpoint = 'https://human.adamwhite.work/lab/api/linked';
@@ -44,7 +46,7 @@ const server = createServer(async (request, response) => {
   try {
     const { pathname } = new URL(request.url, 'http://localhost');
     if (pathname === '/notes/button.js') {
-      reply(response, 200, mime['.js']);
+      reply(response, 200, mime['.js'], await readFile(new URL('../../workers/feedback/public/notes/button.js', import.meta.url)));
       return;
     }
     if (pathname === '/favicon.ico') {
@@ -233,7 +235,7 @@ async function checkMenus(page, url) {
   const wrong = campaign.cast.filter(person => person.id !== campaign.culprit);
   for (const person of wrong.slice(0, 3)) await accuse(page, person.id);
   await see(page, 'done');
-  expect(/three.*wrong|three.*innocent/i.test(await visibleText('#done')), 'loss explains why the case ended');
+  expect(/3 wrong accusations/i.test(await page.locator('#resultArt').getAttribute('aria-label')), 'loss describes the rejected portraits');
   await press(page, '#again');
   await accuse(page, campaign.culprit);
   await press(page, '#skipReveal');
@@ -257,34 +259,35 @@ async function checkMenus(page, url) {
   const downloading = page.waitForEvent('download');
   await press(page, '#sendShare');
   expect((await downloading).suggestedFilename().endsWith('.png'), 'fallback initiates PNG download');
-  expect(/download started/i.test(await visibleText('#sharing')), 'download gives visible feedback');
+  expect(await page.locator('#shareStatus svg').isVisible() &&
+    /download started/i.test(await page.locator('#shareStatus').textContent()), 'download shows an icon and announces feedback');
   assert.deepEqual(findings, [], 'cold-play menu regressions');
 }
 
 async function checkFirstPlay(page, url) {
   const failures = [];
   const expect = (ok, message) => { if (!ok) failures.push(message); };
-  const guide = async () => {
+  const cue = async () => {
     await pauseForRender(page);
-    return (await page.locator('#playGuide').allTextContents()).join(' ');
+    return page.locator('#playGuide').getAttribute('data-cue');
   };
   const touchAt = ({ x, y }) => page.touchscreen.tap(x, y);
   await page.goto(url);
   await see(page, 'menu');
   await page.locator('#play').evaluate(button => button.click());
   await pauseForRender(page);
-  expect(/lied.*portrait/is.test(await guide()), 'opening gives the objective and first action');
+  expect(await cue() === 'inspect', 'opening prompts portrait inspection');
   const { points } = await state(page);
   await touchAt(points.notebook);
-  expect(/hold a portrait/i.test(await guide()), 'empty notebook explains how to pin evidence');
+  expect(await cue() === 'pin', 'empty notebook demonstrates how to pin evidence');
   await touchAt(points.notebook);
   await hold(page, points.suspects[0]);
   await hold(page, points.suspects[0]);
-  expect(/already pinned/i.test(await guide()), 'a duplicate pin has visible feedback');
+  expect(await cue() === 'duplicate', 'a duplicate pin gets a distinct cue');
   await hold(page, points.suspects[1]);
   await hold(page, points.suspects[2]);
   await hold(page, points.suspects[3]);
-  expect(/notebook full/i.test(await guide()), 'a full notebook explains how to make room');
+  expect(await cue() === 'full', 'a full notebook signals erasure');
   const erase = (await state(page)).points.notes[0].remove;
   await touchAt({ x: erase.x, y: erase.y + 21 });
   expect((await state(page)).notes.map(note => note.id).join() === '1,2', 'row-edge tap removes the intended note');
@@ -295,9 +298,9 @@ async function checkFirstPlay(page, url) {
   expect((await state(page)).selected === innocent, 'portrait extends through its 44px target');
   await touchAt(portrait);
   if ((await state(page)).selected === null) await touchAt(portrait);
-  expect(/tap the alibi/i.test(await guide()), 'statement explains how to visit its time');
+  expect(await cue() === 'jump', 'the claim points to its replay time');
   await scrub(page, campaign.cast[innocent].claim.beat);
-  expect(/outlined room/i.test(await guide()), 'at the claim time the player knows what to compare');
+  expect(await cue() === 'compare', 'at the claim time the room comparison is cued');
   // The bright ink is the raised accusation stamp. It must stay off the
   // suspect strip when the player is only comparing an honest alibi.
   await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -313,25 +316,25 @@ async function checkFirstPlay(page, url) {
   }, points.suspects[0]), 'the tutorial never points an accusation stamp at a truthful portrait');
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await touchAt(points.stamp);
-  expect(/tap a portrait to accuse/i.test(await guide()), 'tapping the stamp visibly arms it');
+  expect(await cue() === 'armed', 'tapping the stamp targets the portraits');
   expect((await state(page)).stars === 3, 'arming alone has no penalty');
   await touchAt(points.stamp);
   await touchAt(portrait);
   expect((await state(page)).stars === 3, 'second stamp tap cancels without charging a star');
   await touchAt(points.stamp);
   await touchAt(portrait);
-  expect((await state(page)).stars === 2 && /told the truth/i.test(await guide()),
+  expect((await state(page)).stars === 2 && await cue() === 'wrong',
     'a chosen wrong accusation explains the lost star');
   await page.goto(url.replace('level=1', 'level=3'));
   await see(page, 'menu');
   await page.locator('#play').evaluate(button => button.click());
   await scrub(page, 1);
-  expect(/shutter/i.test(await guide()), 'the missing frame explains the closed shutter');
+  expect(await cue() === 'shutter', 'the missing frame cues the claim instead');
   await page.goto(url.replace('level=1', 'level=22'));
   await see(page, 'menu');
   await page.locator('#play').evaluate(button => button.click());
   await scrub(page, createCase({ level: 22, seed }).blackoutBeat);
-  expect(/lights out.*symbol/is.test(await guide()), 'blackout explains its visual sound evidence');
+  expect(await cue() === 'blackout', 'blackout cues its visual sound evidence');
   await page.evaluate(() => {
     window.testTones = 0;
     const create = AudioContext.prototype.createOscillator;
@@ -351,13 +354,21 @@ async function checkFirstPlay(page, url) {
   const buttons = (await state(page)).points;
   for (const id of [0, 1, 3]) {
     await touchAt(buttons.stamp);
-    // A deliberate final tap must exercise the browser’s compatibility click.
-    if (id === 3) await delay(1200);
+    // The result buttons can move with localized content. Observe a stray
+    // compatibility click even when the final portrait no longer covers one.
+    if (id === 3) {
+      await delay(1200);
+      await page.evaluate(() => {
+        window.lossTapClicked = false;
+        document.addEventListener('click', () => { window.lossTapClicked = true; }, { capture: true, once: true });
+      });
+    }
     await touchAt(buttons.suspects[id]);
   }
   await delay(300);
-  expect((await state(page)).screen === 'done' && await page.locator('#result').isVisible(),
-    'releasing the third accusation over the new Menu button leaves the loss visible');
+  expect((await state(page)).screen === 'done' && await page.locator('#resultArt').isVisible(),
+    'releasing the third accusation leaves the loss visible');
+  expect(!await page.evaluate(() => window.lossTapClicked), 'the final tap dispatches no compatibility click');
   assert.deepEqual(failures, [], 'cold-play regressions');
 }
 
@@ -544,7 +555,7 @@ async function runDaily(page, profile) {
 
   await press(page, '#share');
   assert.ok(await page.locator('#closeShare').isVisible(), 'share card opens');
-  assert.match(await page.locator('#shareArt').getAttribute('aria-label'), /^Alibi daily 2026-11-24. 3 stars. Time 0:\d\d\.$/);
+  assert.match(await page.locator('#shareArt').getAttribute('aria-label'), /^Alibi · Daily\. November 24, 2026\. 3 stars\. Time 0:\d\d\.$/);
   const png = await page.locator('#shareArt').evaluate(canvas => canvas.toDataURL());
   assert.ok(png.startsWith('data:image/png;base64,') && png.length > 1000, 'share preview exports PNG pixels');
   await shot(page, profile, 'daily-share');
@@ -611,7 +622,7 @@ async function runHardDaily(page, profile, url) {
   await see(page, 'reveal');
   await press(page, '#skipReveal');
   await press(page, '#share');
-  assert.match(await page.locator('#shareArt').getAttribute('aria-label'), /hard daily/);
+  assert.match(await page.locator('#shareArt').getAttribute('aria-label'), /Hard Daily/);
   await shot(page, profile, 'hard-share');
   await press(page, '#closeShare');
   await press(page, '#endMenu');
@@ -642,10 +653,210 @@ async function runAdvanced(page, profile, url) {
   }
 }
 
+async function checkLanguages(page, profile, url) {
+  const day = '2026-11-24';
+  const date = new Date(`${day}T12:00:00Z`);
+  await page.addInitScript(() => {
+    localStorage.setItem('notes.k', 'check');
+    window.drawnWords = {};
+    const fillText = CanvasRenderingContext2D.prototype.fillText;
+    CanvasRenderingContext2D.prototype.fillText = function (value, ...args) {
+      const words = window.drawnWords[this.canvas.id] ??= new Set();
+      words.add(String(value));
+      return fillText.call(this, value, ...args);
+    };
+  });
+  await page.goto(url.replace('lang=en', 'lang=tr') + '&hint=0');
+  await see(page, 'menu');
+  const { en, tr } = await page.evaluate(async () => (await import('/alibi/words.js')).tables);
+  assert.deepEqual(Object.keys(tr).sort(), Object.keys(en).sort(), 'both languages have every key');
+  for (const [key, value] of Object.entries(en)) {
+    const fields = text => (text.match(/\{\w+\}/g) ?? []).sort();
+    assert.ok(value.trim() && tr[key].trim(), `${key}: nonempty translations`);
+    assert.deepEqual(fields(tr[key]), fields(value), `${key}: the same interpolation fields`);
+  }
+  const regexEscape = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const foreign = Object.entries(en).flatMap(([key, value]) => {
+    if (value === tr[key] || !/[a-z]{2,}/i.test(value.replace(/\{\w+\}/g, ''))) return [];
+    const pattern = value.split(/\{\w+\}/).map(regexEscape).join('.+?');
+    return [new RegExp(`(?<![\\p{L}\\p{N}])${pattern}(?![\\p{L}\\p{N}])`, 'iu')];
+  });
+  const capture = async (language, name) => {
+    await pauseForRender(page);
+    const { overflow, phrases, canvas, current } = await page.evaluate(() => {
+      const overflow = [];
+      const screen = window.alibiState().screen;
+      const phrases = [document.title];
+      const elements = [document.querySelector('#stage'), ...document.querySelectorAll('#stage *, #notes-button')];
+      for (const el of elements) {
+        const bounds = el.getBoundingClientRect();
+        if (!el.getClientRects().length || getComputedStyle(el).visibility === 'hidden') continue;
+        if (el.getAttribute('aria-label')) phrases.push(el.getAttribute('aria-label'));
+        if (el.title) phrases.push(el.title);
+        const content = [...el.childNodes].filter(node => node.nodeType === Node.TEXT_NODE).map(node => node.textContent).join(' ').trim();
+        if (content) phrases.push(content);
+        if (el.matches('.sr-only') || !bounds.width || !bounds.height) continue;
+        if (bounds.left < -.5 || bounds.top < -.5 || bounds.right > innerWidth + .5 || bounds.bottom > innerHeight + .5 ||
+          (el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 1)) overflow.push(el.id || el.className || el.tagName);
+      }
+      const canvas = [...(window.drawnWords.c ?? [])];
+      if (screen === 'done') canvas.push(...(window.drawnWords.resultArt ?? []));
+      if (screen === 'sharing') canvas.push(...(window.drawnWords.shareArt ?? []));
+      window.drawnWords = {};
+      return { overflow, phrases, canvas, current: document.documentElement.lang };
+    });
+    assert.equal(current, language, name);
+    assert.deepEqual(overflow, [], `${language} ${name}: nothing clips or leaves the viewport`);
+    if (language === 'tr') {
+      const normalized = [...phrases, ...canvas].map(phrase => phrase.trim().replace(/\s+/g, ' '));
+      assert.deepEqual(normalized.filter(phrase => foreign.some(pattern => pattern.test(phrase))), [], `${name}: no English DOM, canvas or accessible copy`);
+    }
+    if (wordsShots && profile !== 'pixel') {
+      await page.screenshot({ path: join(wordsShots, `${profile}-${language}-${name}.png`), scale: 'css' });
+    }
+    return canvas;
+  };
+  const tapClaim = async () => {
+    const { x, y } = await page.locator('#c').evaluate(canvas => {
+      const box = canvas.getBoundingClientRect();
+      const scale = Math.min(box.width / 360, box.height / 640);
+      return { x: box.left + box.width / 2, y: box.top + (box.height - 640 * scale) / 2 + 85 * scale };
+    });
+    await page.touchscreen.tap(x, y);
+  };
+
+  assert.equal(await page.locator('#menuLanguage span').textContent(), 'TR', 'URL selects Turkish');
+  assert.equal(await page.locator('#notes-button').getAttribute('aria-label'), tr.notes);
+  await press(page, '#menuLanguage');
+  await page.reload();
+  await see(page, 'menu');
+  assert.equal(await page.locator('#menuLanguage span').textContent(), 'EN', 'menu choice survives reload after a URL override');
+  await press(page, '#play');
+  await press(page, '#pause');
+  const before = await state(page);
+  await press(page, '#pauseLanguage');
+  assert.deepEqual(await state(page), before, 'switching language leaves the investigation paused and intact');
+  await page.reload();
+  await see(page, 'paused');
+  assert.equal(await page.locator('#pauseLanguage span').textContent(), 'TR', 'pause choice survives reload');
+  await press(page, '#toMenu');
+  await press(page, '#menuLanguage');
+  await page.clock.setFixedTime(date);
+
+  for (const [language, table] of [['en', en], ['tr', tr]]) {
+    for (const id of ['menuLanguage', 'pauseLanguage']) {
+      if (id === 'pauseLanguage') { await press(page, '#play'); await press(page, '#pause'); }
+      const box = await page.locator(`#${id}`).boundingBox();
+      assert.ok(box.width >= 44 && box.height >= 44, `${id} has a 44px target`);
+      if (id === 'pauseLanguage') { await capture(language, 'pause'); await press(page, '#toMenu'); }
+    }
+    await capture(language, 'menu');
+    await press(page, '#pickCase');
+    await capture(language, 'cases');
+    await press(page, '#caseMenu');
+    await press(page, '#openCalendar');
+    await capture(language, 'calendar');
+    await press(page, '#calendarMenu');
+    await press(page, '#play');
+    const { points } = await state(page);
+    const innocent = campaign.cast.find(person => person.id !== campaign.culprit);
+    assert.ok((await capture(language, 'first-level')).includes(table.objective), 'opening objective is painted on canvas');
+    await tap(page, points.suspects[innocent.id]);
+    await capture(language, 'alibi-time');
+    await tapClaim();
+    assert.equal((await state(page)).frame, innocent.claim.beat, 'tapping the highlighted claim visits its time');
+    assert.ok((await capture(language, 'teaching')).includes('≠'), 'the comparison shows the general accusation rule');
+    await tap(page, points.notebook);
+    await capture(language, 'notebook-empty');
+    await hold(page, points.suspects[innocent.id]);
+    await capture(language, 'notebook-note');
+    await tap(page, points.notebook);
+    await tap(page, points.stamp);
+    assert.ok((await capture(language, 'armed')).includes(table.cancel), 'armed stamp paints the localized cancel action');
+    await tap(page, points.suspects[innocent.id]);
+    assert.ok((await capture(language, 'wrong')).includes('='), 'wrong accusation shows a matching alibi');
+    await accuse(page, campaign.culprit);
+    await see(page, 'reveal');
+    await capture(language, 'reveal');
+    await press(page, '#skipReveal');
+    await capture(language, 'win');
+    await press(page, '#again');
+    for (const person of campaign.cast.filter(person => person.id !== campaign.culprit).slice(0, 3)) await accuse(page, person.id);
+    assert.equal((await state(page)).outcome, 'wrong');
+    assert.ok((await capture(language, 'loss')).includes('='), 'loss models a same-time comparison');
+    await press(page, '#endMenu');
+
+    await press(page, '#daily');
+    await accuse(page, dailyCase(day).culprit);
+    await see(page, 'reveal');
+    await press(page, '#skipReveal');
+    await press(page, '#share');
+    const pngText = await capture(language, 'daily-share');
+    assert.ok(pngText.includes(`${table.title} · ${table.daily}`), 'export draws the localized title');
+    const localizedDate = new Intl.DateTimeFormat(language, { dateStyle: 'long', timeZone: 'UTC' }).format(date);
+    assert.ok(pngText.some(text => text.startsWith(localizedDate)), 'export draws the localized date');
+    await press(page, '#closeShare');
+    await press(page, '#endMenu');
+
+    const advancedUrl = new URL(page.url());
+    advancedUrl.searchParams.set('level', '3');
+    await page.goto(advancedUrl.href);
+    await press(page, '#play');
+    await scrub(page, 1);
+    await capture(language, 'shutter');
+    await press(page, '#pause');
+    await press(page, '#toMenu');
+    await page.evaluate(() => {
+      const profile = JSON.parse(localStorage.getItem('alibi-save'));
+      localStorage.setItem('alibi-save', JSON.stringify({ ...profile, level: 15 }));
+    });
+    await page.reload();
+    await press(page, '#hardDaily');
+    const hardCase = dailyCase(day, true);
+    await scrub(page, hardCase.blackoutBeat);
+    const staggered = hardCase.cast.find(person => person.claim.beat !== hardCase.blackoutBeat);
+    await tap(page, (await state(page)).points.suspects[staggered.id]);
+    assert.ok(!(await capture(language, 'blackout')).includes('≠'), 'a different-time blackout does not teach accusation');
+    await tapClaim();
+    assert.equal((await state(page)).frame, staggered.claim.beat);
+    await accuse(page, hardCase.culprit);
+    await see(page, 'reveal');
+    await press(page, '#skipReveal');
+    await press(page, '#share');
+    assert.ok((await capture(language, 'hard-share')).includes(`${table.title} · ${table.hardDaily}`));
+    await press(page, '#closeShare');
+    await press(page, '#endMenu');
+
+    if (language === 'en') {
+      await page.goto(url.replace('&lang=en', '') + '&hint=0');
+      await see(page, 'menu');
+      await press(page, '#menuLanguage');
+      await page.evaluate(() => localStorage.removeItem('alibi-save'));
+      await page.reload();
+      await see(page, 'menu');
+    }
+  }
+}
+
 async function runProfile(profile, engine, device, origin) {
   const browser = await engine.launch();
   try {
-    const url = `${origin}/alibi/?seed=${seed}&level=1&labRunSource=agent`;
+    const url = `${origin}/alibi/?seed=${seed}&level=1&labRunSource=agent&lang=en`;
+    if (!shotsOnly) {
+      const languageContext = await browser.newContext(device);
+      try {
+        const errors = [];
+        await stubLab(languageContext, origin, [], errors);
+        const page = await languageContext.newPage();
+        page.on('pageerror', error => errors.push(error.message));
+        await checkLanguages(page, profile, url);
+        assert.deepEqual(errors, [], 'localization browser errors');
+        console.log(`PASS ${profile} English and Turkish ${device.viewport.width}×${device.viewport.height}`);
+      } finally {
+        await languageContext.close();
+      }
+    }
+    if (wordsOnly) return;
     if (!shotsOnly) {
       const menuContext = await browser.newContext(device);
       try {
@@ -694,6 +905,7 @@ async function runProfile(profile, engine, device, origin) {
 }
 
 await mkdir(shots, { recursive: true });
+if (wordsShots) await mkdir(wordsShots, { recursive: true });
 await new Promise((listen, reject) => {
   server.once('error', reject);
   server.listen(0, '127.0.0.1', listen);
