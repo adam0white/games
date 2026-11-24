@@ -473,6 +473,10 @@ const GAMES = {
     assert.deepEqual(dposts[d0 + 1], { id: dposts[d0].id, remove: true }, 'stop sharing takes the row off today\'s board too'); await page.click('#board .back');
     await page.unroute('**/lab-api/board/lantern-daily');
     await page.unroute('**/lab-api/board/lantern');
+    // The Music switch (the score from the lab's Lantern Song): on at first, kept when turned off, and the same switch on the menu and the card.
+    assert.equal((await state()).music, true); assert.equal(await page.textContent('#menu button.music'), 'Music: on');
+    await page.click('#menu button.music'); assert.equal((await state()).music, false); assert.equal((await saved())['lantern-music'], '0'); assert.equal(await page.textContent('#card button.music'), 'Music: off');
+    await page.reload(); assert.equal((await state()).music, false, 'off is kept'); await page.click('#menu button.music'); assert.equal((await saved())['lantern-music'], '1'); assert.equal((await state()).music, true);
     await sleep(400); await page.reload(); st = await state(); assert.equal(st.name, 'Rio <b>river</b'); assert.equal(st.board.length, 5, 'the board is kept');
     await page.evaluate(() => localStorage.setItem('hf-lab-recording-off', '1')); await page.reload(); // recording off again, as the steps below expect
     // Views (notes #158, #159): 2D, 3D and first person, saved under lantern-view. First person steers by pressing a side; a drag does not.
