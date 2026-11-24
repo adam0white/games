@@ -648,6 +648,8 @@ Asked what the rival should do next, the tester asked for all three ideas: speed
 The bot table (slow unaided, stars, clears) is the same line for line as before the change; at 1.25 and above the slow bot loses more of level 11, so 1.15 was kept. Seconds the rival takes, against a player behind / far ahead, and the limit: level 8 99 / 67 / 85, 11 100 / 64 / 80, 14 82 / 58 / 75, 16 76 / 50 / 70, 23 96 / 65 / 85, 28 84 / 57 / 75. `bots.mjs` claims: against a player who is behind it needs longer than the limit, against one far ahead it is faster, it hurries on every race, makes every mistake, a player who stops one short loses; a run survives its link, an expert beats an average friend, a slow player loses to an expert friend at the friend's time, and broken links are refused. The phone check plays a friend race won and lost, copies the link, and opens a broken one. Screenshots of the bar, bubbles and cards looked at (WebKit iPhone 13).
 
 ### Not verified
+`check.mjs` did not finish on this Mac: it stops at "level 1 replay improves on one star" (WebKit), "level 19 to fail" (Chromium) and, with `--words`, "a walk-off loss". Main's untouched Fix-It stops at the same three places the same evening; the game's clock ran slower than real time there, which is the suspected cause, not shown. Whatever comes after those steps did not run on this change.
+
 A real phone and its share sheet; whether the rival feels fair or funny; a race against a real friend. The friend race uses a run already played, not two people at once.
 
 ### Left as a proposal (2026-11-24, note #233)
