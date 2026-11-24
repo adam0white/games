@@ -115,7 +115,7 @@
   <p><button class="back">Back</button></p>
 </div></div>
 <div id="card" class="screen"><div><h1 id="title"></h1><p id="line"></p><p id="sub"></p>
-  <div id="ask" hidden><p>Show your endless scores to everyone on the leaderboard? After a yes, every run from the next one goes up by itself.</p><p><input id="askName" maxlength="16" autocomplete="nickname" enterkeyhint="done" placeholder="Type a name"></p><p class="hint" id="askNote">Only your name and your best score are sent.</p><p><button id="askYes">Yes, show them</button><button id="askNo">No</button></p></div>
+  <div id="ask" hidden><p>Show your endless scores to everyone on the leaderboard? After a yes, every run from the next one goes up by itself.</p><p><input id="askName" maxlength="16" autocomplete="nickname" enterkeyhint="done" placeholder="Type a name"></p><p class="hint" id="askNote">Your name and your score are sent, and a signal when a run starts. Nothing else.</p><p><button id="askYes">Yes, show them</button><button id="askNo">No</button></p></div>
   <p><button id="go" class="main">Play again</button></p><p><button id="toMenu">Menu</button></p><p><button id="viewNext" hidden></button></p></div></div>
 <script type="module">
 import { create, step, centre, half, sight, fall, fog, wind, rain, dazzle, level, score, boat, progress, DT, GOAL, BOAT, NIGHTS, STATS, POWERS, LAST, FLOORS, LEVELS, SECTORS, towerStage, climbPace, FIELD, REBORN_PACE, GIFTS, ABILITIES, startAt } from './sim.js?v=14'; // raise v when sim.js changes its exports, so a cached copy cannot break the page
@@ -565,13 +565,13 @@ function finish() {
   } else if (endless && daily) {
     const pts = score(s), was = plain(store.json('lantern-daily', {})), best = Math.max(pts, was.d === today() ? Math.floor(was.s) || 0 : 0); store.set('lantern-daily', JSON.stringify({ d: today(), s: best }));
     boardSend(pts, ticket); ticket = null;
-    if (!decided && pts > 0) { $('ask').hidden = false; $('askName').value = playerName(); $('askNote').textContent = 'Only your name and your best score are sent.'; }
+    if (!decided && pts > 0) { $('ask').hidden = false; $('askName').value = playerName(); $('askNote').textContent = 'Your name and your score are sent, and a signal when a run starts. Nothing else.'; }
     $('title').textContent = `${pts}`; $('line').textContent = `${why} Today's river: your best today is ${best}. Everyone plays this same river until midnight UTC.`; $('go').textContent = 'Try today\'s river again';
   } else if (endless) {
     const pts = score(s), best = Math.max(pts, store.get('lantern-best-endless')); store.set('lantern-best-endless', best);
     const place = onBoard(pts);
     boardSend(pts, ticket); ticket = null;
-    if (!decided && pts > 0) { $('ask').hidden = false; $('askName').value = playerName(); $('askNote').textContent = 'Only your name and your best score are sent.'; }
+    if (!decided && pts > 0) { $('ask').hidden = false; $('askName').value = playerName(); $('askNote').textContent = 'Your name and your score are sent, and a signal when a run starts. Nothing else.'; }
     $('title').textContent = `${pts}`; $('line').textContent = `${why} Best ${best}.${place ? ` Number ${place} on this phone's leaderboard.` : ''}`; $('go').textContent = 'Play again';
   } else {
     const pct = Math.floor(progress(s) * 100), key = `lantern-best-${stage}`, best = Math.max(pct, store.get(key)); store.set(key, best);
@@ -597,7 +597,7 @@ function onBoard(pts) {
 // id made here. After that yes, every endless run is sent by itself (note #155). lantern-share is '1' while sharing, '' after a no and
 // absent before the player has chosen; lantern-board-id holds the id. Any bad answer (no server, an error, a slow network, not JSON) gives null, and the screen
 // stays the phone's own board, with no tabs and no tick. The server allows fewer characters in a name than this phone does.
-const BOARD_URL = '/lab-api/board/lantern', BOARD_WAIT = 4000;
+const BOARD_URL = '/lab-api/board/lantern', BOARD_WAIT = 4000, BOARD_RETRY = 6000;
 // Today's river: one river a day, the same for every player, from a seed made of the UTC date. It has its own shared board
 // (lantern-daily on the server), which starts empty each UTC day. A run on it stays off the endless boards, because a river
 // that can be learned is a different contest. lantern-daily holds this phone's best of the day: { d, s }.
@@ -628,7 +628,10 @@ async function boardSend(pts, run) {
   if (!sharing || !boardId || !playerName() || !(pts > 0)) return;
   const sent = boardId, ran = s, day = daily, k = ++sends, r = run && await run.ok ? run.r : null; // ran: the run this score is from
   if (!sharing || boardId !== sent) return;
-  const out = await boardCall({ id: boardId, n: playerName(), s: Math.min(Math.floor(pts), 1000000), ...(r ? { r } : {}) }, day ? DAY_URL : BOARD_URL);
+  const body = { id: boardId, n: playerName(), s: Math.min(Math.floor(pts), 1000000), ...(r ? { r } : {}) }, url = day ? DAY_URL : BOARD_URL;
+  let out = await boardCall(body, url);
+  // One more try after a bad answer (a slow network, or too many posts in a minute): the ticket is still good, and without this the run would never go up.
+  if (!out && sharing && boardId === sent) { await new Promise(done => setTimeout(done, BOARD_RETRY)); if (sharing && boardId === sent) out = await boardCall(body, url); }
   if (!out || !sharing || !boardId) { if (out && !sharing) boardCall({ id: sent, remove: true }, day ? DAY_URL : BOARD_URL); return; } // a no given while this was on its way takes the row away again
   if (k !== sends) return; // a later run's answer already came or is on its way
   if (day) { sharedDay = out.rows; mineDay = out.place; if (screen === 'board') boardShow(); if (mineDay && s === ran && !playing && s.over && (screen === 'play' || screen === 'card')) $('sub').textContent += ` Number ${mineDay} today among all players.`; return; }
@@ -651,7 +654,7 @@ function boardShow() {
   const playText = day ? 'Play today\'s river' : 'Play the endless river'; if ($('boardPlay').textContent !== playText) $('boardPlay').textContent = playText; // WebKit drops a tap on a button whose text is rewritten under the finger
   $('boardHint').textContent = day ? 'Today\'s river: the same river for every player until midnight UTC. Best runs today of the players who share.' : (all ? 'Endless river, best runs of the players who share.' : shared ? 'Endless river, best runs on this phone.' : 'Endless river, best runs on this phone. Your name and scores stay on this phone.') + ' No stats on the endless river: everyone plays it the same way.';
   $('share').checked = sharing;
-  $('shareNote').textContent = sharing ? (playerName() ? `Every endless run from now on goes up by itself, as ${playerName()}. Untick to take your row away.` : 'Type a name above and your runs go up by themselves.') : 'A tick sends your name and your best score to this game\'s server, after every endless run. Nothing else is sent.';
+  $('shareNote').textContent = sharing ? (playerName() ? `Every endless run from now on goes up by itself, as ${playerName()}. Untick to take your row away.` : 'Type a name above and your runs go up by themselves.') : 'A tick sends your name and your score to this game\'s server after every endless run, and a signal when a run starts. Nothing else is sent.';
   if (!list.length) { const li = document.createElement('li'); li.textContent = day ? (sharedDay ? 'Nobody has shared a run on today\'s river yet.' : '…') : all ? 'Nobody has shared a run yet.' : 'No runs yet. Play the endless river to get on the board.'; ol.append(li); return; }
   list.forEach((r, i) => {
     const li = document.createElement('li'); if (day ? i + 1 === mineDay : all ? i + 1 === mine : r === lastRun) li.className = 'me';

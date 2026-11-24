@@ -423,7 +423,7 @@ const GAMES = {
       dposts.push(b); if (b.remove) dkept.delete(b.id); else dkept.set(b.id, { n: b.n, s: Math.max(b.s, dkept.get(b.id)?.s ?? 0) });
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ place: b.remove ? 0 : dlisted().indexOf(dkept.get(b.id)) + 1, rows: dlisted() }) });
     });
-    await page.click('#tabAll'); assert.match(await page.textContent('#rows'), /Zed99999/); assert.doesNotMatch(await page.textContent('#rows'), /Rio/); assert.match(await page.textContent('#shareNote'), /A tick sends your name and your best score/);
+    await page.click('#tabAll'); assert.match(await page.textContent('#rows'), /Zed99999/); assert.doesNotMatch(await page.textContent('#rows'), /Rio/); assert.match(await page.textContent('#shareNote'), /A tick sends your name and your score .* and a signal when a run starts/);
     // The yes sends nothing by itself. A score goes up with a run ticket: the page tells the server when a sharing player's endless run starts.
     assert.equal(starts.length, 0, 'no ticket is asked for before the yes');
     await page.check('#share'); await until(page, () => /from now on goes up by itself/.test(document.querySelector('#shareNote').textContent), 'the tick is kept'); await sleep(300);
