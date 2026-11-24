@@ -1,5 +1,105 @@
 # Borrowed Time
 
+## 2026-11-24 · Second cold play
+
+A first-time player who cannot read English, played by touch before reading any source: WebKit with the iPhone 13 profile and Chromium at 360 × 640, locale tr-TR, an empty save, a screenshot after every tap. Evidence filenames are relative to `scratchpad/shots/cold2-borrowed/` in this pass's task directory (`w` WebKit, `c` Chromium). Played: three free lives and one Daily in WebKit (one won with 51 years left and 810 points, one with a reload mid-chapter and two deliberate wrong names, one lost by letting the candle run out), one life in Chromium (lost the same way), and every menu, pause, the language button, the album, the share card and the role gallery.
+
+### Findings, ranked by harm to a first-time player
+
+1. **A wrong photo tap put the gold check on the tapped photo** (`w051`, `c006`, and in practice `w006`). The check meant "this photo is true, so it is not the lie", but a cold player reads a gold check as "right!", next to a −12 that looks like a fee. Fixed.
+2. **The practice did not say what to do.** It had no words: a clue (a cat), two photos (a bird and a cat) and, after 3 s, a hand on the bird. A player who matches pictures taps the cat, the one that agrees with the clue (`w004` to `w006`). Fixed.
+3. **No price felt real.** Careful lives ended with 51 and 55 of 150 years (`w048`, `w152`). Both losses needed four to six minutes of standing still (`w105` to `w108`, `c019` to `c021`). Rewind was a 20-year lock that opened one more torn photo (`w101`, `w102`), and the bots agree it was rarely worth it (11% of careful runs). Fixed (below).
+4. **The picker's buttons let the island's "Kim?" button show through "Bu benim!"** (`c011`). Fixed.
+5. **The chapter card's preview icons were not understood**: a candle with "×1,5" and two crossed seals (`w027`), cut paper and a cat → cat check (`w017`). Known (audit item 11); left.
+6. **The seal badges in the Old chapter** (`w030`, `w031`, `w032`, `w039`) were not understood until the second signed photo; "Bir ipucu hâlâ eksik" said what was wrong but not where to look. Left; it is the chapter's lesson and the signed practice teaches it.
+7. **The torn edge** reads only when looked at closely (`w094`, `w102`). The shapes differ (audit item 10, measured); left.
+8. **Tapping Rewind away from the mirror** showed the crossed icon and "0" (`w061`): understood as "not here", which is right.
+9. **The key in a photo and the staff in a portrait** were hard to match the first time (`w008`); the "stick" is a flute, learned only from a role name. Left (art).
+10. **Islands repeat across lives**: Old in life 1 was Child in life 3 (`w076`). Seven templates, three a life: expected, and consecutive lives repeat a chapter's island 6.7% of the time (checked). Left.
+11. **The gallery circles look about 32 px** (`w115`); the hit area is the whole cell (known). The privacy text has a gap before its last line (`w055`, kit, known). The album shows a dashed "0" for a chapter named wrong (`w110`, known). Left.
+12. **A memory that adds nothing new still costs its full price** (`w132`). That is a decision the player makes; kept.
+
+No English on a Turkish screen. No console errors or page errors in either browser. Pause, resume, the language button, the reload mid-chapter ("Devam et" restored the life at the same years, `w054` to `w056`), Daily, album and share card worked.
+
+### Why the pressure went, and what restored it
+
+The tester's idea is that every ability costs years of your life. Three rounds moved the careful bots' margin from thin to wide:
+
+| Round | Careful min / mean | Slow min | Rewind used |
+| --- | --- | --- | --- |
+| Before puzzles | 37.6 / 82.0 | 14.1 | 97% |
+| Old Push also holds the mirror's kind (no puzzles) | 47.3 / 89.2 | 29.2 | 41% |
+| Memories that lie (puzzles) | 55.2 / 92.1 | 38.2 | 21% |
+| Linked photographs | 49.7 / 85.3 | about 24 | about 70% |
+| Two-kind entry memory | 64.6 / 91.5 | 40.7 | 11% |
+
+Ablations on the code before this pass (one bots run each):
+- **The Old Push extra kind** no longer matters with puzzles: each memory's kinds come from its puzzle. Removing the line changes nothing (Rewind 10%, all checks pass).
+- **The two-kind entry** is the cause of the Rewind collapse. The old mirror showed `first` and `other`, and `other` is the entry's second kind, so after the entry Rewind added only what Leap adds, for 4 more years. Going back to a one-kind entry in Grown-up and Old gives Rewind 70% and slow min 22.3, but fails two existing assertions (the entry must need a deduction; the ramp must get harder chapter by chapter). It also moves the slow mean by only 2 years (69.4 against 71.4): the earlier "pressure" was a thin tail, not a thin margin.
+
+So neither cause was reverted. Two changes instead. The mirror change on its own makes the game easier (at 150 years: slow min 50.1, careful mean 92.5, spending decisions 4.09), because one Rewind replaces Leap and Light; all the added pressure comes from the shorter candle.
+- **The Old mirror now shows the two kinds the entry does not (`first` and `next`).** One Rewind (20 years) stands in for Leap and Light (26 years) plus the walk to the leap stone, so it is a real choice: the careful bot takes it on 36% of runs and Leap on 68%. Grown-up stays as it was: the same change there added only 3 points of Rewind use and raised the worst Grown-up spend from 31 to 41.
+- **The candle is 135 years, not 150.** Chosen with a new bot, the first-timer: the slow bot (half speed, 8 s still before each choice) that also taps one true photo in the first puzzle of every chapter. In this pass a person spent about 20 years more than the slow bot; one wrong tap a chapter is 36. At 150 the first-timer's median was 38 years left; at 140, 27; at 135, 22 with 2 of 540 runs fading in the Old chapter; at 130, 17 with 7 fading. 135 is the lowest that keeps it at 99% or better. The first chapter is unchanged: a first-timer spends 29 years there on average and never fades before the Old chapter.
+
+Aims: a first-timer finishes almost always (at least 99%) with a median of 30 years or less, never fades in the first two chapters, and the careful bot uses Rewind on at least a quarter of runs, without forcing it (the bot without old-chapter Rewind still names all three, 540 of 540).
+
+Bot tables (`node bots.mjs`), before → after:
+
+| | Before | After |
+| --- | --- | --- |
+| Careful years left min / mean | 64.6 / 91.5 | 56.0 / 77.5 |
+| Careful score | 1220 | 1080 |
+| Slow years left min / mean | 40.7 / 71.4 | 35.1 / 57.7 |
+| Careful person (3 s thought) min | 63.9 | 49.3 |
+| First-timer: named all three / median / 10th percentile / min | 540 of 540 / 38.4 / 24.9 / 4.7 (measured on the old code with the new bot) | 538 of 540 / 22.2 / 11.7 / 0.0 |
+| Careful uses: Light / Push / Leap / Rewind | 93 / 100 / 93 / 11% | 91 / 100 / 68 / 36% |
+| Spending decisions a run | 4.29 (3: 9%, 4: 57%, 5: 30%, 6: 4%) | 4.09 (3: 7%, 4: 77%, 5: 16%) |
+| Years spent Child / Grown-up / Old, careful min/mean/max | 10/11/31, 14/16/31, 16/32/45 | 10/11/31, 14/16/31, 16/31/41 |
+| Without old-chapter Rewind | 540/540, min 64.6 | 540/540, min 49.6 |
+| Random tapper / first-picture / always-pay score | 844 / 834 / 912 | 733 / 717 / 786 (careful 1080) |
+| Gambler score, all three right | 716, 13% | 671, 17% |
+| Spender | faded 100% | faded 100% |
+| Hasty stuck: pay / blind tap, years left | 98.6 / 96.1 | 83.6 / 81.1 |
+
+No existing bot threshold moved. Spending decisions (4.09) are close to the asserted floor of 4: more runs now use Rewind in place of Leap and Light. Scores fall by about 140 for the same play, so a best score set before this pass is harder to beat, and today's Daily scores mix both candles. A saved life from before resumes with its old years; the candle drawing is clamped so a life above 135 stays in its frame.
+
+### What changed, and the assertion for each
+
+| Change | Assertion | Against the old code |
+| --- | --- | --- |
+| A tapped photo that is not the lie is dimmed and wears a red badge with a white cross (`wrongMark`), never the gold check. Live puzzles and the practice; torn pieces keep their small cross. | `check.mjs` `assertWrongBadge`, after the wrong tap in the live dark puzzle and the wrong practice tap: no gold circle in the tapped photo's corner, and the red one there. | Failed (badge reverted to the gold check): "practice: a tapped true photo shows no gold check". |
+| The practice shows "Find the lie" / "Match the edge" in the page language beside its free candle. | `check.mjs` `finishPractice`: the practice paints its title in English or Turkish. | Failed on the code before this pass, and with only the title reverted: "the lie practice says what to do (Find the lie)". |
+| The practice hand shows after 1.2 s, not 3 s (`HAND_AFTER`); the state hook gains `puzzle.hand`. | `check.mjs` `finishPractice`: `puzzle.hand` is true within 1.5 s of the practice settling. | Failed with the hand back at 3 s: "timed out waiting for: the practice hand shows within 1.5 s". |
+| The Old mirror shows `first` and `next`; the candle is 135 years. | `bots.mjs` section 9: a first-timer names all three on at least 99% of runs and never fades before the Old chapter; its median years left is at most 30; the careful bot uses Rewind on at least 25% of runs. | Failed: median 38.4, Rewind 11%. |
+| The picker's two buttons get an opaque base. | None: a drawing fix, confirmed in screenshots. | – |
+| The candle drawing is clamped at full, so a life saved under the 150-year candle draws inside its frame. | None: not seen on screen (no old checkpoint was loaded). | – |
+
+### Replayed by touch after the changes
+
+Fresh saves, tr-TR, the same touch controller (`rw` WebKit iPhone 13, `rc` Chromium 360 × 640).
+- The practice now reads "Yalanı bul 0" with the hand already on the bird (`rw004`, `rc003`); a tap on the cat dims it under a red badge, and the hand stays on the bird (`rw005`, `rc004`).
+- A wrong live tap dims the true photo under the red badge, −12 on the candle (`rw007`, `rc006`).
+- The candle starts at 135 (`rw002`, `rc001`). In the Old chapter the mirror's sign shows a hat and a hand, Rewind opened a torn pair of hat and held thing, and with the entry it named the face (`rw024`, `rw026`, `rw027`, `rw030`). That life had one wrong tap and one blind wrong name and ended with 46 years and 506 points (`rw032`).
+- A careful Chromium life (`kc` prefix) with no wrong tap and no blind name: about 121 years left after the Child chapter (read on screen, shot not kept), 104 after the Grown-up chapter (`kc026`), then in Old Push (13) for the entry, Rewind (20) at the mirror and a torn pair matched by its edge (`kc039`, `kc040`), ending with 56 years and 860 points (`kc043`). These are on-screen readings. Old cost about 48 of the 104. The end margin is close to the careful bot's minimum (56.0) and under its mean (77.5): a person who reads every puzzle right still ends with about two fifths of the candle, so the thin margin belongs to players who err, not to careful ones. After the entry, three faces were left that differed in two kinds, and the mirror's torn pair settled both, so Rewind bought something the entry had not.
+- The torn practice says "Parçayı eşleştir 0" (`rw026`).
+- The picker shows no "Kim?" through "Bu benim!" in either browser (`rw010`, `rc009`).
+
+### Final runs (each alone)
+
+- `node bots.mjs`: all checks passed (6.6 s).
+- `node check.mjs`: all nine passes ok. An earlier run in this pass failed once on WebKit with "short album rows use the available width for photos": the album canvas was blank in the screenshot (not even its paper). A WebKit-only rerun passed, and so did the final run. Not reproduced; recorded as a possible WebKit paint-timing flake in `drawAlbum`, unresolved.
+- `node experiments/kit/check/phone.mjs borrowed`: ok on WebKit and Chromium, hint ok on both.
+
+### Not verified
+
+- Real people: the first-timer bot stands in for a person who errs once a chapter. Whether 135 years feels tight but fair to a real first-time player is a guess from one cold player.
+- A real phone and a real thumb; colour-vision simulation of the red badge.
+- The live-puzzle badge assertion was not seen failing on its own: the mutation stopped at the practice badge, which uses the same drawing.
+- The practice-hand assertion waits 1.5 s of wall clock for a hand that appears after 1.2 s of game ticks; a heavily loaded browser could make it flake.
+- The Grown-up mirror still shows the entry's second kind, so Rewind there buys what Push buys for 7 more years. Left: changing it raised the worst Grown-up spend from 31 to 41 and added only 3 points of Rewind use.
+- Against the targets the caller cited, the slow bot's minimum (35.1) is above the earlier 24 and Rewind (36%) is below the earlier 70%. The thin margin is measured on the first-timer instead, which rests on one cold player's two lives.
+- Turkish wording of the practice title is the existing live-puzzle string, not reviewed by a native speaker.
+
 ## 2026-11-24 · Open items from the audit (flake, islands, entry memory, tears, gallery, Daily, role names)
 
 This pass works through the audit's open items 7, 8, 10, 11 (gallery part), 12 and 14 below, and one check flake. Evidence filenames are relative to `scratchpad/shots/open-borrowed/` in this pass's task directory. Each new assertion was run against a copy of the previous commit (`e5994dd3`) and failed there; the failure is quoted with each one.
