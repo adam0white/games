@@ -143,6 +143,7 @@ function lesson() {
 }
 function guidance() {
   const { gate, bridge, lane, bog, outrun } = game.terrain;
+  if (outrun && !outrun.gathered && game.dog.mode === 'outrun') return 'Dog circling · wait before dragging again.';
   if (outrun && !outrun.gathered) return 'Flick ' + (outrun.x < 180 ? 'left' : 'right') + ' to gather the bellwether.';
   if (gate && !gate.open) {
     if (gate.progress > 0) return 'Hold the flock · gate opening ' + Math.round(100 * gate.progress) + '%';
@@ -322,7 +323,6 @@ canvas.addEventListener('pointerdown', event => {
 canvas.addEventListener('pointermove', event => {
   if (event.pointerId !== owner) return;
   const next = point(event);
-  const travel = Math.hypot(next.x - gesture.start.x, next.y - gesture.start.y);
   gesture.arc += Math.hypot(next.x - gesture.previous.x, next.y - gesture.previous.y);
   gesture.previous = next;
   const drift = Math.hypot(next.x - gesture.anchor.x, next.y - gesture.anchor.y);
@@ -336,13 +336,14 @@ canvas.addEventListener('pointermove', event => {
     gesture.held = false;
   }
   if (!gesture.held) target = next;
-  if (travel >= 14) {
+  const uphill = gesture.start.y - next.y;
+  if (uphill >= 14 && uphill >= Math.abs(next.x - gesture.start.x)) {
     tutorialMoved = true;
     if (lesson() === 'drag') hints.drag.done();
   }
 });
 function whistle(kind, direction) {
-  if (lesson() === kind) hints[kind].done();
+  if (kind === 'hold' && lesson() === 'hold') hints.hold.done();
   command(game, kind, direction);
   const high = kind === 'outrun';
   audio.tone(high ? 1100 : 660, high ? .21 : .13, .025, 'sine', high ? 360 : -120);
@@ -381,9 +382,9 @@ for (const [name, [kind, label]] of Object.entries(gestures)) {
   // An inert anchor lets an unrelated gesture leave this lesson available.
   hints[name] = hint(el('hint-' + name), {
     kind, label, key: 'night-flock-2:hint-' + name,
-    when: () => screen === 'play' && game?.status === 'play' && owner === null && lesson() === name,
-    delay: name === 'drag' ? 6500 : 2200, reach: 27,
-    bottom: () => innerHeight - canvas.getBoundingClientRect().bottom + canvas.clientHeight * .2
+    when: () => screen === 'play' && game?.status === 'play' && owner === null &&
+      game.dog.mode !== 'outrun' && lesson() === name,
+    delay: name === 'drag' ? 6500 : 2200, reach: 27
   });
 }
 
@@ -396,7 +397,7 @@ function resize() {
 function paint() {
   ctx.setTransform(canvas.width / 360, 0, 0, canvas.height / 520, 0, 0);
   const guide = mode === 'campaign' && level === 1 && !tutorialMoved && !target && game.status === 'play'
-    && !hints.drag.shown && query.get('hint') !== '0';
+    && query.get('hint') !== '0';
   draw(ctx, game, { clock: reducedMotion.matches && (!game.started || guide) ? 1.7 : clock, look, pressed: target, guide });
 }
 function frame(now) {
@@ -406,8 +407,11 @@ function frame(now) {
     clock += reducedMotion.matches && !game.started ? 0 : dt;
     if (game.status === 'play') {
       const home = game.home, rescued = game.rescued, lost = game.lost;
+      const flank = game.terrain.outrun;
+      const gathering = flank && !flank.gathered;
       holdIfStill(dt);
       step(game, dt, target);
+      if (gathering && flank.gathered) hints.outrun.done();
       if (game.home > home) {
         recordCount();
         audio.tone([392, 494, 587, 659][(game.home - 1) % 4], .24, .035, 'sine');

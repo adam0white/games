@@ -23,9 +23,12 @@ const saves = {
   keeper: { v: 1, unlocked: 2, sound: true, played: true, daily: { day: localDay, score: 1400 } },
   channels: { unlocked: 3, completed: false, sound: true },
   flock: { v: 1, unlocked: 2, best: 17, sound: true, played: true },
+  flock2: { v: 1, unlocked: 2, best: 31, sound: true, played: true },
   podwire: { v: 1, next: 2, complete: false, sound: true },
   kite: { v: 1, unlocked: 2, level: 2, best: 157, sound: true, look: 'copper' },
   loaves: { unlocked: 2, best: 240, sound: true },
+  vine: { v: 1, unlocked: 3, level: 2, best: 7, sound: true, look: 'cobalt' },
+  rubbing: { level: 2, unlocked: 2, sound: true, ink: 'red' },
 };
 
 function pageEntry(key, value, hintKey, rest, secondary = {}) {
@@ -115,20 +118,25 @@ async function guideDog(page, { finger, until }) {
   await finger(page, '#field', [['pointerup', x, y - height * .1]]);
 }
 
-async function pointerDrag(page, start, end, beforeMove) {
+async function pointerDrag(page, start, end, { beforeMove, afterMove, flick = false } = {}) {
   const chromium = page.context().browser().browserType().name() === 'chromium';
   const session = chromium ? await page.context().newCDPSession(page) : null;
-  const touch = (type, touchPoints) => session.send('Input.dispatchTouchEvent', { type, touchPoints });
+  // Timestamp the fast gesture so protocol round trips cannot turn it into a slow drag.
+  const startTime = flick ? Date.now() / 1000 : null;
+  const touch = (type, touchPoints, seconds) => session.send('Input.dispatchTouchEvent', {
+    type, touchPoints, timestamp: startTime === null ? undefined : startTime + seconds,
+  });
   try {
     // These controls use native pointer capture. WebKit exposes only single-touch taps.
-    if (session) await touch('touchStart', [start]);
+    if (session) await touch('touchStart', [start], 0);
     else { await page.mouse.move(start.x, start.y); await page.mouse.down(); }
     if (beforeMove) await beforeMove();
-    if (session) await touch('touchMove', [end]);
-    else await page.mouse.move(end.x, end.y, { steps: 4 });
+    if (session) await touch('touchMove', [end], .04);
+    else await page.mouse.move(end.x, end.y, { steps: flick ? 1 : 4 });
+    if (afterMove) await afterMove();
   } finally {
     if (session) {
-      try { await touch('touchEnd', []); } finally { await session.detach(); }
+      try { await touch('touchEnd', [], .08); } finally { await session.detach(); }
     } else await page.mouse.up();
   }
 }
@@ -138,8 +146,9 @@ async function pluckWire(page, { until }, depth = 12) {
   const [low, high] = zones[0];
   const { left, top, width, height } = await page.locator('#board').evaluate(el => el.getBoundingClientRect().toJSON());
   const x = left + width * (low + high) / 720, y = top + height * 250 / 380;
-  await pointerDrag(page, { x, y }, { x, y: y + height * depth / 380 },
-    () => until(page, () => window.podwireView().grip !== null, 'pointer grips the wire'));
+  await pointerDrag(page, { x, y }, { x, y: y + height * depth / 380 }, {
+    beforeMove: () => until(page, () => window.podwireView().grip !== null, 'pointer grips the wire'),
+  });
   await until(page, n => window.podwireView().plucks === n + 1, 'releasing the wire plucks it', 4000, plucks);
 }
 
@@ -190,6 +199,80 @@ async function steerTide(page, { until }) {
     const s = window.tideState();
     return s.target > minimumTarget && s.game.river.x > minimumX;
   }, 'drag steers the boat right', 8000, { minimumTarget: target + 24 / scale, minimumX: river.x + 4 / scale });
+}
+
+async function fieldPoint(page, width, height) {
+  const box = await page.locator('#field').boundingBox();
+  return (x, y) => ({ x: box.x + x * box.width / width, y: box.y + y * box.height / height });
+}
+
+async function hintPoint(knob) {
+  return knob.evaluate(el => {
+    const { x, y, width, height } = el.getBoundingClientRect();
+    const point = { x: x + width / 2, y: y + height / 2 };
+    if (document.elementFromPoint(point.x, point.y)?.id !== 'field') throw new Error('hint is not over the field');
+    return point;
+  });
+}
+
+async function driveFlock(page, { until }) {
+  const at = await fieldPoint(page, 360, 520);
+  const { x, y } = await page.evaluate(() => window.flockState().game.dog);
+  await pointerDrag(page, at(x, y), at(x, y - 65), {
+    afterMove: () => until(page, y => {
+      const { game, pressed } = window.flockState();
+      return game.started && pressed && game.dog.y <= y - 4;
+    }, 'held drag moves the dog uphill', 4000, y),
+  });
+  await until(page, () => !window.flockState().pressed, 'dog releases after the drag');
+}
+
+async function commandFlock(page, { until }, command) {
+  const at = await fieldPoint(page, 360, 520);
+  const { dog, terrain } = await page.evaluate(() => window.flockState().game);
+  const start = at(dog.x, dog.y);
+  const acted = () => until(page, mode => window.flockState().game.dog.mode === mode, `dog obeys the ${command} command`, 4000, command);
+  if (command === 'hold') {
+    await pointerDrag(page, start, start, { beforeMove: acted });
+    await acted();
+    return;
+  }
+  const direction = Math.sign(terrain.outrun.x - dog.x);
+  await pointerDrag(page, start, at(dog.x + direction * 70, dog.y - 5), { flick: true });
+  await acted();
+  await until(page, () => window.flockState().game.terrain.outrun.gathered, 'the dog gathers the bellwether');
+}
+
+const flockHints = ['drag', 'hold', 'outrun'].map((name, index) => ({
+  name, selector: `#hint-${name} + .kit-hint`, key: `night-flock-2:hint-${name}`,
+  delay: name === 'drag' ? 6500 : 2200, play: '#field', timing: { board: true },
+  seed: { 'night-flock-2:save': json({ ...saves.flock2, unlocked: index + 1, played: false }) },
+  input: name === 'drag' ? driveFlock : (page, checks) => commandFlock(page, checks, name),
+}));
+const flockStars = { 1: 5 };
+const flockDaily = { date: utcDay, stars: 3 };
+
+async function moveVineLamp(page, { until, knob }) {
+  const at = await fieldPoint(page, 360, 480);
+  const point = knob ? await hintPoint(knob) : at(270, 300);
+  const { lamp: before, time } = await page.evaluate(() => window.vineState());
+  await page.touchscreen.tap(point.x, point.y);
+  await until(page, ({ before, time }) => {
+    const s = window.vineState();
+    return s.started && s.time > time && Math.hypot(s.lamp.x - before.x, s.lamp.y - before.y) > 10;
+  }, 'touch moves the lamp and starts growth', 8000, { before, time });
+}
+
+async function rubPlate(page, { until, knob }) {
+  const at = await fieldPoint(page, 240, 280);
+  const start = knob ? await hintPoint(knob) : at(20, 140);
+  const end = at(220, 140);
+  const { coverage, distance } = await page.evaluate(() => window.rubbingState());
+  await pointerDrag(page, start, end);
+  await until(page, before => {
+    const s = window.rubbingState();
+    return s.distance > before.distance && s.coverage > before.coverage;
+  }, 'stroke transfers pigment', 8000, { coverage, distance });
 }
 
 const splitlightLegacy = { 'night-splitlight:plate': '2', 'night-splitlight:sound': 'on' };
@@ -327,6 +410,28 @@ export const labPages = {
     hint: { delay: 8500, play: '#pause', timing: { start: '#endless' }, input: guideDog,
       start: async page => { await page.click('#pause'); await page.click('#evenings'); await page.click('#endless'); } },
   }),
+  'lab/night-flock-2': {
+    startsOnBoard: true, sound: '#sound', saveKey: 'night-flock-2:save', pausePosition: { x: 8, y: 23 },
+    seeds: {
+      'night-flock-2:save': json(saves.flock2),
+      'night-flock-2:stars': json(flockStars),
+      'night-flock-2:daily': json(flockDaily),
+      ...Object.fromEntries(flockHints.map(({ key }) => [key, '1'])),
+    },
+    state: () => { const s = window.flockState?.(); return s && { screen: s.screen, t: s.game.time }; },
+    verify: () => {
+      const { saved, stars, mode, game } = window.flockState();
+      return { saved, stars, mode, level: game.level };
+    },
+    expect: { saved: saves.flock2, stars: flockStars, mode: 'campaign', level: 2 },
+    verifyPaused: async page => {
+      await page.click('#evenings');
+      assert.equal(await page.textContent('#record'), 'Daily 2/3 stars · Endless · device best 31');
+      await page.click('#back');
+    },
+    touch: driveFlock,
+    hints: flockHints,
+  },
   'lab/night-podwire': pageEntry('night-podwire:progress', saves.podwire, 'night-podwire:next-hint', {
     startsOnBoard: true, sound: '#sound',
     state: () => { const s = window.podwireView?.(); return s && { screen: s.screen, t: s.time }; },
@@ -366,6 +471,41 @@ export const labPages = {
     verifyPaused: async page => assert.equal(await page.textContent('#record'), 'Best on this device · 240'),
     touch: foldDough,
     hint: { delay: 3800, play: '#bakery', timing: { board: true }, input: foldDough },
+  }),
+  'lab/night-vine': pageEntry('night-vine:save', saves.vine, 'night-vine:hint', {
+    startsOnBoard: true, pause: '#pauseButton', sound: '#sound',
+    state: () => {
+      const s = window.vineState?.();
+      return s && { screen: s.screen === 'pause' ? 'paused' : s.screen, t: s.time };
+    },
+    verify: () => {
+      const { level, unlocked, best } = window.vineState();
+      return { level, unlocked, best, look: document.body.dataset.look };
+    },
+    expect: { level: 2, unlocked: 3, best: 7, look: 'cobalt' },
+    touch: moveVineLamp,
+    hint: { delay: 3100, play: '#field', timing: { board: true }, input: moveVineLamp },
+  }),
+  'lab/night-rubbing': pageEntry('night-rubbing:save', saves.rubbing, 'night-rubbing:hint', {
+    startsOnBoard: true, sound: '#sound', resumeTouch: true,
+    state: () => {
+      const s = window.rubbingState?.();
+      return s && { screen: s.screen, t: s.distance };
+    },
+    verify: () => {
+      const { level, unlocked, sound } = window.rubbingState();
+      return { level, unlocked, sound, ink: document.querySelector('#ink').textContent };
+    },
+    expect: { level: 2, unlocked: 2, sound: true, ink: 'Red chalk' },
+    verifyPaused: async (page, { finger }) => {
+      const at = await fieldPoint(page, 240, 280);
+      const start = at(20, 170), end = at(220, 170);
+      const before = await page.evaluate(() => window.rubbingState());
+      await finger(page, '#field', [['pointerdown', start.x, start.y], ['pointermove', end.x, end.y], ['pointerup', end.x, end.y]]);
+      assert.deepEqual(await page.evaluate(() => window.rubbingState()), before, 'a paused stroke changes no pigment or distance');
+    },
+    touch: rubPlate,
+    hint: { delay: 2200, play: '#field', timing: { board: true }, input: rubPlate },
   }),
   'lab/night-splitlight': {
     startsOnBoard: true, sound: '#sound', soundKey: 'night-splitlight:sound', soundOff: 'off',

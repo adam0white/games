@@ -11,7 +11,7 @@ import { leftEdge, rightEdge } from './sim.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const notesButton = resolve(root, '../workers/feedback/public/notes/button.js');
-const shots = process.env.SHOTS || '/private/tmp/night-r5-flock2';
+const shots = process.env.SHOTS || '/private/tmp/night-r6-review/flock/check';
 const saveKey = 'night-flock-2:save';
 const types = {
   '.css': 'text/css',
@@ -290,6 +290,40 @@ async function pauseAndRelease(page, input, name) {
   return afterSecondary.game.time;
 }
 
+async function rotateIdleHint(page, name) {
+  const portrait = page.viewportSize();
+  const cue = '#hint-drag + .kit-hint.on';
+  await page.locator(`${cue} .hand`).waitFor({ state: 'visible' });
+  const drag = await page.evaluate(selector => {
+    const cue = document.querySelector(selector);
+    const hand = cue.querySelector('.hand');
+    const animation = hand.getAnimations().find(entry => entry.animationName === 'command-drive');
+    return {
+      sidewaysTrack: getComputedStyle(cue.querySelector('.line')).display !== 'none',
+      transforms: animation?.effect.getKeyframes().map(frame => frame.transform),
+    };
+  }, cue);
+  assert.equal(drag.sidewaysTrack, false, 'the opening hint has no sideways route');
+  assert.ok(drag.transforms?.includes('translateY(-48px)'), 'the opening hand demonstrates an uphill drag');
+  const beforeRotate = await page.evaluate(() => window.flockGuideDraws);
+  await page.setViewportSize({ width: portrait.height, height: portrait.width });
+  await readyToPaint(page, name);
+  assert.equal((await state(page)).game.time, 0, 'rotating the idle lesson does not start the clock');
+  const offset = await page.evaluate(selector => {
+    const cue = document.querySelector(selector).getBoundingClientRect();
+    const field = document.querySelector('#field').getBoundingClientRect();
+    return { x: cue.x - field.x - field.width * .5, y: cue.y - field.y - field.height * .8 };
+  }, cue);
+  assert.ok(Math.abs(offset.x) <= 1 && Math.abs(offset.y) <= 1,
+    'the visible hint stays anchored to the landscape field');
+  assert.ok(await page.evaluate(before => window.flockGuideDraws > before, beforeRotate),
+    'the canvas path remains visible with the delayed hand cue');
+  await screenshot(page, name, '01a-idle-landscape-hint');
+  await page.setViewportSize(portrait);
+  await readyToPaint(page, name);
+  return offset;
+}
+
 async function rotateDuringSteering(page, input, name) {
   const portrait = page.viewportSize();
   const { x, y } = (await state(page)).game.dog;
@@ -335,6 +369,25 @@ async function rotateDuringSteering(page, input, name) {
   assert.equal(retried.game.level, 1, 'the current evening can be selected again mid-run');
   assert.equal(retried.game.time, 0, 'selecting the current evening starts it over');
   return { width: layout.field.width, height: layout.field.height };
+}
+
+async function feedbackLayout(page, name) {
+  const portrait = page.viewportSize();
+  for (const [viewport, label] of [[portrait, 'portrait'], [{ width: 320, height: 568 }, 'short']]) {
+    await page.setViewportSize(viewport);
+    await readyToPaint(page, name);
+    const overlap = await page.locator('#notes-button').evaluate(button => {
+      const notes = button.getBoundingClientRect();
+      return ['#pause', '#field', '#field-map'].filter(selector => {
+        const box = document.querySelector(selector).getBoundingClientRect();
+        return notes.left < box.right && notes.right > box.left && notes.top < box.bottom && notes.bottom > box.top;
+      });
+    });
+    assert.deepEqual(overlap, [], `${label} feedback stays clear of field controls`);
+    await screenshot(page, name, `03c-notes-${label}`);
+  }
+  await page.setViewportSize(portrait);
+  await readyToPaint(page, name);
 }
 
 // Guide the rear flock uphill. Recover sheep near the banks and meet a wolf
@@ -410,6 +463,26 @@ async function selectEvening(page, level) {
   assert.equal(game.level, level);
   assert.equal(game.time, 0);
   return game;
+}
+
+async function flankFlick(page, name, game, direction) {
+  const durations = [];
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt) game = await selectEvening(page, game.level);
+    const input = await steering(page, name);
+    await page.evaluate(() => { window.flockFlickDuration = null; });
+    const { x, y } = game.dog;
+    await input.down(1, x, y);
+    await input.move(1, x + direction * 70, y - 5);
+    await input.up(1);
+    const elapsed = await page.evaluate(() => window.flockFlickDuration);
+    assert.ok(Number.isFinite(elapsed), 'the browser delivered a full primary gesture');
+    if (elapsed <= 300) return { game, input };
+    // Three separate browser commands can take more than 300 ms on a busy host.
+    // Retry only a slow input. A valid flick still has to work on the first try.
+    durations.push(elapsed);
+  }
+  assert.fail('the browser delivered no flick within 300 ms: ' + durations.join(', '));
 }
 
 // Bring both teaching flocks home through the pointer layer. Letting go is
@@ -495,18 +568,27 @@ async function valleyChecks(page, name) {
   assert.equal(holdLesson.heldAtGate, true);
 
   game = await selectEvening(page, 3);
-  input = await steering(page, name);
   await visibleLesson(page, 'outrun');
   await screenshot(page, name, '10-outrun-lesson');
-  const direction = game.terrain.outrun.x < game.dog.x ? -1 : 1;
-  await input.down(1, game.dog.x, game.dog.y);
-  await input.move(1, game.dog.x + direction * 70, game.dog.y - 5);
-  await input.up(1);
+  const direction = Math.sign(game.terrain.outrun.x - 180);
+  await flankFlick(page, name, game, -direction);
+  await page.waitForFunction(() => window.flockState().game.dog.mode === 'outrun' &&
+    document.querySelector('#instruction').textContent.includes('wait before dragging again'), null, { polling: 20 });
+  await page.waitForFunction(() => window.flockState().game.dog.mode !== 'outrun', null, { polling: 20 });
+  assert.equal((await state(page)).game.terrain.outrun.gathered, false, 'the opposite flank leaves the bellwether behind');
+  assert.equal(await page.evaluate(() => localStorage.getItem('night-flock-2:hint-outrun')), null,
+    'an unsuccessful flick does not mark the lesson completed');
+  await visibleLesson(page, 'outrun');
+  await screenshot(page, name, '10a-lesson-after-wrong-flick');
+  game = await selectEvening(page, 3);
+  ({ game, input } = await flankFlick(page, name, game, direction));
   await page.waitForFunction(() => window.flockState().game.dog.mode === 'outrun', null, { polling: 20 });
   await screenshot(page, name, '11-outrun');
   await page.waitForFunction(x => Math.abs(window.flockState().game.dog.x - x) > 15, game.dog.x);
 
   const outrunLesson = await finishLesson(page, input);
+  assert.equal(await page.evaluate(() => localStorage.getItem('night-flock-2:hint-outrun')), '1',
+    'gathering the bellwether marks the lesson completed');
 
   game = await selectEvening(page, 20);
   assert.equal(game.sheep.length, 80);
@@ -517,13 +599,14 @@ async function valleyChecks(page, name) {
   const samples = [], intervals = [];
   for (let run = 0; run < 4; run++) {
     if (run) game = await selectEvening(page, 20);
-    input = await steering(page, name);
-    await input.down(1, game.dog.x, game.dog.y);
     if (run % 2) {
       const side = Math.sign(game.terrain.outrun.x - game.dog.x);
-      await input.move(1, game.dog.x + side * 70, game.dog.y - 5);
+      await flankFlick(page, name, game, side);
+    } else {
+      input = await steering(page, name);
+      await input.down(1, game.dog.x, game.dog.y);
+      await input.up(1);
     }
-    await input.up(1);
     const beforeBurst = await state(page);
     if (run % 2) assert.equal(beforeBurst.game.dog.mode, 'outrun', 'time a working flank command');
     await page.evaluate(() => { window.frameProbe = []; });
@@ -608,8 +691,16 @@ async function run({ name, engine, device }) {
         requestAnimationFrame(countFrame);
       });
       window.flockCheckPointers = [];
+      let pressedAt;
       document.addEventListener('pointerdown', event => {
-        if (event.target.id === 'field') window.flockCheckPointers.push([event.pointerType, event.isTrusted, event.isPrimary]);
+        if (event.target.id !== 'field') return;
+        window.flockCheckPointers.push([event.pointerType, event.isTrusted, event.isPrimary]);
+        if (event.isPrimary && event.isTrusted) pressedAt = event.timeStamp;
+      }, { capture: true });
+      document.addEventListener('pointerup', event => {
+        if (event.target.id === 'field' && event.isPrimary && event.isTrusted) {
+          window.flockFlickDuration = event.timeStamp - pressedAt;
+        }
       }, { capture: true });
     });
     // The first WebKit viewport can stall before its first animation frame on this host.
@@ -636,6 +727,7 @@ async function run({ name, engine, device }) {
     assert.ok(await page.evaluate(() => window.flockGuideDraws > 0 && window.flockGuideMinAlpha >= 0.62),
       'the uphill route remains visible through the animated hand cycle');
     await screenshot(page, name, '01-first-evening');
+    const idleHintOffset = await rotateIdleHint(page, name);
     let input = await steering(page, name);
     const first = await beginner(page, input);
     await controls(page, ['next', 'retry', 'end-evenings']);
@@ -666,9 +758,16 @@ async function run({ name, engine, device }) {
     await page.waitForFunction(n => window.flockGuideDraws > n + 1, guideDraws, { polling: 50, timeout: 5000 });
     await screenshot(page, name, '02a-guide-after-tap');
     const secondaryAt = await pauseAndRelease(page, input, name);
-    const afterDrag = await page.evaluate(() => window.flockGuideDraws);
+    const afterWrongDrag = await page.evaluate(() => window.flockGuideDraws);
+    await page.waitForFunction(n => window.flockGuideDraws > n + 1, afterWrongDrag, { polling: 50, timeout: 5000 });
+    await screenshot(page, name, '02b-guide-after-sideways-drag');
+    const dog = (await state(page)).game.dog;
+    await input.down(1, dog.x, dog.y);
+    await input.move(1, dog.x, dog.y - 33);
+    await input.up(1);
+    const afterUphill = await page.evaluate(() => window.flockGuideDraws);
     await readyToPaint(page, name);
-    assert.equal(await page.evaluate(() => window.flockGuideDraws), afterDrag, 'the guide stops after a steering drag');
+    assert.equal(await page.evaluate(() => window.flockGuideDraws), afterUphill, 'the guide stops after an uphill drag');
     const pointers = await page.evaluate(() => window.flockCheckPointers);
     assert.ok(pointers.some(([type, trusted, primary]) => type === (name === 'webkit' ? 'mouse' : 'touch') && trusted && primary),
       'primary steering uses trusted browser input');
@@ -689,11 +788,13 @@ async function run({ name, engine, device }) {
     if (!(await state(page)).game.started) await page.locator('#field').tap();
     assert.ok((await state(page)).game.time > 0, 'reload interrupts a running evening');
 
+    await page.evaluate(() => localStorage.setItem('notes.k', 'phone-check'));
     await page.reload();
     await waitForScreen(page, 'play');
     await readyToPaint(page, name);
     assert.equal((await state(page)).game.level, 2, 'reload opens the highest unlocked evening');
     assert.equal((await state(page)).game.time, 0, 'reload clears the in-progress clock');
+    await feedbackLayout(page, name);
     await page.tap('#pause');
     await waitForScreen(page, 'paused');
     const soundOn = (await state(page)).saved.sound;
@@ -807,7 +908,7 @@ async function run({ name, engine, device }) {
     assert.deepEqual(errors, [], 'browser errors');
     assert.deepEqual(outside, [], 'external requests');
     assert.deepEqual(telemetry, [], 'telemetry requests');
-    console.log(JSON.stringify({ browser: name, device, first, slow, secondaryAt, landscape, firstWave, secondWave, bestBeforeReload, warningAt, dailySeed: daily.game.seed, dailyResult, dailyStars: dailyRecord.stars, newFields,
+    console.log(JSON.stringify({ browser: name, device, first, slow, secondaryAt, landscape, idleHintOffset, firstWave, secondWave, bestBeforeReload, warningAt, dailySeed: daily.game.seed, dailyResult, dailyStars: dailyRecord.stars, newFields,
       errors: errors.length, externalRequests: outside.length, telemetry: telemetry.length }));
     await context.close();
   } finally {

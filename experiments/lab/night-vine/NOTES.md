@@ -30,7 +30,7 @@ The tending bot finished **240/240** campaign beds across 24 seeds. The table gi
 
 ### Reproduce
 
-Run from the repository root. The phone check finds Playwright through `$PLAYWRIGHT` or `~/code/human-framework/node_modules`, serves the static page locally and writes images to `/private/tmp/night-r5-new5/`.
+Run from the repository root. The phone check finds Playwright through `$PLAYWRIGHT` or `~/code/human-framework/node_modules`, serves the static page locally and writes images to `/private/tmp/night-r6-review/vine/check/`.
 
 ```sh
 fnm exec --using=26.12.0 node experiments/lab/night-vine/bots.mjs
@@ -54,3 +54,25 @@ Both headless profiles exercised one trusted opening tap, the first harvest, pru
 Each profile reported 0 browser errors, 0 external requests and 0 telemetry requests. The two-profile check exited 0. All 14 phone-check screenshots were inspected. On a separate Chromium opening, the delayed tap cue landed 2.08 CSS pixels from the window centre. An off-centre touch 32 field units to its right completed that bed in 8.00 simulated seconds.
 
 Unaided first-time play by a stranger, physical-phone performance and sound by ear remain unverified.
+
+## 2026-11-24 · First-play review
+
+- The opening explicitly asks for a tap on the lit window. The first fruit bed names the marked trellis arm as the next place to tap. The delayed hand still points at the target.
+- A held contact at field coordinates (230, 390) moved the lamp to (12, 425) when the viewport rotated, although the finger stayed still. The game now discards movement and release from a gesture if the glass moves or resizes by more than 1 CSS px. The phone check holds a contact through rotation and through a same-size horizontal shift, then checks the lamp and cut count.
+- Opening the bed picker in landscape used 525.53 CSS px of height and put the sound button's bottom at y=512.53 on both profiles. A two-column pause card now uses 318.39 CSS px. The sound button ends at y=334.19 on the 390 px viewport and y=345.19 on the 412 px viewport. All ten bed slots, settings and pause actions fit without scrolling.
+- With the private feedback key present, the feedback link covered 15 × 34 CSS px of the iPhone pause button. Moving the link from y=62 to y=8 eliminated the overlap. The header, glass and pause actions cleared the link in both orientations, as did the landscape result button. The window remained tappable.
+
+Fresh-storage play on both browsers used trusted touch taps, trusted Chromium touch drags and trusted WebKit mouse drags. Both runs paused, replanted, reloaded during growth, navigated away and used browser Back, rotated during growth, and recovered from a wilted bed 6. Back navigation and reload in these headless runs replanted the saved bed. A separate check dispatched blur and verified that the game paused. The first complete real-time pass reached the bed 10 harvest and its arbour button on both profiles.
+
+| Profile | Simulated clear seconds, beds 1–10 | Measured animation callbacks | Callback p95 / maximum (ms) | Interval p95 / maximum (ms) |
+| --- | --- | ---: | ---: | ---: |
+| WebKit iPhone 13 | 8.00, 10.03, 8.13, 10.80, 11.77, 12.27, 10.43, 13.93, 15.00, 16.10 | 9,841 | 1.0 / 15.0 | 15.0 / 137.0 |
+| Chromium Pixel 7 | 8.00, 10.17, 8.13, 10.73, 11.70, 12.87, 10.33, 13.93, 15.20, 16.43 | 8,413 | 0.5 / 26.4 | 16.7 / 83.3 |
+
+The timing probe wrapped animation callbacks during the headless review, including screenshot captures and concurrent browser checks. Both campaigns reported zero page errors. All 20 fruit-target orders across the six multi-arm fixed campaign beds also cleared in isolated simulation. The intact bots cleared 240/240 campaign beds and 288/288 arbour beds. The reversed-light mutation exited 1. No acceptance threshold changed.
+
+After the fixes, both profiles cleared all ten beds again. The final bed took 16.23 s on WebKit and 18.33 s on Chromium. WebKit recorded 10,324 callbacks at 1.0 ms p95 and 7.0 ms maximum. Chromium recorded 8,967 at 0.6 ms p95 and 5.5 ms maximum. The p95 callback intervals were 20.0 and 16.8 ms. Maximum intervals were 184.0 and 3,066.5 ms during the concurrent headless runs. An earlier concurrent Chromium run missed a bed 6 flick and timed out. The repeated run cleared beds 6, 8 and 10 with one flick each. The causes of the missed flick and long callback interval remain unresolved.
+
+The updated phone check exited 0 on both profiles. The opening took 8.00 simulated seconds on each, with 8.960 s wall time on WebKit and 14.618 s on Chromium. Bed 2 finished at 10.033 and 10.100 simulated seconds respectively. Each cut detached 25 nodes and brought flower shade from 0.52673 and 0.53549 to zero. Both retained an arbour best of 1 after reload and reported zero browser errors, external requests and telemetry requests.
+
+Screenshots are under `/private/tmp/night-r6-review/vine/`. The reviewed images include the opening and its delayed cue, both orientations, the open bed picker with the feedback link, reload and browser Back, wilt and retry, pruning and the final harvest. Physical-device rotation, OS backgrounding, audio by ear and unaided play by a new person remain unverified.

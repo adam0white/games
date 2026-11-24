@@ -36,8 +36,9 @@ const noise = (d, v, hz) => { if (snd.ctx) snd.noise(d, v, hz); };
 let lastGlug = 0, lastDrip = 0, lastSplat = 0;
 
 // ---------- layout: the world is 100 x 160 units
-const cv = $('c'), g = cv.getContext('2d'), liquid = liquidSurface();
+const cv = $('c'), g = cv.getContext('2d', { alpha: false }), liquid = liquidSurface();
 let W = 0, H = 0, dpr = 1, top = 0, bot = 0, k = 3, ox = 0, oy = 0;
+let wallGradient, verticalTiles, horizontalTiles;
 function layout() {
   dpr = Math.min(2, devicePixelRatio || 1); W = innerWidth; H = innerHeight;
   cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
@@ -45,6 +46,20 @@ function layout() {
   // Reserve the complete jug rotation envelope above world y=0, below the HUD.
   const availH = H - top - bot - 118;
   k = Math.min(W / 100, availH / 194); ox = (W - 100 * k) / 2; oy = top + 104 + 34 * k + (availH - 194 * k) / 2;
+  wallGradient = g.createLinearGradient(0, 0, 0, H);
+  wallGradient.addColorStop(0, '#ffe8c9');
+  wallGradient.addColorStop(1, '#f4c99a');
+  verticalTiles = new Path2D();
+  horizontalTiles = new Path2D();
+  const tile = 12 * k, counter = oy + FLOOR * k;
+  for (let x = ox % tile; x < W && tile > 0; x += tile) {
+    verticalTiles.moveTo(x, 0);
+    verticalTiles.lineTo(x, counter);
+  }
+  for (let y = counter % tile; y < counter && tile > 0; y += tile) {
+    horizontalTiles.moveTo(0, y);
+    horizontalTiles.lineTo(W, y);
+  }
 }
 addEventListener('resize', layout); layout();
 
@@ -166,21 +181,22 @@ function showEnd() {
 
 // ---------- drawing
 const X = x => ox + x * k, Y = y => oy + y * k;
+let preview, paintedState, paintedTime;
 function draw(t) {
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   // kitchen wall and tiles
-  const bg = g.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#ffe8c9'); bg.addColorStop(1, '#f4c99a');
-  g.fillStyle = bg; g.fillRect(0, 0, W, H);
+  g.fillStyle = wallGradient; g.fillRect(0, 0, W, H);
   g.strokeStyle = '#e9b98455'; g.lineWidth = 1;
-  const tile = 12 * k; for (let x = ox % tile; x < W; x += tile) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, Y(FLOOR)); g.stroke(); }
-  for (let y = Y(FLOOR) % tile; y < Y(FLOOR); y += tile) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
+  g.stroke(verticalTiles);
+  g.stroke(horizontalTiles);
   const sx = shake && !calm ? (Math.random() - 0.5) * shake : 0, sy = shake && !calm ? (Math.random() - 0.5) * shake : 0;
   g.translate(sx, sy);
   // counter
   g.fillStyle = '#b8794a'; g.fillRect(-10, Y(FLOOR), W + 20, H);
   g.fillStyle = '#d6955f'; g.fillRect(-10, Y(FLOOR), W + 20, 5 * k);
   g.fillStyle = '#00000018'; g.fillRect(-10, Y(FLOOR) + 5 * k, W + 20, 2 * k);
-  const st = s || create(lvl, 1);
+  if (!s && preview?.L.n !== lvl) preview = create(lvl, 1);
+  const st = s || preview;
   const [juice, light] = PALETTE[st.L.n - 1];
   drawGlass(st, juice, light, t);
   drawJuice(st, juice, light);
@@ -191,8 +207,13 @@ function draw(t) {
   g.setTransform(1, 0, 0, 1, 0, 0);
 }
 function drawJuice(st, juice, light) {
-  liquid.draw(st.p, juice, light);
-  g.drawImage(liquid.canvas, X(liquid.x0), Y(liquid.y0), liquid.width * k, liquid.height * k);
+  if (paintedState !== st || paintedTime !== st.t) {
+    liquid.draw(st.p, juice, light);
+    paintedState = st;
+    paintedTime = st.t;
+  }
+  const { canvas, x0, y0, scale, bounds: { x, y, w, h } } = liquid;
+  if (w && h) g.drawImage(canvas, x, y, w, h, X(x0 + x / scale), Y(y0 + y / scale), w * k / scale, h * k / scale);
 }
 function drawGlass(st, juice, light, t) {
   const gl = st.glass, l = X(gl.x - gl.w - 1.2), r = X(gl.x + gl.w + 1.2), tp = Y(gl.top), bt = Y(gl.bottom + 1.2);
@@ -252,12 +273,18 @@ function hud(st, juice) {
   // spill allowance: drops left before a splash ends it, along the counter
   const left = Math.max(0, st.L.spill - st.spilled);
   const cy = Y(FLOOR) + Math.max(9, Math.min(14 * k, (H - Y(FLOOR)) * 0.5)); // on the counter's front, drawn even in the home-bar area
-  {
-    const n = st.L.spill, gap2 = Math.min(16, (W - 40) / n), sx = W / 2 - (n - 1) * gap2 / 2;
-    for (let i = 0; i < n; i++) {
+  const n = st.L.spill, gap2 = Math.min(16, (W - 40) / n), sx = W / 2 - (n - 1) * gap2 / 2;
+  for (const [from, to, color] of [[0, left, '#fff6ea'], [left, n, '#7a4a2a']]) {
+    if (from === to) continue;
+    g.fillStyle = color;
+    g.beginPath();
+    for (let i = from; i < to; i++) {
       const x = sx + i * gap2;
-      g.fillStyle = i < left ? '#fff6ea' : '#7a4a2a'; g.beginPath(); g.moveTo(x, cy - 7); g.quadraticCurveTo(x + 5, cy, x, cy + 4); g.quadraticCurveTo(x - 5, cy, x, cy - 7); g.fill();
+      g.moveTo(x, cy - 7);
+      g.quadraticCurveTo(x + 5, cy, x, cy + 4);
+      g.quadraticCurveTo(x - 5, cy, x, cy - 7);
     }
+    g.fill();
   }
 }
 
@@ -290,18 +317,26 @@ setInterval(() => { if (mode === 'menu') dailyLabel(); }, 60000);
 hint(cv, { kind: 'drag', key: 'wild-pour:hint', when: () => mode === 'play' && !paused && !!s && !s.over, played: save.tries > 0, bottom: () => Math.max(120, H - Y(90)) }); // in the gap between the jug and the glass, clear of the line
 
 // ---------- for the phone check
-window.pourState = () => {
-  const btns = [...document.querySelectorAll('button')].filter(b => b.offsetParent !== null);
-  return {
+window.pourState = (details = true) => {
+  const view = {
     screen: mode === 'play' && paused ? 'paused' : mode, level: lvl, playing: mode === 'play' && !paused, paused,
     over: !!s?.over, won: !!s?.won, why: s?.why ?? '', stars: s?.stars ?? 0, inGlass: s?.inGlass ?? 0, spilled: s?.spilled ?? 0,
     inJug: s?.inJug ?? 0, flying: s?.flying ?? 0, angle: s?.angle ?? 0, t: s?.t ?? 0, target: s?.L.target ?? 0, saved: save.stars.slice(),
-    sensor: sensor !== null, minTouchPx: Math.min(...btns.map(b => Math.min(b.getBoundingClientRect().width, b.getBoundingClientRect().height))),
-    daily: daily ? { ...daily, best: validBest(readJson(DAILY_KEY), daily.day) } : null, seed: s?.seed,
+    sensor: sensor !== null, seed: s?.seed,
     remaining: s ? Math.max(0, s.L.time - s.t) : 30,
     jugClearance: Y(30 - Math.hypot(42, 43.4) - 1.5) - (top + 96),
     jug: s ? { x: X(s.pivot.x), y: Y(s.pivot.y) } : null, W, H,
   };
+  // The synthetic thumb reads this each frame. Layout and storage reads are only for assertions.
+  if (details) {
+    const buttons = [...document.querySelectorAll('button')].filter(button => button.offsetParent !== null);
+    view.minTouchPx = Math.min(...buttons.map(button => {
+      const { width, height } = button.getBoundingClientRect();
+      return Math.min(width, height);
+    }));
+    view.daily = daily ? { ...daily, best: validBest(readJson(DAILY_KEY), daily.day) } : null;
+  }
+  return view;
 };
 
 window.pourPerf = () => ({ intervals: frameSamples.slice(), work: workSamples.slice() });
