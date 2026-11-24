@@ -262,7 +262,7 @@ function draw(now) {
   const visible = ghosts.filter(p => p.a && Math.abs(p.d / DISTANCE * 78 - s.y) < H / unit);
   visible.forEach((p, i) => {
     // The report's distance is progress to dawn, including slow-water credit. No powers in race setup.
-    let y = sy(p.y ?? p.d / DISTANCE * 78); if (Math.abs(y - H * .68) < 34) y -= 60 + i * 32;
+    let y = sy(p.y ?? p.d / DISTANCE * 78); if (Math.abs(y - H * .68) < 34) y -= 84 + i * 34; // label hangs 28-52 px below a ghost: clear your own boat
     boatDraw(sx((p.x + 1) / 2), y, color(p.id), p.n, true, now);
   });
   if (!finished || phase === 'menu' || phase === 'lobby') boatDraw(sx(s.x), sy(s.y), '#ffd28a', '', false, now, s.light, clamp((target - s.x) * 2, -.3, .3));
