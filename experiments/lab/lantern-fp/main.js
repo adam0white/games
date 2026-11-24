@@ -86,7 +86,7 @@ function run() {
   function up(e){if(e.pointerId!==pointer)return;drop();}
   canvas.addEventListener('pointerup',up);canvas.addEventListener('pointercancel',up);canvas.addEventListener('lostpointercapture',up);
   // Pointer movement is deliberately ignored: the half where the press began owns the whole press.
-  hint(canvas,{kind:'tap',key:'lantern-fp:hint',delay:1500,bottom:70,when:()=>playing&&!paused&&screen==='play',played:save.runs>0,label:'Tap left or right to steer'});
+  hint(canvas,{kind:'tap',key:'lantern-fp:hint',delay:2500,bottom:70,when:()=>playing&&!paused&&screen==='play',played:save.runs>0,label:'Tap left or right to steer'});
   function pause(){if(!playing||paused)return;paused=true;drop();clearTones();show('paused');snd.hold();}
   function resume(){if(!playing||!paused)return;paused=false;control.target=s.x;drop();acc=0;last=performance.now();snd.release();show('play');}
   $('play').onclick=begin;$('again').onclick=begin;$('pause').onclick=pause;$('resume').onclick=resume;

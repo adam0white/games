@@ -1,6 +1,8 @@
 // Pour: bots that prove the rules and measure difficulty.
 //   node bots.mjs            all checks; exits 1 on a failure
 //   node bots.mjs --mutate   the same checks with a broken rule (the glass has no floor); must exit 1
+//   node bots.mjs --planner-only --from=100 --count=21   all levels on held-out seeds; same 5/6 win-rate check
+//   node bots.mjs --level=6 --from=1 --count=12   one level, with each result and the same win-rate check
 import { create, step, band, LEVELS, digest, rng, glassX, clone } from './sim.js';
 
 const MUTATE = process.argv.includes('--mutate');
@@ -64,11 +66,32 @@ export function play(n, seed, policy, opts = {}) {
 let fail = 0;
 const ok = (cond, msg) => { console.log(`${cond ? 'ok  ' : 'FAIL'} ${msg}`); if (!cond) fail++; };
 const SEEDS = 16, PSEEDS = 6;
+const integerArg = (name, fallback) => {
+  const arg = process.argv.find(a => a.startsWith(`--${name}=`));
+  const value = arg ? Number(arg.slice(name.length + 3)) : fallback;
+  if (!Number.isSafeInteger(value) || value < 1) throw new Error(`--${name} must be a positive integer`);
+  return value;
+};
+const firstSeed = integerArg('from', Number(process.env.FROM || 1));
+const plannerSeeds = integerArg('count', PSEEDS);
 
 // 1. careful bot finishes every level; 2. clumsy bot finishes level 1 often and less as levels rise
 const careRate = [], clumRate = [], stars = [];
 const only = process.argv.find(a => a.startsWith('--level='));
-if (only) { const n = +only.slice(8); const from = +(process.env.FROM || 1); for (let seed = from; seed < from + PSEEDS; seed++) { const a = play(n, seed, planner()); console.log(n, seed, a.won, a.why, a.inGlass, a.spilled, a.t.toFixed(1)); } process.exit(0); }
+if (only || process.argv.includes('--planner-only')) {
+  const levels = only ? [integerArg('level', 1)] : Array.from({ length: LEVELS }, (_, i) => i + 1);
+  if (levels.some(n => n > LEVELS)) throw new Error(`--level must be at most ${LEVELS}`);
+  for (const n of levels) {
+    let wins = 0;
+    for (let seed = firstSeed; seed < firstSeed + plannerSeeds; seed++) {
+      const a = play(n, seed, planner());
+      if (a.won) wins++;
+      console.log(n, seed, a.won, a.why, a.inGlass, a.spilled, a.t.toFixed(1));
+    }
+    ok(wins / plannerSeeds >= 5 / 6 - 1e-9, `level ${n}: planner ${wins}/${plannerSeeds}, seeds ${firstSeed}-${firstSeed + plannerSeeds - 1}; minimum win rate 5/6`);
+  }
+  process.exit(fail ? 1 : 0);
+}
 if (process.argv.includes('--why')) {
   for (let n = 1; n <= LEVELS; n++) {
     const tally = (pol) => { const t = {}; for (let seed = 1; seed <= SEEDS; seed++) { const s = play(n, seed, pol(seed)); const k = s.why + (s.won ? '' : `(${s.inGlass}/${s.spilled})`); t[s.why] = (t[s.why] || 0) + 1; if (seed <= 4) t['e' + seed] = `${s.inGlass}g ${s.spilled}s ${s.inJug}j ${s.t.toFixed(1)}t`; } return JSON.stringify(t); };

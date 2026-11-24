@@ -75,6 +75,10 @@ starts; 20 seeds per level):
 | 14 | 0/20 | 8/20 (3) |
 | 17 | 0/20 | 0/20 |
 
+Both policies finished 0/20 trials from level 17. A complete ascent is not independently demonstrated; the win
+transition check uses an injected fixture. These synthetic failures do not establish that ascent is impossible.
+Difficulty and rewards were not rebalanced during this defect review.
+
 Whole runs of up to 4 minutes from Ant, 9 seeds, ended by the third death: the careful bot reached levels
 11 6 5 7 9 5 11 9 4 (median 7) and was still alive at 4 minutes in 8 of 9; the clumsy bot reached 4 4 5 2 4 3 4 5 3
 (median 4) and was alive at 4 minutes in 2 of 9. Run lengths in seconds (240 = still alive at the 4-minute cap): careful
@@ -145,3 +149,92 @@ zoo at game size, bench, small-*, desktop-*, `sheet.png` with all 55 species at 
 - Spread wings for the Dragon only in flight; fold them on the ground like the birds.
 - A daily-meadow board (best level per day) needs a server; the seed is already shared.
 - A Zoo pen could show the species' sight wedge and speed, as a field guide.
+
+## Independent review — 2026-11-24
+
+### Changes and regression evidence
+
+- The first finger now owns the play stick until release. Previously a second finger changed a rightward input of
+  `+0.7272727272727273` to `-0.7272727272727273`. That known-bad case failed before the fix. The page uses the existing kit
+  stick and filters additional pointer-down events locally. Lost pointer capture also drops the stick.
+- The Zoo keeps one active leading finger. A second finger no longer replaces its pointer ID and strands the first
+  animal's follow target. Pointer release, cancel, lost capture, leaving the Zoo and leaving the page clear that target.
+  Buttons do not start a lead through the sticky toolbar.
+- A win opens the terminal card immediately. The former 1,200 ms callback could replace the menu or a restarted run,
+  and the meadow kept stepping during that delay. Delayed promotion/win sounds now belong to their screen and are
+  cancelled on a screen transition. Retry also resets shake and the death deadline.
+- The end card measures simulation time. Pause, promotion decisions and death cards no longer inflate the run duration.
+  Starting a run records level 1, so a first run with no promotion cannot report a best level of 0.
+- `?bench=` accepts a finite integer from 0 to 200. `Infinity`, negative and NaN inputs disable the benchmark; 1,000,000
+  becomes 200. Timing history retains at most 600 frame intervals and 600 work samples. Previously `Infinity` could
+  keep the creation loop running forever, and timing arrays grew on every frame.
+- `check.mjs` adds regression coverage for second-finger ownership, lost capture, pause with held input, reload,
+  Zoo release/exit, immediate win, win retry, best level 1, end-card time, four benchmark query values and bounded
+  timing history. Win uses an injected level-18 fixture; the normal promotion/death/retry route uses pointer play.
+- The Zoo poke check now samples the response inside the pointer event. Its thresholds remain exactly `n === 1` and
+  `squash > 0.5`. The earlier check sampled after automation returned, by which time a successful poke had decayed to
+  0.0667 in WebKit and 0.4167 in Chromium on this loaded machine. No gameplay, rig or performance threshold was lowered.
+
+### Visual review and limits
+
+The menu has one short instruction and an obvious Play button. The inspected promotion, death, retry and pause cards
+have readable text and separated targets. The Zoo's animal labels and toolbar are readable. The white ring makes the
+player identifiable at play size. Creature detail is more legible in the Zoo than during play; species recognition at
+play size is still unverified. The existing 360×640 and desktop checks passed.
+
+Screenshots and exact run output from this review are in `review-shots/` and `review-*.log`. One early WebKit menu
+screenshot was entirely black even though DOM checks passed. The isolated rerun rendered the initial and reloaded
+menus correctly; both were inspected, along with play, promotion, death, end, pause, win and both Zoo sizes.
+Real device safe-area insets, physical
+multi-touch, sound and native Zoo touch scrolling remain unverified. The second-finger regression dispatches distinct
+pointer IDs in both browser engines; it does not claim to reproduce the operating system's touch arbitration.
+
+### Final check numbers
+
+Chromium Pixel 7: `check.mjs chromium` exited 0. First promotion took 30 s, with 3 eaten, 62 live rigs and bite squash
+1.00. Reckless play ended the run in 35 s. Zoo lead distance fell from 62 px to 10 px in 2.5 s. All added regressions
+passed. The 40-animal benchmark collected 247 frames in 4 s: mean 16.7 ms, p95 16.7 ms; page work mean 2.0 ms,
+p95 2.8 ms. There were 0 page errors, 0 console errors and 0 failed requests.
+
+The first isolated WebKit iPhone 13 rerun passed gameplay and the added regressions but exited 1 on the unchanged
+frame-rate requirement. Promotion took 30 s, with 3 eaten, 63 live rigs and bite squash 0.36. Reckless play ended in
+25 s. Zoo lead distance fell from 38 px to 9 px in 2.5 s. Its 40-animal benchmark collected 202 frames in 4 s:
+mean 20.2 ms (50 fps), p95 47.0 ms; page work mean 2.0 ms, p95 4.0 ms. Host load was high; that is a possible
+explanation, not proof that the frame-rate failure is external to the page.
+
+The final isolated WebKit rerun exited 0 without threshold changes. Promotion took 19 s, with 3 eaten, 63 live rigs
+and bite squash 1.00. Reckless play ended in 27 s. Zoo lead distance fell from 53 px to 10 px in 2.5 s. All added
+regressions passed. The 40-animal benchmark collected 279 frames in 4 s: mean 14.4 ms (70 fps), p95 19.0 ms;
+page work mean 2.1 ms, p95 3.0 ms. There were 0 page errors, 0 console errors and 0 failed requests.
+
+The independent screenshot-guided routes used `review-play.mjs`, which reads no simulation state and changes
+none. Each direction came from the visible prey and player ring; the pause button held the scene between image
+inspections. On WebKit, 5 thumb movements (9.2 s of requested holding) ate 3 prey and opened promotion. Selecting
+the fast form continued at level 2 with 3 lives; pause, menu and reload worked and retained best level 2. On Chromium,
+4 thumb movements (6.4 s of requested holding) stayed at level 1 with 3 lives and an empty food bar; the prey escaped
+those coarse turns. Pause, menu and reload worked and retained best level 1. This short route does not establish
+equal novice difficulty across devices. All route screenshots were inspected; text and controls remained readable,
+with no off-screen controls or overlapping targets. Both routes reported 0 page/console errors and closed their
+test browsers and local servers.
+
+`bots.mjs` completed with exit 0. It walked 55 species for 10,000 steps each (550,000 steps), with 0 non-finite
+steps, 0 overlapping gait frames and 100.0% alternation across 65,019 step waves. Worst spine error was
+7.11e-12%, worst chain error 1.15e-11%, and maximum foot reach 98.00% of leg length. The real simulation ran
+14,400 ticks with up to 64 rigs, 305 built, and reached level 6 with 0 non-finite values. Careful play survived
+four minutes in 8/9 runs, with median top level 7 and minimum 4; clumsy play survived in 2/9 runs with median 4.
+Careful top levels were `11 6 5 7 9 5 11 9 4`; clumsy top levels were `4 4 5 2 4 3 4 5 3`.
+
+| Starting level | Clumsy finishes within 3 tries | Careful finishes within 3 tries |
+| --- | ---: | ---: |
+| 1 | 19/20 | 20/20 |
+| 2 | 19/20 | 20/20 |
+| 4 | 17/20 | 19/20 |
+| 6 | 3/20 | 15/20 |
+| 8 | 8/20 | 18/20 |
+| 11 | 2/20 | 11/20 |
+| 14 | 0/20 | 8/20 |
+| 17 | 0/20 | 0/20 |
+
+`bots.mjs --mutate` also completed its full run, then exited 1 with exactly 2 failed checks: 207,710 overlapping
+gait frames and 0 alternating waves. Its other rig checks and all difficulty checks passed. No bot counts,
+seeds, run durations or thresholds were changed.

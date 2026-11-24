@@ -1,6 +1,6 @@
 // games-lab-ai: POST /lab-api/persona and /lab-api/quest ask a small Workers AI model to write a rival
 // ("Nemesis") or a meadow quest-giver. The client sends only enumerated fields and small
-// integers. The Worker writes the whole prompt itself, so no client text reaches the model. Nothing is logged.
+// integers. The Worker writes the whole prompt itself, so no client text reaches the model.
 
 // Every animal name in the game, in sim order. The test checks this list against the game's sim.js.
 export const FORM_NAMES = ['Aphid', 'Mite', 'Grub', 'Ant', 'Beetle', 'Fire Ant', 'Spider', 'Scorpion', 'Wasp', 'Mantis', 'Crab', 'Mouse', 'Frog', 'Mole', 'Lizard', 'Bat',
@@ -19,6 +19,8 @@ export const LIMITS = { body: 2048, kills: [1, 9], escapes: [0, 20], kin: [0, 20
 const ALLOWED_ORIGIN = 'https://play.adamwhite.work';
 const DEV_ORIGIN = /^http:\/\/(localhost|127\.0\.0\.1)(:\d{1,5})?$/;
 export const originAllowed = origin => origin === ALLOWED_ORIGIN || DEV_ORIGIN.test(origin || '');
+const questSpecies = giver => giver === 'ant-queen' ? 'ant' : giver;
+const questFallbackName = giver => giver.replaceAll('-', ' ').replace(/\b[a-z]/g, letter => letter.toUpperCase());
 
 // Words that make a reply unusable: swearing, gore, real-world religion and politics. A reply that contains one is
 // thrown away (502) and the page keeps its offline persona. Cartoon threats ("I will eat you") are allowed.
@@ -102,14 +104,14 @@ export function buildQuestMessages(q) {
   const system = [
     'You write a quest-giver for a cheerful meadow phone game for children. Reply in English, with short, warm, funny, child-safe sentences.',
     'Reply with JSON only: {"name":"...","ask":"...","thanks":"...","scold":"...","secret":"..."}.',
-    'name: an invented animal nickname, letters, spaces, apostrophes and hyphens only, at most 24 characters. Never a real person.',
+    'name: an invented animal nickname containing the requested species as a whole word. Use letters, spaces, apostrophes and hyphens only, at most 24 characters. Never a real person.',
     'ask: the giver asks the player to do the given task. Include the exact count as a digit and the target, with a natural plural if needed. At most 70 characters.',
     'thanks: said when the player succeeds, at most 60 characters. scold: a gentle, silly complaint when the player fails or dawdles, at most 60 characters.',
     'secret: one small piece of invented lore about the meadow, at most 70 characters.',
     'fetch means bring things, hunt means find things, escort means guide companions, race means race past markers, hide means hide things. Keep every task harmless.',
     'No swearing, blood, injuries, weapons, real people, religion, politics, countries or brands. Return every field, without any extra fields.',
   ].join('\n');
-  const user = `The giver is a ${q.giver}, feeling ${q.mood}. Task: ${q.kind}. Target: ${q.target}. Count: ${q.count}. Voice variation: ${q.variant}.`;
+  const user = `The giver is a ${q.giver}, feeling ${q.mood}. Include the word "${questSpecies(q.giver)}" in its name. Task: ${q.kind}. Target: ${q.target}. Count: ${q.count}. Voice variation: ${q.variant}.`;
   return [{ role: 'system', content: system }, { role: 'user', content: user }];
 }
 
@@ -162,11 +164,12 @@ export function cleanQuest(raw, q) {
   const target = q.target === 'berry' ? 'berr(?:y|ies)' : q.target === 'lost-ant' ? 'lost[ -]ants?' : `${q.target}s?`;
   if (!new RegExp(`\\b${q.count}\\b`).test(out.ask) || !new RegExp(`\\b${target}\\b`, 'i').test(out.ask)) return null;
   if (BLOCK.test(Object.values(out).join(' '))) return null;
+  if (!new RegExp(`\\b${questSpecies(q.giver)}\\b`, 'i').test(out.name)) out.name = questFallbackName(q.giver);
   return out;
 }
 
 const cacheKey = q => `https://games-lab-ai.cache/persona/v1/${q.event}/${encodeURIComponent(q.form)}/${encodeURIComponent(q.playerForm)}/${q.kills}/${q.escapes}/${q.kin}/${q.variant}`;
-const questCacheKey = q => `https://games-lab-ai.cache/quest/v1/${q.giver}/${q.kind}/${q.target}/${q.count}/${q.mood}/${q.variant}`;
+const questCacheKey = q => `https://games-lab-ai.cache/quest/v2/${q.giver}/${q.kind}/${q.target}/${q.count}/${q.mood}/${q.variant}`;
 const withTimeout = (p, ms) => { let timer; return Promise.race([p, new Promise((_, no) => { timer = setTimeout(() => no(new Error('timeout')), ms); })]).finally(() => clearTimeout(timer)); };
 
 // The daily cap. DAILY_CAP is a var; anything that is not a whole number from 1 up falls back to the default.
@@ -235,22 +238,44 @@ export async function handle(request, env, ctx = { waitUntil() {} }, deps = {}) 
     if (!(await env.PER_IP.limit({ key: ip })).success || !(await env.GLOBAL.limit({ key: 'all' })).success) return json(429, { error: 'busy' }, origin);
   } catch { return json(429, { error: 'busy' }, origin); }
 
-  // Hard cap for the whole world: one Durable Object counts model calls per UTC day. Over the cap, or if the counter
-  // cannot be reached, there is no model call and the page keeps its offline text.
-  try {
-    const day = utcDay(deps.now ? deps.now() : Date.now()), cap = dailyCap(env);
-    const counter = env.DAILY.get(env.DAILY.idFromName('global'));
-    if (!(await counter.take(day, cap, endpoint)).ok) return json(503, { error: 'daily cap' }, origin);
-  } catch { return json(503, { error: 'daily cap' }, origin); }
+  if (typeof env.AI?.run !== 'function') {
+    console.error(new Error('Inference binding unavailable'));
+    return json(502, { error: 'model' }, origin);
+  }
+  const input = { messages: quest ? buildQuestMessages(q) : buildMessages(q), response_format: { type: 'json_schema', json_schema: quest ? QUEST_SCHEMA : SCHEMA }, max_tokens: LIMITS.maxTokens, temperature: 0.9 };
+  const options = env.AI_GATEWAY ? { gateway: { id: env.AI_GATEWAY, skipCache: true } } : undefined;
+  // The existing timeout covers inference. The retry adds at most half that wait.
+  const timeouts = quest ? [LIMITS.timeoutMs, LIMITS.timeoutMs / 2] : [LIMITS.timeoutMs];
+  for (const [attempt, timeout] of timeouts.entries()) {
+    try {
+      const day = utcDay(deps.now ? deps.now() : Date.now()), cap = dailyCap(env);
+      const counter = env.DAILY.get(env.DAILY.idFromName('global'));
+      if (!(await counter.take(day, cap, endpoint)).ok) {
+        if (attempt === 0) return json(503, { error: 'daily cap' }, origin);
+        break;
+      }
+    } catch {
+      if (attempt === 0) return json(503, { error: 'daily cap' }, origin);
+      console.error(new Error('Quest retry counter unavailable'));
+      break;
+    }
 
-  let persona = null;
-  try {
-    const out = await withTimeout(env.AI.run(env.MODEL, { messages: quest ? buildQuestMessages(q) : buildMessages(q), response_format: { type: 'json_schema', json_schema: quest ? QUEST_SCHEMA : SCHEMA }, max_tokens: LIMITS.maxTokens, temperature: 0.9 }, env.AI_GATEWAY ? { gateway: { id: env.AI_GATEWAY, skipCache: true } } : undefined), LIMITS.timeoutMs);
-    // Depending on the model the text is in response (string or object) or in an OpenAI-style choices list.
-    const raw = out?.choices?.[0]?.message?.content ?? out?.response ?? out;
-    persona = quest ? cleanQuest(raw, q) : clean(raw);
-  } catch { persona = null; }
-  if (!persona) return json(502, { error: 'model' }, origin);
-  if (cache) ctx.waitUntil(cache.put(key, new Response(JSON.stringify(persona), { headers: { 'Content-Type': 'application/json', 'Cache-Control': `public, max-age=${LIMITS.cacheSeconds}` } })));
-  return json(200, persona, origin);
+    let answer;
+    try {
+      const out = await withTimeout(env.AI.run(env.MODEL, input, options), timeout);
+      // The text may be an object, a string or an OpenAI-style choice.
+      const raw = out?.choices?.[0]?.message?.content ?? out?.response ?? out;
+      answer = quest ? cleanQuest(raw, q) : clean(raw);
+    } catch {
+      if (quest) console.error(new Error('Quest inference failed'));
+      continue;
+    }
+    if (!answer) {
+      if (quest) console.error(new Error('Quest output failed validation'));
+      continue;
+    }
+    if (cache) ctx.waitUntil(cache.put(key, new Response(JSON.stringify(answer), { headers: { 'Content-Type': 'application/json', 'Cache-Control': `public, max-age=${LIMITS.cacheSeconds}` } })));
+    return json(200, answer, origin);
+  }
+  return json(502, { error: 'model' }, origin);
 }

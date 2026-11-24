@@ -1,5 +1,5 @@
 // Lantern: Spark, the page. Rules: ../../lantern/sim.js, unchanged; the spark layer: ./sim.js. This file draws, plays sound and reads input.
-import { start, tick, view, stars, murmur, rating, reach, glow, centre, half, boat, NIGHTS, TIN_MAX, RING_MAX, GLOW, DT } from './sim.js';
+import { start, tick, view, stars, murmur, rating, reach, glow, centre, half, boat, NIGHTS, REFILL, TIN_MAX, RING_MAX, GLOW, DT } from './sim.js';
 import { readJson, writeJson, read, write } from '../../kit/save.js';
 import { sound } from '../../kit/audio.js';
 import { onLeave, isPauseKey } from '../../kit/pause.js';
@@ -135,7 +135,7 @@ canvas.addEventListener('pointerdown', ev => {
 for (const type of ['pointerup', 'pointercancel']) addEventListener(type, ev => touches.delete(ev.pointerId), true);
 function aim(x) { const c = centre(e.s, e.s.y), h = half(e.s, e.s.y) + 0.02; target = Math.max(c - h, Math.min(c + h, x)); }
 const steer = drag(canvas, { playing: () => playing, paused: () => paused, resume: () => resume(), from: () => e.s.x, travel: dx => dx * dpr / unit * gain, aim, mouse: ev => aim((ev.clientX * dpr - left) / unit), settle: 12 });
-hint(canvas, { kind: 'drag', key: 'lantern-spark:hint', delay: 1500, bottom: 56, when: () => playing && !paused && screen === 'play', played: save.played > 0 });
+hint(canvas, { kind: 'drag', key: 'lantern-spark:hint', delay: 1500, bottom: 170, when: () => playing && !paused && screen === 'play', played: save.played > 0 });
 const sparkBtn = $('spark');
 sparkBtn.addEventListener('pointerdown', ev => { ev.preventDefault(); ev.stopPropagation(); if (paused) resume(); else strike(); });
 sparkBtn.addEventListener('click', ev => ev.preventDefault());
@@ -170,7 +170,7 @@ function step1() {
   for (const ev of e.events) {
     if (ev === 'spark') { tone(1900, 0.09, 0.07, 'square', 900); snd.noise(0.09, 0.22, 4200); setTimeout(() => tone(1318.5, 0.6, 0.05, 'triangle'), 30); burst(s.x, s.y, 22, '255,226,160', 0.9); squash = 1; }
     if (ev === 'empty') { tone(140, 0.12, 0.12, 'square'); say('The tin is empty', 1300); }
-    if (ev === 'ember') { tone(scale[Math.min(streak++, scale.length - 1)], 0.45, 0.1, 'triangle'); setTimeout(() => tone(scale[Math.min(streak, scale.length - 1)] * 1.5, 0.3, 0.05, 'sine'), 70); burst(s.x, s.y, 14, '255,160,70', 0.5); say(e.tin >= TIN_MAX ? 'Tin full' : '+2 sparks', 900); }
+    if (ev === 'ember') { tone(scale[Math.min(streak++, scale.length - 1)], 0.45, 0.1, 'triangle'); setTimeout(() => tone(scale[Math.min(streak, scale.length - 1)] * 1.5, 0.3, 0.05, 'sine'), 70); burst(s.x, s.y, 14, '255,160,70', 0.5); say(e.tin >= TIN_MAX ? 'Tin full' : `+${REFILL} ${REFILL === 1 ? 'spark' : 'sparks'}`, 900); }
     if (ev === 'graze') tone(1600, 0.08, 0.04);
     if (ev === 'thunder') { snd.noise(1.6, 0.35, 140); tone(48, 1.8, 0.22, 'sawtooth', -10); shake = Math.max(shake, 0.5); }
     if (ev === 'hurt') { tone(150, 0.35, 0.25, 'square', -60); snd.noise(0.25, 0.3, 700); shake = 1; flashRed = 1; target = s.x; steer.rebase(); burst(s.x, s.y, 18, '255,90,100', 0.8); streak = 0; say(s.hearts === 1 ? 'One life left' : `${s.hearts} lives left`, 1300); }

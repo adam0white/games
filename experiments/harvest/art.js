@@ -9,6 +9,51 @@ export const TAU = Math.PI * 2;
 export function rrect(g, x, y, w, h, r) { g.beginPath(); g.roundRect ? g.roundRect(x, y, w, h, r) : g.rect(x, y, w, h); }
 export function ell(g, x, y, rx, ry, rot = 0) { g.beginPath(); g.ellipse(x, y, Math.max(0.1, rx), Math.max(0.1, ry), rot, 0, TAU); }
 
+// Narrow, segmented ears with awns, attached to long stems. Reuse the same shape in the field and sheaves.
+export const wheatPaths = () => ({ stems: new Path2D(), heads: new Path2D(), awns: new Path2D(), lit: new Path2D() });
+function traceWheat(p, x, y, h, a = 0) {
+  const sn = Math.sin(a), cs = Math.cos(a);
+  const point = (u, v) => [x + (u * cs - v * sn) * h, y + (u * sn + v * cs) * h];
+  const line = (path, u, v, u1, v1) => { path.moveTo(...point(u, v)); path.lineTo(...point(u1, v1)); };
+  line(p.stems, 0, 0, 0, -1);
+  // The long pointed leaf and the stem stay visible below the ear.
+  p.stems.moveTo(...point(0, -0.27)); p.stems.quadraticCurveTo(...point(-0.2, -0.32), ...point(-0.18, -0.54)); p.stems.quadraticCurveTo(...point(-0.04, -0.45), ...point(0, -0.27));
+  for (let k = 0; k < 4; k++) for (const side of [-1, 1]) {
+    const v = -0.91 + k * 0.105, w = (k === 0 ? 0.075 : 0.115) * side;
+    p.heads.moveTo(...point(0, v + 0.115)); p.heads.lineTo(...point(w, v + 0.045)); p.heads.lineTo(...point(w * 0.9, v - 0.055)); p.heads.lineTo(...point(0, v + 0.02)); p.heads.closePath();
+    line(p.awns, w * 0.9, v - 0.055, w * 1.55, v - 0.18);
+    line(p.lit, w * 0.38, v + 0.055, w * 0.77, v + 0.005);
+  }
+  line(p.awns, 0, -0.98, 0, -1.15);
+}
+let wheatShape = null;
+export function addWheat(p, x, y, h, a = 0) {
+  if (!wheatShape) { wheatShape = wheatPaths(); traceWheat(wheatShape, 0, 0, 1); }
+  const sn = Math.sin(a) * h, cs = Math.cos(a) * h, matrix = new DOMMatrix([cs, sn, -sn, cs, x, y]);
+  for (const key of ['stems', 'heads', 'awns', 'lit']) p[key].addPath(wheatShape[key], matrix);
+}
+export function paintWheat(g, p, { wet = false, storm = false, line = 1 } = {}) {
+  g.lineCap = 'round'; g.lineJoin = 'round'; g.lineWidth = line;
+  g.strokeStyle = wet ? '#6d8290' : '#946b26'; g.stroke(p.stems);
+  g.fillStyle = wet ? '#8da2ac' : storm ? '#d9ab45' : C.wheat; g.fill(p.heads);
+  g.strokeStyle = wet ? '#527384' : '#a77a26'; g.stroke(p.heads);
+  g.lineWidth = Math.max(0.65, line * 0.7); g.strokeStyle = wet ? '#b7d9e6' : '#ffe5a0'; g.stroke(p.awns); g.stroke(p.lit);
+}
+const wheatSprites = new Map();
+export function wheat(g, x, y, h, a = 0, { wet = false, storm = false } = {}) {
+  const key = wet ? 'wet' : storm ? 'storm' : 'dry';
+  if (!wheatSprites.has(key)) {
+    const cv = document.createElement('canvas'); cv.width = 48; cv.height = 112;
+    const q = cv.getContext('2d', { willReadFrequently: true }), p = wheatPaths(); addWheat(p, 24, 100, 84);
+    paintWheat(q, p, { wet, storm, line: 3.3 });
+    // Finish the detached canvas before its first drawImage on either phone engine.
+    q.getImageData(0, 0, cv.width, cv.height); wheatSprites.set(key, cv);
+  }
+  // Rasterize the detailed ear once, so a late field stays cheap to draw on phones.
+  g.save(); g.translate(x, y); g.rotate(a);
+  g.drawImage(wheatSprites.get(key), -24 / 84 * h, -100 / 84 * h, 48 / 84 * h, 112 / 84 * h); g.restore();
+}
+
 // A grain icon: a small ear of wheat.
 export function grain(g, x, y, s, col = C.gold) {
   g.save(); g.translate(x, y); g.rotate(-0.5);
@@ -77,8 +122,9 @@ export function sheaf(g, x, y, s, a = 0.5) {
   g.save(); g.translate(x, y); g.rotate(a);
   g.strokeStyle = C.wheatDark; g.lineWidth = Math.max(1, s * 0.08); g.lineCap = 'round';
   g.beginPath(); for (const o of [-0.12, 0, 0.12]) { g.moveTo(-s * 0.45, o * s); g.lineTo(s * 0.2, o * s * 0.6); } g.stroke();
-  g.fillStyle = C.wheat; g.strokeStyle = C.ink; g.lineWidth = Math.max(0.8, s * 0.05);
-  ell(g, s * 0.3, 0, s * 0.24, s * 0.17); g.fill(); g.stroke();
+  const p = wheatPaths();
+  for (const o of [-0.12, 0, 0.12]) addWheat(p, -s * 0.2, o * s, s * 0.65, Math.PI / 2 + o * 0.4);
+  paintWheat(g, p, { line: Math.max(0.6, s * 0.025) });
   g.fillStyle = '#b5482f'; g.fillRect(-s * 0.08, -s * 0.12, s * 0.07, s * 0.24);
   g.restore();
 }

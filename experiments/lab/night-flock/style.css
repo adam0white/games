@@ -1,0 +1,70 @@
+:root {
+  color-scheme: light;
+  --paper:#f3ebda;
+  --ink:#243a36;
+  --muted:#5d685a;
+  --rule:#bebdab;
+  --gold:#ac673c;
+}
+* {box-sizing:border-box}
+body {
+  margin:0; height:100vh; height:100dvh; display:grid; place-items:center;
+  padding: max(10px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));
+  background:var(--paper); color:var(--ink); font-family: "Avenir Next", "Trebuchet MS", system-ui, sans-serif;
+  -webkit-tap-highlight-color:transparent;
+}
+.folio {width:min(100%,462px,calc((100dvh - 172px - env(safe-area-inset-bottom) - env(safe-area-inset-top)) * .6923)); min-width:0}
+header,footer,.ledger,.pair,.dusk-label {display:flex;align-items:center;justify-content:space-between}
+header {margin:0 1px 14px}
+.smallcaps {display:block;font-size:10px;line-height:1.25;letter-spacing:.18em;text-transform:uppercase;font-weight:750}
+.heading .smallcaps,#pause-chapter,#end-caption {color:var(--muted)}
+h1,h2,.tally {font-family: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif}
+h1 {font-size:clamp(38px,12vw,60px);font-weight:500;letter-spacing:-.055em;line-height:.99;margin:3px 0 0}
+h1 i {font-weight:400}
+button {border:1px solid var(--rule);background:transparent;color:var(--ink);min-width:44px;min-height:44px;padding:9px 15px;border-radius:6px;line-height:1.2;font-family:inherit;font-size:14px;font-weight:650;cursor:pointer}
+button:hover {background:#d7d8c688}
+button:focus-visible,canvas:focus-visible {outline:3px solid #b7673e;outline-offset:2px}
+button:active {transform:translateY(1px)}
+button:disabled {opacity:.43;cursor:default}
+.round {width:46px;height:46px;border-radius:50%;display:grid;place-items:center;border-color:#909b88}
+.bars {width:13px;height:16px;border-inline:4px solid var(--ink)}
+.plate {position:relative;border:1px solid #33483e;overflow:hidden;border-radius:4px;background:#274748;box-shadow:0 2px 0 #283f341a}
+canvas {display:block;width:100%;height:auto;aspect-ratio:360 / 520;touch-action:none;user-select:none;-webkit-user-select:none;cursor:crosshair}
+footer {padding:14px 1px 9px;align-items:center}
+.measure {display:flex;flex-direction:column;gap:3px}
+.tally {font-size:23px;line-height:1;font-variant-numeric:tabular-nums}
+.tally b {font-weight:600}
+.divider {color:#8c927d;font-size:18px}
+.daylight {width:41%}
+.dusk-label {align-items:baseline}
+#time {font-family:Georgia,serif;font-size:17px;font-variant-numeric:tabular-nums}
+.dusk-track {height:4px;margin-top:6px;background:#ced0be;overflow:hidden;border-radius:2px}
+#light {display:block;height:100%;width:100%;background:var(--gold);transform-origin:left}
+.ledger {gap:8px;min-height:24px;border-top:1px solid var(--rule);color:var(--muted);font-size:11px;letter-spacing:.025em}
+#remark {text-align:right}
+.sheet {display:none;position:fixed;z-index:5;inset:0;align-items:center;justify-content:center;padding:16px;background:#112c2cb0;overflow:auto}
+.sheet.on {display:flex}
+.card {width:min(100%,348px);max-height:96dvh;overflow:auto;border-radius:6px;padding:24px;background:var(--paper);box-shadow:0 10px 40px #0b232a55;text-align:center}
+.card h2 {font-size:35px;font-weight:500;line-height:1.05;letter-spacing:-.04em;margin:5px 0 18px}
+.card p {font-size:14px;line-height:1.4;color:var(--muted);margin:8px auto 12px}
+.card .primary {width:100%;background:var(--ink);color:var(--paper);border-color:var(--ink);font-size:16px}
+.pair {gap:8px;margin-top:8px}
+.pair button {flex:1}
+#levels {display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin-bottom:15px}
+#levels button {padding:0}
+#levels [aria-current] {border:2px solid var(--ink)}
+#back {width:100%}
+[hidden] {display:none!important}
+@media(max-height:580px) {
+  body {padding:5px}
+  .folio {width:min(100%,calc((100dvh - 104px) * .6923))}
+  header {margin-bottom:4px} h1 {font-size:26px}
+  footer {padding:3px 0} .tally {font-size:17px} .ledger {min-height:18px}
+}
+@media(orientation:landscape) and (max-height:580px) {
+  .folio {display:grid;width:auto;grid-template-columns:clamp(130px,24vw,190px) min(68vw,calc((100dvh - 14px) * .6923));grid-template-rows:1fr auto auto 1fr;column-gap:18px}
+  header {grid-column:1;grid-row:2;align-items:flex-start}
+  .plate {grid-column:2;grid-row:1/5}
+  footer {grid-column:1;grid-row:3;gap:16px;padding:15px 0}
+  .ledger {grid-column:1;grid-row:4;align-self:start}
+}

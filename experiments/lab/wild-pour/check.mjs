@@ -1,7 +1,8 @@
 // Phone check for Pour: PLAYWRIGHT=<dir with playwright> node experiments/lab/wild-pour/check.mjs [webkit|chromium]
 // Serves experiments/ on a free port, plays level 1 by real touch pointer events on WebKit (iPhone 13) and
-// Chromium (Pixel 7), and fails on any page or console error. Screenshots go to $SHOTS (default /private/tmp/night-wild).
+// Chromium (Pixel 7), and fails on any page or console error. Screenshots go to $SHOTS (default ./screenshots beside this file).
 import { createServer } from 'node:http';
+import { spawn } from 'node:child_process';
 import { readFile, mkdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
@@ -9,7 +10,7 @@ import { dirname, extname, join, normalize, resolve } from 'node:path';
 import assert from 'node:assert/strict';
 
 const here = dirname(fileURLToPath(import.meta.url)), root = resolve(here, '../..');
-const SHOTS = process.env.SHOTS || '/private/tmp/night-wild';
+const SHOTS = process.env.SHOTS || join(here, 'screenshots');
 await mkdir(SHOTS, { recursive: true });
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript' };
 const server = createServer(async (req, res) => {
@@ -54,22 +55,38 @@ async function pour(page, shot) {
 
 async function run(name) {
   const [type, device] = PHONES[name];
-  const browser = await type.launch();
+  // Keep the display awake while measuring macOS WebKit's animation clock; release it after the test.
+  const awake = process.platform === 'darwin' ? spawn('/usr/bin/caffeinate', ['-diu', '-t', '180'], {stdio:'ignore'}) : null;
+  let browser;
+  try {
+  if (awake) await sleep(1000); // wake the display before WebKit creates its view
+  browser = await type.launch({ headless: process.env.HEADED !== '1' && !(name === 'webkit' && process.platform === 'darwin') });
   const ctx = await browser.newContext({ ...device });
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(`pageerror: ${e.message}`));
   page.on('console', m => { if (m.type() === 'error') errors.push(`console: ${m.text()}`); });
-  await page.goto(`${base}/lab/wild-pour/?seed=3`);
+  await page.goto(`${base}/lab/wild-pour/?seed=3&perf=1`);
   await until(page, () => window.pourState && window.pourState().screen === 'menu', 'menu');
   await sleep(300);
+  await page.bringToFront();
+  const boot = await page.evaluate(() => new Promise(resolve => {
+    let frames = 0, done = false;
+    const tick = () => { frames++; if (!done) requestAnimationFrame(tick); };
+    requestAnimationFrame(tick);
+    setTimeout(() => { done = true; resolve({frames, visibility:document.visibilityState, focused:document.hasFocus()}); }, 500);
+  }));
+  console.log(`${name}: renderer startup ${JSON.stringify(boot)}, errors ${JSON.stringify(errors)}`);
   await page.screenshot({ path: join(SHOTS, `${name}-1-menu.png`) });
   let st = await state(page);
   assert.ok(st.minTouchPx >= 48, `menu touch targets ${st.minTouchPx.toFixed(0)} px`);
 
+  await page.evaluate(() => document.getElementById('play').addEventListener('click', () => { window.__started = window.pourState(); }, {once:true}));
   await page.tap('#play');
   st = await state(page);
   assert.ok(st.playing && st.level === 1, 'Play starts level 1');
+  assert.equal(await page.evaluate(() => window.__started.remaining), 30, 'clock starts at exactly 30 seconds in the Play event');
+  assert.ok(st.jugClearance >= 0, `whole jug rotation clears HUD by ${st.jugClearance.toFixed(2)}px`);
   // Doing nothing pours nothing, and after 3 s the kit's finger hint shows how to tip.
   await sleep(3600);
   st = await state(page);
@@ -100,7 +117,8 @@ async function run(name) {
   assert.ok(st.playing && st.level === 2, 'Next starts level 2');
   await page.tap('#pause');
   st = await state(page); assert.ok(st.paused, 'pause button pauses');
-  const t = st.t; await sleep(400); assert.equal((await state(page)).t, t, 'paused: time stands still');
+  const t = st.t, remaining = st.remaining; await sleep(400); assert.equal((await state(page)).t, t, 'paused: time stands still');
+  assert.equal((await state(page)).remaining, remaining, 'pause freezes visible countdown');
   await page.tap('#resume'); await sleep(300);
   assert.ok((await state(page)).t > t, 'go on: time runs');
   await page.tap('#pause'); await page.tap('#quit');
@@ -110,9 +128,78 @@ async function run(name) {
   await until(page, () => window.pourState && window.pourState().screen === 'menu', 'menu after reload');
   st = await state(page); assert.ok(st.saved[0] >= 1, 'stars survive a reload');
 
+  // Profile the actual animation loop separately from screenshot capture and automation.
+  await page.tap('#play');
+  await sleep(1000);
+  const before = await page.evaluate(() => window.pourPerf().intervals.length);
+  await sleep(5000);
+  const perf = await page.evaluate(start => {
+    const p = window.pourPerf(), summarize = a => {
+      const sorted = a.slice().sort((a,b) => a-b);
+      return { count: a.length, mean: a.reduce((x,y) => x+y,0)/a.length,
+        p95: sorted[Math.floor(sorted.length*.95)], max: sorted.at(-1) };
+    };
+    return { interval: summarize(p.intervals.slice(start)), work: summarize(p.work.slice(start)) };
+  }, before);
+  console.log(`${name}: frame profile ${JSON.stringify(perf)}`);
+  assert.ok(perf.interval.count >= 250, 'at least 250 frames in five seconds');
+  assert.ok(perf.work.p95 < 16.67, 'p95 simulation and render work fits 60fps budget');
+  assert.ok(perf.interval.mean < 18, 'mean frame interval sustains near 60fps');
+  // Full tilt must remain below both the dots and clock, including the handle stroke.
+  await page.evaluate(() => {
+    const c = document.getElementById('c');
+    for (const [type,x] of [['pointerdown',80],['pointermove',360]])
+      c.dispatchEvent(new PointerEvent(type,{pointerId:8,pointerType:'touch',clientX:x,clientY:400,bubbles:true}));
+  });
+  await until(page, () => window.pourState().angle >= 2.39, 'full tilt');
+  await page.screenshot({ path: join(SHOTS, `${name}-4-full-tilt.png`) });
+  assert.ok((await state(page)).jugClearance >= 0, 'full tilt clears HUD');
+  await page.evaluate(() => document.getElementById('c').dispatchEvent(new PointerEvent('pointerup', {pointerId:8,pointerType:'touch',bubbles:true})));
+  if ((await state(page)).over) {
+    await until(page, () => window.pourState().screen === 'end', 'full tilt result');
+    await page.tap('#toMenu');
+  } else { await page.tap('#pause'); await page.tap('#quit'); }
+
+  // Daily retries share seed, do not award campaign stars, and retain the device best.
+  const campaign = (await state(page)).saved;
+  await page.tap('#daily');
+  const dailyStart = await state(page);
+  assert.ok(dailyStart.daily && dailyStart.level === 1, 'daily starts');
+  const activeStart = await page.evaluate(() => window.pourPerf().intervals.length);
+  await pour(page);
+  await until(page, () => window.pourState().screen === 'end', 'daily result', 35000);
+  const active = await page.evaluate(start => {
+    const p = window.pourPerf(), stats = data => {
+      const a = data.slice(start), sorted = a.slice().sort((x,y) => x-y);
+      return {count:a.length,mean:a.reduce((x,y)=>x+y,0)/a.length,p95:sorted[Math.floor(a.length*.95)],max:sorted.at(-1)};
+    };
+    return {interval:stats(p.intervals),work:stats(p.work)};
+  }, activeStart);
+  console.log(`${name}: active pour profile ${JSON.stringify(active)}`);
+  assert.ok(active.interval.count >= 120, 'at least two seconds of active pour measured');
+  assert.ok(active.work.p95 < 16.67, 'active pour p95 work fits 60fps budget');
+  assert.ok(active.interval.mean < 18, 'active pour mean interval sustains near 60fps');
+  const dailyEnd = await state(page);
+  assert.ok(dailyEnd.won, 'daily touch pour wins');
+  assert.equal(dailyEnd.daily.best.off, Math.abs(dailyEnd.inGlass - dailyEnd.target), 'daily precision saved');
+  assert.equal(dailyEnd.daily.best.spilled, dailyEnd.spilled, 'daily spills saved');
+  assert.deepEqual(dailyEnd.saved, campaign, 'daily leaves campaign stars unchanged');
+  assert.equal(await page.locator('#next').isVisible(), false, 'daily has no campaign Next');
+  await page.screenshot({ path: join(SHOTS, `${name}-5-daily.png`) });
+  await page.tap('#retry');
+  const retry = await state(page);
+  assert.equal(retry.seed, dailyStart.seed, 'daily retry keeps seed');
+  assert.equal(retry.daily.day, dailyStart.daily.day, 'daily retry keeps day');
+  await page.reload();
+  await until(page, () => window.pourState?.().screen === 'menu', 'daily reload');
+  assert.ok((await page.locator('#dailyBest').textContent()).includes(`${dailyEnd.daily.best.off} from the line`), 'device best survives reload');
+  await page.tap('#daily');
+  assert.deepEqual((await state(page)).daily.best, dailyEnd.daily.best, 'reload preserves exact daily best');
+  console.log(`${name}: daily ${dailyEnd.inGlass}/${dailyEnd.target}, ${dailyEnd.spilled} spilled; clearance ${retry.jugClearance.toFixed(2)}px`);
+
   assert.deepEqual(errors, [], 'no page or console errors');
-  await browser.close();
   console.log(`${name}: ok`);
+  } finally { try { await browser?.close(); } finally { awake?.kill(); } }
 }
 
 const which = process.argv[2] ? [process.argv[2]] : ['webkit', 'chromium'];

@@ -4,7 +4,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { handle, validateQuest, cleanQuest, buildQuestMessages, GIVERS, KINDS, TARGETS, MOODS, QUEST_LIMITS, QUEST_SCHEMA, LIMITS, readSpend, takeOne } from '../src/core.mjs';
 
 const GOOD = { giver: 'beetle', kind: 'fetch', target: 'seed', count: 3, mood: 'grumpy', variant: 0 };
-const QUEST = { name: 'Old Boots', ask: 'Bring me 3 seeds, please. My pantry echoes!', thanks: 'A feast! My pantry has stopped echoing.', scold: 'Even the moss is overtaking you!', secret: 'The oldest daisy keeps a spare sunrise under one leaf.' };
+const QUEST = { name: 'Old Beetle', ask: 'Bring me 3 seeds, please. My pantry echoes!', thanks: 'A feast! My pantry has stopped echoing.', scold: 'Even the moss is overtaking you!', secret: 'The oldest daisy keeps a spare sunrise under one leaf.' };
 const PERSONA = { name: 'Old Scar', title: 'Keeper of the Grass', temperament: 'stalker', persistence: 2, territory: 2, lines: { rise: 'Hello, little Ant.', notice: 'Hello again.', escape: 'Come back!', kill: 'Crunch!', beaten: 'Good work!' } };
 const NOW = Date.UTC(2026, 10, 23, 12), DAY = '2026-11-23';
 // Real SQLite under the same cursor interface as Durable Object storage.
@@ -68,10 +68,28 @@ test('quest asks must retain the count and target after clamping; natural plural
   }
   assert.ok(cleanQuest({ ...QUEST, ask: 'Please guide 3 lost-ants home.' }, { ...GOOD, target: 'lost-ant' }));
   for (const ask of ['Bring me seeds!', 'Bring me 4 seeds!', 'Bring me 13 seeds!', 'Bring me 3 seedlings!', 'Bring me 3 berries!', `${'Please hurry. '.repeat(8)}Bring me 3 seeds.`]) assert.equal(cleanQuest({ ...QUEST, ask }, GOOD), null, ask);
-  const out = cleanQuest({ ...QUEST, name: "Old 😀 Boots 17 <>", thanks: 'Thank you! '.repeat(20), scold: 'You’re slow—like moss!', secret: 'A long meadow tale. '.repeat(20) }, GOOD);
-  assert.ok(out); assert.equal(out.name, 'Old Boots'); assert.equal(out.scold, "You're slow-like moss!");
+  const out = cleanQuest({ ...QUEST, name: "Old 😀 Beetle 17 <>", thanks: 'Thank you! '.repeat(20), scold: 'You’re slow—like moss!', secret: 'A long meadow tale. '.repeat(20) }, GOOD);
+  assert.ok(out); assert.equal(out.name, 'Old Beetle'); assert.equal(out.scold, "You're slow-like moss!");
   for (const [k, max] of Object.entries(QUEST_LIMITS)) assert.ok(out[k].length <= max, k);
   assert.match(out.name, /^[A-Za-z' -]+$/);
+});
+
+test('the prompt and cleaned name use the whole species word for all eight givers', () => {
+  const givers = [
+    ['beetle', 'beetle', 'Beetle'], ['snail', 'snail', 'Snail'],
+    ['spider', 'spider', 'Spider'], ['frog', 'frog', 'Frog'],
+    ['bird', 'bird', 'Bird'], ['mouse', 'mouse', 'Mouse'],
+    ['ant-queen', 'ant', 'Ant Queen'], ['firefly', 'firefly', 'Firefly'],
+  ];
+  for (const [giver, species, fallback] of givers) {
+    const q = { ...GOOD, giver };
+    assert.ok(buildQuestMessages(q)[1].content.includes(`Include the word "${species}" in its name.`));
+    const name = `Moss-${species.toUpperCase()}`;
+    assert.deepEqual(cleanQuest({ ...QUEST, name }, q), { ...QUEST, name });
+    for (const wrong of ['Old Boots', `Moss${species}`, `Queen ${species}ling`, `Moss Under the Old Stone ${species}`]) {
+      assert.deepEqual(cleanQuest({ ...QUEST, name: wrong }, q), { ...QUEST, name: fallback }, wrong);
+    }
+  }
 });
 
 test('quest applies the persona banned-word filter to every field and rejects missing or non-text output', () => {
@@ -125,25 +143,85 @@ test('quest cache includes every input field and a cache hit spends no call or r
   assert.equal(cache.store.size, 1);
 });
 
-test('quest model failure and timeout count but are not cached', async () => {
-  for (const ai of [() => { throw new Error('down'); }, () => ({ response: 'No quest.' }), () => ({ response: { ...QUEST, secret: 'There will be blood!' } }), () => new Promise(() => {})]) {
-    const env = fakeEnv({ ai }), cache = fakeCache(), c = ctx();
-    assert.equal((await handle(req(), env, c, deps({ cache }))).status, 502); await Promise.all(c.waits);
-    assert.deepEqual(readSpend(env.sql, DAY), { persona: 0, quest: 1 }); assert.equal(cache.store.size, 0);
+test('quest retries a model failure or unusable output once and caches only the successful answer', async () => {
+  for (const fail of [() => { throw new Error('down'); }, () => ({ response: 'No quest.' }), () => ({ response: { ...QUEST, secret: 'There will be blood!' } })]) {
+    let calls = 0;
+    const env = fakeEnv({ ai: () => ++calls === 1 ? fail() : { response: QUEST }, perIp: 1, global: 1, cap: 2 });
+    const cache = fakeCache(), c = ctx();
+    const res = await handle(req(), env, c, deps({ cache }));
+    assert.equal(res.status, 200); assert.deepEqual(await res.json(), QUEST);
+    await Promise.all(c.waits);
+    assert.equal(env.calls.length, 2);
+    assert.deepEqual(readSpend(env.sql, DAY), { persona: 0, quest: 2 });
+    assert.equal(env.keys.length, 2, 'one request uses each limiter once');
+    assert.equal(cache.store.size, 1);
   }
+});
+
+test('two quest failures return the original model error and neither attempt is cached', async () => {
+  for (const ai of [() => { throw new Error('down'); }, () => ({ response: 'No quest.' }), () => ({ response: { ...QUEST, secret: 'There will be blood!' } })]) {
+    const env = fakeEnv({ ai }), cache = fakeCache(), c = ctx();
+    const res = await handle(req(), env, c, deps({ cache }));
+    assert.equal(res.status, 502); assert.deepEqual(await res.json(), { error: 'model' });
+    assert.equal(env.calls.length, 2);
+    assert.deepEqual(readSpend(env.sql, DAY), { persona: 0, quest: 2 });
+    assert.equal(c.waits.length, 0); assert.equal(cache.store.size, 0);
+  }
+});
+
+test('hung quest attempts wait at most 6000 ms and 3000 ms with quota charged per invocation', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: NOW });
+  const env = fakeEnv({ ai: () => new Promise(() => {}) });
+  const flush = () => new Promise(resolve => setImmediate(resolve));
+  let finished = false;
+  const response = handle(req(), env, ctx(), deps()).then(res => { finished = true; return res; });
+  await flush();
+  t.mock.timers.tick(5999); await flush();
+  assert.equal(env.calls.length, 1);
+  assert.deepEqual(readSpend(env.sql, DAY), { persona: 0, quest: 1 });
+  t.mock.timers.tick(1); await flush();
+  assert.equal(env.calls.length, 2);
+  assert.deepEqual(readSpend(env.sql, DAY), { persona: 0, quest: 2 });
+  t.mock.timers.tick(2999); await flush();
+  assert.equal(finished, false);
+  t.mock.timers.tick(1);
+  assert.equal((await response).status, 502);
+  assert.equal(Date.now() - NOW, 9000);
+});
+
+test('quest bypasses legacy cached names and caches the species fallback without a retry', async () => {
+  const old = { ...QUEST, name: 'Old Boots' };
+  const env = fakeEnv({ ai: () => ({ response: old }), cap: 1 });
+  const cache = fakeCache(), c = ctx();
+  cache.store.set('https://games-lab-ai.cache/quest/v1/beetle/fetch/seed/3/grumpy/0', JSON.stringify(old));
+  const expected = { ...QUEST, name: 'Beetle' };
+  assert.deepEqual(await (await handle(req(), env, c, deps({ cache }))).json(), expected);
+  await Promise.all(c.waits);
+  assert.deepEqual(await (await handle(req(), env, ctx(), deps({ cache }))).json(), expected);
+  assert.equal(env.calls.length, 1);
+  assert.deepEqual(readSpend(env.sql, DAY), { persona: 0, quest: 1 });
+});
+
+test('a missing inference binding does not consume daily allowance', async () => {
+  const env = fakeEnv();
+  delete env.AI;
+  const res = await handle(req(), env, ctx(), deps());
+  assert.equal(res.status, 502); assert.deepEqual(await res.json(), { error: 'model' });
+  assert.deepEqual(readSpend(env.sql, DAY), { persona: 0, quest: 0 });
 });
 
 test('one shared daily cap counts both endpoints, including failures, and resets at UTC midnight', async () => {
   const env = fakeEnv({ cap: 2 }), persona = { event: 'rise', form: 'Ant', playerForm: 'Ant', kills: 1 };
   assert.equal((await handle(req(persona, { path: '/lab-api/persona' }), env, ctx(), deps())).status, 200);
   env.AI.run = async () => { env.calls.push({}); throw new Error('down'); };
-  assert.equal((await handle(req(), env, ctx(), deps())).status, 502);
+  const failed = await handle(req(), env, ctx(), deps());
+  assert.equal(failed.status, 502); assert.deepEqual(await failed.json(), { error: 'model' });
   assert.deepEqual(await (await spend(env)).json(), { day: DAY, calls: { persona: 1, quest: 1 }, cap: 2 });
   assert.equal((await handle(req(), env, ctx(), deps())).status, 503); assert.equal(env.calls.length, 2);
   assert.equal((await handle(req(), env, ctx(), deps({ now: () => NOW + 86400000 }))).status, 502);
-  assert.deepEqual(readSpend(env.sql, '2026-11-24'), { persona: 0, quest: 1 });
-  assert.deepEqual(env.sql.exec('SELECT day, n FROM days').toArray().map(r => ({ ...r })), [{ day: '2026-11-24', n: 1 }]);
-  assert.deepEqual(env.sql.exec('SELECT day, persona, quest FROM calls').toArray().map(r => ({ ...r })), [{ day: '2026-11-24', persona: 0, quest: 1 }]);
+  assert.deepEqual(readSpend(env.sql, '2026-11-24'), { persona: 0, quest: 2 });
+  assert.deepEqual(env.sql.exec('SELECT day, n FROM days').toArray().map(r => ({ ...r })), [{ day: '2026-11-24', n: 2 }]);
+  assert.deepEqual(env.sql.exec('SELECT day, persona, quest FROM calls').toArray().map(r => ({ ...r })), [{ day: '2026-11-24', persona: 0, quest: 2 }]);
 });
 
 test('spend returns only current-day aggregate counts, permits same-site reads, and fails closed', async () => {

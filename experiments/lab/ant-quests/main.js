@@ -1,4 +1,4 @@
-import {create, step, guide, peekQuest, RESIDENTS, FALLBACK, DT, DAY, WIDTH, HEIGHT} from './sim.js';
+import {create, step, guide, peekQuest, RESIDENTS, FALLBACK, DT, DAY, WIDTH, HEIGHT, HIDE_RADIUS} from './sim.js';
 import {drawForm, setLook} from '../../ant-promotion/art.js';
 import {readJson, writeJson} from '../../kit/save.js';
 import {sound} from '../../kit/audio.js';
@@ -9,7 +9,8 @@ import {stick} from '../../kit/stick.js';
 import {hint} from '../../kit/hint.js';
 noZoom(); setLook(2);
 const $=id=>document.getElementById(id), canvas=$('c'), g=canvas.getContext('2d');
-const KEY='ant-quests-save', raw=readJson(KEY), save={v:1,best:0,runs:0,sound:true,memory:{},secrets:{}};
+const KEY='ant-quests-save', DIALOGUE_KEY='ant-quests:dialogue', QUEST_TIMEOUT_MS=12000;
+const raw=readJson(KEY), save={v:1,best:0,runs:0,sound:true,memory:{},secrets:{}};
 if(raw && typeof raw==='object'){
   save.best=Number.isFinite(raw.best)?Math.max(0,Math.min(12,raw.best)):0;
   save.runs=Number.isFinite(raw.runs)?Math.max(0,raw.runs):0; save.sound=raw.sound!==false;
@@ -18,7 +19,8 @@ if(raw && typeof raw==='object'){
 }
 const store=()=>writeJson(KEY,save), snd=sound({on:()=>save.sound});
 let mode='menu', s=null, W=0,H=0,scale=1,ox=0,oy=0,last=0,acc=0,shake=0,particles=[],pulses=[],toastFor=0,returnFromBook='play';
-let run=0,calls=0,requests=new Map(),shown=new Set(),activeLines=null,bubbleFor=0,bubbleQuest=null,completeSeen=0;
+let dialogue=readJson(DIALOGUE_KEY),calls=0,activeLines=null,bubbleFor=0,bubbleQuest=null,completeSeen=0;
+const requests=new Map(), shown=new Set();
 const keys=new Set(), reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const cards=screens(['menu','paused','bookCard','end'],name=>{
   mode=name;pad.drop();keys.clear();acc=0;
@@ -33,9 +35,10 @@ const hearts=()=>s?Object.values(s.friends).reduce((a,b)=>a+b,0):0;
 function tone(f=440,d=.09,v=.06,type='triangle',slide=0){snd.tone(f,d,v,type,slide);}
 function toast(text){$('toast').textContent=text;toastFor=2.4;$('toast').classList.add('on');}
 function burst(x,y,color='#efc86b',n=22){if(reduced)n=5;for(let i=0;i<n;i++){const a=Math.random()*Math.PI*2,v=25+Math.random()*80;particles.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v-25,life:.6+Math.random()*.6,age:0,color,r:2+Math.random()*3});}pulses.push({x,y,age:0,color});}
-function cancelRequests(){for(const q of requests.values())q.controller?.abort();requests.clear();}
+function cancelRequests(){for(const {controller} of requests.values())controller.abort();requests.clear();}
 function start(){
-  cancelRequests();run++;calls=0;shown.clear();bubbleQuest=null;activeLines=null;completeSeen=0;particles=[];pulses=[];shake=0;
+  cancelRequests();calls=0;shown.clear();bubbleQuest=null;activeLines=null;completeSeen=0;particles=[];pulses=[];shake=0;
+  toastFor=0;$('toast').classList.remove('on');
   const query=new URLSearchParams(location.search), seed=query.has('seed')?Number(query.get('seed'))>>>0:20261123;
   s=create({seed,memory:save.memory});save.runs++;store();bubbleFor=0;
   snd.unlock();snd.release();tone(392,.12);tone(587,.2,.04);cards('play');
@@ -44,17 +47,39 @@ function pause(){if(mode!=='play')return;cards('paused');snd.hold();}
 function resume(){snd.unlock();snd.release();cards('play');}
 function clean(p){if(!p||typeof p!=='object')return null;const out={};for(const k of ['name','ask','thanks','scold','secret']){if(typeof p[k]!=='string'||!p[k].trim())return null;out[k]=p[k].trim().slice(0,70);}return out;}
 function fallback(q){const f=FALLBACK[q.giver];return {name:f.name,ask:f.ask[q.kind].replaceAll('{count}',String(q.count)).replaceAll('{target}',q.target),thanks:f.thanks,scold:f.scold,secret:f.secret};}
-// Request at most once per approaching offer. Never replace words already read.
+function dailyDialogue(){
+  const day=new Date().toISOString().slice(0,10);
+  if(dialogue?.day!==day)dialogue={day,givers:{}};
+  return dialogue;
+}
+// A resident can ask for several different tasks. Only reuse text for matching instructions.
+const taskKey=q=>`${q.kind}:${q.target}:${q.count}`;
+const cachedLines=q=>clean(dailyDialogue().givers?.[q.giver]?.[taskKey(q)]);
+function cacheLines(q,day,lines){
+  const today=dailyDialogue();
+  if(today.day!==day)return;
+  const stored=readJson(DIALOGUE_KEY), givers={...today.givers,...(stored?.day===day?stored.givers:null)};
+  givers[q.giver]={...today.givers?.[q.giver],...givers[q.giver],[taskKey(q)]:lines};
+  dialogue={day,givers};writeJson(DIALOGUE_KEY,dialogue);
+}
+// Request at most once per approaching offer. Use the built-in lines while it is pending.
 function prefetch(){
   if(!s||calls>=8)return;
   for(const r of RESIDENTS){
     if(Math.hypot(s.player.x-r.x,s.player.y-r.y)>100)continue;
-    const q=peekQuest(s,r.id);if(!q||requests.has(q.id)||shown.has(q.id))continue;
-    const entry={controller:new AbortController(),lines:null,run},token=run;requests.set(q.id,entry);calls++;
-    const timer=setTimeout(()=>entry.controller.abort(),4000);
+    const q=peekQuest(s,r.id);if(!q||requests.has(q.id)||shown.has(q.id)||cachedLines(q))continue;
+    const day=dailyDialogue().day, controller=new AbortController(), entry={controller,lines:null};
+    requests.set(q.id,entry);calls++;
+    const timer=setTimeout(()=>controller.abort(),QUEST_TIMEOUT_MS);
     const body={giver:q.giver,kind:q.kind,target:q.target,count:q.count,mood:r.mood,variant:q.variant};
-    fetch('/lab-api/quest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:entry.controller.signal})
-      .then(r=>r.ok?r.json():null).then(p=>{if(run===token&&!shown.has(q.id))entry.lines=clean(p);}).catch(()=>{}).finally(()=>clearTimeout(timer));
+    fetch('/lab-api/quest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:controller.signal})
+      .then(r=>r.ok?r.json():null).then(p=>{
+        const lines=clean(p);
+        if(!lines||controller.signal.aborted)return;
+        entry.lines=lines;
+        cacheLines(q,day,lines);
+        if(s.quest?.id===q.id&&bubbleQuest?.id===q.id){activeLines=lines;speak(bubbleQuest);}
+      }).catch(()=>{}).finally(()=>clearTimeout(timer));
     if(calls>=8)break;
   }
 }
@@ -68,7 +93,7 @@ function events(){for(const e of s.events){
   const type=e.type||e.t,q=e.quest||s.quest;
   if(type==='offer'){
     const offered=q??e;shown.add(offered.id);bubbleQuest=structuredClone(offered);
-    activeLines=requests.get(offered.id)?.lines||fallback(offered);
+    activeLines=requests.get(offered.id)?.lines??cachedLines(offered);
     const m=save.memory[offered.giver];
     speak(offered);
     if(m?.failed)toast(`${resident(offered.giver).name}: Don't let me down again.`);
@@ -92,7 +117,7 @@ function events(){for(const e of s.events){
 }
 if(s.status!=='play')finish();}
 function rememberFailure(){if(s?.quest){const id=s.quest.giver;save.memory[id]={...(save.memory[id]||{}),failed:true};store();}}
-function finish(){rememberFailure();save.best=Math.max(save.best,hearts());store();$('endTitle').textContent=s.status==='won'?'Everyone belongs.':'The meadow remembers.';$('endScore').textContent=`${hearts()} / 12 hearts`;$('endLine').textContent=s.status==='won'?'Four friends. A brighter meadow.':'Tomorrow is another little adventure.';$('endBest').textContent=`Best ${save.best} hearts · ${Object.keys(save.secrets).length} secrets`;cards('end');if(s.status==='won'){for(const r of RESIDENTS)burst(r.x,r.y,'#edc66c',45);[523,659,784,1047].forEach((f,i)=>setTimeout(()=>tone(f,.45,.08),i*130));}else tone(330,.6,.06,'sine',-70);}
+function finish(){cancelRequests();rememberFailure();save.best=Math.max(save.best,hearts());store();$('endTitle').textContent=s.status==='won'?'Everyone belongs.':'The meadow remembers.';$('endScore').textContent=`${hearts()} / 12 hearts`;$('endLine').textContent=s.status==='won'?'Four friends. A brighter meadow.':'Tomorrow is another little adventure.';$('endBest').textContent=`Best ${save.best} hearts · ${Object.keys(save.secrets).length} secrets`;cards('end');if(s.status==='won'){for(const r of RESIDENTS)burst(r.x,r.y,'#edc66c',45);[523,659,784,1047].forEach((f,i)=>setTimeout(()=>tone(f,.45,.08),i*130));}else tone(330,.6,.06,'sine',-70);}
 function book(){returnFromBook=mode;if(mode==='play')snd.hold();cards('bookCard');const box=$('entries');box.textContent='';for(const r of RESIDENTS){const div=document.createElement('div');div.className='entry';const b=document.createElement('b');b.textContent=r.name;const p=document.createElement('p');const m=save.memory[r.id];p.textContent='♥'.repeat(m?.hearts||0)+'♡'.repeat(3-(m?.hearts||0))+(m?.failed?' · Still waiting':m?.visits?' · Remembers you':' · Not yet friends');div.append(b,p);
   // Each friend's secrets sit under that friend: a separate list after four entries was scrolled out of sight.
   for(const v of new Set(Object.entries(save.secrets).filter(([k])=>k.split('-')[0]===r.id).map(([,v])=>v))){const q=document.createElement('p');q.className='secret';q.textContent=`“${v}”`;div.append(q);}box.append(div);}if(!Object.keys(save.secrets).length){const p=document.createElement('p');p.textContent='Every heart holds a secret.';box.append(p);}}
@@ -131,11 +156,10 @@ function world(now){
   g.shadowColor='#0d281f66';g.shadowBlur=25;g.shadowOffsetY=12;g.fillStyle='#b6c78a';g.beginPath();g.roundRect(0,0,WIDTH,HEIGHT,42);g.fill();g.shadowBlur=0;g.shadowOffsetY=0;
   // A hand-drawn meadow border, with open walking ground in the middle.
   for(let i=0;i<75;i++){const x=15+(i*137.51)%330,y=15+(i*79.37)%470;if(x>110&&x<240&&y>140&&y<410)continue;const c=i%3===0?'#91af71':'#a6be7c';ellipse(x,y,7,3,c,-.6);if(i%5===0){line([[x,y],[x+1,y-13]],'#86a36a',1.6);for(let k=0;k<5;k++)ellipse(x+Math.cos(k*1.257)*4,y-13+Math.sin(k*1.257)*4,3,3,i%2?'#fff2ce':'#e6a98c');ellipse(x,y-13,2.5,2.5,'#e6bf69');}}
-  // Stream has two crossings. Silk opens the central shortcut.
+  // Silk opens a shortcut over the slow water.
   line([[15,245],[65,260],[125,245],[180,260],[240,245],[300,260],[345,245]],'#7d9e7c',35);
   line([[15,242],[65,257],[125,242],[180,257],[240,242],[300,257],[345,242]],'#89bdba',27);
   for(let i=0;i<10;i++){const x=22+i*33,y=247+Math.sin(i*2)*6;line([[x,y],[x+10,y]],'#c5e3cf',2);}
-  for(const x of [30,330]){ellipse(x,249,23,19,'#b6c78a');for(let k=0;k<3;k++)ellipse(x-8+k*8,247+(k%2)*6,7,5,'#d5d0a7');}
   if(world.bridge){const bw=25+world.bridge*17;line([[180,227],[180,280]],'#fff2cf',bw*2);for(let y=231;y<280;y+=8)line([[180-bw,y],[180+bw,y]],'#b7ad88',2);}
   // Beetle's gate and snail's trail reflect functional state in sim.js.
   const rx=180+(world.rockOpen||0)*22,rr=23-(world.rockOpen||0)*3;ellipse(rx,340,rr,rr*.85,'#77856a');ellipse(rx-4,335,rr*.7,rr*.55,'#9aa486');
@@ -145,9 +169,9 @@ function world(now){
   if(s){
     const q=s.quest;
     if(q){
-      for(const p of q.points||[]){if(p.taken||p.done||p.gone)continue;target(p.x,p.y,t);if(q.kind==='hide'){ellipse(p.x,p.y,27,23,'#6e985c');for(let k=0;k<4;k++)ellipse(p.x-18+k*11,p.y-8-(k%2)*7,13,15,'#82a96a');}else if(q.kind==='hunt'){ant(p.x,p.y,Math.sin(t)*.2,t,6,'#8b9a42');}else{ellipse(p.x,p.y,6,9,q.target==='berry'?'#cf775a':'#d8ae63',.5);line([[p.x-2,p.y-4],[p.x+2,p.y+4]],'#f5dda2',1);}}
+      for(const p of q.points||[]){if(p.taken||p.done||p.gone)continue;if(q.kind==='hide'){ellipse(p.x,p.y,27,23,'#6e985c');for(let k=0;k<4;k++)ellipse(p.x-18+k*11,p.y-8-(k%2)*7,13,15,'#82a96a');}else if(q.kind==='hunt'){ant(p.x,p.y,Math.sin(t)*.2,t,6,'#8b9a42');}else{ellipse(p.x,p.y,6,9,q.target==='berry'?'#cf775a':'#d8ae63',.5);line([[p.x-2,p.y-4],[p.x+2,p.y+4]],'#f5dda2',1);}target(p.x,p.y,t);}
       if(q.lost){target(q.lost.x,q.lost.y,t);ant(q.lost.x,q.lost.y,0,t,8,'#ad6e48');}
-      if(q.goal&&(q.ready||q.kind==='race'||q.kind==='escort'))target(q.goal.x,q.goal.y,t);
+      if(q.goal&&(q.ready||q.kind==='escort'))target(q.goal.x,q.goal.y,t);
     }
     for(const h of s.hunters||[]){if(h.gone)continue;ellipse(h.x,h.y+2,14,7,'#2e4e3433');ant(h.x,h.y,h.a||0,t,10,'#a65546');}
     const dest=guide(s);if(dest&&s.status==='play'){
@@ -163,11 +187,21 @@ function world(now){
 function target(x,y,t){g.save();g.strokeStyle='#fff8dc';g.lineWidth=2;g.beginPath();g.arc(x,y,17+Math.sin(t*4)*2,0,7);g.stroke();g.restore();}
 function hero(id){const c=$(id),ctx=c.getContext('2d');ctx.clearRect(0,0,600,300);ctx.save();ctx.translate(300,155);ctx.scale(2,2);ctx.fillStyle='#e5e8c5';ctx.beginPath();ctx.ellipse(0,15,135,34,0,0,7);ctx.fill();for(const [i,r]of RESIDENTS.entries())folk(ctx,r.id,-99+i*66,8,i,3);ctx.restore();}
 hero('hero');hero('endArt');
+function taskStatus(q){
+  if(q.ready)return 'Return to giver';
+  if(q.kind==='race')return 'Reach the pebble';
+  if(q.kind==='escort')return q.escorting?'Lead it back':'Find the lost ant';
+  if(q.kind==='hide'){
+    const leaf=q.points[0],underLeaf=Math.hypot(s.player.x-leaf.x,s.player.y-leaf.y)<HIDE_RADIUS;
+    return underLeaf?`Stay under leaf · ${Math.floor(q.progress*100)}%`:'Reach the leaf';
+  }
+  return `${q.progress} / ${q.count}`;
+}
 function frame(now){requestAnimationFrame(frame);const dt=last?Math.min(.1,(now-last)/1000):0;last=now;
   if(mode==='play'&&s){prefetch();acc+=dt;while(acc>=DT&&mode==='play'){acc-=DT;step(s,input());events();}
     $('hearts').textContent=`♥ ${hearts()} / 12`;
     const left=Math.max(0,Math.ceil(DAY-s.t));$('clock').textContent=`${Math.floor(left/60)}:${String(left%60).padStart(2,'0')}`;$('sunfill').style.transform=`scaleX(${clamp(1-s.t/DAY,0,1)})`;
-    if(s.quest){const q=s.quest;$('progress').textContent=`${q.ready?'Bring home':q.kind==='hide'?Math.floor((q.progress||0)*100)+'%':(q.progress||0)+' / '+q.count} · ${Math.ceil(q.remaining)}s`;$('questfill').style.width=`${clamp((q.progress||0)/q.count,0,1)*100}%`;}
+    if(s.quest){const q=s.quest;$('progress').textContent=`${taskStatus(q)} · ${Math.ceil(q.remaining)}s`;$('questfill').style.width=`${clamp(q.progress/q.count,0,1)*100}%`;}
     else{$('progress').textContent='';$('questfill').style.width='0%';if(bubbleFor>100){$('line').textContent='Follow the little path to a friend.';$('name').textContent='The meadow';}}
     if(!s.quest&&bubbleFor<=0){$('name').textContent='The meadow';$('line').textContent='Follow the little path to a friend.';bubbleFor=999;$('bubble').style.display='block';}
     if(bubbleFor<100){bubbleFor-=dt;if(bubbleFor<=0)$('bubble').style.display='none';}
@@ -176,5 +210,5 @@ function frame(now){requestAnimationFrame(frame);const dt=last?Math.min(.1,(now-
   if(toastFor>0){toastFor-=dt;if(toastFor<=0)$('toast').classList.remove('on');}world(now);
 }
 // Read-only snapshot: phone checks steer with pointer input through the kit stick.
-window.meadowState=()=>({mode,audio:!!snd.ctx,s:s?structuredClone(s):null,calls,shown:[...shown],completed:completeSeen,save:structuredClone(save),guide:s?guide(s):null,layout:{scale,ox,oy,W,H},bubble:$('line').textContent,source:activeLines===null?'none':(bubbleQuest&&requests.get(bubbleQuest.id)?.lines===activeLines?'model':'fallback')});
+window.meadowState=()=>({mode,audio:!!snd.ctx,s:s?structuredClone(s):null,calls,shown:[...shown],completed:completeSeen,save:structuredClone(save),guide:s?guide(s):null,layout:{scale,ox,oy,W,H},bubble:$('line').textContent,source:bubbleQuest?(activeLines?'model':'fallback'):'none'});
 cards('menu');requestAnimationFrame(frame);

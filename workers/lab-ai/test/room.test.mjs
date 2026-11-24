@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFile } from 'node:fs/promises';
 import { ROOM, roomName, roomMessage, rateWindow, needsRound, freshRound, freeId } from '../src/room.mjs';
+import { decode } from '../../../experiments/lab/lantern-race/sim.js';
 
 // Run the class itself with socket/context stand-ins. Only the platform base class and 101 response are replaced;
 // a wrangler dev smoke test exercises the real runtime separately. Import paths still point to the real modules.
@@ -20,7 +21,13 @@ class Socket {
   deserializeAttachment() { return structuredClone(this.attachment); }
 }
 globalThis.WebSocketPair = class { constructor() { this[0] = new Socket(); this[1] = new Socket(); this[0].server = this[1]; } };
-const context = () => ({ sockets: [], getWebSockets() { return this.sockets; }, acceptWebSocket(ws) { this.sockets.push(ws); } });
+const context = () => ({
+  sockets: [],
+  alarmAt: null,
+  getWebSockets() { return this.sockets; },
+  acceptWebSocket(ws) { this.sockets.push(ws); },
+  get storage() { return { setAlarm: async time => { this.alarmAt = time; } }; },
+});
 const req = (path = '/lab-api/room/lantern-race/open', { origin = 'https://play.adamwhite.work', method = 'GET', upgrade = 'websocket', ip = '203.0.113.2' } = {}) => new Request(`https://play.adamwhite.work${path}`, { method, headers: { ...(origin ? { Origin: origin } : {}), ...(upgrade ? { Upgrade: upgrade } : {}), 'CF-Connecting-IP': ip } });
 const connect = r => r.fetch(req()).webSocket.server;
 const message = (r, ws, q) => r.webSocketMessage(ws, JSON.stringify(q));
@@ -68,28 +75,110 @@ test('class: connect, names, rounds, relays, hibernation attachments, leave and 
   const a = connect(r), b = connect(r);
   assert.deepEqual(a.frames[0], { t: 'you', id: 1, peers: [], round: null });
   assert.deepEqual(b.frames[0], { t: 'you', id: 2, peers: [{ id: 1, n: 'Boat' }], round: null });
-  message(r, a, { t: 'hi', n: 'Ada' }); assert.deepEqual(b.frames.at(-1), { t: 'join', id: 1, n: 'Ada' });
+  message(r, a, { t: 'hi', n: 'Canoe' }); assert.deepEqual(b.frames.at(-1), { t: 'join', id: 1, n: 'Canoe' });
   const before = Date.now(); message(r, a, { t: 'ready' });
+  assert.equal(frames(a, 'round').length, 0, 'one Ready does not start a two-socket room');
+  r = new Room(ctx, {});
+  message(r, b, { t: 'ready' });
   const round = frames(a, 'round')[0]; assert.ok(round.start >= before + 4000 && round.start <= Date.now() + 4000);
   assert.ok(Number.isInteger(round.seed) && round.seed >= 0 && round.seed <= 0xffffffff);
   assert.deepEqual(frames(b, 'round')[0], round);
+  assert.deepEqual(a.frames.at(-2), { t: 'roster', ids: [1, 2] });
+  assert.deepEqual(decode(JSON.stringify(round)), round);
+  assert.equal(decode(JSON.stringify(a.frames.at(-2))), null, 'old clients silently ignore the roster');
   message(r, b, { t: 'ready' }); assert.equal(frames(a, 'round').length, 1, 'active round cannot be reset');
   message(r, a, { t: 'p', x: -0.2, d: 42, a: 1 });
   assert.equal(frames(a, 'p').length, 0); assert.deepEqual(b.frames.at(-1), { t: 'p', id: 1, x: -0.2, d: 42, a: 1 });
   message(r, a, { t: 'done', s: 42 }); assert.deepEqual(a.frames.at(-1), { t: 'done', id: 1, s: 42 });
   assert.deepEqual(b.frames.at(-1), a.frames.at(-1));
   r = new Room(ctx, {}); // same sockets, no JS memory: restore round, names, done flags and rate windows
-  assert.equal(r.clients.get(a).n, 'Ada'); assert.equal(r.clients.get(a).done, true);
+  assert.equal(r.clients.get(a).n, 'Canoe'); assert.equal(r.clients.get(a).done, true);
   assert.deepEqual(r.round, { seed: round.seed, start: round.start });
   const late = connect(r); assert.deepEqual(late.frames[0].round, r.round);
   message(r, late, { t: 'ready' }); assert.equal(frames(a, 'round').length, 1);
-  message(r, b, { t: 'done', s: 55 }); message(r, late, { t: 'ready' });
-  assert.equal(frames(a, 'round').length, 2, 'late arrival does not hold up finished participants');
+  message(r, b, { t: 'done', s: 55 });
+  for (const ws of [a, b, late]) assert.equal(ws.deserializeAttachment().round, null);
+  r = new Room(ctx, {});
+  message(r, late, { t: 'ready' });
+  assert.equal(frames(a, 'round').length, 1, 'a new round requires new Ready messages');
+  message(r, a, { t: 'ready' }); message(r, b, { t: 'ready' });
+  assert.equal(frames(a, 'round').length, 2);
   assert.equal(r.clients.get(late).inRound, true, 'late arrival participates in the next round');
   r.webSocketClose(b, 1000, 'bye'); assert.deepEqual(a.frames.at(-1), { t: 'leave', id: 2 });
   assert.equal(b.deserializeAttachment(), null); assert.equal(connect(r).frames[0].id, 2);
   for (const ws of [...r.clients.keys()]) r.webSocketClose(ws, 1006, '');
   assert.equal(r.round, null); assert.equal(new Room(ctx, {}).clients.size, 0);
+});
+
+test('the 8-second alarm starts only ready racers after reconstruction, without another client message', t => {
+  t.mock.timers.enable({ apis: ['Date'], now: 10_000 });
+  const ctx = context();
+  let r = new Room(ctx, {});
+  const a = connect(r), b = connect(r), idle = connect(r);
+  message(r, a, { t: 'ready' });
+  assert.equal(ctx.alarmAt, 18_000);
+  t.mock.timers.tick(3000);
+  message(r, b, { t: 'ready' });
+  message(r, a, { t: 'ready' });
+  assert.equal(ctx.alarmAt, 18_000, 'subsequent Ready frames do not extend the deadline');
+  r = new Room(ctx, {});
+  t.mock.timers.tick(4999); r.alarm();
+  assert.equal(frames(a, 'round').length, 0);
+  t.mock.timers.tick(1); r.alarm(); r.alarm();
+  assert.equal(frames(a, 'round').length, 1, 'alarm retry cannot start a duplicate');
+  assert.equal(frames(a, 'round')[0].start, 22_000);
+  assert.deepEqual(frames(a, 'roster'), [{ t: 'roster', ids: [1, 2] }]);
+  assert.deepEqual(frames(a, 'round'), frames(b, 'round'));
+  assert.equal(frames(idle, 'round').length, 0);
+  assert.equal(idle.deserializeAttachment().inRound, false);
+  message(r, idle, { t: 'p', x: 0, d: 1, a: 1 });
+  message(r, idle, { t: 'done', s: 1 });
+  assert.equal(frames(a, 'p').length, 0);
+  assert.equal(frames(a, 'done').length, 0);
+  message(r, a, { t: 'done', s: 2 });
+  assert.notEqual(connect(r).frames[0].round, null, 'one racer remains');
+  message(r, b, { t: 'done', s: 3 });
+  const welcome = connect(new Room(ctx, {})).frames[0];
+  assert.equal(welcome.round, null);
+  assert.deepEqual(decode(JSON.stringify(welcome)), welcome);
+});
+
+test('an overdue alarm does not let a late Ready or arrival change the roster', t => {
+  t.mock.timers.enable({ apis: ['Date'], now: 10_000 });
+  const r = new Room(context(), {}), a = connect(r), b = connect(r);
+  message(r, a, { t: 'ready' });
+  t.mock.timers.tick(8001);
+  message(r, b, { t: 'ready' });
+  assert.deepEqual(frames(a, 'roster'), [{ t: 'roster', ids: [1] }]);
+  assert.equal(frames(b, 'round').length, 0);
+  assert.equal(connect(r).frames[0].round.start, 22_001);
+});
+
+test('departures satisfy quorum, discard a departed Ready, and clear the last racer', t => {
+  t.mock.timers.enable({ apis: ['Date'], now: 10_000 });
+  const ctx = context(), r = new Room(ctx, {}), a = connect(r), b = connect(r);
+  message(r, a, { t: 'ready' });
+  r.webSocketClose(a, 1000, '');
+  t.mock.timers.tick(8000); r.alarm();
+  assert.equal(frames(b, 'round').length, 0);
+  const c = connect(r);
+  message(r, b, { t: 'ready' });
+  assert.equal(ctx.alarmAt, 26_000);
+  r.webSocketClose(c, 1000, '');
+  assert.equal(frames(b, 'round')[0].start, 22_000, 'the remaining ready socket starts immediately');
+  const spectator = connect(r);
+  r.webSocketClose(b, 1000, '');
+  assert.equal(spectator.deserializeAttachment().round, null);
+  assert.equal(connect(new Room(ctx, {})).frames[0].round, null);
+});
+
+test('a failed round announcement removes the departed racer from later rosters', () => {
+  const r = new Room(context(), {}), a = connect(r), b = connect(r);
+  message(r, a, { t: 'ready' });
+  a.broken = true;
+  message(r, b, { t: 'ready' });
+  assert.deepEqual(b.frames.slice(-3, -1), [{ t: 'leave', id: 1 }, { t: 'roster', ids: [2] }]);
+  assert.equal(frames(b, 'round').length, 1);
 });
 
 test('class: room full, invalid frames ignored, rate survives wake, failed sockets leave once', () => {
@@ -138,6 +227,9 @@ test('done reports reach everyone even outside a round; only participants affect
   message(r, a, { t: 'done', s: 7 });
   assert.deepEqual(a.frames.at(-1), { t: 'done', id: 1, s: 7 }); assert.deepEqual(b.frames.at(-1), a.frames.at(-1));
   assert.equal(r.clients.get(a).done, false);
-  message(r, a, { t: 'ready' }); const late = connect(r); message(r, late, { t: 'done', s: 9 });
-  assert.equal(r.clients.get(late).done, false); assert.deepEqual(a.frames.at(-1), { t: 'done', id: 3, s: 9 });
+  message(r, a, { t: 'ready' }); message(r, b, { t: 'ready' });
+  const late = connect(r); message(r, late, { t: 'done', s: 9 });
+  assert.equal(r.clients.get(late).done, false);
+  assert.equal(frames(a, 'done').length, 1, 'spectator score is not relayed into an active race');
+  assert.notEqual(r.round, null);
 });

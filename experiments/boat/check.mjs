@@ -52,7 +52,7 @@ async function playOut(page, name, shot, limitMs = 120000) {
     if (a?.k === 'ripple') { await swipe(page, a.x, a.y, a.ex, a.ey); input.swipes++; await sleep(330); }
     else if (a?.k === 'pebble') { await page.mouse.click(a.x, a.y); input.taps++; await sleep(330); }
     else await sleep(110);
-    if (shot && !mid && (await state(page)).y > 2.3) { await page.screenshot({ path: join(shots, `${name}-${shot}.png`) }); mid = true; }
+    if (shot && !mid && (await state(page)).y > 2.3) { await page.screenshot({ scale: 'css', path: join(shots, `${name}-${shot}.png`) }); mid = true; }
   }
   return input;
 }
@@ -83,19 +83,25 @@ try {
       assert.equal(await page.evaluate(() => getComputedStyle(document.getElementById('menuMore')).display), 'none', 'a first visit sees only Play');
       await bounds(page);
       await sleep(500);
-      await page.screenshot({ path: join(shots, `${name}-menu.png`) });
+      await page.screenshot({ scale: 'css', path: join(shots, `${name}-menu.png`) });
       await page.click('#play');
       let st = await state(page);
       assert.equal(st.screen, 'play');
       assert.equal(st.level, 1);
       await bounds(page);
-      await sleep(600);
+      await page.waitForFunction(() => !!document.querySelector('.kit-hint.on[data-kind="hold-and-move"]'), undefined, { timeout: 6000 });
+      assert.equal(await page.locator('.kit-hint.on .hand').isVisible(), true, 'the shared ghost finger is visible');
+      assert.equal(await page.locator('.kit-hint.on .hand').count(), 1, 'the shared hint shows a ghost finger');
+      assert.equal(await page.locator('.kit-hint.on').evaluate(el => getComputedStyle(el).pointerEvents), 'none', 'hint leaves the canvas interactive');
+      await page.screenshot({ scale: 'css', path: join(shots, `${name}-shared-hint.png`) });
       const drift = await state(page);
       assert.ok(drift.y > st.y, 'the current carries the boat without any touch');
       // One real swipe to the right, beside the boat: a ripple appears and the boat is pushed right.
       await swipe(page, drift.boat.x - 70, drift.boat.y - 10, drift.boat.x + 50, drift.boat.y - 10);
       await sleep(80);
       assert.ok((await state(page)).ripples >= 1, 'a swipe makes a ripple');
+      assert.equal(await page.locator('.kit-hint.on').count(), 0, 'real input dismisses the shared hint');
+      assert.equal(await page.evaluate(() => localStorage.getItem('boat:hint')), '1', 'hint completion persists');
       await sleep(900);
       const pushed = await state(page);
       assert.ok(pushed.x > drift.x + 0.1, `the ripple pushed the boat right (${drift.x.toFixed(2)} to ${pushed.x.toFixed(2)})`);
@@ -123,7 +129,7 @@ try {
       assert.ok(done.fx > 0, 'actions and the win emit particles');
       await bounds(page);
       await sleep(700);
-      await page.screenshot({ path: join(shots, `${name}-end.png`) });
+      await page.screenshot({ scale: 'css', path: join(shots, `${name}-end.png`) });
       const blob = await page.evaluate(() => localStorage.getItem('boat-save'));
       const saved = JSON.parse(blob);
       assert.ok(saved.stars['1'] >= 1 && saved.opened === 2, 'stars saved and street 2 opened');
@@ -141,7 +147,7 @@ try {
       assert.equal(await page.isVisible('#next'), false, 'no Next after a loss');
       await bounds(page);
       await sleep(500);
-      await page.screenshot({ path: join(shots, `${name}-lost.png`) });
+      await page.screenshot({ scale: 'css', path: join(shots, `${name}-lost.png`) });
       await page.click('#again');
       st = await state(page);
       assert.ok(st.screen === 'play' && st.level === 2 && st.t < 0.5, 'Retry restarts in one tap');
@@ -152,10 +158,10 @@ try {
       assert.equal(await page.evaluate(() => localStorage.getItem('boat-save')), JSON.stringify({ ...JSON.parse(blob), ...JSON.parse(await page.evaluate(() => localStorage.getItem('boat-save'))) }), 'save survives reload');
       assert.ok(JSON.parse(await page.evaluate(() => localStorage.getItem('boat-save'))).stars['1'] >= 1);
       await bounds(page);
-      await page.screenshot({ path: join(shots, `${name}-menu-returning.png`) });
+      await page.screenshot({ scale: 'css', path: join(shots, `${name}-menu-returning.png`) });
       await page.click('#choose');
       await bounds(page);
-      await page.screenshot({ path: join(shots, `${name}-streets.png`) });
+      await page.screenshot({ scale: 'css', path: join(shots, `${name}-streets.png`) });
       await page.click('#selectBack');
       // The daily stream.
       await page.click('#daily');
@@ -163,9 +169,9 @@ try {
       assert.equal(d.daily, true);
       assert.equal(d.seed, 5, 'the seed in the address is used');
       await playOut(page, name, 'daily', 25000).catch(() => {});
-      await page.screenshot({ path: join(shots, `${name}-daily.png`) });
+      await page.screenshot({ scale: 'css', path: join(shots, `${name}-daily.png`) });
       if ((await state(page)).screen === 'play') { await page.click('#pause'); await page.click('#restart'); }
-      else { await sleep(300); await page.screenshot({ path: join(shots, `${name}-daily-end.png`) }); await page.click('#next'); }
+      else { await sleep(300); await page.screenshot({ scale: 'css', path: join(shots, `${name}-daily-end.png`) }); await page.click('#next'); }
       const again = await state(page);
       assert.ok(again.daily && again.seed === 5, 'restart keeps the same daily stream');
       const s2 = JSON.parse(await page.evaluate(() => localStorage.getItem('boat-save')));
@@ -178,16 +184,16 @@ try {
       await page.setViewportSize({ width: 360, height: 640 });
       await sleep(300);
       await bounds(page);
-      await page.screenshot({ path: join(shots, `${name}-360-menu.png`) });
+      await page.screenshot({ scale: 'css', path: join(shots, `${name}-360-menu.png`) });
       await page.click('#choose');
       await bounds(page);
       await page.click('#levels button');
       await sleep(900);
       await bounds(page);
-      await page.screenshot({ path: join(shots, `${name}-360-play.png`) });
+      await page.screenshot({ scale: 'css', path: join(shots, `${name}-360-play.png`) });
       await page.click('#pause');
       await bounds(page);
-      await page.screenshot({ path: join(shots, `${name}-360-pause.png`) });
+      await page.screenshot({ scale: 'css', path: join(shots, `${name}-360-pause.png`) });
       await page.click('#toMenu');
       await page.setViewportSize({ width: 1280, height: 800 });
       await sleep(300);
@@ -202,7 +208,7 @@ try {
       await page.keyboard.press('Space');
       await sleep(100);
       assert.equal((await state(page)).stones, 1, 'desktop: space drops a pebble');
-      await page.screenshot({ path: join(shots, `${name}-desktop.png`) });
+      await page.screenshot({ scale: 'css', path: join(shots, `${name}-desktop.png`) });
       await page.keyboard.press('Escape');
       assert.equal((await state(page)).screen, 'paused');
       await page.click('#toMenu');
@@ -210,13 +216,37 @@ try {
       await page.waitForFunction(() => window.boatState);
       assert.equal((await state(page)).sound, false, 'sound setting persists');
       await sleep(300);
+      // The early pebble lesson: the target follows the water and a real tap parts the grate.
+      await page.setViewportSize({ width: device.viewport.width, height: device.viewport.height });
+      await page.evaluate(() => { localStorage.setItem('boat-save', JSON.stringify({ v: 1, opened: 3, stars: {}, sound: false, daily: {}, best: 0 })); localStorage.setItem('hf-lab-recording-off', '1'); });
+      await page.reload(); await page.waitForFunction(() => window.boatState);
+      await page.click('#play');
+      await page.waitForFunction(() => !!window.boatState().ghostTap);
+      const lesson = await state(page);
+      assert.equal(lesson.level, 3);
+      assert.ok(lesson.ghostTap.y > 90 && lesson.ghostTap.y < device.viewport.height - 40, 'ghost tap is visible above the boat');
+      await page.screenshot({ scale: 'css', path: join(shots, `${name}-pebble-hint.png`) });
+      // Screenshot capture may outlast the moving target. Restart, then tap its current position.
+      if ((await state(page)).screen === 'play') { await page.click('#pause'); await page.click('#restart'); }
+      else await page.click('#again');
+      await page.waitForFunction(() => !!window.boatState().ghostTap);
+      const target = (await state(page)).ghostTap;
+      await page.mouse.click(target.x, target.y);
+      await page.waitForFunction(() => window.boatState().screen === 'play' && window.boatState().stones === 1 && !window.boatState().ghostTap);
+      await sleep(150);
+      await page.screenshot({ scale: 'css', path: join(shots, `${name}-parted-grate.png`) });
+      // Let the boat use the parted current before policy input resumes.
+      await page.waitForFunction(() => window.boatState().y > 3.05 || !!window.boatState().over, undefined, { timeout: 18000 });
+      assert.equal((await state(page)).over, null, 'the ghost tap alone gets through the grate');
+      await playOut(page, name, 'pebble-play');
+      assert.equal((await state(page)).over, 'win', 'the pebble street finishes with real input');
       assert.deepEqual(errors, [], 'zero page, console, request and HTTP errors');
       console.log(`PASS ${name}: street 1 won in ${done.t.toFixed(1)}s with ${done.riders} passengers, ${done.stars} stars, ${input.swipes} swipes and ${input.taps} taps by real pointer input; street 2 untouched lost to the drain; save, daily, pause, keyboard, 360px and desktop pass; 0 page/console errors`);
     } catch (e) {
       failed++;
       console.error(`FAIL ${name}:`, e);
       console.error(errors);
-      await page.screenshot({ path: join(shots, `${name}-failure.png`) }).catch(() => {});
+      await page.screenshot({ scale: 'css', path: join(shots, `${name}-failure.png`) }).catch(() => {});
     } finally {
       await ctx.close();
       await browser.close();

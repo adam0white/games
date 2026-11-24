@@ -1,6 +1,7 @@
 // Paper Boat: all rules. Pure, seeded, fixed timestep; runs in Node (bots.mjs) and in the page (main.js).
 // Units: the gutter is 1 wide (x from 0 to 1). y grows downstream. Speeds are widths per second.
 export const DT = 1 / 60;
+export const STAR_SOAK = 0.53; // third star requires more than 47% dry paper
 export const U = 0.3; // base current
 export const BOAT_R = 0.055;
 export const CH = 2.2; // length of one generated piece of the daily stream
@@ -27,15 +28,19 @@ const R = (y, h) => ({ k: 'rapid', y, h });
 const RAW = [
   { name: 'Mill Lane', teach: 'ripple', len: 7, items: [B(0.76, 3.0), B(0.26, 5.0)] },
   { name: 'Grate Street', teach: 'drain', len: 8, items: [D(0.5, 3.4), B(0.76, 5.4)] },
-  { name: 'Three Drains', teach: 'pebble', len: 9.5, items: [D(0.32, 3), B(0.74, 4.0), D(0.68, 5.4), B(0.28, 6.5), D(0.46, 7.8)] },
-  { name: 'Leaf Fall', teach: 'leaf', len: 9.5, items: [L(0.3, 2.7), L(0.47, 2.8), L(0.63, 2.68), B(0.2, 3.8), L(0.55, 5.0), L(0.72, 5.1), L(0.88, 5.0), D(0.3, 6.7), B(0.74, 7.6)] },
+  { name: 'Split Grate', teach: 'pebble', len: 9.5, items: [{ ...D(0.5, 2.8), grate: true }, B(0.74, 4.0), D(0.68, 5.4), B(0.28, 6.5), D(0.46, 7.8)] },
+  { name: 'Leaf Fall', teach: 'leaf', len: 9.5, items: [L(0.3, 2.7), L(0.47, 2.8), L(0.63, 2.68), B(0.2, 4.4), L(0.55, 5.0), L(0.72, 5.1), L(0.88, 5.0), D(0.3, 6.7), B(0.74, 7.6)] },
   { name: 'Snail Corner', teach: 'snail', len: 10.5, items: [L(0.72, 3.0, 0.13), B(0.72, 3.0, 'snail'), D(0.4, 4.5), L(0.18, 5.8), L(0.34, 5.9), B(0.76, 6.4), D(0.64, 8.2)] },
   { name: 'Cat Alley', teach: 'paw', len: 10.5, items: [P(0.5, 3.3, 3.4, 0.6), B(0.26, 4.6), P(0.32, 6.2, 3.2, 1.5), D(0.72, 6.3), B(0.6, 8.2, 'snail')] },
   { name: 'Downpipe Row', teach: 'gush', len: 11.5, items: [G(2.5, 1.0, 1), D(0.84, 3.9), B(0.3, 4.8), G(5.6, 1.0, -1), L(0.12, 6.9), L(0.27, 7.0), B(0.74, 8.3, 'snail'), D(0.45, 9.6)] },
   { name: 'Steep Hill', teach: 'rapid', len: 13, items: [R(2.4, 3.8), B(0.72, 2.9), D(0.3, 3.7), D(0.7, 4.9), D(0.4, 6.0), P(0.5, 7.8, 3.2, 0.3), B(0.24, 9.1), L(0.6, 9.9), D(0.62, 10.8), D(0.26, 11.7)] },
   { name: 'Market Slalom', teach: 'mix', len: 13.5, items: [D(0.3, 2.6), L(0.7, 3.2), L(0.84, 3.3), D(0.62, 4.2), B(0.24, 4.6), P(0.4, 5.8, 3.0, 0.9), D(0.78, 6.6), G(7.2, 0.9, 1), D(0.86, 8.5), L(0.3, 8.9), B(0.5, 9.6, 'snail'), D(0.3, 10.6), D(0.7, 11.4), P(0.5, 12.3, 2.8, 0.2)] },
-  { name: 'Pond Road', teach: 'all', len: 16, items: [D(0.5, 2.6), B(0.2, 3.3), G(3.8, 0.9, -1), D(0.14, 5.1), L(0.6, 5.5), L(0.76, 5.6), P(0.36, 6.7, 3.0, 0.5), B(0.72, 7.4, 'snail'), R(8.0, 3.0), D(0.3, 8.9), D(0.72, 9.9), D(0.42, 10.9), P(0.6, 12.1, 2.8, 1.1), L(0.2, 12.9), L(0.36, 13.0), B(0.26, 13.7), D(0.6, 14.5), D(0.22, 15.2)] },
+  { name: 'Pond Road', teach: 'all', len: 16, items: [D(0.5, 2.6), B(0.2, 3.3), G(3.8, 0.9, -1), D(0.14, 5.1), L(0.6, 5.5), L(0.76, 5.6), P(0.36, 6.7, 3.0, 0.5), B(0.72, 7.4, 'snail'), R(8.0, 3.0), D(0.3, 8.9), D(0.72, 9.9), D(0.42, 10.9), P(0.6, 12.1, 2.8, 1.1), L(0.2, 12.9), L(0.36, 13.0), B(0.26, 13.7), D(0.5, 14.5), D(0.22, 15.2), D(0.86, 15.1)] },
 ];
+// Rapids come before the cross-current street: speed alone is gentler than a sideways gush.
+[RAW[6], RAW[7]] = [RAW[7], RAW[6]];
+// Passenger rescue, then timed paws, then the leaf corridor.
+[RAW[3], RAW[4], RAW[5]] = [RAW[4], RAW[5], RAW[3]];
 export const LEVELS = RAW.map((l, n) => ({
   ...l,
   n: n + 1,
@@ -103,6 +108,13 @@ export function create({ level = 1, seed = 1, daily = false, mut = null } = {}) 
 export const length = (s) => (s.daily ? Infinity : LEVELS[s.level - 1].len);
 export const speedUp = (s, y) => (s.daily ? 1 + Math.min(0.6, Math.max(0, y) / 150) : 1);
 export const soakRate = (s) => (s.daily ? 0.0125 + 0.00013 * s.b.y : LEVELS[s.level - 1].soak);
+// A pebble upstream of the broad grate parts its intake into two safe currents.
+export const grateParted = (s, it) => s.mut !== 'touch' && s.stones.some(st => Math.abs(st.x - (it.x - 0.08)) < 0.13 && Math.abs(st.y - (it.y - 0.22)) < 0.14);
+export function pebbleHint(s) {
+  if (s.daily || s.over) return null;
+  const it = LEVELS[s.level - 1].items.find(it => it.grate && s.b.y < it.y + 0.15 && it.y - s.b.y < 1.3 && !grateParted(s, it));
+  return it ? { k: 'pebble', x: it.x - 0.08, y: it.y - 0.22 } : null;
+}
 export function pawState(s, it) {
   const t = s.tick * DT + it.phase, c = t % it.period;
   return { cycle: Math.floor(t / it.period), warn: c >= it.period - PAW_WARN, down: c >= it.period - PAW_DOWN, c, left: it.period - c };
@@ -125,7 +137,7 @@ export function flow(s, x, y) {
     const dx = x - it.x, dy = y - it.y, d2 = dx * dx + dy * dy;
     if (d2 > 0.3) continue;
     const d = Math.sqrt(d2) || 1e-6;
-    if (it.k === 'drain') { const p = 0.42 * Math.exp(-d2 / 0.029); vx -= (dx / d) * p; vy -= (dy / d) * p; }
+    if (it.k === 'drain') { const p = (it.grate && grateParted(s, it) ? 0.08 : 0.42) * Math.exp(-d2 / 0.029); vx -= (dx / d) * p; vy -= (dy / d) * p; }
     else { const p = 0.05 * Math.exp(-d2 / 0.02); vx += (dx / d) * p; }
   }
   if (s.mut !== 'touch') {
@@ -153,6 +165,8 @@ export function step(s, acts = []) {
   for (const a of acts) {
     s.acts++;
     if (a.k === 'ripple') {
+      // Splash costs paper even on a fast run; distant ripples do not wet the boat.
+      s.soak += 0.02 * Math.max(0.3, Math.min(1, a.a ?? 1)) * Math.exp(-((a.x - b.x) ** 2 + (a.y - b.y) ** 2) / 0.06);
       const m = Math.hypot(a.dx, a.dy) || 1;
       s.ripples.push({ x: a.x, y: a.y, dx: a.dx / m, dy: a.dy / m, a: Math.max(0.3, Math.min(1, a.a ?? 1)), age: 0 });
       if (s.ripples.length > MAX_RIPPLES) s.ripples.shift();
@@ -173,7 +187,7 @@ export function step(s, acts = []) {
   s.stones = s.stones.filter((st) => st.age < STONE_LIFE);
 
   const [fx, fy] = flow(s, b.x, b.y);
-  let drag = 1, rate = soakRate(s);
+  let drag = 1, rate = soakRate(s) * (s.riders.includes('snail') ? 0.5 : 1);
   const near = items(s, b.y - 1, b.y + 1);
   for (const it of near) {
     if (it.k === 'gush' || it.k === 'rapid') continue;
@@ -182,7 +196,7 @@ export function step(s, acts = []) {
       drag = 0.3; rate += 0.085;
       if (!b.inLeaf) s.ev.push({ type: 'leaf', x: it.x, y: it.y });
       b.inLeaf = 2;
-    } else if (it.k === 'drain' && d < DRAIN_R && s.mut !== 'drain') {
+    } else if (it.k === 'drain' && (it.grate ? Math.abs(b.y - it.y) < DRAIN_R && (!grateParted(s, it) || d < DRAIN_R) : d < DRAIN_R) && s.mut !== 'drain') {
       s.over = 'drain'; s.ev.push({ type: 'drain', x: it.x, y: it.y });
     } else if (it.k === 'bug' && !s.got[it.id] && d < BUG_R) {
       s.got[it.id] = 1; s.riders.push(it.kind); s.soak = Math.max(0, s.soak - (s.daily ? 0.16 : 0.08));
@@ -223,7 +237,7 @@ export function step(s, acts = []) {
 export function stars(s) {
   if (s.over !== 'win') return 0;
   const all = s.riders.length >= LEVELS[s.level - 1].bugs;
-  return 1 + (all ? 1 : 0) + (all && s.soak < 0.62 ? 1 : 0);
+  return 1 + (all ? 1 : 0) + (all && s.soak < STAR_SOAK ? 1 : 0);
 }
 export const score = (s) => Math.max(0, Math.floor((s.b.y - 0.3) * 10)) + s.riders.length * 25;
 export function dailySeed(date = new Date()) {
@@ -249,6 +263,8 @@ function value(c) {
 }
 export function candidates(s) {
   const b = s.b, out = [null];
+  const tap = pebbleHint(s);
+  if (tap) out.push(tap);
   for (const dir of [-1, 1]) {
     out.push({ k: 'ripple', x: b.x - dir * 0.1, y: b.y + 0.03, dx: dir, dy: 0, a: 1 });
     out.push({ k: 'ripple', x: b.x - dir * 0.1, y: b.y + 0.03, dx: dir, dy: 0, a: 0.5 });

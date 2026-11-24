@@ -19,7 +19,7 @@ const server = createServer(async (req, res) => {
   if (url.pathname === '/notes/button.js') { res.writeHead(200, { 'content-type': 'text/javascript' }); return res.end(''); }
   let file = normalize(join(root, decodeURIComponent(url.pathname)));
   if (url.pathname.endsWith('/')) file = join(file, 'index.html');
-  try { if (!file.startsWith(root)) throw 0; const body = await readFile(file); res.writeHead(200, { 'content-type': types[extname(file)] ?? 'application/octet-stream', 'cache-control': 'no-store' }); res.end(body); }
+  try { if (!file.startsWith(root)) throw 0; let body = await readFile(file); if (process.argv.includes('--mutate-transitions') && file.endsWith('/main.js')) body = Buffer.from(body.toString().replace('pendingDraft = 0.65;', "setTimeout(() => { if (s.phase === 'draft' && mode === 'play') draft(); }, 650);")); res.writeHead(200, { 'content-type': types[extname(file)] ?? 'application/octet-stream', 'cache-control': 'no-store' }); res.end(body); }
   catch { res.writeHead(404); res.end('not found'); }
 });
 await new Promise(done => server.listen(0, '127.0.0.1', done));
@@ -40,6 +40,11 @@ const THUMB = () => {
     if (window.__stopThumb) return;
     requestAnimationFrame(f);
     const s = window.antDraftState();
+    // Act in the frame that observes the transition, before its short celebration expires.
+    if (s.mode === 'play' && ((s.phase === 'draft' && window.__pauseDraft) || (['won','lost'].includes(s.phase) && window.__pauseEnd))) {
+      if (s.phase === 'draft') window.__pauseDraft = false; else window.__pauseEnd = false;
+      document.querySelector('#pause').click(); return;
+    }
     if (s.mode !== 'play' || s.paused || s.phase !== 'fight') { if (down) { send('up', 0, 0); down = false; } return; }
     let best = null, bt = Infinity;
     for (const e of s.foes) { const sp = { termite: 30, beetle: 19, wasp: 46, spider: 15 }[e.kind], t = (552 - e.y) / sp + (e.kind === 'wasp' ? 30 : 0); if (t < bt) { bt = t; best = e; } }
@@ -63,6 +68,7 @@ async function run(name) {
     // 1. menu, then a first-time player who does not touch: the shared finger hint shows
     await page.goto(base + '?seed=7');
     await until(page, () => window.antDraftState && window.antDraftState().mode === 'menu', 'menu');
+    await page.bringToFront(); await page.evaluate(() => { window.__reviewPainted = false; requestAnimationFrame(() => requestAnimationFrame(() => { window.__reviewPainted = true; })); }); await page.waitForFunction(() => window.__reviewPainted, null, { timeout: 10000 });
     await sleep(300);
     await page.screenshot({ path: join(SHOTS, `${name}-1-menu.png`) });
     const small = await page.evaluate(() => [...document.querySelectorAll('button')].filter(b => b.offsetParent && (b.offsetWidth < 48 || b.offsetHeight < 48)).map(b => b.id || b.textContent));
@@ -90,14 +96,37 @@ async function run(name) {
 
     // 4. a whole run at speed 6: draft a card after every wave, until the end card
     await page.goto(base + '?seed=11&speed=6');
+    await page.evaluate(() => { window.__pauseDraft = true; window.__pauseEnd = true; });
     await until(page, () => window.antDraftState().mode === 'menu', 'menu again');
     await page.click('#play');
     await page.evaluate(THUMB);
-    let drafts = 0, shotDraft = false;
+    let drafts = 0, shotDraft = false, checkedDraftPause = false, checkedEndPause = false;
     const t0 = Date.now();
     for (;;) {
       st = await state(page);
       if (st.mode === 'end') break;
+      if (st.mode === 'paused' && st.phase === 'draft' && !checkedDraftPause) {
+        checkedDraftPause = true;
+        const t = (await state(page)).t;
+        await sleep(900);
+        assert.equal((await state(page)).mode, 'paused', 'draft transition waits for resume');
+        assert.equal((await state(page)).t, t);
+        await page.screenshot({path:join(SHOTS, `${name}-draft-transition-paused.png`)});
+        await page.tap('#resume');
+        await until(page, () => window.antDraftState().mode === 'draft', 'draft after interrupted celebration', 3000);
+      }
+      if (st.mode === 'paused' && ['won','lost'].includes(st.phase) && !checkedEndPause) {
+        checkedEndPause = true; await sleep(1500);
+        assert.equal((await state(page)).mode, 'paused', 'end transition must not replace pause');
+        await page.tap('#quit'); await page.tap('#play'); await sleep(1500);
+        assert.equal((await state(page)).mode, 'play', 'abandoned end cannot replace a new run');
+        assert.equal((await state(page)).held.length, 0);
+        // Finish a separate run for the existing end-card and saved-score checks.
+        await page.goto(base + '?seed=11&speed=6');
+        await until(page, () => window.antDraftState?.().mode === 'menu', 'fresh menu');
+        await page.tap('#play'); await page.evaluate(THUMB); drafts = 0;
+        continue;
+      }
       if (st.mode === 'draft') {
         await until(page, () => document.querySelectorAll('.pick.in').length === 3 || window.antDraftState().offer.length < 3, 'cards dealt', 3000);
         await sleep(400);
@@ -105,13 +134,17 @@ async function run(name) {
         const n = await page.locator('.pick').count();
         const before = st.held.length;
         await page.locator('.pick').nth(drafts % n).tap();
+        await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+        await sleep(500); assert.equal((await state(page)).mode, 'paused', 'leaving during card animation pauses next wave');
+        await page.tap('#resume');
         await until(page, k => window.antDraftState().held.length > k, 'card taken', 3000, before);
         drafts++;
         if (drafts === 4) { await sleep(1200); await page.screenshot({ path: join(SHOTS, `${name}-6-later-wave.png`) }); }
       }
-      if (Date.now() - t0 > 150000) throw new Error('run did not end in 150 s');
+      if (Date.now() - t0 > 240000) throw new Error('run did not end in 240 s');
       await sleep(100);
     }
+    assert.ok(checkedDraftPause && checkedEndPause, 'both transition pause windows exercised');
     await sleep(600);
     st = await state(page);
     await page.screenshot({ path: join(SHOTS, `${name}-7-end.png`) });

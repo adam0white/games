@@ -2,7 +2,7 @@
 // No alternate Lantern rules, artificial lives or disabled collisions are used.
 import assert from 'node:assert/strict';
 import { create, step, progress } from '../../lantern/sim.js';
-import { ranking, interpolate, ghostTrack, position, decode, validMessage, bytes, botControl, botTarget, nightForSeed, NIGHTS, countdown, cleanName, roomCode, makeCode, dailySeed } from './sim.js';
+import { ranking, interpolate, ghostTrack, position, decode, decodeRoomFrame, validMessage, bytes, botControl, botTarget, nightForSeed, NIGHTS, countdown, cleanName, roomCode, makeCode, dailySeed } from './sim.js';
 let failures = 0, checks = 0;
 const claim = (name, fn) => { checks++; try { fn(); console.log('ok  ' + name); } catch (e) { failures++; console.error('FAIL ' + name + ': ' + e.message); } };
 const rank = process.argv.includes('--mutate') ? entries => ranking(entries).reverse() : ranking;
@@ -36,6 +36,15 @@ claim('eight-peer roster receive bound handles the contract byte conflict', () =
   const roster = { t: 'you', id: 1, peers: Array.from({length:8}, (_,i) => ({ id:i+1, n:'abcdefghijklmnop' })), round: { seed: 4294967295, start: 1795000000000 } };
   assert.ok(bytes(roster) > 200); assert.deepEqual(decode(JSON.stringify(roster)), roster);
   console.log('    full eight-peer ASCII roster ' + bytes(roster) + ' bytes (receive-only exception)');
+});
+claim('round roster accepts only one to eight distinct socket IDs', () => {
+  const roster = { t: 'roster', ids: [8, 2, 1, 7, 3, 6, 4, 5] };
+  assert.deepEqual(decodeRoomFrame(JSON.stringify(roster)), roster);
+  assert.equal(decode(JSON.stringify(roster)), null, 'legacy decoder ignores round rosters');
+  for (const ids of [[], [1, 1], [0], [9], ['1'], null]) assert.equal(decodeRoomFrame(JSON.stringify({ t: 'roster', ids })), null);
+  assert.equal(decodeRoomFrame(JSON.stringify({ ...roster, start: 0 })), null);
+  assert.equal(decodeRoomFrame(JSON.stringify(roster).padEnd(201)), null);
+  assert.equal(decodeRoomFrame(JSON.stringify({ t: 'leave', id: 1 }).padEnd(201)), null);
 });
 claim('start offset clamped to 1..6 seconds; shared seed selects one night', () => {
   assert.equal(countdown(100, 1000), 1000); assert.equal(countdown(10000, 0), 6000); assert.equal(countdown(4000, 0), 4000);

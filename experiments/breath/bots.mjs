@@ -101,6 +101,46 @@ function run(level, seed, policy, seconds = 240, daily = false) {
 }
 const N = 32,
   rows = [];
+for (const level of [1, 2]) {
+  const seeds = [
+    ...Array.from({ length: N }, (_, i) => i + 1),
+    1700 + level * 97,
+    1801,
+  ];
+  const holdLosses = [];
+  const releaseWins = { warning: [], smoke: [] };
+  for (const seed of seeds) {
+    for (const delay of [0, 3.4, 12]) {
+      for (const releaseAt of [null, "warning", "smoke"]) {
+        const s = create({ seed, level });
+        while (s.t < delay) step(s, false);
+        const start = s.t;
+        let releases = 0;
+        while (!s.over) {
+          const w = wave(s, position(s).floor);
+          const hold = !releaseAt || !w.gust || (releaseAt === "smoke" && w.warning);
+          if (s.held && !hold) releases++;
+          step(s, hold);
+        }
+        if (releaseAt && s.over === "win" && s.stars === 3 && releases === level)
+          releaseWins[releaseAt].push(s.t - start);
+        if (!releaseAt && s.over === "lost" && s.floorReached === 1 && s.t - start < 20)
+          holdLosses.push(s.t - start);
+      }
+    }
+  }
+  const total = seeds.length * 3;
+  check(
+    holdLosses.length === total,
+    `level ${level}: continuous hold loses on the first floor in ${holdLosses.length}/${total} runs (last at ${Math.max(...holdLosses).toFixed(2)}s)`,
+  );
+  for (const [cue, wins] of Object.entries(releaseWins)) {
+    check(
+      wins.length === total,
+      `level ${level}: ${level} release(s) at ${cue} earn three stars in ${wins.length}/${total} runs (last at ${Math.max(...wins).toFixed(2)}s)`,
+    );
+  }
+}
 for (let level = 1; level <= LEVELS.length; level++) {
   const carefulRuns = [],
     clumsyRuns = [];
@@ -129,6 +169,10 @@ check(
 check(
   rows.every((row, i) => !i || row.clumsy <= rows[i - 1].clumsy),
   "clumsy win count never rises from one level to the next",
+);
+check(
+  rows.every((row, i) => !i || row.clumsy < rows[i - 1].clumsy),
+  "clumsy win count falls at every level",
 );
 const blocks = [0, 3, 6, 9].map((i) =>
   rows.slice(i, i + 3).reduce((n, r) => n + r.clumsy, 0),

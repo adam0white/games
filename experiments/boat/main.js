@@ -1,5 +1,5 @@
 // Paper Boat: the page. Rules live in sim.js; this file draws, listens and saves.
-import { create, step, flow, items, advise, stars, score, pawState, length, dailySeed, LEVELS, DT, BOAT_R, RIPPLE_LIFE, STONE_LIFE, PAW_R, PAW_WARN } from './sim.js';
+import { create, step, flow, items, advise, stars, score, pawState, length, dailySeed, pebbleHint, grateParted, STAR_SOAK, LEVELS, DT, BOAT_R, RIPPLE_LIFE, STONE_LIFE, PAW_R, PAW_WARN } from './sim.js';
 import { readJson, writeJson } from '../kit/save.js';
 import { sound } from '../kit/audio.js';
 import { onLeave, isPauseKey } from '../kit/pause.js';
@@ -91,8 +91,8 @@ function finish() {
   $('endRiders').textContent = daily ? String(s.riders.length) : `${s.riders.length} / ${LEVELS[level - 1].bugs}`;
   $('endStatName').textContent = daily ? 'Best' : 'Dry paper left';
   $('endStat').textContent = daily ? `${save.best}${newBest ? ' · new!' : ''}` : `${Math.round((1 - s.soak) * 100)}%`;
-  $('endTip').textContent = win ? (endStars === 3 ? '' : endStars === 2 ? 'Arrive drier for the third star.' : 'Bring every passenger for more stars.')
-    : daily ? 'Passengers bail water. Same stream for everyone today.' : s.over === 'drain' ? 'Swipe the water to push the boat aside.' : 'Leaves and paws soak the paper.';
+  $('endTip').textContent = win ? (endStars === 3 ? '' : endStars === 2 ? 'Keep over 47% dry paper for the third star. Ripples splash.' : 'Bring every passenger for more stars.')
+    : daily ? 'Passengers bail water. Same stream for everyone today.' : s.over === 'drain' ? (LEVELS[level - 1]?.teach === 'pebble' ? 'A pebble parts the current.' : 'Swipe the water to push the boat aside.') : 'Ripples splash. Leaves and paws soak the paper.';
   const next = $('next');
   next.style.display = win || daily ? '' : 'none';
   next.textContent = daily ? 'Again' : level < 10 ? 'Next street' : "Today's stream";
@@ -170,7 +170,7 @@ addEventListener('keydown', (e) => {
   if (dir) { queue.push({ k: 'ripple', x: b.x - dir[0] * 0.1, y: b.y - dir[1] * 0.1, dx: dir[0], dy: dir[1], a: 1 }); e.preventDefault(); }
   else if (e.key === ' ') { queue.push({ k: 'pebble', x: b.x + (b.x > 0.5 ? 0.1 : -0.1), y: b.y + 0.16 }); e.preventDefault(); }
 });
-hint(cv, { kind: 'hold-and-move', key: 'boat:hint', when: () => mode === 'play' && !s.over, played: !!old && (old.opened > 1 || (old.best || 0) > 0), delay: 2500, bottom: 150 });
+const help = hint(cv, { kind: 'hold-and-move', key: 'boat:hint', when: () => mode === 'play' && !s.over && !pebbleHint(s), played: !!old && (old.opened > 1 || (old.best || 0) > 0), delay: 2500, bottom: 150 });
 
 // ---- effects ----
 function burst(x, y, n, colour, speed = 0.5, life = 0.6, size = 3) {
@@ -306,6 +306,16 @@ function drawKerbs() {
 function drawItem(it, t) {
   const px = sx(it.x), py = sy(it.y), h = h32(it.id + it.k);
   if (it.k === 'drain') {
+    if (it.grate) {
+      const parted = grateParted(s, it);
+      g.fillStyle = parted ? '#163d43' : '#0a151b'; g.fillRect(x0, py - cw * 0.045, cw, cw * 0.09);
+      g.strokeStyle = '#839399'; g.lineWidth = 3;
+      for (let i = 0; i < 15; i++) { const x = x0 + (i + 0.5) * cw / 15; g.beginPath(); g.moveTo(x - 3, py - cw * 0.04); g.lineTo(x + 3, py + cw * 0.04); g.stroke(); }
+      if (parted) {
+        g.strokeStyle = '#8fd8d2'; g.lineWidth = 5;
+        for (const dir of [-1, 1]) { g.beginPath(); g.moveTo(px, py + cw * 0.42); g.quadraticCurveTo(px + dir * cw * 0.28, py + cw * 0.22, px + dir * cw * 0.24, py - cw * 0.2); g.stroke(); }
+      }
+    }
     const r = cw * 0.105;
     g.fillStyle = '#0c1c2499'; g.beginPath(); g.arc(px, py, r * 1.7, 0, 6.3); g.fill();
     g.strokeStyle = '#d6f4f7'; g.lineWidth = 2; g.lineCap = 'round';
@@ -408,9 +418,13 @@ function drawHud(t) {
   // a drop, then the paper that is still dry
   const danger = s.soak > 0.72, pulse = danger ? 1 + 0.12 * Math.sin(t * 10) : 1;
   g.save(); g.translate(x + 21, y + 21); g.scale(pulse, pulse); g.fillStyle = danger ? '#ff8f6b' : '#8fd8d2'; g.beginPath(); g.moveTo(0, -11); g.bezierCurveTo(9, 0, 8, 9, 0, 9); g.bezierCurveTo(-8, 9, -9, 0, 0, -11); g.fill(); g.restore();
+  if (s.riders.includes('snail')) { // a shell round the rain drop: its passenger shelters the paper
+    g.strokeStyle = '#8fd8d2'; g.lineWidth = 2; g.beginPath(); g.arc(x + 21, y + 21, 16, -2.7, 0.4); g.stroke();
+  }
   g.fillStyle = '#ffffff22'; g.beginPath(); g.roundRect(x + 38, y + 13, bw - 6, 14, 7); g.fill();
   const dry = Math.max(0, 1 - s.soak);
   g.fillStyle = danger ? '#ff8f6b' : '#f7f1e1'; g.beginPath(); g.roundRect(x + 38, y + 13, Math.max(8, (bw - 6) * dry), 14, 7); g.fill();
+  if (!daily) { const xx = x + 38 + (bw - 6) * (1 - STAR_SOAK); g.strokeStyle = '#ffc857'; g.lineWidth = 3; g.beginPath(); g.moveTo(xx, y + 10); g.lineTo(xx, y + 30); g.stroke(); g.fillStyle = '#ffc857'; g.font = '14px system-ui'; g.textAlign = 'center'; g.fillText('★', xx, y + 42); }
   // passengers aboard, and those still waiting
   const total = daily ? s.riders.length : LEVELS[level - 1].bugs;
   for (let i = 0; i < Math.min(total, 6); i++) { const cx = x + 20 + i * 30, cy = y + 64; g.fillStyle = '#16242cc9'; g.beginPath(); g.arc(cx, cy, 14, 0, 6.3); g.fill(); if (i < s.riders.length) rider(s.riders[i], cx, cy + (s.riders[i] === 'snail' ? 3 : 1), 8, t); else { g.strokeStyle = '#ffffff55'; g.lineWidth = 2; g.setLineDash([4, 4]); g.beginPath(); g.arc(cx, cy, 8, 0, 6.3); g.stroke(); g.setLineDash([]); } }
@@ -422,6 +436,18 @@ function drawHud(t) {
   }
 }
 function drawCue(t) {
+  // This street's ghost taps the upstream intake; it stays until a pebble parts the grate.
+  const tap = mode === 'play' && !help.shown ? pebbleHint(s) : null;
+  if (tap) {
+    const px = sx(tap.x), py = sy(tap.y), phase = (t % 1.8) / 1.8;
+    g.save(); g.translate(px, py);
+    g.strokeStyle = '#ffc857'; g.lineWidth = 3; g.globalAlpha = 0.85;
+    g.beginPath(); g.arc(0, 0, 16 + phase * 20, 0, Math.PI * 2); g.stroke();
+    g.globalAlpha = 0.75; g.fillStyle = '#fff'; g.translate(0, 10 + Math.sin(phase * Math.PI) * 14);
+    g.beginPath(); g.roundRect(-5, -10, 10, 34, 5); g.roundRect(-12, 8, 30, 25, 9); g.fill();
+    g.restore();
+    return;
+  }
   // Street 1 and 2, before the first touch: chevrons on the water show which way to sweep it.
   if (mode !== 'play' || daily || level > 2 || s.acts > 0 || s.over) return;
   const b = s.b;
@@ -490,7 +516,7 @@ requestAnimationFrame(frame);
 
 // For check.mjs and for looking at a run from the console. Nothing here changes the game.
 window.boatState = () => ({ screen: mode, over: s.over, level, daily, seed: s.seed, x: s.b.x, y: s.b.y, soak: s.soak, riders: s.riders.length, t: s.tick * DT, tick: s.tick, moves: s.acts,
-  ripples: s.ripples.length, stones: s.stones.length, fx: fxCount, stars: endStars, sound: save.sound, len: length(s), boat: { x: sx(s.b.x), y: sy(s.b.y) }, cw });
+  ripples: s.ripples.length, stones: s.stones.length, fx: fxCount, stars: endStars, sound: save.sound, len: length(s), boat: { x: sx(s.b.x), y: sy(s.b.y) }, cw, ghostTap: pebbleHint(s) ? { x: sx(pebbleHint(s).x), y: sy(pebbleHint(s).y) } : null });
 window.boatAdvice = () => {
   if (mode !== 'play' || s.over) return null;
   const a = advise(s);

@@ -1,11 +1,13 @@
 // Pour: the page. Drawing, input (finger, keys, and the phone's own tilt), sound, save, cards. Rules are in sim.js.
-import { create, step, band, levelY, toWorld, JUG, R, FLOOR, LEVELS, MAX_TILT, DT } from './sim.js';
+import { create, step, band, levelY, toWorld, JUG, FLOOR, LEVELS, MAX_TILT, DT } from './sim.js';
 import { readJson, writeJson } from '../../kit/save.js';
 import { sound } from '../../kit/audio.js';
 import { onLeave, isPauseKey } from '../../kit/pause.js';
 import { noZoom } from '../../kit/zoom.js';
 import { screens } from '../../kit/screens.js';
 import { hint } from '../../kit/hint.js';
+import { liquidSurface } from './liquid.js';
+import { DAILY_KEY, dailyPour, validBest, dailyBest } from './daily.js';
 
 noZoom();
 const $ = id => document.getElementById(id);
@@ -22,6 +24,9 @@ const save = { v: 1, stars: Array(LEVELS).fill(0), sound: true, tries: 0 };
   if (old && Number.isFinite(old.tries)) save.tries = old.tries;
 }
 const store = () => writeJson(KEY, save);
+let daily = null;
+const bestLabel = best => best ? `Best on this device: ${best.off} from the line · ${best.spilled} spilled` : 'Best on this device: —';
+function dailyLabel() { const d = dailyPour(); $('dailyBest').textContent = `${d.day} UTC · ${bestLabel(validBest(readJson(DAILY_KEY), d.day))}`; }
 const unlocked = () => { let n = 1; while (n < LEVELS && save.stars[n - 1] > 0) n++; return n; };
 
 // ---------- sound
@@ -31,14 +36,15 @@ const noise = (d, v, hz) => { if (snd.ctx) snd.noise(d, v, hz); };
 let lastGlug = 0, lastDrip = 0, lastSplat = 0;
 
 // ---------- layout: the world is 100 x 160 units
-const cv = $('c'), g = cv.getContext('2d');
+const cv = $('c'), g = cv.getContext('2d'), liquid = liquidSurface();
 let W = 0, H = 0, dpr = 1, top = 0, bot = 0, k = 3, ox = 0, oy = 0;
 function layout() {
   dpr = Math.min(2, devicePixelRatio || 1); W = innerWidth; H = innerHeight;
   cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
   const cs = getComputedStyle($('probe')); top = parseFloat(cs.paddingTop) || 0; bot = parseFloat(cs.paddingBottom) || 0;
-  const availH = H - top - bot - 56;
-  k = Math.min(W / 100, availH / 160); ox = (W - 100 * k) / 2; oy = top + 52 + (availH - 160 * k) / 2;
+  // Reserve the complete jug rotation envelope above world y=0, below the HUD.
+  const availH = H - top - bot - 118;
+  k = Math.min(W / 100, availH / 194); ox = (W - 100 * k) / 2; oy = top + 104 + 34 * k + (availH - 194 * k) / 2;
 }
 addEventListener('resize', layout); layout();
 
@@ -52,10 +58,11 @@ const show = screens(['menu', 'paused', 'end'], name => {
 });
 const PALETTE = [['#ff8a3d', '#ffc078'], ['#e8436a', '#ff9db3'], ['#7cc242', '#c3ec8e'], ['#8a5cf0', '#c9b2ff'], ['#ffb400', '#ffe38a'], ['#e8436a', '#ff9db3'], ['#25a7d6', '#9be3ff'], ['#ff8a3d', '#ffc078']];
 
-function start(n) {
+function start(n, challenge = null) {
+  daily = challenge;
   lvl = n; save.tries++; store();
-  const seed = query.has('seed') ? +query.get('seed') : save.tries * 101 + n;
-  s = create(n, seed); want = 0; fx = []; shake = 0; acc = 0; endAt = 0; lineFlash = 0;
+  const seed = daily ? daily.seed : query.has('seed') ? +query.get('seed') : save.tries * 101 + n;
+  s = create(n, seed); finger = null; keyDown = false; keyTilt = 0; want = 0; fx = []; shake = 0; acc = 0; endAt = 0; lineFlash = 0;
   mode = 'play'; paused = false; show('play'); snd.release();
   tone(520, 0.12, 0.08, 'triangle', 200);
 }
@@ -105,18 +112,22 @@ function target() {
 }
 
 // ---------- loop
+const frameSamples = [], workSamples = [];
 function frame(now) {
+  const began = performance.now(), measuring = query.has('perf') && mode === 'play' && !paused && !s?.over;
   requestAnimationFrame(frame);
-  const dt = Math.min(0.1, (now - (last || now)) / 1000); last = now;
+  const elapsed = now - (last || now);
+  const dt = Math.min(0.1, elapsed / 1000); last = now;
   if (mode === 'play' && !paused && s && !s.over) {
     want = target(); acc += dt;
     while (acc >= DT && !s.over) { step(s, want); acc -= DT; react(); }
     if (s.over) finish();
-  } else if (mode === 'play' && s && s.over && endAt && now > endAt) { endAt = 0; showEnd(); }
+  } else if (mode === 'play' && !paused && s && s.over && endAt && now > endAt) { endAt = 0; showEnd(); }
   for (const p of fx) { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 260 * dt; p.life -= dt; }
   fx = fx.filter(p => p.life > 0);
   shake *= Math.pow(0.02, dt); lineFlash = Math.max(0, lineFlash - dt);
   draw(now / 1000);
+  if (measuring && elapsed > 0) { frameSamples.push(elapsed); workSamples.push(performance.now() - began); if (frameSamples.length > 3600) { frameSamples.shift(); workSamples.shift(); } }
 }
 requestAnimationFrame(frame);
 
@@ -135,9 +146,10 @@ function react() {
 function splash(x, y, color, n) { if (calm) return; for (let i = 0; i < n; i++) fx.push({ x, y, vx: (Math.random() - 0.5) * 60, vy: -40 - Math.random() * 60, life: 0.5 + Math.random() * 0.3, color, r: 0.8 + Math.random() }); }
 
 function finish() {
+  if (daily) { const best = dailyBest(readJson(DAILY_KEY), daily.day, s); if (best) writeJson(DAILY_KEY, best); }
   finger = null; endAt = performance.now() + (s.won ? 900 : 1100);
   if (s.won) {
-    if (s.stars > save.stars[lvl - 1]) save.stars[lvl - 1] = s.stars; store();
+    if (!daily && s.stars > save.stars[lvl - 1]) save.stars[lvl - 1] = s.stars; store();
     [523, 659, 784, 1047, 1319].forEach((f, i) => setTimeout(() => tone(f, 0.3, 0.08, 'triangle'), i * 90));
     const g2 = s.glass; for (let i = 0; i < 26; i++) fx.push({ x: g2.x + (Math.random() - 0.5) * g2.w * 2, y: g2.top, vx: (Math.random() - 0.5) * 90, vy: -80 - Math.random() * 90, life: 1.2, color: ['#ffd23f', '#ff8a3d', '#fff'][i % 3], r: 1.2, star: true });
   } else { tone(330, 0.3, 0.09, 'sawtooth', -150); setTimeout(() => tone(220, 0.4, 0.08, 'sawtooth', -100), 180); shake = 8; }
@@ -147,8 +159,8 @@ function showEnd() {
   const title = s.won ? ['Okay!', 'Nice!', 'Just right!'][s.stars - 1] : s.why === 'over' ? 'Too much!' : s.why === 'spill' ? 'Splash!' : 'Too little!';
   $('endTitle').textContent = title;
   $('endStars').innerHTML = [1, 2, 3].map(i => `<span class="${s.won && s.stars >= i ? '' : 'off'}">★</span>`).join('');
-  $('endLine').textContent = `${s.inGlass} / ${s.L.target}`;
-  $('next').style.display = s.won && lvl < LEVELS ? '' : 'none';
+  $('endLine').textContent = `${s.inGlass} / ${s.L.target}` + (daily ? ` · ${daily.day} UTC · ${bestLabel(validBest(readJson(DAILY_KEY), daily.day))}` : '');
+  $('next').style.display = !daily && s.won && lvl < LEVELS ? '' : 'none';
   $('retry').classList.toggle('main', !s.won || lvl === LEVELS);
 }
 
@@ -179,14 +191,8 @@ function draw(t) {
   g.setTransform(1, 0, 0, 1, 0, 0);
 }
 function drawJuice(st, juice, light) {
-  g.fillStyle = juice;
-  g.beginPath();
-  for (const q of st.p) { const r = (q.st === 2 ? 1.25 : 1.6) * R * k; g.moveTo(X(q.x) + r, Y(q.y)); g.arc(X(q.x), Y(q.y), r, 0, 7); }
-  g.fill();
-  g.fillStyle = light; g.globalAlpha = 0.7;
-  g.beginPath();
-  for (const q of st.p) { if (q.st === 2) continue; const r = 0.55 * R * k; g.moveTo(X(q.x - 0.5) + r, Y(q.y - 0.6)); g.arc(X(q.x - 0.5), Y(q.y - 0.6), r, 0, 7); }
-  g.fill(); g.globalAlpha = 1;
+  liquid.draw(st.p, juice, light);
+  g.drawImage(liquid.canvas, X(liquid.x0), Y(liquid.y0), liquid.width * k, liquid.height * k);
 }
 function drawGlass(st, juice, light, t) {
   const gl = st.glass, l = X(gl.x - gl.w - 1.2), r = X(gl.x + gl.w + 1.2), tp = Y(gl.top), bt = Y(gl.bottom + 1.2);
@@ -235,6 +241,14 @@ function hud(st, juice) {
     g.fillStyle = i < st.L.n - 1 || save.stars[i] ? '#ff8a3d' : i === st.L.n - 1 ? '#fff6ea' : '#e6d0b5'; g.fill();
     g.lineWidth = 2; g.strokeStyle = '#3b2a3f'; g.stroke();
   }
+  // A draining clock ring and seconds: the 30-second deadline, without words.
+  const remaining = Math.max(0, st.L.time - st.t), cx = W / 2, cyClock = top + 74;
+  g.lineWidth = 4; g.strokeStyle = '#e6d0b5';
+  g.beginPath(); g.arc(cx, cyClock, 20, 0, Math.PI * 2); g.stroke();
+  g.strokeStyle = remaining <= 5 ? '#c43745' : '#3b2a3f';
+  g.beginPath(); g.arc(cx, cyClock, 20, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * remaining / st.L.time); g.stroke();
+  g.fillStyle = '#3b2a3f'; g.font = 'bold 17px system-ui'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(String(Math.ceil(remaining)), cx, cyClock);
   // spill allowance: drops left before a splash ends it, along the counter
   const left = Math.max(0, st.L.spill - st.spilled);
   const cy = Y(FLOOR) + Math.max(9, Math.min(14 * k, (H - Y(FLOOR)) * 0.5)); // on the counter's front, drawn even in the home-bar area
@@ -249,6 +263,7 @@ function hud(st, juice) {
 
 // ---------- cards
 function levelsCard() {
+  dailyLabel();
   const u = unlocked(), box = $('levels'); box.innerHTML = '';
   for (let i = 1; i <= LEVELS; i++) {
     const b = document.createElement('button'); b.className = 'small' + (i === lvl ? ' cur' : '');
@@ -261,13 +276,16 @@ function levelsCard() {
 function soundLabel() { for (const id of ['sound1', 'sound2']) $(id).textContent = `Sound: ${save.sound ? 'on' : 'off'}`; }
 for (const id of ['sound1', 'sound2']) $(id).addEventListener('click', () => { save.sound = !save.sound; store(); soundLabel(); if (save.sound) { snd.unlock(); tone(660, 0.1, 0.07); } });
 $('play').addEventListener('click', () => { snd.unlock(); askSensor(); start(lvl); });
+$('daily').addEventListener('click', () => { snd.unlock(); askSensor(); const d = dailyPour(); start(d.level, d); });
 $('pause').addEventListener('click', pause);
 $('resume').addEventListener('click', resume);
 $('quit').addEventListener('click', () => { paused = false; snd.release(); mode = 'menu'; s = null; levelsCard(); show('menu'); });
 $('next').addEventListener('click', () => start(Math.min(LEVELS, lvl + 1)));
-$('retry').addEventListener('click', () => start(lvl));
+$('retry').addEventListener('click', () => start(lvl, daily));
 $('toMenu').addEventListener('click', () => { mode = 'menu'; s = null; levelsCard(); show('menu'); });
 levelsCard(); soundLabel();
+// Refresh a menu left open across UTC midnight; an in-progress run keeps its date.
+setInterval(() => { if (mode === 'menu') dailyLabel(); }, 60000);
 
 hint(cv, { kind: 'drag', key: 'wild-pour:hint', when: () => mode === 'play' && !paused && !!s && !s.over, played: save.tries > 0, bottom: () => Math.max(120, H - Y(90)) }); // in the gap between the jug and the glass, clear of the line
 
@@ -279,6 +297,11 @@ window.pourState = () => {
     over: !!s?.over, won: !!s?.won, why: s?.why ?? '', stars: s?.stars ?? 0, inGlass: s?.inGlass ?? 0, spilled: s?.spilled ?? 0,
     inJug: s?.inJug ?? 0, flying: s?.flying ?? 0, angle: s?.angle ?? 0, t: s?.t ?? 0, target: s?.L.target ?? 0, saved: save.stars.slice(),
     sensor: sensor !== null, minTouchPx: Math.min(...btns.map(b => Math.min(b.getBoundingClientRect().width, b.getBoundingClientRect().height))),
+    daily: daily ? { ...daily, best: validBest(readJson(DAILY_KEY), daily.day) } : null, seed: s?.seed,
+    remaining: s ? Math.max(0, s.L.time - s.t) : 30,
+    jugClearance: Y(30 - Math.hypot(42, 43.4) - 1.5) - (top + 96),
     jug: s ? { x: X(s.pivot.x), y: Y(s.pivot.y) } : null, W, H,
   };
 };
+
+window.pourPerf = () => ({ intervals: frameSamples.slice(), work: workSamples.slice() });

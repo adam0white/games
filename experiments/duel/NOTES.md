@@ -1,6 +1,6 @@
 # Thumb Duel
 
-Two players share one phone. The screen is split in half, and the top half is drawn upside down. A match is first to 3 duel wins (at most 5 decided duels, hard cap 12 duels including draws). Each duel is drawn from a shuffled deck of 7 kinds without repeats. Solo mode, "Play the bot", puts a sim.js bot in the top half at one of 3 strengths.
+Two players share one phone. The screen is split in half, and the top half is drawn upside down. A match is first to 3 duel wins (at most 5 decided duels, hard cap 12 duels including draws). Each duel is drawn from a shuffled deck of 9 kinds without repeats. Solo mode, "Play the bot", puts a bot in the top half at one of 3 strengths.
 
 Served at `/duel/`. There is no build step. The files are:
 
@@ -15,8 +15,8 @@ Served at `/duel/`. There is no build step. The files are:
 
 - The board is 1 wide and 2 tall: x runs 0..1 and y runs -1 (top) to 1 (bottom). Side 0 is the bottom player and side 1 the top. `mirror()` gives the top player the same view as the bottom player.
 - Each pointer is assigned to a side by where it went down (`pointerId` to side, set at pointerdown). It keeps that side until it lifts, even if it crosses the middle line. Pause clears all pointers. In solo mode, touches in the top half are ignored.
-- The per-tick input for each side is `{held, taps, px, py}`.
-- Keyboard and mouse work for the bottom side only. Space is the tap or hold, 1-4 are the memory pads, and the arrow keys move the hockey paddle.
+- Each side sends `{held, taps, px, py, heldFor, releases}` per tick. Only presses started during a swipe or launch duel can complete those gestures. Pause and pointer cancellation discard unfinished gestures.
+- Keyboard and mouse work for the bottom side only. Space is the tap or hold, including release to launch. Keys 1-4 are the memory pads. The arrow keys move the hockey paddle. Up scores one swipe per press.
 
 ## Duels
 
@@ -26,9 +26,11 @@ Served at `/duel/`. There is no build step. The files are:
 | quick draw | tap | the lantern flashes after 1.4-3.6 s; the first tap after the flash wins the point, and a tap before it gives the point away; first to 2 points; ties are void | 5 flashes or 20 s, then more points win |
 | sumo beetles | hold | holding pushes; pressing again shoves; a shove into a beetle that was not holding misses, and the shover stumbles and is dazed; pushed past the edge loses | 15 s, then the more central beetle wins |
 | catch firefly | tap | tap the firefly while it is on your side; it feints; a wrong tap dazes you; first to 5 catches | 20 s, then more catches win |
-| air hockey | drag | the paddle follows your finger, and the puck is a seed; first to 3 goals | 20 s, then more goals win |
+| air hockey | drag | the paddle follows your finger, and the puck is a seed. First to 3 goals, with a goal opening spanning 70% of the board | 20 s, then more goals win |
 | memory flash | tap | repeat a lit sequence of 3-5 pads on your own 4 pads; first to 2 rounds; finishing on the same tick voids the round | 20 s, then more rounds win |
 | balance dewdrop | hold | holding tilts the leaf against a wobble; keep the drop in the middle band longest | 14 s |
+| beetle race | flick | flick toward the center and lift to advance. First to 17 valid flicks | 17 s, then more flicks win |
+| seed launch | hold and release | hold to charge, then lift at the gold mark. Up to 100 points per shot. Both sides get the same six marks | 16 s or six shots per side, then higher total wins |
 
 A draw scores for neither side, and the match deals another duel. "Best of 5" is implemented as first to 3, so draws can make a match longer (the longest seen in 100 seeds was 8 duels). All parameters are named constants at the top of each duel in `sim.js`.
 
@@ -40,10 +42,10 @@ A draw scores for neither side, and the match deals another duel. "Best of 5" is
 - The levels are the bot strengths easy, medium and hard. Medium opens after a win against easy, and hard after a win against medium. Each level shows stars equal to min(3, best win streak against that strength).
 - Friend mode saves the current and best wins-in-a-row by side colour, and the menu shows that streak line.
 - The save is the `save.js` key `duel-save`: `{v:1, sound, matches, friend:{side,run,best}, solo:{easy|medium|hard:{won,run,best}}}`. The hint uses the key `duel:hint`.
-- A first-ever match (matches === 0) opens with tug. This puts a tap duel under the tap hint, which shows on the first duel only and only to the bottom player, at the bottom centre.
+- A first-ever match (matches === 0) opens with tug. The tap hint shows after 3 s of idle play. In friend mode a copy faces each player. In solo, it faces the human player. The first accepted play input retires the hint.
 - lab.js records each duel as `rec.event('duel', {kind, winner, ms, solo})`, and the match as `rec.start({solo, strength, ...})` and `rec.end('won'|'lost'|'played'|'left')`.
 
-## Bot numbers (`node bots.mjs`, 2026-11-24, all claims hold, exit 0)
+## Initial bot numbers (`node bots.mjs`, 2026-11-24, all claims hold, exit 0)
 
 - Determinism: seed 4242 plays the same match twice, and another seed gives a different match.
 - Each duel alone was played for 100 seeds per row:
@@ -93,13 +95,34 @@ It covers:
 - Memory won by thumb.
 - A 360x640 screen, and desktop keyboard and mouse.
 
-The last run on 2026-11-24 passed with zero page and console errors: WebKit took 101 s, and Chromium took 149 s including the small-screen and desktop runs. It also asserts that the first screen shows exactly one short line. The screenshots are in `/private/tmp/night-duel/`.
+The initial run on 2026-11-24 passed with zero page and console errors. WebKit took 101 s, and Chromium took 149 s including the small-screen and desktop runs. It also asserts that the first screen shows exactly one short line. The initial screenshots are in `/private/tmp/night-duel/`.
+
+## 2026-11-24 update
+
+- Widened the hockey goal from 50% to 70% of the rink and kept three goals to win. In the 200-seed medium-bot test, the median dropped from 19.98 s to 12.78 s, p90 was 17.93 s, and draws dropped from 38/200 to 7/200 (3.5%). Four additional batches had 6, 6, 10 and 7 draws per 200, for 36/1,000 (3.6%) across all five batches.
+- Mirrored the shared tap hint by rotating the top copy 180°. The first accepted tap dismisses both copies and saves the existing `duel:hint` key.
+- Added Beetle Race and Seed Launch. A valid flick moves at least 22% of the board width toward the center in at most 0.45 s. A launch scores by the distance from the mark when the thumb lifts. The simulation applies both seats' inputs before it decides a winner. Equal final totals draw.
+
+| medium vs medium | median | p90 | longest | undecided |
+|---|---:|---:|---:|---:|
+| beetle race | 15.92 s | 17.00 s | 17.00 s | 17/200 |
+| seed launch | 10.47 s | 11.22 s | 12.30 s | 0/200 |
+
+- In each new duel, careful beats idle 40/40 and beats clumsy 100/100 from each seat. Added scripted checks for invalid flicks, simultaneous finishes, and launch accuracy. The existing balance thresholds are unchanged. The deck minimum assertion rose from 7 to 9 to require the two additions.
+- The test-only `slow-human` profile uses a 0.35 s base reaction and a nominal tap rate of 3.9/s. Match times include the 3 s intros and 1.6 s result cards.
+
+| 100 matches per matchup | median | range | 60–180 s |
+|---|---:|---:|---:|
+| slow-human vs slow-human | 78.82 s | 41.02–126.53 s | 80/100 |
+| slow-human vs easy | 73.45 s | 44.32–125.32 s | 66/100 |
+
+- Careful beat easy 100/100 at a median of 44.25 s. The full bot run exited 0. The tug mutation still exited 1 with four failed claims. The optional `--quick` sample reports the same tug seat-share failure as before this change (20 bottom wins in 53 decided duels).
+- `check.mjs` passed with zero browser errors on WebKit iPhone 13 (124 s) and Chromium Pixel 7 (179 s, including the small-screen and desktop runs). It checked both hint copies, valid and invalid flicks in both seats, independent holds and releases, pause cancellation, and the new keyboard controls. The countdown, in-play and scored screenshots were inspected on both profiles. They are in `/private/tmp/night-duel-r2-final/`.
+- The shared kit's Duel check passed for both profiles with existing `duel-save` and `duel:hint` fixtures. The full shared-worktree preflight was stopped after it reported failures in other experiments.
 
 ## Decisions that differ from the brief
 
 - Solo offers 3 strengths, but medium and hard are locked until the previous strength is beaten. This gives the run a progression.
-- Bot match medians are 0.8 to 1.3 min, and careful against easy takes 0.8 min, which is under the 1 minute floor. Human matches have slower reactions and should run longer, but that is unmeasured.
-- The widest seat shares are hockey (44% bottom) and quick draw (55-56%). Both are inside the 40-60% claim.
 - The tagline and the friend streak share one line on the first screen. The desktop keyboard line is on the pause card.
 
 ## Not verified
@@ -107,13 +130,34 @@ The last run on 2026-11-24 passed with zero page and console errors: WebKit took
 - Two real fingers on a real phone. Touch was tested only through CDP and synthetic PointerEvents. Real-device multi-touch limits are untested: iOS gesture arbitration, palm rejection, and Android's limit on simultaneous points in the browser.
 - Audio on a real iPhone (unlock on the first gesture).
 - Real safe-area insets. Playwright reports zero, so the notch and home-bar padding are untested.
-- Lab recording end to end. The slug `duel` is not yet in LAB_PROTOTYPES in human-framework, so the server will refuse sends until someone adds it there. That file is outside this directory.
-- `kit/check/phone.mjs` seed lines for `duel-save` and `duel:hint` were not added, because that file is outside this directory.
-- Whether strangers understand each pictogram without words. No human has played this game yet.
+- Live lab routing and storage. The browser check intercepts the endpoint and verifies the records the page sends.
+- Actual match duration with people and whether new players understand each pictogram.
 
 ## Open ideas
 
-- Hockey between medium bots usually runs to the 20 s limit: median 20.0, with 38 of 200 duels undecided. It was 17.3 s before medium was softened to fix the ladder. If people find it long, use a wider goal or a 2-goal target.
-- Give the top player a hint too. Today only the bottom player sees it.
-- An 8th kind (for example "stack": alternating holds to build a tower) so a 5-duel match shows more variety.
 - A "party" mode with three-match series and a running tally.
+
+## 2026-11-24 — phone play review
+
+- Quitting to the menu before the first tug input used to retire the help for that visit. The next eligible duel now still shows it. One accepted input still retires both copies.
+- Quick Draw's countdown used to demonstrate repeated taps around both sides of the lamp's flash. The pictured thumb now taps only while its lamp is lit. Each player's live cue distinguishes waiting from tapping.
+- Holding the pause key produced a second toggle through keyboard repeat. One press now makes one transition.
+- Layout changes cancel existing contacts and their queued input. Seed Launch resumes with two fresh holds instead of charging toward a shot with pre-rotation coordinates.
+- A Beetle Race flick could start on the pictured beetle late in the race and score nothing. The minimum starting distance from the center is now 0.23 board widths, down from 0.34, matching the lane's near edge. A flick still needs 0.22 board widths of travel within 0.45 seconds. Both seats use the same rule. No check or bot acceptance threshold changed.
+- At 342 px landscape height, the old result's Menu button spanned y=335–383, leaving 7 of its 48 px visible. The result now keeps both player regions within the viewport and places the bottom actions side by side. Short menu cards permit vertical touch scrolling. Tug keeps both critters in frame during a large pull. Seed Launch separates each final score from its result label.
+- At 280 px height, a native Chromium drag scrolled the menu 110 px and moved the 48 px Sound control from y=262.34–310.34 to y=152.34–200.34. A native tap then toggled it.
+
+Local play used a clean save, the normal countdown, and the real input path. Timings below are wall-clock seconds measured after the initial help and pause exercise for easy, and from starting the driver on medium and hard. The driver reads the game state and sends touches. It leaves the simulation clock and results alone.
+
+| Profile | Easy | Medium | Hard | Two-seat Beetle Race | Two-seat Seed Launch |
+| --- | --- | --- | --- | --- | --- |
+| WebKit iPhone 13 | 3–0 in 28.464 s | 3–1 in 58.980 s | 3–0 in 39.593 s | 17–17 in 5.53 s | 585–451, 6/6 shots per seat, in 7.75 s |
+| Chromium Pixel 7 | 3–0 in 36.643 s | 3–1 in 60.796 s | 3–0 in 39.833 s | 17–16 in 9.40 s | 556–407, 6/6 shots per seat, in 8.33 s |
+
+The review exercised pause and resume, leaving and returning, rematch, landscape and a mid-duel reload that retained completed progression. Chromium used native Playwright taps and CDP multi-touch. WebKit used native taps and dispatched touch PointerEvents for multi-touch. The browser assertions cover each correction above. Phone checks hit-test visible, enabled control centers, verify at least 48 px in both dimensions, then send native Playwright taps. For WebKit, the check nudges the viewport by 1 px and restores it before play, and schedules the timing-sensitive first pair of releases in the document. Both changes address host-side frame and actionability stalls. Screenshots use CSS-pixel resolution and a 90 s capture timeout. The timed launch checks are separate from screenshots taken while charging.
+
+The full bot check exited 0 in 6.2 s. The tug mutation exited 1 with four failed claims. Between equal medium bots, Beetle Race had a 15.92 s median and 17 draws in 200, and Seed Launch had a 10.47 s median and zero draws in 200.
+
+The final screenshot-enabled `check.mjs` exited 0 on WebKit iPhone 13 (127 s, 33 captures) and Chromium Pixel 7 (188 s, 26 phone captures plus four small-screen and desktop captures). Both passed with zero browser errors. The final landscape Seed Launch replay ended 550–550 on WebKit and 569–569 on Chromium after six shots per seat. The registered shared Duel play and hint checks passed on both profiles. Screenshots are under `/private/tmp/night-r3-review/thumb-duel/verified/`. Reviewed first play, layout, pause, rematch, both new duels and landscape results.
+
+Still unverified: first-time human comprehension, two contacts and safe-area insets on physical phones, audio by ear, and live lab delivery.

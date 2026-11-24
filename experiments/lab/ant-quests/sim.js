@@ -1,5 +1,7 @@
 // A small, independent meadow. Rules use a fixed tick and a serializable RNG.
 export const WIDTH = 360, HEIGHT = 500, DT = 1 / 60, DAY = 180;
+export const HIDE_RADIUS = 26;
+const ESCORT_JOIN_RADIUS = 45, ESCORT_FOLLOW_RADIUS = 70;
 export const RESIDENTS = [
   { id: 'beetle', name: 'Beetle', mood: 'grumpy', x: 64, y: 385, color: '#cb9560' },
   { id: 'snail', name: 'Snail', mood: 'sleepy', x: 72, y: 130, color: '#e3b15c' },
@@ -7,10 +9,10 @@ export const RESIDENTS = [
   { id: 'frog', name: 'Frog', mood: 'proud', x: 285, y: 390, color: '#77a977' },
 ];
 export const FALLBACK = {
-  beetle: { name: 'Beetle', ask: { fetch: 'Bring me {count} seeds. Good ones.', hunt: 'Catch {count} aphids off my roots.', escort: 'Bring that lost ant here.', race: 'Beat me to the golden pebble!', hide: 'Hide this pebble under the leaf. Stay still.' }, thanks: 'Hmph. You are a proper neighbour.', scold: 'Late again. Try with both feet.', secret: 'The oldest stone is hollow underneath.' },
-  snail: { name: 'Snail', ask: { fetch: 'A little dew. {count} drops, please.', hunt: 'Those {count} aphids keep me awake.', escort: 'Our little friend has lost the way.', race: 'To the pebble. I will watch from here.', hide: 'Shh. Hide this pebble under the leaf.' }, thanks: 'You make the meadow feel like home.', scold: 'Oh. I waited until my tea went cold.', secret: 'Dew tastes sweeter on a moonlit morning.' },
+  beetle: { name: 'Beetle', ask: { fetch: 'Bring me {count} seeds. Good ones.', hunt: 'Catch {count} aphids off my roots.', escort: 'Bring that lost ant here.', race: 'Reach the golden pebble before time runs out!', hide: 'Hide this pebble under the leaf. Stay still.' }, thanks: 'Hmph. You are a proper neighbour.', scold: 'Late again. Try with both feet.', secret: 'The oldest stone is hollow underneath.' },
+  snail: { name: 'Snail', ask: { fetch: 'A little dew. {count} drops, please.', hunt: 'Those {count} aphids keep me awake.', escort: 'Find the lost ant and lead it back to me.', race: 'To the pebble. I will watch from here.', hide: 'Hide this pebble. Stay under the leaf until the bird passes.' }, thanks: 'You make the meadow feel like home.', scold: 'Oh. I waited until my tea went cold.', secret: 'Dew tastes sweeter on a moonlit morning.' },
   spider: { name: 'Spider', ask: { fetch: 'Bring {count} crumbs. No questions.', hunt: '{count} aphids. A tiny favour, really.', escort: 'Lead our wanderer safely home.', race: 'Touch the pebble before my thread falls.', hide: 'Hide this pebble beneath that leaf.' }, thanks: 'A deal is a deal. Watch my silk.', scold: 'That was not quite our arrangement.', secret: 'A strand of silk can carry a whole ant.' },
-  frog: { name: 'Frog', ask: { fetch: 'Fetch {count} berries for a champion.', hunt: 'Catch {count} aphids. Show some spring!', escort: 'Bring that lost ant to my pond.', race: 'Race you to the golden pebble!', hide: 'Bird above! Hide this pebble beneath the leaf.' }, thanks: 'Splendid! I shall guard your path.', scold: 'Even champions practise. Try again.', secret: 'The pond reflects stars before the sky does.' },
+  frog: { name: 'Frog', ask: { fetch: 'Fetch {count} berries for a champion.', hunt: 'Catch {count} aphids. Show some spring!', escort: 'Bring that lost ant to my pond.', race: 'How fast can you reach the golden pebble?', hide: 'Bird above! Stay under the leaf with this pebble.' }, thanks: 'Splendid! I shall guard your path.', scold: 'Even champions practise. Try again.', secret: 'The pond reflects stars before the sky does.' },
 };
 const PLANS = { beetle: ['fetch', 'hunt', 'race'], snail: ['fetch', 'escort', 'hide'], spider: ['hunt', 'race', 'fetch'], frog: ['race', 'hide', 'escort'] };
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -58,7 +60,7 @@ function offer(s, giver) {
     q.remaining = [0, 23, 15, 11][stage];
     q.points = [{ ...q.goal, taken: false }];
   }
-  if (kind === 'escort') { q.lost = { ...q.points[0], a: 0, ph: 0 }; q.points = []; q.remaining += 8; }
+  if (kind === 'escort') { q.lost = { ...q.points[0], a: 0, ph: 0 }; q.escorting = false; q.points = []; q.remaining += 8; }
   if (kind === 'hide') { q.points = [{ x: r.x + inward * 72, y: r.y + down * 48, taken: false }]; q.holdNeed = 2.8 + stage * .7; q.remaining = [0, 24, 17, 12][stage]; }
   // Never place a target inside the movable boulder.
   const rock = { x: 180 + s.world.rockOpen * 22, y: 340 }, avoid = v => {
@@ -129,10 +131,13 @@ export function step(s, input = {}) {
     if (distance(p, q.goal) < 24) { q.progress = 1; if (s.rules.requirementMultiplier === 1) complete(s); }
   } else if (q.kind === 'escort') {
     const l = q.lost, d = distance(p, l);
-    if (d < 70 && d > 16) { const speed = Math.min(26 * .92 * DT, d - 16); l.a = Math.atan2(p.y - l.y, p.x - l.x); l.x += (p.x - l.x) / d * speed; l.y += (p.y - l.y) / d * speed; l.ph += DT * 10; }
+    // Keep guiding home once the player gets close. Only redirect if the ant stops following.
+    if (d >= ESCORT_FOLLOW_RADIUS) q.escorting = false;
+    else if (d <= ESCORT_JOIN_RADIUS) q.escorting = true;
+    if (d < ESCORT_FOLLOW_RADIUS && d > 16) { const speed = Math.min(26 * .92 * DT, d - 16); l.a = Math.atan2(p.y - l.y, p.x - l.x); l.x += (p.x - l.x) / d * speed; l.y += (p.y - l.y) / d * speed; l.ph += DT * 10; }
     if (distance(l, q.goal) < 34 && distance(p, q.goal) < 32) { q.progress = 1; if (s.rules.requirementMultiplier === 1) complete(s); }
   } else if (q.kind === 'hide') {
-    if (distance(p, q.points[0]) < 26) q.hold += DT; else q.hold = Math.max(0, q.hold - DT * .5);
+    if (distance(p, q.points[0]) < HIDE_RADIUS) q.hold += DT; else q.hold = Math.max(0, q.hold - DT * .5);
     q.progress = Math.min(1, q.hold / q.holdNeed);
     if (q.hold >= q.holdNeed * s.rules.requirementMultiplier) complete(s);
   }
@@ -150,7 +155,7 @@ export function guide(s) {
   } else if (q.kind === 'fetch' || q.kind === 'hunt') {
     target = q.ready ? q.goal : q.points.filter(v => !v.taken).sort((a, b) => distance(s.player, a) - distance(s.player, b))[0] || q.goal;
   } else if (q.kind === 'escort') {
-    target = distance(s.player, q.lost) > 45 ? q.lost : q.goal;
+    target = q.escorting ? q.goal : q.lost;
   } else target = q.kind === 'hide' ? q.points[0] : q.goal;
   return { x: target.x, y: target.y };
 }

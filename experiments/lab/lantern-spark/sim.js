@@ -3,7 +3,7 @@
 // ring passes keeps an afterglow for GLOW seconds. Between sparks the player steers by memory, by stars reflected in the water
 // (a rock blots out the stars under it), by fireflies that hover over safe water, by the sound of water on rocks, and by thunder.
 //
-// The writes into Lantern's state: `s.light` is held at 1 before every step, so Lantern's own flame never runs out
+// The writes into Lantern's state: `s.calm` is scaled once at start by config().flow for the early-night pace; `s.light` is held at 1 before every step, so Lantern's own flame never runs out
 // (the run cannot end 'dark'); and on the short early nights `s.over` is set to 'dawn' when the boat has come the night's
 // share of the river (config().length). Everything else is Lantern's own step. The layer never draws from Lantern's random streams
 // (s.r, s.q), so a seed gives the same river here as in Lantern.
@@ -16,8 +16,8 @@ export const NIGHTS = 6;
 // that are about the flame (fog, rain, lightning) or that cannot be read in the dark (wind, hidden rocks, whirlpools that pull),
 // so Echo stops at six and gives itself its own ramp below.
 export const STAGE = [0, 1, 2, 3, 4, 5, 6];
-export const TIN = 12;          // sparks at the start of a night
-export const REFILL = 2;        // sparks an ember gives
+export const TIN = 8;          // sparks at the start of a night
+export const REFILL = 1;        // sparks an ember gives
 export const TIN_MAX = 20;
 export const GLOW = 2.2;         // seconds an afterglow takes to fade
 export const RING_SPEED = 1.6;  // river units a second
@@ -26,19 +26,20 @@ export const NEAR = 0.22;       // an ember this close glows faintly on its own:
 const STAR = 0.07;              // star cell size in river units; one star a cell, jittered
 const BANK = 0.05;              // bank sample spacing
 
-// Echo's own ramp, a night at a time: Lantern's river gets busier; here, in addition, fireflies thin out, stars thin out
+// The ramp: Lantern's river gets busier; early flow is slower, fireflies thin out, stars thin out
 // (more empty cells, so a hole is less surely a rock), thunder comes less often, and the spare hearts go.
 export function config(n) {
   n = Math.max(1, Math.min(NIGHTS, Math.floor(n) || 1));
   const k = (n - 1) / (NIGHTS - 1);
   return {
     n, stage: STAGE[n],
-    hearts: n <= 2 ? 2 : n <= 4 ? 1 : 0,   // Lantern's 'hearts' stat: spare lives (3 lives, then 2, then 1)
-    length: [0, 0.5, 0.65, 0.8, 1, 1, 1][n], // share of Lantern's river before dawn: the first nights are short
-    calm: 3,                               // Lantern's 'calm' stat at its top: the river runs 12% slower than Lantern's
-    fly: 0.32 + 0.4 * k,                   // river units between firefly rows
-    empty: 0.2 + 0.25 * k,                 // share of star cells with no star
-    thunder: 14 + 14 * k,                  // mean seconds between thunderclaps
+    hearts: n <= 5 ? 2 : 1,   // Lantern's 'hearts' stat: spare lives (3 lives on nights 1–5, then 2)
+    length: [0, 0.5, 0.55, 0.6, 0.65, 0.75, 0.9][n], // share of Lantern's river before dawn: the first nights are short
+    flow: 0.75 + 0.25 * k,                  // scale calm once at start; keep the first night long without entering its moving-rock section
+    calm: 3,                               // Lantern's base calm stat: 12% slower, before the flow multiplier
+    fly: 0.55 + 0.2 * k,                   // river units between firefly rows
+    empty: 0.5 + 0.1 * k,                 // share of star cells with no star
+    thunder: 12 + 16 * k,                  // mean seconds between thunderclaps
   };
 }
 
@@ -67,6 +68,7 @@ export function mutate(name) { mutant = name || ''; }
 export function start(seed, n = 1) {
   const cf = config(n);
   const s = create(seed, cf.stage, false, [], { hearts: cf.hearts, calm: cf.calm });
+  s.calm *= cf.flow;
   const r = rng(seed ^ 0x51ab7e);
   const e = { seed, n: cf.n, cf, s, r, tin: TIN, used: 0, rings: [{ x: s.x, y: s.y, t: 0, r: 0 }], lit: new Map(), banks: new Map(), flies: [], nextFly: Math.ceil((s.y + 0.6) / cf.fly), nextThunder: 6 + r() * 6, flash: -9, hits: 0, refills: 0, events: [] };
   placeFlies(e);
@@ -82,7 +84,7 @@ export function tick(e, target, spark = false) {
     if (e.tin > 0) { e.tin--; e.used++; e.rings.push({ x: s.x, y: s.y, t: s.t, r: 0 }); e.events.push('spark'); }
     else e.events.push('empty');
   }
-  s.light = 1; // the one write into Lantern's state: its flame is not this game's clock
+  s.light = 1; // its flame is held; river progress is this game's clock
   step(s, target);
   if (!s.over && progress(s) >= e.cf.length - 1e-9) { s.over = 'dawn'; s.events.push('dawn'); } // a short night ends early
   for (const ev of s.events) {
@@ -157,13 +159,15 @@ export function channel(s, y) {
 // as {x, y, on, i, j}; on false is a hole the player can see in the even scatter.
 export function stars(e, y0, y1) {
   const s = e.s, out = [];
+  // Grid jitter stays within two cells of the requested interval. Distant rocks cannot occlude a returned star.
+  const rocks = s.rocks.filter(k => k.on && k.y + k.rad + 0.02 > y0 - 2 * STAR && k.y - k.rad - 0.02 < y1 + 2 * STAR);
   for (let j = Math.floor((y0 - s.y) / STAR); j <= Math.ceil((y1 - s.y) / STAR); j++) {
     for (let i = 0; i < 1 / STAR; i++) {
       if (hash(i, j, e.seed) < e.cf.empty) continue; // no star in this cell
       const x = (i + 0.2 + 0.6 * hash(i, j, e.seed + 1)) * STAR, y = s.y + (j + 0.2 + 0.6 * hash(i, j, e.seed + 2)) * STAR;
       const c = centre(s, y), h = half(s, y);
       if (Math.abs(x - c) > h - 0.008) continue; // the bank: no water, no reflection
-      const on = !s.rocks.some(k => k.on && Math.abs(k.y - y) < k.rad + 0.02 && Math.hypot(Math.max(0, Math.abs(k.x - x) - k.len), k.y - y) < k.rad + 0.012);
+      const on = !rocks.some(k => Math.abs(k.y - y) < k.rad + 0.02 && Math.hypot(Math.max(0, Math.abs(k.x - x) - k.len), k.y - y) < k.rad + 0.012);
       out.push({ x, y, on, i, j });
     }
   }

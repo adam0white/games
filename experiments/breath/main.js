@@ -1,4 +1,5 @@
 import {
+  ALCOVE_RADIUS,
   DT,
   LEVELS,
   create,
@@ -10,10 +11,10 @@ import {
 } from "./sim.js";
 import { readJson, writeJson } from "../kit/save.js";
 import { sound } from "../kit/audio.js";
+import { hint } from "../kit/hint.js";
 import { onLeave, isPauseKey } from "../kit/pause.js";
 import { noZoom } from "../kit/zoom.js";
 import { screens } from "../kit/screens.js";
-import { hint } from "../kit/hint.js";
 import { lab } from "../kit/lab.js";
 noZoom();
 const $ = (id) => document.getElementById(id),
@@ -94,6 +95,7 @@ let s = null,
   lastWarning = false,
   finished = false;
 const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const hintMode = query.get("hint");
 const PALETTES = {
   night: {
     sky: "#101e2b",
@@ -129,11 +131,24 @@ const PALETTES = {
 let C = PALETTES[save.look];
 const cv = $("c"),
   g = cv.getContext("2d");
+// The kit supplies the stationary target and help lifecycle. Local CSS shows a hold and lift.
+const help = hint(cv, {
+  kind: "tap",
+  key: "breath:hint",
+  when: () => screen === "play",
+  played: save.runs > 0,
+  label: "Hold to run. Let go to crouch.",
+});
 let W = 0,
   H = 0,
   dpr = 1,
   top = 0,
   bottom = 0,
+  left = 0,
+  right = 0,
+  landscape = false,
+  worldTop = 0,
+  worldBottom = 0,
   bw = 0,
   bx = 0,
   fh = 148,
@@ -147,13 +162,30 @@ function layout() {
   const cs = getComputedStyle($("probe"));
   top = parseFloat(cs.paddingTop) || 0;
   bottom = parseFloat(cs.paddingBottom) || 0;
+  left = parseFloat(cs.paddingLeft) || 0;
+  right = parseFloat(cs.paddingRight) || 0;
+  landscape = W > H && H < 550;
+  worldTop = top + (landscape ? 76 : 144);
+  worldBottom = H - bottom - (landscape ? 55 : 94);
+  baseY = H - bottom - (landscape ? 86 : 137);
   bw = Math.min(430, W - 46);
   bx = (W - bw) / 2;
-  fh = Math.min(156, Math.max(132, (H - top - bottom - 170) / 3.5));
-  baseY = H - bottom - 137;
+  fh = landscape
+    ? Math.min(115, Math.max(54, (baseY - worldTop + 4) / 3))
+    : Math.min(156, Math.max(116, (H - top - bottom - 195) / 3.5));
+  if (s) cam = cameraTarget(position(s));
+  fx = [];
 }
 addEventListener("resize", layout);
 layout();
+function cameraTarget(p) {
+  const maxCam = Math.max(
+    0,
+    s.config.floors + 1 - (baseY + 4 - worldTop) / fh,
+  );
+  const focusY = landscape ? worldTop + (worldBottom - worldTop) * 0.68 : H * 0.64;
+  return Math.min(maxCam, Math.max(0, p.y - (baseY - focusY) / fh));
+}
 const xx = (x) => bx + 22 + x * (bw - 44),
   yy = (y) => baseY - (y - cam) * fh;
 const round = (ctx, x, y, w, h, r, c) => {
@@ -284,9 +316,10 @@ function finish() {
     stars: s.stars,
     score: s.score || 0,
   });
+  const timedOut = s.t > s.config.limit;
   $("endLabel").textContent = daily ? "Tower of the day" : `Level ${level}`;
   $("endTitle").textContent =
-    s.over === "win" ? "Everyone out!" : "Take a breather";
+    s.over === "win" ? "Everyone out!" : timedOut ? "Time ran out" : "Take a breather";
   $("stars").textContent = daily
     ? `${s.score || 0} points`
     : "★ ".repeat(s.stars || 0) + "☆ ".repeat(3 - (s.stars || 0));
@@ -299,7 +332,9 @@ function finish() {
   $("endTip").textContent =
     s.over === "win"
       ? "Safe at last."
-      : "Stop in mint doorways. Wait for the whole line.";
+      : timedOut
+        ? "Use clear corridors to make up time."
+        : "Stop in mint doorways. Wait for the whole line.";
   $("next").textContent = daily
     ? "Play today again"
     : s.over === "win" && level < 12
@@ -307,6 +342,7 @@ function finish() {
       : s.over === "win"
         ? "Play the daily tower"
         : "Try again";
+  $("again").hidden = s.over !== "win";
   chooseScreen("end");
   drawResult();
   if (s.over === "win") {
@@ -445,7 +481,7 @@ for (const type of ["pointerup", "pointercancel", "lostpointercapture"])
 addEventListener("keydown", (e) => {
   if (isPauseKey(e)) {
     e.preventDefault();
-    screen === "paused" ? resume() : pause();
+    if (!e.repeat) screen === "paused" ? resume() : pause();
     return;
   }
   if (
@@ -468,14 +504,52 @@ addEventListener("keyup", (e) => {
     tone(160, 0.08, 0.04);
   }
 });
-hint(cv, {
-  kind: "hold-and-move",
-  key: "breath:hint",
-  label: "Hold to run. Release to shelter.",
-  when: () => screen === "play" && !s?.over,
-  played: old !== null && save.runs > 0,
-  bottom: () => bottom + 100,
-});
+const holdHand = new Path2D(
+  "M-4 15V1Q-4-4 0-4Q4-4 4 1V10Q7 7 10 11Q14 9 16 14Q20 12 21 17V26Q20 36 13 39H3Q-1 38-4 33L-11 22Q-14 17-10 15Q-7 14-4 19Z",
+);
+function gesture(x, y, lift) {
+  g.save();
+  g.translate(x, y);
+  g.strokeStyle = lift > 0.5 ? C.mint : C.gold;
+  g.fillStyle = lift > 0.5 ? "#18323e" : "#ffbf6944";
+  g.lineWidth = 2;
+  g.beginPath();
+  g.ellipse(0, 0, 14, 7, 0, 0, Math.PI * 2);
+  g.fill();
+  g.stroke();
+  g.translate(0, -lift * 19);
+  g.fillStyle = C.bright;
+  g.strokeStyle = "#0b1b27";
+  g.lineWidth = 1.8;
+  g.fill(holdHand);
+  g.stroke(holdHand);
+  g.restore();
+}
+function liftArrow(x, y) {
+  g.strokeStyle = C.mint;
+  g.lineWidth = 2;
+  g.beginPath();
+  g.moveTo(x, y + 14);
+  g.lineTo(x, y);
+  g.moveTo(x - 4, y + 4);
+  g.lineTo(x, y);
+  g.lineTo(x + 4, y + 4);
+  g.stroke();
+}
+function drawReleaseHint(x, y) {
+  const t = (s.t - s.gustStarted) % 2.8;
+  const lift = reduced ? 1 : Math.min(1, t / 0.32);
+  g.save();
+  if (landscape) {
+    g.translate(x, y);
+    g.scale(0.78, 0.78);
+    x = y = 0;
+  }
+  round(g, x - 27, y - 27, 56, 72, 15, "#0b1b27f5");
+  gesture(x - 3, y, lift);
+  liftArrow(x + 18, y - 15);
+  g.restore();
+}
 
 function person(
   ctx,
@@ -625,8 +699,9 @@ function drawResult() {
   );
 }
 function drawClock(f, y) {
+  if (y - 20 < worldTop || y + 20 > worldBottom) return;
   const w = wave(s, f),
-    x = bx + bw - 25,
+    x = bx + bw - (landscape ? 63 : 25),
     r = 12;
   if (w.phase2 !== null && w.phase2 !== undefined) {
     g.strokeStyle = "#a6b2d74a";
@@ -671,7 +746,7 @@ function drawClock(f, y) {
 function drawFloor(f) {
   const y = yy(f),
     roof = y - fh + 12;
-  if (y < top + 90 || roof > H) return;
+  if (y + 13 < worldTop || roof > worldBottom) return;
   round(g, bx - 4, roof, bw + 8, fh - 10, 4, C.wall);
   round(g, bx + 7, roof + 9, bw - 14, fh - 29, 4, C.room);
   // Door recesses mark the three safe pockets. The full doorway lights up when occupied.
@@ -691,7 +766,7 @@ function drawFloor(f) {
     g.lineTo(x + 17, y - 3);
     g.stroke();
     round(g, x - 17, y - 5, 34, 5, 2, C.mint);
-    disk(g, x + 9, roof + 58, 2, C.gold);
+    if (fh >= 96) disk(g, x + 9, roof + 58, 2, C.gold);
   }
   const w = wave(s, f);
   if (w.smoke > 0.025 || w.warning) {
@@ -704,19 +779,42 @@ function drawFloor(f) {
     for (let i = 0; i < 19; i++) {
       const u = (((i * 0.077 + clock * 0.038 * dir) % 1) + 1) % 1;
       const x = bx + u * bw;
-      const vy = roof + 26 + (i % 3) * 22;
+      const vy = roof + 15 + ((i % 3) + 0.5) * (fh - 22) / 3;
       g.globalAlpha = strength * (0.18 + (i % 4) * 0.08);
       disk(g, x, vy, 25 + (i % 5) * 6, C.smoke);
       g.globalAlpha = strength * 0.15;
       disk(g, x - 7, vy - 7, 22, "#b9bcc5");
     }
+    if (w.gust) {
+      g.strokeStyle = "#dce1ed";
+      g.lineWidth = 2;
+      g.globalAlpha = strength * 0.6;
+      for (let i = 0; i < 10; i++) {
+        const x = bx + ((i * 0.19 + clock * 0.8 * dir + 20) % 1) * bw;
+        const y = roof + 15 + (i % 5) * (fh - 24) / 5;
+        g.beginPath();
+        g.moveTo(x, y);
+        g.lineTo(x + dir * 27, y + 1);
+        g.stroke();
+      }
+    }
     g.restore();
+  }
+  if (w.gust) {
+    const x = xx(0.5),
+      radius = ALCOVE_RADIUS * (bw - 44);
+    round(g, x - radius, y - 5, radius * 2, 5, 2, C.mint);
+    g.strokeStyle = C.mint;
+    g.lineWidth = 3;
+    g.beginPath();
+    g.roundRect(x - 18, roof + 22, 36, fh - 39, [8, 8, 3, 3]);
+    g.stroke();
   }
   g.fillStyle = C.edge;
   g.fillRect(bx - 5, y, bw + 10, 8);
   g.fillStyle = "#101f2c";
   g.fillRect(bx - 5, y + 8, bw + 10, 5);
-  text(String(f).padStart(2, "0"), bx + 18, roof + 22, 14, C.bright);
+  text(String(f).padStart(2, "0"), bx + (landscape ? 53 : 18), roof + 22, 14, C.bright);
   drawClock(f, roof + 23);
   // The rail at each stair makes the zigzag legible.
   if (f > 0) {
@@ -758,14 +856,12 @@ function draw() {
       round(g, x + 8, j * 103 + 25, 8, 17, 2, "#ffe1a30b");
   }
   if (s) {
-    const p = position(s, s.progress),
-      maxCam = Math.max(
-        0,
-        s.config.floors + 1 - (baseY + 12 - (top + 92)) / fh,
-      ),
-      want = Math.min(maxCam, Math.max(0, p.y - (baseY - H * 0.64) / fh));
-    cam += (want - cam) * 0.12;
+    const p = position(s, s.progress);
+    cam += (cameraTarget(p) - cam) * 0.12;
     g.save();
+    g.beginPath();
+    g.rect(0, worldTop, W, worldBottom - worldTop);
+    g.clip();
     if (shake > 0 && !reduced)
       g.translate(
         Math.sin(clock * 83) * shake,
@@ -774,25 +870,28 @@ function draw() {
     const flo = s.config.floors;
     for (let f = 0; f <= flo; f++) drawFloor(f);
     // Street stays in the world as the camera rises.
-    const street = yy(0) + 20;
+    const street = yy(0) + (landscape ? 13 : 20);
+    const streetLine = street + (landscape ? 2 : 6);
     g.fillStyle = "#18313c";
     g.fillRect(bx - 22, street, W - bx + 22, 70);
     g.strokeStyle = C.mint;
     g.lineWidth = 3;
     g.beginPath();
-    g.moveTo(bx, street + 6);
-    g.lineTo(bx + bw, street + 6);
+    g.moveTo(bx, streetLine);
+    g.lineTo(bx + bw, streetLine);
     g.stroke();
-    text("STREET", bx + bw / 2, street + 18, 14, C.mint, "center");
+    text("STREET", bx + bw / 2, street + (landscape ? 13 : 18), 14, C.mint, "center");
     const folks = s.people.filter((p) => !p.rescued);
     for (const n of folks) {
       const at = position(s, n.progress);
       const x = xx(at.x),
         y = yy(at.y);
-      if (y > top + 75 && y < H - 60) {
+      if (y > worldTop && y < worldBottom + 64) {
         if (!n.joined) {
-          disk(g, x, y - 70, 11, "#f4ecd618");
-          text(n.kind === "cat" ? "♪" : "!", x, y - 69, 16, C.gold, "center");
+          const markerX = x + (landscape ? 26 : 0);
+          const markerY = y - (landscape ? 33 : 70);
+          disk(g, markerX, markerY, 11, "#f4ecd618");
+          text(n.kind === "cat" ? "♪" : "!", markerX, markerY, 16, C.gold, "center");
         }
         person(
           g,
@@ -802,7 +901,7 @@ function draw() {
           n.breath,
           n.joined && (held || keyboard),
           p.x >= 0.5 ? -1 : 1,
-          n.kind === "child" ? 0.9 : 0.85,
+          (n.kind === "child" ? 0.9 : 0.85) * (landscape ? 0.76 : 1),
           clock + n.id,
         );
       }
@@ -821,7 +920,7 @@ function draw() {
       (held || keyboard) && screen === "play",
       Math.sign(position(s, Math.min(s.length, s.progress + 0.025)).x - p.x) ||
         (p.x > 0.5 ? -1 : 1),
-      1,
+      landscape ? 0.76 : 1,
       clock,
     );
     if (s.breath < 40) {
@@ -833,25 +932,29 @@ function draw() {
     }
     // Small route chevrons indicate direction without requiring a steering input.
     const target = position(s, Math.min(s.length, s.progress + 0.13));
-    const dx = Math.sign(target.x - p.x),
-      dy = Math.sign(target.y - p.y);
-    g.globalAlpha = 0.55 + Math.sin(clock * 4) * 0.2;
-    g.strokeStyle = C.gold;
-    g.lineWidth = 3;
-    for (let i = 0; i < 2; i++) {
-      const ax = x + dx * (30 + i * 14),
-        ay = y - 18 - dy * (30 + i * 14);
-      g.beginPath();
-      if (dx) {
-        g.moveTo(ax - dx * 5, ay - 5);
-        g.lineTo(ax, ay);
-        g.lineTo(ax - dx * 5, ay + 5);
-      } else {
-        g.moveTo(ax - 5, ay + dy * 5);
-        g.lineTo(ax, ay);
-        g.lineTo(ax + 5, ay + dy * 5);
+    if (releaseHint(p)) {
+      drawReleaseHint(xx(0.5) + (s.returning ? -67 : 67), yy(1) - fh * 0.53);
+    } else if (!(p.floor === 1 && wave(s, 1).gust && safe(s))) {
+      const dx = Math.sign(target.x - p.x),
+        dy = Math.sign(target.y - p.y);
+      g.globalAlpha = 0.55 + Math.sin(clock * 4) * 0.2;
+      g.strokeStyle = C.gold;
+      g.lineWidth = 3;
+      for (let i = 0; i < 2; i++) {
+        const ax = x + dx * (30 + i * 14),
+          ay = y - 18 - dy * (30 + i * 14);
+        g.beginPath();
+        if (dx) {
+          g.moveTo(ax - dx * 5, ay - 5);
+          g.lineTo(ax, ay);
+          g.lineTo(ax - dx * 5, ay + 5);
+        } else {
+          g.moveTo(ax - 5, ay + dy * 5);
+          g.lineTo(ax, ay);
+          g.lineTo(ax + 5, ay + dy * 5);
+        }
+        g.stroke();
       }
-      g.stroke();
     }
     g.globalAlpha = 1;
     g.restore();
@@ -865,18 +968,22 @@ function draw() {
   if (screen === "play") {
     const width = Math.min(W - 40, 390),
       x = (W - width) / 2,
-      y = H - bottom - 90;
-    round(g, x, y, width, 60, 22, "#0b1b27ee");
+      y = worldBottom + 4,
+      height = landscape ? 44 : 60;
+    round(g, x, y, width, height, 22, "#0b1b27ee");
     g.strokeStyle = held || keyboard ? C.gold : C.mint;
     g.lineWidth = 1;
     g.beginPath();
-    g.roundRect(x, y, width, 60, 22);
+    g.roundRect(x, y, width, height, 22);
     g.stroke();
     const holding = held || keyboard;
+    const sheltered = safe(s);
+    const action = sheltered ? "RELEASE TO BREATHE" : "RELEASE TO CROUCH";
+    const advice = sheltered ? "Wait for the whole line" : "Stop in mint doorways";
     text(
-      holding ? "RELEASE TO SHELTER" : "HOLD TO RUN",
+      holding ? action : "HOLD TO RUN",
       W / 2,
-      y + 23,
+      y + (landscape ? 13 : 23),
       16,
       holding ? C.gold : C.mint,
       "center",
@@ -884,12 +991,12 @@ function draw() {
     );
     text(
       holding
-        ? "Keep the whole line together"
-        : safe(s, s.progress)
+        ? advice
+        : sheltered
           ? "Sheltered · breathe"
           : "Crouching",
       W / 2,
-      y + 44,
+      y + (landscape ? 31 : 44),
       14,
       C.bright,
       "center",
@@ -897,9 +1004,9 @@ function draw() {
     );
     if (toastT > 0) {
       g.globalAlpha = Math.min(1, toastT);
-      const w = Math.min(W - 50, 310);
-      round(g, (W - w) / 2, top + 96, w, 42, 14, "#0b1b27ee");
-      text(toast, W / 2, top + 117, 16, C.bright, "center");
+      const { x, y, width, height } = toastBounds();
+      round(g, x, y, width, height, 14, "#0b1b27ee");
+      text(toast, x + width / 2, y + height / 2, 16, C.bright, "center");
       g.globalAlpha = 1;
     }
   }
@@ -912,14 +1019,37 @@ function draw() {
     g.restore();
   }
 }
+function releaseHint(p) {
+  return (
+    hintMode !== "0" && screen === "play" && (held || keyboard) &&
+    p.floor === 1 && !p.stair && Math.abs(p.corridor - 0.5) < 0.29 &&
+    wave(s, 1).gust
+  );
+}
+function toastBounds() {
+  const width = Math.min(310, landscape ? W / 2 - right - 68 : W - 50);
+  return {
+    x: landscape ? W - right - 68 - width : (W - width) / 2,
+    y: top + (landscape ? 10 : 82),
+    width,
+    height: 34,
+  };
+}
 function drawHUD(p) {
-  const x = Math.max(16, (W - 454) / 2),
-    w = Math.min(W - 88, 380),
+  const x = landscape ? left + 18 : Math.max(16, (W - 454) / 2),
+    w = Math.min(380, landscape ? W / 2 - x - 12 : W - 88),
     y = top + 14;
-  round(g, x - 8, y - 7, w + 9, 70, 18, "#101e2be8");
+  round(g, x - 8, y - 7, w + 9, landscape ? 58 : 70, 18, "#101e2be8");
   text(daily ? `DAILY · ${s.round}` : `LEVEL ${level}`, x, y + 8, 14, C.mint);
+  if (!daily) {
+    const seconds = Math.max(0, Math.ceil(s.config.limit - s.t));
+    const clockLabel = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+    text(clockLabel, x + w / 2 - 12, y + 8, 14, seconds <= 30 ? C.gold : C.bright, "center");
+  }
   text(
-    `${s.returning ? "↓ Street" : "↑ Rescue"} · ${s.people.filter((p) => p.joined || p.rescued).length}/${s.people.length}`,
+    s.returning
+      ? `↓ Out · ${s.rescued}/${s.people.length}`
+      : `↑ Found · ${s.people.filter((p) => p.joined).length}/${s.people.length}`,
     x + w - 15,
     y + 8,
     14,
@@ -952,8 +1082,8 @@ function drawHUD(p) {
         : s.blocked
           ? "WAITING FOR CLEAR AIR"
           : "WAVE COMING",
-      W / 2,
-      top + 166,
+      landscape ? toastBounds().x + toastBounds().width / 2 : W / 2,
+      top + (landscape ? 59 : 128),
       14,
       C.gold,
       "center",
@@ -1082,6 +1212,14 @@ window.breathState = () => ({
   opened: save.opened,
   fx: fx.length,
   confetti: confetti.length,
+  hint: screen === "play" && help.shown ? "hold-release" : s && releaseHint(position(s)) ? "release" : null,
+  view: {
+    top: worldTop,
+    bottom: worldBottom,
+    floorHeight: fh,
+    floors: s ? Array.from({ length: s.config.floors }, (_, i) => yy(i + 1)) : [],
+    toast: screen === "play" && toastT > 0 ? toastBounds() : null,
+  },
 });
 window.breathAdvice = () => (s && !s.over ? careful(s) : false);
 chooseScreen("menu");

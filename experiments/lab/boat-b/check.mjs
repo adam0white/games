@@ -11,7 +11,7 @@ import { guide } from './sim.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '../..');
-const shots = '/private/tmp/night-boat-b';
+const shots = join(here, 'check-shots');
 await mkdir(shots, { recursive: true });
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css' };
 const server = createServer(async (req, res) => {
@@ -53,6 +53,9 @@ async function open(browser, options) {
   page.on('requestfailed', req => errors.push(`request failed: ${req.url()}`));
   page.on('response', response => { if (response.status() >= 400) errors.push(`HTTP ${response.status()} ${response.url()}`); });
   await page.goto(`${base}/lab/boat-b/`);
+  await page.bringToFront();
+  await page.evaluate(() => { window.__boatReviewFrames = 0; requestAnimationFrame(() => { window.__boatReviewFrames++; requestAnimationFrame(() => window.__boatReviewFrames++); }); });
+  await page.waitForFunction(() => window.__boatReviewFrames === 2, undefined, { timeout: 10000, polling: 100 });
   await until(page, () => window.boatState?.().screen === 'menu', 'menu');
   return { context, page, errors, external };
 }

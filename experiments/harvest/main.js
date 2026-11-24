@@ -1,7 +1,7 @@
 // Harvest Morning: the page. View, input, sound, save, cards. The rules are in sim.js.
 import * as sim from './sim.js';
 import { DT, LEVELS, HELP, HELPERS, RIVAL, LANE, SWEEP, STAND, LYING, GONE, NEST_BONUS } from './sim.js';
-import { C, TAU, rrect, ell, grain, star, person, sheaf, cart, crow, stone, hare, whetstone, reason, job, cloud, sun } from './art.js';
+import { C, TAU, rrect, ell, grain, star, person, sheaf, cart, crow, stone, hare, whetstone, reason, job, cloud, sun, wheat } from './art.js';
 import { readJson, writeJson } from '../kit/save.js';
 import { sound } from '../kit/audio.js';
 import { onLeave, isPauseKey } from '../kit/pause.js';
@@ -87,6 +87,7 @@ function layout() {
   vergeTop = H - sb - VERGE;
   tufts = Array.from({ length: 90 }, (_, i) => ({ x: hash(i, 1) * W, y: hash(i, 2) * H, s: 3 + hash(i, 3) * 5 }));
   fit();
+  if (s) draw(1); // Changing canvas dimensions clears it; repaint before waiting for an animation frame.
 }
 function fit() {
   if (!s) return;
@@ -103,7 +104,7 @@ const sx = x => ox + x * c, sy = y => oy + y * c;
 
 // ---------- run state
 let s = null, prev = null, level = 0, daily = false, playing = false, paused = false, screen = 'menu', acc = 0, last = performance.now(), clock = 0;
-let finger = null, keys = new Set(), parts = [], floats = [], shake = 0, flash = 0, banner = null, cartBounce = 0, endAt = 0, hireGuard = {}, lastTouched = 0, swing = 0, bob = 0, hares = [], gusts = [], ending = null, ripple = [];
+let finger = null, keys = new Set(), parts = [], floats = [], shake = 0, flash = 0, banner = null, cartBounce = 0, endAt = 0, hireGuard = {}, lastTouched = 0, swing = 0, bob = 0, hares = [], gusts = [], ending = null, ripple = [], soakedWheat = [];
 let ears = null; // per cell: ear offsets, so the field looks hand-made but stays the same
 const seedQ = query.has('seed') ? Number(query.get('seed')) >>> 0 : null;
 const levelQ = query.has('level') ? Math.max(1, Math.min(LEVELS.length, Number(query.get('level')) || 1)) - 1 : null;
@@ -144,7 +145,7 @@ function demo() { s = sim.create({ level: 6, seed: 3 }); prev = null; prepare();
 function prepare() {
   ears = [];
   for (let i = 0; i < s.cols * s.rows; i++) ears.push(Array.from({ length: 5 }, (_, k) => ({ x: 0.18 + 0.64 * hash(i, k * 3 + 1), y: 0.18 + 0.64 * hash(i, k * 3 + 2), a: (hash(i, k * 3 + 3) - 0.5) * 0.9, s: 0.85 + 0.3 * hash(i, k + 40) })));
-  parts = []; floats = []; hares = []; gusts = []; ripple = [];
+  parts = []; floats = []; hares = []; gusts = []; ripple = []; soakedWheat = [];
 }
 
 // ---------- a morning
@@ -161,12 +162,13 @@ function begin(lv, isDaily) {
   banner = { t: 0, ...BANNER[L.learn] , title: daily ? "Today's field" : `Field ${lv + 1}` };
   rec.start({ level: daily ? 0 : lv + 1, daily: daily ? today : null, seed, cols: s.cols, rows: s.rows });
   show('play');
+  draw(1);
   SFX.tap();
 }
 const BANNER = {
   cut: { word: 'Cut and carry' }, crows: { word: 'Crows!' }, strong: { word: 'Help for hire' }, stone: { word: 'A hidden stone' },
   child: { word: 'Crow chaser' }, wind: { word: 'Wind!' }, old: { word: 'Double bundles' }, nest: { word: "A hare's nest" },
-  fast: { word: 'A fast cutter' }, pond: { word: 'The pond' }, far: { word: 'A far cart' }, all: { word: 'Last field' }, daily: { word: 'Same for everyone' },
+  fast: { word: 'Cut, bundle and carry' }, pond: { word: 'The pond' }, far: { word: 'A far cart' }, all: { word: 'Last field' }, daily: { word: 'Same for everyone' },
 };
 
 function finish() {
@@ -295,7 +297,7 @@ function target() {
 
 // ---------- the loop
 function snapshot() {
-  const p = { me: { x: s.me.x, y: s.me.y }, h: {} };
+  const p = { me: { x: s.me.x, y: s.me.y }, h: {}, rainStanding: s.t + DT >= s.L.time ? s.st.map(v => v === STAND) : null };
   for (const id of HELPERS) p.h[id] = { x: s.helpers[id].x, y: s.helpers[id].y };
   for (const k of s.crows) { k.px = k.x; k.py = k.y; }
   return p;
@@ -339,8 +341,14 @@ function drain() {
       case 'hire': SFX.hire(); popSlot(e.id, '#7fd36a'); break;
       case 'refuse': SFX.refuse(); popSlot(e.id, '#d0523f'); shakeSlot(e.id); break;
       case 'home': SFX.home(); popSlot(e.id, '#fff4dc'); break;
-      case 'storm': SFX.storm(); flash = 1; shake = Math.max(shake, 12); buzz(80); break;
-      case 'soak': SFX.soak(); break;
+      case 'storm': banner = { t: 0, title: 'Rain!', word: 'Uncut wheat is lost' }; SFX.storm(); flash = 1; shake = Math.max(shake, 12); buzz(80); break;
+      case 'soak':
+        SFX.soak();
+        for (let row = 0; row < s.rows; row++) {
+          const i = row * s.cols + e.col;
+          if (prev?.rainStanding?.[i]) soakedWheat.push({ i, t: 0, flat: s.flat[i] });
+        }
+        break;
       case 'trample': SFX.trample(); burst(X, Y, 4, ['#94703d', '#c9962e'], 60, 'chaff'); break;
     }
   }
@@ -359,6 +367,7 @@ function tick(dt) {
   for (const f of floats) f.t += dt; floats = floats.filter(f => f.t < 1);
   for (const r of ripple) r.t += dt; ripple = ripple.filter(r => r.t < 0.5);
   for (const h of hares) h.t += dt; hares = hares.filter(h => h.t < 2);
+  for (const q of soakedWheat) q.t += dt;
   for (const q of gusts) q.t += dt; gusts = gusts.filter(q => q.t < 1.6);
   for (const sl of slots) { if (sl.pop) sl.pop = Math.max(0, sl.pop - dt * 3); if (sl.no) sl.no = Math.max(0, sl.no - dt * 2); if (sl.nope) sl.nope = Math.max(0, sl.nope - dt); }
   shake = Math.max(0, shake - dt * 30); flash = Math.max(0, flash - dt * 2); cartBounce = Math.max(0, cartBounce - dt * 3);
@@ -427,28 +436,24 @@ function drawField(alpha) {
   for (const i of s.found) stone(g, sx(i % cols + 0.5), sy(Math.floor(i / cols) + 0.6), c * 0.5);
   // the hare's nest (ears showing)
   if (s.nestAlive && s.nest.length) { const i = s.nest[0]; hare(g, sx(i % cols + 0.5), sy(Math.floor(i / cols) + 0.62), c * 0.75, 0.9 + 0.1 * Math.sin(t * 2), t); }
-  // standing wheat: ears swaying in the wind
+  // Standing wheat: long stalks, pointed spikelets and awns, never a solid oval.
   const amp = (0.05 + storm * 0.12) * c;
-  g.lineWidth = Math.max(1, c * 0.035); g.strokeStyle = '#8a6420';
-  const shadow = new Path2D(), body = new Path2D(), lit = new Path2D();
   for (let i = 0; i < cols * rows; i++) {
     if (s.st[i] !== STAND) continue;
     const cx0 = sx(i % cols), cy0 = sy(Math.floor(i / cols)), col = i % cols, row = Math.floor(i / cols), flat = s.flat[i];
     let gust = 0; for (const q of gusts) { const d = Math.hypot(cx0 - q.x, cy0 - q.y) / c; gust += Math.max(0, 1 - Math.abs(d - q.t * 6)) * (1 - q.t / 1.6); }
     const sw = Math.sin(t * 1.7 + col * 0.55 + row * 0.35) * amp + Math.sin(t * 3.1 + col) * amp * 0.3 + gust * c * 0.2;
-    const prog = s.prog[i];
-    for (const e of ears[i]) {
-      const x = cx0 + e.x * c + sw * (flat ? 0.2 : 1), y = cy0 + e.y * c, rx = c * 0.13 * e.s, ry = c * (flat ? 0.34 : 0.24) * e.s, rot = flat ? 1.1 : e.a + sw / c * 1.5 - prog * 0.8;
-      // each ear is its own closed shape: move to its start point first, or the path joins the ears with lines
-      const ex = Math.cos(rot), ey = Math.sin(rot), oval = (p, x, y, a, b) => { p.moveTo(x + a * ex, y + a * ey); p.ellipse(x, y, a, b, rot, 0, TAU); };
-      oval(shadow, x + c * 0.06, y + c * 0.1, rx, ry);
-      oval(body, x, y, rx, ry);
-      oval(lit, x - rx * 0.3, y - ry * 0.25, rx * 0.4, ry * 0.45);
+    for (const e of ears[i]) wheat(g, cx0 + e.x * c, cy0 + (e.y + 0.16) * c, c * 0.68 * e.s, flat ? 1.1 + sw / c * 0.2 : e.a * 0.45 + sw / c - s.prog[i] * 0.6, { storm: storm > 0.6 });
+  }
+  // Rain hits standing wheat: blue splashes, then bent grey stalks remain on the wet soil.
+  for (const q of soakedWheat) {
+    const col = q.i % cols, row = Math.floor(q.i / cols), k = calm ? 1 : Math.min(1, q.t / 0.65);
+    for (const e of ears[q.i]) wheat(g, sx(col + e.x), sy(row + e.y + 0.16), c * 0.68 * e.s * (1 - k * 0.45), (q.flat ? 1.1 : e.a * 0.45) + k * 0.95, { wet: true });
+    if (q.t < 0.65) {
+      g.strokeStyle = `rgba(211,242,255,${1 - q.t / 0.65})`; g.lineWidth = 2;
+      ell(g, sx(col + 0.5), sy(row + 0.6), c * (0.15 + q.t * 0.6), c * (0.08 + q.t * 0.2)); g.stroke();
     }
   }
-  g.fillStyle = '#7a5a1f55'; g.fill(shadow);
-  g.fillStyle = storm > 0.6 ? '#d9ab45' : C.wheat; g.fill(body); g.strokeStyle = '#9b7024'; g.lineWidth = Math.max(1, c * 0.04); g.stroke(body);
-  g.fillStyle = '#ffe9a8'; g.fill(lit);
   // hares running off
   for (const h of hares) hare(g, sx(h.x + h.dir * h.t * 5), sy(h.y) - Math.abs(Math.sin(h.t * 12)) * c * 0.4, c * 0.75, 1, h.t);
   // the lane and the cart
@@ -493,6 +498,9 @@ function drawField(alpha) {
     g.stroke();
     // the front
     const fx = sx(fr); g.fillStyle = '#3c435233'; g.fillRect(sx(0), sy(0), fx - sx(0), (rows + LANE) * c);
+    // The pale blue edge marks the moving boundary even with reduced motion.
+    g.fillStyle = '#b7e9ff77'; g.fillRect(fx - 4, sy(0), 8, rows * c);
+    g.strokeStyle = '#e4f7ff'; g.lineWidth = 2; g.beginPath(); g.moveTo(fx, sy(0)); g.lineTo(fx, sy(rows)); g.stroke();
   }
 }
 function arrow(x0, y0, x1, y1) {
@@ -588,7 +596,7 @@ function drawHero() {
   q.fillStyle = sky; rrect(q, 0, 0, w, h, 18); q.fill();
   cloud(q, w * 0.18, h * 0.3, 26, true); sun(q, w * 0.86, h * 0.28, 12, 0);
   q.fillStyle = C.wheat; rrect(q, 0, h * 0.55, w, h * 0.45, 0); q.fill();
-  for (let k = 0; k < 26; k++) { q.fillStyle = k % 2 ? '#e0ad3c' : '#ffe08a'; ell(q, (k + 0.5) * w / 26, h * 0.6 + (k % 3) * 3, 6, 11, 0.2); q.fill(); }
+  for (let k = 0; k < 30; k++) wheat(q, (k + 0.5) * w / 30, h * 0.88 + (k % 3) * 4, 33 + (k % 4) * 3, (k % 3 - 1) * 0.12);
   cart(q, w * 0.22, h * 0.78, 20, 0.7); person(q, w * 0.55, h * 0.72, 16, 'me', { scythe: true, face: 0.3, swing: 0.2, sheaves: 2 }); person(q, w * 0.75, h * 0.78, 13, 'child', { face: 2.6 });
   crow(q, w * 0.4, h * 0.25, 9, 1, false);
 }
@@ -616,7 +624,7 @@ window.harvestState = () => ({
   helpers: s ? Object.fromEntries(HELPERS.map(id => [id, { hired: s.helpers[id].hired, ever: s.helpers[id].ever, gone: s.helpers[id].gone }])) : {},
   minTouch: slots.length ? Math.min(...slots.map(r => Math.min(r.w, r.h))) : null,
   stars: save.stars.slice(), best: save.best.slice(), board: save.board.slice(), dailyBest: save.daily[today] ?? null, sound: save.sound, runs: save.runs,
-  hint: !!document.querySelector('.kit-hint.on'), finger: !!finger, parts: parts.length,
+  hint: !!document.querySelector('.kit-hint.on'), finger: !!finger, parts: parts.length, rainWheat: soakedWheat.length,
 });
 window.harvestSim = () => s;
 

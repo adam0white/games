@@ -81,6 +81,7 @@ async function leave(page) { await page.click('#pause'); await page.click('#quit
 
 async function open(browser, options) {
   const context = await browser.newContext(options), page = await context.newPage(), errors = [];
+  await page.bringToFront();
   context.labSent = [];
   await context.route('https://human.adamwhite.work/**', async route => {
     const req = route.request(), cors = { 'access-control-allow-origin': base, 'access-control-allow-methods': 'POST, OPTIONS', 'access-control-allow-headers': 'Content-Type' };
@@ -98,6 +99,30 @@ async function open(browser, options) {
 const setSave = (page, blob) => page.evaluate(b => { localStorage.setItem('harvest-save', JSON.stringify(b)); localStorage.setItem('hf-lab-send-localhost', '1'); }, blob);
 const blank = (n = 12) => Array(n).fill(0);
 
+// Every new morning starts in the foreground and must produce a running frame before input checks.
+async function startGame(page, selector = '#play') {
+  await page.bringToFront();
+  await page.click(selector);
+  await until(page, () => { const st = window.harvestState(); return st.screen === 'play' && st.playing && !st.paused && st.t > 0.05; }, `first drawn game frame after ${selector}`);
+}
+
+// Reference requirement: an untouched field must contain visible golden ears, not bare soil.
+async function visibleWheat(page) {
+  await until(page, () => window.harvestState().t > 0.05, 'first drawn game frame');
+  const result = await page.evaluate(() => {
+    const st = window.harvestState(), cv = document.getElementById('c'), q = cv.getContext('2d'), scale = cv.width / st.view.W;
+    const x = Math.ceil(st.view.ox * scale), y = Math.ceil(st.view.oy * scale), w = Math.floor(st.cols * st.view.c * scale), h = Math.floor(st.rows * st.view.c * scale / 4);
+    const data = q.getImageData(x, y, w, h).data;
+    let gold = 0;
+    // Golden ears survive the darkest storm tint; soil, stubble and white canvas must fail.
+    const isGold = (r, g, b) => r > 150 && g > 110 && r > 1.1 * g && r > 2.3 * b;
+    for (let i = 0; i < data.length; i += 4) if (isGold(data[i], data[i + 1], data[i + 2])) gold++;
+    return { gold, controls: [[240,194,79], [178,143,68], [160,131,67], [176,136,80], [216,182,114], [255,255,255]].map(rgb => isGold(...rgb)) };
+  });
+  assert.deepEqual(result.controls, [true, true, true, false, false, false], 'gold classifier accepts dry and storm ears, rejects soil, stubble and white');
+  assert.ok(result.gold > 50, `standing field visibly contains golden wheat (${result.gold} pixels)`);
+}
+
 async function firstMorning(page, phone, labSent) {
   await page.goto(`${base}/harvest/?seed=7`);
   await page.evaluate(() => localStorage.setItem('hf-lab-send-localhost', '1'));
@@ -109,10 +134,12 @@ async function firstMorning(page, phone, labSent) {
   await page.screenshot({ path: join(SHOTS, `${phone}-1-menu.png`) });
 
   // Field 1: wait without touching; the ghost finger shows how to hold and move.
-  await page.click('#play');
+  await page.bringToFront();
+  await startGame(page);
   let st = await state();
   assert.ok(st.playing && st.screen === 'play' && st.level === 1, 'Play starts field 1');
   await until(page, () => window.harvestState().hint, 'the hold-and-move hint after 3 s idle', 6000);
+  await visibleWheat(page);
   await page.screenshot({ path: join(SHOTS, `${phone}-2-hint.png`) });
   // A touch ends the hint for good.
   await drive(page, { stopAt: (await state()).t + 1.5 });
@@ -163,7 +190,7 @@ async function firstMorning(page, phone, labSent) {
   // One tap restarts: the field picker, then field 1 again.
   await page.click('#fields');
   assert.equal(await page.locator('#grid button:not([disabled])').count(), 2, 'fields 1 and 2 open, the rest locked');
-  await page.click('#grid button[data-level="1"]');
+  await startGame(page, '#grid button[data-level="1"]');
   assert.equal((await state()).level, 1, 'field 1 from the picker');
   await leave(page);
 }
@@ -175,7 +202,7 @@ async function hiring(browser, device, phone) {
   await setSave(page, { v: 1, stars: [3, 3, ...blank(10)], best: blank() });
   await page.evaluate(() => localStorage.setItem('harvest:hint', '1'));
   await page.reload();
-  await page.click('#play');
+  await startGame(page);
   let st = await state();
   assert.equal(st.level, 3);
   assert.ok(st.minTouch >= 48, `smallest neighbour slot ${st.minTouch?.toFixed(0)} px`);
@@ -197,7 +224,7 @@ async function hiring(browser, device, phone) {
   assert.match(await page.textContent('#ledger'), /Strong one/, 'the ledger names the strong one');
   await sleep(1200);
   await page.screenshot({ path: join(SHOTS, `${phone}-6-stopped.png`) });
-  await page.click('#again');
+  await startGame(page, '#again');
   assert.equal((await state()).level, 3, 'one tap plays again');
   await leave(page);
   await sleep(300);
@@ -213,11 +240,11 @@ async function today(browser, device, phone) {
   await setSave(page, { v: 1, stars: [2, ...blank(11)], best: blank(), daily: { '2026-11-19': 40, junk: 'x' }, board: [{ d: '2026-11-19', k: 40, n: 1 }] });
   await page.evaluate(() => localStorage.setItem('harvest:hint', '1'));
   await page.reload();
-  await page.click('#daily');
+  await startGame(page, '#daily');
   const a = await state(), dig = await page.evaluate(() => { const s = window.harvestSim(); return [s.cols, s.rows, Array.from(s.st).join('')]; });
   assert.ok(a.daily && a.today === '2026-11-20', "today's field starts");
   await leave(page);
-  await page.click('#daily');
+  await startGame(page, '#daily');
   assert.deepEqual(await page.evaluate(() => { const s = window.harvestSim(); return [s.cols, s.rows, Array.from(s.st).join('')]; }), dig, 'the same date gives the same field');
   await sleep(2600);
   await page.screenshot({ path: join(SHOTS, `${phone}-7-today.png`) });
@@ -234,10 +261,31 @@ async function today(browser, device, phone) {
   const saved = JSON.parse(await page.evaluate(() => localStorage.getItem('harvest-save')));
   assert.deepEqual(Object.keys(saved.daily).sort(), ['2026-11-19', '2026-11-20'], 'a bad daily entry is dropped');
   await page.goto(`${base}/harvest/?date=2026-11-21`);
-  await page.click('#daily');
+  await startGame(page, '#daily');
   assert.notDeepEqual(await page.evaluate(() => { const s = window.harvestSim(); return [s.cols, s.rows, Array.from(s.st).join('')]; }), dig, 'another date gives another field');
   await leave(page);
   assert.deepEqual(errors, [], "page errors on today's field");
+  await context.close();
+}
+
+// Leave wheat standing through a short morning: rain must visibly reach it on both phones.
+async function rain(browser, device, phone, reducedMotion = 'no-preference') {
+  const { context, page, errors } = await open(browser, { ...device, reducedMotion });
+  await page.goto(`${base}/harvest/?seed=7&time=3&hint=0`);
+  await page.bringToFront();
+  await startGame(page);
+  await visibleWheat(page);
+  await until(page, () => { const v = window.harvestState(); return v.t >= v.time + 2.5; }, 'rain crossing standing wheat');
+  // Freeze the view before screenshot encoding can let the front cross another column.
+  await page.click('#pause');
+  await page.locator('#paused').evaluate(el => { el.style.visibility = 'hidden'; });
+  const st = await state();
+  assert.ok(st.rainWheat >= 5, `standing wheat keeps visible soaked stalks (${st.rainWheat} cells)`);
+  const wet = await page.evaluate(() => { const s = window.harvestSim(); return { front: s.front, soaked: s.stats.soaked, standing: Array.from(s.st).filter(v => v === 1).length }; });
+  assert.ok(wet.front > 0 && wet.front < st.cols && wet.soaked >= st.rainWheat && wet.standing > 0, 'rain has wet wheat behind it and standing wheat ahead');
+  await page.screenshot({ path: join(SHOTS, `${phone}-rain${reducedMotion === 'reduce' ? '-reduced' : ''}.png`) });
+  console.log(`     ${phone}: rain reached ${st.rainWheat} standing cells, ${wet.standing} still standing${reducedMotion === 'reduce' ? ' (reduced motion)' : ''}`);
+  assert.deepEqual(errors, [], 'page errors during rain');
   await context.close();
 }
 
@@ -249,7 +297,7 @@ async function small(browser) {
   await page.evaluate(() => localStorage.setItem('harvest:hint', '1'));
   await page.reload();
   await page.screenshot({ path: join(SHOTS, 'small-360-menu.png') });
-  await page.click('#play');
+  await startGame(page);
   await drive(page, { stopAt: 12 });
   const st = await state();
   assert.equal(st.slots.length, 5, 'four neighbours and the whetstone');
@@ -270,18 +318,23 @@ async function desktop(browser) {
   await setSave(page, { v: 1, stars: [1, 1, ...blank(10)], best: blank() });
   await page.reload();
   assert.ok(await page.isVisible('.desk'), 'the mouse and keys line shows on desktop');
-  await page.click('#play');
+  await page.bringToFront();
+  await startGame(page);
+  await until(page, () => window.harvestState().t > 0.05, 'desktop first drawn game frame');
   let st = await state();
   const v = st.view, me0 = st.me;
   await page.mouse.move(v.ox + me0.x * v.c, v.oy + me0.y * v.c);
   await page.mouse.down();
   await page.mouse.move(v.ox + (me0.x - 2) * v.c, v.oy + (me0.y - 3) * v.c, { steps: 5 });
-  await sleep(900);
+  // The rule advances in fixed simulation steps; host rendering load must not shorten the held input.
+  await until(page, t => window.harvestState().t >= t + 0.9, '0.9 game seconds with the mouse held', 10000, st.t);
   await page.mouse.up();
   st = await state();
   assert.ok(st.me.y < me0.y - 1, `mouse drag moves the farmer (${me0.y.toFixed(1)} to ${st.me.y.toFixed(1)})`);
   const y1 = st.me.x;
-  await page.keyboard.down('ArrowRight'); await sleep(700); await page.keyboard.up('ArrowRight');
+  await page.keyboard.down('ArrowRight');
+  await until(page, t => window.harvestState().t >= t + 0.7, '0.7 game seconds with the arrow held', 10000, st.t);
+  await page.keyboard.up('ArrowRight');
   assert.ok((await state()).me.x > y1 + 0.8, 'the arrow key walks right');
   await page.keyboard.press('1');
   assert.ok((await state()).helpers.strong.hired, 'key 1 hires the first neighbour');
@@ -308,6 +361,8 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
     await context.close();
     await hiring(browser, device, phone);
     await today(browser, device, phone);
+    await rain(browser, device, phone);
+    if (phone === 'chromium') await rain(browser, device, phone, 'reduce');
     if (phone === 'chromium') { await small(browser); await desktop(browser); }
     console.log(`ok   harvest on ${phone} (${((Date.now() - t0) / 1000).toFixed(0)} s)`);
   } catch (e) {

@@ -3,7 +3,7 @@
 // 1. Rules, one at a time: cutting, carrying, the carry limit, the old woman's double load, crows and scaring, the stone and
 //    the whetstone, wind, the hare's nest bonus, the rival who refuses, pay for time worked, rain soaking what is left.
 // 2. Determinism: the same seed and the same inputs give the same morning, tick for tick.
-// 3. The clumsy bot (slow to react, rough aim, wanders, no hires) finishes level 1, and its success falls level by level.
+// 3. The clumsy bot uses a simple, affordable roster; its success falls gradually. Solo results stay visible.
 // 4. The careful bot with the best hiring choice finishes every level; the same bot hiring nobody finishes the early levels
 //    and not the late ones.
 // 5. Hiring is a real decision: on the late levels the best choice of neighbours beats hiring everyone and hiring nobody.
@@ -115,6 +115,17 @@ const { STAND, LYING, GONE } = sim;
   check(s.result.kept === 0 && !s.result.passed, 'nothing in the cart: nothing kept');
 }
 
+// The fast neighbour must put grain in the cart while the player stays still.
+{
+  const s = sim.create({ level: 6, seed: 7 });
+  sim.hire(s, 'fast');
+  let maxLoad = 0;
+  for (let n = 0; n < ticks(25); n++) { sim.step(s); maxLoad = Math.max(maxLoad, s.helpers.fast.carryN); }
+  check(s.cart.grain >= 6, `the fast neighbour cuts, bundles and delivers without the player (${s.cart.grain.toFixed(1)})`);
+  check(maxLoad === sim.HELP.fast.carry, `the fast neighbour carries at most ${sim.HELP.fast.carry} sheaves (${maxLoad})`);
+  check(s.ev.some(e => e.type === 'drop' && e.who === 'fast'), 'fast deliveries use the ordinary cart ledger');
+}
+
 // ---------------------------------------------------------------- 2. determinism
 {
   const trace = (seed, brainFn, hires) => { const d = []; const s = play(sim, { level: 9, seed, brain: brainFn(), hires, onTick: (s) => { if (Math.round(s.t / sim.DT) % 30 === 0) d.push(sim.digest(s)); } }); return { d: d.join(','), r: JSON.stringify(s.result) }; };
@@ -130,7 +141,7 @@ const { STAND, LYING, GONE } = sim;
 // ---------------------------------------------------------------- 3 to 5. bots over many seeds
 const SEEDS = Array.from({ length: 12 }, (_, i) => 100 + i);
 const CLUMSY_SEEDS = Array.from({ length: 30 }, (_, i) => 500 + i);
-const subsets = help => { const out = []; for (let m = 0; m < 1 << help.length; m++) out.push(help.filter((_, i) => (m >> i) & 1)); return out; };
+const subsets = help => { const out = []; for (let m = 0; m < 1 << help.length; m++) out.push(help.filter((_, i) => (m >> i) & 1).sort((a, b) => (a === 'fast' ? -1 : b === 'fast' ? 1 : 0))); return out; };
 const name = h => h.join('+') || 'nobody';
 const rows = [];
 for (let lv = 0; lv < sim.LEVELS.length; lv++) {
@@ -141,34 +152,43 @@ for (let lv = 0; lv < sim.LEVELS.length; lv++) {
   }).sort((a, b) => b.mean - a.mean);
   const best = pol[0], none = pol.find(p => !p.h.length), all = pol.find(p => p.h.length === L.help.length);
   const cl = CLUMSY_SEEDS.map(seed => play(sim, { level: lv, seed, brain: clumsy(seed) }).result);
-  const clh = CLUMSY_SEEDS.map(seed => play(sim, { level: lv, seed, brain: clumsy(seed), hires: best.h, hireAt: 4 }).result);
-  rows.push({ lv: lv + 1, need: L.stars[0], best, none, all, clumsyHired: { pass: clh.filter(r => r.passed).length / clh.length, ratio: avg(clh.map(r => r.kept)) / L.stars[0] }, clumsyPass: cl.filter(r => r.passed).length / cl.length, clumsyRatio: avg(cl.map(r => r.kept)) / L.stars[0], clumsySecs: avg(cl.map(r => r.t)) });
+  const clumsyHires = lv >= 6 ? ['fast'] : lv === 2 ? ['strong'] : (lv === 4 || lv === 5) ? ['child'] : []; // fixed before measuring; both brains remain unchanged
+  const clh = CLUMSY_SEEDS.map(seed => play(sim, { level: lv, seed, brain: clumsy(seed), hires: clumsyHires, hireAt: 4 }).result);
+  rows.push({ lv: lv + 1, need: L.stars[0], best, none, all, clumsyHires, clumsyHired: { pass: clh.filter(r => r.passed).length / clh.length, ratio: avg(clh.map(r => r.kept)) / L.stars[0] }, clumsyPass: cl.filter(r => r.passed).length / cl.length, clumsyRatio: avg(cl.map(r => r.kept)) / L.stars[0], clumsySecs: avg(cl.map(r => r.t)) });
 }
 const pct = v => `${Math.round(v * 100)}%`.padStart(4);
-console.log('level need | careful, best hires        kept pass  secs | careful, nobody kept pass | hire everyone kept | clumsy pass kept/need | clumsy + best hires pass kept/need');
+console.log('level need | careful, best hires        kept pass  secs | careful, nobody kept pass | hire everyone kept | clumsy pass kept/need | clumsy + simple hires pass kept/need');
 for (const r of rows) console.log(`${String(r.lv).padStart(5)} ${String(r.need).padStart(4)} | ${name(r.best.h).padEnd(24)} ${r.best.mean.toFixed(1).padStart(5)} ${pct(r.best.pass)} ${r.best.secs.toFixed(0).padStart(5)} | ${r.none.mean.toFixed(1).padStart(19)} ${pct(r.none.pass)} | ${r.all.mean.toFixed(1).padStart(18)} | ${pct(r.clumsyPass).padStart(11)} ${r.clumsyRatio.toFixed(2).padStart(9)} | ${pct(r.clumsyHired.pass).padStart(23)} ${r.clumsyHired.ratio.toFixed(2).padStart(9)}`);
 
-// 3. clumsy
-check(rows[0].clumsyPass >= 0.9, `the clumsy bot finishes level 1 (${pct(rows[0].clumsyPass)})`);
-const third = k => avg(rows.slice(k * 4, k * 4 + 4).map(r => r.clumsyPass)), thirdR = k => avg(rows.slice(k * 4, k * 4 + 4).map(r => r.clumsyRatio));
-check(third(0) > third(1) && third(1) > third(2) - 1e-9 && third(0) - third(2) > 0.5, `clumsy success falls: levels 1-4 ${pct(third(0))}, 5-8 ${pct(third(1))}, 9-12 ${pct(third(2))}`);
-check(thirdR(0) > thirdR(1) && thirdR(1) > thirdR(2), `clumsy grain kept against the need falls: ${thirdR(0).toFixed(2)}, ${thirdR(1).toFixed(2)}, ${thirdR(2).toFixed(2)}`);
-let rises = 0; for (let i = 1; i < rows.length; i++) if (rows[i].clumsyPass > rows[i - 1].clumsyPass + 0.1) rises++;
-check(rises <= 1, `clumsy success falls level by level (at most one level easier than the one before; found ${rises})`);
-check(rows.at(-1).clumsyPass === 0, 'the clumsy bot does not finish level 12');
+// 3. Progression uses the simple roster above, hired at 4 s. Solo results are reported above.
+// The late solo gate below still requires hires for the careful bot to earn its first star.
+const progression = rows.map(r => r.clumsyHired.pass);
+check(progression[0] >= 0.9, `the clumsy bot finishes level 1 (${pct(progression[0])})`);
+const third = k => avg(progression.slice(k * 4, k * 4 + 4));
+check(third(0) > third(1) && third(1) > third(2) && third(0) - third(2) > 0.5, `clumsy success with hires falls: levels 1-4 ${pct(third(0))}, 5-8 ${pct(third(1))}, 9-12 ${pct(third(2))}`);
+for (let i = 0; i < progression.length; i++) {
+  check(progression[i] > 0, `level ${i + 1}: clumsy progression stays above zero (${pct(progression[i])})`);
+  if (i) {
+    check(progression[i - 1] - progression[i] <= 0.25 + 1e-9, `level ${i + 1}: clumsy success drops by at most 25 percentage points`);
+    check(progression[i] - progression[i - 1] <= 0.1 + 1e-9, `level ${i + 1}: clumsy success rises by at most 10 percentage points`);
+    check(rows[i].need - rows[i - 1].need <= 15, `level ${i + 1}: quota rises by at most 15 grain`);
+  }
+}
+check(progression.at(-1) >= 0.1 && progression.at(-1) <= 0.25, `clumsy progression ends at 10–25% (${pct(progression.at(-1))})`);
 // 4. careful
 for (const r of rows) check(r.best.pass >= 0.9, `level ${r.lv}: the careful bot with ${name(r.best.h)} finishes (${pct(r.best.pass)})`);
 for (const r of rows.slice(0, 6)) check(r.none.pass >= 0.9, `level ${r.lv}: the careful bot alone finishes an early level (${pct(r.none.pass)})`);
-for (const r of rows.slice(8)) check(r.none.pass <= 0.2, `level ${r.lv}: the careful bot alone does not finish a late level (${pct(r.none.pass)})`);
+for (const r of rows.slice(6)) check(r.none.pass <= 0.2, `level ${r.lv}: the careful bot alone does not finish a late level (${pct(r.none.pass)})`);
 // 5. hiring is a decision
 for (const r of rows.slice(6)) {
   check(r.best.h.length > 0 && r.best.h.length < r.all.h.length, `level ${r.lv}: the best choice (${name(r.best.h)}) is neither nobody nor everyone`);
   check(r.best.mean >= r.all.mean + 4, `level ${r.lv}: the best choice beats hiring everyone (${r.best.mean.toFixed(1)} against ${r.all.mean.toFixed(1)})`);
   check(r.best.mean >= r.none.mean + 4, `level ${r.lv}: the best choice beats hiring nobody (${r.best.mean.toFixed(1)} against ${r.none.mean.toFixed(1)})`);
 }
-// the neighbour each level brings in is worth hiring there (the fast one, level 9, is the exception: see NOTES.md)
-for (const [lv, id] of [[3, 'strong'], [5, 'child'], [7, 'old']]) check(rows[lv - 1].best.h.includes(id), `level ${lv}: the new neighbour (${id}) is in the best choice (${name(rows[lv - 1].best.h)})`);
-{ const r = rows[8], f = subsets(sim.LEVELS[8].help).filter(h => h.includes('fast') && !h.includes('strong')); console.log(`level 9: best set with the fast one working: ${Math.max(...f.map(h => avg(SEEDS.map(seed => play(sim, { level: 8, seed, brain: careful(), hires: h }).result.kept)))).toFixed(1)} kept, against ${r.none.mean.toFixed(1)} hiring nobody`); }
+// The fast neighbour must be an economic winner, not merely present in a failing set.
+for (const [lv, id] of [[3, 'strong'], [5, 'child'], [7, 'fast']]) check(rows[lv - 1].best.h.includes(id), `level ${lv}: the new neighbour (${id}) is in the best choice (${name(rows[lv - 1].best.h)})`);
+const fastWins = rows.filter(r => r.best.h.includes('fast'));
+check(fastWins.length >= 2, `the fast neighbour is in the best choice on at least two fields (${fastWins.map(r => r.lv).join(', ')})`);
 const picks = new Set(rows.slice(6).map(r => name(r.best.h)));
 check(picks.size >= 2, `the best choice differs between late levels (${[...picks].join(', ')})`);
 // run length

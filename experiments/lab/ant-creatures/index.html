@@ -117,7 +117,7 @@ const daySeed = day => { let h = 2166136261; for (const ch of day) h = Math.imul
 const FONT = size => `bold ${size}px ui-rounded, 'Arial Rounded MT Bold', system-ui, sans-serif`;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
-let s = null, mode = 'menu', W = 0, H = 0, dpr = 1, zoom = 1, last = 0, acc = 0, shake = 0, sayTimer = 0, flash = 0, dying = 0, lives = LIVES, top = 1, runStart = 0;
+let s = null, mode = 'menu', W = 0, H = 0, dpr = 1, zoom = 1, last = 0, acc = 0, shake = 0, sayTimer = 0, flash = 0, dying = 0, lives = LIVES, top = 1;
 const floats = [], bits = [], keys = new Set(), rigs = new Map(); let me_ = null; // me_: the player's rig
 
 // ---------- sound: every action has one
@@ -134,7 +134,17 @@ function burst(x, y, colours, n, speed, size, list = bits) {
 
 // ---------- screens
 const cards = screens(['menu', 'evolve', 'dead', 'over', 'paused', 'win']);
+const delayedSounds = new Set();
+function laterSound(fn, ms) { const id = setTimeout(() => { delayedSounds.delete(id); fn(); }, ms); delayedSounds.add(id); }
+function releaseZoo() {
+  if (!zooDown) return;
+  const { id, i } = zooDown, pen = pens[i];
+  pen.tx = pen.follow?.x ?? pen.x; pen.ty = pen.follow?.y ?? pen.y; pen.follow = null; pen.wait = 2; zooDown = null;
+  try { zoo.releasePointerCapture(id); } catch {}
+}
 function show(name) {
+  for (const id of delayedSounds) clearTimeout(id); delayedSounds.clear();
+  releaseZoo();
   mode = name; cards(name);
   const play = name === 'play';
   $('hud').style.display = s && ['play', 'dying', 'evolve', 'dead', 'paused'].includes(name) ? 'block' : 'none';
@@ -153,8 +163,8 @@ function menu() {
 function start() {
   const day = today(); if (save.day !== day) { save.day = day; save.dayBest = 0; }
   s = create(Number(query.get('seed')) || daySeed(day), [ANT], 0, SPAWN_WEIGHTS, true); // Wild rules, the main game's default
-  rigs.clear(); me_ = null; floats.length = 0; bits.length = 0; flash = 0; lives = LIVES; top = 1; runStart = performance.now(); acc = 0;
-  store(); hud(); show('play'); blip(440, 0.12, 'triangle', 0.1, 220);
+  rigs.clear(); me_ = null; floats.length = 0; bits.length = 0; flash = 0; lives = LIVES; top = 1; acc = 0; shake = 0; dying = 0;
+  reached(1); hud(); show('play'); blip(440, 0.12, 'triangle', 0.1, 220);
   say('Eat the little bugs with green numbers');
 }
 function hud() {
@@ -179,7 +189,7 @@ function portrait(canvas, F, t = 0) {
   drawCreature(x, c, { px: 1 / k });
 }
 function offer() {
-  blip(520, 0.25, 'triangle', 0.14, 400); setTimeout(() => blip(780, 0.3, 'triangle', 0.12, 400), 120);
+  blip(520, 0.25, 'triangle', 0.14, 400);
   burst(s.player.x, s.player.y, ['#ffe23a', '#ffb42a', '#ffffff', '#8dff8a'], 40, 220, 5);
   $('evolveSay').textContent = `You were ${article(me(s).name)}. Pick what you become.`;
   const box = $('opts'); box.textContent = '';
@@ -191,12 +201,12 @@ function offer() {
     b.onclick = () => { if (!s.choosing) return; choose(s, i); reached(level(s)); blip(520, 0.3, 'triangle', 0.14, 500); me_ = null; hud(); show('play'); say(`You are ${article(F.name)} now`); };
     box.append(b);
   });
-  show('evolve');
+  show('evolve'); laterSound(() => blip(780, 0.3, 'triangle', 0.12, 400), 120);
 }
 function died() {
   const d = s.dead, prev = s.player.stack.length > 1 ? FORMS[s.player.stack.at(-2)] : FORMS[ANT];
   if (lives <= 0) { // the end card
-    const secs = Math.round((performance.now() - runStart) / 1000);
+    const secs = Math.round(s.t);
     $('overSay').textContent = `Eaten by ${article(d.to)}. You reached level ${top} in ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}.`;
     $('overBest').textContent = `Today's best: level ${save.dayBest} · ever: ${save.best}`;
     blip(330, 0.5, 'triangle', 0.12, -120); show('over'); return;
@@ -217,7 +227,10 @@ $('goOn').onclick = () => { tap(); goOn(); };
 $('pause').onclick = () => { tap(); show('paused'); }; $('resume').onclick = () => { tap(); show('play'); };
 
 // ---------- input: the kit's floating stick, with the main game's numbers
+// Keep the kit stick owned by its first finger until release.
+cv.addEventListener('pointerdown', e => { if (pad.touch && pad.touch.id !== e.pointerId) e.stopImmediatePropagation(); }, { capture: true });
 const pad = stick(cv, { when: () => mode === 'play', reach: 55, leash: 70, dead: 0.15 });
+cv.addEventListener('lostpointercapture', e => { if (pad.touch?.id === e.pointerId) pad.drop(); });
 hint(cv, { kind: 'stick', key: 'ant-creatures:hint', when: () => mode === 'play', played });
 addEventListener('keydown', e => {
   if (isPauseKey(e)) { if (mode === 'play') show('paused'); else if (mode === 'paused') show('play'); else if (mode === 'zoo' && e.key === 'Escape') show('menu'); return; }
@@ -367,16 +380,18 @@ let zooDown = null;
 function penAt(cx, cy) { for (let i = 0; i < pens.length; i++) { const b = penBox(i); if (cx >= b.x && cx <= b.x + b.w && cy >= b.y + 26 && cy <= b.y + 26 + b.h) return i; } return -1; }
 function toPen(i, cx, cy) { const b = penBox(i), k = pens[i].k || 1; return { x: (cx - b.x - b.w / 2) / k, y: (cy - b.y - 26 - b.h / 2) / k }; }
 zoo.addEventListener('pointerdown', e => {
+  if (zooDown || e.target.closest('button')) return;
   const i = penAt(e.clientX, e.clientY); if (i < 0) return; snd.unlock();
   const pen = pens[i], q = toPen(i, e.clientX, e.clientY); zooDown = { id: e.pointerId, i };
   if (pen.c && Math.hypot(q.x - pen.x, q.y - pen.y) < pen.F.r * 1.6 + 14 / (pen.k || 1)) { // a poke
     poke(pen.c); blip(300 + 900 / (pen.F.r + 3) * 8, 0.12, 'square', 0.08, -200); crunch(0.05, 0.08, 2400);
     const b = penBox(i); burst(e.clientX, e.clientY, [pen.F.c, '#ffe23a', '#ffffff'], 10, 160, 4, zbits); pen.poked = (pen.poked || 0) + 1; pen.wait = 0.6; pen.follow = null; zooDown = null;
-  } else { pen.follow = q; blip(880, 0.05, 'sine', 0.05); }
+  } else { try { zoo.setPointerCapture(e.pointerId); } catch {} pen.follow = q; blip(880, 0.05, 'sine', 0.05); }
 });
 zoo.addEventListener('pointermove', e => { if (zooDown && zooDown.id === e.pointerId) { const q = toPen(zooDown.i, e.clientX, e.clientY); pens[zooDown.i].follow = q; } });
-const zooUp = e => { if (zooDown && zooDown.id === e.pointerId) { const pen = pens[zooDown.i]; pen.tx = pen.follow?.x ?? pen.x; pen.ty = pen.follow?.y ?? pen.y; pen.follow = null; pen.wait = 2; zooDown = null; } };
-zoo.addEventListener('pointerup', zooUp); zoo.addEventListener('pointercancel', zooUp);
+const zooUp = e => { if (zooDown && zooDown.id === e.pointerId) releaseZoo(); };
+zoo.addEventListener('pointerup', zooUp); zoo.addEventListener('pointercancel', zooUp); zoo.addEventListener('lostpointercapture', zooUp);
+onLeave(releaseZoo);
 function zooFrame(dt) {
   g.fillStyle = '#24451f'; g.fillRect(0, 0, W, H);
   let shown = 0;
@@ -430,7 +445,7 @@ function drawSheet() {
 }
 
 // ---------- ?bench=N: N animals walking on the meadow, drawn by the play path, timed for check.mjs
-const benchN = Number(query.get('bench')) || 0, bench = { n: benchN, gaps: [], cpu: [], drawn: 0, list: [] };
+const requestedBench = Number(query.get('bench')), benchN = Number.isFinite(requestedBench) ? clamp(Math.floor(requestedBench), 0, 200) : 0, bench = { n: benchN, gaps: [], cpu: [], drawn: 0, list: [] };
 function benchFrame(now, dt) {
   if (!bench.list.length) for (let i = 0; i < benchN; i++) { const F = FORMS[(i * 7 + 3) % FORMS.length]; bench.list.push({ F, c: creature(F, WORLD / 2, WORLD / 2, 0), R: 40 + (i % 8) * 28, w: (0.5 + (i % 5) * 0.15) * (i % 2 ? 1 : -1), ph: i * 0.9, acc: 0 }); }
   zoom = Math.sqrt(W * H) / (480 + 14 * 8);
@@ -447,7 +462,7 @@ function frame(now) {
   const dt = last ? Math.min(0.1, (now - last) / 1000) : 0, gap = last ? now - last : 0; last = now;
   const t0 = performance.now();
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
-  if (mode === 'bench') { benchFrame(now, dt); if (gap) { bench.gaps.push(gap); bench.cpu.push(performance.now() - t0); } return; }
+  if (mode === 'bench') { benchFrame(now, dt); if (gap) { bench.gaps.push(gap); bench.cpu.push(performance.now() - t0); if (bench.gaps.length > 600) { bench.gaps.shift(); bench.cpu.shift(); } } return; }
   if (mode === 'sheet') return;
   if (mode === 'zoo') { zooFrame(dt); return; }
   if (mode === 'menu') { g.fillStyle = '#3f6a34'; g.fillRect(0, 0, W, H); drawHero(dt); return; }
@@ -483,9 +498,9 @@ function frame(now) {
         }
         if (e.t === 'win') {
           reached(TOP); hud(); $('winSay').textContent = `You climbed all ${TOP} levels and became ${article(me(s).name)}.`;
-          for (let k = 0; k < 4; k++) setTimeout(() => blip(523 * 2 ** (k / 4), 0.3, 'triangle', 0.13, 200), k * 140);
+          show('win');
+          for (let k = 0; k < 4; k++) laterSound(() => blip(523 * 2 ** (k / 4), 0.3, 'triangle', 0.13, 200), k * 140);
           burst(s.player.x, s.player.y, ['#ffe23a', '#ff7a6a', '#8dff8a', '#7ac8ff', '#ffffff'], 90, 380, 6); shake = 0.3;
-          setTimeout(() => show('win'), 1200);
         }
       }
     }

@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f2e9d6">
+  <link rel="icon" href="data:,">
+  <title>Night Flock</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <main class="folio">
+    <header>
+      <div class="heading">
+        <div id="chapter" class="smallcaps">Evening 01 / 10</div>
+        <h1>Night <i>Flock</i></h1>
+      </div>
+      <button id="pause" class="round" aria-label="Pause"><span class="bars" aria-hidden="true"></span></button>
+    </header>
+    <div class="plate">
+      <canvas id="field" width="360" height="520" aria-label="Move the sheepdog behind the flock and drive the sheep uphill through the gate"></canvas>
+    </div>
+    <footer>
+      <div class="measure">
+        <span class="smallcaps">In the fold</span>
+        <span class="tally"><b id="home">0</b><span class="divider"> / </span><span id="total">12</span></span>
+      </div>
+      <div class="daylight">
+        <div class="dusk-label"><span class="smallcaps">Until dark</span><span id="time">–</span></div>
+        <div class="dusk-track"><span id="light"></span></div>
+      </div>
+    </footer>
+    <div class="ledger"><span id="score">0 points</span><span id="remark" role="status"></span></div>
+  </main>
+
+  <section id="paused" class="sheet" aria-labelledby="pause-title"><div class="card">
+    <div class="smallcaps" id="pause-chapter">Evening 01</div>
+    <h2 id="pause-title">Paused</h2>
+    <button class="primary" id="resume">Back to the flock</button>
+    <div class="pair"><button id="evenings">Choose a field</button><button id="sound">Sound on</button></div>
+  </div></section>
+  <section id="evenings-screen" class="sheet" aria-labelledby="fields-title"><div class="card">
+    <h2 id="fields-title">The evenings</h2>
+    <div id="levels" aria-label="Choose an evening"></div>
+    <button class="primary" id="endless">Count them home <span aria-hidden="true">∞</span></button>
+    <p id="record">Endless · best on this device: 0</p>
+    <button id="back">Back</button>
+  </div></section>
+  <section id="end" class="sheet" aria-labelledby="end-title"><div class="card">
+    <div id="end-caption" class="smallcaps"></div>
+    <h2 id="end-title"></h2>
+    <p id="end-line"></p>
+    <p id="end-score"></p>
+    <button class="primary" id="next"></button>
+    <div class="pair"><button id="retry">Try again</button><button id="end-evenings">Choose a field</button></div>
+  </div></section>
+  <script type="module" src="./main.js"></script>
+  <script src="/notes/button.js" defer></script>
+</body>
+</html>

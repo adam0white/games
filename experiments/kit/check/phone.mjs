@@ -1,11 +1,11 @@
 // Phone runs for the live experiments. Run before and after any change to experiments/kit/ or to a game's page:
-//   node experiments/kit/check/phone.mjs            both games, WebKit iPhone 13 and Chromium Pixel 7
+//   node experiments/kit/check/phone.mjs            every registered page, WebKit iPhone 13 and Chromium Pixel 7
 //   node experiments/kit/check/phone.mjs lantern webkit
 // It serves this checkout the way production does (/<slug>/, the 301 from /proto/<slug>/, /notes/button.js), seeds saves in the
 // formats players already have, and fails on any page error. Playwright is not a dependency of this repository:
 // set PLAYWRIGHT to a directory that has it installed, or install it anywhere Node can resolve it.
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { readFile, mkdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, extname, join, normalize, resolve } from 'node:path';
@@ -14,6 +14,8 @@ import { gunzipSync } from 'node:zlib';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { experimentPath } from '../../../src/worker.mjs';
 import { experimentRoots } from '../../../scripts/experiments.mjs';
+import { pages } from './pages.mjs';
+import { labPages } from './lab-pages.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 // The notes page builds its games menu and game picker from kit/games.json, so every experiment has to be in it.
@@ -53,6 +55,75 @@ const finger = (page, sel, steps) => page.evaluate(([sel, steps]) => {
 const labSent = page => page.context().labSent;
 const labRuns = (page, game) => labSent(page).filter(r => r.game === game && r.kind === 'run');
 const LAB_LOCAL = () => localStorage.setItem('hf-lab-send-localhost', '1'); // pages on 127.0.0.1 send only with this
+const shots = process.env.SHOTS;
+if (shots) await mkdir(shots, { recursive: true });
+async function shot(page, stage) {
+  if (shots) await page.screenshot({ path: join(shots, `${page.context().checkName}-${stage}.png`) });
+}
+
+// Registrations name the page's own save format, state hook and controls. Keep these contracts in the page's section.
+async function savedPhone(page, g) {
+  if (g.prepare) await g.prepare(page);
+  const state = () => page.evaluate(g.state);
+  const wait = async (predicate, what) => {
+    let last;
+    for (let i = 0; i < 80; i++) { last = await state(); if (predicate(last)) return last; await sleep(100); }
+    throw new Error(`timed out waiting for: ${what} (screen=${last?.screen}, t=${last?.t})`);
+  };
+  const pause = async () => {
+    if (g.pauseDown) await finger(page, g.pause ?? '#pause', [['pointerdown', 0, 0]]);
+    else await page.click(g.pause ?? '#pause');
+    await wait(s => s.paused || s.screen === 'paused', 'pause');
+  };
+  const play = async () => {
+    if (g.start) await g.start(page); else await page.click(g.play ?? '#play');
+    await wait(s => s.screen === 'play', 'play');
+  };
+  await page.goto(`${base}${g.path}?labRunSource=agent`);
+  await until(page, g.state, 'game script');
+  await page.evaluate(seeds => { for (const [k, v] of Object.entries(seeds)) localStorage.setItem(k, v); localStorage.setItem('notes.k', 'check'); }, g.seeds);
+  await page.reload(); await until(page, g.state, 'game script after seeded reload');
+  assert.deepEqual(await page.evaluate(g.verify), g.expect, 'old save: loaded by the page');
+  assert.equal(await page.evaluate(() => window.audioLog.made), 0, 'no audio before the first tap');
+  await noZoomed(page); await shot(page, 'menu');
+  await play();
+  assert.equal(await page.evaluate(() => window.audioLog.made), 1, 'Play starts one audio context');
+  await g.touch(page, { finger, until, sleep });
+  await shot(page, 'play');
+  await pause();
+  const t = (await state()).t; await sleep(300);
+  assert.equal((await state()).t, t, 'time stands still while paused'); await shot(page, 'paused');
+  const toggleSound = async () => {
+    await page.click(g.sound);
+    if (g.saveKey) assert.equal(await page.evaluate(k => JSON.parse(localStorage.getItem(k)).sound, g.saveKey), false, 'sound off saved');
+    else assert.equal(await page.evaluate(k => localStorage.getItem(k), g.soundKey), g.soundOff, 'sound off saved');
+  };
+  if (g.sound && !g.soundOnMenu) await toggleSound();
+  await page.click(g.resume ?? '#resume'); await wait(s => s.screen === 'play' && !s.paused, 'resume');
+  await wait(s => s.screen === 'play' && !s.paused && s.t > t, 'time advances after resume');
+  await page.evaluate(() => dispatchEvent(new Event('blur'))); await wait(s => s.paused || s.screen === 'paused', 'losing focus pauses');
+  await page.keyboard.press('P'); await wait(s => s.screen === 'play' && !s.paused, 'capital P resumes');
+  await page.evaluate(() => dispatchEvent(new Event('pagehide'))); await wait(s => s.paused || s.screen === 'paused', 'putting the page away pauses');
+  await page.click(g.menu); await wait(s => s.screen === 'menu', 'back on the menu');
+  if (g.sound && g.soundOnMenu) await toggleSound();
+  // A setting write must keep every seeded field. Only the named run counters may advance.
+  const kept = await page.evaluate(keys => Object.fromEntries(keys.map(k => [k, localStorage.getItem(k)])), Object.keys(g.seeds));
+  for (const [k, v] of Object.entries(g.seeds)) {
+    if (k === g.soundKey && g.sound) { assert.equal(kept[k], g.soundOff); continue; }
+    if (k === g.saveKey || g.changed?.[k]) {
+      const expected = JSON.parse(v), actual = JSON.parse(kept[k]);
+      if (k === g.saveKey && g.sound) expected.sound = false;
+      for (const [field, delta] of Object.entries(g.changed?.[k] ?? {})) expected[field] += delta;
+      assert.deepEqual(actual, expected, `old save: ${k} kept after play and setting write`);
+    } else assert.equal(kept[k], v, `old save: ${k} kept`);
+  }
+  await page.reload(); await until(page, g.state, 'game script after reload');
+  assert.deepEqual(await page.evaluate(keys => Object.fromEntries(keys.map(k => [k, localStorage.getItem(k)])), Object.keys(kept)), kept, 'reload keeps every seeded key');
+  assert.equal(await page.evaluate(() => localStorage.getItem('notes.k')), 'check', 'tester link kept');
+  await play();
+  assert.equal(await page.evaluate(() => window.audioLog.made), g.sound ? 0 : 1, 'sound choice survives reload');
+  await pause(); await page.click(g.menu);
+}
 
 // The joystick's numbers: 55 px of travel is full speed, a dead zone of 0.15 of that, and a 70 px leash that drags the origin.
 async function stickNumbers(page) {
@@ -141,25 +212,32 @@ async function noZoomed(page) {
 // still with words. g: path, play (the button that starts a run), resume (the pause card's button), key, delay, moved (did the
 // press reach the game), alive (keep the run going while the check waits), legacy (a save in the game's existing format).
 async function hinted(page, g) {
+  if (g.prepare) await g.prepare(page);
   const on = () => page.evaluate(() => !!document.querySelector('.kit-hint.on'));
   // Leave the game first: a game may save as its page goes away (Ant Promotion does), which would make this player a returning one.
   const fresh = async (seed = {}) => { await page.goto(`${base}/notes/button.js`); await page.evaluate(seed => { localStorage.clear(); for (const [k, v] of Object.entries(seed)) localStorage.setItem(k, v); }, seed); await page.goto(`${base}${g.path}`); await page.waitForSelector(g.play); };
-  const play = async () => { await page.click(g.play); if (g.alive) await page.evaluate(g.alive); };
+  const play = async () => { if (g.start) await g.start(page); else await page.click(g.play); if (g.alive) await page.evaluate(g.alive); };
   const idle = async ms => { for (let t = 0; t < ms; t += 500) { if (g.alive) await page.evaluate(g.alive); await sleep(500); } };
   await fresh();
   await sleep(g.delay + 500); assert.equal(await on(), false, 'hint: not on the menu');
   await play(); await sleep(g.delay / 2); assert.equal(await on(), false, 'hint: not before the delay');
   await until(page, () => !!document.querySelector('.kit-hint.on'), 'hint: shown after the delay', g.delay + 8000); // CI's software WebGL draws lantern-3d at a few frames a second
+  await shot(page, 'hint');
   assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.kit-hint .label')).display), 'none', 'hint: no words while it moves');
-  await page.evaluate(() => dispatchEvent(new Event('blur'))); await sleep(200); assert.equal(await on(), false, 'hint: hidden under the pause card');
+  await page.evaluate(() => dispatchEvent(new Event('blur')));
+  if (g.waitHintState) await until(page, () => !document.querySelector('.kit-hint.on'), 'hint: hidden under the pause card');
+  else { await sleep(200); assert.equal(await on(), false, 'hint: hidden under the pause card'); }
   await page.click(g.resume); await until(page, () => !!document.querySelector('.kit-hint.on'), 'hint: back after resume (a tap on a card is not play input)', 2000);
   if (g.alive) await page.evaluate(g.alive);
   // A real press where the knob is: the page's own hit test says the game is under it, and the game moves.
   const { x, y, top } = await page.evaluate(() => { const r = document.querySelector('.kit-hint .knob').getBoundingClientRect(), x = r.x + r.width / 2, y = r.y + r.height / 2; return { x, y, top: document.elementFromPoint(x, y)?.id }; });
-  assert.equal(top, 'c', 'hint: the game canvas is what a finger on the hint touches');
+  assert.equal(top, (g.canvas ?? '#c').slice(1), 'hint: the game canvas is what a finger on the hint touches');
   const before = await page.evaluate(g.before ?? (() => null));
   await page.mouse.move(x, y); await page.mouse.down(); await page.mouse.move(x + 40, y, { steps: 4 });
-  assert.ok(await page.evaluate(g.moved, before), 'hint: a press on the hint reaches the game'); await page.mouse.up();
+  if (g.releaseInput) await page.mouse.up();
+  if (g.waitInput) await until(page, g.moved, 'hint: a press on the hint reaches the game', 8000, before);
+  else assert.ok(await page.evaluate(g.moved, before), 'hint: a press on the hint reaches the game');
+  if (!g.releaseInput) await page.mouse.up();
   assert.equal(await page.evaluate(() => document.querySelector('.kit-hint')), null, 'hint: gone on the first input');
   assert.equal(await page.evaluate(k => localStorage.getItem(k), g.key), '1', 'hint: the player is remembered');
   await idle(g.delay + 500); assert.equal(await on(), false, 'hint: does not come back');
@@ -807,6 +885,12 @@ const GAMES = {
   },
 };
 
+// Every new page has its own save seed, controls and first-time help contract beside its registration.
+for (const [slug, g] of Object.entries({ ...pages, ...labPages })) {
+  GAMES[slug] = page => savedPhone(page, { ...g, path: `/${slug}/` });
+  if (g.hint) GAMES[`hint ${slug}`] = page => hinted(page, { path: `/${slug}/`, play: g.play ?? '#play', resume: g.resume ?? '#resume', prepare: g.prepare, start: g.start, waitInput: true, waitHintState: true, ...g.hint });
+}
+
 const [onlyGame, onlyPhone] = process.argv.slice(2);
 // The first argument is 'all' or a comma list of experiments. An experiment's name picks its own check, its
 // first-time help check, and for Lantern the three checks below that play Lantern.
@@ -821,6 +905,7 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
   for (const [game, run] of Object.entries(GAMES)) {
     if (!picked(game)) continue;
     const context = await browser.newContext({ ...device }), page = await context.newPage(), errors = [];
+    context.checkName = `${phone}-${game.replaceAll(/[^a-z0-9-]/gi, '-')}`;
     // Answer the lab endpoint here, so no check ever reaches it. Records are kept for the assertions.
     context.labSent = []; context.labTried = 0;
     await context.route('https://human.adamwhite.work/**', async route => {
@@ -846,7 +931,7 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
     page.on('requestfailed', r => errors.push(`request failed: ${r.url()}`)); page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
     // Lantern's check is the longest: its seven ability showings (note #123) took it past 150 s on WebKit.
     try { await within(run(page), game === 'lantern' ? 240000 : 150000, 'the whole check'); assert.deepEqual(errors.filter(e => !(context.labDown && /human\.adamwhite\.work|Load failed|Failed to fetch|ERR_CONNECTION_REFUSED/.test(e))).filter(e => !(context.boardBad && /\/lab-api\/board\/|status of 401/.test(e))).filter(e => !(context.badFrame && /lab check: one bad frame/.test(e))).filter(e => !(context.viewBad && /view3d\.js|net::ERR_FAILED|Failed to load resource|Importing a module/.test(e))), [], 'page errors'); console.log(`ok   ${game} on ${phone}`); }
-    catch (e) { failed++; console.log(`FAIL ${game} on ${phone}: ${e.message}`); if (process.env.CHECK_STACK) console.log(e.stack); if (errors.length) console.log('     ' + errors.join('\n     ')); }
+    catch (e) { failed++; console.log(`FAIL ${game} on ${phone}: ${e.message}`); if (process.env.CHECK_STACK) console.log(e.stack); if (errors.length) console.log('     ' + errors.join('\n     ')); await shot(page, 'failure').catch(() => {}); }
     try { await within(context.close(), 15000, 'closing the page'); }
     catch (e) { console.log(`     ${e.message}; starting the browser again`); browser.close().catch(() => {}); browser = await engine.launch(); }
   }
