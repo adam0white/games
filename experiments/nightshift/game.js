@@ -5,8 +5,10 @@ import { screens } from '../kit/screens.js';
 import { lab } from '../kit/lab.js';
 import { hint } from '../kit/hint.js';
 import { noZoom } from '../kit/zoom.js';
-import { create, step, dailyKey, dailyNight, DEFAULT_SEED, LAST, WIDTH, HEIGHT, DT, LIFT, REST, FUSE, CASE } from './sim.js';
-import { renderer, cover, clock, lessonArt } from './art.js';
+import {
+  create, step, dailyKey, dailyNight, aimFor, EXITS, HATCH, deadline, spread, DEFAULT_SEED, LAST, WIDTH, HEIGHT, DT, LIFT, REST, FUSE, CASE,
+} from './sim.js';
+import { renderer, cover, clock, lessonArt, lossArt } from './art.js';
 import { apply, count, date, lang, langs, number, padded, setLang, t, time } from './words.js';
 
 const $ = id => document.getElementById(id);
@@ -24,6 +26,10 @@ const profile = {
     date: typeof old?.daily?.date === 'string' ? old.daily.date : '',
     streak: Math.max(0, whole(old?.daily?.streak, 0)),
   },
+  // Best stars per story night. Older saves have none, so every night starts at zero.
+  stars: Array.from({ length: LAST }, (_, i) => bounded(whole(old?.stars?.[i], 0), 0, 3)),
+  // Nights whose loss picture has been shown once. Older saves have none.
+  lossShown: Array.from({ length: LAST }, (_, i) => old?.lossShown?.[i] === true),
 };
 const persist = () => save.writeJson(KEY, profile);
 const params = new URLSearchParams(location.search);
@@ -50,6 +56,9 @@ let waitForAim = false;
 let showFirstDrag = false;
 let pauseRules = [];
 let effects = [];
+// Each escape this night: the exhibit, the way it went, and the exit it used.
+let escapedBy = [];
+let showLoss = false;
 let day = '';
 let nextLevel = null;
 let bestBefore = 0;
@@ -94,7 +103,7 @@ function foot(x, kind) {
   source.start();
 }
 
-const switchScreen = screens(['menu', 'paused', 'result', 'shareCard'], name => {
+const switchScreen = screens(['menu', 'nights', 'paused', 'result', 'shareCard'], name => {
   screen = name;
   canvas.setAttribute('aria-hidden', String(name !== 'play'));
   $('hud').hidden = name !== 'play';
@@ -139,9 +148,37 @@ function renderMenu() {
     else if (i < profile.cleared) mark.className = 'cleared';
     return mark;
   }));
+  $('progress').setAttribute('aria-label', [t('pickNight'), t('nightProgress', { n: number(level), total: number(LAST) })].join(' · '));
   $('play').setAttribute('aria-label', t('playNight', { n: number(level), total: number(LAST) }));
   cover($('poster'));
   lessonArt($('goal'), ['goal']);
+}
+
+const starLine = n => t('starFilled').repeat(n) + t('starEmpty').repeat(3 - n);
+
+function renderNights() {
+  const open = Math.max(profile.unlocked, levelOverride ?? 1);
+  $('nightGrid').replaceChildren(...Array.from({ length: LAST }, (_, i) => {
+    const n = i + 1;
+    const tile = document.createElement('button');
+    tile.className = 'night';
+    tile.dataset.night = n;
+    tile.disabled = n > open;
+    const label = document.createElement('b');
+    label.textContent = number(n);
+    const stars = document.createElement('small');
+    stars.textContent = n > open ? '' : starLine(profile.stars[i]);
+    tile.append(label, stars);
+    tile.setAttribute('aria-label', n > open ? t('nightLocked', { n: number(n) })
+      : t('nightStars', { n: number(n), stars: count(profile.stars[i] === 1 ? 'oneStar' : 'stars', profile.stars[i]) }));
+    tile.onclick = () => start('story', n);
+    return tile;
+  }));
+}
+
+function showNights() {
+  renderNights();
+  switchScreen('nights');
 }
 
 function showMenu() {
@@ -188,6 +225,7 @@ function playGuide() {
     return {
       drag: 'aimRule', hold: 'holdRule', painting: 'paintingRule', twins: 'twinsRule',
       mirror: 'mirrorRule', shy: 'shyRule', cat: 'catRule', fuse: 'fuseRule', stairs: 'stairsRule',
+      hatch: 'hatchRule', ghost: 'ghostRule',
     }[state.lesson];
   }
   return 'aimRule';
@@ -223,6 +261,8 @@ function start(mode = 'story', level = levelOverride ?? profile.unlocked) {
   waitForAim = mode === 'story' && state.level === 1 && !profile.played;
   showFirstDrag = waitForAim;
   effects = [];
+  escapedBy = [];
+  showLoss = false;
   accumulator = 0;
   previous = null;
   capturesLogged = 0;
@@ -241,7 +281,7 @@ function pause() {
   pauseRules = ['aimRule'];
   if (state.mode !== 'long') pauseRules.push('goal');
   pauseRules.push('lossRule');
-  for (const feature of ['twins', 'mirror', 'shy', 'fuse', 'cat', 'stairs']) {
+  for (const feature of ['twins', 'mirror', 'shy', 'fuse', 'cat', 'stairs', 'hatch', 'ghost']) {
     if (state[feature]) pauseRules.push(feature + 'Rule');
   }
   renderPause();
@@ -278,11 +318,16 @@ function finish() {
     profile.cleared = Math.max(profile.cleared, state.level);
     profile.unlocked = Math.max(profile.unlocked, nextLevel ?? LAST);
   }
+  if (state.mode === 'story') profile.stars[state.level - 1] = Math.max(profile.stars[state.level - 1], won ? 3 - state.escapes : 0);
   if (won && state.mode === 'daily' && profile.daily.date < day) {
     profile.daily.streak = profile.daily.date === yesterday(day) ? profile.daily.streak + 1 : 1;
     profile.daily.date = day;
   }
   if (state.mode === 'long') profile.best = Math.max(profile.best, Math.floor(state.time));
+  // The first loss on a night shows what got out and where, once.
+  // Daily always shows it: its nights come and go by date, and a Daily loss must not use up a story night's first loss.
+  showLoss = state.outcome === 'escaped' && (state.mode === 'daily' || (state.mode === 'story' && !profile.lossShown[state.level - 1]));
+  if (showLoss && state.mode === 'story') profile.lossShown[state.level - 1] = true;
   profile.played = true;
   persist();
   rec.end(state.outcome, summary());
@@ -310,7 +355,13 @@ function renderResult() {
   }
   $('again').textContent = t(nextLevel ? 'next' : 'again');
   $('share').hidden = state.mode !== 'daily';
-  cover($('resultPoster'), state.outcome);
+  cover($('resultPoster'), state.outcome, {}, state.wing);
+  const picture = $('lossArt');
+  picture.hidden = !showLoss;
+  if (showLoss) {
+    picture.setAttribute('aria-label', t('howOut', { ways: escapedBy.map(escape => t('out_' + escape.way)).join(', ') }));
+    lossArt(picture, escapedBy);
+  }
 }
 
 function saveLongRecord() {
@@ -341,7 +392,7 @@ function openShare() {
     streak: count('streak', visibleStreak(day)),
   };
   target.setAttribute('aria-label', t('shareDescription', labels));
-  cover(target, state.outcome === 'dawn' ? 'share' : 'share-loss', labels);
+  cover(target, state.outcome === 'dawn' ? 'share' : 'share-loss', labels, state.wing);
   cardFile = null;
   $('saveCard').disabled = true;
   target.toBlob(blob => {
@@ -435,6 +486,8 @@ addEventListener('pagehide', saveLongRecord);
 noZoom();
 
 $('play').onclick = () => start();
+$('progress').onclick = showNights;
+$('nightsBack').onclick = showMenu;
 $('long').onclick = () => start('long');
 $('daily').onclick = () => start('daily');
 $('pause').onclick = pause;
@@ -513,8 +566,13 @@ function react(event, now) {
   if (type === 'escape') {
     snd.tone(211, .19, .11, 'triangle', -76);
     rec.event('escape', { exhibit: actor.kind });
+    const exit = actor.route.exit === HATCH ? 'hatch' : actor.route.exit === EXITS[0] ? 'left' : 'right';
+    escapedBy.push({ kind: actor.kind, way: actor.kind === 'ghost' ? 'ghost' : exit, exit });
   }
-  if (type === 'cat') snd.tone(655, .19, .061, 'sine', -210);
+  if (type === 'cat') {
+    snd.tone(655, .19, .061, 'sine', -210);
+    if (event.woke) effects.push({ type: 'wake', x: event.x, y: event.y, tx: event.woke.x, ty: event.woke.y, at: now, life: 1100 });
+  }
   if (type === 'trip') snd.tone(160, .32, .1, 'sawtooth', -60);
   if (type === 'fuse') {
     snd.tone(475, .26, .09, 'sine', 243);
@@ -555,9 +613,16 @@ window.nightshiftState = () => ({
   screen, paused: screen === 'paused', mode: state.mode, level: state.level, seed: state.seed,
   day, tick: state.tick, time: state.time, outcome: state.outcome, escapes: state.escapes, returned: state.returned,
   light: { ...state.light }, aim: { ...aim }, bounce: state.bounce && { ...state.bounce },
-  blackout: state.blackout, fused: state.fused,
-  actors: state.actors.map(({ id, kind, state, x, y, progress, hold, lit, mirrored }) =>
-    ({ id, kind, state, x, y, progress, hold, lit, mirrored })),
+  blackout: state.blackout, fused: state.fused, trips: state.trips, trippedAt: state.trippedAt, masked: state.masked,
+  stars: [...profile.stars], escapedBy: escapedBy.map(escape => ({ ...escape })), lossShown: showLoss && screen === 'result',
+  actors: (shift => state.actors.map(actor => {
+    const { id, kind, state: phase, x, y, progress, hold, lit, mirrored } = actor;
+    // reach: where a beam stops this exhibit now; urgency: share of the distance it may still walk.
+    return {
+      id, kind, state: phase, x, y, progress, hold, lit, mirrored, drawnX: x + (shift.get(id)?.x ?? 0),
+      reach: aimFor(state, actor), urgency: progress / Math.max(deadline(state, actor), 1e-6),
+    };
+  }))(spread(state.actors)),
 });
 
 localize();
