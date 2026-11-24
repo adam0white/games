@@ -77,7 +77,7 @@ Both phones apply each segment when it comes back from the table. The server see
 
 The shared room client keeps the seat key in browser storage. Reopening the same link in that browser reclaims the seat while the table exists. Friend matches leave the bot, daily and shared-board records alone.
 
-The phone check targets Playwright's iPhone 13 and Pixel 7 profiles and uses the Worker's table protocol functions in Node. It covers joining, replay after reload and disconnect, full tables, move validation and rematch. The room flow passed in a Node DOM harness. This session denied the local HTTP listener and browser startup, leaving the phone profiles, rendered screenshots and 360 × 640 layout unverified. The deployed Worker, physical phones and native share sheets also remain unverified.
+The phone check targets Playwright's iPhone 13 and Pixel 7 profiles and uses the Worker's table protocol functions in Node. It covers joining, replay after reload and disconnect, full tables, move validation and rematch. The builder's sandbox could not start a browser, so the lab ran the check itself on 2026-11-24: it passes on both profiles, with a 22-segment match, and the lab looked at the six friend screenshots per browser. Not verified: two real phones, the share sheet, a slow or lossy network.
 
 ## Open ideas
 
