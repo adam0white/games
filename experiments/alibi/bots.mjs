@@ -178,6 +178,29 @@ for (let i = 0; i < 366; i++) {
   }
 }
 
+// Masks must matter. After the lesson case, a mask case hides its liar under a
+// mask, and where the tape allows it the false room holds another mask then.
+const maskTrials = [];
+for (const [i, spec] of CASES.entries()) {
+  if (spec.masks && !spec.tutorial) maskTrials.push(createCase({ level: i + 1 }));
+}
+for (let i = 0; i < 366; i++) maskTrials.push(dailyCase(offsetDay('2026-01-01', i)));
+const unmasked = maskTrials.filter(c => c.frames.at(-1)[c.culprit].mask === null);
+assert.deepEqual(unmasked.map(c => c.level), [], 'mask cases hide the liar under a mask');
+const hidesLie = (c, id) => {
+  const { beat, room } = c.cast[id].claim;
+  return beat !== c.blackoutBeat && c.frames[beat].some((actor, other) => other !== id && actor.room === room && actor.mask !== null);
+};
+const exposed = maskTrials.filter(c => !hidesLie(c, c.culprit) && c.frames.at(-1).some((actor, id) => actor.mask !== null
+  && hidesLie(createCase({ seed: c.seed, level: c.level, culpritOverride: id }), id)));
+assert.deepEqual(exposed.map(c => c.level), [], 'a masked liar’s false room holds another mask whenever the tape allows it');
+
+// check.mjs looks for the Daily mask tags on mark 4 whatever the date.
+for (const c of maskTrials.slice(-366)) {
+  const masked = replay(c).map(frame => frame.actors.some(actor => actor.mask !== null));
+  assert.equal(masked.indexOf(true), 3, 'every Daily puts its masks on at mark 4');
+}
+
 const control = createCase({ level: 3 });
 const { cards, positions } = prove(control);
 const innocent = (control.culprit + 1) % cards.length;
