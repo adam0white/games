@@ -211,9 +211,9 @@ const GAMES = {
     const framesAfter = await page.evaluate(async () => {
       const C = CanvasRenderingContext2D.prototype, fill = C.fillRect; let thrown = false, n = 0;
       C.fillRect = function (...a) { if (!thrown) { thrown = true; throw new Error('lab check: one bad frame'); } return fill.apply(this, a); };
-      await new Promise(done => setTimeout(done, 200)); C.fillRect = fill;
+      for (let i = 0; i < 100 && !thrown; i++) await new Promise(done => setTimeout(done, 50)); C.fillRect = fill; // headless WebKit draws about two frames a second
       const raf = window.requestAnimationFrame; window.requestAnimationFrame = f => { n++; return raf(f); };
-      await new Promise(done => setTimeout(done, 400)); window.requestAnimationFrame = raf; return thrown ? n : -1;
+      for (let i = 0; i < 100 && !n; i++) await new Promise(done => setTimeout(done, 50)); window.requestAnimationFrame = raf; return thrown ? n : -1;
     });
     assert.ok(framesAfter > 0, `frames go on after a drawing error (${framesAfter})`);
     let st = await state();
