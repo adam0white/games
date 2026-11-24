@@ -136,3 +136,94 @@ Language choice uses the kit's shared preference. A URL language applies on entr
 All 24 campaign bot routes earned three stars. The standalone phone check passed WebKit iPhone 13 and Chromium Pixel 7, 390×664, and 360×640. Both-language screenshots and layout checks passed at 360×640 and the WebKit iPhone 13 profile, with a second WebKit pass at 390×844. Checks cover matching translation keys and placeholders, English leakage in Turkish, live language switching, persistence, viewport bounds, and the road cue's wait, cross, and tail phases. The shared game and hint checks passed on WebKit and Chromium.
 
 A keyboard run crossed the first sun pad in both browser engines and showed a positive refill in Turkish. A Turkish-speaking player has not reviewed the copy or played the new cues. Physical touch, safe-area behavior, audible feedback, and storage at the live lab endpoint remain unverified. The phone checks use emulated touch and a local lab stub.
+
+## Middle and late game audit — 2026-11-24
+
+A returning player played stages 9–24 and Endless in Turkish with touch only. WebKit used the iPhone 13 profile. Chromium ran at 360×640. Screenshot paths are relative to the session's `shots/deep-ducklings/` folder, which is outside the repository.
+
+### Findings, ranked by quit risk
+
+1. **Stage 20's clock is untaught, and the ghost teaches the losing input.** The ghost finger taps a near point. Each tap stops the mother, so she runs out of time. The loss card says "Süre doldu" and gives no tip. WebKit lost twice (`webkit/263`–`268`, `274`–`276`) and Chromium once (`chromium/143`–`146`). Holding a finger ahead won with three stars (`chromium/147`).
+2. **A cat's reach is invisible, and the opening heading leads into it.** Stage 10 has no guide. Its default ghost points straight ahead, and continuing that heading passes inside the cat's trigger. Chromium lost a heart and all three followers (`chromium/113`, card `122`). WebKit also took two stars. Stage 9 never shows how close is too close (`webkit/164`, `165`, `171`, `172`). A quack woke the cat (`webkit/174`). A simulation of "follow the opening ghost, then keep its heading" also harms the flock on stages 13, 15 and 23.
+3. **The folding leaves on stage 16 are unclear.** The quack ghost appears (`chromium/132`), but quacking while parked still scattered all three (`chromium/134`). Nothing shows that she must keep moving (`webkit/231`, `237`, `238`).
+4. **The pause menu has no retry.** A stage 6 run that could no longer be won forced "Yüzüşü bırak" and a trip through the map (`webkit/031`).
+5. **Rewards are flat.** Chapter and campaign cards look like ordinary clears (`webkit/015`, `162`, `230`, `312`). The final card has no next step and does not point to Endless. The album of duckling names is saved but never shown (`webkit/313`).
+6. **Current zones are untaught.** The chevrons point up-river, but the push reads as ambiguous (`webkit/249`–`251`, `chromium/145`).
+7. **Endless problems:**
+   - It introduces objects the campaign never showed: logs (`webkit/314`), the pike inside a nearly invisible ring that then hit (`webkit/319`, `320`), the turtle (`chromium/167`, `webkit/388`), the red bubble ring (`webkit/363`) and bridges with cyclists (`webkit/354`–`357`).
+   - Two birds vanished near a bridge or bubbles with no visible cause (`webkit/364`, `chromium/162`–`163`).
+   - Logs hide trailing ducklings (`chromium/152`, `webkit/368`, `372`).
+   - The score has no label (`webkit/318`).
+   - The reduced-refill chip is hard to read (`chromium/154`, `webkit/380`).
+   - The HUD covers a pad (`chromium/153`).
+   - Re-rescuing your own scattered birds scores again, so scattering can be farmed. Two starting birds re-joined for +30 (`webkit/375`–`376`).
+8. **The offscreen nest marker shows while the nest is on screen.** It overlaps the nest (`webkit/143`, `150`, `160`, `202`, `chromium/120`, `126`) and covers waiting ducklings (`webkit/159`, `225`, `289`).
+9. **Some late levels feel the same or are trivially easy:**
+   - Stage 7 (`webkit/147`–`152`).
+   - Stage 9 (`webkit/163`–`168`, `chromium/107`–`110`).
+   - Stage 11 (`webkit/185`–`191`).
+   - Stages 13 and 14 (`webkit/206`–`220`).
+   - Stage 18 (`webkit/249`–`254`).
+   - Stage 21 (`webkit/277`–`282`).
+   - Stage 23 (`webkit/294`–`300`).
+   - Stages 22 and 24 reuse earlier hazards without a twist.
+10. **Stage 12 scattered followers along the guide's weed edge in WebKit** (`webkit/192`–`194`, `205`). Chromium followed the same guide for three stars (`chromium/124`–`128`). This may be path variance.
+11. **Endless loses the way after a rescue.** In Chromium run 3, chasing scattered birds turned the mother back down the pond. The lily-pad cue only showed at the start and in the last 10 seconds, so she swam to the starting bank and scored 0 (`chromium/205`–`213`).
+12. **Turkish text:** no English leaks or clipped strings were seen. The album names are English, but they are never displayed.
+
+Every Endless run ended at sunset, never by hearts:
+
+| Browser | Run 1 | Run 2 | Run 3 |
+| --- | --- | --- | --- |
+| WebKit | 350 | 840 | 170 |
+| Chromium | 590 | 830 | 0 |
+
+Shots: WebKit `334`, `369`, `389`; Chromium `168`, `200`, `213`. The game has no daily mode.
+
+### What was fixed
+
+Every fix that changes behaviour has an assertion that failed before the fix and passes after it. The check.mjs assertions were shown red by running the new check.mjs against the previous files. Purely visual changes are marked "Not asserted".
+
+| Finding | Change | Assertion |
+| --- | --- | --- |
+| 1. Stage 20 clock | Stage 20 gets a hold lesson: a pressed ghost finger slides ahead of her whenever she is idle, with the line "Keep your finger down ahead of her to keep swimming". A loss to the clock adds the same tip, as a picture, to the end card. | check.mjs: a `?level=20` loss ends with `why === 'dusk'` and shows `#starTip .hold`. |
+| 2. Cat reach and opening headings | Stages 10, 13, 15 and 23 get opening guides that keep clear of harm. A sleeping cat now shows a dashed ring at its reach that warms as she nears it. | bots.mjs `ghostHarm`: following each stage's opening ghost, then keeping its heading for 3.5 s, causes no hits or scatters (red on 10, 13, 15, 23). |
+| 3. Stage 16 folding leaves | During the bridge warning, the ghost presses the quack button and, if she is parked, draws a route and a pressed finger toward the nest. | Not asserted; visual only. |
+| 4. No retry in the pause menu | The pause menu has a Retry button next to Leave. `#pauseMenu` keeps its id. | check.mjs: pause-menu retry restarts the same stage, unpaused, with the clock reset. |
+| 5. Flat rewards | The Next button names the next chapter when a chapter ends ("Sıradaki: Yol"). Finishing stage 24 shows "On to the endless pond", which starts Endless. | check.mjs: the stage 4 card reads "Next: Road"; the stage 24 card shows `#endlessNext`, and tapping it starts Endless. |
+| 7. Re-rescue scoring | Only a newly found duckling scores on joining. A scattered one swimming back scores nothing. | bots.mjs: Endless planner runs with at least 3 rejoins earn 0 points from them (red: 380 points). |
+| 7. Pike ring nearly invisible | The pike ring is pale cream with longer dashes. | Not asserted; visual only. |
+| 7. Score has no label | The Endless score shows a star before the number. | Not asserted. |
+| 8. Nest marker over the nest | The marker shows only once the nest is a tenth of a pond width above it. | bots.mjs `nestMarkerShows` cases (red under the old rule). |
+| 9. Late stages felt the same (21 listed; 19 retuned with it) | Stage 19 adds a duckling behind the far-bank rock; straight play now earns one star. Stage 21 adds a duckling inside the current, so she must leave the current early to miss the weed. | bots.mjs campaign: both stay 3★-solvable by the planner; holding straight for the nest now earns 1★ on stage 19 and 0★ on stage 21. |
+| 11. Endless loses the way | The lily-pad cue also returns whenever she is more than half a pond width behind her furthest point. | bots.mjs `padCueShows` cases (red under the old rule). |
+
+One regression was introduced and caught during the work. `chapterName(chapterOf(25))` threw after stage 24, which froze the end card. The stage 24 check caught it. The Next label is now set only when there is a next stage.
+
+New strings (`holdTip`, `nextChapterName`, `endlessNext`) have English and Turkish entries in words.js. The save key, save format, `#play`, `#pause`, `#pauseMenu`, the state hook's `.screen` and `.paused`, lab outcomes, the kit hint and kit/i18n.js usage are unchanged.
+
+### Replayed by touch after the fixes
+
+- WebKit: stage 21 and stage 19 after the retune, both 3★ (`webkit/391`–`402`); the nest stays clear of the marker (`395`); the stage 20 hold ghost, the loss tip and a 3★ win holding a finger (`403`–`408`); the stage 10 cat ring and guide, 3★ (`410`–`414`); pause retry (`415`, `416`); stage 24 at 3★ and the Endless button on the final card (`417`–`426`).
+- Chromium: stage 21 after the retune, one loss at the weed, pause retry, then 3★ (`chromium/170`–`176`); Endless runs 2 and 3, where re-rescuing scored nothing (`189`, `190`, `206`, `208`); the lily-pad cue hidden while swimming on and shown after swimming back (`216`, `217`); the stage 16 lesson while parked on the leaves, with no page error (`225`); the opening guides on stages 13, 15, 23 and the stage 20 ghost (`232`–`237`); the Turkish clock-loss tip as a picture (`238`); stage 4 at 3★ with "Sıradaki: Yol" on the chapter card (`249`); the pale pike ring in Endless, partly under the HUD (`254`).
+
+### Left, and why
+
+- Endless still shows logs, the turtle, red bubbles and cyclists that the campaign never teaches. Teaching them needs new campaign stages or an Endless intro, which is a larger design change than this pass.
+- Birds vanished near a bridge or bubbles with no visible cause (finding 7). The cause was not found; it is unresolved.
+- Logs still hide trailing ducklings, and the HUD can cover a pad. Both need layering or layout work across every screen size.
+- The reduced-refill chip is still hard to read.
+- The duckling album is saved but still not shown.
+- Current zones have no new teaching beyond stage 18's existing guide.
+- Stage 12's WebKit scatter may be path variance; the planner and Chromium both clear it at 3★, so it was not retuned.
+- Stages 7, 9, 11, 13, 14, 18 and 23 still feel close to their neighbours, and 22 and 24 still reuse earlier hazards without a twist. Only 19 and 21 were retuned, to keep the change small enough to replay by touch.
+- Stage 16's lesson shows the quack and a route off the leaves at once. In a simulation, quacking at the warning and swimming on brings 2 of 3 home (enough to pass); quacking about 0.7 s later brings all 3; parking scatters all 3. The lesson therefore teaches a passing move, not the 3★ timing. By touch, swimming on without a quack brought 1 of 3 home (`chromium/225`–`227`). Unresolved whether the lesson should show the later quack.
+- The cat ring, pike ring, stage 16 ghost and Endless score star have no pixel assertion.
+
+### Verification
+
+- `node bots.mjs`: passed, including every stage solvable at 3★ by the planner.
+- `node check.mjs`: passed on webkit-iphone13, chromium-pixel7, chromium-390x664, chromium-360x640 and webkit-390x844 (both languages and layouts).
+- `node experiments/kit/check/phone.mjs ducklings`: passed on WebKit and Chromium, including the kit hint.
+- `index.html` now loads `sim.js?v=4`, because the scoring rule in sim.js changed; earlier scoring changes bumped this number too.
+- Not verified: real phones (touch was emulated); Turkish wording by a native speaker; Chromium stages 11, 13–15, 17–19 and 22–24 played to the end by touch (WebKit played all of 9–24, and Chromium skipped ahead by raising the saved progress); the new guides on stages 13, 15 and 23 were seen on screen (`chromium/232`–`234`) but those stages were not replayed to the end. The game has no daily mode.

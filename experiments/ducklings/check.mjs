@@ -9,6 +9,7 @@ import { dirname, extname, join, normalize, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { gunzipSync } from 'node:zlib';
 import assert from 'node:assert/strict';
+import { ROUTES } from './bots.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url)), root = resolve(here, '..');
 const SHOTS = process.env.SHOTS || join(tmpdir(), 'ducklings-shots');
@@ -42,6 +43,25 @@ const finger = (page, steps) => page.evaluate(steps => {
   for (const [type, x, y, id = 7] of steps) el.dispatchEvent(new PointerEvent(type, { pointerId: id, pointerType: 'touch', isPrimary: id === 7, clientX: x, clientY: y, pressure: type === 'pointerup' ? 0 : 0.5, bubbles: true, cancelable: true }));
 }, steps);
 const tap = (page, sel) => page.evaluate(sel => { const el = document.querySelector(sel); el.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 9, pointerType: 'touch', bubbles: true, cancelable: true })); el.click(); }, sel);
+
+// Hold a finger on each authored waypoint in turn (the bots' route), then on the nest. One pond width is one viewport width.
+async function follow(page, route, ms = 40000) {
+  const vp = page.viewportSize(), t0 = Date.now(); let i = 0, down = false;
+  while (Date.now() - t0 < ms) {
+    const st = await state(page);
+    if (st.screen !== 'play' || !st.playing) break;
+    while (typeof route[i] === 'number') i++;
+    const point = route[i];
+    if (point && Math.hypot(st.mom.x - point[0], st.mom.y - point[1]) < .045) { i++; continue; }
+    let dx = point ? (point[0] - st.mom.x) * vp.width : st.nest.sx - st.mom.sx;
+    let dy = point ? -(point[1] - st.mom.y) * vp.width : st.nest.sy - st.mom.sy;
+    const room = st.mom.sy - 90;
+    if (-dy > room) { const k = room / -dy; dx *= k; dy *= k; }
+    await finger(page, [[down ? 'pointermove' : 'pointerdown', st.mom.sx + dx, st.mom.sy + dy]]); down = true;
+    await sleep(40);
+  }
+  if (down) await finger(page, [['pointerup', 0, 0]]);
+}
 
 // Drag toward visible points in the pond. Waiting ducklings first, then the nest.
 async function drive(page, ms) {
@@ -471,6 +491,51 @@ async function run(name, engine, device, localizationOnly = false) {
     await end();
     assert.equal((await state(page)).stars, 3, 'touch dash clears the moving current');
     assert.equal((await save()).opened, 3, 'preview did not unlock the map');
+
+    // Middle and late game audit. A clock loss names the input that beats the clock.
+    await goto('?level=20&fast=5');
+    await tap(page, '#play');
+    st = await state(page);
+    await page.touchscreen.tap(Math.round(st.mom.sx), Math.round(st.mom.sy - 60));
+    await end();
+    assert.equal((await state(page)).why, 'dusk');
+    assert.match(await page.locator('#starTip .hold').getAttribute('aria-label'), /finger down ahead/, 'a clock loss shows the held-finger tip');
+    await shot('clock-tip');
+    // Retry from the pause menu restarts the same swim.
+    await goto('?level=10');
+    await tap(page, '#play');
+    st = await state(page);
+    await finger(page, [['pointerdown', st.mom.sx, st.mom.sy - 60]]);
+    await until(page, () => window.ducklingsState().t > 1, 'swim before retry');
+    await finger(page, [['pointerup', 0, 0]]);
+    await tap(page, '#pause');
+    await assertTargets(page);
+    await shot('pause-retry');
+    await tap(page, '#pauseRetry');
+    st = await state(page);
+    assert.ok(st.screen === 'play' && !st.paused && st.stage === 10 && st.t < .5 && st.waiting, 'pause retry restarts the same swim');
+    await leave();
+    // The last stage of a chapter names the next chapter, and the last nest opens the endless pond.
+    const kept = await save();
+    await page.evaluate(old => localStorage.setItem('ducklings-save', JSON.stringify({ ...old, opened: 24 })), kept);
+    await goto('?level=4');
+    await tap(page, '#play');
+    await follow(page, ROUTES[4]);
+    await end();
+    assert.equal((await state(page)).over, 'nest');
+    assert.equal(await page.textContent('#next'), 'Next: Road', 'the chapter card names the next chapter');
+    await goto('?level=24');
+    await tap(page, '#play');
+    await follow(page, ROUTES[24]);
+    await end();
+    assert.equal((await state(page)).over, 'nest', 'the last stage is won by its route');
+    await until(page, () => getComputedStyle(document.querySelector('#endlessNext')).display !== 'none', 'the last nest offers the endless pond');
+    await assertTargets(page);
+    await shot('trail-complete');
+    await tap(page, '#endlessNext');
+    assert.equal((await state(page)).mode, 'endless', 'the endless button starts the endless pond');
+    await leave();
+    await page.evaluate(old => localStorage.setItem('ducklings-save', JSON.stringify(old)), kept);
 
     if (!process.env.VISUAL_ONLY) {
       const legacy = { v: 1, sound: false, opened: 8, stars: {1: 2, 7: 3}, best: {1: 140}, endless: 8210, home: 56, album: {Pip: 1}, taught: true };

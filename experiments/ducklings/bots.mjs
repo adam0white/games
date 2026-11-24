@@ -2,11 +2,17 @@ import assert from 'node:assert/strict';
 import { create, step, stars, LAST_STAGE, DT, SPEED, GAP, R_MOM, R_DUCK, LINE_MAX, QUACK_TIME, QUACK_SQUEEZE, TRAITS,
   hitAny, moveMom, pathAt, stepDelay, duskRate } from './sim.js';
 import { bands, routeCheck } from './route.mjs';
-import { starFeedback, warningOnScreen } from './feedback.js';
+import { LEVELS } from './levels.js';
+import { starFeedback, warningOnScreen, nestMarkerShows, padCueShows } from './feedback.js';
 
 assert.equal(warningOnScreen(-450, 640), false, 'a distant upstream hazard stays quiet');
 assert.equal(warningOnScreen(900, 640), false, 'a hazard behind the screen stays quiet');
 assert.equal(warningOnScreen(200, 640), true, 'a visible hazard can sound its warning');
+// 390 px wide at 3x: the marker top is 79 px below a 47 px inset, and the nest is drawn about .12 pond widths tall below its center.
+assert.equal(nestMarkerShows(378 - 40, 378, 1170), false, 'the nest marker stays away while the nest itself shows below it');
+assert.equal(nestMarkerShows(378 - 200, 378, 1170), true, 'the nest marker appears once the nest is above the screen');
+assert.equal(padCueShows(false, 40, 3.2, 2.4), true, 'the lily-pad cue returns when she swims back down the pond');
+assert.equal(padCueShows(false, 40, 3.2, 3.0), false, 'the lily-pad cue stays away while she swims on');
 
 for (const [arrived, hits, scatters, expected] of [
   [3, 0, 0, ['nest']],
@@ -118,7 +124,7 @@ export function planner(careful) {
 }
 // Waypoints are separate from the campaign data. They drive the same eased steering
 // and tick loop as a held thumb. A number is a wait at the preceding waypoint.
-const ROUTES = [
+export const ROUTES = [
   null,
   [],
   [[.73, .86]],
@@ -138,9 +144,9 @@ const ROUTES = [
   [[.77, .86], [.77, 1.38]],
   [[.66, .78], [.64, 1.15], [.33, 1.26], [.32, 1.93]],
   [[.51, 1.76]],
-  [[.30, 1.46], [.64, 1.47], [.67, 2.45]],
+  [[.30, 1.46], [.18, 1.80], [.20, 2.10], [.45, 2.55]],
   [],
-  [[.29, .78], [.24, 1.39], [.24, 1.94]],
+  [[.45, .70], [.58, 1.20], [.25, 1.55], [.24, 1.94]],
   [[.31, .79], [.21, 1.39], [.18, 2.14], [.37, 2.38], [.74, 2.28]],
   [[.25, .83], [.23, 1.25], [.24, 2.40]],
   [[.73, .76], [.72, .91], [.72, 1.43], [.34, 1.51], [.32, 2.12], [.24, 2.73], [.39, 3.40]],
@@ -176,6 +182,23 @@ function play(opts, act, limit = 135, sample) {
   return { s, trace };
 }
 
+// The opening ghost is the first thing a player copies. Follow it, keep its heading for a few seconds,
+// and the flock must come through unharmed. Stages 1, 2 and 5 draw their own guides.
+export function ghostHarm(stage) {
+  const s = create({ stage }), points = LEVELS[stage].guide ?? [[.5, .65]];
+  let i = 0;
+  while (!s.over && s.t < 12 && i < points.length) {
+    const [x, y] = points[i];
+    if (Math.hypot(s.mom.x - x, s.mom.y - y) < .045) { i++; continue; }
+    step(s, { x, y });
+  }
+  const last = points.at(-1), prev = points.at(-2) ?? [.5, .35];
+  const dx = last[0] - prev[0], dy = last[1] - prev[1], length = Math.hypot(dx, dy);
+  const ahead = { x: last[0] + dx / length * .5, y: last[1] + dy / length * .5 }, until = s.t + 3.5;
+  while (!s.over && s.t < until) step(s, ahead);
+  return s.hits + s.scatters;
+}
+
 function campaign() {
   const table = [];
   for (let stage = 1; stage <= LAST_STAGE; stage++) {
@@ -189,6 +212,8 @@ function campaign() {
   }
   console.table(table);
   assert.ok(table.every(row => row.stars === 3), 'every level has a clean, full-flock route');
+  const misled = table.map(row => row.level).filter(stage => ![1, 2, 5].includes(stage) && ghostHarm(stage) > 0);
+  assert.deepEqual(misled, [], 'following the opening ghost never leads the flock into harm');
   assert.ok(table.filter(row => row.straight < 3).length >= 14, 'holding straight is worse than route choice');
   const sticky = play({ stage: 12 }, straight, 12).s;
   assert.equal(sticky.hits, 0, 'the mother crosses the weeds unharmed');
@@ -234,6 +259,18 @@ function endless() {
   console.table(times.map(t => ({ seconds: t, drain: duskRate(t).toFixed(2), competent: cuts[t][0], average: cuts[t][1] })));
   const repeat = () => play({ endless: true, seed: 202 }, planner(true));
   assert.equal(repeat().trace, repeat().trace, 'endless fixed-tick determinism');
+  // A scattered duckling that swims back is a rescue, not new points: scattering must not pay.
+  let rejoins = 0, rejoinPoints = 0;
+  for (let k = 1; k <= 12 && rejoins < 3; k++) {
+    let before = 0;
+    play({ endless: true, seed: k * 101 }, planner(true), 135, s => {
+      const again = s.events.filter(e => e.type === 'join' && e.again).length;
+      if (again && !s.events.some(e => e.type !== 'join')) { rejoins += again; rejoinPoints += s.score - before; }
+      before = s.score;
+    });
+  }
+  assert.ok(rejoins > 0, 'the competent planner re-rescues at least one scattered duckling');
+  assert.equal(rejoinPoints, 0, 're-rescuing a scattered duckling scores nothing');
   const idleRun = play({ endless: true, seed: 101 }, idle).s;
   assert.equal(idleRun.score, 0);
   for (const [label, lo, hi] of [['competent', 60, 120], ['average', 25, 60]]) {
