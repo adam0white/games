@@ -538,3 +538,17 @@ Not fixed: in the 3D look the green food arrow decides "off screen" with the fla
 
 ### Checks
 `bots.mjs`: a direct check for each hunting use and for 6, 7 and 8. Main's rules and these, fed the same steering without the button, still end identical (24 runs). WebKit iPhone 13: pause and resume shows the button again; a second finger leaves the steering vector unchanged and the first finger still steers after it lifts; a click on the button uses the skill; a real promotion shows the skill line. Not verified: a real phone, and the rival fix (2) has no direct check.
+
+## 2026-11-24: Turkish
+
+The game is now in English and Turkish, with the shared language kit (`experiments/kit/i18n.js`).
+
+- **How a player picks it.** `?lang=tr` on the address, the globe button, or a Turkish browser. The choice is the kit's one key, `kit:lang`, shared by every game. An English browser gets English. The globe sits beside the Rules button on the menu (the title keeps its width) and in the top right corner of the pause card. It switches at once: every card, the HUD, the skill button and a speech bubble that is showing redraw; an explicit `?lang=` in the address follows the choice.
+- **What stays English.** `sim.js`, the save (`ant-promotion:v1`) and lab records are unchanged. Animal names, skill labels, the rival's name, title and lines are identifiers there. They are translated only when drawn, by looking the English text up in `words.js` under a prefix: `animal.Fire Ant`, `skill.Hard shell`, `trait.`, `sight.`, `look.`, `pattern.`, `epithet.`, `title.`, `line.`. A text with no entry is drawn in English, so an old save or a new animal never shows a raw key. The rival's saved name "One Eye the Wolf" is drawn as "Tek Göz Kurt" only when both parts are known.
+- **English is unchanged.** English strings moved into `words.js` as the same text. The How to play list, the lab notice and the recording switch keep the English the page and the kit wrote; Turkish replaces them and switching back restores them. A browser check compared every English screen (text, aria-labels, title, canvas text) with the page before the change: only the globe differs.
+- **Turkish grammar.** Turkish has no article, and a case ending on an inserted animal name must follow vowel harmony. Every Turkish sentence with an inserted name is written so the name needs no ending: "Kurt olarak devam et", "Yengeç iken seni bir Kertenkele yedi", "Kitabına eklendi: Kurt", "Artık Kurt oldun", the rival's `{you}` always at the end of a clause.
+- **Fit.** The skill button shrinks its font (13, 12, 11 px) when a label would need a third line or overflow; every English label measures at 14 px, so English never shrinks.
+
+**To add a string:** add the key to `tables.en` and `tables.tr` in `words.js` and draw it with `t('key', { vars })`. A new animal or skill label needs only a Turkish entry (`'animal.<English name>'`, `'skill.<English label>'`); a check in node (all 55 names present and different) is in this change's report, not in the repo.
+
+**Not verified.** No native Turkish speaker has read the text. Ask the tester (or another Turkish reader) to play one life in Turkish and mark anything stiff or wrong, especially the animal names (Böcek for Beetle, Kılıç Dişli Kaplan for Sabertooth, Yıldırım Kuşu for Thunderbird), the rival's epithets and lines, and the skill labels.
