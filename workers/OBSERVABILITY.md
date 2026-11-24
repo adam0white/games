@@ -30,7 +30,9 @@ Source: Cloudflare docs read on 2026-11-24 (Workers Logs, Traces spans and attri
 
 - Invocation logs: method, URL without the query string, response status and request metadata, for seven days.
 - Traces: the request URL and path, user agent, accept headers, country and region, Cloudflare location. No client IP attribute is listed.
-- Issues: the error, stack, Worker version, and "invocation and request details". Occurrences are kept seven days.
+- Issues, measured on 2026-11-24 with a throwaway Worker: an occurrence holds the error name, message and stack, the Worker version, the request method, URL and path (query string removed), the `cf-ipcountry`, `cf-ray` and `user-agent` headers, and trace ids. No client IP, no `Authorization` header and no body. Only failing requests produce an occurrence. Occurrences are kept seven days.
+- Issues appeared about 20 seconds after the failing request: one for an uncaught exception, one for `console.error(new Error(...))` with a 200 response, and one for a returned 503.
+- The first `wrangler deploy` of a brand-new Worker with this block failed once with "This Worker does not exist on your account [code: 10007]"; running the same deploy again succeeded.
 
 ## Exceptions (owner decisions)
 

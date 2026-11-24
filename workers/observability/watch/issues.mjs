@@ -17,7 +17,8 @@ const SKIP_TYPES = new Set(['security']);
 
 /** Names of every Worker configured in this checkout, archived ones left out. */
 export function workerNames(root) {
-  const names = new Set(Object.keys(ELSEWHERE));
+  // WORKER_ISSUES_EXTRA: more Worker names, space separated, for a Worker not yet on main or a test.
+  const names = new Set([...Object.keys(ELSEWHERE), ...(process.env.WORKER_ISSUES_EXTRA ?? '').split(/\s+/).filter(Boolean)]);
   const walk = dir => {
     for (const entry of readdirSync(dir)) {
       if (['node_modules', '.git', 'archive', 'dist', '.wrangler'].includes(entry)) continue;
