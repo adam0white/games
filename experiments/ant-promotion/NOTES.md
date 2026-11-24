@@ -431,6 +431,8 @@ The first sight table (birds 2.85, Rabbit, Deer and Zebra wider) took classic st
 
 The first full `bots.mjs 6 12` failed in the rival rules: their test animal, the Mole, no longer has the plain wedge. They now use a Porcupine, which has it (asserted); every assertion is kept, and the bite-range one still uses the Mole. The bot play printed before that point matches the table above.
 
+The rival section of `bots.mjs` passes after that. One number moved: the bot that is reckless until its first death ate its rival in 3 of 6 Classic runs and 2 of 6 Wild runs. The build that added the rival had 6 and 6; main just before this change was not measured, so part of the drop may be from the changes in between.
+
 ### Not verified
 - How a pounce feels to a person, and whether it is enough. Bots show fast picks rise less high in Classic; their deaths barely change.
 - Whether the tester meant the animals' sight, the player's own view, or both. Only the animals' sight changed; a question went to the tester.
