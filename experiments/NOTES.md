@@ -144,3 +144,8 @@ Paper Boat (`/boat/`, same day): a paper boat rides a gutter stream; the player 
 ## 2026-11-24: Night Flock and Night Vine (tester t1, note #208, answering #198)
 
 Asked which of Night Flock and Night Vine they would keep playing, the tester chose "None". Recorded only: dropping a game is the owner's decision.
+
+## 2026-11-24: which small games and lab pages to keep (tester t1, notes #206, #207)
+
+- **#206, answering #174:** the best of the six are Thumb Duel, Paper Boat and Seed Sling, between which the tester did not choose. Recorded; no game was dropped.
+- **#207, answering #175:** keep Ant Draft A, Lantern Spark, Lantern Race and one the transcript calls "Lantern pulls", which matches no page (asked back). The tester wants the Lantern ones inside Lantern as modes. Ant Draft changes are in `lab/ant-draft/NOTES.md`.

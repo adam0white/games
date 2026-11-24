@@ -1,6 +1,7 @@
 // Ant Draft: the page. Rules are in sim.js; this file draws, plays sound and turns the thumb into the rally point.
 import { create, step, setRally, pick, threat, score, nextWave, DT, W, H, QUEEN, CARDS, CARD, MAXLVL, LEASH } from './sim.js';
-import { readJson, writeJson } from '../../kit/save.js';
+import { level, LEVELS, CHAPTERS, TUTORIAL, stars } from './levels.js';
+import { readJson, writeJson, read, write } from '../../kit/save.js';
 import { sound } from '../../kit/audio.js';
 import { onLeave, isPauseKey } from '../../kit/pause.js';
 import { noZoom } from '../../kit/zoom.js';
@@ -15,6 +16,11 @@ const canvas = $('c'), ctx = canvas.getContext('2d');
 const KEY = 'ant-draft:save';
 const save = Object.assign({ best: 0, wins: 0, runs: 0, sound: true, daily: null }, readJson(KEY, {}));
 const playedBefore = save.runs > 0;
+// ant-draft:levels: { open: highest level open, stars: { level: 1..3 } }. ant-draft:tutorial: '1' once the tutorial was played or skipped.
+const LV = 'ant-draft:levels', prog = Object.assign({ open: 1, stars: {} }, readJson(LV, {}));
+prog.open = Math.max(1, Math.min(LEVELS, Math.floor(prog.open) || 1)); if (!prog.stars || typeof prog.stars !== 'object') prog.stars = {};
+let cur = null; // what is being played: a level number, 0 for the tutorial, null for the 8-wave long run
+let floats = [], lost = null, booms = [], boomed = 0, hitsShown = 0, peak = 0, tipText = '', afterTutorial = null; // numbers that rise, the health the swarm just lost, explosions
 const persist = () => writeJson(KEY, save);
 const snd = sound({ on: () => save.sound });
 const params = new URLSearchParams(location.search);
@@ -25,7 +31,7 @@ let s = null, mode = 'menu', paused = false, daily = false, acc = 0, last = perf
 let parts = [], rings = [], banner = null, finger = null, pendingEnd = 0, pendingDraft = 0, draftOpenAt = 0, lastBite = 0;
 let cw = 0, ch = 0, dpr = 1, scale = 1, ox = 0, oy = 0, ground = null;
 const keys = new Set();
-const show = screens(['menu', 'draft', 'paused', 'end'], name => { $('pause').style.display = name === 'play' ? 'grid' : 'none'; });
+const show = screens(['menu', 'ask', 'levels', 'draft', 'paused', 'end'], name => { $('pause').style.display = name === 'play' ? 'grid' : 'none'; });
 
 // ---------- layout ----------
 function resize() {
@@ -116,11 +122,17 @@ const ring = (x, y, r, col, life = 0.4) => rings.push({ x, y, r, col, life, max:
 function onEvent(e) {
   const now = performance.now();
   switch (e.type) {
+    case 'hit': { // damage on one enemy adds up for a third of a second, then rises as one number
+      const f = floats.find(q => q.id === e.id && q.age < 0.35);
+      if (f) { f.n += e.n; f.x = e.x; f.y = e.y - 16; } else { floats.push({ id: e.id, n: e.n, x: e.x + (Math.random() - 0.5) * 8, y: e.y - 16, age: 0, col: '#ffe23a' }); hitsShown++; }
+      break; }
     case 'bite': burst(e.x, e.y, 2, '#fff8e6', 50, 0.25, 1.6); if (now - lastBite > 55) { lastBite = now; snd.tone(520 + Math.random() * 240, 0.035, 0.035, 'square'); } break;
-    case 'chomp': burst(e.x, e.y, 2, '#ff7a6a', 40, 0.3, 1.8); break;
+    case 'chomp': floats.push({ id: 0, n: e.n, x: e.x, y: e.y - 8, age: 0, col: '#ff8a7a' }); burst(e.x, e.y, 2, '#ff7a6a', 40, 0.3, 1.8); break;
     case 'kill': { const big = e.foe === 'stag' ? 3 : e.foe === 'beetle' || e.foe === 'spider' ? 1.6 : 1; burst(e.x, e.y, 10 * big, FOECOL[e.foe], 90 * big, 0.6, 3); burst(e.x, e.y, 4 * big, '#fff8e6', 60, 0.4, 2); ring(e.x, e.y, 16 * big, '#fff8e6'); shake = Math.max(shake, big > 2 ? 16 : big > 1 ? 5 : 2); snd.tone(300 / big + 180, 0.12, 0.09, 'triangle', -160); if (big > 1) snd.noise(0.12 * big, 0.14, 700); break; }
-    case 'antdie': burst(e.x, e.y, 5, '#8a1f1a', 50, 0.4, 2); snd.tone(190, 0.06, 0.04, 'sawtooth', -60); break;
-    case 'boom': ring(e.x, e.y, 30, '#ffb42a', 0.35); burst(e.x, e.y, 9, '#ffb42a', 110, 0.4, 3); shake = Math.max(shake, 3); snd.noise(0.14, 0.12, 500); break;
+    case 'antdie': booms.push({ x: e.x, y: e.y, t: 0, r: 12, puff: 1 }); burst(e.x, e.y, 7, '#8a1f1a', 60, 0.5, 2.2); snd.tone(190, 0.06, 0.04, 'sawtooth', -60); break;
+    case 'boom': boomed++; booms.push({ x: e.x, y: e.y, t: 0, r: 30 + 6 * (s.cards.fire | 0) }); ring(e.x, e.y, 44, '#fff8e6', 0.3); burst(e.x, e.y, 12, '#ff7a1f', 140, 0.5, 3.4); burst(e.x, e.y, 7, '#ffe23a', 90, 0.35, 2.6); burst(e.x, e.y, 5, '#4a3a30', 40, 0.9, 4);
+      if (e.hits) floats.push({ id: 0, n: e.n * e.hits, x: e.x, y: e.y - 22, age: 0, col: '#ff7a1f', big: 1 });
+      shake = Math.max(shake, 5); snd.noise(0.22, 0.16, 420); snd.tone(95, 0.2, 0.1, 'sine', -50); break;
     case 'split': ring(e.x, e.y, 14, '#ff7a3a', 0.3); snd.tone(640, 0.07, 0.05, 'sine', 320); break;
     case 'spit': snd.tone(880, 0.08, 0.03, 'sine', -500); break;
     case 'queenhit': shake = Math.max(shake, 8); redFlash = 0.25; burst(e.x, e.y - 8, 8, '#ff3a2a', 90, 0.5, 3); snd.tone(110, 0.22, 0.16, 'sawtooth', -50); snd.noise(0.1, 0.12, 300); break;
@@ -128,7 +140,7 @@ function onEvent(e) {
     case 'crumb': snd.tone(900, 0.03, 0.025, 'sine'); break;
     case 'deliver': burst(e.x, e.y, 3, '#fff0c2', 40, 0.4, 2); snd.tone(780, 0.07, 0.05, 'sine', 240); break;
     case 'heal': ring(e.x, e.y, 44, '#8dff8a', 0.6); burst(e.x, e.y, 12, '#8dff8a', 60, 0.7, 2.5); snd.tone(440, 0.25, 0.06, 'sine', 440); break;
-    case 'wave': banner = { text: e.n === s.waves && s.waves === 8 ? 'Final wave' : `Wave ${e.n}`, t: 0 }; snd.tone(392, 0.12, 0.08, 'triangle'); later(() => snd.tone(587, 0.2, 0.08, 'triangle'), 120); break;
+    case 'wave': peak = 0; banner = { text: cur === 0 ? `Step ${e.n}` : e.n === s.waves && (cur !== null || s.waves === 8) ? 'Final wave' : `Wave ${e.n}`, t: 0 }; snd.tone(392, 0.12, 0.08, 'triangle'); later(() => snd.tone(587, 0.2, 0.08, 'triangle'), 120); break;
     case 'draft': pendingDraft = 0.55; [523, 659, 784].forEach((f, i) => later(() => snd.tone(f, 0.16, 0.07, 'triangle'), i * 80)); break;
     case 'won': pendingEnd = 1.3; for (let i = 0; i < 6; i++) later(() => { burst(40 + Math.random() * 280, 120 + Math.random() * 300, 22, ['#ffe23a', '#ff7a6a', '#8dff8a', '#fff8e6'][i % 4], 150, 1, 3.4); snd.tone([523, 659, 784, 1047, 784, 1047][i], 0.22, 0.09, 'triangle'); }, i * 150); break;
     case 'lost': pendingEnd = 1.1; shake = 20; burst(e.x, e.y, 40, '#b98552', 160, 1, 4); burst(e.x, e.y, 20, '#ff3a2a', 120, 0.8, 3); [330, 262, 196, 131].forEach((f, i) => later(() => snd.tone(f, 0.28, 0.11, 'sawtooth', -40), i * 150)); snd.noise(0.5, 0.2, 200); break;
@@ -137,11 +149,18 @@ function onEvent(e) {
 const drain = () => { for (const e of s.events) onEvent(e); s.events.length = 0; };
 
 // ---------- flow ----------
+function play(n) { // the first time, ask about the tutorial (tester note #207); a later Play goes straight in
+  if (read('ant-draft:tutorial') === null && !playedBefore && save.runs === 0) { afterTutorial = n; mode = 'ask'; show('ask'); return; }
+  cur = n; start(false);
+}
 function start(isDaily = daily) {
   clearTimers(); choosing = false; pauseAfterPick = false; daily = isDaily; snd.unlock();
   const d = new Date(), seed = params.has('seed') ? Number(params.get('seed')) : daily ? d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate() : (Math.random() * 2 ** 31) | 0;
   const waves = Number(params.get('waves')), hp = Number(params.get('hp'));
-  s = create(seed, { waves: Number.isFinite(waves) && waves >= 1 ? Math.min(8, Math.floor(waves)) : 8, hp: Number.isFinite(hp) && hp > 0 ? Math.min(QUEEN.hp, hp) : QUEEN.hp });
+  const L = cur === null ? null : cur === 0 ? TUTORIAL : level(cur);
+  floats = []; booms = []; peak = 0; lost = null;
+  s = create(seed, { level: L, safe: cur === 0, waves: Number.isFinite(waves) && waves >= 1 ? Math.min(8, Math.floor(waves)) : 8, hp: Number.isFinite(hp) && hp > 0 ? Math.min(QUEEN.hp, hp) : QUEEN.hp });
+  for (const id of (params.get('give') || '').split(',')) if (CARD[id]) s.cards[id] = 3; // for looking at a card's effect
   parts = []; rings = []; finger = null; keys.clear(); shake = redFlash = 0; banner = null; acc = 0; paused = false; pendingEnd = pendingDraft = 0; mode = 'play'; show('play'); drain();
 }
 function openDraft() {
@@ -166,26 +185,60 @@ function choose(i, b) {
   for (const el of $('offers').children) el.classList.add(el === b ? 'chosen' : 'passed');
   later(() => { choosing = false; pick(s, i); mode = 'play'; show('play'); drain(); last = performance.now(); if (pauseAfterPick) { pauseAfterPick = false; pause(); } }, 300);
 }
+function endLevel(won) {
+  if (params.has('give')) won = false; // a look at an effect opens no levels
+  const next = won && cur > 0 && cur < LEVELS; save.runs++; persist(); // the long run's best and wins stay its own
+  const n = stars(s.queen.hp);
+  if (won && cur > 0) { prog.stars[cur] = Math.max(prog.stars[cur] | 0, n); prog.open = Math.max(prog.open, Math.min(LEVELS, cur + 1)); writeJson(LV, prog); }
+  if (cur === 0) write('ant-draft:tutorial', '1');
+  $('endTitle').textContent = cur === 0 ? 'You are ready!' : won ? `Level ${cur} cleared` : 'The nest fell';
+  $('endScore').textContent = cur === 0 ? '' : won ? '★'.repeat(n) + '☆'.repeat(3 - n) : `Level ${cur}`;
+  $('endLine').textContent = cur === 0 ? 'Guard the queen with what you learned.' : won ? (cur === LEVELS ? 'All fifty levels cleared!' : `Queen's health ${Math.round(s.queen.hp)}. 80 or more gives three stars.`) : 'Meet the enemies before they reach her.';
+  $('again').textContent = cur === 0 ? 'Play' : next ? 'Next level' : 'Again'; $('again').dataset.next = cur === 0 ? (afterTutorial ?? prog.open) : next ? cur + 1 : '';
+  $('replay').style.display = next ? '' : 'none';
+}
 function endRun() {
+  if (cur !== null) { mode = 'end'; endLevel(s.phase === 'won'); $('endStats').style.display = 'none'; heldRow(); show('end'); menuNumbers(); return; }
+  $('endStats').style.display = ''; $('again').textContent = 'Again'; $('again').dataset.next = ''; $('replay').style.display = 'none';
   const won = s.phase === 'won', sc = score(s); save.runs++; if (won) save.wins++;
   const isBest = sc > save.best; if (isBest) save.best = sc;
   if (daily) { const day = new Date().toDateString(); if (!save.daily || save.daily.day !== day || sc > save.daily.score) save.daily = { day, score: sc }; }
   persist(); mode = 'end';
   $('endTitle').textContent = won ? 'The queen is safe!' : 'The nest fell';
   $('endScore').textContent = sc; $('endWave').textContent = Math.min(s.waves, s.wave + 1); $('endWaves').textContent = s.waves; $('best2').textContent = save.best;
-  const held = $('held'); held.textContent = '';
-  for (const c of CARDS) { const n = s.cards[c.id] | 0; if (!n) continue; const chip = document.createElement('div'); chip.className = 'chip'; chip.title = c.words; chip.dataset.card = c.id; chip.append(iconCanvas(c.id, 92)); chip.insertAdjacentHTML('beforeend', pips(n)); held.append(chip); }
+  heldRow();
   $('endLine').textContent = isBest ? 'New best!' : daily ? 'Daily run' : '';
   show('end'); menuNumbers();
+}
+function heldRow() {
+  const held = $('held'); held.textContent = '';
+  for (const c of CARDS) { const n = s.cards[c.id] | 0; if (!n) continue; const chip = document.createElement('div'); chip.className = 'chip'; chip.title = c.words; chip.dataset.card = c.id; chip.append(iconCanvas(c.id, 92)); chip.insertAdjacentHTML('beforeend', pips(n)); held.append(chip); }
 }
 function menuNumbers() {
   $('best').textContent = save.best; $('wins').textContent = save.wins;
   for (const id of ['sound1', 'sound2']) $(id).textContent = `Sound: ${save.sound ? 'on' : 'off'}`;
+  $('play').textContent = prog.open === 1 && !prog.stars[1] ? 'Play' : `Level ${prog.open}`;
   $('dailyLine').textContent = save.daily && save.daily.day === new Date().toDateString() ? `Today: ${save.daily.score}` : '';
 }
 function pause() { keys.clear(); if (mode !== 'play' || paused) return; paused = true; finger = null; snd.hold(); show('paused'); }
 function resume() { paused = false; snd.release(); last = performance.now(); show('play'); }
-$('play').onclick = () => start(false); $('daily').onclick = () => start(true); $('again').onclick = () => start(daily);
+// The phone checks open the long run with ?waves=; everyone else gets the next level.
+$('play').onclick = () => { if (params.has('waves')) { cur = null; start(false); } else play(prog.open); };
+$('long').onclick = () => { cur = null; start(false); }; $('daily').onclick = () => { cur = null; start(true); };
+$('again').onclick = () => { if ($('again').dataset.next) cur = Number($('again').dataset.next); start(daily); };
+$('replay').onclick = () => start(false);
+$('learn').onclick = $('askYes').onclick = () => { if (mode === 'menu') afterTutorial = null; cur = 0; start(false); };
+$('askNo').onclick = () => { write('ant-draft:tutorial', '1'); cur = afterTutorial ?? prog.open; start(false); };
+$('toLevels').onclick = openLevels; $('levelsBack').onclick = () => { mode = 'menu'; show('menu'); };
+function openLevels() {
+  mode = 'levels'; const box = $('levelGrid'); box.textContent = '';
+  CHAPTERS.forEach((c, i) => {
+    const h = document.createElement('h3'); h.textContent = c.name; box.append(h);
+    const row = document.createElement('div'); row.className = 'five'; box.append(row);
+    for (let n = i * 5 + 1; n <= i * 5 + 5; n++) { const b = document.createElement('button'), st = prog.stars[n] | 0; b.className = 'lv' + (n === prog.open ? ' now' : ''); b.disabled = n > prog.open; b.dataset.level = n; b.innerHTML = `${n}<small>${'★'.repeat(st) || (n > prog.open ? '🔒' : '&nbsp;')}</small>`; b.setAttribute('aria-label', `Level ${n}`); b.onclick = () => play(n); row.append(b); }
+  });
+  show('levels'); box.querySelector('.now')?.scrollIntoView({ block: 'center' });
+}
 $('toMenu').onclick = $('quit').onclick = () => { paused = false; snd.release(); clearTimers(); finger = null; keys.clear(); mode = 'menu'; show('menu'); menuNumbers(); };
 $('pause').onclick = pause; $('resume').onclick = resume;
 $('sound1').onclick = $('sound2').onclick = () => { save.sound = !save.sound; persist(); menuNumbers(); if (save.sound) snd.tone(660, 0.1, 0.08, 'triangle'); };
@@ -236,12 +289,17 @@ function draw() {
     if (f.slow > 0) { ctx.strokeStyle = '#8fd3ff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(f.x, f.y, f.r + 4, t * 4, t * 4 + 4); ctx.stroke(); }
     if (f.hp < f.max || f.type === 'stag') { const w = f.r * 2.2; ctx.fillStyle = '#0b1408aa'; ctx.fillRect(f.x - w / 2 - 1, f.y - f.r - 9, w + 2, 5); ctx.fillStyle = '#ff5a4a'; ctx.fillRect(f.x - w / 2, f.y - f.r - 8, w * Math.max(0, f.hp / f.max), 3); }
   }
+  labels();
   for (const p of s.spits) { ctx.fillStyle = '#e9d8ff'; ell(ctx, p.x, p.y, 3.4, 3.4); ctx.fillStyle = '#e9d8ff55'; ell(ctx, p.x, p.y, 6, 6); }
   // A scout marks where the next enemies come in.
   if (s.cards.scout && s.phase === 'fight') for (const p of s.pending) { const dt = p.at - s.waveT; if (dt > 3) break; const a = 0.5 + 0.5 * Math.sin(t * 10); ctx.fillStyle = FOECOL[p.type]; ctx.globalAlpha = 0.5 + 0.5 * a; ctx.beginPath(); ctx.moveTo(p.x - 8, 4); ctx.lineTo(p.x + 8, 4); ctx.lineTo(p.x, 16 + a * 3); ctx.closePath(); ctx.fill(); ctx.globalAlpha = 1; }
   for (const r of rings) { const k = 1 - r.life / r.max; ctx.strokeStyle = r.col; ctx.globalAlpha = 1 - k; ctx.lineWidth = 3 * (1 - k) + 0.5; ctx.beginPath(); ctx.arc(r.x, r.y, r.r * (0.3 + k), 0, 6.3); ctx.stroke(); }
   for (const p of parts) { ctx.globalAlpha = Math.min(1, p.life / p.max * 1.6); ctx.fillStyle = p.col; ell(ctx, p.x, p.y, p.size, p.size); }
   ctx.globalAlpha = 1;
+  for (const b of booms) boomDraw(b);
+  for (const f of floats) { const k = Math.min(1, f.age / 0.9), sz = f.big ? 19 : f.col === '#ffe23a' ? 14 : 11; ctx.globalAlpha = 1 - k * k; text(`-${f.n < 1 ? f.n.toFixed(1) : Math.round(f.n)}`, Math.max(16, Math.min(W - 16, f.x)), Math.max(62, f.y - k * 22), sz, f.col); } ctx.globalAlpha = 1;
+  swarmBar();
+  if (cur === 0 && s.phase === 'fight') tutorialTip();
   // Queen's health, over the mound.
   const bw = 78, bx = QUEEN.x - bw / 2, by = QUEEN.y + 31, k = q.hp / q.max;
   ctx.fillStyle = '#3a2a22'; rr(bx - 2, by - 2, bw + 4, 11, 5); ctx.fill(); ctx.fillStyle = '#5a1a14'; rr(bx, by, bw, 7, 3.5); ctx.fill();
@@ -256,6 +314,46 @@ function draw() {
   if (banner) { const a = banner.t < 0.25 ? banner.t / 0.25 : Math.max(0, 1 - (banner.t - 1.1) / 0.5), sc = 1 + (1 - Math.min(1, banner.t / 0.25)) * 0.6; ctx.save(); ctx.globalAlpha = a; ctx.translate(W / 2, 200); ctx.scale(sc, sc); ctx.textAlign = 'center'; ctx.font = 'bold 44px ui-rounded, "Arial Rounded MT Bold", system-ui, sans-serif'; ctx.lineWidth = 8; ctx.strokeStyle = '#3a2a22'; ctx.fillStyle = '#ffe23a'; ctx.strokeText(banner.text, 0, 0); ctx.fillText(banner.text, 0, 0); ctx.restore(); }
   if (redFlash > 0) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = `rgba(255,58,42,${redFlash * 0.9})`; ctx.fillRect(0, 0, canvas.width, canvas.height); }
 }
+function text(str, x, y, size, col, align = 'center') { ctx.font = `bold ${size}px ui-rounded, "Arial Rounded MT Bold", system-ui, sans-serif`; ctx.textAlign = align; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round'; ctx.lineWidth = Math.max(2.5, size / 4.5); ctx.strokeStyle = '#2a1a12'; ctx.fillStyle = col; ctx.strokeText(str, x, y); ctx.fillText(str, x, y); }
+// Each enemy's name and health over it (tester note #207). In a crowd the one nearest the queen keeps its label and the ones under it drop the name.
+const NAME = { aphid: 'Aphid', beetle: 'Beetle', wasp: 'Wasp', spider: 'Spider', stag: 'Stag beetle' };
+function labels() {
+  const put = [];
+  for (const f of [...s.foes].sort((a, b) => b.y - a.y)) {
+    if (f.hp <= 0 || f.y < -4) continue;
+    const y = f.y < 72 ? f.y + f.r + 10 : f.y - f.r - 15, x = Math.max(30, Math.min(W - 30, f.x)), hp = Math.max(1, Math.ceil(f.hp));
+    if (put.every(p => Math.abs(p.x - x) > 52 || Math.abs(p.y - y) > 13)) { text(`${NAME[f.type]} ${hp}`, x, y, 11, '#fff8e6'); put.push({ x, y }); }
+    else if (put.every(p => Math.abs(p.x - x) > 18 || Math.abs(p.y - y) > 11)) { text(hp, x, y, 10, '#fff8e6'); put.push({ x, y }); }
+  }
+}
+// The whole swarm's health in one bar. The full mark is the most health the swarm has had this wave, so a dead ant makes it drop.
+function swarmHealth() { let hp = 0; for (const a of s.ants) if (a.kind !== 'worker') hp += Math.max(0, a.hp); return hp; }
+function swarmBar() {
+  const hp = swarmHealth(); peak = Math.max(peak, hp); lost = lost === null || lost < hp ? hp : lost + (hp - lost) * 0.06;
+  const w = 190, x = W / 2 - w / 2, y = 34, k = peak ? hp / peak : 0, k2 = peak ? lost / peak : 0;
+  ctx.fillStyle = '#3a2a22'; rr(x - 2, y - 2, w + 4, 15, 7); ctx.fill(); ctx.fillStyle = '#5a1a14'; rr(x, y, w, 11, 5); ctx.fill();
+  if (k2 > 0.02) { ctx.fillStyle = '#fff0c2'; rr(x, y, Math.max(10, w * k2), 11, 5); ctx.fill(); }
+  if (k > 0.02) { ctx.fillStyle = k > 0.5 ? '#ff7a3a' : k > 0.25 ? '#ffb42a' : '#ff3a2a'; rr(x, y, Math.max(10, w * k), 11, 5); ctx.fill(); }
+  text(`Ants ${Math.ceil(hp)} / ${Math.ceil(peak)}`, W / 2, y + 6, 11, '#fff8e6');
+}
+function boomDraw(b) {
+  const k = Math.min(1, b.t / (b.puff ? 0.35 : 0.5));
+  if (b.puff) { ctx.strokeStyle = `rgba(255,120,100,${1 - k})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(b.x, b.y, b.r * (0.3 + k), 0, 6.3); ctx.stroke(); return; }
+  const R = b.r * (0.45 + 0.65 * Math.sqrt(k)), g = ctx.createRadialGradient(b.x, b.y, R * 0.1 * k, b.x, b.y, R);
+  g.addColorStop(0, `rgba(255,255,230,${1 - k})`); g.addColorStop(0.4, `rgba(255,200,60,${0.95 * (1 - k)})`); g.addColorStop(0.75, `rgba(255,90,20,${0.8 * (1 - k)})`); g.addColorStop(1, 'rgba(60,30,20,0)');
+  ctx.fillStyle = g; ell(ctx, b.x, b.y, R, R);
+}
+// The tutorial shows one line at a time, for what is on the field now.
+function tutorialTip() {
+  const has = t => s.foes.some(f => f.type === t);
+  tipText = s.wave === 0 ? (s.waveT < 4.5 ? 'Drag anywhere: your ants follow the flag' : s.foes.length ? 'Put the flag on the aphid. Your ants bite it' : s.crumbs.length ? 'Workers carry the food home. 3 food = a new ant' : 'More aphids are coming')
+    : s.wave === 1 ? (has('beetle') ? 'Its name and health are above it. The top bar is your ants' : s.foes.length ? 'Each bite shows its damage' : 'Cards stack up: you pick one after every wave')
+    : has('spider') ? 'Spiders spit from far away. Go and get them' : has('wasp') ? 'Wasps hunt your workers. Guard them' : 'In a real level, keep the queen alive';
+  ctx.font = 'bold 15px ui-rounded, "Arial Rounded MT Bold", system-ui, sans-serif';
+  const words = tipText.split(' '), lines = ['']; for (const w of words) { const t = lines.at(-1) ? `${lines.at(-1)} ${w}` : w; if (ctx.measureText(t).width > 250) lines.push(w); else lines[lines.length - 1] = t; }
+  const y0 = 76; ctx.fillStyle = '#fff8e6f0'; ctx.strokeStyle = '#3a2a22'; ctx.lineWidth = 2; rr(W / 2 - 138, y0, 276, 16 + lines.length * 20, 12); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#3a2a22'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; lines.forEach((l, i) => ctx.fillText(l, W / 2, y0 + 18 + i * 20));
+}
 function rr(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
 
 function frame(now) {
@@ -267,6 +365,7 @@ function frame(now) {
   }
   if (!paused) {
     for (const p of parts) { p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.92; p.vy *= 0.92; }
+    for (const f of floats) f.age += dt; for (const b of booms) b.t += dt; floats = floats.filter(f => f.age < 0.9); booms = booms.filter(b => b.t < 0.5);
     for (const r of rings) r.life -= dt;
     parts = parts.filter(p => p.life > 0); rings = rings.filter(r => r.life > 0);
     if (banner && (banner.t += dt) > 1.6) banner = null;
@@ -284,5 +383,5 @@ menuArt(); menuNumbers(); requestAnimationFrame(frame);
 window.antDraftState = () => {
   const f = s && threat(s), px = p => p && { x: ox + p.x * scale, y: oy + p.y * scale };
   return { mode, paused, phase: s?.phase, wave: s?.wave, waves: s?.waves, hp: s?.queen.hp, ants: s?.ants.length, foes: s?.foes.length, kills: s?.kills, offers: s ? [...s.offers] : [], picks: s ? [...s.picks] : [], cards: s ? { ...s.cards } : {},
-    rally: s && px(s.rally), aim: px(f && { x: f.x, y: Math.min(f.y + 6, QUEEN.y - 30) }), lift: LIFT, hint: tip.shown, best: save.best, runs: save.runs, seed: s?.seed, t: s?.t };
+    rally: s && px(s.rally), aim: px(f && { x: f.x, y: Math.min(f.y + 6, QUEEN.y - 30) }), lift: LIFT, hint: tip.shown, cur, open: prog.open, swarm: s && swarmHealth(), peak, boomed, hitsShown, floats: floats.length, tip: cur === 0 ? tipText : '', best: save.best, runs: save.runs, seed: s?.seed, t: s?.t };
 };

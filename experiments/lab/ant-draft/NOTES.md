@@ -147,3 +147,21 @@ Final WebKit iPhone 13 check exits 0: 360 frames in 5007 ms, zero frames above 5
 The independent WebKit input/reload review also exits 0 for both drafts. This build retains first-pointer x=130 through the second touch, moves to x=180 with the owner, and remains x=180 after capture loss. Blur clears keyboard movement; menu/restart/reload and invalid query options pass.
 
 Shared-kit validation: the full before-run had seven failures in unrelated Lantern/Ant Promotion/lab-down cases (`kit-before.log`), including navigation timeouts and unavailable WebGL2. The after-run of the kit smoke case passes on both phone profiles (`kit-after-chromium.log`, `kit-after-webkit.log`). The full shared suite is not claimed green. No shared files changed. Local browser servers stub the hosted notes button; its live service, physical-phone sound/haptics/performance, and human play acceptance remain unverified.
+
+## 2026-11-24: levels, tutorial, numbers and explosions (tester t1, note #207, answering #175)
+
+The note, in short: Ant Draft A is liked; it needs a tutorial level, at least 50 more levels, a visible explosion for the explosion card, damage numbers and health by each enemy's name, and one health bar for all the ants.
+
+- **Fifty levels** (`levels.js`): ten chapters of five, 3 to 6 waves each, stars by the queen's health (80 and 40). The old 8-wave run is kept as "Long run", with its best, wins and daily; the existing key is unchanged. New keys: `ant-draft:levels` ({ open, stars }) and `ant-draft:tutorial` ('1').
+- **Tutorial:** offered on the first Play of a new player, and always under "How to play". Three short waves, a line of words for what is on the field, and the queen cannot be hurt.
+- **Numbers:** each enemy shows its name and health; damage adds up for a third of a second and rises as one yellow number; bites on ants rise in pink. In a crowd, hidden labels show the health only or nothing.
+- **Explosion:** the Fire card draws a fireball with the damage it did in orange. Every ant death shows a red ring.
+- **Ants bar:** the health of all fighting ants. Full is the most they had this wave, so a dead ant lowers it.
+- Own additions: stars, the chapter themes, and `?give=fire,split` to look at a card (opens no levels).
+
+Checks: `bots-levels.mjs 8`: all 50 levels won by a careful bot in at least half of 8 runs (the lowest are 63%), clumsy win rate falls from 0.94 (levels 1 to 10) to 0.46 (41 to 50), idle flag wins 4% of levels 26 to 50. The thresholds were set before tuning. Levels that aim at being too hard can still appear: 8 runs per level is a small sample. `bots.mjs 40` (the long run) passes, and the 8-wave run uses the same rules. `check.mjs` run C covers the first-time question, the tutorial to its end, level 1, the level list and a reload; it passed on Chromium with the frame-rate line lowered by `MIN_FPS=1`. On this machine that line failed before any change too (45 and 17 frames in about 5 s on Chromium and WebKit, against 45 or 33 and 16 after), so **frame rate was not judged**, and WebKit did not finish run B. CI runs the shared phone check, not this one.
+
+Not verified: a person, a real phone, frame rate on a phone, levels 1 to 50 in a browser (bots only).
+
+### Left as a proposal (2026-11-24)
+- The tester's answer also says The Swarm, Living Animals and Ant Draft B could be dropped. Recorded only; dropping is the owner's decision.

@@ -627,3 +627,10 @@ Played by touch, Turkish, scratch screenshots in `shots/open-fixit/` (`wb-` WebK
 Final runs on the finished code: `node bots.mjs` all claims hold; `node check.mjs` ok on WebKit (357 s) and Chromium (518 s), exit 0; `node experiments/kit/check/phone.mjs fixit` ok on WebKit and Chromium.
 
 Not verified: the fresh-lift ignored circle (not reproduced); the magnifier on a phone smaller than 360 × 640; how a first-time player reads the step pictures, the slip and the green token; star times (paused clock).
+
+## 2026-11-24: answer (tester t1, note #205, answering #179)
+
+Asked what would make the levels better, the tester chose a rival stall to race against.
+
+### Left as a proposal (2026-11-24, note #205)
+- A rival stall: a second counter at the top of the screen fixes things at its own pace and shows its count; a level goal is to fix more before the bell. Needs a rule in `sim.js` (the rival's pace per level) and bots that win and lose against it.

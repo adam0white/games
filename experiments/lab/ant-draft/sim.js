@@ -45,14 +45,15 @@ function rnd(s) { let t = (s.rng = (s.rng + 0x6d2b79f5) | 0); t = Math.imul(t ^ 
 const lvl = (s, id) => s.cards[id] | 0;
 const ev = (s, type, x, y, data) => s.events.push({ type, x, y, ...data });
 
-// opts: waves and hp (a shorter run and a weak queen, for the phone check), mutate (bots.mjs --mutate: the queen takes no damage), noCards (picks do nothing).
+// opts.level: a level from levels.js ({ waves: [...WAVE rows], tough, swift, start }); without it the run is the 8-wave long run, unchanged.
+// opts.safe: the tutorial, where the queen cannot be hurt. opts: waves and hp (a shorter run and a weak queen, for the phone check), mutate (bots.mjs --mutate: the queen takes no damage), noCards (picks do nothing).
 export function create(seed = 1, opts = {}) {
   const s = {
-    seed, rng: seed | 0, opts, t: 0, tick: 0, wave: 0, waves: Math.min(WAVES, opts.waves || WAVES), phase: 'fight', waveT: 0,
+    seed, rng: seed | 0, opts, t: 0, tick: 0, wave: 0, list: opts.level?.waves ?? WAVE, tough: opts.level?.tough ?? 1, swift: opts.level?.swift ?? 1, waves: opts.level ? opts.level.waves.length : Math.min(WAVES, opts.waves || WAVES), phase: 'fight', waveT: 0,
     queen: { hp: opts.hp || QUEEN.hp, max: QUEEN.hp, hurt: 0 }, rally: { x: 180, y: 430 }, ants: [], foes: [], crumbs: [], acid: [], spits: [], pending: [],
     cards: {}, picks: [], offers: [], food: 0, frenzy: 0, id: 1, events: [], kills: 0, lost: 0, hatched: 0, trail: { x: 180, y: 430, t: 0 },
   };
-  for (let i = 0; i < 6; i++) addAnt(s, 'soldier');
+  for (let i = 0; i < (opts.level?.start ?? 6); i++) addAnt(s, 'soldier');
   for (let i = 0; i < 2; i++) addAnt(s, 'worker');
   startWave(s);
   return s;
@@ -81,11 +82,11 @@ function startWave(s) {
 // The spawn list of a wave: fixed composition, seeded positions. Also used by the page to show the next wave to a scout.
 function plan(s, w) {
   const out = [];
-  for (const [type, count, lane, first, gap] of WAVE[w]) for (let i = 0; i < count; i++)
+  for (const [type, count, lane, first, gap] of s.list[w]) for (let i = 0; i < count; i++)
     out.push({ type, at: first + i * gap, x: Math.max(24, Math.min(W - 24, lane * W + (rnd(s) - 0.5) * 70)) });
   return out.sort((a, b) => a.at - b.at);
 }
-export const composition = w => { const n = {}; for (const [type, count] of WAVE[w] ?? []) n[type] = (n[type] | 0) + count; return n; };
+export const composition = (w, list = WAVE) => { const n = {}; for (const [type, count] of list[w] ?? []) n[type] = (n[type] | 0) + count; return n; };
 
 export function setRally(s, x, y) { s.rally.x = Math.max(8, Math.min(W - 8, x)); s.rally.y = Math.max(8, Math.min(H - 8, y)); }
 
@@ -105,7 +106,7 @@ function deal(s) {
 
 function hurtFoe(s, f, dmg) {
   if (f.hp <= 0) return;
-  f.hp -= dmg; f.flash = 0.12;
+  f.hp -= dmg; f.flash = 0.12; ev(s, 'hit', f.x, f.y, { id: f.id, n: dmg, foe: f.type });
   if (f.hp > 0) return;
   s.kills++; ev(s, 'kill', f.x, f.y, { foe: f.type });
   const F = FOES[f.type];
@@ -116,7 +117,7 @@ function killAnt(s, a) {
   a.hp = 0; s.lost++; ev(s, 'antdie', a.x, a.y, { kind: a.kind });
   if (a.carry) s.crumbs.push({ id: s.id++, x: a.x, y: a.y, taken: 0 });
   const fire = lvl(s, 'fire');
-  if (fire) { ev(s, 'boom', a.x, a.y); for (const f of s.foes) if (Math.hypot(f.x - a.x, f.y - a.y) < 30 + f.r) hurtFoe(s, f, (a.kind === 'mini' ? 3 : 6) * fire); }
+  if (fire) { const n = (a.kind === 'mini' ? 3 : 6) * fire; let hits = 0; for (const f of s.foes) if (f.hp > 0 && Math.hypot(f.x - a.x, f.y - a.y) < 30 + f.r) { hurtFoe(s, f, n); hits++; } ev(s, 'boom', a.x, a.y, { n, hits }); }
   const split = lvl(s, 'split');
   if (split && a.kind === 'soldier') { for (let i = 0; i <= split; i++) addAnt(s, 'mini', a.x + (rnd(s) - 0.5) * 14, a.y + (rnd(s) - 0.5) * 14); ev(s, 'split', a.x, a.y); }
 }
@@ -135,7 +136,7 @@ export function step(s) {
   const scout = lvl(s, 'scout');
   // Arrivals.
   while (s.pending.length && s.pending[0].at <= s.waveT) {
-    const p = s.pending.shift(), F = FOES[p.type], hp = F.hp * (1 + 0.06 * s.wave);
+    const p = s.pending.shift(), F = FOES[p.type], hp = F.hp * (1 + 0.06 * s.wave) * s.tough;
     s.foes.push({ id: s.id++, type: p.type, x: p.x, y: -16, hp, max: hp, r: F.r, cd: 0.5, ang: Math.PI / 2, slow: 1.6 * scout, flash: 0, busy: 0 });
     ev(s, 'spawn', p.x, 0, { foe: p.type });
   }
@@ -144,11 +145,11 @@ export function step(s) {
   for (const f of s.foes) {
     if (f.hp <= 0) continue;
     const F = FOES[f.type]; f.cd -= DT; if (f.flash > 0) f.flash -= DT; if (f.slow > 0) f.slow -= DT;
-    const speed = F.speed * (f.slow > 0 ? 0.5 : 1) * DT;
+    const speed = F.speed * s.swift * (f.slow > 0 ? 0.5 : 1) * DT;
     // Bite the nearest ant in reach.
     let near = null, nd = f.r + 10, held = false;
     for (const a of s.ants) { if (a.hp <= 0) continue; const d = Math.hypot(a.x - f.x, a.y - f.y); if (d < nd) { nd = d; near = a; } if (a.kind !== 'worker' && d < f.r + 11) held = true; }
-    if (near && f.cd <= 0) { f.cd = F.cd; near.hp -= F.dmg; ev(s, 'chomp', near.x, near.y); if (near.hp <= 0) killAnt(s, near); }
+    if (near && f.cd <= 0) { f.cd = F.cd; near.hp -= F.dmg; ev(s, 'chomp', near.x, near.y, { n: F.dmg }); if (near.hp <= 0) killAnt(s, near); }
     const qd = Math.hypot(QUEEN.x - f.x, QUEEN.y - f.y);
     f.busy = 0;
     if (f.type === 'wasp') {
@@ -208,12 +209,12 @@ export function step(s) {
   return s;
 }
 function hurtQueen(s, dmg) {
-  if (s.opts.mutate) return; // the broken rule for `bots.mjs --mutate`
+  if (s.opts.mutate || s.opts.safe) return; // the broken rule for `bots.mjs --mutate`
   s.queen.hp = Math.max(0, s.queen.hp - dmg); s.queen.hurt = 0.3; ev(s, 'queenhit', QUEEN.x, QUEEN.y, { n: dmg });
 }
 export function score(s) { return (s.wave + (s.phase === 'won' ? 1 : 0)) * 100 + Math.round(s.queen.hp) + s.kills; }
 // What a scout shows: the next wave's enemies by type.
-export const nextWave = s => composition(s.wave + 1);
+export const nextWave = s => composition(s.wave + 1, s.list);
 
 // The same players bots.mjs measures; the phone check drives the page with `careful`.
 export function threat(s) {
