@@ -1,7 +1,7 @@
 // Lantern 3D renderer: draws one frame of the Lantern simulation with WebGL2.
 // It reads the simulation and never changes it. World axes: x is the sim's x (river units),
 // y is up, z points back toward the camera; the boat's row is always z = 0, so z = -(y - s.y).
-import { centre, half, fall, fog, wind, rain, sight, dazzle, boat, BOAT } from './sim.js?v=14';
+import { centre, half, fall, fog, wind, rain, sight, dazzle, boat, BOAT } from './sim.js?v=15';
 
 const ROWS = 256, DY = 0.05, BEHIND = 40; // river table: 256 rows, 0.05 apart, from 2 units behind the boat
 const NEAR = -1.2, FAR = 4.2, ROW_STEP = 0.025; // ground mesh rows, boat-relative
@@ -695,7 +695,8 @@ export function createRenderer(canvas) {
       let tx = trail.length ? (y < trail[0][0] ? trail[0][1] : s.x) : s.x;
       if (y < s.y && trail.length > 1 && y >= trail[0][0]) { while (ti < trail.length - 2 && trail[ti + 1][0] < y) ti++; const a = trail[ti], b = trail[ti + 1]; tx = a[1] + (b[1] - a[1]) * Math.max(0, Math.min(1, (y - a[0]) / (b[0] - a[0] || 1))); }
       rowData[o + 3] = tx;
-      rowData[o + 4] = (fog(s, y - 0.3) + 2 * fog(s, y) + fog(s, y + 0.3)) / 4; // softened at the ends of a fog stretch rowData[o + 5] = wind(s, y); rowData[o + 6] = rain(s, y) ? 1 : 0; rowData[o + 7] = 0;
+      rowData[o + 4] = (fog(s, y - 0.3) + 2 * fog(s, y) + fog(s, y + 0.3)) / 4; // softened at the ends of a fog stretch
+      rowData[o + 5] = wind(s, y); rowData[o + 6] = rain(s, y) ? 1 : 0; rowData[o + 7] = 0;
     }
     gl.bindTexture(gl.TEXTURE_2D, rowsTex);
     gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 2, ROWS, gl.RGBA, gl.FLOAT, rowData);

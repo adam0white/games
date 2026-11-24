@@ -670,6 +670,20 @@ const GAMES = {
       await until(page, g => Math.sign(window.lanternState().x - 0.5) === g && Math.abs(window.lanternState().x - 0.5) > 0.02, `a press steers (${sign})`, 8000, sign); await finger(page, '#c', [['pointerup', x, 600]]); await sleep(400);
     }
     await finger(page, '#c', [['pointerdown', 100, 600]]); await finger(page, '#c', [['pointermove', 300, 600]]); await until(page, () => window.lanternState().target < window.lanternState().x + 1e-6, 'a press that slides stays a press on the side it began'); await finger(page, '#c', [['pointerup', 300, 600]]);
+    // Note #203: a short press is a small step, the boat stops when the finger lifts, a held press does not cross into the bank, and leaning the phone steers.
+    const calm = () => page.evaluate(() => { const s = window.lanternSim(); s.rocks = []; s.safe = 0; s.light = 1; s.x = window.lanternCentre(); });
+    const presses = await page.evaluate(() => window.lanternTicks([[8, 1], [30, 0]])); assert.ok(presses.step > 0.002 && presses.step < 0.05, `a short press is a small step (${presses.step})`); assert.ok(presses.last < 0.002, `the boat stops after the finger lifts (${presses.last})`);
+    const held = await page.evaluate(() => window.lanternTicks([[240, 1]])); assert.equal(held.hearts, 0, 'a held press does not push the boat into the bank');
+    // A phone that says no, then (after a reload) one that says yes.
+    const answer = a => page.evaluate(a => { if (window.DeviceOrientationEvent) DeviceOrientationEvent.requestPermission = () => Promise.resolve(a); }, a);
+    const lean = (gamma, beta = 45) => page.evaluate(([g, b]) => { for (let i = 0; i < 3; i++) dispatchEvent(Object.assign(new Event('deviceorientation'), { beta: b, gamma: g })); }, [gamma, beta]);
+    await finger(page, '#pause', [['pointerdown', 0, 0]]); assert.equal(await page.isVisible('#card button.steer'), true, 'the pause card changes the steering'); await page.click('#card button.steer'); assert.equal((await saved())['lantern-steer'], 'press'); await page.click('#card button.steer'); assert.equal((await saved())['lantern-steer'], 'tilt');
+    await page.reload(); await until(page, () => window.lanternState().view === 'first', 'first person after a reload'); await answer('denied'); await page.click('#play'); await lean(25); assert.equal((await state()).tilting, false, 'no permission: no tilt');
+    assert.ok((await page.evaluate(() => window.lanternTicks([[8, -1]]))).step > 0.002, 'no permission: pressing still steers');
+    await page.reload(); await until(page, () => window.lanternState().view === 'first', 'first person after a reload'); await answer('granted'); await page.click('#play'); await until(page, () => window.lanternState().playing, 'play'); await page.evaluate(() => { window.lanternSim().safe = 60; }); await lean(0); await lean(0); assert.equal((await state()).tilting, true, 'readings turn tilt on');
+    for (const sign of [-1, 1]) { await calm(); await lean(sign * 25); await until(page, g => { for (let i = 0; i < 2; i++) dispatchEvent(Object.assign(new Event('deviceorientation'), { beta: 45, gamma: g * 25 })); return Math.sign(window.lanternState().slide) === g; }, `leaning steers (${sign})`, 8000, sign); }
+    await until(page, () => { dispatchEvent(Object.assign(new Event('deviceorientation'), { beta: 45, gamma: 0 })); return window.lanternState().slide === 0; }, 'level stops the boat');
+    await sleep(1700); assert.equal((await state()).tilting, false, 'no readings: pressing steers again');
     await page.reload(); await until(page, () => window.lanternState().view === 'first', 'the view is kept'); await page.click('[data-view="2d"]'); assert.equal((await state()).view, '2d');
     // A look on the whole screen (notes #73 and #112): tapping an owned boat shows it and hides every button; a tap brings the shop back,
     // and the button under the pack wears it.

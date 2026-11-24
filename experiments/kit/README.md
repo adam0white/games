@@ -12,6 +12,7 @@ Shared code for the games under `experiments/`. It is served at `/kit/` as plain
 | `stick.js` | `stick(el, { when, reach, leash, dead })`: a floating joystick; the game owns the numbers and draws it from `touch` |
 | `drag.js` | `drag(el, { playing, paused, resume, from, travel, aim, mouse, settle })`: steering by relative finger travel, with the settle distance after a pause; the game owns the gain |
 | `sides.js` | `sides(el, { on, playing, paused, resume })`: press the left or right half to steer, hold to keep turning (Lantern's first-person view) |
+| `tilt.js` | `tiltSteer()`: steering by leaning the phone, with the iPhone permission, a straight position, and the screen kept on (Lantern's first person) |
 | `hint.js` | `hint(el, { kind, key, when, played, delay, look, label, reach, bottom })`: help for a first-time player who does not touch: a see-through copy of the control with a finger showing how; see below |
 | `i18n.js` | `words({ en: {...}, tr: {...} })` gives `{ t, lang, setLang, apply, langs }`: text in the player's language, chosen by `?lang=`, a remembered choice (`kit:lang`, shared by every game) or the browser; `apply()` fills `data-i18n` elements |
 | `room.js` | `table({ game, version, name, onState, onMove, ... })`, `newCode`, `linkFor`, `codeFromLink`, `share`: a table for friends by four-letter code or link, no account, for turn-based games; see below |

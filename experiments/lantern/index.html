@@ -90,6 +90,7 @@
   <p><button id="endless">Endless river</button><button id="daily" data-i18n="daily">Today's river</button><button id="tower">Tower climb</button><button id="anew" hidden>New climb from level 1</button></p>
   <p><button id="toShop" data-i18n="shop">Shop</button><button id="toBoard" data-i18n="board">Leaderboard</button></p>
   <p id="views"><button data-view="2d">2D</button><button data-view="3d">3D</button><button data-view="first" data-i18n="view_first">First person</button></p>
+  <p class="steerRow" hidden><button class="steer"></button></p>
   <p class="hint" id="viewNote" hidden></p>
   <p><button id="toCredits" data-i18n="credits">Credits</button><button class="music"></button></p>
 </div></div>
@@ -119,9 +120,9 @@
 </div></div>
 <div id="card" class="screen"><div><button id="pauseLanguage" class="language" hidden></button><h1 id="title"></h1><p id="line"></p><p id="sub"></p>
   <div id="ask" hidden><p data-i18n="ask">Show your endless scores to everyone on the leaderboard? After a yes, every run from the next one goes up by itself.</p><p><input id="askName" maxlength="16" autocomplete="nickname" enterkeyhint="done" placeholder="Type a name"></p><p class="hint" id="askNote">Your name and your score are sent, and a signal when a run starts. Nothing else.</p><p><button id="askYes" data-i18n="askYes">Yes, show them</button><button id="askNo" data-i18n="askNo">No</button></p></div>
-  <p><button id="go" class="main">Play again</button></p><p><button id="toMenu">Menu</button><button class="music"></button></p><p><button id="viewNext" hidden></button></p></div></div>
+  <p><button id="go" class="main">Play again</button></p><p><button id="toMenu">Menu</button><button class="music"></button></p><p><button id="viewNext" hidden></button></p><p class="steerRow" hidden><button class="steer"></button></p></div></div>
 <script type="module">
-import { create, step, centre, half, sight, fall, fog, wind, rain, dazzle, level, score, boat, progress, DT, GOAL, BOAT, NIGHTS, STATS, POWERS, LAST, FLOORS, LEVELS, SECTORS, towerStage, climbPace, FIELD, REBORN_PACE, GIFTS, ABILITIES, startAt } from './sim.js?v=14'; // raise v when sim.js changes its exports, so a cached copy cannot break the page
+import { create, step, centre, half, sight, fall, fog, wind, rain, dazzle, level, score, boat, progress, DT, GOAL, BOAT, NIGHTS, STATS, POWERS, LAST, FLOORS, LEVELS, SECTORS, towerStage, climbPace, FIELD, REBORN_PACE, GIFTS, ABILITIES, startAt, pace } from './sim.js?v=15'; // raise v when sim.js changes its exports, so a cached copy cannot break the page
 import { read, readNumber, readJson, write } from '../kit/save.js';
 import { sound } from '../kit/audio.js';
 import { music } from './music.js';
@@ -129,6 +130,7 @@ import { onLeave, isPauseKey } from '../kit/pause.js';
 import { screens } from '../kit/screens.js';
 import { drag } from '../kit/drag.js';
 import { sides } from '../kit/sides.js';
+import { tiltSteer } from '../kit/tilt.js';
 import { hint } from '../kit/hint.js';
 import { lab } from '../kit/lab.js'; // lab recording: the rec lines below
 import { noZoom } from '../kit/zoom.js'; noZoom(); // no double-tap or pinch zoom (note #74)
@@ -252,7 +254,14 @@ addEventListener('resize', () => { resize(); size3(); }); resize();
 
 let s = create(1, stage), playing = false, paused = false, target = 0.5, acc = 0, last = 0, shake = 0, glow = 0, sparks = [], ended = -1e9, screen = 'menu', lastLevel = 1, nearFall = false, sayTimer = 0, shown = '', weather = '';
 const sx = x => left + x * unit, sy = y => H * 0.74 - (y - s.y) * unit;
-window.lanternState = () => ({ music: musicOn, songStep: song ? song.step : -1, daily, view, viewReady: !!R3, sharing, tab, asked, shared: shared ? shared.length : -1, x: s.x, y: s.y, t: s.t, over: s.over, target, playing, paused, stage, opened, endless, tower, climb, screen, hearts: s.hearts, shield: s.shield, light: s.light, taken: s.taken, stats, on: s.on, busy, boost: s.boost, slow: s.slow, size: s.size, big: s.big, progress: progress(s), score: score(s), bank, owned: [...owned], worn, looking, towerAt: towerAt(), reborn, peek: peek && peek[0], field: s.field, crashOn, crash: crash && crash.how, winOn, win: victory && victory.how, name: playerName(), board, unit: unit / dpr, start, magnet: s.magnet, flare: s.flare, scene: scene && scene.kind }); // read by the browser checks
+window.lanternState = () => ({ pressing, tilting: tilting(), lean: tilt.lean(), slide, music: musicOn, songStep: song ? song.step : -1, daily, view, viewReady: !!R3, sharing, tab, asked, shared: shared ? shared.length : -1, x: s.x, y: s.y, t: s.t, over: s.over, target, playing, paused, stage, opened, endless, tower, climb, screen, hearts: s.hearts, shield: s.shield, light: s.light, taken: s.taken, stats, on: s.on, busy, boost: s.boost, slow: s.slow, size: s.size, big: s.big, progress: progress(s), score: score(s), bank, owned: [...owned], worn, looking, towerAt: towerAt(), reborn, peek: peek && peek[0], field: s.field, crashOn, crash: crash && crash.how, winOn, win: victory && victory.how, name: playerName(), board, unit: unit / dpr, start, magnet: s.magnet, flare: s.flare, scene: scene && scene.kind }); // read by the browser checks
+window.lanternCentre = () => centre(s, s.y);
+window.lanternTicks = plan => { // the checks steer some ticks by real presses, [ticks, side] each: how far the boat went from the middle, its last tick's move, hearts lost
+  const tap = (type, side) => canvas.dispatchEvent(new PointerEvent(type, { pointerId: 9, pointerType: 'touch', clientX: innerWidth * (0.5 + 0.3 * side), clientY: innerHeight * 0.7, bubbles: true }));
+  s.x = target = centre(s, s.y); s.hearts = 3; s.safe = 0; s.field = 0; slide = 0; let was = s.x, last = 0; const from = s.x;
+  for (const [n, side] of plan) { if (side) tap('pointerdown', side); for (let i = 0; i < n && playing; i++) { s.rocks = []; s.embers = []; s.powers = []; s.light = 1; was = s.x; tick(); last = Math.abs(s.x - was); } if (side) tap('pointerup', side); }
+  const out = { step: Math.abs(s.x - from), last, hearts: 3 - s.hearts }; s.hearts = 1; s.safe = 60; return out;
+};
 window.lanternSim = () => s; // the browser checks use this to reach late stretches quickly
 
 const cards = screens(['menu', 'shop', 'credits', 'card', 'board']);
@@ -270,12 +279,12 @@ function show(name) {
 const VIEWS = ['2d', '3d', 'first'];
 let view = '2d', R3 = null, snap3 = true, loading3 = null, viewNote = ''; // viewNote: the key of the note under the view buttons
 const canvas3 = $('c3');
-function views() { for (const b of document.querySelectorAll('#views button')) b.className = b.dataset.view === view ? 'on' : ''; $('viewNext').textContent = t('viewName', { name: t(`view_${view}`) }); }
+function views() { for (const b of document.querySelectorAll('#views button')) b.className = b.dataset.view === view ? 'on' : ''; $('viewNext').textContent = t('viewName', { name: t(`view_${view}`) }); steerShow(); }
 function size3() { if (R3) { const k = Math.min(1.5, dpr) / dpr; R3.resize(Math.round(W * k), Math.round(H * k)); } } // fewer pixels than the flat page: 3D costs more
 async function setView(v, keep = true) {
   if (!VIEWS.includes(v)) v = '2d';
   if (v !== '2d' && !R3) {
-    loading3 ??= import('./view3d.js?v=1').then(m => m.createRenderer(canvas3)).catch(() => null);
+    loading3 ??= import('./view3d.js?v=2').then(m => m.createRenderer(canvas3)).catch(() => null);
     const made = await loading3;
     if (!made || made.errors.length) { v = '2d'; loading3 = null; $('viewNote').hidden = false; viewNote = 'viewNoStart'; $('viewNote').textContent = t(viewNote); }
     else if (!R3) { R3 = made; canvas3.addEventListener('webglcontextlost', () => { setView('2d', false); R3 = null; $('viewNote').hidden = false; viewNote = 'viewStopped'; $('viewNote').textContent = t(viewNote); }); size3(); }
@@ -526,7 +535,7 @@ function begin() {
   song?.start(s.seed); // a new tune for each river; today's river has the same tune for everyone
   if (endless && !tower) boardTicket(); else ticket = null; // the shared board's run ticket, only for a player who shares
   const boosted = fresh && Object.values(runStats).some(v => v > 0);
-  target = s.x; crash = null; victory = null; playing = true; paused = false; acc = 0; streak = 0; sparks = []; lastLevel = 1; size = 1; fire0 = flame(); nearFall = false; weather = ''; steer.reset(); pads.drop(); snap3 = true;
+  target = s.x; crash = null; victory = null; playing = true; paused = false; acc = 0; streak = 0; sparks = []; lastLevel = 1; size = 1; fire0 = flame(); nearFall = false; weather = ''; steer.reset(); pads.drop(); snap3 = true; slide = 0; tilt.zero();
   shown = ''; show('play'); hud();
   say((tower ? t(climb > LEVELS ? (fromFloor ? 'saySectorFloor' : 'saySector') : (fromFloor ? 'sayTowerFloor' : 'sayTower'), { n: climb > LEVELS ? climb - LEVELS : climb, of: LEVELS, f: fromFloor }) : endless ? t('endless') : t('sayNight', { n: stage })) + (boosted ? '. ' + t('statsOn') : waiting ? '. ' + t('statsWait') : ''), waiting ? 2800 : 1800); floor = fromFloor;
   rec.start({ view, mode: mode(), night: tower || endless ? 0 : stage, ...(tower ? { level: climb, floor: fromFloor } : {}) });
@@ -748,6 +757,23 @@ const steer = drag(canvas, { playing: () => playing && view !== 'first', paused:
 const mouseX = e => { if (view === '2d' || !R3) return (e.clientX * dpr - left) / unit; const row = R3.boatRow(), k = canvas3.width / innerWidth; return (e.clientX * k - row.left) / row.unit; };
 // First person: press the left or right half of the screen; hold to keep turning (experiments/kit/sides.js, note #159).
 const pads = sides(canvas, { on: () => view === 'first', playing: () => playing, paused: () => paused, resume: () => resume() });
+// Tilting the phone steers first person (note #203); pressing a side is the other choice, and takes over when the phone sends no tilt.
+// Both set how fast the boat slides, and the boat stops when the player does. lantern-steer: 'press' or 'tilt'; absent means tilt.
+const tilt = tiltSteer(); let pressing = read('lantern-steer') === 'press', slide = 0;
+const tilting = () => view === 'first' && !pressing && tilt.live();
+const PRESS = 0.55, TILT = 0.8, REST = 2.5, FULL = 18; // top sideways speeds (the rules allow 0.95); degrees ignored, degrees for top speed
+function steerShow() { for (const p of document.querySelectorAll('.steerRow')) p.hidden = view !== 'first'; for (const b of document.querySelectorAll('button.steer')) b.textContent = t(pressing ? 'steerPress' : 'steerTilt'); }
+for (const b of document.querySelectorAll('button.steer')) b.addEventListener('click', () => { pressing = !pressing; store.set('lantern-steer', pressing ? 'press' : 'tilt'); if (!pressing) tilt.ask(); steerShow(); if (paused) pauseText(); });
+// Asked inside the click that picks first person or starts a run in it: an iPhone shows its prompt only from a click.
+addEventListener('click', e => { if (!pressing && e.target.closest?.('button') && (e.target.id === 'viewNext' ? VIEWS[(VIEWS.indexOf(view) + 1) % 3] === 'first' : view === 'first' || e.target.dataset.view === 'first')) tilt.ask(); }, true);
+function glide() { // first person: the next target, a little to one side; steering into a bank slides along it, so a held press never drives the boat through (a boat nobody steers can still drift into a bend)
+  const lean = tilting() ? tilt.lean() : 0, push = Math.min(1, Math.max(0, Math.abs(lean) - REST) / (FULL - REST)), side = tilting() ? 0 : pads.side();
+  const want = (tilting() ? Math.sign(lean) * push ** 1.3 * TILT : side * PRESS) * pace(s);
+  slide += (want - slide) * (want ? (tilting() ? 0.3 : 0.1) : 0.3); // a press builds up over about a quarter of a second
+  if (Math.abs(slide) < 0.01) slide = 0;
+  const room = Math.max(0, half(s, s.y) - boat(s) - 0.01), c = centre(s, s.y), to = s.x + slide * DT;
+  target = slide > 0 ? Math.min(to, c + room) : slide < 0 ? Math.max(to, c - room) : s.x;
+}
 hint(canvas, { kind: 'drag', label: t('hint'), key: 'lantern-hint', delay: 1500, bottom: 56, when: () => playing && !paused && screen === 'play' && view !== 'first', played: read('lantern-bank') !== null }); // a first-time player who does not touch sees how (experiments/kit/hint.js); 1.5 s, as a boat left alone meets a rock in 3 to 9 s; low, below the boat
 
 // Buttons.
@@ -797,7 +823,7 @@ $('toMenu').addEventListener('click', () => { if (paused) { rec.end('quit', { mo
 
 // Pause: the button, P or Escape, and whenever the page loses the screen (a phone call, another app).
 function pauseText() { // the pause card's words; the language button draws them again
-  $('toMenu').textContent = t('menu'); $('title').textContent = t('paused'); $('line').textContent = endless ? t('pauseScore', { n: score(s) }) : tower ? t('pauseTower', { tag: tag(climb), f: Math.floor(progress(s) * FLOORS), of: FLOORS }) : t('pauseNight', { n: stage, pct: Math.floor(progress(s) * 100) }); $('sub').textContent = t(view === 'first' ? 'touchGoFirst' : 'touchGo'); $('go').textContent = t('goOn');
+  $('toMenu').textContent = t('menu'); $('title').textContent = t('paused'); $('line').textContent = endless ? t('pauseScore', { n: score(s) }) : tower ? t('pauseTower', { tag: tag(climb), f: Math.floor(progress(s) * FLOORS), of: FLOORS }) : t('pauseNight', { n: stage, pct: Math.floor(progress(s) * 100) }); $('sub').textContent = t(view === 'first' ? (tilting() ? 'touchGoTilt' : 'touchGoFirst') : 'touchGo'); $('go').textContent = t('goOn');
 }
 function pause() {
   if (!playing || paused) return; paused = true; steer.drop(); pads.drop(); keys.clear(); $('viewNext').hidden = false;
@@ -805,7 +831,7 @@ function pause() {
   $('ask').hidden = true; show('card'); snd.hold();
 }
 function resume() {
-  if (!paused) return; paused = false; acc = 0; snap3 = true; last = performance.now(); target = s.x;
+  if (!paused) return; paused = false; acc = 0; snap3 = true; last = performance.now(); target = s.x; slide = 0; tilt.zero();
   show('play'); snd.release();
 }
 pauseButton.addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); pause(); });
@@ -852,7 +878,8 @@ function react(e) {
 function tick() {
   if (keys.has('ArrowLeft') || keys.has('a')) target = s.x - 0.1;
   if (keys.has('ArrowRight') || keys.has('d')) target = s.x + 0.1;
-  const press = pads.side(); if (press) aim(s.x + 0.1 * press);
+  const keyed = keys.has('ArrowLeft') || keys.has('a') || keys.has('ArrowRight') || keys.has('d');
+  if (view === 'first' && !keyed) glide(); else slide = 0;
   step(s, target);
   for (const e of s.events) react(e);
   // Things worth saying aloud: the waterfall coming up, and each step harder on the endless river.
@@ -917,7 +944,7 @@ function wreck(now) {
 const rgb = t => t.split(',').map(v => v / 255), hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255);
 function draw3(now, dt, dawn, day) {
   const first = view === 'first', e = crash ? Math.max(0, Math.min(1, (now - crash.t0) / 900)) : 0;
-  R3.draw(s, { now, dt, target, shake, glow, sparks, dawn, day, playing, snap: snap3, cam: view, fire: rgb(skin('flame')[2]), wet: hex(skin('water')[2]).map(v => 0.02 + 0.5 * v), tint: skin('boat')[0] === 'oak' ? null : hex(skin('boat')[2]), hideBoat: !!crash && !first, sink: first ? e : 0 });
+  R3.draw(s, { now, dt, target: first ? s.x + slide * 0.2 : target, shake, glow, sparks, dawn, day, playing, snap: snap3, cam: view, fire: rgb(skin('flame')[2]), wet: hex(skin('water')[2]).map(v => 0.02 + 0.5 * v), tint: skin('boat')[0] === 'oak' ? null : hex(skin('boat')[2]), hideBoat: !!crash && !first, sink: first ? e : 0 });
   snap3 = false;
   const k = W / canvas3.width, at = (x, y, h = 0) => R3.project(x, -(y - s.y), h).map(v => v * k), row = R3.boatRow().unit * k;
   g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; g.clearRect(0, 0, W, H);
@@ -943,7 +970,12 @@ function draw3(now, dt, dawn, day) {
   if (first && s.field) { const v = g.createRadialGradient(W / 2, H / 2, H * 0.3, W / 2, H / 2, H * 0.65); v.addColorStop(0, 'rgba(140,205,255,0)'); v.addColorStop(1, 'rgba(140,205,255,.3)'); g.fillStyle = v; g.fillRect(0, 0, W, H); }
   if (playing && s.boost) { g.strokeStyle = `rgba(255,235,170,${0.5 * Math.min(1, s.boost * 2)})`; g.lineWidth = 2 * dpr; g.beginPath(); for (let i = 0; i < 18; i++) { const a = i * 2.4, r = (0.3 + ((i * 0.37 + now / 400) % 1) * 0.6) * H; g.moveTo(W / 2 + Math.cos(a) * r, H * 0.4 + Math.sin(a) * r); g.lineTo(W / 2 + Math.cos(a) * (r + 40 * dpr), H * 0.4 + Math.sin(a) * (r + 40 * dpr)); } g.stroke(); }
   if (playing && s.slow) { const v = g.createRadialGradient(W / 2, H / 2, H * 0.25, W / 2, H / 2, H * 0.7); v.addColorStop(0, 'rgba(150,110,255,0)'); v.addColorStop(1, `rgba(150,110,255,${0.3 * Math.min(1, s.slow * 2)})`); g.fillStyle = v; g.fillRect(0, 0, W, H); }
-  if (first && playing && !paused) for (const d of [-1, 1]) { // the two halves to press
+  if (first && playing && !paused && tilting()) { // a level: the bead shows which way and how much the phone leans
+    const y = H * 0.77, w = W * 0.22, k = Math.max(-1, Math.min(1, tilt.lean() / FULL)); g.lineCap = 'round'; g.strokeStyle = 'rgba(255,217,160,.3)'; g.lineWidth = 4 * dpr; g.beginPath(); g.moveTo(W / 2 - w, y); g.lineTo(W / 2 + w, y); g.stroke();
+    g.fillStyle = `rgba(255,217,160,${0.5 + 0.45 * Math.abs(k)})`; g.beginPath(); g.arc(W / 2 + k * w, y, 8 * dpr, 0, 7); g.fill();
+    if (s.t < 4) { g.fillStyle = `rgba(255,230,189,${Math.min(0.9, 4 - s.t)})`; g.font = `${16 * dpr}px Georgia, serif`; g.textAlign = 'center'; g.textBaseline = 'bottom'; g.fillText(t('tiltHint'), W / 2, y - 16 * dpr); }
+  }
+  else if (first && playing && !paused) for (const d of [-1, 1]) { // the two halves to press
     const on = pads.side() === d, x = W / 2 + d * W * 0.38, y = H * 0.9, r = 12 * dpr; g.strokeStyle = `rgba(255,217,160,${on ? 0.95 : 0.4})`; g.lineWidth = (on ? 5 : 3.5) * dpr; g.lineCap = 'round'; g.lineJoin = 'round'; g.beginPath(); g.moveTo(x - d * r * 0.5, y - r); g.lineTo(x + d * r * 0.5, y); g.lineTo(x - d * r * 0.5, y + r); g.stroke();
   }
   if (victory) winDraw(now);
@@ -1102,7 +1134,8 @@ function draw(now) {
 function frame(now) {
   requestAnimationFrame(frame); // first, so one bad frame cannot stop the game for good; its error still reaches the console
   const dt = Math.min(0.1, (now - last) / 1000 || 0); last = now;
-  if (playing && !paused) { acc += dt; while (acc >= DT && playing) { tick(); acc -= DT; } }
+  tilt.awake(playing && !paused && tilting());
+  if (playing && !paused && !tilt.asking()) { acc += dt; while (acc >= DT && playing) { tick(); acc -= DT; } }
   else if (looking) drift(dt);
   if (!paused && !(s.over && s.over !== 'dawn')) burn(fire0, skin('flame')[0], dt, Math.max(-0.5, Math.min(0.5, (target - s.x) * 4)), s.light);
   shake = Math.max(0, shake - dt * 3); glow = Math.max(0, glow - dt * 2);
