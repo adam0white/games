@@ -1,0 +1,513 @@
+{
+  "date": "2026-11-24",
+  "node": "26.12.0",
+  "kind": "seeded local simulation, no network",
+  "method": {
+    "targets": {
+      "firstGrowthSeconds": 10,
+      "firstScoreSeconds": 15,
+      "deathsPerMinute": 2,
+      "socialPercent": 70,
+      "feastTopHalfBySeconds": 120,
+      "feastLeaderChanges": 1,
+      "rushEventKinds": 3,
+      "rushScoreCV": 0.4
+    },
+    "viewport": [
+      390,
+      844
+    ],
+    "controller": "nearest visible food, home when carrying, retreat from visible Feast predator within180, follow Rush hill/golden goals, no sprint or combat"
+  },
+  "cases": [
+    {
+      "mode": "classic",
+      "people": 1,
+      "seed": 1,
+      "warmupSeconds": 10,
+      "seconds": 350,
+      "ants": 32,
+      "firstProgressSeconds": 0.75,
+      "deaths": 1,
+      "deathsPerMinute": 0.17142857142857143,
+      "socialPercent": 99.14285714285714,
+      "firstScoreSeconds": 0.75,
+      "targets": {
+        "firstProgress": true,
+        "deaths": true,
+        "social": true
+      }
+    },
+    {
+      "mode": "classic",
+      "people": 1,
+      "seed": 7,
+      "warmupSeconds": 10,
+      "seconds": 350,
+      "ants": 32,
+      "firstProgressSeconds": 10.1,
+      "deaths": 6,
+      "deathsPerMinute": 1.0285714285714287,
+      "socialPercent": 93.71428571428572,
+      "firstScoreSeconds": 10.1,
+      "targets": {
+        "firstProgress": true,
+        "deaths": true,
+        "social": true
+      }
+    },
+    {
+      "mode": "classic",
+      "people": 1,
+      "seed": 42,
+      "warmupSeconds": 10,
+      "seconds": 350,
+      "ants": 32,
+      "firstProgressSeconds": 9.15,
+      "deaths": 2,
+      "deathsPerMinute": 0.34285714285714286,
+      "socialPercent": 98.28571428571429,
+      "firstScoreSeconds": 9.15,
+      "targets": {
+        "firstProgress": true,
+        "deaths": true,
+        "social": true
+      }
+    },
+    {
+      "mode": "classic",
+      "people": 12,
+      "seed": 1,
+      "warmupSeconds": 10,
+      "seconds": 350,
+      "ants": 32,
+      "firstProgressSeconds": 9.4,
+      "deaths": 3,
+      "deathsPerMinute": 0.5142857142857143,
+      "socialPercent": 97.42857142857143,
+      "firstScoreSeconds": 9.4,
+      "targets": {
+        "firstProgress": true,
+        "deaths": true,
+        "social": true
+      }
+    },
+    {
+      "mode": "classic",
+      "people": 12,
+      "seed": 7,
+      "warmupSeconds": 10,
+      "seconds": 350,
+      "ants": 32,
+      "firstProgressSeconds": 10.6,
+      "deaths": 0,
+      "deathsPerMinute": 0,
+      "socialPercent": 100,
+      "firstScoreSeconds": 10.6,
+      "targets": {
+        "firstProgress": true,
+        "deaths": true,
+        "social": true
+      }
+    },
+    {
+      "mode": "classic",
+      "people": 12,
+      "seed": 42,
+      "warmupSeconds": 10,
+      "seconds": 350,
+      "ants": 32,
+      "firstProgressSeconds": 9.85,
+      "deaths": 1,
+      "deathsPerMinute": 0.17142857142857143,
+      "socialPercent": 98.85714285714286,
+      "firstScoreSeconds": 9.85,
+      "targets": {
+        "firstProgress": true,
+        "deaths": true,
+        "social": true
+      }
+    },
+    {
+      "mode": "feast",
+      "people": 1,
+      "seed": 1,
+      "warmupSeconds": 10,
+      "seconds": 230,
+      "ants": 24,
+      "firstProgressSeconds": 0.2,
+      "deaths": 0,
+      "deathsPerMinute": 0,
+      "socialPercent": 100,
+      "firstGrowthSeconds": 0.2,
+      "firstTopHalfSeconds": 13,
+      "bestRank": 5,
+      "leaderChanges": 7,
+      "distinctLeaders": 3,
+      "targets": {
+        "firstProgress": true,
+        "deaths": true,
+        "social": true,
+        "topHalf": true,
+        "leaderChanges": true
+      }
+    },
+    {
+      "mode": "feast",
+      "people": 1,
+      "seed": 7,
+      "warmupSeconds": 10,
+      "seconds": 230,
+      "ants": 24,
+      "firstProgressSeconds": 0.25,
+      "deaths": 0,
+      "deathsPerMinute": 0,
+      "socialPercent": 100,
+      "firstGrowthSeconds": 0.25,
+      "firstTopHalfSeconds": 26,
+      "bestRank": 5,
+      "leaderChanges": 3,
+      "distinctLeaders": 3,
+      "targets": {
+        "firstProgress": true,
+        "deaths": true,
+        "social": true,
+        "topHalf": true,
+        "leaderChanges": true
+      }
+    },
+    {
+      "mode": "feast",
+      "people": 1,
+      "seed": 42,
+      "warmupSeconds": 10,
+      "seconds": 230,
+      "ants": 24,
+      "firstProgressSeconds": 0.3,
+      "deaths": 0,
+      "deathsPerMinute": 0,
+      "socialPercent": 100,
+      "firstGrowthSeconds": 0.3,
+      "firstTopHalfSeconds": 46,
+      "bestRank": 5,
+      "leaderChanges": 19,
+      "distinctLeaders": 5,
+      "targets": {
+        "firstProgress": true,
+        "deaths": true,
+        "social": true,
+        "topHalf": true,
+        "leaderChanges": true
+      }
+    },
+    {
+      "mode": "feast",
+      "people": 12,
+      "seed": 1,
+      "warmupSeconds": 10,
+      "seconds": 230,
+      "ants": 24,
+      "firstProgressSeconds": 0.2,
+      "deaths": 0,
+      "deathsPerMinute": 0,
+      "socialPercent": 100,
+      "firstGrowthSeconds": 0.2,
+      "firstTopHalfSeconds": 36,
+      "bestRank": 5,
+      "leaderChanges": 11,
+      "distinctLeaders": 6,
+      "targets": {
+        "firstProgress": true,
+        "deaths": true,
+        "social": true,
+        "topHalf": true,
+        "leaderChanges": true
+      }
+    },
+    {
+      "mode": "feast",
+      "people": 12,
+      "seed": 7,
+      "warmupSeconds": 10,
+      "seconds": 230,
+      "ants": 24,
+      "firstProgressSeconds": 0.55,
+      "deaths": 0,
+      "deathsPerMinute": 0,
+      "socialPercent": 100,
+      "firstGrowthSeconds": 0.55,
+      "firstTopHalfSeconds": 2,
+      "bestRank": 5,
+      "leaderChanges": 22,
+      "distinctLeaders": 6,
+      "targets": {
+        "firstProgress": true,
+        "deaths": true,
+        "social": true,
+        "topHalf": true,
+        "leaderChanges": true
+      }
+    },
+    {
+      "mode": "feast",
+      "people": 12,
+      "seed": 42,
+      "warmupSeconds": 10,
+      "seconds": 230,
+      "ants": 24,
+      "firstProgressSeconds": 0.3,
+      "deaths": 0,
+      "deathsPerMinute": 0,
+      "socialPercent": 100,
+      "firstGrowthSeconds": 0.3,
+      "firstTopHalfSeconds": 97,
+      "bestRank": 5,
+      "leaderChanges": 21,
+      "distinctLeaders": 6,
+      "targets": {
+        "firstProgress": true,
+        "deaths": true,
+        "social": true,
+        "topHalf": true,
+        "leaderChanges": true
+      }
+    },
+    {
+      "mode": "rush",
+      "people": 1,
+      "seed": 1,
+      "warmupSeconds": 10,
+      "seconds": 110,
+      "ants": 32,
+      "firstProgressSeconds": 1.95,
+      "deaths": 0,
+      "deathsPerMinute": 0,
+      "socialPercent": 100,
+      "firstScoreSeconds": 1.95,
+      "eventKinds": [
+        1,
+        2,
+        4,
+        8,
+        16
+      ],
+      "distinctEventKinds": 5,
+      "colonyScores": [
+        142,
+        139,
+        152,
+        159
+      ],
+      "colonyScoreRange": 20,
+      "scoreCV": 0.0538424913868555,
+      "targets": {
+        "firstProgress": true,
+        "deaths": true,
+        "social": true,
+        "variety": true,
+        "colonySpread": true
+      }
+    },
+    {
+      "mode": "rush",
+      "people": 1,
+      "seed": 7,
+      "warmupSeconds": 10,
+      "seconds": 110,
+      "ants": 32,
+      "firstProgressSeconds": 2.2,
+      "deaths": 0,
+      "deathsPerMinute": 0,
+      "socialPercent": 100,
+      "firstScoreSeconds": 2.2,
+      "eventKinds": [
+        1,
+        2,
+        4,
+        8,
+        16
+      ],
+      "distinctEventKinds": 5,
+      "colonyScores": [
+        173,
+        144,
+        158,
+        130
+      ],
+      "colonyScoreRange": 43,
+      "scoreCV": 0.10572053813518931,
+      "targets": {
+        "firstProgress": true,
+        "deaths": true,
+        "social": true,
+        "variety": true,
+        "colonySpread": true
+      }
+    },
+    {
+      "mode": "rush",
+      "people": 1,
+      "seed": 42,
+      "warmupSeconds": 10,
+      "seconds": 110,
+      "ants": 32,
+      "firstProgressSeconds": 1.95,
+      "deaths": 0,
+      "deathsPerMinute": 0,
+      "socialPercent": 100,
+      "firstScoreSeconds": 1.95,
+      "eventKinds": [
+        1,
+        2,
+        4,
+        8,
+        16
+      ],
+      "distinctEventKinds": 5,
+      "colonyScores": [
+        183,
+        161,
+        142,
+        150
+      ],
+      "colonyScoreRange": 41,
+      "scoreCV": 0.09692474847435498,
+      "targets": {
+        "firstProgress": true,
+        "deaths": true,
+        "social": true,
+        "variety": true,
+        "colonySpread": true
+      }
+    },
+    {
+      "mode": "rush",
+      "people": 12,
+      "seed": 1,
+      "warmupSeconds": 10,
+      "seconds": 110,
+      "ants": 32,
+      "firstProgressSeconds": 3.45,
+      "deaths": 0,
+      "deathsPerMinute": 0,
+      "socialPercent": 100,
+      "firstScoreSeconds": 3.45,
+      "eventKinds": [
+        1,
+        4,
+        8,
+        16
+      ],
+      "distinctEventKinds": 4,
+      "colonyScores": [
+        189,
+        184,
+        215,
+        211
+      ],
+      "colonyScoreRange": 31,
+      "scoreCV": 0.06729414297256603,
+      "targets": {
+        "firstProgress": true,
+        "deaths": true,
+        "social": true,
+        "variety": true,
+        "colonySpread": true
+      }
+    },
+    {
+      "mode": "rush",
+      "people": 12,
+      "seed": 7,
+      "warmupSeconds": 10,
+      "seconds": 110,
+      "ants": 32,
+      "firstProgressSeconds": 2.15,
+      "deaths": 0,
+      "deathsPerMinute": 0,
+      "socialPercent": 100,
+      "firstScoreSeconds": 2.15,
+      "eventKinds": [
+        1,
+        4,
+        8,
+        16
+      ],
+      "distinctEventKinds": 4,
+      "colonyScores": [
+        197,
+        193,
+        198,
+        201
+      ],
+      "colonyScoreRange": 8,
+      "scoreCV": 0.014506366466742202,
+      "targets": {
+        "firstProgress": true,
+        "deaths": true,
+        "social": true,
+        "variety": true,
+        "colonySpread": true
+      }
+    },
+    {
+      "mode": "rush",
+      "people": 12,
+      "seed": 42,
+      "warmupSeconds": 10,
+      "seconds": 110,
+      "ants": 32,
+      "firstProgressSeconds": 3.75,
+      "deaths": 0,
+      "deathsPerMinute": 0,
+      "socialPercent": 100,
+      "firstScoreSeconds": 3.75,
+      "eventKinds": [
+        1,
+        2,
+        8,
+        16
+      ],
+      "distinctEventKinds": 4,
+      "colonyScores": [
+        206,
+        201,
+        182,
+        188
+      ],
+      "colonyScoreRange": 24,
+      "scoreCV": 0.049695584495000826,
+      "targets": {
+        "firstProgress": true,
+        "deaths": true,
+        "social": true,
+        "variety": true,
+        "colonySpread": true
+      }
+    }
+  ],
+  "foodOnlyFeastNegativeComparison": [
+    {
+      "mode": "feast",
+      "people": 12,
+      "seed": 1,
+      "seconds": 240,
+      "ants": 24,
+      "firstProgressSeconds": 0.6,
+      "deaths": 13,
+      "deathsPerMinute": 3.25,
+      "socialPercent": 89.16666666666667,
+      "firstTopHalfSeconds": 1,
+      "bestRank": 5,
+      "leaderChanges": 23,
+      "distinctLeaders": 7,
+      "targets": {
+        "firstProgress": true,
+        "deaths": false,
+        "social": true,
+        "topHalf": true,
+        "leaderChanges": true
+      }
+    }
+  ]
+}

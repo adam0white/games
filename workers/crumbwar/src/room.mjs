@@ -2,6 +2,7 @@
 // world, so there is no locking and no cheating by racing. Nothing is stored: a room's state lives in memory
 // and is thrown away when the last person leaves or the code is redeployed. See DECISIONS.md.
 import { DurableObject } from 'cloudflare:workers';
+import { getMode, snapshotEvery } from '../public/crumbwar/shared/modes.js';
 import * as C from '../public/crumbwar/shared/config.js';
 import * as P from '../public/crumbwar/shared/proto.js';
 import { createWorld, step, addAnt, removeAnt, setInput } from './sim.mjs';
@@ -18,7 +19,7 @@ const IDLE_TICKS = 90 * C.TICK_HZ, LAG_TICKS = 8 * C.TICK_HZ, GHOST_TICKS = 30 *
 export class Room extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
-    this.world = null; this.clients = new Map(); this.ghosts = new Map(); this.timer = null; this.name = ''; this.cap = 0; this.burn = 0;
+    this.world = null; this.clients = new Map(); this.ghosts = new Map(); this.timer = null; this.name = ''; this.mode = null; this.cap = 0; this.burn = 0;
     this.stat = { wakes: 0, late10: 0, late50: 0, maxLate: 0, dropped: 0, bytesOut: 0, msgsOut: 0, msgsIn: 0, kicks: 0, quietMax: 0, stallMax: 0, slowWindows: 0 };
     for (const k of ROOM_COUNTS) this.stat[k] = 0; // joins, kicks by reason, refusals by reason: see metrics.mjs
     this.sent = {}; // the counts as last reported to the directory
@@ -32,7 +33,7 @@ export class Room extends DurableObject {
       if (row) {
         ctx.storage.sql.exec('DELETE FROM mark');
         const m = JSON.parse(row.v), deploy = m.version !== this.version;
-        this.alert(deploy ? 'room_redeployed' : 'room_lost', m.name, { people: m.people, ticksPerSecond: m.rate, markAgeSeconds: Math.round((Date.now() - m.at) / 1000) });
+        this.alert(deploy ? 'room_redeployed' : 'room_lost', m.name, { people: m.people, ticksPerSecond: m.rate, markAgeSeconds: Math.round((Date.now() - m.at) / 1000) }, m.mode || 'classic');
       }
     } catch {}
     // A socket that outlived the memory it belonged to has no ant. Close it; the page joins again.
@@ -43,22 +44,27 @@ export class Room extends DurableObject {
 
   // One line in Workers Logs, one point in Analytics Engine and, for the kinds a person should hear about, one row
   // in the alerts list that the watch job reads. Nothing here names a player or an address.
-  alert(kind, room, detail) {
+  alert(kind, room, detail, mode = this.mode || 'classic') {
+    detail = { ...detail, mode };
     const test = String(room || '').startsWith('lt-');
     try { console[kind === 'room_redeployed' ? 'log' : 'error'](JSON.stringify({ event: kind, room, test, ...detail })); } catch {}
-    try { this.env.METRICS?.writeDataPoint({ indexes: [kind], blobs: [kind, room || '', this.version], doubles: [detail.people || 0, detail.ticksPerSecond || 0] }); } catch {}
+    try { this.env.METRICS?.writeDataPoint({ indexes: [kind], blobs: [kind, room || '', this.version, mode], doubles: [detail.people || 0, detail.ticksPerSecond || 0] }); } catch {}
     if (kind !== 'room_redeployed') this.ctx.waitUntil(this.env.DIRECTORY.getByName('alerts').alert(kind, room || '', test, JSON.stringify(detail)).catch(() => {}));
   }
   mark() {
     const w = this.world;
     try {
-      if (w) this.ctx.storage.sql.exec("INSERT OR REPLACE INTO mark VALUES ('run', ?)", JSON.stringify({ name: this.name, version: this.version, at: Date.now(), people: this.people(), rate: this.rate ?? C.TICK_HZ }));
+      if (w) this.ctx.storage.sql.exec("INSERT OR REPLACE INTO mark VALUES ('run', ?)", JSON.stringify({ name: this.name, mode: this.mode, version: this.version, at: Date.now(), people: this.people(), rate: this.rate ?? C.TICK_HZ }));
       else this.ctx.storage.sql.exec('DELETE FROM mark');
     } catch {}
   }
 
   async fetch(request) {
     const q = new URL(request.url).searchParams, trusted = q.get('trusted') === '1', ip = q.get('ip') || '?';
+    const mode = q.has('mode') ? q.get('mode') : 'classic';
+    if (!getMode(mode) || getMode(mode).enabled === false) return new Response('unknown mode', { status: 400 });
+    if (this.mode && this.mode !== mode) return new Response('mode', { status: STALE_ROOM_STATUS });
+    this.mode ||= mode;
     this.name ||= q.get('name');
     if (!this.cap || trusted && q.get('cap')) this.cap = Math.min(240, Number(trusted && q.get('cap') || this.env.HUMAN_CAP || 60));
     // A load test may ask for wasted work on every tick, to show what an overloaded room looks like in the counters.
@@ -68,7 +74,8 @@ export class Room extends DurableObject {
     if (q.get('v') && Number(q.get('v')) !== C.PROTO) { this.stat.refusedProtocol++; this.report(); return new Response('protocol', { status: STALE_ROOM_STATUS }); }
     if (this.people() >= this.cap) { this.stat.refusedFull++; return new Response('full', { status: 409 }); }
     if (!trusted) { let n = 0; for (const c of this.clients.values()) if (c.ip === ip) n++; if (n >= PER_IP) { this.stat.refusedIp++; return new Response('too many from one address', { status: 429 }); } }
-    const ghost = this.ghosts.get(q.get('resume') || '');
+    const saved = this.ghosts.get(q.get('resume') || '');
+    const ghost = saved && saved.round === this.world?.round ? saved : null;
     if (q.get('resume') && !ghost && q.get('explicit') === '1') { this.stat.refusedGone++; return new Response('gone', { status: 410 }); }
     const w = this.world ??= this.fresh();
     this.minuteTick ??= w.tick;
@@ -80,13 +87,13 @@ export class Room extends DurableObject {
     this.ctx.acceptWebSocket(ws);
     const client = { ws, ant: a, view: net.newView(), ackSeq: 0, tokens: MSG_BURST, tokenTick: w.tick, changed: w.tick, seen: w.tick, pinged: w.tick, joined: w.tick, ip, token: t[0].toString(16).padStart(8, '0') + t[1].toString(16).padStart(8, '0') };
     a.client = client; this.clients.set(ws, client); this.stat.joins++;
-    this.send(client, net.welcome(a, w.tick, t[0], t[1], this.name));
+    this.send(client, net.welcome(a, w.tick, t[0], t[1], this.name, this.mode));
     this.start(); this.report();
     return new Response(null, { status: 101, webSocket: pair[0] });
   }
 
   fresh() {
-    const w = createWorld(crypto.getRandomValues(new Uint32Array(1))[0]);
+    const w = createWorld(crypto.getRandomValues(new Uint32Array(1))[0], this.mode);
     balance(w);
     for (let i = 0; i < 200; i++) { for (const a of w.ants) if (a) think(w, a); step(w); } // ten seconds, so nobody joins a world at rest
     return w;
@@ -104,7 +111,13 @@ export class Room extends DurableObject {
     this.clients.delete(ws);
     const w = this.world, a = client.ant;
     if (!w) return;
-    if (ghostFor) this.ghosts.set(client.token, { colony: a.colony, until: w.tick + ghostFor, keep: { score: a.score, delivered: a.delivered, kills: a.kills, deaths: a.deaths, tier: a.tier, nameA: a.nameA, nameB: a.nameB } });
+    if (ghostFor) {
+      const keep = {};
+      for (const key of ['score', 'delivered', 'kills', 'deaths', 'tier', 'nameA', 'nameB', 'mass', 'rank', 'bestRank', 'roundDelivered', 'deliveries', 'goal', 'goalProgress', 'goalIndex', 'goalSince', 'hillTicks', 'golden']) {
+        if (a[key] !== undefined) keep[key] = structuredClone(a[key]);
+      }
+      this.ghosts.set(client.token, { colony: a.colony, round: w.round, until: w.tick + ghostFor, keep });
+    }
     removeAnt(w, a); balance(w); this.report();
     if (!this.people()) this.emptyAt = w.tick;
   }
@@ -180,7 +193,7 @@ export class Room extends DurableObject {
         if (victim?.client) this.send(victim.client, killer ? net.event(4, killer.nameA, killer.nameB, killer.colony) : net.event(4, 255, 255, 255));
       } else for (const c of this.clients.values()) this.send(c, net.event(type, x, 0, 0));
     }
-    for (const c of this.clients.values()) if ((tick + c.ant.id) % C.SNAP_EVERY === 0) this.send(c, net.snapshot(w, c.ant, c.view, c.ackSeq));
+    for (const c of this.clients.values()) if ((tick + c.ant.id) % snapshotEvery(w.rules, w.count) === 0) this.send(c, net.snapshot(w, c.ant, c.view, c.ackSeq));
     if (tick % C.TICK_HZ === 0) {
       const ranked = w.ants.filter(Boolean).sort((p, q) => q.score - p.score), people = this.people();
       for (const c of [...this.clients.values()]) {
@@ -194,7 +207,7 @@ export class Room extends DurableObject {
         const s = this.stat, last = this.sampled || {}, d = k => (s[k] || 0) - (last[k] || 0);
         // Doubles 1-7 are unchanged from before; 8-14 were added for kick reasons. Each is a change over the minute
         // except people, ants, the tick rate, stallMax and quietMax. Analytics Engine takes up to 20 doubles.
-        try { this.env.METRICS?.writeDataPoint({ indexes: ['room'], blobs: ['room', this.name, this.version], doubles: [people, w.count, this.rate ?? C.TICK_HZ, d('bytesOut'), d('msgsIn'), s.stallMax, s.quietMax,
+        try { this.env.METRICS?.writeDataPoint({ indexes: ['room'], blobs: ['room', this.name, this.version, this.mode], doubles: [people, w.count, this.rate ?? C.TICK_HZ, d('bytesOut'), d('msgsIn'), s.stallMax, s.quietMax,
           d('kickIdle'), d('kickNoPing'), d('kickBehind'), d('kickText') + d('kickSize') + d('kickRate') + d('kickType'), d('sendFailed'), d('closedByClient') + d('socketErrors'), d('joins')] }); } catch {}
         this.sampled = { ...s };
         this.report({ roomMinutes: this.minutes(), ...delta(s, this.sent) });
@@ -215,7 +228,8 @@ export class Room extends DurableObject {
     if (!this.name) return;
     const lt = this.name.startsWith('lt-');
     if (lt && !counts) return;
-    const dir = this.env.DIRECTORY.getByName(lt ? 'dir:lt' : 'dir:' + this.name.split('-')[0]);
+    const region = lt ? 'lt' : this.name.split('-')[0];
+    const dir = this.env.DIRECTORY.getByName(this.mode === 'classic' ? `dir:${region}` : `dir:${this.mode}:${region}`);
     this.ctx.waitUntil(dir.report(this.name, this.people(), C.PROTO, counts && Object.keys(counts).length ? counts : null).catch(() => {}));
   }
 
@@ -223,7 +237,7 @@ export class Room extends DurableObject {
     const w = this.world;
     const s = this.stat, kicksByReason = {};
     for (const k of ROOM_COUNTS) if (k.startsWith('kick') || k === 'sendFailed') kicksByReason[k] = s[k];
-    return { room: this.name, version: this.version, protocol: C.PROTO, running: !!w, kicksByReason, windowTicksPerSecond: this.rate ?? null, tick: w?.tick ?? 0, people: this.people(), ants: w?.count ?? 0, food: w?.foodCount ?? 0, cap: this.cap, ...this.stat,
+    return { room: this.name, mode: this.mode || 'classic', version: this.version, protocol: C.PROTO, running: !!w, kicksByReason, windowTicksPerSecond: this.rate ?? null, tick: w?.tick ?? 0, people: this.people(), ants: w?.count ?? 0, food: w?.foodCount ?? 0, cap: this.cap, ...this.stat,
       // The clock inside a timer does not show lateness on Cloudflare (the late counters stay 0 there), so the honest
       // measure of an overloaded room is ticks per real second, taken at this call, which carries a fresh clock.
       ticksPerSecond: w && this.t0 ? Math.round((w.tick - this.tick0) / Math.max(1, Date.now() - this.t0) * 10000) / 10 : 0 };

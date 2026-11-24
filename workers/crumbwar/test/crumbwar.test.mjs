@@ -524,13 +524,13 @@ test('the directory does not offer a room of another protocol to new people', ()
 // The page and the server mix only if these files agree. When one changes, decide whether a page and a room of
 // the two versions can still play together. If not, raise PROTO in config.js. Then record the new fingerprint here.
 test('a change to the wire format or the shared constants is a decision about PROTO', () => {
-  const files = ['public/crumbwar/shared/config.js', 'public/crumbwar/shared/proto.js', 'public/crumbwar/shared/move.js', 'public/crumbwar/shared/predict.js', 'src/net.mjs'];
+  const files = ['public/crumbwar/shared/config.js', 'public/crumbwar/shared/proto.js', 'public/crumbwar/shared/move.js', 'public/crumbwar/shared/predict.js', 'src/net.mjs', 'public/crumbwar/shared/modes.js'];
   const h = createHash('sha256');
   for (const f of files) h.update(f).update('\0').update(readFileSync(new URL('../' + f, import.meta.url))).update('\0');
   const now = [C.PROTO, h.digest('hex').slice(0, 16)];
   assert.deepEqual(now, PROTO_FINGERPRINT, `shared code changed. Bump PROTO if old pages and new rooms (or the reverse) cannot play together, then set PROTO_FINGERPRINT to ${JSON.stringify(now)}`);
 });
-const PROTO_FINGERPRINT = [1, '606e02be16716637'];
+const PROTO_FINGERPRINT = [2, '8b9e99349784bddd'];
 
 test('kick and refusal counters fold into hourly totals', () => {
   const room = readFileSync(new URL('../src/room.mjs', import.meta.url), 'utf8');
@@ -550,4 +550,361 @@ test('kick and refusal counters fold into hourly totals', () => {
   assert.deepEqual(s.regions.enam, [{ hour: new Date(h1).toISOString(), joins: 1, peakPeople: 4 }, { hour: new Date(h0).toISOString(), joins: 2 }]);
   assert.deepEqual(s.totals, { joins: 3, peakPeople: 9 }, 'load test rooms stay out of the totals');
   assert.equal(s.regions.sam, undefined);
+});
+
+// Feast acceptance is expressed as observable outcomes, independent of bot policy.
+import { RANKS, RANK_AT, rankOf, GRASS, inGrass, MODES } from '../public/crumbwar/shared/modes.js';
+const FEAST = MODES.feast;
+const feastScene = (seed = 71) => { const w = createWorld(seed, 'feast'); w.tick = 2; for (let i = 0; i < 160; i++) addFood(w, 3100, 2200 + i, 1); return w; };
+const stillSteps = (w, n) => { for (let i = 0; i < n; i++) step(w); };
+const closeTo = (actual, expected, tolerance = 1e-6) => assert.ok(Math.abs(actual - expected) <= tolerance, `${actual} differs from ${expected}`);
+
+test('feast: size ratio controls eating from every direction, without colony allies', () => {
+  for (const theta of [0, Math.PI / 2, Math.PI, Math.PI * 1.5]) {
+    const w = feastScene(), large = put(w, 0, 800, 800, 0), small = put(w, 0, 800 + 15 * Math.cos(theta), 800 + 15 * Math.sin(theta), theta);
+    large.mass = 15; small.mass = 12; // Exact 1.25 boundary, below shrink threshold.
+    step(w);
+    assert.equal(small.alive, false, `contact at ${theta} radians eats`);
+    assert.equal(large.kills, 1);
+    assert.equal(w.colonyScore.reduce((a, b) => a + b), 0);
+  }
+  const w = feastScene(), a = put(w, 0, 800, 800), b = put(w, 0, 810, 800);
+  a.mass = 14.99; b.mass = 12; step(w);
+  assert.ok(a.alive && b.alive, 'below 1.25 neither ant is eaten');
+});
+
+test('feast: protection blocks eating by either participant and grass blocks contact', () => {
+  for (const protect of ['large', 'small', 'none']) {
+    const w = feastScene(), [gx, gy] = GRASS[0];
+    const x = protect === 'none' ? gx : 800, y = protect === 'none' ? gy : 800;
+    const large = put(w, 0, x, y), small = put(w, 0, x + 10, y);
+    large.mass = 50; small.mass = 12;
+    if (protect === 'large') large.protectUntil = w.tick + 10;
+    if (protect === 'small') small.protectUntil = w.tick + 10;
+    step(w);
+    assert.ok(large.alive && small.alive, protect);
+  }
+});
+
+test('feast: grass never contains food, including direct additions and Queen trails', () => {
+  const w = feastScene();
+  for (const [x, y] of GRASS) assert.equal(addFood(w, x, y, 1), -1, 'grass rejects food');
+  const [gx, gy, radius] = GRASS[0], queen = put(w, 0, gx + radius + 10, gy, 0);
+  queen.mass = 90; queen.rank = 5; w.tick = 39; step(w);
+  for (let id = 0; id < C.MAX_FOOD; id++) if (w.fkind[id]) assert.equal(inGrass(w.fx[id], w.fy[id]), false, 'trail and cluster food stay outside grass');
+});
+
+test('feast: eaten ants retain sixty percent, return in two seconds, and avoid predators', () => {
+  const w = feastScene(), predator = put(w, 0, 800, 800), victim = put(w, 0, 810, 800);
+  predator.mass = 60; victim.mass = 30;
+  step(w);
+  const before = 30 - (30 - 16) * FEAST.shrink * C.DT;
+  closeTo(victim.mass, before * .6);
+  closeTo(predator.mass, 60 - (60 - 16) * FEAST.shrink * C.DT + before * .4 * FEAST.gain);
+  assert.equal(victim.respawnAt - w.tick, 2 * C.TICK_HZ);
+  const retained = victim.mass;
+  predator.x = 1600; predator.y = 1600;
+  stillSteps(w, 2 * C.TICK_HZ - 1); assert.equal(victim.alive, false);
+  step(w); assert.equal(victim.alive, true);
+  closeTo(victim.mass, retained);
+  assert.equal(victim.protectUntil - w.tick, 4 * C.TICK_HZ);
+  assert.ok(Math.hypot(victim.x - predator.x, victim.y - predator.y) > 500, 'respawn is far from the dangerous ant');
+  const low = feastScene(), eater = put(low, 0, 800, 800), egg = put(low, 0, 810, 800); eater.mass = 20;
+  step(low); assert.equal(egg.mass, 10, 'retention has a ten-size floor');
+});
+
+test('feast: excess size shrinks, small ants move faster, and sprint costs size', () => {
+  const w = feastScene(), large = put(w, 0, 800, 800), small = put(w, 0, 400, 400);
+  large.mass = 60; stillSteps(w, 20);
+  assert.ok(large.mass < 60 && large.mass > 59, 'decay is gradual');
+  const base = { mode: 'feast', mass: 10, x: 400, y: 400, heading: 0, tier: 0, carry: 0, stamina: 100 };
+  const light = { ...base }, heavy = { ...base, mass: 80 };
+  stepMove(light, 0, true, false); stepMove(heavy, 0, true, false);
+  assert.ok(light.x > heavy.x, 'small ants can outrun big ants');
+  small.mass = 15; setInput(w, small, 0, true, true); const stamina = small.stamina;
+  step(w); closeTo(small.mass, 15 - .6 * C.DT); assert.equal(small.stamina, stamina);
+});
+
+test('feast: cake needs sixty uninterrupted nearby ticks and is worth its cake growth', () => {
+  const w = feastScene(), a = put(w, 0, 800, 800), cake = addFood(w, 800, 800, 3);
+  stillSteps(w, 59); assert.equal(w.fkind[cake], 3); assert.equal(a.mass, 10);
+  step(w); assert.equal(w.fkind[cake], 0); assert.equal(a.mass, 10 + FEAST.cakeGrowth);
+  const next = addFood(w, 800, 800, 3); stillSteps(w, 30); a.x = 900; step(w); a.x = 800; stillSteps(w, 30);
+  assert.equal(w.fkind[next], 3, 'leaving resets chewing progress');
+});
+
+test('feast: rank thresholds, promotion, best rank and size reset survive a full round', () => {
+  assert.deepEqual(RANKS, ['Egg', 'Worker', 'Forager', 'Soldier', 'Major', 'Queen']);
+  assert.deepEqual([10, 16, 28, 46, 75, 120].map(rankOf), [0, 1, 2, 3, 4, 5]);
+  assert.deepEqual([15.99, 27.99, 45.99, 74.99, 119.99].map(rankOf), [0, 1, 2, 3, 4]);
+  const w = feastScene(), a = put(w, 0, 800, 800); a.mass = RANK_AT[1] - FEAST.crumbGrowth; addFood(w, 800, 800, 1); step(w);
+  assert.deepEqual([a.rank, a.bestRank], [1, 1]);
+  a.mass = 11; step(w); assert.deepEqual([a.rank, a.bestRank], [0, 1]);
+  assert.equal(w.roundEnd, 240 * C.TICK_HZ);
+  w.tick = w.roundEnd - 1; setInput(w, a, 0, true, true); const state = [a.x, a.y, a.mass]; step(w);
+  assert.deepEqual([a.x, a.y, a.mass], state, 'the round-end tick is already in the break');
+  assert.equal(w.breakUntil - w.tick, 10 * C.TICK_HZ);
+  const predator = put(w, 0, a.x + 10, a.y); predator.mass = 80;
+  const dead = put(w, 0, 900, 900); dead.alive = false; dead.respawnAt = w.tick + 1;
+  stillSteps(w, 10 * C.TICK_HZ - 1);
+  assert.deepEqual([a.x, a.y, a.mass], state, 'movement and size freeze throughout break');
+  assert.equal(dead.alive, false, 'respawns wait until the break ends');
+  assert.equal(a.alive, true, 'a touching predator cannot eat during the break');
+  step(w); assert.deepEqual([w.round, w.breakUntil, a.mass, a.rank, a.bestRank], [2, 0, 10, 0, 0]);
+});
+
+test('feast: seeded clusters move, cake appears, and no generated food enters grass', () => {
+  const w = createWorld(83, 'feast'), twin = createWorld(83, 'feast');
+  step(w); step(twin); assert.deepEqual(w.feature, twin.feature); const initial = { ...w.feature };
+  stillSteps(w, 499); stillSteps(twin, 499);
+  assert.deepEqual(w.feature, twin.feature); assert.notDeepEqual(w.feature, initial);
+  stillSteps(w, 500); assert.equal(w.feature.kind, 3);
+  assert.ok(w.fkind.includes(3), 'scheduled cake exists');
+  for (let id = 0; id < C.MAX_FOOD; id++) if (w.fkind[id]) assert.equal(inGrass(w.fx[id], w.fy[id]), false);
+});
+
+test('feast: bots fill twenty-four ants and snapshots preserve labels, size deltas and own ranks', () => {
+  const w = createWorld(93, 'feast'), me = put(w, 0, 800, 800); balance(w);
+  assert.equal(w.count, 24); assert.equal(w.ants.filter(a => a?.bot).length, 23);
+  const other = w.ants.find(a => a?.bot); Object.assign(other, { x: 900, y: 800, mass: 42, protectUntil: 1000 }); me.protectUntil = 1000;
+  const view = net.newView(), ants = new Map(), food = new Map();
+  const snap = () => { const msg = net.snapshot(w, me, view, 0), r = new P.Reader(msg); assert.equal(r.u8(), P.SNAP); const s = P.readSnap(r, ants, food, C.POS_Q, C.OWN_Q); assert.equal(r.n, msg.length); return s; };
+  step(w); const first = snap(); assert.equal(ants.get(other.id).bot, true); assert.ok(Number.isInteger(ants.get(other.id).mass) && Math.abs(ants.get(other.id).mass - other.mass) < 1, 'other ant sizes use integer precision');
+  assert.deepEqual([first.mode, first.rank, first.bestRank], [1, me.rank, me.bestRank]);
+  other.mass = 49; step(w); snap(); assert.ok(Number.isInteger(ants.get(other.id).mass) && Math.abs(ants.get(other.id).mass - other.mass) < 1, 'other ant sizes use integer precision');
+  other.x = 3100; other.y = 3100; step(w); snap(); assert.equal(ants.has(other.id), false);
+  const wr = new P.Reader(net.welcome(me, 77, 1, 2, 'enam-0', 'feast')); wr.u8(); assert.equal(P.readWelcome(wr).mode, 1);
+  const ranked = w.ants.filter(Boolean).sort((a, b) => b.score - a.score), sr = new P.Reader(net.scores(w, ranked, me, 1)); sr.u8(); const s = P.readScores(sr);
+  assert.deepEqual([s.mode, s.bestRank, s.delivered, s.kills, s.deaths], [1, me.bestRank, me.delivered, me.kills, me.deaths]);
+  assert.equal(sr.n, sr.v.byteLength);
+});
+
+const rushScene = (seed = 101) => { const w = createWorld(seed, 'rush'); w.tick = 2; for (let i = 0; i < 160; i++) addFood(w, 3100, 2200 + i, 1); return w; };
+
+test('rush: two-minute rounds freeze for eight seconds then reset all progress', () => {
+  const w = rushScene(), a = put(w, 0, 800, 800);
+  Object.assign(a, { score: 17, deliveries: 4, goal: 2, goalIndex: 2, goalProgress: 1, participation: 31, boostUntil: 9999, shieldUntil: 9999 });
+  w.colonyScore = [3, 9, 6, 2]; assert.equal(w.roundEnd, 120 * C.TICK_HZ);
+  w.tick = w.roundEnd - 1; setInput(w, a, 0, true, false); step(w);
+  assert.equal(w.lastWinner, 1); assert.equal(w.breakUntil - w.tick, 8 * C.TICK_HZ);
+  const frozen = [a.x, a.y, a.score, ...w.colonyScore]; stillSteps(w, 8 * C.TICK_HZ - 1);
+  assert.deepEqual([a.x, a.y, a.score, ...w.colonyScore], frozen);
+  step(w);
+  assert.deepEqual([w.round, w.breakUntil, a.score, a.deliveries, a.goal, a.goalProgress, a.participation, a.boostUntil, a.shieldUntil], [2, 0, 0, 0, 0, 0, 0, 0, 0]);
+});
+
+test('rush: golden crumb has a marker, is worth five at home and clears its marker on pickup', () => {
+  const w = createWorld(111, 'rush'); step(w);
+  const id = w.goldenId; assert.ok(id >= 0); assert.equal(w.fkind[id], 2);
+  assert.deepEqual(w.feature, { x: w.feature.x, y: w.feature.y, kind: 2 });
+  closeTo(w.fx[id], w.feature.x, .001); closeTo(w.fy[id], w.feature.y, .001);
+  const a = put(w, 0, w.fx[id], w.fy[id]); step(w);
+  assert.equal(a.carry, 2); assert.equal(a.participation & 2, 2); assert.equal(w.goldenId, -1); assert.equal(w.feature.kind, 5);
+  [a.x, a.y] = C.NESTS[0]; step(w);
+  assert.deepEqual([a.carry, a.score, a.delivered, w.colonyScore[0]], [0, 5, 5, 5]);
+});
+
+test('rush: seeds grant six-second speed and shield effects without taking the carry slot', () => {
+  for (const kind of [3, 4]) {
+    const w = rushScene(), a = put(w, 0, 800, 800); addFood(w, 800, 800, kind); step(w);
+    assert.equal(a.carry, 0); assert.equal(a.participation & 4, 4); assert.equal(a.score, 1);
+    assert.equal((kind === 3 ? a.boostUntil : a.shieldUntil) - w.tick, 6 * C.TICK_HZ);
+    if (kind === 3) {
+      const start = a.x; setInput(w, a, 0, true, false); step(w); closeTo(a.x - start, C.SPEED * C.DT * 1.3);
+      w.tick = a.boostUntil - 1; const old = a.x; step(w); closeTo(a.x - old, C.SPEED * C.DT);
+    } else {
+      const attacker = put(w, 1, 780, 800, 0); step(w); assert.equal(a.hp, 5, 'shield stops a bite');
+      w.tick = a.shieldUntil - 1; attacker.biteAt = 0; step(w); assert.equal(a.hp, 4, 'shield expires at its deadline');
+    }
+  }
+});
+
+test('rush: the hill pays its unique majority every four seconds and never pays a tie', () => {
+  const w = rushScene(), a = put(w, 0, 1550, 1600), b = put(w, 0, 1650, 1600), enemy = put(w, 1, 1600, 1500);
+  for (const ant of [a, b, enemy]) { ant.protectUntil = 10000; ant.goal = -1; }
+  const outside = put(w, 2, 1741, 1600); outside.protectUntil = 10000; outside.goal = -1;
+  w.tick = 78; step(w); assert.equal(w.colonyScore[0], 0); step(w);
+  assert.deepEqual(w.colonyScore, [2, 0, 0, 0]); assert.deepEqual([a.score, b.score, enemy.score, outside.score], [2, 2, 0, 0]);
+  assert.equal(a.participation & 8, 8); assert.equal(outside.participation & 8, 0);
+  b.x = 2000; b.y = 2000; w.tick = 159; step(w); assert.deepEqual(w.colonyScore, [2, 0, 0, 0], 'one against one is unpaid');
+});
+
+test('rush: personal goals award five points, track only their task and advance in order', () => {
+  const w = rushScene(), a = put(w, 0, ...C.NESTS[0]);
+  for (let i = 0; i < 2; i++) { a.carry = 1; step(w); }
+  assert.deepEqual([a.goal, a.goalProgress, a.score], [0, 2, 2]);
+  a.carry = 1; step(w); assert.deepEqual([a.goal, a.goalProgress, a.score, w.colonyScore[0]], [1, 0, 8, 8]);
+  a.x = 1600; a.y = 1600; a.protectUntil = 10000; a.goalProgress = 0;
+  stillSteps(w, 99); assert.deepEqual([a.goal, a.goalProgress], [1, 99]);
+  step(w); assert.deepEqual([a.goal, a.goalProgress], [2, 0]);
+  const beforeGold = a.score; a.x = 800; a.y = 800; addFood(w, 800, 800, 2); step(w);
+  assert.deepEqual([a.goal, a.goalProgress, a.score], [3, 0, beforeGold + 5]);
+  a.carry = 0; a.protectUntil = 0; a.x = 800; a.y = 800; a.heading = 0;
+  const carrier = put(w, 1, 820, 800); carrier.carry = 1;
+  const beforeBite = a.score; step(w); assert.deepEqual([a.goal, a.goalProgress, a.goalIndex, a.score], [0, 0, 4, beforeBite + 5]);
+  const bot = put(w, 0, ...C.NESTS[0]); bot.bot = true; bot.carry = 1; bot.goalProgress = 2; step(w);
+  assert.equal(bot.score, 1, 'bots get deliveries but no goal rewards'); assert.equal(bot.goalProgress, 2);
+});
+
+test('rush: frenzy doubles deliveries, seeds, hill payments, kills and goal rewards', () => {
+  for (const frenzy of [false, true]) {
+    const multiplier = frenzy ? 2 : 1;
+    const w = rushScene(); w.tick = frenzy ? 2000 : 100;
+    const a = put(w, 0, ...C.NESTS[0]); a.carry = 1; a.goalProgress = 2; step(w);
+    assert.equal(a.score, 6 * multiplier, 'delivery plus goal');
+    assert.equal(w.colonyScore[0], 6 * multiplier);
+    a.x = 800; a.y = 800; addFood(w, 800, 800, 3); const beforeSeed = a.score; step(w);
+    assert.equal(a.score - beforeSeed, multiplier, 'seed');
+    a.x = 1600; a.y = 1600; a.goal = -1; w.tick = frenzy ? 2079 : 159;
+    const beforeHill = a.score; step(w); assert.equal(a.score - beforeHill, 2 * multiplier, 'hill');
+    a.x = 800; a.y = 800; a.heading = 0; a.protectUntil = 0; a.goal = 3; a.goalProgress = 0;
+    const victim = put(w, 1, 820, 800); victim.carry = 1; victim.hp = 1;
+    const beforeKill = a.score; step(w); assert.equal(a.score - beforeKill, 7 * multiplier, 'kill plus carrier goal');
+    assert.equal(a.participation & 16, frenzy ? 16 : 0);
+  }
+});
+
+test('rush: timed golden crumbs and seeds replay from round seed despite unrelated random draws', () => {
+  for (const seed of [1, 7, 42]) {
+    const a = createWorld(seed, 'rush'), b = createWorld(seed, 'rush');
+    for (let tick = 1; tick <= 800; tick++) {
+      for (let i = 0; i < 13; i++) b.rand();
+      step(a); step(b);
+      if (tick === 1 || tick % 240 === 0 || tick % 400 === 0) {
+        assert.deepEqual(a.feature, b.feature, `seed ${seed}, tick ${tick}`);
+        const special = w => Array.from(w.fkind, (kind, id) => kind >= 2 ? [kind, +w.fx[id].toFixed(2), +w.fy[id].toFixed(2)] : null).filter(Boolean).filter(([kind]) => kind >= 3);
+        assert.deepEqual(special(a), special(b), 'seed positions do not depend on bot RNG');
+      }
+    }
+  }
+});
+
+test('rush: own goals, power timers, participation, results and awards decode fully', () => {
+  const w = rushScene(), me = put(w, 0, 800, 800), bestDelivery = put(w, 1, 1000, 1000), bestBiter = put(w, 2, 1200, 1000);
+  Object.assign(me, { goal: 2, goalProgress: 1, boostUntil: w.tick + 120, shieldUntil: w.tick + 90, participation: 31, delivered: 9, roundDelivered: 9, kills: 2, deaths: 1 });
+  Object.assign(bestDelivery, { deliveries: 12, nameA: 3, nameB: 4 }); Object.assign(bestBiter, { kills: 8, nameA: 5, nameB: 6 });
+  let r = new P.Reader(net.snapshot(w, me, net.newView(), 0)); assert.equal(r.u8(), P.SNAP); const s = P.readSnap(r, new Map(), new Map(), C.POS_Q, C.OWN_Q);
+  assert.deepEqual([s.mode, s.goal, s.goalProgress, s.boostLeft, s.shieldLeft, s.participation], [2, 2, 1, 120, 90, 31]); assert.equal(r.n, r.v.byteLength);
+  w.breakUntil = w.tick + 160; w.lastWinner = 1; w.colonyScore = [9, 20, 12, 0];
+  r = new P.Reader(net.scores(w, w.ants.filter(Boolean), me, 3)); r.u8(); const scores = P.readScores(r);
+  assert.deepEqual([scores.mode, scores.inBreak, scores.left, scores.delivered, scores.kills, scores.deaths], [2, true, 8, 9, 2, 1]);
+  assert.deepEqual(scores.awards, [{ nameA: 3, nameB: 4, count: 12 }, { nameA: 5, nameB: 6, count: 8 }]); assert.equal(r.n, r.v.byteLength);
+});
+
+test('rush: bots return carried golden food, prefer a visible golden crumb and ignore hidden food', () => {
+  const w = rushScene(), a = put(w, 0, 800, 800); a.bot = true; a.carry = 2;
+  let [dx, dy] = decide(w, a); const towardHome = C.NESTS[0].map((v, i) => v - [a.x, a.y][i]);
+  assert.ok(dx * towardHome[0] + dy * towardHome[1] > 0);
+  a.carry = 0; addFood(w, 900, 800, 2); addFood(w, 800, 700, 1);
+  [dx, dy] = decide(w, a); assert.ok(dx > .9 && Math.abs(dy) < .1, 'visible golden crumb wins over equal-distance regular food');
+  const hidden = rushScene(), lone = put(hidden, 0, 800, 800); lone.bot = true; addFood(hidden, 100, 100, 2);
+  [dx, dy] = decide(hidden, lone); assert.ok(dx > 0 && dy > 0, 'outside vision cannot steer bot toward hidden food');
+});
+
+test('rush: a simple visible-food forager scores within fifteen seconds in every fixed seed', t => {
+  const times = [];
+  for (const seed of [1, 7, 42]) {
+    const w = createWorld(seed, 'rush'), me = addAnt(w, pickColony(w), false, 0, 0); balance(w);
+    let first = Infinity;
+    for (let tick = 0; tick < 15 * C.TICK_HZ; tick++) {
+      for (const a of w.ants) if (a?.bot) think(w, a);
+      if (tick % 5 === 0 && me.alive) {
+        let [x, y] = me.carry ? C.NESTS[me.colony] : [1600, 1600], nearest = Infinity;
+        if (!me.carry) for (let id = 0; id < C.MAX_FOOD; id++) if (w.fkind[id] && Math.abs(w.fx[id] - me.x) <= C.VIEW && Math.abs(w.fy[id] - me.y) <= C.VIEW) {
+          const d = (w.fx[id] - me.x) ** 2 + (w.fy[id] - me.y) ** 2;
+          if (d < nearest) { nearest = d; x = w.fx[id]; y = w.fy[id]; }
+        }
+        setInput(w, me, byteOf(Math.atan2(y - me.y, x - me.x)), true, false);
+      }
+      step(w);
+      if (me.score > 0) { first = w.tick / C.TICK_HZ; break; }
+    }
+    assert.ok(first <= 15, `seed ${seed}: first score ${first} seconds`); times.push(first);
+  }
+  t.diagnostic(`Rush first score seconds for seeds1/7/42: ${times.join('/')}`);
+});
+
+test('rush: a frenzy goal completion alone marks frenzy participation', () => {
+  const w = rushScene(), a = put(w, 0, 1600, 1600);
+  w.tick = 2000; a.goal = 1; a.goalProgress = 99; a.goalIndex = 1;
+  step(w); assert.equal(a.score, 10); assert.equal(a.participation & 16, 16);
+});
+
+test('rush: an unfinished goal moves on after its time without a reward', () => {
+  const w = rushScene(), a = put(w, 0, 900, 900);
+  w.tick = 2000; a.goal = 2; a.goalIndex = 2; a.goalProgress = 0; a.goalSince = w.tick - MODES.rush.goalSkipSeconds * C.TICK_HZ + 1;
+  const before = a.score; step(w); assert.deepEqual([a.goal, a.goalIndex, a.score], [3, 3, before]);
+  a.goalSince = w.tick - 10; step(w); assert.equal(a.goal, 3);
+});
+
+test('rush: end-of-round delivered points survive death and reset only at the next round', () => {
+  const w = rushScene(), a = put(w, 0, ...C.NESTS[0]); a.carry = 2; step(w);
+  assert.deepEqual([a.delivered, a.roundDelivered], [5, 5]);
+  a.x = 820; a.y = 800; a.hp = 1; const enemy = put(w, 1, 800, 800); step(w);
+  assert.equal(a.alive, false); assert.deepEqual([a.delivered, a.roundDelivered], [0, 5]);
+  let r = new P.Reader(net.scores(w, [a, enemy], a, 2)); r.u8(); assert.equal(P.readScores(r).delivered, 5);
+  w.tick = w.roundEnd - 1; step(w); w.tick = w.breakUntil - 1; step(w); assert.equal(a.roundDelivered, 0);
+});
+
+test('rush: random replenishment never adds unannounced sugar beside the scheduled golden crumb', () => {
+  for (const seed of [1, 7, 42]) {
+    const w = createWorld(seed, 'rush');
+    for (let tick = 0; tick < 300; tick++) step(w);
+    assert.deepEqual(Array.from(w.fkind, (kind, id) => kind === 2 ? id : -1).filter(id => id >= 0), [w.goldenId]);
+  }
+});
+
+test('feast: simultaneous eating chains preserve the same outcome under ant-id permutation', () => {
+  const outcomes = [];
+  for (const order of [[0, 1, 2], [2, 1, 0]]) {
+    const w = feastScene(); w.tick = 100; const roles = [];
+    for (const role of order) { const a = put(w, 0, 900 + 25 * role, 900); a.mass = [100, 70, 50][role]; roles[role] = a; }
+    step(w); outcomes.push(roles.map(a => [a.alive, a.mass, a.kills, a.deaths]));
+  }
+  assert.deepEqual(outcomes[0], outcomes[1], 'geometry and size decide, not ant ids');
+});
+
+test('new modes: reset tick has no scheduled food and age one fires only one starter event', () => {
+  for (const mode of ['feast', 'rush']) {
+    const w = createWorld(131, mode); step(w);
+    w.tick = w.roundEnd - 1; step(w); w.tick = w.breakUntil - 1; step(w);
+    assert.equal(w.tick - w.roundStart, 0); assert.equal(w.foodCount, 0, `${mode}: reset is empty`);
+    step(w); assert.equal(w.tick - w.roundStart, 1);
+    const count = kind => w.fkind.filter(k => k === kind).length;
+    if (mode === 'feast') { assert.ok(count(1) > 0); assert.equal(count(3), 0, 'first cake waits until fifty seconds'); }
+    else { assert.equal(count(2), 1, 'one golden crumb'); assert.equal(count(3) + count(4), 8, 'one eight-seed starter event'); }
+  }
+});
+
+test('net: two observers receive identical shared-ant state and fresh deltas across ticks and id reuse', () => {
+  for (const mode of ['classic', 'feast', 'rush']) {
+    const w = createWorld(141, mode), one = put(w, 0, 800, 800), two = put(w, 0, 810, 800);
+    let target = put(w, 1, 900, 800); target.mass = 42; target.bot = true;
+    for (const a of [one, two, target]) a.protectUntil = 10000;
+    const views = [net.newView(), net.newView()], known = [new Map(), new Map()];
+    for (let tick = 0; tick < 3; tick++) {
+      if (tick === 1) { target.x += 9; target.mass = 49; target.hp = 3; }
+      if (tick === 2) { removeAnt(w, target); target = put(w, 1, 920, 810); Object.assign(target, { mass: 60, bot: false, nameA: 7, nameB: 8, protectUntil: 10000 }); }
+      step(w);
+      for (let i = 0; i < 2; i++) {
+        const r = new P.Reader(net.snapshot(w, [one, two][i], views[i], i)); r.u8(); P.readSnap(r, known[i], new Map(), C.POS_Q, C.OWN_Q); assert.equal(r.n, r.v.byteLength);
+      }
+      assert.deepEqual(known[0].get(target.id), known[1].get(target.id), `${mode}, tick ${tick}: both observers agree`);
+      const got = known[0].get(target.id);
+      assert.equal(got.x, Math.round(target.x * C.POS_Q) / C.POS_Q);
+      assert.deepEqual([got.hp, got.bot, got.nameA, got.nameB], [target.hp, target.bot, target.nameA, target.nameB]);
+      if (mode === 'feast') assert.ok(Math.abs(got.mass - target.mass) < 1);
+    }
+  }
+});
+
+import { getMode, snapshotEvery } from '../public/crumbwar/shared/modes.js';
+test('snapshot policy: only Rush above one hundred twenty ants drops to five Hz, simulation stays twenty Hz', () => {
+  assert.equal(snapshotEvery(getMode('rush'), 120), 2);
+  assert.equal(snapshotEvery(getMode('rush'), 121), 4);
+  for (const mode of ['classic', 'feast']) assert.equal(snapshotEvery(getMode(mode), 240), 2);
+  assert.equal(C.TICK_HZ, 20);
+  for (const mode of ['classic', 'feast', 'rush']) {
+    const w = createWorld(151, mode); stillSteps(w, 20); assert.equal(w.tick, 20);
+  }
 });

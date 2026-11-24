@@ -1,6 +1,12 @@
 # Crumbwar
 
-A many-player ant game, served at `play.adamwhite.work/crumbwar/`. Four colonies carry food home and bite each other. One Durable Object runs each room. "Crumbwar" is a working name.
+A many-player ant game. One Worker serves three modes:
+
+- Classic: `https://play.adamwhite.work/crumbwar/`. Four colonies carry food home and bite each other.
+- Feast: `https://play.adamwhite.work/crumbwar/feast/`. Eat crumbs and smaller ants. Grow through six ranks.
+- Rush: `https://play.adamwhite.work/crumbwar/rush/`. Two-minute colony rounds with goals, golden crumbs, seeds, a hill and frenzy.
+
+One Durable Object runs each room. Modes have separate rooms and directories. "Crumbwar" is a working name.
 
 **Owner decision (2026-11-23).** The owner asked for this game: massively multiplayer, built on Cloudflare with Durable Objects, with bots to fill rooms. That is the owner decision that `AGENTS.md` requires for multiplayer and for new server infrastructure. It covers this Worker only. The page is unlisted and `noindex`; outside publishing stays paused.
 
@@ -19,7 +25,10 @@ Run these from `workers/crumbwar`.
 
 ```sh
 node --test test/                       # unit tests
-node loadtest/bench.mjs                 # tick cost and bytes per client, in Node
+node loadtest/bench.mjs                 # all modes: 12, 60 and 240 people, no network
+node loadtest/bots.mjs                  # seeded behavior targets, ten-second bot warmup
+node loadtest/repeat-bench.mjs --out /tmp/crumbwar-bench --assert-targets # three counterbalanced repeats
+node loadtest/bots.mjs --classic-regression # retained six-minute Classic comparison
 echo "LOADTEST_KEY=$(openssl rand -hex 16)" > .dev.vars
 npx wrangler dev --port 8799            # local server at http://localhost:8799/crumbwar/
 node loadtest/load.mjs --url ws://localhost:8799/crumbwar/play --key <key> --clients 20 --seconds 15
@@ -47,3 +56,13 @@ Lab recording: the page loads the shared kit recorder (`/kit/lab.js`) the same w
 Watching it: `GET /crumbwar/api/health` lists rooms that were lost or ran slow in the last 6 hours, and the workflow `.github/workflows/crumbwar-watch.yml` turns new entries into a GitHub issue labelled `crumbwar-alert`. Joins are limited to 60 a minute per address. Both are described in [DECISIONS.md](DECISIONS.md) under "Alerts" and "Rooms and scaling".
 
 `npx wrangler rollback` returns to the previous version. To remove the game, run `npx wrangler delete`: the routes go with the Worker, and `/crumbwar/` then falls through to the static site, which has no such path. Rooms store nothing, so there is no data to migrate or restore. A deploy does not close open sockets at once: an occupied room can run the old code for minutes (seen 2026-11-24). Pages and rooms of another `PROTO` are kept apart by the version check. A rollback past the version check removes it.
+
+## Mode checks
+
+`node --test test/` covers Classic, Feast, Rush, protocol decoding and mode isolation. The Durable Object base is mocked in routing tests. No test here proves a live Cloudflare integration.
+
+`node loadtest/bots.mjs` uses seeds 1, 7 and 42 with one and twelve scripted people per mode. It warms bots for ten seconds before the people join. `--warmup 0` gives a cold-room comparison. The script follows visible food, retreats from larger Feast ants, and follows Rush hill and golden goals. It reports behavior, not enjoyment.
+
+`node loadtest/bench.mjs` includes decisions, simulation, per-client snapshots, scoreboards and event fanout. It reports both elapsed tick time and process CPU time. Use elapsed time for the one-millisecond gate. Byte totals exclude WebSocket framing, pings and the one-time welcome. They include scoreboard and targeted death notices.
+
+Metrics and status accept `mode=classic`, `mode=feast` or `mode=rush`. For example, `/crumbwar/api/metrics?mode=feast&hours=24&lt=<key>` reads Feast totals. Alerts include their mode. The visible room names stay in the form `enam-0` in every mode.

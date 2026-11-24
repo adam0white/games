@@ -26,7 +26,11 @@ export class Directory extends DurableObject {
   alerts(since, tests) {
     const sql = this.ctx.storage.sql;
     sql.exec('CREATE TABLE IF NOT EXISTS alerts (id INTEGER PRIMARY KEY AUTOINCREMENT, at INTEGER, kind TEXT, room TEXT, test INTEGER, detail TEXT)');
-    return sql.exec('SELECT id, at, kind, room, test, detail FROM alerts WHERE at >= ? AND (test = 0 OR ?) ORDER BY id DESC LIMIT 100', Number(since) || 0, tests ? 1 : 0).toArray();
+    return sql.exec('SELECT id, at, kind, room, test, detail FROM alerts WHERE at >= ? AND (test = 0 OR ?) ORDER BY id DESC LIMIT 100', Number(since) || 0, tests ? 1 : 0).toArray().map(row => {
+      let mode = 'classic';
+      try { mode = JSON.parse(row.detail).mode || 'classic'; } catch {}
+      return { ...row, mode };
+    });
   }
   assign(prefix, cap, exclude, proto) { return assign(this.rooms, prefix, cap, exclude, Date.now(), proto); }
   // name '' carries only counts (the Worker's refusals); an `lt-` name carries only counts (load test rooms are

@@ -1,6 +1,6 @@
 // Constants shared by the server and the page. The page predicts its own ant with the same numbers and the
 // same movement function (move.js), so a change here changes both sides in one deploy.
-export const PROTO = 1;
+export const PROTO = 2;
 export const TICK_HZ = 20;
 export const DT = 1 / TICK_HZ;
 export const SNAP_EVERY = 2; // a client gets a snapshot every 2nd tick: 10 a second

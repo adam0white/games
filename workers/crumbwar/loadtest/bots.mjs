@@ -4,7 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 import * as C from '../public/crumbwar/shared/config.js';
 import { byteOf } from '../public/crumbwar/shared/move.js';
-import { createWorld, addAnt, setInput, foodNear, step } from '../src/sim.mjs';
+import { createWorld, addAnt, setInput, foodNear, antsNear, step } from '../src/sim.mjs';
 
 // Exact maximum count in a closed radius-r disk with an arbitrary center.
 // An optimum disk can move until two points touch its boundary. Check both
@@ -114,6 +114,97 @@ export function timeDecisions(bots, seed = 42) {
   return ms / ticks;
 }
 
+// Phone viewport follows client.js: the longer side displays 1100 world units.
+// These are screen encounters, rather than the larger interest-management square.
+export const TARGETS = Object.freeze({ firstGrowthSeconds: 10, firstScoreSeconds: 15,
+  deathsPerMinute: 2, socialPercent: 70, feastTopHalfBySeconds: 120,
+  feastLeaderChanges: 1, rushEventKinds: 3, rushScoreCV: 0.4 });
+
+export function driveModePerson(w, a) {
+  if (w.rules.name === 'classic') return drivePerson(w, a);
+  if (!a.alive || (w.tick + a.id) % 5) return;
+  let tx = C.WORLD / 2, ty = C.WORLD / 2, best = -1, bd = Infinity;
+  if (w.rules.colonies && a.carry) [tx, ty] = C.NESTS[a.colony];
+  else {
+    foodNear(w, a.x, a.y, C.VIEW, id => {
+      const d = (w.fx[id] - a.x) ** 2 + (w.fy[id] - a.y) ** 2;
+      if (d < bd) { best = id; bd = d; }
+    });
+    if (best >= 0) { tx = w.fx[best]; ty = w.fy[best]; }
+  }
+  // Follow one visible personal goal at a time. The map marker is public.
+  let holdHill = false;
+  if (w.rules.name === 'rush' && !a.carry) {
+    if (a.goal === 1) { tx = 1600; ty = 1600; holdHill = Math.hypot(a.x - tx, a.y - ty) < w.rules.hillRadius * .6; }
+    else if (a.goal === 2 && w.feature.kind === 2) { tx = w.feature.x; ty = w.feature.y; }
+  }
+  // A simple person also retreats from a visibly larger ant. This uses the
+  // readable size ratio and the same 4 Hz decision cadence, not future state.
+  let danger = null, nearest = 180;
+  if (w.rules.name === 'feast') antsNear(w, a.x, a.y, C.VIEW, other => {
+    if (other === a || w.tick < other.protectUntil || other.mass < a.mass * w.rules.eatRatio) return;
+    const d = Math.hypot(other.x - a.x, other.y - a.y);
+    if (d < nearest) { nearest = d; danger = other; }
+  });
+  if (danger) { tx = a.x + a.x - danger.x; ty = a.y + a.y - danger.y; }
+  // No combat targeting, global food coordinates, sprint, or hidden state.
+  // Stop on a visible cake to chew it; ordinary crumbs are picked up while moving.
+  const chewing = w.rules.name === 'feast' && best >= 0 && w.fkind[best] === 3 && bd < 12 * 12 && !danger;
+  setInput(w, a, byteOf(Math.atan2(ty - a.y, tx - a.x) + (w.rand() - .5) * .35), !chewing && !holdHill, false);
+}
+
+export function measureMode(bots, mode, people = 1, seed = 42, warmupSeconds = 10) {
+  const w = createWorld(seed, mode), humans = [];
+  // Match a fresh room: bots already forage before the first person joins.
+  bots.balance(w);
+  for (let t = 0; t < warmupSeconds * C.TICK_HZ; t++) {
+    for (const a of w.ants) if (a?.bot) bots.think(w, a);
+    step(w);
+  }
+  const joinedTick = w.tick;
+  for (let i = 0; i < people; i++) { humans.push(addAnt(w, bots.pickColony(w), false, 0, 0)); bots.balance(w); }
+  bots.balance(w);
+  const person = humans[0], startMass = person.mass, seconds = (w.roundEnd - joinedTick) / C.TICK_HZ;
+  let firstProgress = null, deaths = 0, social = 0, seenSeconds = 0, firstTopHalf = null;
+  let leader = null, leaderChanges = 0, bestRank = 0;
+  const eventKinds = new Set(), leaderIds = new Set();
+  for (let t = 0; t < seconds * C.TICK_HZ; t++) {
+    for (const a of w.ants) if (a) (a.bot ? bots.think : driveModePerson)(w, a);
+    step(w);
+    if (firstProgress === null && (mode === 'feast' ? person.mass > startMass : person.score > 0)) firstProgress = (w.tick - joinedTick) / C.TICK_HZ;
+    for (const [type, , victim] of w.events) {
+      if (type === 1 && victim === person.id) deaths++;
+      // Rush participation is counted from its cumulative per-ant bitset below.
+    }
+    bestRank = Math.max(bestRank, person.rank ?? 0);
+    if (w.tick % C.TICK_HZ === 0) {
+      seenSeconds++;
+      if (person.alive && w.ants.some(a => a && a !== person && a.alive &&
+        Math.abs(a.x - person.x) <= 1100 * 390 / 844 / 2 && Math.abs(a.y - person.y) <= 550)) social++;
+      if (mode === 'feast') {
+        const ranked = w.ants.filter(a => a?.alive).sort((a, b) => b.mass - a.mass || a.id - b.id);
+        const position = ranked.indexOf(person);
+        if (firstTopHalf === null && person.mass > startMass && position >= 0 && position < ranked.length / 2) firstTopHalf = (w.tick - joinedTick) / C.TICK_HZ;
+        if (ranked[0]) { const id = ranked[0].id; if (leader !== null && id !== leader) leaderChanges++; leader = id; leaderIds.add(id); }
+      }
+    }
+  }
+  const result = { mode, people, seed, warmupSeconds, seconds, ants: w.count, firstProgressSeconds: firstProgress,
+    deaths, deathsPerMinute: deaths / (seconds / 60), socialPercent: social / seenSeconds * 100 };
+  result[mode === 'feast' ? 'firstGrowthSeconds' : 'firstScoreSeconds'] = firstProgress;
+  if (mode === 'feast') Object.assign(result, { firstTopHalfSeconds: firstTopHalf, bestRank,
+    leaderChanges, distinctLeaders: leaderIds.size });
+  if (mode === 'rush') for (let bit = 1; bit <= 16; bit *= 2) if ((person.participation ?? 0) & bit) eventKinds.add(bit);
+  if (mode === 'rush') Object.assign(result, { eventKinds: [...eventKinds].sort((a,b)=>a-b),
+    distinctEventKinds: eventKinds.size, colonyScores: [...w.colonyScore],
+    colonyScoreRange: Math.max(...w.colonyScore) - Math.min(...w.colonyScore), scoreCV: scoreCV(w.colonyScore) });
+  result.targets = { firstProgress: firstProgress !== null && firstProgress <= (mode === 'feast' ? TARGETS.firstGrowthSeconds : TARGETS.firstScoreSeconds),
+    deaths: result.deathsPerMinute <= TARGETS.deathsPerMinute, social: result.socialPercent >= TARGETS.socialPercent };
+  if (mode === 'feast') Object.assign(result.targets, { topHalf: firstTopHalf !== null && firstTopHalf <= TARGETS.feastTopHalfBySeconds, leaderChanges: leaderChanges >= TARGETS.feastLeaderChanges });
+  if (mode === 'rush') Object.assign(result.targets, { variety: eventKinds.size >= TARGETS.rushEventKinds, colonySpread: result.scoreCV <= TARGETS.rushScoreCV });
+  return result;
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const value = flag => { const i = args.indexOf(flag); return i < 0 ? undefined : args[i + 1]; };
@@ -121,6 +212,11 @@ async function main() {
   const bots = await import(botsPath ? pathToFileURL(resolve(botsPath)).href : '../src/bots.mjs');
   const seeds = (value('--seeds') ?? '1,7,42').split(',').map(Number);
   if (seeds.some(seed => !Number.isSafeInteger(seed))) throw new Error('Seeds must be integers');
+  if (!args.includes('--classic-regression') && !args.includes('--timing-only')) {
+    console.log(JSON.stringify({ targets: TARGETS, viewport: [390, 844], controller: 'nearest visible food, home when carrying, retreat from visible Feast predator within180, follow Rush hill/golden goals, no sprint or combat' }));
+    for (const mode of (value('--modes') ?? 'classic,feast,rush').split(',')) for (const people of [1, 12]) for (const seed of seeds) console.log(JSON.stringify(measureMode(bots, mode, people, seed, Number(value('--warmup') ?? 10))));
+    return;
+  }
   const timings = Array.from({ length: 3 }, () => timeDecisions(bots));
   console.log(JSON.stringify({ people: 1, bots: 31, decisionMeanMsPerTick: timings, lowest: Math.min(...timings) }));
   if (args.includes('--timing-only')) return;

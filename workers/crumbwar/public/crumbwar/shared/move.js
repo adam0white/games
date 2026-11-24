@@ -13,8 +13,9 @@ export function stepMove(a, angleByte, move, sprint) {
   const turn = TURN * DT;
   a.heading += d > turn ? turn : d < -turn ? -turn : d;
   a.heading -= Math.floor(a.heading / TAU) * TAU;
-  let v = SPEED * TIER_SLOW[a.tier] * CARRY_SLOW[a.carry];
-  if (sprint && a.stamina > 0) { v *= SPRINT; a.stamina = Math.max(0, a.stamina - STAMINA_DRAIN * DT); }
+  let v = a.mode === 'feast' ? 190 / (1 + Math.max(0, (a.mass ?? 10) - 10) * .009) : SPEED * TIER_SLOW[a.tier] * CARRY_SLOW[a.carry];
+  if (a.mode === 'rush' && a.boost) v *= 1.3;
+  if (sprint && (a.mode === 'feast' || a.stamina > 0)) { v *= SPRINT; if (a.mode !== 'feast') a.stamina = Math.max(0, a.stamina - STAMINA_DRAIN * DT); }
   else a.stamina = Math.min(STAMINA, a.stamina + STAMINA_REGEN * DT);
   a.x = Math.min(WORLD - 10, Math.max(10, a.x + Math.cos(a.heading) * v * DT));
   a.y = Math.min(WORLD - 10, Math.max(10, a.y + Math.sin(a.heading) * v * DT));
