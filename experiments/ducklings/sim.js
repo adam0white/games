@@ -475,7 +475,8 @@ export function step(s, target, quack = false) {
     if (Math.hypot(l.x - m.x, l.y - m.y) < TOUCH) {
       s.lost.splice(i--, 1);
       s.line.push({ id: l.id, name: l.name, trait: l.trait, delay: 0, scared: !!l.scared });
-      s.joins++; s.score += 10 * s.line.length;
+      // Only a new duckling scores. A scattered one swimming back is already counted, so scattering never pays.
+      s.joins++; if (l.born) s.score += 10 * s.line.length;
       s.events.push({ type: 'join', id: l.id, n: s.line.length, x: l.x, y: l.y, again: !l.born });
     }
   }

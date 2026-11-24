@@ -114,6 +114,8 @@
   #menu .extras button { margin: 0; min-width: 0; min-height: 44px; font-size: 13px; padding: 4px; border-width: 1px; }
   #album { font-size: 12px; margin: .25em 0; }
   #end.screen, #paused.screen { background: #173d3d9c; }
+  #paused .row { display: flex; gap: 6px; justify-content: center; }
+  #paused .row button { flex: 1; min-width: 0; margin: 0; padding-inline: .6em; }
   #end > div, #paused > div { background: #fff9df; padding: 20px 14px; border: 2px solid #fffef0; border-radius: 27px; box-shadow: 0 9px 0 #265f5888; }
   #end #postcard { display: block; width: 100%; height: 106px; }
   #end h2 { margin: 0; letter-spacing: -.03em; line-height: 1.05; }
@@ -122,7 +124,7 @@
   #endActions button { min-width: 80px; margin: 0; font-size: 15px; }
   #endActions button.main { min-width: 130px; }
   #end #postcard { filter: drop-shadow(0 2px 0 #6eac9566); }
-  #end #next { margin-inline: 0; width: 100%; border-radius: 16px; }
+  #end #next, #end #endlessNext { margin-inline: 0; width: 100%; border-radius: 16px; }
   #endStars { font-size: 2.65em; letter-spacing: .06em; }
   @media (max-height: 690px) {
     #menuArt { height: 92px; width: 240px; }
@@ -169,7 +171,7 @@
   <h2 data-i18n="paused"></h2>
   <p id="pausedLine"></p>
   <p><button id="resume" class="main" data-i18n="resume"></button></p>
-  <p><button id="pauseMenu" data-i18n="leave"></button></p>
+  <p class="row"><button id="pauseRetry" data-i18n="retry"></button><button id="pauseMenu" data-i18n="leave"></button></p>
   <p><button id="sound2"></button></p>
   <div id="labSwitch"></div>
 </div></div>
@@ -181,13 +183,13 @@
   <div id="endLine"></div>
   <div id="starTip"></div>
   <p class="score" id="endScore"></p>
-  <p><button id="next" class="main"></button></p>
+  <p><button id="next" class="main"></button><button id="endlessNext" class="main" data-i18n="endlessNext" style="display:none"></button></p>
   <div id="endActions"><button id="again" data-i18n="retry"></button><button id="endMenu" data-i18n="map"></button></div>
 </div></div>
 
 <script type="module">
-import { create, step, stars, timeLeft, pathAt, view, DT, SPEED, R_MOM, hits, LAST_STAGE, ENDLESS_AFTER, ENDLESS_TIME, TRAITS, QUACK_COOL, HEARTS, duskRate } from './sim.js?v=3';
-import { starFeedback, warningOnScreen } from './feedback.js';
+import { create, step, stars, timeLeft, pathAt, view, DT, SPEED, R_MOM, hits, LAST_STAGE, ENDLESS_AFTER, ENDLESS_TIME, TRAITS, QUACK_COOL, HEARTS, duskRate } from './sim.js?v=4';
+import { starFeedback, warningOnScreen, nestMarkerShows, padCueShows } from './feedback.js';
 import { CHAPTERS, LEVELS, chapterOf } from './levels.js';
 import * as art from './art.js?v=4';
 import { icon } from './icons.js';
@@ -428,6 +430,8 @@ function finish() {
   if (s.gone.length) endLine.append(graphic(countText('hiddenDucks', s.gone.length), icon('reeds') + number(s.gone.length)));
   const tip = $('starTip');
   tip.replaceChildren();
+  // A clock loss names the input that beats it: a finger held ahead keeps her swimming.
+  if (!won && !s.endless && s.why === 'dusk') tip.append(graphic(t('holdTip'), icon('hold') + icon('up'), 'stat condition hold'));
   const needs = won ? starFeedback(s) : [];
   if (needs.length) {
     const lead = document.createElement('span');
@@ -448,8 +452,11 @@ function finish() {
   spans.forEach(sp => { sp.className = ''; });
   const nextOk = !s.endless && won && s.stage < LAST_STAGE && open(s.stage + 1);
   $('next').style.display = nextOk ? '' : 'none';
-  $('next').textContent = chapter === chapterOf(s.stage + 1) ? countText('next', s.stage + 1) : t('nextChapter');
-  $('again').className = nextOk ? '' : 'main';
+  if (nextOk) $('next').textContent = chapter === chapterOf(s.stage + 1) ? countText('next', s.stage + 1) : t('nextChapterName', { chapter: chapterName(chapterOf(s.stage + 1)) });
+  // The last nest opens onto the endless pond instead of a dead end.
+  const onward = !s.endless && won && s.stage === LAST_STAGE;
+  $('endlessNext').style.display = onward ? '' : 'none';
+  $('again').className = nextOk || onward ? '' : 'main';
   if (won) burst(s.nest.x, s.nest.y, 'spark', still ? 8 : 40);
   drawPostcard(won);
   (won ? sfx.win : sfx.fail)();
@@ -539,6 +546,12 @@ function resume() {
 }
 onLeave(pause);
 $('resume').addEventListener('click', resume);
+// Start the same swim over without the trip through the map; the abandoned run is recorded as left, as when leaving.
+$('pauseRetry').addEventListener('click', () => {
+  if (!playing) return;
+  rec.end('left', { stage: s.stage, arrived: s.arrived.length, collected: s.joins, stars: 0, score: s.score, mode });
+  begin(mode === 'endless');
+});
 $('pauseMenu').addEventListener('click', () => {
   if (playing) { rec.end('left', { stage: s.stage, arrived: s.arrived.length, collected: s.joins, stars: 0, score: s.score, mode }); playing = false; paused = false; snd.release(); }
   show('menu');
@@ -546,6 +559,7 @@ $('pauseMenu').addEventListener('click', () => {
 $('play').addEventListener('click', () => begin(false));
 $('endless').addEventListener('click', () => begin(true));
 $('again').addEventListener('click', () => begin(mode === 'endless'));
+$('endlessNext').addEventListener('click', () => begin(true));
 $('next').addEventListener('click', () => { stage = Math.min(LAST_STAGE, s.stage + 1); tab = chapterOf(stage); begin(false); });
 $('endMenu').addEventListener('click', () => {
   if (s.stage && open(s.stage + 1) && s.stage < LAST_STAGE && s.over === 'nest') stage = s.stage + 1;
@@ -745,7 +759,16 @@ function drawHazards(now) {
       else if (v.visible) art.car(g, sx(v.x), sy(h.y), u, h.dir);
       else if (waitTouch && s.stage === 5) art.car(g, sx(h.dir > 0 ? .08 : .92), sy(h.y), u, h.dir);
     }
-    if (h.kind === 'cat') art.sleepingCat(g, sx(h.x), sy(h.y), h.r * u, v.phase, now / 1000);
+    if (h.kind === 'cat') {
+      // her reach: a dashed ring that warms as the mother comes close, so the safe line shows before the pounce
+      if (v.phase === 'rest') {
+        const near = Math.max(0, Math.min(1, 1 - (Math.hypot(s.mom.x - h.x, s.mom.y - h.y) - h.trigger) / .25));
+        g.strokeStyle = `rgba(${Math.round(255 - 38 * near)},${Math.round(248 - 150 * near)},${Math.round(216 - 140 * near)},${.30 + .45 * near})`;
+        g.lineWidth = Math.max(2, .006 * u); g.setLineDash([.018 * u, .02 * u]);
+        g.beginPath(); g.arc(sx(h.x), sy(h.y), h.trigger * u, 0, 7); g.stroke(); g.setLineDash([]);
+      }
+      art.sleepingCat(g, sx(h.x), sy(h.y), h.r * u, v.phase, now / 1000);
+    }
     if (h.kind === 'bridge' || h.kind === 'weed') art.leaves(g, sx(h.x), sy(h.y), h.r * u, h.kind, v.phase, now / 1000);
     if (h.kind === 'current') art.current(g, sx(h.x), sy(h.y1), sy(h.y0), h.w * u, u, h.dx, now / 1000);
     if (h.kind === 'log') for (const l of v.logs) {
@@ -760,7 +783,7 @@ function drawHazards(now) {
     }
     if (h.kind === 'pike') {
       art.pike(g, { hx: sx(v.hx), hy: sy(v.hy), mx: sx(v.mx), my: sy(v.my), tx: sx(v.tx), ty: sy(v.ty) }, u, now / 1000);
-      g.strokeStyle = 'rgba(30,70,80,.12)'; g.lineWidth = Math.max(1, 0.003 * u); g.setLineDash([4, 8]); g.beginPath(); g.arc(sx(h.cx), sy(h.cy), h.R * u, 0, 7); g.stroke(); g.setLineDash([]);
+      g.strokeStyle = 'rgba(255,248,216,.42)'; g.lineWidth = Math.max(2, 0.005 * u); g.setLineDash([.014 * u, .018 * u]); g.beginPath(); g.arc(sx(h.cx), sy(h.cy), h.R * u, 0, 7); g.stroke(); g.setLineDash([]);
     }
     if (h.kind === 'turtle') art.turtle(g, sx(h.x), sy(h.y), h.r, u, v.phase, v.f, now / 1000);
     if (h.kind === 'bike') for (const b of v.bikes) {
@@ -903,7 +926,7 @@ function drawGuide(now) {
   const spec = s.endless ? null : LEVELS[s.stage];
   if (s.endless) {
     const pad = s.checkpoints.find(p => !p.got);
-    if (pad && (waitTouch || timeLeft(s) <= 10)) {
+    if (pad && padCueShows(waitTouch, timeLeft(s), s.best, s.mom.y)) {
       const edge = sy(pad.y) < (inset.top + 113) * dpr;
       const marker = $('padDirection');
       marker.hidden = !edge;
@@ -941,6 +964,30 @@ function drawGuide(now) {
     }
     return;
   }
+  if (spec.lesson === 'clock' && !s.home) {
+    // Against the clock a tap is a stop. Whenever she idles, a pressed finger slides up the river ahead of her.
+    const idle = finger === null && (!destination || Math.hypot(destination.x - s.mom.x, destination.y - s.mom.y) < .045);
+    showGuideLabel(idle ? 'holdTip' : null);
+    if (!idle || help.shown) return;
+    const [ex, ey] = spec.guide.at(-1), end = [ex, Math.min(ey, s.mom.y + .70)], start = [s.mom.x, s.mom.y + .14];
+    const k = still ? .6 : Math.min(1, ((now / 1000) % 2.2) / 1.6), press = mixPoint(start, end, k);
+    drawRoute([s.mom.x, s.mom.y], [end], now);
+    art.ghostFinger(g, sx(press[0]), sy(press[1]), u, .4);
+    return;
+  }
+  if (spec.lesson === 'bridge' && !s.home && !help.shown && s.hazards.some(h => h.kind === 'bridge' && view(h, s.t).phase === 'warn')) {
+    // The leaves fold under whoever is still on them. Point at the quack, and if she has stopped, at the water ahead.
+    showGuideLabel(null);
+    const button = $('quack').getBoundingClientRect();
+    art.ghostFinger(g, (button.right + 7) * dpr, (button.top + 9) * dpr, u * .7, still ? .4 : now / 1000);
+    const idle = finger === null && (!destination || Math.hypot(destination.x - s.mom.x, destination.y - s.mom.y) < .045);
+    if (idle) {
+      const end = [s.nest.x, Math.min(s.nest.y, s.mom.y + .45)];
+      drawRoute([s.mom.x, s.mom.y], [end], now);
+      art.ghostFinger(g, sx(end[0]), sy(end[1]), u, .4);
+    }
+    return;
+  }
   showGuideLabel(null);
   const teaching = spec.guide && s.t < 5;
   if ((!waitTouch && !teaching) || help.shown) return;
@@ -950,9 +997,6 @@ function drawGuide(now) {
   drawRoute([s.mom.x, s.mom.y], next, now);
   if (waitTouch) {
     art.ghostFinger(g, sx(next[0][0]), sy(next[0][1]), u, still ? .4 : now / 1000);
-  } else if (s.stage === 16 && s.hazards.some(h => h.kind === 'bridge' && view(h, s.t).phase === 'warn')) {
-    const button = $('quack').getBoundingClientRect();
-    art.ghostFinger(g, (button.right + 7) * dpr, (button.top + 9) * dpr, u * .7, still ? .4 : now / 1000);
   }
 }
 
@@ -1061,7 +1105,7 @@ function drawHud(now) {
 
     const stats = $('runStats');
     if (s.endless) {
-      stats.replaceChildren(graphic(countText('points', s.score), number(s.score)),
+      stats.replaceChildren(graphic(countText('points', s.score), '<span aria-hidden="true">★</span>' + number(s.score)),
         graphic(countText('sunlight', remaining), icon('sun') + number(remaining)),
         ...(faster ? [graphic(t('lightDropsFaster'), icon('down'))] : []));
     } else if (timed) {
@@ -1082,7 +1126,7 @@ function drawHud(now) {
 
   const roadGuideActive = s.stage === 5 && pathAt(s, s.line.at(-1)?.delay ?? 0).y <= s.hazards[0].y1;
   const nestAhead = !s.endless && !s.home && !roadGuideActive && following >= LEVELS[s.stage].need &&
-    sy(s.nest.y) < (inset.top + 79) * dpr;
+    nestMarkerShows(sy(s.nest.y), (inset.top + 79) * dpr, u);
   const marker = $('nestDirection');
   marker.hidden = !nestAhead;
   if (nestAhead) marker.style.left = `${Math.max(36, Math.min(W / dpr - 36, sx(s.nest.x) / dpr))}px`;

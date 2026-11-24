@@ -17,6 +17,7 @@ const shapes = {
   right: '<path d="M3 12h17m-6-6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2"/>',
   life: '<path d="M12 21 3 12C-2 5 7 0 12 7c5-7 14-2 9 5z" fill="#f56978" stroke="#a33248"/>',
   spent: '<path d="M12 21 3 12C-2 5 7 0 12 7c5-7 14-2 9 5z" fill="#fff9df" stroke="#7a6556"/>',
+  hold: '<path d="M9 21v-6l-2.5-2.5a1.4 1.4 0 0 1 2-2L10 12V4a1.5 1.5 0 0 1 3 0v6l5 1.2c1.2.3 2 1.4 1.8 2.6L19 21z" fill="#fff8eb" stroke="#6b4f36"/><circle cx="11.5" cy="4" r="3.4" fill="none" stroke="#a15e21" stroke-dasharray="2 2"/>',
   clock: '<circle cx="12" cy="12" r="9" fill="#fff9df" stroke="currentColor"/><path d="M12 6v6l4 2" fill="none" stroke="currentColor"/>',
   heart: '<path d="M12 21 3 12C-2 5 7 0 12 7c5-7 14-2 9 5z" fill="#f56978" stroke="#a33248"/><path d="m13 6-3 6 4 1-3 5" fill="none" stroke="#6f273b"/>',
   scatter: duck + '<path d="m3 5 2 3M6 2l1 3M2 8l2 2" stroke="#874321" stroke-width="2"/>',

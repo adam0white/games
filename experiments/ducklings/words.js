@@ -107,6 +107,9 @@ export const tables = {
     starMissing: 'For three stars, bring all {n} home',
     starHits: 'For three stars, avoid hits',
     starScares: 'For three stars, avoid scares',
+    holdTip: 'Keep your finger down ahead of her to keep swimming',
+    nextChapterName: 'Next: {chapter}',
+    endlessNext: 'On to the endless pond',
   },
   tr: {
     title: 'Peşimden Gel',
@@ -214,6 +217,9 @@ export const tables = {
     starMissing: 'Üç yıldız için {n} yavrunun hepsini yuvaya getir',
     starHits: 'Üç yıldız için çarpmadan geç',
     starScares: 'Üç yıldız için yavruları ürkütme',
+    holdTip: 'Yüzmeye devam etmesi için parmağını önünde basılı tut',
+    nextChapterName: 'Sıradaki: {chapter}',
+    endlessNext: 'Sonsuz gölete geç',
   },
 };
 
