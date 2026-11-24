@@ -783,7 +783,7 @@ function draw() {
     g.moveTo(bx, street + 6);
     g.lineTo(bx + bw, street + 6);
     g.stroke();
-    text("STREET", bx + bw / 2, street + 27, 14, C.mint, "center");
+    text("STREET", bx + bw / 2, street + 18, 14, C.mint, "center");
     const folks = s.people.filter((p) => !p.rescued);
     for (const n of folks) {
       const at = position(s, n.progress);

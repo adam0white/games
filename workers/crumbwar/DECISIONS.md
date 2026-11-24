@@ -29,6 +29,58 @@ These are synthetic traffic and local CPU/byte measurements. They do not establi
 
 Seen in headless Chromium against `wrangler dev` (2026-11-23) at 390×844, 360×640 and 1280×800, 40 s each, with a script that walks to the middle and carries food home: food and ants of several colonies were on screen within 4 s of joining; the scripted player delivered food (2 points by 36 s at 360×640). Page fixes made then: on narrow screens the top five and the human and bot counts sat on the colony scores, so they moved below the clock; the rank line no longer wraps; names are 11 screen pixels high at every zoom (they were about 6 px on a 360×640 phone); crowded names are thinned nearest first, and a kept label adds the hidden count and how many are bots (seen: "Tawny Sentry · bot +1 bot"); the arrow hides while the middle is on screen, and its label reads "Food in the middle · N", outlined; the map's middle marker scales with the map; the camera no longer starts one frame from a stale position. Seen and not changed (sim): bots of several colonies stack on one spot in fights, about ten at once.
 
+## Bots, 2026-11-24
+
+The first separation change removed the pile but also removed decisive combat. This retune keeps 100-unit ally separation and 75-unit separation from enemies other than the current target. Bots admit a small group by visible distance: yield behind two healthy allies for a healthy enemy, three for a carrier or wounded enemy. A 12-unit tolerance prevents switching on tiny distance changes; this is approximate admission, not a hard reservation. Protected or badly wounded allies do not suppress a pursuit. No bot reads another ant's private plan or distinguishes human enemies from bot enemies.
+
+Each four ids have two foragers, one raider and one guard. Healthy-target pursuit ranges are 85/200/150/85 units; vulnerable-target ranges are 150/330/180/150. Guards answer enemies within 360 units of their nest from up to 300 units away. Visible carriers and wounded enemies have priority; a modest preference for the current target maintains pursuit. Targets outside pursuit range cannot suppress a reachable fight. Bots approach a rear quarter with a 12-unit offset, then face the target within 55 units. Raiders retreat at one HP; guards at 30% of maximum HP (rounded down), foragers at 40%. All keep retreating until fully healed. Carriers return home and sprint near enemies. Vision, client input calls, decision cadence and aim error remain unchanged. No simulation rule changed.
+
+**Acceptance.** Six simulated minutes in 1- and 12-person rooms, seeds 1/7/42. Deaths must average 40–80. Each colony must lose at least four ants in every seed. Each colony's food must reach the original BEFORE mean floor below in every seed. Every seed must have score CV at most 0.15, cluster max at most five and crowded share below 2%. The 1-person scripted human must take bites on at least six ticks and die to bites 1–4 times in each seed. Bot-only mean decision cost must be below 0.15 ms per tick, taking the lowest of three runs. This is local simulation acceptance; owner play acceptance remains separate.
+
+Measured with Node 26.12.0 and `node loadtest/bots.mjs`. People are independent scripted foragers: nearest visible food, home when carrying, center when searching, 4 Hz input with the same aim error. No combat or retreat policy is added to the people. Room joins balance after each person arrives. Every second checks the exact maximum occupancy of any radius-40 disk among living ants, starting at second one, with 360 samples per seed. **The cluster maximum is a one-second sampled maximum, not a bound on intervening ticks.** Median/max cover 1080 samples per room size; food, bites, deaths and CV below are seed means. Colony order is Red/Blue/Green/Gold. CV is population standard deviation divided by mean.
+
+| People | Brain | Cluster median / max | Samples with at least 6 | Food points per colony | Bites | Deaths | Score CV |
+|---|---|---|---|---|---|---|---|
+| 1 | Original BEFORE | 3 / 9 | 3.52% | 102.3 / 73.7 / 68.0 / 73.0 | 1907.3 | 97.7 | 0.172 |
+| 1 | Before this retune | 2 / 4 | 0% | 225.7 / 242.0 / 225.3 / 220.0 | 391.7 | 9.7 | 0.055 |
+| 1 | After this retune | 3 / 5 | 0% | 156.3 / 159.0 / 144.3 / 160.3 | 1337.0 | 68.3 | 0.062 |
+| 12 | Original BEFORE | 3 / 8 | 2.59% | 170.7 / 154.3 / 133.7 / 157.7 | 1468.3 | 73.3 | 0.110 |
+| 12 | Before this retune | 2 / 4 | 0% | 244.7 / 256.0 / 240.0 / 243.3 | 390.7 | 14.7 | 0.049 |
+| 12 | After this retune | 3 / 5 | 0% | 200.7 / 195.0 / 217.0 / 210.7 | 975.0 | 47.3 | 0.059 |
+
+Per-seed after results (all pass):
+
+| People | Seed | Food points | Deaths | Colony deaths | Score CV | Cluster max |
+|---|---|---|---|---|---|---|
+| 1 | 1 | 160/152/136/142 | 74 | 16/16/20/22 | 0.062 | 5 |
+| 1 | 7 | 157/152/138/168 | 68 | 20/15/20/13 | 0.070 | 4 |
+| 1 | 42 | 152/173/159/171 | 63 | 19/13/17/14 | 0.053 | 4 |
+| 12 | 1 | 209/210/219/204 | 50 | 10/11/18/11 | 0.026 | 5 |
+| 12 | 7 | 206/174/217/231 | 42 | 13/12/12/5 | 0.102 | 5 |
+| 12 | 42 | 187/201/215/197 | 50 | 16/8/15/11 | 0.050 | 5 |
+
+The original BEFORE is `src/bots.mjs` at `10052b05fb33b3ed3e1a7fd6ec9d7b095a9d1f31`; its previously recorded numbers remain the food floor. Before this retune is the uncommitted brain received at the start of this task, SHA-256 `4d9e369c0e314ea619482739022d9939d5191c5dd874abfe37b2f43672f9aa26`. Both before/after use the same updated harness. A temporary copy of that starting brain remains at `/tmp/crumbwar-bots-before-2026-11-24.mjs`; copy it into `src/.bots-before.mjs` to run `node loadtest/bots.mjs --bots ./src/.bots-before.mjs`, then remove the temporary source file. Changed random consumption changes later food history.
+
+**Human threat, one person.** Bitten counts applied-damage ticks, including lethal bites; simultaneous bites count once, so this conservatively undercounts individual bites. Killed counts simulation kill events attributed to an ant; nest-guard deaths are counted separately and are zero in every before/after run. Bites for all ants in the table above count selected attacks, which can exceed damage applications.
+
+| Brain | Bitten ticks, seeds 1/7/42 | Mean bitten ticks / minute | Killed, seeds 1/7/42 | Mean killed |
+|---|---|---|---|---|
+| Before this retune | 11/24/7 | 2.33 | 1/4/0 | 1.67 |
+| After this retune | 25/34/26 | 4.72 | 2/2/2 | 2.00 |
+
+**Bot decision cost.** `loadtest/bots.mjs` times only the complete bot decision pass in a 1-person room (31 bots), including staggered no-op calls. Human input, simulation, cluster sampling and snapshots are outside the interval. Each timing starts a fresh seed-42 world, warms 200 ticks, then averages the remaining 7000 ticks. `--timing-only` runs the three timing trials without the metrics suite. The room's 240-person benchmark cannot isolate this cost because that room has no filler bots.
+
+| Brain | Mean ms/tick, three runs | Lowest ms/tick |
+|---|---|---|
+| Before this retune | 0.10510 / 0.06950 / 0.03270 | 0.03270 |
+| After this retune | 0.02964 / 0.02493 / 0.02106 | 0.02106 |
+
+Both lowest means pass 0.15 ms. The machine was busy; these local timings establish the budget check, not a controlled speedup.
+
+**Verification.** `node --test test/` passes 33 tests. Requirement-derived six-minute regression checks cover all six cases, including each seed's colony losses, CV, crowd samples and human threat. Focused tests cover small-group admission, healthy even fights, wounded allies, nest defence and identical human/bot targeting. The old brain's 8/13/8 deaths (mean 9.67) fail the new 40–80 death gate. Review found and fixed unreachable targets masking reachable fights, unhealthy/protected allies suppressing pursuit, and nest deaths being counted as human kills. An intermediate candidate killed the human six times in one seed; the final gate checks each seed rather than allowing a passing mean to hide that miss.
+
+Nobody has looked at this retune in a browser. Real players, phones, deployed CPU and game feel remain unverified. Live rooms warm bots for ten seconds; this measurement starts cold. No server, commit, push or deployment was made. Protected room, routing, client and simulation-configuration files were unchanged.
+
 ## Telemetry, 2026-11-23
 
 The page records play through the shared kit recorder (`/kit/lab.js`). The import is dynamic. Where the file is not served (under `wrangler dev`), the game plays and records nothing.
@@ -156,7 +208,7 @@ What was seen:
 1. **The 1.3 second gap happened again once, in run 3, and that time the test machine was the cause.** Every socket was silent for 1338 ms at second 521. In the same run the test machine's timer was 1040 ms late, the room heard nothing for 1064 ms, and the room's tick count never fell more than 46 ms behind. So the room kept ticking and the machine that runs all 240 clients paused. The machine was also running browser tests at the time. Whether the first 1.3 second gap (2026-11-23) had the same cause is an inference: that run did not record timer lag.
 2. **A room stall was not seen.** `stallMax` stayed under 50 ms (one tick) in all three runs, 36,000 ticks in total. Ticks per second read 20.0 at the end of each.
 3. **Short gaps on one socket are normal on this path.** Each run had about 60 to 75 gaps of 300 to 850 ms that hit one to four sockets at a time. The room advanced the usual 2 ticks between the two snapshots and 2 to 6 snapshots arrived together afterwards. That is late delivery on one connection, then a catch-up, not a missed send. All 240 sockets share one home network path, so this says little about real players. The page draws other ants 150 ms in the past, so a gap this long shows as a short freeze of the other ants.
-4. **Not explained:** 6 and 3 sockets closed with 1006 in runs 1 and 2 and the room counted the same number of kicks. The kick reason was not recorded. The likely one is the 8 second lag kick or the ping timeout; this is a guess.
+4. **Not explained:** 6 and 3 sockets closed with 1006 in runs 1 and 2 and the room counted the same number of kicks. The kick reason was not recorded. The likely one is the 8 second lag kick or the ping timeout; this is a guess. Kicks are now counted by reason (see "Kick reasons"), so the next run will say.
 - The live page was run in headless Chromium at phone size: it joined a room through the directory, steered at 150 units a second and stopped on release. Cloudflare's analytics beacon is blocked by the page's content security policy, which is intended.
 
 ### Overload, on purpose
@@ -193,7 +245,64 @@ The question an alert answers: did players lose a round, or play a slow one, wit
 
 ### Server metrics
 
-The Worker writes to the Analytics Engine dataset `crumbwar`: one point a minute per running room (people, ants, tick rate, bytes out, messages in, `stallMax`, `quietMax`), one per alert, and one per refused join (wrong origin or rate limited, by continent). No address, name or room member is written. Nothing reads the dataset yet; query it with the Analytics Engine SQL API when a question needs it. The status call also reports `version` and `windowTicksPerSecond`.
+The Worker writes to the Analytics Engine dataset `crumbwar`: one point a minute per running room (people, ants, tick rate, bytes out, messages in, `stallMax`, `quietMax`), one per alert, and one per refused join (wrong origin or rate limited, by continent). No address, name or room member is written. Nothing reads the dataset yet; query it with the Analytics Engine SQL API when a question needs it. Kick reasons were added to the room point on 2026-11-24 (see "Kick reasons"), and hourly totals that need no token are kept in the directories (see "Metrics read path"). The status call also reports `version` and `windowTicksPerSecond`.
+
+## Version check, 2026-11-24
+
+The problem, seen 2026-11-24: an occupied room kept running the old Worker code for minutes after a deploy, while every page loaded afterwards was the new one (see "Known gaps"). A deploy that changes the wire format or `shared/config.js` would then put a new page on an old room.
+
+`PROTO` in `shared/config.js` names what a page and a room must agree on. It already existed, was already the second byte of WELCOME, and was 1 from the first commit. It is reused, unchanged. No value in `config.js` changed.
+
+The rule: the page and the Worker are deployed together, so the Worker's `PROTO` is the truth. Each check compares against it.
+
+| Who differs from the Worker | How it is found | What happens |
+|---|---|---|
+| The page (cached, open across a deploy, or open across a rollback) | The page sends `v=<PROTO>` in the join URL. | The Worker accepts the socket and closes it with 4005 "game updated". A refused upgrade would reach the page only as 1006. The page shows "Game updated, reloading" and reloads. |
+| The room (old code still running) | The Worker sends `v=<PROTO>` to the room. The room compares it with its own. | The room refuses with 421. The Worker asks the directory again with that room excluded, as it does for a full room. People already in the room play on. |
+| A room from before this change | It cannot refuse. Its WELCOME carries its `PROTO`. | The page closes the socket and joins again with `avoid=<room>`, which the Worker excludes. At most twice, then the reload path. |
+
+- **Both directions reload.** A page with a higher number than the Worker is also not the page the Worker serves now (after a rollback). A reload fetches the right one.
+- **No reload loop.** The page reloads at most once a minute for an update (`mayReload` in `shared/version.js`, kept in `sessionStorage`). A second ask within the minute shows "The game was updated. Reload the page to play." If storage cannot be written, the page does not reload at all, because nothing would stop a loop.
+- **The directory stops offering an old room.** Rooms now send their `PROTO` with each head count report. `assign` skips a room whose protocol differs from the asking Worker's. A room that never sent one is treated as protocol 1 (`LEGACY_PROTO`). An old room leaves the list when it reports that it is empty. An empty room of another protocol stays listed with no people until it goes stale (45 s), so its name is not handed out again while the old code may still run there. The directory list is memory only, so its filter is an optimisation. The room's own refusal is the guard.
+- **Pages from before this change** send no `v`. The Worker lets them through. If `PROTO` changed, the old page's own WELCOME check reloads it (the old code reloads without a guard; it fetches the new page, which has the guard).
+- **The WELCOME layout must keep its first two bytes** (type, then `PROTO`) in every future version, because that is how old pages and old rooms are recognised.
+- **When to bump `PROTO`.** A test fingerprints `config.js`, `proto.js`, `move.js`, `predict.js` and `net.mjs` together with `PROTO`. Any change to those files fails it until someone decides: if an old page and a new room (or the reverse) cannot play together, raise `PROTO`; then record the new fingerprint. A comment-only change also trips it. That is the cost of a manual number: a person must decide, and the test makes sure the decision is not skipped.
+- **Cost.** No new Durable Object call. One query parameter each way. A page that is stale costs one socket accept and close in the Worker. A stale room costs one extra room fetch per join until the directory hears its report.
+
+Tested without Cloudflare (`node --test test/`): the Worker's verdict for current, older, newer, missing and garbage numbers; the reload guard (once, then refused for a minute; no storage, throwing storage and storage that drops writes all refuse; a clock that went backwards does not block); the directory filter, including the known bad case (without the filter the old, fuller room wins); the fingerprint. Two mutations were checked to fail the tests: removing the directory filter, and removing the one-a-minute guard.
+
+Seen on `wrangler dev` (2026-11-24), over real sockets from Node: `v=0` and `v=2` were closed with 4005 "game updated"; `v=1` and no `v` joined; `avoid=enam-0` was sent to `enam-1`. A stale room was made by fault injection, temporarily (the room's own protocol read as 2 after its first join), and the injection was removed afterwards. With the room's report carrying protocol 2, the next two joins went to `enam-1` without touching `enam-0`, and the directory listed `enam-0` with protocol 2. With the report left at 1 (so only the refusal worked), `enam-0` refused two joins (`refusedProtocol` 2) and both landed in `enam-1`. In both runs the first player in `enam-0` kept receiving about 11 messages a second, and after it left, the next join went to `enam-1`.
+
+The page's WELCOME check was exercised in both browsers by a temporary fault injection in the room (the WELCOME's protocol byte set to 9), removed afterwards. With only `enam-0` wrong, the page closed that socket, joined again with `avoid=enam-0` and played in `enam-1`, with one page load. With every room wrong, the page tried three rooms, reloaded once, tried three rooms again and showed "The game was updated. Reload the page to play.", with two page loads in all.
+
+Seen in Playwright against `wrangler dev`, at 390x844, in Chromium and in WebKit, with `config.js` routed: patched to `PROTO = 0` or `PROTO = 2` on every load, the page loaded twice (one reload), and pressing Play after the reload showed "The game was updated. Reload the page to play." with no further load. Patched on the first load only, the page reloaded once, then joined and played. Unpatched, both browsers joined and moved 280 to 300 units in 2 s. The only failed requests were `/kit/hint.js`, `/kit/lab.js` and `/notes/button.js`, which the static site serves, not this Worker.
+
+A known cost: after a `PROTO` bump, a directory that restarted knows no rooms, so it can offer three old rooms in a row. That join gets 503 until the rooms' reports arrive, within 15 s.
+
+Not verified: two code versions running at once on Cloudflare (this cannot be made locally; the stale room above was simulated in one version). A real cache serving an old page. Gradual deployments (two Worker versions serving at once) were not considered beyond the loop guard. After an update reload, the page shows the start card with no note, and the person presses Play again; a join that starts by itself would skip the recording notice rule.
+
+**Deploy order.** Deploy this change alone, with `PROTO` still 1. Every room and page then agrees. Rooms from before it keep running until they empty and need no check, because their protocol is also 1. A later deploy that changes the wire format or the shared constants raises `PROTO` in the same commit. A rollback past this change removes the check; the rolled-back page and rooms then behave as before it.
+
+## Kick reasons, 2026-11-24
+
+`kick` now takes a reason, and the room counts each one (`src/metrics.mjs` lists them): `kickIdle` (4003), `kickNoPing` (4004, no ping for 8 s), `kickBehind` (4004, pings arrive but name a tick 8 s old), `kickText`, `kickSize`, `kickRate`, `kickType` (all 1008), and `sendFailed` (a send threw and the socket was dropped, which was not counted before). Other ends of a socket are counted too: `closedByClient` and `socketErrors`. Joins a room refused are counted by reason: `refusedFull`, `refusedIp`, `refusedGone`, `refusedProtocol`.
+
+The status call returns them, plus `kicksByReason`. The load test prints `kicksByReason` and `closeReasons` at the top level, and the full counters in `roomCounters`. The once-a-minute Analytics Engine point gained seven doubles after the first seven, which did not move: 8 `kickIdle`, 9 `kickNoPing`, 10 `kickBehind`, 11 all four 1008 kinds, 12 `sendFailed`, 13 `closedByClient` plus `socketErrors`, 14 `joins`, each a change over the minute. Analytics Engine takes up to 20 doubles (Cloudflare documentation, limits page, read 2026-11-24).
+
+Seen on `wrangler dev`: a text message, a 9 byte message, an unknown type and a 200 message burst each closed with 1008; a socket that never pinged and one that pinged with tick 0 each closed with 4004. The room's counts arrived in the hourly totals as one of each of `kickText`, `kickSize`, `kickType`, `kickRate`, `kickNoPing` and `kickBehind` per run. A status call 25 s after the first join, after the room had emptied and stopped, returned `joins` 0 and `tick` 0: the room had been evicted and the call met a fresh object. Room counters live in memory only. The hourly totals, sent when the room stops, are the record that survives. The 6 and 3 unexplained kicks of 2026-11-24 remain unexplained until the next deployed 240 client run.
+
+## Metrics read path, 2026-11-24
+
+Nothing read the Analytics Engine dataset, and reading it needs an API token. Instead each regional Directory object keeps hourly totals for 14 days in a small SQLite table (`metrics`: hour, key, value). `GET /crumbwar/api/metrics?lt=<key>[&hours=N]` returns them per region, newest hour first, and totals over the window. It uses the same key check as the status call and is 404 without it. It holds numbers only.
+
+- **Fed by calls that already existed.** A room already reported its head count to its region's directory every 15 seconds. Once a minute, and once when it stops, that report now also carries the counts since the last one: `joins`, `roomMinutes` (to two decimals, so short rooms count), kicks by reason, refusals by reason. No new call per join. One SQLite upsert per key per report, at most once a minute per running room.
+- **Joins the Worker refuses** before any room is asked (`refusedForbidden`, `refusedLimited`, `refusedBusy`, `refusedStalePage`) are held in the Worker isolate and sent to the region's directory at most once a minute per isolate. A flood of refused joins therefore buys at most one Durable Object write a minute per isolate. Counts held in an isolate that ends are lost; Analytics Engine has the exact numbers. Seen locally: 10 stale page refusals were made across two runs of the local server and 8 arrived.
+- **Peak people.** `peakPeople` is the sum of people over a region's rooms that reported in the last 45 s, taken at each report, the largest in the hour. `peakRoom` is the largest single room. Both are kept in memory between the minute reports, so a directory restart can lose part of an hour's peak. In the totals over regions, a peak is the largest regional value, not a sum.
+- **Load test rooms** send their counts to a separate object, `dir:lt`, which never offers rooms. It is shown under the region `lt` and left out of the totals.
+- **Why the regional directories and not the `alerts` object.** The regional directory already receives each room's report, so the counts ride on it. Writing to `alerts` would have added one call a minute per room. The cost: the read path asks seven objects (six regions and `lt`), which only happens when someone with the key asks.
+- **Old directory code** ignores the extra arguments, so a deploy in which a directory still runs old code loses those counts and nothing else.
+
+Seen on `wrangler dev`: an `lt-` room run for 80 s reported once from its minute block while running (`joins` +5, `roomMinutes` +0.83, read at about 68 s) and kept 20 ticks a second apart from one pause. In that run the test machine itself stalled for 3.5 s (the load generator's timer was 3497 ms late and the local room's `stallMax` was 4880 ms at the same second), and the local room raised `room_slow` (7.6 ticks a second). This is the first time `room_slow` was seen to fire; it was a local machine pause, not a Cloudflare one. After browser joins and a load test, the endpoint returned `enam` with `joins` 11, `closedByClient` 11, `peakPeople` 1, `peakRoom` 1, `refusedStalePage` 8, `roomMinutes` 1.05, and `lt` with the kick counts above. Without the key: 404. Not verified on Cloudflare. Not checked: the 14 day pruning (it runs once an hour per directory and deletes hours older than 14 days), and the size of the table after 14 days (at most about 25 keys an hour, 336 hours, so under 10,000 rows a region).
 
 ## Spend
 
@@ -207,10 +316,9 @@ Logged 2026-11-24. The gap, burn and rate limit tests used about 250 GB-s of dur
 - No lag compensation for bites.
 - No way for friends to share a room.
 - The `room_slow` alert has never been seen to fire, and an alert has not yet been seen to arrive as a GitHub issue (see "Alerts").
-- Server metrics are written to Analytics Engine and nothing reads them yet.
-- The reason for a kick is not counted by kind.
+- Server metrics are written to Analytics Engine and nothing reads them yet. A small hourly summary is readable with the load test key (see "Metrics read path").
 - All deployed tests ran from one place into one region. Rooms in other regions and players far from their room are untested.
-- **A deploy and a running room (seen 2026-11-24).** A room with 10 test clients ran across a deploy. No socket closed, no alert was raised, and four minutes later the room still ran the old version and accepted new joins, while a new room ran the new version. So a deploy does not end a round at once; an occupied room keeps the old server code until Cloudflare restarts it, and the page is the new one. A deploy that changes the wire format or `shared/config.js` can therefore put a new page on an old room. The density change did this for a few minutes with test clients only. Before such a deploy with real players, add a version check at join. The `room_redeployed` path was not exercised by this test.
+- **A deploy and a running room (seen 2026-11-24).** A room with 10 test clients ran across a deploy. No socket closed, no alert was raised, and four minutes later the room still ran the old version and accepted new joins, while a new room ran the new version. So a deploy does not end a round at once; an occupied room keeps the old server code until Cloudflare restarts it, and the page is the new one. A deploy that changes the wire format or `shared/config.js` can therefore put a new page on an old room. The density change did this for a few minutes with test clients only. A version check at join now handles this (see "Version check"); it was not tested across a real deploy. The `room_redeployed` path was not exercised by this test.
 - The time a tick takes cannot be measured inside a deployed object, because the clock does not advance during execution there (from memory of the Workers security model; not re-read). The late-tick counters do not show it either (see "Overload, on purpose"); use `ticksPerSecond`.
 - Exercised once by hand over real sockets against `wrangler dev` (2026-11-23), not by an automated test: resume returns the same ant; a 9 byte message, a text message and a 200 message burst each close the socket with 1008; the fifth socket from one address is refused; a client that never pings is removed after 8 to 9 seconds. Never exercised: the idle kick and the 3 retries when a room is full.
 - Under `wrangler dev` only, a socket the room closes from its tick loop stays in the closing state. The page does not depend on the close event: five seconds without a message ends the socket and reconnects.

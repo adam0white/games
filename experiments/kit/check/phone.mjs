@@ -381,7 +381,7 @@ const GAMES = {
     await sleep(400); await page.evaluate(() => localStorage.removeItem('hf-lab-recording-off')); await page.reload(); // recording back on, so the check below can see what is sent
     const sentBefore = labSent(page).length;
     // The shared board (workers/lab-ai) is played by a stand-in here. mode: ok answers, 401 and html are bad answers, hang never answers.
-    const posts = [], kept = new Map([['zed', { n: 'Zed', s: 99999 }]]); let mode = 'ok';
+    const posts = [], starts = [], kept = new Map([['zed', { n: 'Zed', s: 99999 }]]); let mode = 'ok';
     const listed = () => [...kept.values()].sort((x, y) => y.s - x.s);
     await page.route('**/lab-api/board/lantern', async route => {
       const r = route.request();
@@ -389,7 +389,8 @@ const GAMES = {
       if (mode === '401') return route.fulfill({ status: 401, contentType: 'application/json', body: '{"rows":[{"n":"Bad","s":5}]}' });
       if (mode === 'html') return route.fulfill({ status: 200, contentType: 'text/html', body: '<html>not found</html>' });
       if (r.method() !== 'POST') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ rows: listed() }) });
-      const b = r.postDataJSON(); posts.push(b); if (b.remove) kept.delete(b.id); else kept.set(b.id, { n: b.n, s: Math.max(b.s, kept.get(b.id)?.s ?? 0) });
+      const b = r.postDataJSON(); if (b.start) { starts.push(b); return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' }); }
+      posts.push(b); if (b.remove) kept.delete(b.id); else kept.set(b.id, { n: b.n, s: Math.max(b.s, kept.get(b.id)?.s ?? 0) });
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ place: b.remove ? 0 : listed().indexOf(kept.get(b.id)) + 1, rows: listed() }) });
     });
     await page.click('#toBoard'); await until(page, () => window.lanternState().shared >= 0, 'the shared board answers'); await page.click('#tabPhone'); assert.equal(await page.isVisible('#name'), true); assert.match(await page.textContent('#rows'), /^1No name55/);
@@ -414,28 +415,72 @@ const GAMES = {
       assert.match(await page.textContent('#rows'), /Rio/, `${m}: the phone's board shows`); assert.match(await page.textContent('#boardHint'), /stay on this phone/); await page.click('#board .back');
     }
     mode = 'ok'; await openBoard(); assert.equal(await page.isVisible('#tabs'), true, 'tabs when the shared board answers'); assert.match(await page.textContent('#rows'), /Zed/, 'all players come first');
+    // The daily board's stand-in (Today's river, below). Stopping sharing posts a removal to it too.
+    const dposts = [], dstarts = [], dkept = new Map([['day', { n: 'Day', s: 77777 }]]), dlisted = () => [...dkept.values()].sort((x, y) => y.s - x.s);
+    await page.route('**/lab-api/board/lantern-daily', async route => {
+      const r = route.request(); if (r.method() !== 'POST') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ rows: dlisted() }) });
+      const b = r.postDataJSON(); if (b.start) { dstarts.push(b); return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' }); }
+      dposts.push(b); if (b.remove) dkept.delete(b.id); else dkept.set(b.id, { n: b.n, s: Math.max(b.s, dkept.get(b.id)?.s ?? 0) });
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ place: b.remove ? 0 : dlisted().indexOf(dkept.get(b.id)) + 1, rows: dlisted() }) });
+    });
     await page.click('#tabAll'); assert.match(await page.textContent('#rows'), /Zed99999/); assert.doesNotMatch(await page.textContent('#rows'), /Rio/); assert.match(await page.textContent('#shareNote'), /A tick sends your name and your best score/);
-    await page.check('#share'); await until(page, () => document.querySelector('#rows li.me'), 'the shared row');
-    assert.equal(posts.length, 1); assert.deepEqual(Object.keys(posts[0]).sort(), ['id', 'n', 's'], 'only the id, the name and the score are sent'); assert.equal(posts[0].n, 'Rio <b>river</b'); assert.ok(posts[0].s >= 900); assert.match(posts[0].id, /^[A-Za-z0-9-]{20,64}$/);
-    assert.match(await page.textContent('#rows li.me'), /^2Rio/); assert.equal(await page.locator('#rows b').count(), 0, 'no markup from a shared name'); assert.equal((await saved())['lantern-share'], '1'); assert.equal(await page.isChecked('#share'), true);
-    await page.click('#boardPlay'); await page.evaluate(() => { const s = window.lanternSim(); s.extra = 40; s.light = 0.0001; s.warm = 0; });
-    await until(page, () => window.lanternState().screen === 'card' && !window.lanternState().playing, 'second endless run ends'); await page.click('#toMenu');
-    for (let i = 0; i < 40 && posts.length < 2; i++) await sleep(50);
-    assert.equal(posts.length, 2, 'after one yes, a run is sent by itself'); assert.equal(posts[1].id, posts[0].id); assert.ok(posts[1].s < 900);
-    await openBoard(); await page.click('#tabAll'); await page.uncheck('#share'); for (let i = 0; i < 40 && posts.length < 3; i++) await sleep(50);
-    assert.deepEqual(posts[2], { id: posts[0].id, remove: true }, 'stop sharing takes the row away'); assert.equal((await saved())['lantern-share'], ''); assert.equal((await saved())['lantern-board-id'], '');
+    // The yes sends nothing by itself. A score goes up with a run ticket: the page tells the server when a sharing player's endless run starts.
+    assert.equal(starts.length, 0, 'no ticket is asked for before the yes');
+    await page.check('#share'); await until(page, () => /from now on goes up by itself/.test(document.querySelector('#shareNote').textContent), 'the tick is kept'); await sleep(300);
+    assert.equal(posts.length, 0, 'the yes sends no old score'); assert.equal(starts.length, 0); assert.equal((await saved())['lantern-share'], '1'); assert.equal(await page.isChecked('#share'), true);
+    await page.click('#boardPlay'); await until(page, () => window.lanternState().playing, 'the run starts'); for (let i = 0; i < 40 && starts.length < 1; i++) await sleep(50);
+    assert.equal(starts.length, 1, 'the run asks for a ticket'); assert.deepEqual(Object.keys(starts[0]).sort(), ['r', 'start']); assert.match(starts[0].r, /^[A-Za-z0-9-]{20,64}$/);
+    await page.evaluate(() => { const s = window.lanternSim(); s.extra = 40; s.light = 0.0001; s.warm = 0; });
+    await until(page, () => window.lanternState().screen === 'card' && !window.lanternState().playing, 'second endless run ends');
+    await until(page, () => /of all players/.test(document.querySelector('#sub').textContent), 'the card says the place among all players'); await page.click('#toMenu');
+    assert.equal(posts.length, 1, 'after one yes, a run is sent by itself'); assert.deepEqual(Object.keys(posts[0]).sort(), ['id', 'n', 'r', 's'], 'only the id, the name, the score and the run ticket are sent');
+    assert.equal(posts[0].n, 'Rio <b>river</b'); assert.ok(posts[0].s < 900, 'the run, not the old best'); assert.match(posts[0].id, /^[A-Za-z0-9-]{20,64}$/); assert.equal(posts[0].r, starts[0].r); assert.notEqual(posts[0].r, posts[0].id);
+    await openBoard(); await page.click('#tabAll'); assert.match(await page.textContent('#rows li.me'), /^2Rio/); assert.equal(await page.locator('#rows b').count(), 0, 'no markup from a shared name');
+    await page.uncheck('#share'); for (let i = 0; i < 40 && posts.length < 2; i++) await sleep(50);
+    assert.deepEqual(posts[1], { id: posts[0].id, remove: true }, 'stop sharing takes the row away'); assert.equal((await saved())['lantern-share'], ''); assert.equal((await saved())['lantern-board-id'], '');
     await until(page, () => !/Rio/.test(document.querySelector('#rows').textContent), 'the row is gone'); assert.ok(!JSON.stringify(labSent(page)).includes(posts[0].id), 'the board id is not sent to the lab');
-    // A no is kept: the next run asks nothing and sends nothing. Yes on the card (a player who has not chosen) sends the run at once.
+    // A no is kept: the next run asks nothing and sends nothing. Yes on the card (a player who has not chosen) sends nothing yet: that run had no ticket.
     const endlessRun = async () => { await page.evaluate(() => { const s = window.lanternSim(); s.extra = 30; s.light = 0.0001; s.warm = 0; }); await until(page, () => window.lanternState().screen === 'card' && !window.lanternState().playing, 'an endless run ends'); };
-    await page.click('#boardPlay'); await endlessRun(); await sleep(300); assert.equal(await page.isVisible('#ask'), false, 'no second question after a no'); assert.equal(posts.length, 3, 'nothing is sent after a no'); await page.click('#toMenu');
+    await page.click('#boardPlay'); await endlessRun(); await sleep(300); assert.equal(await page.isVisible('#ask'), false, 'no second question after a no'); assert.equal(posts.length, 2, 'nothing is sent after a no'); assert.equal(starts.length, 1, 'and no ticket is asked for'); await page.click('#toMenu');
     await page.evaluate(() => { localStorage.removeItem('lantern-share'); localStorage.removeItem('lantern-board-id'); localStorage.removeItem('lantern-name'); }); await page.reload();
-    await page.click('#endless'); await endlessRun(); assert.equal(await page.isVisible('#askYes'), true); await page.click('#askYes'); assert.match(await page.textContent('#askNote'), /Type a name first/); assert.equal(posts.length, 3, 'no name, nothing sent');
-    await page.fill('#askName', 'Rio'); await page.click('#askYes'); await until(page, () => /of all players/.test(document.querySelector('#sub').textContent), 'the card says the place among all players'); assert.equal(posts.length, 4); assert.equal(posts[3].n, 'Rio'); assert.equal(await page.isVisible('#ask'), false); assert.equal((await saved())['lantern-share'], '1');
-    await page.click('#toMenu'); await openBoard(); await page.uncheck('#share'); for (let i = 0; i < 40 && posts.length < 5; i++) await sleep(50); assert.equal(posts.length, 5); await page.click('#board .back');
+    await page.click('#endless'); await endlessRun(); assert.equal(await page.isVisible('#askYes'), true); await page.click('#askYes'); assert.match(await page.textContent('#askNote'), /Type a name first/); assert.equal(posts.length, 2, 'no name, nothing sent');
+    await page.fill('#askName', 'Rio'); await page.click('#askYes'); await until(page, () => /Your next run goes up/.test(document.querySelector('#sub').textContent), 'the card says the next run goes up'); assert.equal(posts.length, 2); assert.equal(starts.length, 1); assert.equal(await page.isVisible('#ask'), false); assert.equal((await saved())['lantern-share'], '1');
+    await page.click('#toMenu'); await openBoard(); await page.uncheck('#share'); for (let i = 0; i < 40 && posts.length < 3; i++) await sleep(50); assert.equal(posts.length, 3); await page.click('#board .back');
     await page.evaluate(() => localStorage.setItem('lantern-name', 'Rio <b>river</b')); // as the lines below expect
+    // Today's river: the same seed for the whole UTC day, its own shared board, and nothing on the endless boards.
+    const d0 = dposts.length; assert.ok(dposts.every(b => b.remove === true), 'only removals reached the daily board so far');
+    const rows0 = (await state()).board.length, best0 = (await saved())['lantern-best-endless'], seedNow = () => page.evaluate(() => window.lanternSim().seed);
+    await page.click('#daily'); assert.equal((await state()).daily, true, 'daily on from the menu'); const seed1 = await seedNow(); await endlessRun();
+    assert.match(await page.textContent('#line'), /Today's river: your best today is \d+/); assert.equal(dposts.length - d0 + dstarts.length, 0, 'not sharing: nothing is sent');
+    const kept1 = JSON.parse((await saved())['lantern-daily']); assert.match(kept1.d, /^\d{4}-\d\d-\d\d$/); assert.ok(kept1.s >= 30);
+    assert.equal((await state()).board.length, rows0, 'a daily run stays off the phone\'s endless board'); assert.equal((await saved())['lantern-best-endless'], best0);
+    await page.click('#go'); assert.equal(await seedNow(), seed1, 'the same river again'); assert.equal((await state()).daily, true, 'daily kept on play again'); await endlessRun(); await page.click('#toMenu');
+    await page.click('#endless'); assert.notEqual(await seedNow(), seed1, 'the endless river is a new river'); assert.equal((await state()).daily, false);
+    await page.evaluate(() => { const s = window.lanternSim(); s.t = -1; s.extra = 0; s.light = 0.0001; s.warm = 0; }); await until(page, () => window.lanternState().screen === 'card' && !window.lanternState().playing, 'a run of 0 ends'); await page.click('#toMenu'); // 0 stays off the board
+    await openBoard(); await page.check('#share'); await page.click('#tabDay'); await until(page, () => /Day77777/.test(document.querySelector('#rows').textContent), 'today\'s board'); assert.match(await page.textContent('#boardHint'), /same river for every player/);
+    const mainSent = posts.length; await page.click('#boardPlay'); assert.equal((await state()).daily, true, 'daily on from the Today tab'); assert.equal(await seedNow(), seed1); for (let i = 0; i < 40 && dstarts.length < 1; i++) await sleep(50);
+    await endlessRun(); await until(page, () => /Number 2 today among all players/.test(document.querySelector('#sub').textContent), 'the place on today\'s board');
+    assert.equal(dposts.length, d0 + 1); assert.equal(dposts[d0].r, dstarts[0].r); assert.equal(posts.length, mainSent, 'nothing goes to the endless board');
+    await page.click('#toMenu'); await openBoard(); await page.uncheck('#share'); for (let i = 0; i < 40 && dposts.length < d0 + 2; i++) await sleep(50);
+    assert.deepEqual(dposts[d0 + 1], { id: dposts[d0].id, remove: true }, 'stop sharing takes the row off today\'s board too'); await page.click('#board .back');
+    await page.unroute('**/lab-api/board/lantern-daily');
     await page.unroute('**/lab-api/board/lantern');
     await sleep(400); await page.reload(); st = await state(); assert.equal(st.name, 'Rio <b>river</b'); assert.equal(st.board.length, 5, 'the board is kept');
     await page.evaluate(() => localStorage.setItem('hf-lab-recording-off', '1')); await page.reload(); // recording off again, as the steps below expect
+    // Views (notes #158, #159): 2D, 3D and first person, saved under lantern-view. First person steers by pressing a side; a drag does not.
+    assert.equal((await state()).view, '2d', 'a save without lantern-view is 2D'); assert.equal((await saved())['lantern-view'], undefined);
+    await page.route('**/view3d.js*', r => r.abort()); page.context().viewBad = true; await page.click('[data-view="3d"]'); await until(page, () => !document.querySelector('#viewNote').hidden, 'a failed 3D load says so'); assert.equal((await state()).view, '2d', 'no 3D: the river stays 2D'); await page.unroute('**/view3d.js*');
+    await page.reload(); await page.click('[data-view="3d"]'); await until(page, () => window.lanternState().view === '3d' && window.lanternState().viewReady, '3D starts', 20000); assert.equal((await saved())['lantern-view'], '3d');
+    await page.click('#play'); await page.evaluate(() => { const s = window.lanternSim(); s.safe = 60; s.light = 1; }); const v0 = (await state()).target;
+    await finger(page, '#c', [['pointerdown', 200, 400], ['pointermove', 215, 400]]); assert.ok((await state()).target > v0, '3D steers by a drag'); await finger(page, '#c', [['pointerup', 215, 400]]);
+    await finger(page, '#pause', [['pointerdown', 0, 0]]); assert.equal(await page.isVisible('#viewNext'), true, 'the pause card changes the view'); await page.click('#viewNext'); assert.equal((await state()).view, 'first'); assert.equal((await saved())['lantern-view'], 'first');
+    await page.click('#go'); await page.evaluate(() => { const s = window.lanternSim(); s.safe = 60; s.light = 1; });
+    for (const [x, sign] of [[40, -1], [340, 1]]) {
+      await page.evaluate(() => { const s = window.lanternSim(); s.x = 0.5; s.rocks = []; s.safe = 60; }); await finger(page, '#c', [['pointerdown', x, 600]]);
+      await until(page, g => Math.sign(window.lanternState().x - 0.5) === g && Math.abs(window.lanternState().x - 0.5) > 0.02, `a press steers (${sign})`, 8000, sign); await finger(page, '#c', [['pointerup', x, 600]]); await sleep(400);
+    }
+    await finger(page, '#c', [['pointerdown', 100, 600]]); await finger(page, '#c', [['pointermove', 300, 600]]); await until(page, () => window.lanternState().target < window.lanternState().x + 1e-6, 'a press that slides stays a press on the side it began'); await finger(page, '#c', [['pointerup', 300, 600]]);
+    await page.reload(); await until(page, () => window.lanternState().view === 'first', 'the view is kept'); await page.click('[data-view="2d"]'); assert.equal((await state()).view, '2d');
     // A look on the whole screen (notes #73 and #112): tapping an owned boat shows it and hides every button; a tap brings the shop back,
     // and the button under the pack wears it.
     await page.click('#toShop'); await page.click('[data-item="red"]'); st = await state();
@@ -621,8 +666,9 @@ const GAMES = {
     await dragNumbers(page); await finger(page, '#c', [['pointerup', 140, 400]]);
     assert.equal(await page.evaluate(() => window.audioLog.made), 1, 'one audio context for the whole run');
     // The run ends with an end card; the page keeps nothing in storage, so a reload starts clean.
-    await page.evaluate(() => { window.lanternSim().light = 0.0001; });
-    await until(page, () => window.lanternState().screen === 'card' && !window.lanternState().playing, 'end card');
+    // CI's software WebGL draws a few frames a second, so the flame takes many seconds of wall time to go out; warm = 0 stops a late ember from feeding it.
+    await page.evaluate(() => { const s = window.lanternSim(); s.light = 0.0001; s.warm = 0; });
+    await until(page, () => window.lanternState().screen === 'card' && !window.lanternState().playing, 'end card', 40000);
     assert.deepEqual(await page.evaluate(() => Object.keys(localStorage).filter(k => k !== 'notes.k')), ['lantern-3d:hint'], 'no saved keys but the first-time help\'s (kit/hint.js)');
     await page.reload(); await until(page, () => window.lanternState, 'game script'); assert.equal((await state()).screen, 'menu');
   },
@@ -667,6 +713,10 @@ const GAMES = {
 };
 
 const [onlyGame, onlyPhone] = process.argv.slice(2);
+// The first argument is 'all' or a comma list of experiments. An experiment's name picks its own check, its
+// first-time help check, and for Lantern the three checks below that play Lantern.
+const WITH = { lantern: ['old links', 'lab down', 'leaving mid-run'] };
+const picked = game => !onlyGame || onlyGame === 'all' || onlyGame.split(',').some(only => game === only || game === `hint ${only}` || WITH[only]?.includes(game));
 // A check that never answers becomes a FAIL line naming it, not a job that runs until its time limit.
 const within = (p, ms, what) => { let t; return Promise.race([p, new Promise((_, no) => { t = setTimeout(() => no(new Error(`no answer in ${ms / 1000}s: ${what}`)), ms); })]).finally(() => clearTimeout(t)); };
 let failed = 0;
@@ -674,7 +724,7 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
   if (onlyPhone && onlyPhone !== phone) continue;
   let browser = await engine.launch();
   for (const [game, run] of Object.entries(GAMES)) {
-    if (onlyGame && onlyGame !== 'all' && onlyGame !== game) continue;
+    if (!picked(game)) continue;
     const context = await browser.newContext({ ...device }), page = await context.newPage(), errors = [];
     // Answer the lab endpoint here, so no check ever reaches it. Records are kept for the assertions.
     context.labSent = []; context.labTried = 0;
@@ -700,8 +750,8 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
     page.on('pageerror', e => errors.push(String(e))); page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
     page.on('requestfailed', r => errors.push(`request failed: ${r.url()}`)); page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
     // Lantern's check is the longest: its seven ability showings (note #123) took it past 150 s on WebKit.
-    try { await within(run(page), game === 'lantern' ? 240000 : 150000, 'the whole check'); assert.deepEqual(errors.filter(e => !(context.labDown && /human\.adamwhite\.work|Load failed|Failed to fetch|ERR_CONNECTION_REFUSED/.test(e))).filter(e => !(context.boardBad && /\/lab-api\/board\/|status of 401/.test(e))).filter(e => !(context.badFrame && /lab check: one bad frame/.test(e))), [], 'page errors'); console.log(`ok   ${game} on ${phone}`); }
-    catch (e) { failed++; console.log(`FAIL ${game} on ${phone}: ${e.message}`); if (errors.length) console.log('     ' + errors.join('\n     ')); }
+    try { await within(run(page), game === 'lantern' ? 240000 : 150000, 'the whole check'); assert.deepEqual(errors.filter(e => !(context.labDown && /human\.adamwhite\.work|Load failed|Failed to fetch|ERR_CONNECTION_REFUSED/.test(e))).filter(e => !(context.boardBad && /\/lab-api\/board\/|status of 401/.test(e))).filter(e => !(context.badFrame && /lab check: one bad frame/.test(e))).filter(e => !(context.viewBad && /view3d\.js|net::ERR_FAILED|Failed to load resource|Importing a module/.test(e))), [], 'page errors'); console.log(`ok   ${game} on ${phone}`); }
+    catch (e) { failed++; console.log(`FAIL ${game} on ${phone}: ${e.message}`); if (process.env.CHECK_STACK) console.log(e.stack); if (errors.length) console.log('     ' + errors.join('\n     ')); }
     try { await within(context.close(), 15000, 'closing the page'); }
     catch (e) { console.log(`     ${e.message}; starting the browser again`); browser.close().catch(() => {}); browser = await engine.launch(); }
   }

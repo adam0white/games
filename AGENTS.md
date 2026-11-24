@@ -24,7 +24,7 @@ Owner, 2026-11-23: Fable and Astra sessions plan, review and decide; gameplay bu
 
 ## Worker observability (owner direction, 2026-11-24)
 
-Every Worker that runs code has logs, traces and Cloudflare Issues on. Start a new Worker from `workers/observability/template.wrangler.jsonc`; `scripts/observability.test.mjs` fails `npm test` when the block is missing. Report a handled failure with `console.error(error)`. Never log note text, tokens, tester ids or player ids. A watcher on the lab's Mac starts a Claude run for each new issue. The rule, what is stored, the exceptions and the watcher are in `workers/OBSERVABILITY.md`. Turning logs, traces or Issues off for a Worker, or on for one in the exceptions table, is an owner decision.
+Every Worker that runs code has logs, traces and Cloudflare Issues on. Start a new Worker from `workers/observability/template.wrangler.jsonc`; `scripts/observability.test.mjs` fails `npm test` when the block is missing. Report a handled failure with `console.error(error)`. Never log note text, tokens, tester ids or player ids. A watcher on the lab's Mac starts a Claude run for each new issue. The rule, what is stored and the watcher are in `workers/OBSERVABILITY.md`. There are no exceptions (owner decision, 2026-11-24). Turning logs, traces or Issues off for a Worker is an owner decision.
 
 ## Current goal (owner, 2026-11-13 and 2026-11-14)
 

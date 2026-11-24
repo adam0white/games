@@ -1,5 +1,6 @@
 // The notes API. Plain functions over the bindings so the tests can run them with in-memory fakes.
-// Nothing here logs: note text, tokens and tester ids stay in D1 and R2.
+// Nothing here logs note text, tokens or tester ids: they stay in D1 and R2. Cloudflare request logs are on
+// (workers/OBSERVABILITY.md), so report a failure with console.error(error) and nothing from the request body.
 
 const MAX_TEXT = 6000;
 const MAX_AUDIO = 12 * 1024 * 1024;

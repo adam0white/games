@@ -11,29 +11,74 @@ const THINK = 5;
 
 export function think(w, a) {
   if (!a.alive || (w.tick + a.id) % THINK) return;
-  const b = a.brain ??= { bold: 0.3 + w.rand() * 0.6 };
+  // Two foragers, one raider and one guard per four ids. Roles and passing
+  // sides survive respawns; reaction time and aim error stay the same.
+  const b = a.brain ??= { role: a.id % 4, side: a.id % 2 ? 1 : -1, retreat: false };
   const [nx, ny] = C.NESTS[a.colony];
-  let tx, ty, sprint = false, foe = null, fd = 1e9, threat = null, td = 1e9;
-  antsNear(w, a.x, a.y, C.VIEW, o => {
-    if (o.colony === a.colony || w.tick < o.protectUntil) return;
+  const visible = [];
+  let tx, ty, sprint = false, foe = null, bestPriority = Infinity, td = Infinity;
+  antsNear(w, a.x, a.y, C.VIEW, o => { if (o !== a) visible.push(o); });
+  for (const o of visible) {
+    if (o.colony === a.colony || w.tick < o.protectUntil) continue;
     const d = Math.hypot(o.x - a.x, o.y - a.y);
-    const stronger = !o.carry && (o.tier > a.tier || o.hp > a.hp + 1);
-    if (stronger) { if (d < td) { td = d; threat = o; } } else if (d < fd) { fd = d; foe = o; }
-  });
-  if (a.carry) { tx = nx; ty = ny; sprint = td < 220 || fd < 160; }
-  else if (foe && fd < 70 && foe.hp <= a.hp) { tx = foe.x; ty = foe.y; sprint = fd > 30 && a.stamina > 20; } // a fight it is winning: finish it
-  else if (a.hp * 2 <= C.TIER_HP[a.tier]) { tx = nx; ty = ny; sprint = td < 250 || fd < 250; }
-  else if (threat && td < 170) { tx = a.x * 2 - threat.x; ty = a.y * 2 - threat.y; sprint = td < 110; }
-  else if (foe && fd < 200 + 300 * b.bold && (foe.carry || b.bold > 0.3)) { tx = foe.x; ty = foe.y; sprint = fd > 50 && a.stamina > 40; }
-  else {
-    let best = -1, bd = 1e12;
-    foodNear(w, a.x, a.y, C.VIEW, id => { const d = (w.fx[id] - a.x) ** 2 + (w.fy[id] - a.y) ** 2 - (w.fkind[id] === 2 ? 40000 : 0); if (d < bd) { bd = d; best = id; } });
-    if (best >= 0) { tx = w.fx[best]; ty = w.fy[best]; }
-    else {
-      // The middle is public. Search there when nothing is in sight.
-      tx = C.WORLD / 2; ty = C.WORLD / 2;
-    }
+    td = Math.min(td, d);
+    const vulnerable = o.carry || o.hp < C.TIER_HP[o.tier];
+    const defending = b.role === 2 && Math.hypot(o.x - nx, o.y - ny) < C.NEST_R + 200;
+    const reach = defending ? 300 : vulnerable ? [150, 330, 180, 150][b.role] : [85, 200, 150, 85][b.role];
+    if (d >= reach) continue;
+    // Yield behind two healthy allies for an ordinary duel, three for a
+    // vulnerable target. The 12-unit tolerance avoids switching on small
+    // distance changes. This is admission by visible position, not a reservation.
+    const limit = vulnerable ? 3 : 2;
+    let closer = 0;
+    for (const p of visible) if (p.colony === a.colony && !p.carry && p.hp > C.TIER_HP[p.tier] * 0.4 && w.tick >= p.protectUntil &&
+      Math.hypot(p.x - o.x, p.y - o.y) < d - 12) closer++;
+    if (closer >= limit) continue;
+    const priority = d - (o.carry ? 140 : 0) - (C.TIER_HP[o.tier] - o.hp) * 25 - (b.target === o.id ? 30 : 0);
+    if (priority < bestPriority) { bestPriority = priority; foe = o; }
   }
+  const fd = foe ? Math.hypot(foe.x - a.x, foe.y - a.y) : Infinity;
+  const maxHP = C.TIER_HP[a.tier];
+  const retreatHP = b.role === 1 ? 1 : Math.floor(maxHP * (b.role === 2 ? 0.3 : 0.4));
+  if (a.hp <= retreatHP) b.retreat = true;
+  if (a.hp >= maxHP) b.retreat = false;
+  if (a.carry || b.retreat) {
+    tx = nx; ty = ny; sprint = td < 220;
+    // Heal inside the safe nest without converging on its exact centre.
+    if (!a.carry) { const t = a.id * 2.4; tx += Math.cos(t) * 95; ty += Math.sin(t) * 95; }
+  } else if (foe) {
+    b.target = foe.id;
+    // Foragers defend nearby, raiders pursue farther, guards pursue between those ranges. Approach the rear quarter.
+    // At bite range face the target itself.
+    const flank = fd > 55 ? 12 : 0;
+    tx = foe.x - Math.cos(foe.heading) * flank - Math.sin(foe.heading) * flank * b.side;
+    ty = foe.y - Math.sin(foe.heading) * flank + Math.cos(foe.heading) * flank * b.side;
+    sprint = fd > 80 && a.stamina > 40;
+  } else {
+    b.target = null;
+    let best = -1, bd = Infinity;
+    foodNear(w, a.x, a.y, C.VIEW, id => {
+      const d = (w.fx[id] - a.x) ** 2 + (w.fy[id] - a.y) ** 2 - (w.fkind[id] === 2 ? 16000 : 0);
+      if (d < bd) { bd = d; best = id; }
+    });
+    if (best >= 0) { tx = w.fx[best]; ty = w.fy[best]; }
+    else { tx = C.WORLD / 2; ty = C.WORLD / 2; }
+  }
+  // Steering changes input only. Give allies room and leave crowded fights.
+  let sx = 0, sy = 0;
+  for (const o of visible) {
+    const dx = a.x - o.x, dy = a.y - o.y, d = Math.hypot(dx, dy);
+    const radius = o.colony === a.colony ? 100 : (a.carry || b.retreat || o !== foe ? 75 : 0);
+    if (d >= radius) continue;
+    const t = (a.id + o.id) * 2.4, sign = a.id < o.id ? 1 : -1;
+    const ux = d > 0.01 ? dx / d : Math.cos(t) * sign;
+    const uy = d > 0.01 ? dy / d : Math.sin(t) * sign;
+    const weight = (1 - d / radius) * 2.5;
+    sx += ux * weight; sy += uy * weight;
+  }
+  const goal = Math.hypot(tx - a.x, ty - a.y) || 1;
+  tx = a.x + (tx - a.x) / goal + sx;
+  ty = a.y + (ty - a.y) / goal + sy;
   // An enemy nest hurts. Walk away from one that is close, whatever the plan was.
   for (let c = 0; c < C.COLONIES; c++) {
     if (c === a.colony) continue;

@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#86ad55">
+<title>Harvest Morning</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #86ad55; overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  body { font: 17px/1.4 ui-rounded, 'SF Pro Rounded', 'Arial Rounded MT Bold', system-ui, sans-serif; color: #3b2a1a; }
+  canvas#c { display: block; width: 100vw; height: 100dvh; touch-action: none; }
+  #probe { position: fixed; top: 0; left: 0; width: 0; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); visibility: hidden; pointer-events: none; }
+  .screen { position: fixed; inset: 0; display: none; place-items: center; text-align: center; overflow-y: auto; touch-action: pan-y; box-sizing: border-box;
+    padding: calc(10px + env(safe-area-inset-top)) env(safe-area-inset-right) calc(10px + env(safe-area-inset-bottom)) env(safe-area-inset-left); background: #3b2a1a66; }
+  #menu { background: radial-gradient(ellipse at 50% 45%, #3b2a1a88, #3b2a1a22 75%); }
+  .screen.on { display: grid; }
+  .card { max-width: 22em; width: calc(100% - 32px); box-sizing: border-box; padding: 18px 16px 14px; margin: 8px 0; background: #fff4dc; border: 3px solid #3b2a1a; border-radius: 24px; box-shadow: 0 8px 0 #3b2a1a55, 0 18px 40px #3b2a1a44; }
+  h1 { font-size: 2.35em; line-height: 1.02; margin: 0 0 .15em; color: #f0c24f; text-shadow: 0 3px 0 #3b2a1a; -webkit-text-stroke: 1.5px #3b2a1a; letter-spacing: .01em; }
+  h2 { font-size: 1.75em; line-height: 1.1; margin: 0 0 .2em; color: #f0c24f; text-shadow: 0 2px 0 #3b2a1a; -webkit-text-stroke: 1px #3b2a1a; }
+  p { margin: .35em 0; }
+  .sub { font-size: .95em; opacity: .85; }
+  .small { font-size: 14px; opacity: .85; }
+  button { font: inherit; font-weight: bold; color: #3b2a1a; background: #fbe6b8; border: 2.5px solid #3b2a1a; border-radius: 16px; padding: .4em 1em; margin: .25em; min-height: 48px; min-width: 8em; touch-action: manipulation; cursor: pointer; box-shadow: 0 4px 0 #3b2a1a; }
+  button:active { transform: translateY(3px); box-shadow: 0 1px 0 #3b2a1a; }
+  button.main { background: #e9b23c; font-size: 1.3em; min-width: 9em; }
+  button:disabled { opacity: .45; }
+  button.small { min-width: 0; font-size: 15px; opacity: 1; }
+  #pause { position: fixed; top: calc(8px + env(safe-area-inset-top)); right: calc(10px + env(safe-area-inset-right)); width: 48px; height: 48px; min-width: 0; min-height: 0; margin: 0; padding: 0; border-radius: 50%; display: none; place-items: center; box-shadow: 0 3px 0 #3b2a1a; background: #fff4dc; }
+  #pause::before { content: ''; width: 4px; height: 16px; border: solid #3b2a1a; border-width: 0 5px; }
+  #hero { display: block; width: 100%; height: 110px; margin: -4px auto 2px; }
+  #grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: .6em 0; }
+  #grid button { min-width: 0; margin: 0; padding: 4px 0 2px; border-radius: 14px; line-height: 1.1; min-height: 56px; }
+  #grid button small { display: block; font-size: 14px; letter-spacing: 1px; color: #c9962e; }
+  #grid button.done { background: #f6d77e; }
+  .ledger { margin: .4em auto; border-collapse: collapse; font-size: 1em; }
+  .ledger td { padding: 2px 8px; }
+  .ledger td:last-child { text-align: right; font-weight: bold; font-variant-numeric: tabular-nums; }
+  .ledger tr.total td { border-top: 2px solid #3b2a1a; font-size: 1.15em; }
+  .ledger .minus { color: #b5482f; }
+  .ledger .plus { color: #3f7d2c; }
+  #endStars { display: block; width: 210px; height: 66px; margin: 0 auto; }
+  #board { margin: .3em auto; font-size: 15px; border-collapse: collapse; }
+  #board td { padding: 1px 8px; } #board tr.me td { font-weight: bold; color: #b5482f; }
+  .lab-notice, .lab-toggle { font-size: 14px !important; }
+  .desk { display: none; } @media (pointer: fine) { .desk { display: block; } }
+  @media (max-height: 640px) { h1 { font-size: 2em; } #hero { height: 80px; } .card { padding: 12px 14px 10px; } button { min-height: 48px; } }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="probe"></div>
+<button id="pause" aria-label="Pause"></button>
+
+<div id="menu" class="screen on"><div class="card">
+  <canvas id="hero" aria-hidden="true"></canvas>
+  <h1>Harvest Morning</h1>
+  <p class="sub">Bring the wheat in before the rain.</p>
+  <p><button id="play" class="main">Play</button></p>
+  <p><button id="daily">Today's field</button><button id="fields">Fields</button></p>
+  <p id="menuLine" class="small"></p>
+  <p class="desk small">Mouse: hold and move. Keys: arrows, Space sharpens, 1 to 4 hire.</p>
+  <p><button id="sound1" class="small">Sound: on</button></p>
+</div></div>
+
+<div id="levels" class="screen"><div class="card">
+  <h2>Fields</h2>
+  <div id="grid"></div>
+  <p><button id="levelsBack">Back</button></p>
+</div></div>
+
+<div id="paused" class="screen"><div class="card">
+  <h2>Paused</h2>
+  <p><button id="resume" class="main">Keep going</button></p>
+  <p><button id="stopHere">Stop here</button><button id="quit">Menu</button></p>
+  <p class="small">Stop here: keep what is in the cart, pay your help for the time they worked.</p>
+  <p><button id="sound2" class="small">Sound: on</button></p>
+</div></div>
+
+<div id="end" class="screen"><div class="card">
+  <h2 id="endTitle">Safe from the rain!</h2>
+  <canvas id="endStars" aria-hidden="true"></canvas>
+  <table class="ledger" id="ledger"></table>
+  <p id="endLine" class="sub"></p>
+  <table id="board"></table>
+  <p><button id="next" class="main">Next field</button></p>
+  <p><button id="again">Again</button><button id="toMenu">Menu</button></p>
+</div></div>
+
+<script type="module" src="./main.js"></script>
+<script src="/notes/button.js" defer></script>
+</body>
+</html>

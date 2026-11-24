@@ -25,6 +25,9 @@
 <script type="module">
 // One entry per experiment: [directory, title, what it tests, which game it comes from]
 const LIST = [
+  ['ant-evolve', 'Ant Promotion: The Meadow Evolves', 'Every animal carries traits. The ones that chase you well, or escape you, have the children. The meadow slowly learns how you play, and tells you what it learned.', 'Ant Promotion'],
+  ['lantern-echo', 'Lantern Echo', 'The lantern is out. A ping every second lights what is ahead for a moment, and each thing answers with a sound from its side. Headphones help.', 'Lantern'],
+  ['lantern-ripples', 'Lantern Ripples', 'The water is simulated: the wake, every pickup, the rain and every hit send ripples across the river.', 'Lantern'],
   ['lantern-fp', 'Lantern: First Person', 'The river seen from the bow. Tap left or right to steer.', 'Lantern'],
   ['lantern-race', 'Lantern: Race', 'Race up to eight boats on the same river, in an open room or with a code for friends.', 'Lantern'],
   ['ant-swarm', 'Ant Promotion: The Swarm', 'You are the colony\'s scent. Paint a trail and hundreds of ants follow it.', 'Ant Promotion'],
@@ -34,6 +37,7 @@ const LIST = [
   ['ant-wilds', 'Ant Promotion: Wilds', 'Animals hunt each other. Watch the chases and eat the leftovers. Now in Ant Promotion as the Wild rules.', 'Ant Promotion'],
   ['ant-nemesis', 'Ant Promotion: Nemesis', 'The animal that kills you becomes a named rival. It talks, remembers you and grows until you can eat it. Now in Ant Promotion.', 'Ant Promotion'],
   ['ant-nest', 'Ant Promotion: The Nest', 'Draw where to dig. The ants decide when. Keep the queen dry when the rain comes.', 'Ant Promotion and The Warren'],
+  ['thankful', 'Thankful Sky', 'Three thanks a day. Each one becomes a light in a sky that grows.', 'the lab'],
 ];
 const box = document.getElementById('list');
 if (!LIST.length) box.innerHTML = '<p>The first experiments are being built.</p>';

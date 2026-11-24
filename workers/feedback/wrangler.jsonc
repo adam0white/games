@@ -24,6 +24,14 @@
     "TRANSLATE_MODEL": "@cf/openai/gpt-oss-120b"
   },
   // Secrets, set with `wrangler secret put`: TESTERS (JSON list of {id, token, lang}) and STAFF_TOKEN.
-  // No request logging: note text, tokens and tester ids never reach logs.
-  "observability": { "enabled": false }
+  // Logs, traces and Issues on (owner decision, 2026-11-24; workers/OBSERVABILITY.md). The code itself still logs no
+  // note text, tokens or tester ids. Cloudflare masks the Authorization header and removes the query string.
+  "upload_source_maps": true,
+  "observability": {
+    "enabled": true,
+    "redact_query_string": true,
+    "logs": { "enabled": true, "invocation_logs": true, "head_sampling_rate": 1 },
+    "traces": { "enabled": true, "head_sampling_rate": 1 },
+    "issues": { "enabled": true }
+  }
 }

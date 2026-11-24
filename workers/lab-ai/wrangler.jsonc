@@ -31,6 +31,13 @@
     { "name": "PER_IP", "namespace_id": "4101", "simple": { "limit": 6, "period": 60 } },
     { "name": "GLOBAL", "namespace_id": "4102", "simple": { "limit": 10, "period": 60 } }
   ],
-  // No request logging.
-  "observability": { "enabled": false }
+  // Logs, traces and Issues on (owner decision, 2026-11-24; workers/OBSERVABILITY.md).
+  "upload_source_maps": true,
+  "observability": {
+    "enabled": true,
+    "redact_query_string": true,
+    "logs": { "enabled": true, "invocation_logs": true, "head_sampling_rate": 1 },
+    "traces": { "enabled": true, "head_sampling_rate": 1 },
+    "issues": { "enabled": true }
+  }
 }

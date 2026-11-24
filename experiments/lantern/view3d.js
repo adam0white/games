@@ -1,13 +1,15 @@
 // Lantern 3D renderer: draws one frame of the Lantern simulation with WebGL2.
 // It reads the simulation and never changes it. World axes: x is the sim's x (river units),
 // y is up, z points back toward the camera; the boat's row is always z = 0, so z = -(y - s.y).
-import { centre, half, fall, fog, wind, rain, sight, dazzle, boat, BOAT } from '../../lantern/sim.js';
+import { centre, half, fall, fog, wind, rain, sight, dazzle, boat, BOAT } from './sim.js?v=14';
 
 const ROWS = 256, DY = 0.05, BEHIND = 40; // river table: 256 rows, 0.05 apart, from 2 units behind the boat
 const NEAR = -1.2, FAR = 4.2, ROW_STEP = 0.025; // ground mesh rows, boat-relative
 const REED_STEP = 0.007, REED_SPAN = 5.6;
-// Camera: 1.6 up and 0.7 behind the boat, looking at a point 0.5 ahead, 50 degree vertical field of view.
+// Camera of the lab page: 1.6 up and 0.7 behind the boat, looking at a point 0.5 ahead, 50 degree vertical field of view.
 const CAM = { h: 1.6, back: 0.7, look: 0.5, fov: 50 };
+// Lantern's own cameras. The 3D view rides low behind the boat; first person sits at the stern, with the lantern in front (notes #158, #159).
+const CAMS = { '3d': { h: 0.98, back: 0.82, look: 0.75, fov: 64 }, first: { h: 0.135, back: 0.1, look: 1.1, fov: 78 } };
 
 const COMMON = `
 precision highp int;
@@ -28,6 +30,11 @@ uniform vec3 uAmb;
 uniform vec3 uHorizon;
 uniform float uDawn;
 uniform float uExpo;
+uniform vec3 uWet; // the water's own colour
+uniform float uHaze; // 1: the far end of the river fades into the night (Lantern's own views)
+uniform float uReedK; // reed height, 1 on the lab page
+uniform float uStone; // 0 river banks, 1 the tower's stone, 2 the second sector's violet stone
+uniform vec3 uTint; uniform float uTintK; // the boat's colour
 // A hash without sine (after Dave Hoskins); inputs are wrapped so large river y keeps full precision.
 float hash(vec2 p) { vec3 q = fract(vec3(p.xyx) * 0.1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
 float vnoise(vec2 p) {
@@ -39,6 +46,7 @@ vec4 row0(float yA) { return texture(uRows, vec2(0.25, ((yA - uRowInfo.x) / uRow
 vec4 row1(float yA) { return texture(uRows, vec2(0.75, ((yA - uRowInfo.x) / uRowInfo.y + 0.5) / uRowInfo.z)); }
 // Height of the bank at a distance off outside the water's edge.
 float bankH(float off, float yA, float side) {
+  if (uStone > 0.5) return 0.13 * smoothstep(0., 0.015, off) - 0.008 * (1. - smoothstep(0., 0.01, off));
   float n = vnoise(vec2(yA * 7., off * 9. + side * 17.));
   return 0.075 * smoothstep(0.0, 0.07, off) * (0.7 + 0.6 * n) + 0.03 * smoothstep(0.15, 0.6, off) * n - 0.008 * (1. - smoothstep(0., 0.01, off));
 }
@@ -77,6 +85,7 @@ vec3 atmos(vec3 col, vec3 p) {
     float nz = vnoise(vec2(p.x * 5. + uTime * 0.15, yA * 3.));
     col = mix(col, vec3(0.5, 0.55, 0.6) * (0.03 + 0.35 * lampW(p)), fg * (0.25 + 0.3 * nz));
   }
+  col *= 1. - uHaze * smoothstep(2.6, 4.1, -p.z);
   col = mix(col, uHorizon, uDawn * smoothstep(1.0, 4.5, length(p - uEye)));
   return col;
 }
@@ -169,7 +178,7 @@ void main() {
       float wl = vnoise(vec2((vW.x - uTime * 0.6 * sign(r1.y)) * 5., yA * 45.));
       foam = max(foam, abs(r1.y) * smoothstep(0.72, 0.95, wl) * 0.6);
     }
-    vec3 alb = vec3(0.04, 0.075, 0.09);
+    vec3 alb = uWet;
     col = shade(vW, n, v, alb, 160., 0.32, 0.6);
     // the sky in the water
     float fres = 0.02 + 0.98 * pow(1. - max(dot(n, v), 0.), 5.);
@@ -186,6 +195,11 @@ void main() {
     float gn = vnoise(vec2(vW.x * 40., yA * 40.)), gn2 = vnoise(vec2(vW.x * 9., yA * 9.));
     vec3 earth = vec3(0.06, 0.045, 0.03), grass = mix(vec3(0.03, 0.05, 0.02), vec3(0.06, 0.075, 0.03), gn);
     vec3 alb = mix(earth, grass, smoothstep(0.015, 0.05, vW.y)) * (0.7 + 0.6 * gn2);
+    if (uStone > 0.5) { // courses of stone, joints staggered
+      float row = floor(yA / 0.12), jx = fract((vW.x + mod(row, 2.) * 0.1) / 0.2), jy = fract(yA / 0.12);
+      float joint = max(step(jx, 0.035), step(jy, 0.05));
+      alb = (uStone > 1.5 ? vec3(0.17, 0.12, 0.23) : vec3(0.16, 0.16, 0.18)) * (0.7 + 0.5 * gn2) * (1. - 0.6 * joint);
+    }
     float wet = 1. - smoothstep(0., 0.03, e);
     col = shade(vW, n, v, alb, 30. + 30. * wet, 0.04 + 0.4 * wet, 0.1);
   }
@@ -281,7 +295,7 @@ void main() {
   float yA = (k + h1) * ${REED_STEP};
   vec4 r = row0(yA);
   float off = 0.002 + 0.05 * h2 * h2;
-  float ht = (0.04 + 0.09 * h3) * (h2 < 0.15 ? 0.5 : 1.);
+  float ht = (0.04 + 0.09 * h3) * (h2 < 0.15 ? 0.5 : 1.) * uReedK;
   float t = aB.x;
   float sway = sin(uTime * 1.7 + yA * 2.3 + h1 * 6.) * 0.18 + (h3 - 0.5) * 0.5 + side * 0.25;
   vec3 p = vec3(r.x + side * (r.y + off) + sway * ht * t * t + aB.y * 0.0045 * (1. - t), bankH(off, yA, side) + ht * t - 0.004, -(yA - uSY));
@@ -320,7 +334,8 @@ void main() {
   if (vW.y < -0.003 && vC.a < 0.5) discard;
   vec3 v = normalize(uEye - vW);
   vec3 n = normalize(vN); if (!gl_FrontFacing) n = -n;
-  vec3 col = shade(vW, n, v, vC.rgb, 30., 0.15, 0.4);
+  vec3 paint = mix(vC.rgb, uTint * (0.35 + 1.4 * dot(vC.rgb, vec3(0.33))), uTintK);
+  vec3 col = shade(vW, n, v, paint, 30., 0.15, 0.4);
   if (vC.a > 1.5) col = vC.rgb * uLampCol * 0.9 * uFlick; // lantern glass glows
   o = vec4(post(atmos(col, vW)), 1.);
 }`;
@@ -483,8 +498,8 @@ const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 const norm = a => { const l = Math.hypot(...a) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-function lookAt(eye, at) {
-  const z = norm(sub(eye, at)), x = norm(cross([0, 1, 0], z)), y = cross(z, x);
+function lookAt(eye, at, up = [0, 1, 0]) {
+  const z = norm(sub(eye, at)), x = norm(cross(up, z)), y = cross(z, x);
   return { m: new Float32Array([x[0], y[0], z[0], 0, x[1], y[1], z[1], 0, x[2], y[2], z[2], 0, -dot(x, eye), -dot(y, eye), -dot(z, eye), 1]), x, y };
 }
 // the flat page's ability colours, brightened for the dark river
@@ -655,11 +670,17 @@ export function createRenderer(canvas) {
     if (u.uHorizon) gl.uniform3fv(u.uHorizon, c.horizon);
     if (u.uDawn) gl.uniform1f(u.uDawn, c.dawnHaze);
     if (u.uExpo) gl.uniform1f(u.uExpo, c.expo);
+    if (u.uWet) gl.uniform3fv(u.uWet, c.wet);
+    if (u.uHaze) gl.uniform1f(u.uHaze, c.haze);
+    if (u.uReedK) gl.uniform1f(u.uReedK, c.reedK);
+    if (u.uStone) gl.uniform1f(u.uStone, c.stone);
+    if (u.uTint) { gl.uniform3fv(u.uTint, c.tint || [1, 1, 1]); gl.uniform1f(u.uTintK, c.tint ? 0.85 : 0); }
   }
 
-  // f: { now, dt, target, shake, glow, sparks, dawn, day, snap }
+  // f: { now, dt, target, shake, glow, sparks, dawn, day, snap }; Lantern's page adds { cam: '3d' or 'first', fire, wet, tint: colours as
+  // three numbers 0 to 1, hideBoat, sink: 0 to 1 after a crash }. Without them the picture is the lab page's.
   function draw(s, f) {
-    if (s.y < lastY || f.snap) { trail = []; camX = centre(s, s.y + 0.3); }
+    if (s.y < lastY || f.snap) { trail = []; camX = f.cam === 'first' ? s.x : centre(s, s.y + 0.3); }
     lastY = s.y;
     if (!trail.length || s.y > trail[trail.length - 1][0] + 0.005) trail.push([s.y, s.x]);
     while (trail.length > 2 && trail[0][0] < s.y - 1.6) trail.shift();
@@ -680,23 +701,27 @@ export function createRenderer(canvas) {
     gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 2, ROWS, gl.RGBA, gl.FLOAT, rowData);
 
     // camera: pans with the river's centre, never with the boat, so a mouse steering by position stays put
-    const want = centre(s, s.y + 0.3);
-    camX += (want - camX) * Math.min(1, (f.dt || 0) * 2.5);
-    const sh = f.shake * 0.02, jx = sh * (Math.random() - 0.5), jy = sh * (Math.random() - 0.5);
-    const eye = [camX + jx, CAM.h + jy, CAM.back], at = [camX + jx, 0, -CAM.look];
-    view = lookAt(eye, at);
-    vp = mul(perspective(CAM.fov * Math.PI / 180, W / H, 0.05, 30), view.m);
+    const own = CAMS[f.cam], C = own || CAM, first = f.cam === 'first', sink = f.sink || 0;
+    const mid = centre(s, s.y + 0.3), want = first ? s.x : own ? mid + (s.x - mid) * 0.35 : mid;
+    camX += (want - camX) * Math.min(1, (f.dt || 0) * (first ? 14 : 2.5));
+    const sh = f.shake * (first ? 0.006 : 0.02), jx = sh * (Math.random() - 0.5), jy = sh * (Math.random() - 0.5);
+    const turn = own ? (centre(s, s.y + 1) - centre(s, s.y)) * (first ? 0.7 : 0.35) : 0; // the view turns with the river
+    const swing = first ? turn / (C.look + C.back) : 0; // the eye stays behind the boat as the view turns
+    const eye = [camX - swing * C.back + jx, C.h * (1 - 0.8 * sink) + jy, C.back], at = [camX + jx + turn, first ? 0.06 + 0.1 * sink : 0, -C.look];
+    const tilt = first ? Math.max(-0.5, Math.min(0.5, (f.target - s.x) * 4)) * 0.12 + sink * 0.5 : 0;
+    view = lookAt(eye, at, [Math.sin(tilt), Math.cos(tilt), 0]);
+    vp = mul(perspective(C.fov * Math.PI / 180, W / H, first ? 0.01 : 0.05, 30), view.m);
 
     // the boat leans into turns as on the flat page, and turns its bow a little
     const lean = Math.max(-0.5, Math.min(0.5, (f.target - s.x) * 4)), bob = 0.002 * Math.sin(time * 2.1);
-    const yaw = -lean * 0.35, roll = -lean * 0.45;
+    const yaw = -lean * (first ? 0.2 : 0.35) - swing, roll = -lean * 0.45;
     const M = model(s.x, bob, 0, yaw, roll);
     // the size ability makes the boat smaller or bigger, as the rules do
     const grow = boat(s) / BOAT; for (let i = 0; i < 12; i++) M[i] *= grow;
     const lamp = [M[0] * LAMP[0] + M[4] * LAMP[1] + M[8] * LAMP[2] + M[12], M[1] * LAMP[0] + M[5] * LAMP[1] + M[9] * LAMP[2] + M[13], M[2] * LAMP[0] + M[6] * LAMP[1] + M[10] * LAMP[2] + M[14]];
     // the light's reach: the same circle the flat page draws, including fog, lightning and the ember glow
     const flick = 1 + Math.sin(f.now / 90) * 0.015 + Math.sin(f.now / 37) * 0.01, R = (sight(s) + f.glow * 0.09) * flick, flash = dazzle(s) < 0;
-    const lampCol = [2.6 * flick, 1.55 * flick, 0.75 * flick].map(v => v * (1 + f.glow * 0.4));
+    const lampCol = (f.fire ? f.fire.map(v => v * v * 2.4 * flick + 0.15) : [2.6 * flick, 1.55 * flick, 0.75 * flick]).map(v => v * (1 + f.glow * 0.4));
     const morning = Math.min(1, f.dawn * 0.45 + f.day);
     const night = [0.006, 0.009, 0.018];
     const amb = flash ? [0.5, 0.55, 0.7] : night.map((v, i) => v + morning * [1.1, 0.85, 0.7][i]);
@@ -708,7 +733,7 @@ export function createRenderer(canvas) {
     const near = s.embers.filter(e => !e.got && e.y > s.y - 0.6 && e.y < s.y + 2.6).sort((a, b) => Math.abs(a.y - s.y) - Math.abs(b.y - s.y)).slice(0, 8);
     near.forEach((e, i) => { pt.set([e.x, 0.05, -(e.y - s.y), 0.2], i * 4); ptCol.set(glowCol(e).map(v => v * 0.55), i * 3); });
 
-    const c = { eye, sy: s.y, yb, time, lamp, lampCol, R, pt, ptCol, npt: near.length, amb, horizon, dawnHaze: morning * 0.8, expo: 1.6 + morning * 0.4 };
+    const c = { eye, sy: s.y, yb, time, lamp, lampCol, R, pt, ptCol, npt: near.length, amb, horizon, dawnHaze: morning * 0.8, expo: 1.6 + morning * 0.4, wet: f.wet || [0.04, 0.075, 0.09], tint: f.tint, haze: own ? 1 - morning : 0, reedK: first ? 0.6 : 1, stone: own && s.tower ? (s.climb > 50 ? 2 : 1) : 0 };
 
     gl.viewport(0, 0, W, H);
     gl.clearColor(0.01, 0.012, 0.02, 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -748,13 +773,13 @@ export function createRenderer(canvas) {
     }
 
     // reeds
-    setCommon(P.reed, c);
+    if (!c.stone) { setCommon(P.reed, c);
     gl.uniform1f(P.reed.u.uReedBase, Math.floor((s.y + NEAR - 0.1) / REED_STEP));
-    gl.bindVertexArray(reedVao); gl.drawElementsInstanced(gl.TRIANGLES, 9, gl.UNSIGNED_SHORT, 0, reedCount);
+    gl.bindVertexArray(reedVao); gl.drawElementsInstanced(gl.TRIANGLES, 9, gl.UNSIGNED_SHORT, 0, reedCount); }
 
     // boat
     setCommon(P.boat, c); gl.uniformMatrix4fv(P.boat.u.uModel, false, M); gl.uniform1f(P.boat.u.uFlick, flick * (1 + f.glow * 0.5));
-    gl.bindVertexArray(boatVao); gl.drawArrays(gl.TRIANGLES, 0, boatCount);
+    gl.bindVertexArray(boatVao); if (!f.hideBoat) gl.drawArrays(gl.TRIANGLES, 0, boatCount);
 
     // glows and their reflections
     const bob2 = t => 0.006 * Math.sin(time * 3.3 + t * 9);
@@ -783,10 +808,14 @@ export function createRenderer(canvas) {
     dec(lamp[0], s.y - 0.09, 0.03, 0.08, 7, 0.012, 0, [1.2, 0.7, 0.32, 0]);
     // the shield: a blue ring while it is held, blinking just after it breaks
     if (s.shield || (s.safe > 0 && Math.floor(f.now / 90) % 2)) { const r = 0.06 * (1 + Math.sin(f.now / 240) * 0.05), a = s.shield ? 1 : 0.6; dec(s.x, s.y, r * 1.8, r * 1.8, 6, r, 0, [0.5 * a, 0.9 * a, 2.0 * a, 0]); }
+    if (s.field && own) { const r = 0.062 * (1 + Math.sin(f.now / 160) * 0.04); dec(s.x, s.y, r * 1.8, r * 1.8, 6, r, 0, [0.9, 1.3, 2.0, 0]); }
     for (const p of f.sparks) spr(p.x, 0.03 + 0.06 * (0.7 - p.life), -(p.y - s.y), 0.008, p.blue ? [0.6, 0.9, 1.6].map(v => v * p.life * 2) : p.red ? [1.6, 0.3, 0.35].map(v => v * p.life * 2) : [1.8, 1.1, 0.5].map(v => v * p.life * 2), 3);
     // the flame and its halo
-    spr(lamp[0], lamp[1] + 0.003, lamp[2], 0.016 * flick, [1.6, 0.8, 0.3], 2);
-    spr(lamp[0], lamp[1], lamp[2], 0.09 * (1 + f.glow * 0.3), [0.22, 0.12, 0.04], 0);
+    const fire = f.fire ? f.fire.map(v => v * 1.6) : [1.6, 0.8, 0.3];
+    if (!f.hideBoat) {
+      spr(lamp[0], lamp[1] + 0.003, lamp[2], (first ? 0.011 : 0.016) * flick, fire, 2);
+      if (!first) spr(lamp[0], lamp[1], lamp[2], 0.09 * (1 + f.glow * 0.3), f.fire ? fire.map(v => v * 0.14) : [0.22, 0.12, 0.04], 0); // in first person it would fill the screen
+    }
 
     gl.enable(gl.BLEND); gl.depthMask(false);
     const nd = Math.min(MAXDEC, decals.length / 12);

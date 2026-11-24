@@ -52,7 +52,7 @@
 <div id="nogl"><div><p>This experiment needs WebGL2, which this browser does not have.</p><p><a href="/lantern/">Play Lantern instead</a></p></div></div>
 <script type="module">
 import { create, step, centre, half, fall, fog, wind, rain, dazzle, progress, DT, GOAL, NIGHTS } from '../../lantern/sim.js';
-import { createRenderer } from '../lantern-3d/render.js';
+import { createRenderer } from '../../lantern/view3d.js?v=1';
 import { sound } from '../../kit/audio.js';
 import { onLeave, isPauseKey } from '../../kit/pause.js';
 import { screens } from '../../kit/screens.js';

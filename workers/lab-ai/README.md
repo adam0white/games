@@ -143,7 +143,7 @@ What is stored: only the current round (seed, start), connected peers (slot id a
 participant/done flags and each socket's last-second message timestamps. This state lives in memory
 and socket attachments, never in SQLite. Attachments preserve it through hibernation, then disappear
 with the sockets. Names are not saved beyond the connection. There is no address in an attachment,
-no history, no account and no logging. An empty room loses its round. A restart can disconnect clients;
+no history and no account, and the code logs nothing from a room. An empty room loses its round. A restart can disconnect clients;
 the page must reconnect and accept the current round or ask for a new one.
 
 | Client text frame | Server action |
@@ -191,7 +191,7 @@ are not subject to the model daily cap.
   and before every model call; cache hits are not counted. Over `DAILY_CAP` (a var, default 2000) the
   answer is 503 and no model call is made. If the counter cannot be reached, the answer is also 503.
   A call that reaches the model counts even if the model then fails.
-- No logging of requests or addresses. `observability` is off. No D1, R2, KV or secrets.
+- Cloudflare logs, traces and Issues are on (owner decision, 2026-11-24; `workers/OBSERVABILITY.md`). A request log holds the address, user agent, location and URL path for seven days. The code logs no names or prompt text. No D1, R2, KV or secrets.
 - The page calls at most once per rival event that needs text (the rise, and each repeat kill),
   never in the first 8 seconds of a run, with a 4 second timeout, and never waits for the answer.
 
@@ -272,3 +272,29 @@ npx wrangler delete -c workers/lab-ai/wrangler.jsonc
 ```
 
 Either way the game keeps working.
+
+### Run tickets (2026-11-24)
+
+The page reports its own score, so an edited page could post any number. A run ticket limits that. When a player who
+shares starts an endless run, the page posts `{ start: true, r }`, where `r` is a random id for that run (not the
+player's id). The server stores `r` and the time in a `runs` table. The score post carries `r`, and the server takes the
+score only if it is at most `seconds since the start * 18 + 50` (the endless score grows by 10 a second, 18 during a
+boost). A ticket works once, is dropped after 6 hours, and the table holds at most 20,000. A refused score gets 422
+`{ error: 'run' }` and changes nothing. Starts are limited per address under their own key (`boardrun:<address>`).
+
+What this does and does not do: it caps how fast a false score can grow. A person who waits an hour can still post an
+hour's worth of points without playing. It does not prove a run.
+
+Stored for a ticket: the run id and a time. Nothing about the player. No ticket is asked for before the player has
+chosen to share.
+
+`RUN.need` lists the games whose scores are refused without a ticket: `lantern` and `lantern-daily` since 2026-11-24,
+once the page with tickets was live. A Lantern page left open from before that has its scores refused until it reloads. Other games on the board are not
+affected: the 18 points a second is Lantern's rule and applies only to a post that carries a ticket.
+
+### Daily boards (2026-11-24)
+
+`DAILY` lists board names that keep one UTC day's rows (`lantern-daily`, Lantern's "Today's river"). They are read and
+posted like any other board. The first read or post of a new UTC day deletes the day before's rows, and the read cache
+is keyed by the day. What is stored is the same as for the main board.
+
