@@ -666,8 +666,9 @@ const GAMES = {
     await dragNumbers(page); await finger(page, '#c', [['pointerup', 140, 400]]);
     assert.equal(await page.evaluate(() => window.audioLog.made), 1, 'one audio context for the whole run');
     // The run ends with an end card; the page keeps nothing in storage, so a reload starts clean.
-    await page.evaluate(() => { window.lanternSim().light = 0.0001; });
-    await until(page, () => window.lanternState().screen === 'card' && !window.lanternState().playing, 'end card');
+    // CI's software WebGL draws a few frames a second, so the flame takes many seconds of wall time to go out; warm = 0 stops a late ember from feeding it.
+    await page.evaluate(() => { const s = window.lanternSim(); s.light = 0.0001; s.warm = 0; });
+    await until(page, () => window.lanternState().screen === 'card' && !window.lanternState().playing, 'end card', 40000);
     assert.deepEqual(await page.evaluate(() => Object.keys(localStorage).filter(k => k !== 'notes.k')), ['lantern-3d:hint'], 'no saved keys but the first-time help\'s (kit/hint.js)');
     await page.reload(); await until(page, () => window.lanternState, 'game script'); assert.equal((await state()).screen, 'menu');
   },
