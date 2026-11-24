@@ -65,6 +65,8 @@
   #pause::before { content: ''; width: 4px; height: 16px; border: solid #ffd9a0aa; border-width: 0 5px; }
   #look { position: fixed; inset: 0; display: none; z-index: 5; } #look.on { display: block; } /* a shop look shown on the whole screen: one tap anywhere goes back */
   body.looking #notes-button { visibility: hidden; }
+  #menu > div, #card > div { position: relative; } /* the language button sits in the card's top right corner */
+  .language { position: absolute; top: 0; right: 0; min-width: 0; min-height: 44px; margin: 0; padding: 0 .6em; display: inline-flex; align-items: center; gap: 4px; font-size: .8em; letter-spacing: .05em; } .language[hidden] { display: none; } .language svg { width: 18px; height: 18px; } #pauseLanguage { top: -56px; }
 </style>
 </head>
 <body>
@@ -72,50 +74,51 @@
 <canvas id="c"></canvas>
 <div id="hud"><div id="hearts"></div><div id="embers"><span class="dot"></span><span id="count">0</span></div></div>
 <div id="big"></div>
-<div id="warn">The lantern is beginning to fade</div>
+<div id="warn" data-i18n="fade">The lantern is beginning to fade</div>
 <div id="say"></div>
 <div id="flash"></div>
-<div id="look" aria-label="Tap to go back to the shop"></div>
-<button id="pause" aria-label="Pause"></button>
+<div id="look" aria-label="Tap to go back to the shop" data-i18n-aria="lookBack"></div>
+<button id="pause" aria-label="Pause" data-i18n-aria="pause"></button>
 <div id="menu" class="screen veil on"><div>
-  <h1>Lantern</h1>
-  <p>Carry the light down the river to dawn.</p>
-  <p class="bank"><span class="dot"></span><span id="bank">0</span> embers<span id="stars"></span></p>
-  <p><button id="less" class="small" aria-label="Earlier night">&lsaquo;</button><button id="play" class="main">Play</button><button id="more" class="small" aria-label="Later night">&rsaquo;</button></p>
+  <button id="menuLanguage" class="language"></button>
+  <h1 data-i18n="title">Lantern</h1>
+  <p data-i18n="tagline">Carry the light down the river to dawn.</p>
+  <p class="bank"><span class="dot"></span><span id="bank">0</span> <span data-i18n="embers">embers</span><span id="stars"></span></p>
+  <p><button id="less" class="small" aria-label="Earlier night" data-i18n-aria="earlier">&lsaquo;</button><button id="play" class="main">Play</button><button id="more" class="small" aria-label="Later night" data-i18n-aria="later">&rsaquo;</button></p>
   <p id="about"></p>
   <p id="ready"></p>
-  <p><button id="endless">Endless river</button><button id="daily">Today's river</button><button id="tower">Tower climb</button><button id="anew" hidden>New climb from level 1</button></p>
-  <p><button id="toShop">Shop</button><button id="toBoard">Leaderboard</button></p>
-  <p id="views"><button data-view="2d">2D</button><button data-view="3d">3D</button><button data-view="first">First person</button></p>
+  <p><button id="endless">Endless river</button><button id="daily" data-i18n="daily">Today's river</button><button id="tower">Tower climb</button><button id="anew" hidden>New climb from level 1</button></p>
+  <p><button id="toShop" data-i18n="shop">Shop</button><button id="toBoard" data-i18n="board">Leaderboard</button></p>
+  <p id="views"><button data-view="2d">2D</button><button data-view="3d">3D</button><button data-view="first" data-i18n="view_first">First person</button></p>
   <p class="hint" id="viewNote" hidden></p>
-  <p><button id="toCredits">Credits</button><button class="music"></button></p>
+  <p><button id="toCredits" data-i18n="credits">Credits</button><button class="music"></button></p>
 </div></div>
 <div id="shop" class="screen veil"><div>
-  <h2>Shop</h2>
-  <p class="bank"><span class="dot"></span><span id="bank2">0</span> embers</p>
-  <p><button class="back">Back</button></p>
+  <h2 data-i18n="shop">Shop</h2>
+  <p class="bank"><span class="dot"></span><span id="bank2">0</span> <span data-i18n="embers">embers</span></p>
+  <p><button class="back" data-i18n="back">Back</button></p>
   <p id="got" class="long">Stats last for your next run only. Each pack holds one surprise for 50 embers. Tap anything you own to see it on the whole screen; the button under it switches it on or off. Two abilities, three crashes and three victories can be on. Hearts and the force field are abilities too.</p>
   <div id="packs"></div>
 </div></div>
 <div id="credits" class="screen veil"><div>
-  <h2>Credits</h2>
-  <p>Lantern comes from the game lab at play.adamwhite.work.</p>
-  <p>Every picture and every sound is made in code.</p>
-  <p>Thank you to our first play-tester. Your notes shaped this version: the menu, the shop, the hearts and the endless river.</p>
-  <p><button class="back">Back</button></p>
+  <h2 data-i18n="credits">Credits</h2>
+  <p data-i18n="creditsFrom">Lantern comes from the game lab at play.adamwhite.work.</p>
+  <p data-i18n="creditsCode">Every picture and every sound is made in code.</p>
+  <p data-i18n="creditsThanks">Thank you to our first play-tester. Your notes shaped this version: the menu, the shop, the hearts and the endless river.</p>
+  <p><button class="back" data-i18n="back">Back</button></p>
 </div></div>
 <div id="board" class="screen veil"><div>
-  <h2>Leaderboard</h2>
+  <h2 data-i18n="board">Leaderboard</h2>
   <p class="hint" id="boardHint"></p>
-  <p><label for="name">Your name</label><br><input id="name" maxlength="16" autocomplete="nickname" enterkeyhint="done" placeholder="Type a name"></p>
-  <p id="tabs" hidden><button id="tabPhone">This phone</button><button id="tabAll">All players</button><button id="tabDay">Today</button></p>
+  <p><label for="name" data-i18n="yourName">Your name</label><br><input id="name" maxlength="16" autocomplete="nickname" enterkeyhint="done" placeholder="Type a name"></p>
+  <p id="tabs" hidden><button id="tabPhone" data-i18n="tabPhone">This phone</button><button id="tabAll" data-i18n="tabAll">All players</button><button id="tabDay" data-i18n="tabDay">Today</button></p>
   <ol id="rows"></ol>
-  <p id="shareRow" hidden><label><input type="checkbox" id="share"> Show my endless scores to everyone</label><br><span class="hint" id="shareNote"></span></p>
+  <p id="shareRow" hidden><label><input type="checkbox" id="share"> <span data-i18n="shareTick">Show my endless scores to everyone</span></label><br><span class="hint" id="shareNote"></span></p>
   <p><button id="boardPlay" class="main">Play the endless river</button></p>
-  <p><button class="back">Back</button></p>
+  <p><button class="back" data-i18n="back">Back</button></p>
 </div></div>
-<div id="card" class="screen"><div><h1 id="title"></h1><p id="line"></p><p id="sub"></p>
-  <div id="ask" hidden><p>Show your endless scores to everyone on the leaderboard? After a yes, every run from the next one goes up by itself.</p><p><input id="askName" maxlength="16" autocomplete="nickname" enterkeyhint="done" placeholder="Type a name"></p><p class="hint" id="askNote">Your name and your score are sent, and a signal when a run starts. Nothing else.</p><p><button id="askYes">Yes, show them</button><button id="askNo">No</button></p></div>
+<div id="card" class="screen"><div><button id="pauseLanguage" class="language" hidden></button><h1 id="title"></h1><p id="line"></p><p id="sub"></p>
+  <div id="ask" hidden><p data-i18n="ask">Show your endless scores to everyone on the leaderboard? After a yes, every run from the next one goes up by itself.</p><p><input id="askName" maxlength="16" autocomplete="nickname" enterkeyhint="done" placeholder="Type a name"></p><p class="hint" id="askNote">Your name and your score are sent, and a signal when a run starts. Nothing else.</p><p><button id="askYes" data-i18n="askYes">Yes, show them</button><button id="askNo" data-i18n="askNo">No</button></p></div>
   <p><button id="go" class="main">Play again</button></p><p><button id="toMenu">Menu</button><button class="music"></button></p><p><button id="viewNext" hidden></button></p></div></div>
 <script type="module">
 import { create, step, centre, half, sight, fall, fog, wind, rain, dazzle, level, score, boat, progress, DT, GOAL, BOAT, NIGHTS, STATS, POWERS, LAST, FLOORS, LEVELS, SECTORS, towerStage, climbPace, FIELD, REBORN_PACE, GIFTS, ABILITIES, startAt } from './sim.js?v=14'; // raise v when sim.js changes its exports, so a cached copy cannot break the page
@@ -130,6 +133,7 @@ import { hint } from '../kit/hint.js';
 import { lab } from '../kit/lab.js'; // lab recording: the rec lines below
 import { noZoom } from '../kit/zoom.js'; noZoom(); // no double-tap or pinch zoom (note #74)
 import { hull, wake, flame, burn, glow as flameGlow, mark, TINT, reeds, shine, halo, flood } from './looks.js?v=4';
+import { t, lang, setLang, apply, langs } from './words.js'; // every word the player sees, in English and Turkish
 
 const query = new URLSearchParams(location.search);
 const gain = Number(query.get('gain')) || 1.3; // boat travel per finger travel; ?gain= to compare
@@ -142,16 +146,11 @@ const towerAt = () => Math.max(1, Math.min(LEVELS * SECTORS, Math.floor(store.ge
 // A lost level is tried again three floors below the floor reached (tester t1, note #142): lantern-tower-floor is that floor, a number, 0 for the level's start.
 const BACK = 3, towerFloor = () => Math.max(0, Math.min(FLOORS - 1 - BACK, Math.floor(store.get('lantern-tower-floor')) || 0));
 let fromFloor = 0; // the floor this tower try starts on
-const NIGHT = [, 'Slide your thumb anywhere to steer. Embers feed the flame.', 'Ice drifts on the water.', 'The rocks are restless.', 'Some rocks ride up and down the current.', 'A waterfall waits halfway.',
-  'Logs lie out from the banks.', 'Fog hides the way ahead.', 'Whirlpools pull you in.', 'A side wind pushes the boat.', 'False embers steal your light. They flicker green.',
-  'Gates of logs leave one gap.', 'Some rocks follow you. They have red eyes.', 'Rain makes the flame fade faster.', 'The ice slides from side to side.', 'Rocks hide under the water until you are close.',
-  'A second waterfall waits near the end.', 'Pairs of rocks spin.', 'Geysers blow and rest. Pass while they rest.', 'Lightning blinds you for a moment.', 'Islands split the river.'];
+// What each night brings is in words.js: night1 to night20, and front1 to front8 for nights 21 to 50 (see ahead below).
 // Nights 21 to 50 hold all twenty things, each night faster, closer and narrower; one old thing takes its turn up front (sim.js).
-const FRONT = ['Logs crowd the banks.', 'Whirlpools gather.', 'Gates of logs, one after another.', 'Red-eyed rocks hunt you.', 'Hidden rocks everywhere.', 'Spinning rocks fill the river.', 'Geysers line the way.', 'Islands, again and again.'];
-for (let n = 21; n <= NIGHTS; n++) NIGHT[n] = `${FRONT[(n - 21) % FRONT.length]} Faster, closer, narrower.${n === NIGHTS ? ' This is the last night.' : ''}`;
 // The tower has two sectors of 50 levels; climb 51 is sector 2, level 1.
-const tag = n => n > LEVELS ? `sector 2, level ${n - LEVELS}` : `level ${n}`, Tag = n => tag(n).replace(/^./, c => c.toUpperCase()), head = n => `Level ${n > LEVELS ? n - LEVELS : n}`, TOP = LEVELS * SECTORS;
-const ahead = n => NIGHT[n] ?? '';
+const tag = n => n > LEVELS ? t('tagSector', { n: n - LEVELS }) : t('tagLevel', { n }), Tag = n => tag(n).replace(/^./, c => c.toUpperCase()), head = n => t('head', { n: n > LEVELS ? n - LEVELS : n }), TOP = LEVELS * SECTORS;
+const ahead = n => n >= 1 && n <= 20 ? t(`night${n}`) : n > 20 && n <= NIGHTS ? t(n === NIGHTS ? 'nightLast' : 'nightLate', { front: t(`front${(n - 21) % 8 + 1}`) }) : '';
 
 // The shop. Embers are the money. A pack gives one thing you do not own yet, picked at random.
 const PACKS = [
@@ -163,6 +162,8 @@ const PACKS = [
   { id: 'win', name: 'Victories', items: [['vfire', 'Fireworks', '#ff6ad5', 'Fireworks burst over the river at dawn.'], ['vlamp', 'Sky lanterns', '#ffb347', 'Paper lanterns rise into the morning.'], ['vbird', 'Birds', '#e8eef8', 'A flock of birds takes off from the banks.'], ['vbow', 'Rainbow', '#7ad0ff', 'A rainbow opens over the river.'], ['vstar', 'Shooting stars', '#fff3a0', 'Stars streak across the last of the night.']] },
 ];
 const COST = 50;
+// The names and descriptions shown come from words.js (item_<id>, desc_<id>); the English in PACKS only helps a reader of this code.
+const itemName = it => t(`item_${it[0]}`), itemDesc = it => t(`desc_${it[0]}`);
 // Rebirth (tester t1, note #73): once every pack is found and all 50 nights are open, the player may start over from night 1 with nothing.
 // The reward is kept for good: each rebirth adds 25% to the embers every run banks, and a star by the ember count. Bests stay.
 // lantern-rebirths: the number of rebirths, a number.
@@ -171,7 +172,7 @@ const boon = () => 1 + 0.25 * reborn, ALL = PACKS.reduce((n, p) => n + p.items.l
 const found = () => PACKS.reduce((n, p) => n + p.items.filter(i => owned.has(i[0])).length, 0), ripe = () => found() >= ALL && opened >= NIGHTS;
 // Stats: bought a level at a time for the next run only, then used up when that run starts (tester t1, 2026-11-23). They change the run itself, where packs change only its looks.
 // The save keeps its format: lantern-stats holds the levels ready for the next run.
-const STAT = [['hearts', 'Hearts', 'Start with one more heart'], ['barrier', 'Barrier', 'The force field lasts longer'], ['calm', 'Calm water', 'The river runs a little slower'], ['wick', 'Long wick', 'The flame fades more slowly'], ['pull', 'Long reach', 'Take embers from further away']];
+const STAT = ['hearts', 'barrier', 'calm', 'wick', 'pull']; // names and what each does: stat_<id> and statWhat_<id> in words.js
 const plain = v => (v && typeof v === 'object' && !Array.isArray(v) ? v : {}); // a damaged save must not stop the game
 let stats = plain(store.json('lantern-stats', {}));
 const statCost = id => 15 * ((stats[id] || 0) + 1);
@@ -261,65 +262,66 @@ function show(name) {
   const play = name === 'play';
   $('hud').style.display = $('big').style.display = play ? 'block' : 'none'; pauseButton.style.display = play ? 'grid' : 'none';
   if (!play) $('warn').classList.remove('on');
+  $('pauseLanguage').hidden = !paused; // the card is also the end of a run, which has no language button
   if (name === 'menu') menu(); if (name === 'shop') shop(); if (name === 'board') boardShow();
 }
 // Three ways to see the same river (notes #158, #159): 2d is this page's own drawing; 3d and first are drawn by view3d.js on a WebGL
 // canvas under this one, which then draws only what lies on top. lantern-view: '2d', '3d' or 'first'. The rules do not know the view.
-const VIEWS = ['2d', '3d', 'first'], VIEW_NAME = { '2d': '2D', '3d': '3D', first: 'First person' };
-let view = '2d', R3 = null, snap3 = true, loading3 = null;
+const VIEWS = ['2d', '3d', 'first'];
+let view = '2d', R3 = null, snap3 = true, loading3 = null, viewNote = ''; // viewNote: the key of the note under the view buttons
 const canvas3 = $('c3');
-function views() { for (const b of document.querySelectorAll('#views button')) b.className = b.dataset.view === view ? 'on' : ''; $('viewNext').textContent = `View: ${VIEW_NAME[view]}`; }
+function views() { for (const b of document.querySelectorAll('#views button')) b.className = b.dataset.view === view ? 'on' : ''; $('viewNext').textContent = t('viewName', { name: t(`view_${view}`) }); }
 function size3() { if (R3) { const k = Math.min(1.5, dpr) / dpr; R3.resize(Math.round(W * k), Math.round(H * k)); } } // fewer pixels than the flat page: 3D costs more
 async function setView(v, keep = true) {
   if (!VIEWS.includes(v)) v = '2d';
   if (v !== '2d' && !R3) {
     loading3 ??= import('./view3d.js?v=1').then(m => m.createRenderer(canvas3)).catch(() => null);
     const made = await loading3;
-    if (!made || made.errors.length) { v = '2d'; loading3 = null; $('viewNote').hidden = false; $('viewNote').textContent = '3D does not start on this phone, so the river stays 2D.'; }
-    else if (!R3) { R3 = made; canvas3.addEventListener('webglcontextlost', () => { setView('2d', false); R3 = null; $('viewNote').hidden = false; $('viewNote').textContent = '3D stopped on this phone, so the river is 2D. Load the page again to try 3D.'; }); size3(); }
+    if (!made || made.errors.length) { v = '2d'; loading3 = null; $('viewNote').hidden = false; viewNote = 'viewNoStart'; $('viewNote').textContent = t(viewNote); }
+    else if (!R3) { R3 = made; canvas3.addEventListener('webglcontextlost', () => { setView('2d', false); R3 = null; $('viewNote').hidden = false; viewNote = 'viewStopped'; $('viewNote').textContent = t(viewNote); }); size3(); }
   }
   view = v; snap3 = true; canvas3.hidden = v === '2d'; pads.drop(); steer.drop(); if (keep) store.set('lantern-view', v); views();
 }
 function menu() {
   $('stars').textContent = reborn ? ` · ${'★'.repeat(Math.min(5, reborn))}${reborn > 5 ? reborn : ''}` : '';
-  $('bank').textContent = bank; $('play').textContent = `Play night ${stage}`;
+  $('bank').textContent = bank; $('play').textContent = t('playNight', { n: stage });
   $('less').disabled = stage <= 1; $('more').disabled = stage >= opened;
   const best = store.get(`lantern-best-${stage}`), top = store.get('lantern-best-endless');
-  $('about').textContent = (reborn ? `Reborn night: ${Math.round(REBORN_PACE * Math.min(5, reborn) * 100)}% faster, +${10 * Math.min(5, reborn)} embers at dawn. ` : '') + ahead(stage) + (best ? ` Best ${best}%.` : '');
-  const ready = STAT.filter(([id]) => stats[id] > 0).map(([id, label]) => `${label} ${stats[id]}`); $('ready').textContent = ready.length ? `Stats for your next night or tower climb: ${ready.join(', ')}. Not for the endless river.` : '';
-  $('endless').textContent = top ? `Endless river · best ${top}` : 'Endless river';
-  const high = store.get('lantern-best-level'), at = towerAt(); const fl = towerFloor(); $('tower').textContent = at > 1 || fl ? `Tower climb · go on at ${tag(at)}${fl ? `, floor ${fl}` : ''}` : high ? `Tower climb · best ${high > LEVELS ? tag(high) : `level ${high} of ${LEVELS}`}` : 'Tower climb';
-  $('anew').hidden = at <= 1 && !fl; $('anew').dataset.sure = ''; $('anew').textContent = 'New climb from level 1';
+  $('about').textContent = [reborn ? t('rebornNight', { pct: Math.round(REBORN_PACE * Math.min(5, reborn) * 100), k: 10 * Math.min(5, reborn) }) : '', ahead(stage), best ? t('bestPct', { n: best }) : ''].filter(Boolean).join(' ');
+  const ready = STAT.filter(id => stats[id] > 0).map(id => t('statLevel', { label: t(`stat_${id}`), n: stats[id] })); $('ready').textContent = ready.length ? t('statsReady', { list: ready.join(', ') }) : '';
+  $('endless').textContent = top ? t('endlessBest', { n: top }) : t('endless');
+  const high = store.get('lantern-best-level'), at = towerAt(); const fl = towerFloor(); $('tower').textContent = at > 1 || fl ? t(fl ? 'towerGoOnFloor' : 'towerGoOn', { tag: tag(at), f: fl }) : high ? t('towerBest', { what: high > LEVELS ? tag(high) : t('levelOf', { n: high, of: LEVELS }) }) : t('tower');
+  $('anew').hidden = at <= 1 && !fl; $('anew').dataset.sure = ''; $('anew').textContent = t('anew');
 }
-const GOT0 = $('got').textContent;
 function shop(text) {
-  $('bank2').textContent = bank; if (text) $('got').textContent = text; else if (!busy && $('got').textContent === '…') $('got').textContent = GOT0; // a spin left half-way
+  $('bank2').textContent = bank; if (text) $('got').textContent = text; else if (!busy && $('got').textContent === '…') $('got').textContent = t('got'); // a spin left half-way
   $('got').classList.toggle('long', $('got').textContent.length > 90); // a long text scrolls away; a short one stays in view
   const box = $('packs'); box.textContent = '';
-  const sdiv = document.createElement('div'); sdiv.className = 'pack'; const sname = document.createElement('b'); sname.textContent = 'Stats'; const warn = document.createElement('small'); warn.className = 'once'; warn.textContent = 'Warning: stats last one run. They are used up when your next night or tower climb starts. Stats never work on the endless river, so its leaderboard is fair.'; sdiv.append(sname, warn);
-  for (const [id, label, what] of STAT) {
+  const sdiv = document.createElement('div'); sdiv.className = 'pack'; const sname = document.createElement('b'); sname.textContent = t('statsHead'); const warn = document.createElement('small'); warn.className = 'once'; warn.textContent = t('statsWarn'); sdiv.append(sname, warn);
+  for (const id of STAT) {
+    const label = t(`stat_${id}`), what = t(`statWhat_${id}`);
     const lv = stats[id] || 0, top = STATS[id], row = document.createElement('div'); row.className = 'stat';
     const txt = document.createElement('span'); txt.textContent = `${label} ${'●'.repeat(lv)}${'○'.repeat(top - lv)}`; const sm = document.createElement('small'); sm.textContent = what; txt.append(sm);
-    const b = document.createElement('button'); b.className = 'small'; b.dataset.stat = id; b.textContent = lv >= top ? 'Full' : `+1 · ${statCost(id)}`; b.disabled = lv >= top || bank < statCost(id); b.setAttribute('aria-label', `${label}: ${what}`);
+    const b = document.createElement('button'); b.className = 'small'; b.dataset.stat = id; b.textContent = lv >= top ? t('full') : `+1 · ${statCost(id)}`; b.disabled = lv >= top || bank < statCost(id); b.setAttribute('aria-label', t('statAria', { label, what }));
     b.addEventListener('click', () => {
       const cost = statCost(id); if (busy || bank < cost || (stats[id] || 0) >= top) return;
       bank -= cost; store.set('lantern-bank', bank); stats[id] = (stats[id] || 0) + 1; store.set('lantern-stats', JSON.stringify(stats));
       audio(); tone(523.25, 0.3, 0.1, 'triangle'); setTimeout(() => tone(783.99, 0.5, 0.1, 'triangle'), 100);
       rec.event('stat', { stat: id, level: stats[id], bank });
-      shop(`${label} ${stats[id]} of ${top} for your next run only. ${what}.`);
+      shop(t('statBought', { label, n: stats[id], top, what }));
     });
     row.append(txt, b); sdiv.append(row);
   }
   box.append(sdiv);
   { // rebirth: shown as a goal until it is open, then as a button that asks twice
-    const r = document.createElement('div'); r.className = 'pack reborn'; const rn = document.createElement('b'); rn.textContent = reborn ? `Rebirth ${'★'.repeat(Math.min(5, reborn))}` : 'Rebirth'; const rs = document.createElement('small'); r.append(rn, rs);
-    if (!ripe()) rs.textContent = `Find everything (${found()} of ${ALL}) and open all ${NIGHTS} nights (${opened} of ${NIGHTS}). Then start over with nothing, and earn 25% more embers for good.${reborn ? ` Now: +${25 * reborn}%.` : ''}`;
+    const r = document.createElement('div'); r.className = 'pack reborn'; const rn = document.createElement('b'); rn.textContent = reborn ? t('rebirthHeadStars', { stars: '★'.repeat(Math.min(5, reborn)) }) : t('rebirthHead'); const rs = document.createElement('small'); r.append(rn, rs);
+    if (!ripe()) rs.textContent = t('rebirthGoal', { found: found(), all: ALL, nights: NIGHTS, opened }) + (reborn ? ' ' + t('rebirthNow', { n: 25 * reborn }) : '');
     else {
-      rs.textContent = `You have it all. Start over from night 1 with nothing found and no embers, and earn ${25 * (reborn + 1)}% more embers for good. Nights get faster and pay more at dawn. Your bests stay.`;
-      const rb = document.createElement('button'); rb.id = 'rebirth'; rb.className = 'main'; rb.textContent = 'Rebirth';
+      rs.textContent = t('rebirthReady', { n: 25 * (reborn + 1) });
+      const rb = document.createElement('button'); rb.id = 'rebirth'; rb.className = 'main'; rb.textContent = t('rebirthButton');
       rb.addEventListener('click', () => {
         if (busy) return;
-        if (rb.dataset.sure !== '1') { rb.dataset.sure = '1'; rb.textContent = 'Tap again to be reborn'; return; }
+        if (rb.dataset.sure !== '1') { rb.dataset.sure = '1'; rb.textContent = t('rebirthSure'); return; }
         reborn++; store.set('lantern-rebirths', reborn);
         bank = 0; store.set('lantern-bank', 0); start = pickStart(); store.set('lantern-start', start); owned = new Set(BASE()); store.set('lantern-owned', '[]');
         worn = { boat: 'oak', water: 'blue', flame: 'amber' }; store.set('lantern-worn', JSON.stringify(worn)); off = new Set(); store.set('lantern-off', '[]'); crashOn = []; store.set('lantern-crash', '[]'); winOn = []; store.set('lantern-win', '[]');
@@ -327,7 +329,7 @@ function shop(text) {
         rec.event('rebirth', { rebirths: reborn });
         const fl = $('flash'); fl.style.transition = 'none'; fl.style.background = '#ffe08a'; fl.style.opacity = 1; void fl.offsetWidth; fl.style.transition = 'opacity 1.8s ease-out'; fl.style.opacity = 0;
         audio(); [392, 523.25, 659.25, 783.99, 1046.5, 1318.5].forEach((f, i) => setTimeout(() => tone(f, 1.2, 0.08, 'triangle'), i * 110));
-        shop(`Reborn. Every run now banks ${25 * reborn}% more embers. Your first ability this time: ${PACKS.find(p => p.id === 'power').items.find(i => i[0] === start)[1]}.`);
+        shop(t('reborn', { n: 25 * reborn, name: itemName([start]) }));
       });
       r.append(rb);
     }
@@ -335,11 +337,11 @@ function shop(text) {
   }
   for (const pack of PACKS) {
     const rest = pack.items.filter(i => !owned.has(i[0])), div = document.createElement('div'); div.className = 'pack';
-    const name = document.createElement('b'); name.textContent = pack.name;
+    const name = document.createElement('b'); name.textContent = t(`pack_${pack.id}`);
     const row = document.createElement('div'); row.className = 'items';
     for (const it of pack.items) {
       const b = document.createElement('button'), has = owned.has(it[0]);
-      b.className = 'item' + (has ? '' : ' locked') + (worn[pack.id] === it[0] || (pack.id === 'power' && has) ? ' worn' : ''); b.dataset.item = it[0]; b.setAttribute('aria-label', has ? it[1] : 'Not found yet');
+      b.className = 'item' + (has ? '' : ' locked') + (worn[pack.id] === it[0] || (pack.id === 'power' && has) ? ' worn' : ''); b.dataset.item = it[0]; b.setAttribute('aria-label', has ? itemName(it) : t('notFound'));
       if (has && pack.id === 'power' && off.has(it[0])) b.className = 'item off';
       if (pack.id === 'crash') b.className = 'item' + (!has ? ' locked' : crashOn.includes(it[0]) ? ' worn' : ' off');
       if (pack.id === 'win') b.className = 'item' + (!has ? ' locked' : winOn.includes(it[0]) ? ' worn' : ' off');
@@ -348,68 +350,68 @@ function shop(text) {
       row.append(b);
     }
     const buy = document.createElement('button'); buy.dataset.pack = pack.id;
-    buy.textContent = rest.length ? `Open a pack · ${COST}` : 'All found'; buy.disabled = !rest.length || bank < COST;
+    buy.textContent = rest.length ? t('openPack', { n: COST }) : t('allFound'); buy.disabled = !rest.length || bank < COST;
     buy.addEventListener('click', () => {
       if (bank < COST || !rest.length || busy) return;
       const it = rest[Math.floor(Math.random() * rest.length)];
       // The pack is paid for and the find is saved at once; the hop and the flash only show it.
       bank -= COST; store.set('lantern-bank', bank); owned.add(it[0]); store.set('lantern-owned', JSON.stringify([...owned])); if (pack.id !== 'power' && pack.id !== 'crash' && pack.id !== 'win') { worn[pack.id] = it[0]; store.set('lantern-worn', JSON.stringify(worn)); }
       let after = '';
-      if (pack.id === 'power' && twoOn().includes(it[0])) after = ` It is off: only ${PICK} abilities at a time. Switch one off to use it.`;
-      if (pack.id === 'win') { if (winOn.length < WIN_ON) { winOn.push(it[0]); store.set('lantern-win', JSON.stringify(winOn)); after = ' It is on.'; } else after = ` It is off: only ${WIN_ON} victories at a time.`; }
-      if (pack.id === 'crash') { if (crashOn.length < CRASH_ON) { crashOn.push(it[0]); store.set('lantern-crash', JSON.stringify(crashOn)); after = ' It is on.'; } else after = ` It is off: only ${CRASH_ON} crashes at a time.`; }
+      if (pack.id === 'power' && twoOn().includes(it[0])) after = t('afterPowerOff', { n: PICK });
+      if (pack.id === 'win') { if (winOn.length < WIN_ON) { winOn.push(it[0]); store.set('lantern-win', JSON.stringify(winOn)); after = t('afterOn'); } else after = t('afterWinOff', { n: WIN_ON }); }
+      if (pack.id === 'crash') { if (crashOn.length < CRASH_ON) { crashOn.push(it[0]); store.set('lantern-crash', JSON.stringify(crashOn)); after = t('afterOn'); } else after = t('afterCrashOff', { n: CRASH_ON }); }
       rec.event('buy', { pack: pack.id, item: it[0], bank });
       $('bank2').textContent = bank; audio(); spin(row, rest.map(i => i[0]), it, pack, after);
     });
     const it = pack.items.find(i => i[0] === chosen[pack.id] && owned.has(i[0])), pick = document.createElement('div'); pick.className = 'pick';
     if (it) { // the thing last shown from this pack, and the button that switches it on or off (note #112)
       const on = pack.id === 'crash' ? crashOn.includes(it[0]) : pack.id === 'win' ? winOn.includes(it[0]) : pack.id === 'power' ? !off.has(it[0]) : worn[pack.id] === it[0];
-      const what = document.createElement('span'); what.textContent = `${it[1]}: ${on ? (pack.id === 'boat' || pack.id === 'water' || pack.id === 'flame' ? 'in use' : 'on') : 'off'}`;
+      const what = document.createElement('span'); what.textContent = t('pickState', { name: itemName(it), state: t(on ? (pack.id === 'boat' || pack.id === 'water' || pack.id === 'flame' ? 'inUse' : 'stateOn') : 'stateOff') });
       const sw = document.createElement('button'); sw.className = 'small'; sw.dataset.switch = it[0];
-      sw.textContent = pack.id === 'boat' || pack.id === 'water' || pack.id === 'flame' ? 'Use it' : on ? 'Switch off' : 'Switch on'; sw.disabled = on && (pack.id === 'boat' || pack.id === 'water' || pack.id === 'flame');
+      sw.textContent = pack.id === 'boat' || pack.id === 'water' || pack.id === 'flame' ? t('useIt') : on ? t('switchOff') : t('switchOn'); sw.disabled = on && (pack.id === 'boat' || pack.id === 'water' || pack.id === 'flame');
       sw.addEventListener('click', () => { if (!busy) flip(pack, it); });
       pick.append(what, sw);
-    } else { pick.className = 'pick hint'; pick.textContent = owned.size && pack.items.some(i => owned.has(i[0])) ? 'Tap one to see it.' : ''; }
+    } else { pick.className = 'pick hint'; pick.textContent = owned.size && pack.items.some(i => owned.has(i[0])) ? t('tapOne') : ''; }
     div.append(name, row, pick, buy); box.append(div);
   }
   if (document.getElementById('notes-button')) { // tester tools: only in a browser that opened a tester's private link; to be removed before launch
-    const t = document.createElement('div'); t.className = 'pack test'; const tn = document.createElement('b'); tn.textContent = 'Tester tools'; const tw = document.createElement('small'); tw.className = 'once'; tw.textContent = 'For testing only. These go away when the game launches.'; t.append(tn, tw);
-    for (const [id, label, act] of [['embers', '+500 embers', () => { bank += 500; store.set('lantern-bank', bank); return 'Added 500 embers.'; }],
-      ['nights', 'Open all nights', () => { opened = NIGHTS; stage = NIGHTS; store.set('lantern-night', opened); return `All ${NIGHTS} nights are open.`; }],
-      ['all', 'Find everything', () => { for (const p of PACKS) for (const i of p.items) owned.add(i[0]); store.set('lantern-owned', JSON.stringify([...owned])); twoOn(); return `Every boat, water, flame, ability, crash and victory is yours. Tap one to see it. Up to ${PICK} abilities, ${CRASH_ON} crashes and ${WIN_ON} victories can be on.`; }]]) {
-      const b = document.createElement('button'); b.dataset.test = id; b.textContent = label; b.addEventListener('click', () => { if (busy) return; const said = act(); rec.event('test', { tool: id, bank }); shop(said); }); t.append(b);
+    const tools = document.createElement('div'); tools.className = 'pack test'; const tn = document.createElement('b'); tn.textContent = t('testHead'); const tw = document.createElement('small'); tw.className = 'once'; tw.textContent = t('testWarn'); tools.append(tn, tw);
+    for (const [id, label, act] of [['embers', t('testEmbers'), () => { bank += 500; store.set('lantern-bank', bank); return t('testEmbersDone'); }],
+      ['nights', t('testNights'), () => { opened = NIGHTS; stage = NIGHTS; store.set('lantern-night', opened); return t('testNightsDone', { n: NIGHTS }); }],
+      ['all', t('testAll'), () => { for (const p of PACKS) for (const i of p.items) owned.add(i[0]); store.set('lantern-owned', JSON.stringify([...owned])); twoOn(); return t('testAllDone', { pick: PICK, crash: CRASH_ON, win: WIN_ON }); }]]) {
+      const b = document.createElement('button'); b.dataset.test = id; b.textContent = label; b.addEventListener('click', () => { if (busy) return; const said = act(); rec.event('test', { tool: id, bank }); shop(said); }); tools.append(b);
     }
     // Erase everything (tester t1, note #73): every lantern- key goes, so the game starts as a new player's would. Two taps, so a stray one does nothing.
-    const wipe = document.createElement('button'); wipe.dataset.test = 'reset'; wipe.textContent = 'Erase everything';
+    const wipe = document.createElement('button'); wipe.dataset.test = 'reset'; wipe.textContent = t('testErase');
     wipe.addEventListener('click', () => {
       if (busy) return;
-      if (wipe.dataset.sure !== '1') { wipe.dataset.sure = '1'; wipe.textContent = 'Tap again to erase'; $('got').textContent = 'This erases embers, nights, finds, stats and bests on this phone.'; return; }
+      if (wipe.dataset.sure !== '1') { wipe.dataset.sure = '1'; wipe.textContent = t('testEraseSure'); $('got').textContent = t('testEraseWarn'); return; }
       rec.event('test', { tool: 'reset', bank });
       const left = sharing && boardId ? [...gone(), boardId] : gone();
       for (const k of Object.keys(localStorage)) if (k.startsWith('lantern-')) localStorage.removeItem(k);
       if (left.length) { store.set('lantern-board-gone', JSON.stringify(left)); boardForget(); } // the rows still to take away outlive the erase
       location.reload();
     });
-    t.append(wipe);
-    box.append(t);
+    tools.append(wipe);
+    box.append(tools);
   }
 }
 // The button under a pack: what a tap on the thing itself did before note #112.
 const chosen = {};
 function flip(pack, it) {
   if (pack.id === 'crash') { // up to three crash effects on; with none on, a crash fits what was hit
-    if (crashOn.includes(it[0])) crashOn = crashOn.filter(k => k !== it[0]); else if (crashOn.length >= CRASH_ON) { shop(`Only ${CRASH_ON} crashes at a time. Switch one off first.`); return; } else crashOn.push(it[0]);
+    if (crashOn.includes(it[0])) crashOn = crashOn.filter(k => k !== it[0]); else if (crashOn.length >= CRASH_ON) { shop(t('onlyCrash', { n: CRASH_ON })); return; } else crashOn.push(it[0]);
     store.set('lantern-crash', JSON.stringify(crashOn)); rec.event('crash-pick', { crash: it[0], on: crashOn.includes(it[0]) });
-    shop(crashOn.includes(it[0]) ? `${it[1]} is on. ${it[3]}` : crashOn.length ? `${it[1]} is off.` : `${it[1]} is off. With no crash on, each crash fits what you hit.`); return; }
+    shop(crashOn.includes(it[0]) ? t('isOnDesc', { name: itemName(it), desc: itemDesc(it) }) : t(crashOn.length ? 'isOff' : 'isOffCrash', { name: itemName(it) })); return; }
   if (pack.id === 'win') { // up to three victories on; with none on, dawn is plain
-    if (winOn.includes(it[0])) winOn = winOn.filter(k => k !== it[0]); else if (winOn.length >= WIN_ON) { shop(`Only ${WIN_ON} victories at a time. Switch one off first.`); return; } else winOn.push(it[0]);
+    if (winOn.includes(it[0])) winOn = winOn.filter(k => k !== it[0]); else if (winOn.length >= WIN_ON) { shop(t('onlyWin', { n: WIN_ON })); return; } else winOn.push(it[0]);
     store.set('lantern-win', JSON.stringify(winOn)); rec.event('win-pick', { win: it[0], on: winOn.includes(it[0]) });
-    shop(winOn.includes(it[0]) ? `${it[1]} is on. ${it[3]}` : winOn.length ? `${it[1]} is off.` : `${it[1]} is off. With no victory on, dawn comes plain.`); return; }
+    shop(winOn.includes(it[0]) ? t('isOnDesc', { name: itemName(it), desc: itemDesc(it) }) : t(winOn.length ? 'isOff' : 'isOffWin', { name: itemName(it) })); return; }
   if (pack.id === 'power') { // switch an ability off to keep it out of the river; two at most
-    if (off.has(it[0]) && powersOwned().length >= PICK) { shop(`Only ${PICK} abilities at a time. Switch one off first.`); return; }
+    if (off.has(it[0]) && powersOwned().length >= PICK) { shop(t('onlyPower', { n: PICK })); return; }
     if (off.has(it[0])) off.delete(it[0]); else off.add(it[0]); store.set('lantern-off', JSON.stringify([...off]));
-    rec.event('ability', { ability: it[0], on: !off.has(it[0]) }); shop(off.has(it[0]) ? `${it[1]} is off. It will not show up in the river.` : `${it[1]} is on. ${it[3]}`); return; }
-  worn[pack.id] = it[0]; store.set('lantern-worn', JSON.stringify(worn)); shop(`${it[1]} is on.`);
+    rec.event('ability', { ability: it[0], on: !off.has(it[0]) }); shop(off.has(it[0]) ? t('isOffPower', { name: itemName(it) }) : t('isOnDesc', { name: itemName(it), desc: itemDesc(it) })); return; }
+  worn[pack.id] = it[0]; store.set('lantern-worn', JSON.stringify(worn)); shop(t('isWorn', { name: itemName(it) }));
 }
 // Opening a pack: a light hops between the hidden things, slows, and stops on the find; then the whole screen fills with its colour.
 let busy = false;
@@ -427,7 +429,7 @@ function spin(row, hidden, it, pack, after = '') {
       const col = pack.id === 'flame' || pack.id === 'power' ? `rgb(${it[2]})` : it[2], fl = $('flash');
       fl.style.transition = 'none'; fl.style.background = col; fl.style.opacity = 0.9; void fl.offsetWidth; fl.style.transition = 'opacity 1.1s ease-out'; fl.style.opacity = 0;
       tone(659.25, 0.5, 0.1, 'triangle'); setTimeout(() => tone(987.77, 0.8, 0.1, 'triangle'), 130); setTimeout(() => tone(1318.5, 1, 0.08, 'triangle'), 260);
-      shop((pack.id === 'power' || pack.id === 'crash' || pack.id === 'win' ? `You found: ${it[1]}! ${it[3]}` : `You found: ${it[1]}!`) + after);
+      shop([pack.id === 'power' || pack.id === 'crash' || pack.id === 'win' ? t('foundDesc', { name: itemName(it), desc: itemDesc(it) }) : t('found', { name: itemName(it) }), after].filter(Boolean).join(' '));
     }, 420);
   };
   hop();
@@ -443,7 +445,7 @@ function look(kind, it) {
   peekScroll = $('shop').firstElementChild.scrollTop;
   looking = kind; peek = it ?? null; peekT = performance.now(); peekN = -1; s = create(7, 1, false, []); s.light = 1; target = s.x; crash = null; victory = null; shake = 0; size = 1;
   show('look'); $('look').classList.add('on'); document.body.classList.add('looking');
-  if (kind === 'power' && peek) { $('hud').style.display = 'block'; setScene(peek[0], true); } else say('Tap to go back', 1400);
+  if (kind === 'power' && peek) { $('hud').style.display = 'block'; setScene(peek[0], true); } else say(t('tapBack'), 1400);
 }
 function unlook() {
   if (!looking) return;
@@ -467,25 +469,7 @@ function drift(dt) { // the river flows by under the boat; no rocks, no pickups,
 let scene = null;
 const SCENE = { boost: 6, slow: 7.5, size: 6.5, magnet: 7.5, flare: 6.5, heart: 6, shield: 6.5 }; // seconds per showing
 const AT = 0.9; // where the ability lies, in river units from the start; about a second and a half away
-const INTRO = {
-  boost: 'See how fast the rocks pass. Then take the gold arrows.',
-  slow: 'See how fast the rocks pass. Then take the violet clock.',
-  size: 'The gap ahead is too narrow for your boat. Take the teal rings.',
-  magnet: 'Those embers are out of reach. Take the pink magnet.',
-  flare: 'Your flame is low and the river is dark. Take the white sun.',
-  heart: 'You have one heart, and a rock is in the way. Take the red heart first.',
-  shield: 'Rocks block the way. Take the blue bubble.',
-};
-const TAKEN = {
-  boost: 'Boost: the river runs 1.8 times as fast, and nothing can break the boat',
-  slow: 'Slow water: the river runs at half speed. Dawn comes just as soon',
-  small: 'Size: a smaller boat slips through the gap. One time in five it grows instead',
-  magnet: 'Magnet: embers swim to you for 7 seconds',
-  flare: 'Flare: the flame is full and does not fade for 6 seconds',
-  heart: 'A heart: one more life. Now watch the rock',
-  shield: 'Force field: for 4 seconds, rocks are pushed out of your way',
-  hurt: 'The heart took the hit. Without it, the run would be over',
-};
+const TAKEN = new Set(['boost', 'slow', 'small', 'magnet', 'flare', 'heart', 'shield', 'hurt']); // what to watch is intro_<kind> in words.js, what happened is taken_<event>
 function setScene(kind, first = false) {
   s = create(7, 1, false, []); s.next = Infinity; s.light = 1; s.safe = 99; s.hearts = 1; target = s.x; sparks = []; streak = 0; crash = null; shown = '';
   const mid = y => centre(s, y), rock = (x, y, rad) => ({ x, x0: x, y, y0: y, rad, kind: '', len: 0, on: true, a: 0, w: 0, b: 0, wy: 0, ph: 0, phy: 0, vy: 0, ice: false, grazed: false });
@@ -499,14 +483,14 @@ function setScene(kind, first = false) {
   if (GIFTS.includes(kind)) s.embers.push({ x: mid(AT), y: AT, got: false, kind }); else s.powers.push({ x: mid(AT), y: AT, got: false, kind, big: false });
   if (kind === 'magnet') for (let i = 0; i < 5; i++) { const y = AT + 0.3 + 0.3 * i; s.embers.push({ x: mid(y) + (i % 2 ? 1 : -1) * 0.17, y, got: false, kind: 'ember' }); }
   scene = { kind, t0: performance.now(), sim: 0 };
-  say(INTRO[kind] + (first ? ' Tap anywhere to go back.' : ''), 2600);
+  say(t(`intro_${kind}`) + (first ? ' ' + t('tapAnywhere') : ''), 2600);
 }
 function playScene() {
   const e = (performance.now() - scene.t0) / 1000;
   if (e > SCENE[scene.kind] || s.over) { setScene(scene.kind); return; }
   for (let n = 0; scene.sim < e && n < 900; n++) { // as many steps as the clock asks, so a slow browser still shows it all
     step(s, target = centre(s, s.y + 0.3)); scene.sim += DT;
-    for (const ev of s.events) { if (ev === 'hit' || ev === 'out' || ev === 'dawn') continue; react(ev); if (TAKEN[ev]) say(TAKEN[ev], 3200); }
+    for (const ev of s.events) { if (ev === 'hit' || ev === 'out' || ev === 'dawn') continue; react(ev); if (TAKEN.has(ev)) say(t(`taken_${ev}`), 3200); }
     if (s.over) break;
   }
   hud();
@@ -544,7 +528,7 @@ function begin() {
   const boosted = fresh && Object.values(runStats).some(v => v > 0);
   target = s.x; crash = null; victory = null; playing = true; paused = false; acc = 0; streak = 0; sparks = []; lastLevel = 1; size = 1; fire0 = flame(); nearFall = false; weather = ''; steer.reset(); pads.drop(); snap3 = true;
   shown = ''; show('play'); hud();
-  say((tower ? (climb > LEVELS ? `Tower sector 2, level ${climb - LEVELS} of ${LEVELS}` : `Tower level ${climb} of ${LEVELS}`) + (fromFloor ? `, from floor ${fromFloor}` : '') : endless ? 'Endless river' : `Night ${stage}`) + (boosted ? '. Your stats are on for this run' : waiting ? '. No stats here: they wait for your next night or climb' : ''), waiting ? 2800 : 1800); floor = fromFloor;
+  say((tower ? t(climb > LEVELS ? (fromFloor ? 'saySectorFloor' : 'saySector') : (fromFloor ? 'sayTowerFloor' : 'sayTower'), { n: climb > LEVELS ? climb - LEVELS : climb, of: LEVELS, f: fromFloor }) : endless ? t('endless') : t('sayNight', { n: stage })) + (boosted ? '. ' + t('statsOn') : waiting ? '. ' + t('statsWait') : ''), waiting ? 2800 : 1800); floor = fromFloor;
   rec.start({ view, mode: mode(), night: tower || endless ? 0 : stage, ...(tower ? { level: climb, floor: fromFloor } : {}) });
 }
 const mode = () => tower ? 'tower' : endless ? 'endless' : 'night';
@@ -554,39 +538,39 @@ function finish() {
   playing = false; ended = performance.now(); steer.drop(); pads.drop(); bankRun();
   rec.end(s.over, { mode: mode(), night: tower || endless ? 0 : stage, reached: Math.floor(progress(s) * 100), score: endless ? score(s) : null, embers: s.taken, hearts: s.hearts, bank });
   $('hud').style.display = $('big').style.display = pauseButton.style.display = 'none'; $('warn').classList.remove('on');
-  const won = s.over === 'dawn', why = { dark: 'The flame went out.', bank: 'You ran onto the bank.', ice: 'You struck the ice.', log: 'You struck a log.', pool: 'The whirlpool took you.', geyser: 'The geyser threw you over.', isle: 'You struck an island.' }[s.over] ?? 'You struck a rock.';
-  const gained = `+${s.banked} ember${s.banked === 1 ? '' : 's'}${s.banked > s.taken ? ` (${s.taken} and the rebirth bonus)` : ''}. You have ${bank}.`;
-  $('toMenu').textContent = 'Menu'; $('ask').hidden = $('viewNext').hidden = true;
+  const won = s.over === 'dawn', why = t(['dark', 'bank', 'ice', 'log', 'pool', 'geyser', 'isle'].includes(s.over) ? `why_${s.over}` : 'why_rock');
+  const gained = t(s.banked > s.taken ? 'gainedBonus' : s.banked === 1 ? 'gained1' : 'gained', { n: s.banked, taken: s.taken, bank });
+  $('toMenu').textContent = t('menu'); $('ask').hidden = $('viewNext').hidden = true;
   if (tower) { // after each level: climb on to a harder one, or stop. The next climb goes on where this one left off (tester t1, note #73)
     const at = Math.min(FLOORS, Math.floor(progress(s) * FLOORS)); store.set('lantern-best-tower', Math.max(at, store.get('lantern-best-tower'))); // the old best floor, still kept
     const cleared = won ? climb : climb - 1, best = Math.max(cleared, store.get('lantern-best-level')); store.set('lantern-best-level', best);
     climbNext = won && climb < TOP ? climb + 1 : won ? 1 : climb; store.set('lantern-tower-at', climbNext); // a lost level is tried again
     const back = won ? 0 : Math.max(0, Math.min(FLOORS - 1 - BACK, at - BACK)); store.set('lantern-tower-floor', back); // three floors below the floor reached (note #142)
-    if (won && climb >= TOP) { $('title').textContent = 'The top'; $('line').textContent = `You climbed both sectors of the tower, all ${TOP} levels.`; $('go').textContent = 'Climb again from level 1'; }
-    else if (won && climb === LEVELS) { $('title').textContent = 'Sector 1 cleared'; $('line').textContent = `You climbed all ${LEVELS} levels. Sector 2 holds ${LEVELS} more, and each is harder again.`; $('go').textContent = 'Climb on to sector 2'; $('toMenu').textContent = 'Stop'; }
+    if (won && climb >= TOP) { $('title').textContent = t('top'); $('line').textContent = t('topLine', { n: TOP }); $('go').textContent = t('climbAgain'); }
+    else if (won && climb === LEVELS) { $('title').textContent = t('sector1'); $('line').textContent = t('sector1Line', { n: LEVELS }); $('go').textContent = t('toSector2'); $('toMenu').textContent = t('stop'); }
     else if (won) {
       const faster = Math.round((climbPace(climb + 1) / climbPace(1) - 1) * 100), joins = towerStage(climb + 1) > towerStage(climb) ? ` New: ${ahead(towerStage(climb + 1))}` : '';
-      $('title').textContent = `${head(climb)} cleared`; // the card's title stays on one line; the line under it names the sector $('line').textContent = `${Tag(climb + 1)} is harder: ${faster >= 5 ? `${faster}% faster than level 1` : 'faster'}, closer rocks, a narrower river.${joins} Climb on, or stop here and go on from ${tag(climb + 1)} later.`;
-      $('go').textContent = `Climb on to ${tag(climb + 1)}`; $('toMenu').textContent = 'Stop';
-    } else { $('title').textContent = head(climb); $('line').textContent = `${why} Best ${best > LEVELS ? tag(best) : `${best} of ${LEVELS}`}. Your climb goes on from ${tag(climb)}${back ? `, floor ${back}: three floors below floor ${at}, where you fell` : ''}.`; $('go').textContent = back ? `Try again from floor ${back}` : `Try ${tag(climb)} again`; }
+      $('title').textContent = t('levelCleared', { n: climb > LEVELS ? climb - LEVELS : climb }); // the card's title stays on one line; the line under it names the sector $('line').textContent = `${Tag(climb + 1)} is harder: ${faster >= 5 ? `${faster}% faster than level 1` : 'faster'}, closer rocks, a narrower river.${joins} Climb on, or stop here and go on from ${tag(climb + 1)} later.`;
+      $('go').textContent = t('climbOn', { tag: tag(climb + 1) }); $('toMenu').textContent = t('stop');
+    } else { $('title').textContent = head(climb); $('line').textContent = t(back ? 'towerLostFloor' : 'towerLost', { why, best: best > LEVELS ? tag(best) : t('nOf', { n: best, of: LEVELS }), tag: tag(climb), back, at }); $('go').textContent = back ? t('tryFloor', { n: back }) : t('tryLevel', { tag: tag(climb) }); }
   } else if (endless && daily) {
     // A run that ends after midnight UTC was on yesterday's river: it counts for neither day and is not sent.
     const late = ranDay !== today(), pts = score(s), was = plain(store.json('lantern-daily', {})), best = Math.max(late ? 0 : pts, was.d === today() ? Math.floor(was.s) || 0 : 0); if (!late) store.set('lantern-daily', JSON.stringify({ d: today(), s: best }));
     if (!late) boardSend(pts, ticket); ticket = null;
-    if (!decided && pts > 0) { $('ask').hidden = false; $('askName').value = playerName(); $('askNote').textContent = 'Your name and your score are sent, and a signal when a run starts. Nothing else.'; }
-    $('title').textContent = `${pts}`; $('line').textContent = late ? `${why} Midnight UTC passed during this run, so it was yesterday's river and does not count. A new river is ready.` : `${why} Today's river: your best today is ${best}. Everyone plays this same river until midnight UTC.`; $('go').textContent = 'Try today\'s river again';
+    if (!decided && pts > 0) { $('ask').hidden = false; $('askName').value = playerName(); $('askNote').textContent = t('askNote'); }
+    $('title').textContent = `${pts}`; $('line').textContent = t(late ? 'dailyLate' : 'dailyLine', { why, best }); $('go').textContent = t('tryDaily');
   } else if (endless) {
     const pts = score(s), best = Math.max(pts, store.get('lantern-best-endless')); store.set('lantern-best-endless', best);
     const place = onBoard(pts);
     boardSend(pts, ticket); ticket = null;
-    if (!decided && pts > 0) { $('ask').hidden = false; $('askName').value = playerName(); $('askNote').textContent = 'Your name and your score are sent, and a signal when a run starts. Nothing else.'; }
-    $('title').textContent = `${pts}`; $('line').textContent = `${why} Best ${best}.${place ? ` Number ${place} on this phone's leaderboard.` : ''}`; $('go').textContent = 'Play again';
+    if (!decided && pts > 0) { $('ask').hidden = false; $('askName').value = playerName(); $('askNote').textContent = t('askNote'); }
+    $('title').textContent = `${pts}`; $('line').textContent = t(place ? 'endlessPlace' : 'endlessLine', { why, best, place }); $('go').textContent = t('playAgain');
   } else {
     const pct = Math.floor(progress(s) * 100), key = `lantern-best-${stage}`, best = Math.max(pct, store.get(key)); store.set(key, best);
-    $('title').textContent = won ? 'Dawn' : s.over === 'dark' ? 'Dark' : `Night ${stage}`;
-    if (won && stage >= NIGHTS) { $('line').textContent = `You carried the light through all ${NIGHTS} nights.`; $('go').textContent = `Play night ${stage} again`; }
-    else if (won) { $('line').textContent = `You carried it through night ${stage}. Night ${stage + 1}: ${ahead(stage + 1)}`; stage++; opened = Math.max(opened, stage); store.set('lantern-night', opened); $('go').textContent = `Play night ${stage}`; }
-    else { $('line').textContent = `${why} ${pct}% of the way to dawn. Best ${best}%.`; $('go').textContent = 'Play again'; }
+    $('title').textContent = t(won ? 'dawn' : s.over === 'dark' ? 'dark' : 'nightTitle', { n: stage });
+    if (won && stage >= NIGHTS) { $('line').textContent = t('allNights', { n: NIGHTS }); $('go').textContent = t('playNightAgain', { n: stage }); }
+    else if (won) { $('line').textContent = t('wonNight', { n: stage, next: stage + 1, ahead: ahead(stage + 1) }); stage++; opened = Math.max(opened, stage); store.set('lantern-night', opened); $('go').textContent = t('playNight', { n: stage }); }
+    else { $('line').textContent = t('nightLost', { why, pct, best }); $('go').textContent = t('playAgain'); }
   }
   $('sub').textContent = gained;
   setTimeout(() => { if (!playing && screen === 'play') show('card'); }, won ? 2600 : crash ? 1300 : 700); // a crash plays out before the card
@@ -656,9 +640,9 @@ async function boardSend(pts, run) {
   if (!out && sharing && boardId === sent) { await new Promise(done => setTimeout(done, BOARD_RETRY)); if (sharing && boardId === sent) out = await boardCall(body, url); }
   if (!out || !sharing || boardId !== sent) return; // after a no given meanwhile, the removal and the server's memory of the id keep the row away
   if (k !== sends[+day]) return; // a later run's answer already came or is on its way
-  if (day) { sharedDay = out.rows; mineDay = out.place; if (screen === 'board') boardShow(); if (mineDay && s === ran && !playing && s.over && (screen === 'play' || screen === 'card')) $('sub').textContent += ` Number ${mineDay} today among all players.`; return; }
+  if (day) { sharedDay = out.rows; mineDay = out.place; if (screen === 'board') boardShow(); if (mineDay && s === ran && !playing && s.over && (screen === 'play' || screen === 'card')) $('sub').textContent += ' ' + t('placeDay', { n: mineDay }); return; }
   shared = out.rows; mine = out.place; if (screen === 'board') boardShow();
-  if (mine && s === ran && !playing && endless && s.over && (screen === 'play' || screen === 'card')) $('sub').textContent += ` Number ${mine} of all players.`;
+  if (mine && s === ran && !playing && endless && s.over && (screen === 'play' || screen === 'card')) $('sub').textContent += ' ' + t('placeAll', { n: mine });
 }
 // The one choice to show scores to everyone. Yes needs a name; a name typed under the old promise to stay on this phone is not a yes.
 async function share(yes) {
@@ -666,21 +650,21 @@ async function share(yes) {
   if (!yes) { const id = boardId; sharing = false; boardId = ''; mine = 0; store.set('lantern-share', ''); store.set('lantern-board-id', ''); boardShow(); if (id) await boardForget(id); boardShow(); return; }
   // The yes sends nothing by itself: a score goes up only with a ticket from the start of its run, so the first one is the next run.
   boardId = crypto.randomUUID(); sharing = true; mine = 0; store.set('lantern-share', '1'); store.set('lantern-board-id', boardId); boardShow();
-  if (!playing && endless && s.over && (screen === 'play' || screen === 'card')) $('sub').textContent += ' Your next run goes up.';
+  if (!playing && endless && s.over && (screen === 'play' || screen === 'card')) $('sub').textContent += ' ' + t('nextGoesUp');
 }
 function boardShow() {
   if (document.activeElement !== $('name')) $('name').value = playerName();
   const day = tab === 'day' && !!shared, all = tab === 'all' && !!shared, list = day ? sharedDay || [] : all ? shared : board, ol = $('rows'); ol.textContent = '';
   // The tabs and the tick appear only when the shared board answered.
   $('tabs').hidden = $('shareRow').hidden = !shared; $('tabPhone').className = all ? '' : 'on'; $('tabAll').className = all ? 'on' : ''; $('tabDay').className = day ? 'on' : ''; $('tabPhone').className = all || day ? '' : 'on';
-  const playText = day ? 'Play today\'s river' : 'Play the endless river'; if ($('boardPlay').textContent !== playText) $('boardPlay').textContent = playText; // WebKit drops a tap on a button whose text is rewritten under the finger
-  $('boardHint').textContent = day ? 'Today\'s river: the same river for every player until midnight UTC. Best runs today of the players who share.' : (all ? 'Endless river, best runs of the players who share.' : shared ? 'Endless river, best runs on this phone.' : 'Endless river, best runs on this phone. Your name and scores stay on this phone.') + ' No stats on the endless river: everyone plays it the same way.';
+  const playText = t(day ? 'playDaily' : 'playEndless'); if ($('boardPlay').textContent !== playText) $('boardPlay').textContent = playText; // WebKit drops a tap on a button whose text is rewritten under the finger
+  $('boardHint').textContent = day ? t('hintDay') : t(all ? 'hintAll' : shared ? 'hintShared' : 'hintPhone') + ' ' + t('hintNoStats');
   $('share').checked = sharing;
-  $('shareNote').textContent = sharing ? (boardName(playerName()) ? `Every endless run from now on goes up by itself, as ${boardName(playerName())}. Untick to take your row away.` : 'Type a name with letters or numbers above and your runs go up by themselves.') : 'A tick sends your name and your score to this game\'s server after every endless run, and a signal when a run starts. Nothing else is sent.';
-  if (!list.length) { const li = document.createElement('li'); li.textContent = day ? (sharedDay ? 'Nobody has shared a run on today\'s river yet.' : '…') : all ? 'Nobody has shared a run yet.' : 'No runs yet. Play the endless river to get on the board.'; ol.append(li); return; }
+  $('shareNote').textContent = sharing ? (boardName(playerName()) ? t('shareOn', { name: boardName(playerName()) }) : t('shareNoName')) : t('shareOff');
+  if (!list.length) { const li = document.createElement('li'); li.textContent = day ? (sharedDay ? t('emptyDay') : '…') : t(all ? 'emptyAll' : 'emptyPhone'); ol.append(li); return; }
   list.forEach((r, i) => {
     const li = document.createElement('li'); if (day ? i + 1 === mineDay : all ? i + 1 === mine : r === lastRun) li.className = 'me';
-    for (const [c, t] of [['k', `${i + 1}`], ['n', r.n || 'No name'], ['s', `${r.s}`], ['d', r.d ? r.d.slice(5).replace('-', '/') : '']]) { const sp = document.createElement('span'); sp.className = c; sp.textContent = t; li.append(sp); }
+    for (const [c, v] of [['k', `${i + 1}`], ['n', r.n || t('noName')], ['s', `${r.s}`], ['d', r.d ? (lang() === 'tr' ? r.d.slice(5).split('-').reverse().join('.') : r.d.slice(5).replace('-', '/')) : '']]) { const sp = document.createElement('span'); sp.className = c; sp.textContent = v; li.append(sp); } // a Turkish date is day.month
     ol.append(li);
   });
 }
@@ -764,7 +748,7 @@ const steer = drag(canvas, { playing: () => playing && view !== 'first', paused:
 const mouseX = e => { if (view === '2d' || !R3) return (e.clientX * dpr - left) / unit; const row = R3.boatRow(), k = canvas3.width / innerWidth; return (e.clientX * k - row.left) / row.unit; };
 // First person: press the left or right half of the screen; hold to keep turning (experiments/kit/sides.js, note #159).
 const pads = sides(canvas, { on: () => view === 'first', playing: () => playing, paused: () => paused, resume: () => resume() });
-hint(canvas, { kind: 'drag', key: 'lantern-hint', delay: 1500, bottom: 56, when: () => playing && !paused && screen === 'play' && view !== 'first', played: read('lantern-bank') !== null }); // a first-time player who does not touch sees how (experiments/kit/hint.js); 1.5 s, as a boat left alone meets a rock in 3 to 9 s; low, below the boat
+hint(canvas, { kind: 'drag', label: t('hint'), key: 'lantern-hint', delay: 1500, bottom: 56, when: () => playing && !paused && screen === 'play' && view !== 'first', played: read('lantern-bank') !== null }); // a first-time player who does not touch sees how (experiments/kit/hint.js); 1.5 s, as a boat left alone meets a rock in 3 to 9 s; low, below the boat
 
 // Buttons.
 $('play').addEventListener('click', () => { endless = tower = daily = false; begin(); });
@@ -772,7 +756,7 @@ $('endless').addEventListener('click', () => { endless = true; tower = daily = f
 $('daily').addEventListener('click', () => { endless = daily = true; tower = false; begin(); });
 $('tower').addEventListener('click', () => { tower = true; endless = daily = false; climb = towerAt(); fromFloor = towerFloor(); begin(); });
 $('anew').addEventListener('click', () => { // two taps: the first only asks, so a stray tap does not lose the climb
-  const b = $('anew'); if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = `Tap again: back to level 1`; return; }
+  const b = $('anew'); if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = t('anewSure'); return; }
   tower = true; endless = daily = false; climb = 1; fromFloor = 0; store.set('lantern-tower-at', 1); store.set('lantern-tower-floor', 0); begin(); });
 $('less').addEventListener('click', () => { stage = Math.max(1, stage - 1); menu(); });
 $('more').addEventListener('click', () => { stage = Math.min(opened, stage + 1); menu(); });
@@ -781,19 +765,19 @@ $('viewNext').addEventListener('click', () => setView(VIEWS[(VIEWS.indexOf(view)
 $('toShop').addEventListener('click', () => show('shop'));
 $('toCredits').addEventListener('click', () => show('credits'));
 $('toBoard').addEventListener('click', async () => { show('board'); if (gone().length) boardForget(); const out = await boardCall(); shared = out ? out.rows : null; asked++; tab = shared ? 'all' : 'phone'; if (screen === 'board') boardShow(); });
-const musicShow = () => { for (const b of document.querySelectorAll('button.music')) b.textContent = musicOn ? 'Music: on' : 'Music: off'; }; musicShow();
+const musicShow = () => { for (const b of document.querySelectorAll('button.music')) b.textContent = t(musicOn ? 'musicOn' : 'musicOff'); }; musicShow();
 for (const b of document.querySelectorAll('button.music')) b.addEventListener('click', () => { musicOn = !musicOn; store.set('lantern-music', musicOn ? '1' : '0'); musicShow(); });
 $('tabPhone').addEventListener('click', () => { tab = 'phone'; boardShow(); });
 $('tabAll').addEventListener('click', () => { tab = 'all'; boardShow(); });
 $('tabDay').addEventListener('click', async () => { tab = 'day'; boardShow(); const out = await boardCall(null, DAY_URL); if (out) sharedDay = out.rows; else sharedDay = sharedDay || []; if (screen === 'board') boardShow(); });
 $('share').addEventListener('change', () => {
   if (!$('share').checked) { share(false); return; }
-  tab = 'all'; if (!boardName(playerName())) { boardShow(); $('shareNote').textContent = 'Type a name with letters or numbers above first. Then tick.'; return; }
+  tab = 'all'; if (!boardName(playerName())) { boardShow(); $('shareNote').textContent = t('shareNeedName'); return; }
   share(true);
 });
 $('askName').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') $('askName').blur(); });
 $('askYes').addEventListener('click', () => {
-  const n = cleanName($('askName').value); if (!boardName(n)) { $('askNote').textContent = n ? 'Use letters or numbers in the name.' : 'Type a name first.'; $('askName').focus(); return; }
+  const n = cleanName($('askName').value); if (!boardName(n)) { $('askNote').textContent = t(n ? 'askBadName' : 'askNoName'); $('askName').focus(); return; }
   store.set('lantern-name', n); $('ask').hidden = true; if (lastRun) { lastRun.n = n; store.set('lantern-board', JSON.stringify(board)); } share(true);
 });
 $('askNo').addEventListener('click', () => { $('ask').hidden = true; share(false); });
@@ -804,14 +788,20 @@ $('name').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 
 for (const b of document.querySelectorAll('.back')) b.addEventListener('click', () => show('menu'));
 $('go').addEventListener('click', () => { if (paused) resume(); else if (performance.now() - ended > 600) { if (tower) { onward = s.over === 'dawn' && climbNext > climb; climb = climbNext; fromFloor = towerFloor(); } begin(); } });
 // Lab recording (experiments/kit/lab.js): the notice on the menu, the switch on the pause card; begin, finish, quit and the shop call rec.
-const rec = lab('lantern'); rec.notice($('menu').firstElementChild); rec.toggle($('card').firstElementChild);
+const rec = lab('lantern'), notice = rec.notice($('menu').firstElementChild), recording = rec.toggle($('card').firstElementChild);
+// The kit's notice and switch take their words from words.js. The space between the parts stays where the kit puts it.
+if (notice) { const link = notice.querySelector('a'), copy = document.createElement('span'); copy.dataset.i18n = 'notice'; link.dataset.i18n = 'privacy'; notice.replaceChildren(copy, ' ', link); }
+if (recording) { const input = recording.querySelector('input'), copy = document.createElement('span'); copy.dataset.i18n = 'record'; recording.replaceChildren(input, ' ', copy); }
 // Leaving a paused run for the menu ends it and keeps its embers.
 $('toMenu').addEventListener('click', () => { if (paused) { rec.end('quit', { mode: mode(), night: tower || endless ? 0 : stage, reached: Math.floor(progress(s) * 100), embers: s.taken, hearts: s.hearts }); } if (paused) { paused = false; playing = false; bankRun(); snd.release(); } show('menu'); });
 
 // Pause: the button, P or Escape, and whenever the page loses the screen (a phone call, another app).
+function pauseText() { // the pause card's words; the language button draws them again
+  $('toMenu').textContent = t('menu'); $('title').textContent = t('paused'); $('line').textContent = endless ? t('pauseScore', { n: score(s) }) : tower ? t('pauseTower', { tag: tag(climb), f: Math.floor(progress(s) * FLOORS), of: FLOORS }) : t('pauseNight', { n: stage, pct: Math.floor(progress(s) * 100) }); $('sub').textContent = t(view === 'first' ? 'touchGoFirst' : 'touchGo'); $('go').textContent = t('goOn');
+}
 function pause() {
   if (!playing || paused) return; paused = true; steer.drop(); pads.drop(); keys.clear(); $('viewNext').hidden = false;
-  $('toMenu').textContent = 'Menu'; $('title').textContent = 'Paused'; $('line').textContent = endless ? `Score ${score(s)}.` : tower ? `Tower ${tag(climb)}, floor ${Math.floor(progress(s) * FLOORS)} of ${FLOORS}.` : `Night ${stage}, ${Math.floor(progress(s) * 100)}% of the way to dawn.`; $('sub').textContent = view === 'first' ? 'Touch the river to go on. Press left or right to steer.' : 'Touch the river to go on.'; $('go').textContent = 'Go on';
+  pauseText();
   $('ask').hidden = true; show('card'); snd.hold();
 }
 function resume() {
@@ -833,7 +823,7 @@ addEventListener('keyup', e => keys.delete(e.key));
 function react(e) {
   if (e === 'ember') { tone(song && musicOn ? song.chime(Math.min(streak++, 7)) : scale[Math.min(streak++, scale.length - 1)], 0.5, 0.12, 'triangle'); glow = 1; for (let i = 0; i < 8; i++) sparks.push({ x: s.x, y: s.y, vx: (Math.random() - 0.5) * 0.4, vy: Math.random() * 0.5, life: 0.6 }); }
   if (e === 'graze') { tone(1320, 0.12, 0.05); glow = Math.max(glow, 0.5); }
-  if (e === 'shield') { tone(880, 0.5, 0.1); setTimeout(() => tone(1320, 0.7, 0.08), 110); glow = 1; say('Force field: rocks are pushed aside', 1700); }
+  if (e === 'shield') { tone(880, 0.5, 0.1); setTimeout(() => tone(1320, 0.7, 0.08), 110); glow = 1; say(t('sayField'), 1700); }
   if (e === 'push') { tone(300, 0.15, 0.08, 'triangle', 220); snd.ctx && snd.noise(0.08, 0.1, 900); }
   if (e === 'fieldEnd') tone(660, 0.3, 0.06, 'sine', -300);
   if (e === 'break') {
@@ -841,20 +831,20 @@ function react(e) {
     tone(240, 0.35, 0.25, 'square'); tone(1760, 0.25, 0.06); shake = 0.6; target = s.x; steer.rebase();
     for (let i = 0; i < 14; i++) sparks.push({ x: s.x, y: s.y, vx: (Math.random() - 0.5) * 0.9, vy: (Math.random() - 0.3) * 0.9, life: 0.7, blue: true });
   }
-  if (e === 'wisp') { tone(150, 0.5, 0.2, 'sawtooth'); say('A false ember!', 1400); streak = 0; }
-  if (e === 'heart') { tone(523.25, 0.4, 0.1, 'triangle'); setTimeout(() => tone(783.99, 0.6, 0.1, 'triangle'), 120); glow = 1; say('A heart: one more life', 1500); }
+  if (e === 'wisp') { tone(150, 0.5, 0.2, 'sawtooth'); say(t('sayWisp'), 1400); streak = 0; }
+  if (e === 'heart') { tone(523.25, 0.4, 0.1, 'triangle'); setTimeout(() => tone(783.99, 0.6, 0.1, 'triangle'), 120); glow = 1; say(t('sayHeart'), 1500); }
   if (e === 'hurt') {
     // A heart took the blow. Steering restarts from where the boat now is.
     tone(180, 0.4, 0.3, 'square'); shake = 0.8; target = s.x; steer.rebase();
     for (let i = 0; i < 14; i++) sparks.push({ x: s.x, y: s.y, vx: (Math.random() - 0.5) * 0.9, vy: (Math.random() - 0.3) * 0.9, life: 0.7, red: true });
-    say('You lost a heart', 1500);
+    say(t('sayHurt'), 1500);
   }
-  if (e === 'boost') { [392, 523.25, 783.99, 1046.5].forEach((f, i) => setTimeout(() => tone(f, 0.3, 0.09, 'sawtooth'), i * 60)); glow = 1; say('Boost! Nothing can stop you', 1600); }
-  if (e === 'slow') { tone(440, 0.9, 0.1); setTimeout(() => tone(330, 1.1, 0.1), 160); glow = 1; say('Slow water. Dawn keeps coming', 1800); }
-  if (e === 'small') { tone(1046.5, 0.25, 0.1, 'triangle'); setTimeout(() => tone(1568, 0.4, 0.08, 'triangle'), 90); glow = 1; say('A smaller boat', 1500); }
-  if (e === 'big') { tone(196, 0.5, 0.2, 'square'); setTimeout(() => tone(147, 0.7, 0.2, 'square'), 120); shake = 0.4; say('Bad luck: a bigger boat!', 1700); }
-  if (e === 'magnet') { tone(660, 0.3, 0.1, 'triangle'); setTimeout(() => tone(990, 0.5, 0.1, 'triangle'), 90); glow = 1; say('Magnet: embers come to you', 1700); }
-  if (e === 'flare') { [523.25, 783.99, 1046.5, 1568].forEach((f, i) => setTimeout(() => tone(f, 0.7, 0.08), i * 70)); glow = 1; say('Flare: the flame holds', 1600); }
+  if (e === 'boost') { [392, 523.25, 783.99, 1046.5].forEach((f, i) => setTimeout(() => tone(f, 0.3, 0.09, 'sawtooth'), i * 60)); glow = 1; say(t('sayBoost'), 1600); }
+  if (e === 'slow') { tone(440, 0.9, 0.1); setTimeout(() => tone(330, 1.1, 0.1), 160); glow = 1; say(t('saySlow'), 1800); }
+  if (e === 'small') { tone(1046.5, 0.25, 0.1, 'triangle'); setTimeout(() => tone(1568, 0.4, 0.08, 'triangle'), 90); glow = 1; say(t('saySmall'), 1500); }
+  if (e === 'big') { tone(196, 0.5, 0.2, 'square'); setTimeout(() => tone(147, 0.7, 0.2, 'square'), 120); shake = 0.4; say(t('sayBig'), 1700); }
+  if (e === 'magnet') { tone(660, 0.3, 0.1, 'triangle'); setTimeout(() => tone(990, 0.5, 0.1, 'triangle'), 90); glow = 1; say(t('sayMagnet'), 1700); }
+  if (e === 'flare') { [523.25, 783.99, 1046.5, 1568].forEach((f, i) => setTimeout(() => tone(f, 0.7, 0.08), i * 70)); glow = 1; say(t('sayFlare'), 1600); }
   if (e === 'hit') crashFx(s.over);
   if (e === 'out') tone(110, 1.2, 0.2);
   if (e === 'dawn') { [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => setTimeout(() => tone(f, 1.6, 0.1, 'triangle'), i * 180)); if (winOn.length) winFx(winOn[Math.floor(Math.random() * winOn.length)]); }
@@ -867,19 +857,19 @@ function tick() {
   for (const e of s.events) react(e);
   // Things worth saying aloud: the waterfall coming up, and each step harder on the endless river.
   const soon = fall(s, s.y + 1.3) > 0 || fall(s, s.y + 0.6) > 0;
-  if (soon && !nearFall) { say('Waterfall!', 1800); tone(196, 0.9, 0.12, 'sawtooth'); }
+  if (soon && !nearFall) { say(t('sayFall'), 1800); tone(196, 0.9, 0.12, 'sawtooth'); }
   nearFall = soon;
   const sky = (fog(s, s.y) ? 'f' : '') + (wind(s, s.y) ? 'w' : '') + (rain(s, s.y) ? 'r' : '') + (dazzle(s) < 0 ? 'l' : '');
   if (sky !== weather) {
-    if (sky.includes('f') && !weather.includes('f')) say('Fog', 1500);
-    if (sky.includes('w') && !weather.includes('w')) say(wind(s, s.y) < 0 ? 'Wind from the right' : 'Wind from the left', 1800);
-    if (sky.includes('r') && !weather.includes('r')) say('Rain', 1500);
+    if (sky.includes('f') && !weather.includes('f')) say(t('sayFog'), 1500);
+    if (sky.includes('w') && !weather.includes('w')) say(t(wind(s, s.y) < 0 ? 'sayWindRight' : 'sayWindLeft'), 1800);
+    if (sky.includes('r') && !weather.includes('r')) say(t('sayRain'), 1500);
     if (sky.includes('l') && !weather.includes('l')) { tone(60, 1.4, 0.3, 'sawtooth'); tone(45, 2, 0.25, 'square'); }
     weather = sky;
   }
-  if (level(s) !== lastLevel) { lastLevel = level(s); if (endless) { say('The river runs harder', 1800); tone(330, 0.3, 0.1, 'triangle'); setTimeout(() => tone(440, 0.5, 0.1, 'triangle'), 140); } }
+  if (level(s) !== lastLevel) { lastLevel = level(s); if (endless) { say(t('sayHarder'), 1800); tone(330, 0.3, 0.1, 'triangle'); setTimeout(() => tone(440, 0.5, 0.1, 'triangle'), 140); } }
   if (s.boost) for (let i = 0; i < 2; i++) sparks.push({ x: s.x + (Math.random() - 0.5) * 0.03, y: s.y - 0.03, vx: (Math.random() - 0.5) * 0.15, vy: -0.6 - Math.random() * 0.5, life: 0.45 });
-  if (tower) { const at = Math.floor(progress(s) * FLOORS); if (at > floor && at < FLOORS) { floor = at; say(at === FLOORS - 1 ? 'The last floor. The river runs straight' : `Floor ${at}`, 1500); tone(330 + 40 * at, 0.4, 0.09, 'triangle'); } }
+  if (tower) { const at = Math.floor(progress(s) * FLOORS); if (at > floor && at < FLOORS) { floor = at; say(at === FLOORS - 1 ? t('sayLastFloor') : t('sayFloor', { n: at }), 1500); tone(330 + 40 * at, 0.4, 0.09, 'triangle'); } }
   hud();
   if (s.over) finish();
 }
@@ -1122,10 +1112,28 @@ function frame(now) {
     song.set({ on: musicOn && playing && !paused, progress: endless && !tower ? Math.min(0.8, s.t / 150) : Math.max(0, Math.min(1, progress(s))), light: s.light, danger: playing ? Math.min(1, Math.max(fall(s, s.y + 0.8), fall(s, s.y), 1 - s.light * 2.5)) : 0 }); }
   try { draw(now); } catch (e) { g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; throw e; } // a bad frame must not leave the next one drawn in a blend mode
 }
+// Language (experiments/kit/i18n.js): ?lang=tr, else the saved kit:lang, else the browser's language. The globe button on the menu and on
+// the pause card switches between English and Turkish and redraws every word at once; no reload, and a paused run stays as it is.
+const GLOBE = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor"/><ellipse cx="12" cy="12" rx="4" ry="9" fill="none" stroke="currentColor"/><path d="M3 12h18" stroke="currentColor"/></svg>';
+const localizeNotes = () => $('notes-button')?.setAttribute('aria-label', t('notes')); $('notesScript')?.addEventListener('load', localizeNotes);
+function redraw() {
+  document.title = t('title'); apply(); musicShow(); views(); localizeNotes();
+  if (viewNote) $('viewNote').textContent = t(viewNote);
+  $('name').placeholder = $('askName').placeholder = t('typeName'); $('got').textContent = t('got');
+  for (const id of ['menuLanguage', 'pauseLanguage']) { $(id).innerHTML = GLOBE + `<span aria-hidden="true">${t('langCode')}</span>`; $(id).setAttribute('aria-label', t('switchLanguage')); }
+  const label = document.querySelector('.kit-hint .label'); if (label) label.textContent = t('hint');
+  if (screen === 'menu') menu(); if (paused) pauseText();
+}
+for (const id of ['menuLanguage', 'pauseLanguage']) $(id).addEventListener('click', () => {
+  setLang(langs[(langs.indexOf(lang()) + 1) % langs.length]);
+  const url = new URL(location.href); if (url.searchParams.has('lang')) { url.searchParams.delete('lang'); history.replaceState(history.state, '', url); } // the address chose the first language; a tap is the saved choice
+  redraw();
+});
+redraw();
 views(); if (read('lantern-view', '2d') !== '2d') setView(read('lantern-view'), false);
 show('menu');
 requestAnimationFrame(frame);
 </script>
-<script src="/notes/button.js" defer></script>
+<script src="/notes/button.js" id="notesScript" defer></script>
 </body>
 </html>
