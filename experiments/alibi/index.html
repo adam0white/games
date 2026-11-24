@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#272036">
+<title>Alibi</title>
+<style>
+  :root { color-scheme: dark; background: #272036; color: #fff1ce; font: 600 15px/1.25 system-ui, sans-serif; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; touch-action: none; overscroll-behavior: none; user-select: none; -webkit-user-select: none; }
+  #stage { position: fixed; inset: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  #c { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #layout { position: absolute; width: 360px; height: 640px; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(var(--scale, 1)); pointer-events: none; }
+  [hidden] { display: none !important; }
+  .screen { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; text-align: center; }
+  .screen.on { display: flex; }
+  .screen.on :is(button, a, label) { pointer-events: auto; }
+  h1, h2 { font-family: Georgia, serif; margin: 0; font-weight: 700; }
+  #menu { align-items: end; }
+  h1 { position: absolute; top: 30px; width: 100%; font-size: 84px; line-height: .88; letter-spacing: -.09em; padding-right: .09em; text-shadow: 0 3px #8b4e61, 0 6px #21182c; color: #ffe9bb; }
+  h2 { font-size: 42px; letter-spacing: -.055em; }
+  .panel { width: 310px; padding: 20px; border: 1px solid #cc9a7ca6; border-radius: 22px; background: #37293e; box-shadow: 0 7px #231c2d, 0 16px 38px #2019277c, inset 0 0 0 4px #ffffff07; }
+  #menu .panel { margin-bottom: 21px; padding: 12px 12px 11px; }
+  #menu .lab-notice { color: #f4d8bb; opacity: 1 !important; }
+  .row { display: flex; gap: 8px; justify-content: center; }
+  .row + .row { margin-top: 8px; }
+  button { color: #fff1ce; font: inherit; min-height: 44px; border: 1px solid #936679; border-radius: 11px; padding: 7px 13px; background: #513950; box-shadow: 0 2px #291f31; cursor: pointer; touch-action: manipulation; }
+  button:hover { background: #66495e; }
+  button:active { transform: translateY(1px); box-shadow: none; }
+  button:focus-visible { outline: 3px solid #ffe6a9; outline-offset: 3px; }
+  .row button { flex: 1; }
+  button.primary { background: #f6c17b; border-color: #ffdda1; color: #39253a; }
+  #play { font-size: 19px; min-height: 51px; width: 100%; margin-bottom: 8px; }
+  #progress { font-size: .82em; padding-left: 7px; }
+  #pause { position: absolute; top: 13px; left: 12px; width: 44px; padding: 0; pointer-events: auto; border-radius: 15px; color: #ffe5b3; }
+  #paused, #done, #cases, #sharing { background: #211a2bab; border-radius: 18px; }
+  #paused .row { margin-top: 12px; }
+  .lab-toggle { margin: 10px 0 0; color: #ecd8c7; font-size: 12px; }
+  .lab-toggle input { accent-color: #f7be69; }
+  #resultArt { width: 240px; height: 107px; display: block; margin: 3px auto 10px; }
+  #share { width: 100%; margin: 9px 0 0; }
+  #shareArt { width: 240px; height: 168px; display: block; margin: 0 auto 10px; }
+  #caseGrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin: 13px 0; }
+  #caseGrid button { padding: 0; min-height: 43px; font-size: 14px; }
+  #caseGrid button span { display: block; font-size: 8px; color: #f7be69; min-height: 10px; }
+  #caseGrid button:disabled { opacity: .5; cursor: default; }
+</style>
+</head>
+<body>
+<main id="stage">
+  <canvas id="c" aria-label="Evening replay, suspects and time controls" aria-keyshortcuts="ArrowLeft ArrowRight"></canvas>
+  <div id="layout">
+    <button id="pause" aria-label="Pause" hidden><svg width="19" height="20" viewBox="0 0 19 20" aria-hidden="true"><path d="M6 4v12m7-12v12" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/></svg></button>
+    <section id="menu" class="screen">
+      <h1>Alibi</h1>
+      <div class="panel">
+        <button id="play" class="primary">Play <span id="progress"></span></button>
+        <div class="row">
+          <button id="daily">Daily <span id="streak"></span></button>
+          <button id="pickCase">Cases</button>
+          <button id="menuSound" aria-label="Sound"></button>
+        </div>
+      </div>
+    </section>
+    <section id="cases" class="screen">
+      <div class="panel">
+        <h2>Cases</h2>
+        <div id="caseGrid"></div>
+        <button id="caseMenu">Menu</button>
+      </div>
+    </section>
+    <section id="paused" class="screen">
+      <div class="panel">
+        <h2>Paused</h2>
+        <div class="row"><button id="resume" class="primary">Resume</button><button id="toMenu">Menu</button></div>
+        <div class="row"><button id="pauseSound"></button></div>
+      </div>
+    </section>
+    <section id="done" class="screen">
+      <div class="panel">
+        <h2 id="result"></h2>
+        <canvas id="resultArt" width="480" height="214" aria-label="Case result"></canvas>
+        <div class="row"><button id="again" class="primary">Again</button><button id="next">Next</button><button id="endMenu">Menu</button></div>
+        <button id="share" hidden>Share</button>
+      </div>
+    </section>
+    <section id="sharing" class="screen">
+      <div class="panel">
+        <canvas id="shareArt" width="720" height="504" aria-label="Daily share card"></canvas>
+        <div class="row"><button id="sendShare" class="primary">Image</button><button id="closeShare">Back</button></div>
+      </div>
+    </section>
+  </div>
+</main>
+<script type="module" src="./game.js"></script>
+<script src="/notes/button.js" defer></script>
+</body>
+</html>
