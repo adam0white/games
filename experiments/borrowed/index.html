@@ -506,6 +506,9 @@ function openPuzzle() {
   tone(440, 0.25, 0.05, 'sine', 120); setTimeout(() => tone(330, 0.3, 0.04, 'sine', -60), 120);
   rec.event('puzzle', { lock: spot.lock, form, life: Math.round(s.life) });
 }
+// The practice hand points at the right photo after a short look (it waited 3 s; a cold player tapped first, wrongly).
+const HAND_AFTER = 1.2;
+const practiceHand = () => !!pz?.practice && !pz.practice.result && (pz.practice.t >= HAND_AFTER || pz.practice.wrong >= 0);
 function closePuzzle() { screen = 'play'; pz = null; tone(330, 0.12, 0.05, 'sine', -100); }
 function puzzleAct(fn) {
   if (screen !== 'puzzle' || !pz || pz.practice || pz.fx || !s.open || !settled()) return;
@@ -612,6 +615,13 @@ function photo(fr, x, y, w, h, time, frame = '#efe4c8', ctx = g) {
 function trueMark(x, y, r) {
   g.beginPath(); g.arc(x, y, r, 0, TAU); g.fillStyle = GOLD; g.fill(); g.strokeStyle = INK; g.lineWidth = 2.5; g.stroke();
   g.beginPath(); g.moveTo(x - r * 0.5, y); g.lineTo(x - r * 0.12, y + r * 0.42); g.lineTo(x + r * 0.5, y - r * 0.4); g.strokeStyle = INK; g.lineWidth = 3; g.lineCap = 'round'; g.stroke();
+}
+// A tapped photo that was not the lie: a red badge with a white cross, never the gold check (a cold player read the
+// check as "right").
+const WRONG_RED = '#e34b61';
+function wrongMark(x, y, r) {
+  g.beginPath(); g.arc(x, y, r, 0, TAU); g.fillStyle = WRONG_RED; g.fill(); g.strokeStyle = INK; g.lineWidth = 2.5; g.stroke();
+  cross(x, y, r * 0.42, '#fff6ec', 3);
 }
 function cross(x, y, r, col = '#ff5a4a', wdt = 6) {
   g.strokeStyle = col; g.lineWidth = wdt; g.lineCap = 'round';
@@ -733,8 +743,13 @@ function puzzleScene(time) {
       candleCost(PICK, cx + 60, ty + 28, time);
     }
   } else if (practice) {
-    if (practice.result) trueMark(cx - 23, ty + 2, 11);
-    candleCost(0, cx + (practice.result ? 14 : 0), ty + 2, time);
+    // The practice says what to do in the page language too, beside its free candle.
+    const title = t(torn ? 'matchEdge' : 'findLie');
+    g.font = '700 21px system-ui, sans-serif';
+    const tw = g.measureText(title).width, left = cx - (tw + 46) / 2;
+    puzzleText(title, left, ty, 21, '#ffd98a', 'left');
+    if (practice.result) trueMark(left + tw + 16, ty, 11);
+    else candleCost(0, left + tw + 30, ty + 1, time);
   } else if (fx.how === 'shown') {
     abilityIcon(g, 'who', cx - 33, ty + 3, 14, CREAM);
     candleCost(SHOW, cx + 11, ty + 4, time);
@@ -830,7 +845,11 @@ function puzzleScene(time) {
     if (rejected || (!finishing && torn && practice?.wrong === i)) cross(x + w / 2, y + h / 2, 25, '#e34b61', 5);
     if (tried || (!finishing && !torn && practice?.wrong === i)) {
       if (torn) cross(x + w - 13, y + 19, 8, '#e34b61', 4);
-      else trueMark(x + 13, y + 13, 11);
+      else {
+        // dimmed, with a red badge: "not this one"
+        g.beginPath(); roundRect(g, x, y, w, h, 7); g.fillStyle = 'rgba(13,9,28,.5)'; g.fill();
+        wrongMark(x + 15, y + 15, 12);
+      }
     }
     if (comparing && torn) edgeCue(paint, fr.edge, false, practice && i === target ? GOOD : '#d9b8ef');
     if (comparing && signed && exposed.length && (practice ? i === target : reduced || cueSide === i)) {
@@ -865,7 +884,7 @@ function puzzleScene(time) {
       });
     }
     const card = puzzleCards[target];
-    if (comparing && (practice.t >= 3 || practice.wrong >= 0)) hand(g, card.x + card.w * 0.73, card.y + card.h * 0.76, reduced ? 0.5 : time % 1);
+    if (practiceHand()) hand(g, card.x + card.w * 0.73, card.y + card.h * 0.76, reduced ? 0.5 : time % 1);
     g.restore();
     return;
   }
@@ -1487,7 +1506,7 @@ function player(time) {
   g.save(); g.translate(X, Y - lift); g.scale(1 + sq, 1 - sq);
   person(g, 0, 0, r, {
     hat: s.known[0], tool: s.known[1], t: time, blink: blinkAt(time, 0), face: s.face,
-    walk: s.path.length ? walkPhase : null, candle: shownLife / LIFE, lost: s.known[0] === null, cloak: '#5b6fd6',
+    walk: s.path.length ? walkPhase : null, candle: Math.min(1, shownLife / LIFE), lost: s.known[0] === null, cloak: '#5b6fd6',
     out: s.status === 'faded', mood: s.status === 'faded' ? 'sad' : null, age: s.chapter,
   });
   g.restore();
@@ -1501,7 +1520,7 @@ function hud(time) {
   grad.addColorStop(0, 'rgba(22,15,44,1)'); grad.addColorStop(1, 'rgba(22,15,44,0)');
   g.fillStyle = grad; g.fillRect(0, viewTop - 6, W, 14);
   // the candle: wax shrinks as the years go
-  const cx = hudL + 30, base = safe.t + 66, full = 46, h = Math.max(2, full * Math.max(0, shownLife) / LIFE);
+  const cx = hudL + 30, base = safe.t + 66, full = 46, h = Math.max(2, full * Math.min(1, Math.max(0, shownLife) / LIFE)); // a checkpoint from a longer candle stays in the frame
   g.beginPath(); g.ellipse(cx, base + 2, 17, 5, 0, 0, TAU); g.fillStyle = '#b08a52'; g.fill(); g.strokeStyle = INK; g.lineWidth = 2; g.stroke();
   candle(g, cx, base, 16, h, time, s.status === 'faded');
   // the price of a ready ability, marked on the wax before it is spent
@@ -1718,6 +1737,8 @@ function lineup(time) {
   if (rv) return;
   // buttons: back to looking, or name yourself
   const bb = lineupButtons.back, bs = lineupButtons.sure, ok = selected >= 0;
+  // an opaque base, so the island's "Who?" button does not show through "That's me!"
+  for (const b of [bb, bs]) { g.beginPath(); roundRect(g, b.x, b.y, b.w, b.h, 26); g.fillStyle = '#1b1430'; g.fill(); }
   g.beginPath(); roundRect(g, bb.x, bb.y, bb.w, bb.h, 26); g.fillStyle = 'rgba(255,243,220,.1)'; g.fill(); g.strokeStyle = 'rgba(255,217,138,.6)'; g.lineWidth = 2; g.stroke();
   const fl = flash && flash.what === 'pick' ? Math.sin(flash.t * 30) * 4 * (1 - flash.t) : 0;
   g.beginPath(); roundRect(g, bs.x + fl, bs.y, bs.w, bs.h, 26); g.fillStyle = ok ? '#ffb347' : 'rgba(255,179,71,.25)'; g.fill(); g.strokeStyle = ok ? '#fff3dc' : 'rgba(255,179,71,.5)'; g.lineWidth = 2; g.stroke();
@@ -2166,7 +2187,7 @@ window.borrowedState = () => ({
     form: pz.spot.puzzle.form, lock: pz.spot.lock, n: pz.spot.puzzle.frags.length, cards: puzzleCards.map(centre),
     tried: pz.spot.puzzle.form === 'torn' ? [...pz.spot.puzzle.tried].reverse() : [...pz.spot.puzzle.tried],
     later: puzzleButtons.later ? centre(puzzleButtons.later) : null,
-    show: puzzleButtons.show ? centre(puzzleButtons.show) : null, practice: !!pz.practice,
+    show: puzzleButtons.show ? centre(puzzleButtons.show) : null, practice: !!pz.practice, hand: practiceHand(),
     practiceResult: !!pz.practice?.result,
     solving: !!pz.fx, settled: settled(), how: pz.fx ? pz.fx.how : null, wrong: pz.wrong.length, stuck: stuckPuzzle(),
   } : null,

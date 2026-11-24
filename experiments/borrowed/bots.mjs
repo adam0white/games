@@ -11,7 +11,9 @@
 //     when stuck does not beat paying;
 //  6. a bot that opens every lock it meets dies or scores clearly worse than the careful bot;
 //  7. a bot that names a face at once is right only at chance (1 in 6) in each chapter, whichever way it picks;
-//  8. a bot that does nothing fades.
+//  8. a bot that does nothing fades;
+//  9. the price is felt: a slow first-timer who taps one true photo in every chapter finishes with a thin margin, never
+//     loses before the old chapter, and the careful bot uses Rewind on a clear share of runs.
 // It also reports spending and puzzle decisions a run, and run length in seconds.
 // It drives the same newRun / walkTo / use / step / pickLie / showMe / later / guess / nextChapter the page ticks.
 import {
@@ -64,6 +66,13 @@ function answer(s, opts) {
   const st = opts.stats;
   if (st) { st.opened++; if (p === opts.want && solvePuzzle(s.faces, s.known, z, s.exposed) < 0) st.stuck++; }
   const r = opts.r || (opts.r = rng(s.seed ^ 0x51ed));
+  // opts.blunder: a first-timer taps one true photo in the first puzzle of every chapter, then plays on.
+  if (opts.blunder && st && !(st.blunders ??= new Set()).has(s.chapter)) {
+    st.blunders.add(s.chapter);
+    const t = z.frags.findIndex((_, i) => i !== z.liar && !z.tried[i]);
+    if (t >= 0) pickLie(s, t);
+    if (s.open !== p || s.status !== 'play') return;
+  }
   const tap = order => { for (const i of order) { if (s.open !== p || s.status !== 'play') return; if (!z.tried[i]) pickLie(s, i); } };
   if (policy === 'buyer') { showMe(s); return; }
   if (policy === 'random') { const o = [...Array(n).keys()]; for (let i = n - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [o[i], o[j]] = [o[j], o[i]]; } tap(o); return; }
@@ -693,6 +702,25 @@ for (const rule of Object.keys(QUICK)) {
 let peekRight = 0, peekNamed = 0, peekScore = 0;
 for (let seed = 1; seed <= 2000; seed++) { const s = peek(seed); peekScore += s.score; for (const c of s.chapters) { peekNamed++; if (c.right) peekRight++; } }
 
+// ---------------------------------------------------------------- 9. the price is felt
+// The game's idea is that every ability costs years of your life. The careful bots never err, so their margin says
+// little about a person: in the second cold play a careful person ended with 51 and 55 of 150 years while the slow bot's
+// median was 73. The first-timer is the slow bot plus one wrong photo tap in every chapter (36 years). It must nearly
+// always finish (fair), must never fade in the first two chapters (the first chapter stays gentle), and its median must
+// be thin (30 years or less), so that one needless ability can cost the life. Before this check: median 37 of 150.
+const firstTimer = [];
+for (let seed = 1; seed <= SEEDS; seed++) for (let a = 1; a < FACES; a += 2) {
+  firstTimer.push(careful(seed, { order: orderFor(seed), answers: [a, (a + 2) % FACES, (a + 4) % FACES], slow: true, think: 8, blunder: true }));
+}
+const ftLeft = firstTimer.map(s => s.life).sort((a, b) => a - b), ftMedian = ftLeft[ftLeft.length >> 1];
+const ftWon = firstTimer.filter(s => s.status === 'remembered').length;
+const ftEarly = firstTimer.filter(s => s.status === 'faded' && s.chapter < 2).length;
+check(ftWon >= 0.99 * firstTimer.length && ftEarly === 0, `a first-timer (slow, one wrong tap a chapter) names all three on at least 99% of runs and never fades before the old chapter (${ftWon}/${firstTimer.length}, ${ftEarly} early)`);
+check(ftMedian <= 30, `a first-timer finishes with a thin margin: median years left at most 30 (${ftMedian.toFixed(1)})`);
+// Rewind, the dearest ability, is a real choice: used on a clear share of careful runs, not forced (see "bot without
+// old-chapter Rewind"). Before this check: 11%.
+check(usage.rewind >= 0.25, `careful bot uses Rewind on at least 25% of runs (${(100 * usage.rewind).toFixed(0)}%)`);
+
 // ---------------------------------------------------------------- 8. doing nothing
 const still = idle(5);
 check(still.status === 'faded', 'a bot that does nothing fades');
@@ -718,6 +746,7 @@ console.log(`gambler (names a face when two are left): score ${gambleScore.toFix
 console.log(`guess at once: ${Object.entries(quickRows).map(([k, v]) => `${k} ${(100 * v).toFixed(1)}% right, score ${quickScore[k].toFixed(0)}, ${JSON.stringify(quickOutcome[k])}`).join('; ')} (chance ${(100 / FACES).toFixed(1)}%)`);
 console.log(`free memory (if any), then guess among the faces that fit: right ${(100 * peekRight / peekNamed).toFixed(1)}% of names, score ${(peekScore / 2000).toFixed(0)}`);
 console.log(`a guess at once that skips the faces of earlier roles (chapters 2 and 3): right ${(100 * roleGuess).toFixed(1)}% (chance ${(100 / FACES).toFixed(1)}%)`);
+console.log(`first-timer (slow careful bot, one wrong photo tap a chapter): ${ftWon}/${firstTimer.length} name all three, years left min ${ftLeft[0].toFixed(1)}, 10th percentile ${ftLeft[Math.floor(ftLeft.length / 10)].toFixed(1)}, median ${ftMedian.toFixed(1)}; spent in the first chapter ${stats(firstTimer, s => s.chapters[0].yearsSpent).mean.toFixed(0)} years on average`);
 console.log(`do-nothing bot: ${still.status} after ${(still.t / 60).toFixed(0)} s`);
 const cpu = process.cpuUsage(cpu0);
 const cpuSeconds = (cpu.user + cpu.system) / 1e6;

@@ -183,6 +183,25 @@ async function practiceInk(page, action, test, side = null) {
     await paint.dispose();
   }
 }
+// The filled circles painted over two frames, with their colour: a badge on a photo is one of these.
+async function badges(page) {
+  return page.evaluate(() => new Promise(resolve => {
+    const ctx = document.querySelector('#c').getContext('2d'), seen = [];
+    const arc = ctx.arc, fill = ctx.fill;
+    let circle;
+    ctx.arc = function(x, y, radius, ...rest) { circle = { x, y, radius }; return arc.call(this, x, y, radius, ...rest); };
+    ctx.fill = function(...args) { if (circle) seen.push({ ...circle, color: this.fillStyle }); circle = null; return fill.apply(this, args); };
+    requestAnimationFrame(() => requestAnimationFrame(() => { Object.assign(ctx, { arc, fill }); resolve(seen); }));
+  }));
+}
+// Second cold play: a tapped photo that is not the lie wore the gold check, and a first-time player read it as "right".
+// It must wear the red badge, and no check, in the photo's top corner.
+async function assertWrongBadge(page, card, label) {
+  const marks = (await badges(page)).filter(m => (m.x < card.x) && m.x > card.x - 90 && m.y < card.y && m.y > card.y - 120 && m.radius >= 10 && m.radius <= 13);
+  assert.ok(!marks.some(m => m.color === '#ffd34d'), `${label}: a tapped true photo shows no gold check`);
+  assert.ok(marks.some(m => m.color === '#e34b61'), `${label}: a tapped true photo shows the red badge`);
+}
+const PRACTICE_TITLE = { lie: ['Find the lie', 'Yalanı bul'], signed: ['Find the lie', 'Yalanı bul'], torn: ['Match the edge', 'Parçayı eşleştir'] };
 const practicePick = { lie: 0, torn: 1, signed: 0 };
 async function finishPractice(page, o = {}) {
   const pz = await waitPuzzle(page);
@@ -194,12 +213,17 @@ async function finishPractice(page, o = {}) {
   const pick = practicePick[pz.form];
   if (!pz.practiceResult) {
     await practiceInk(page, async () => {}, paint => paint.seen.some(mark => mark.type === 'connector'));
-    assert.ok((await canvasWords(page)).some(w => w.text === '0'), 'practice shows a zero candle cost');
+    const words = (await canvasWords(page)).map(w => w.text);
+    assert.ok(words.includes('0'), 'practice shows a zero candle cost');
+    // Second cold play: the practice had no words, and a player who matched pictures tapped the true one.
+    assert.ok(PRACTICE_TITLE[pz.form].some(w => words.includes(w)), `the ${pz.form} practice says what to do (${PRACTICE_TITLE[pz.form][0]})`);
+    await until(page, () => window.borrowedState().puzzle?.hand === true, 'the practice hand shows within 1.5 s', 1500);
   }
   if (o.shot) { await sleep(750); await o.shot(); }
   if (!pz.practiceResult) {
     await tap(page, pz.cards[1 - pick]);
     assert.equal((await state(page)).puzzle.practiceResult, false, 'a wrong practice tap is free and leaves practice open');
+    if (pz.form !== 'torn') await assertWrongBadge(page, pz.cards[1 - pick], 'practice');
     const trueSide = pz.form === 'torn' ? pick : 1 - pick;
     await practiceInk(page, () => tap(page, pz.cards[pick]),
       paint => paint.seen.some(mark => mark.type === 'check' && mark.y > 135 && (paint.side === null || (mark.x < innerWidth / 2) === (paint.side === 0))),
@@ -230,6 +254,7 @@ async function solve(page, phone, seed, k, lock, o = {}) {
     const st = await state(page);
     assert.ok(Math.abs(y0 - st.life - PICK) < 1e-6, `a wrong tap costs ${PICK} years`);
     assert.ok(st.puzzle.tried[other] && st.screen === 'puzzle', 'the wrong pick is marked and the puzzle stays open');
+    if (pz.form !== 'torn') await assertWrongBadge(page, pz.cards[other], 'live puzzle');
     if (o.shots?.wrong) { await sleep(200); await shot(page, phone, o.shots.wrong); }
     await tapShowing(page, pz.cards[other], '0', [130, vp.height - 65]);
     assert.equal((await state(page)).life, st.life, 'repeated wrong tap is free');

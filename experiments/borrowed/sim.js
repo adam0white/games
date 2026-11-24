@@ -26,7 +26,9 @@
 // Tiles are 1 x 1; the player's position is in tile units, centre of tile (i, j) is (i + 0.5, j + 0.5).
 
 export const DT = 1 / 60;
-export const LIFE = 150; // years on the candle at the start of the run
+export const LIFE = 135; // years on the candle at the start of the run; 150 left a careful player 50 to 90 years, so no
+// price felt real. At 135 a slow player who taps one true photo in every chapter still finishes, with about 22 years
+// left at the median (bots.mjs, "a first-timer")
 export const BURN = 0.15; // years a second while you walk and look; frozen on the puzzles, the picture choice, between chapters and on pause
 export const WRONG = 30; // years a wrong name costs with puzzles
 export const wrongCost = s => s.lies ? WRONG : 15;
@@ -399,7 +401,9 @@ function makePuzzles(r, ch, faces, answer, dimsOf) {
     const parentDims = [anchor, first, other].sort();
     out.leap = pair(parentDims, parentDims.map(d => falseParent[d]), 'signed', parentSeal);
     out.dark = pair([first, next], [rival[first], rival[next]], 'signed', dependentSeal);
-    out.rewind = pair([first, other].sort(), [first, other].sort().map(d => d === first ? rival[first] : mismatch(d)), 'torn');
+    // The old mirror shows the two kinds the entry does not: one Rewind can stand in for Leap and Light. When the mirror
+    // repeated the entry's kind, Rewind added only what Leap adds and fell to about 1 run in 10.
+    out.rewind = pair([first, next].sort(), [first, next].sort().map(d => d === first ? rival[first] : mismatch(d)), 'torn');
   }
   return out;
 }
@@ -442,7 +446,7 @@ function buildChapter(s, k) {
   const flip = r() < 0.5;
   const faces = makeFaces(r, ch.apart, ch.apart > 1 ? CHILD_GROUPS : GROUPS);
   let answer = answerOf(s.seed, k, faces, pick(r, FACES));
-  // Which kinds of memory sit where. The free memory by the start shows one kind at random. With a mirror: push, leap
+  // Without puzzles (?lies=0), which kinds of memory sit where. The free memory by the start shows one kind at random. With a mirror: push, leap
   // and dark each guard one kind, and the mirror shows two, one of them the kind no other lock has. Without a mirror
   // (the child) push, leap and dark guard the three kinds the free memory does not show. Every kind can be found.
   const freeDim = pick(r, 4);
@@ -452,8 +456,8 @@ function buildChapter(s, k) {
   const dimsOf = ch.drop === 'M'
     ? { free: [freeDim], push: [rest[0]], leap: [rest[1]], dark: [rest[2]] }
     : { free: [freeDim], push: [lockDims[0]], leap: [lockDims[1]], dark: [lockDims[2]], rewind: [lockDims[3], second].sort() };
-  // In the old chapter Push also holds the kind otherwise exclusive to the mirror.
-  // Light, Push and Leap now cover every kind, while Rewind remains a shortcut.
+  // In the old chapter Push also holds the kind otherwise exclusive to the mirror, so Light, Push and Leap cover every
+  // kind. With puzzles (the default) each memory's kinds come from its puzzle instead (makePuzzles).
   if (ch.id === 'old') dimsOf.push = [lockDims[0], lockDims[3]].sort();
   if (s.opts.answers) answer = s.opts.answers[k];
   // The puzzles come after the answer is fixed and use their own random stream.
