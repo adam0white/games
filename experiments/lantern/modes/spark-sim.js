@@ -25,6 +25,7 @@ export const RING_MAX = 2.3;    // the ring fades out at this radius (the screen
 export const NEAR = 0.22;       // an ember this close glows faintly on its own: the boat feels its warmth
 const STAR = 0.07;              // star cell size in river units; one star a cell, jittered
 const BANK = 0.05;              // bank sample spacing
+const FLARE = 0.65;             // how far a Flare lights round the boat
 
 // The ramp: Lantern's river gets busier; early flow is slower, fireflies thin out, stars thin out
 // (more empty cells, so a hole is less surely a rock), thunder comes less often, and the spare hearts go.
@@ -65,9 +66,11 @@ let mutant = '';
 export function mutate(name) { mutant = name || ''; }
 
 // A night opens with one free spark, so the first thing the player sees is what a spark does.
-export function start(seed, n = 1) {
+// powers: the abilities the player owns and has on (Lantern's shop). They come from their own random stream in sim.js,
+// so the river, its rocks and its embers are the same with or without them; the bots pass none.
+export function start(seed, n = 1, powers = []) {
   const cf = config(n);
-  const s = create(seed, cf.stage, false, [], { hearts: cf.hearts, calm: cf.calm });
+  const s = create(seed, cf.stage, false, powers, { hearts: cf.hearts, calm: cf.calm });
   s.calm *= cf.flow;
   const r = rng(seed ^ 0x51ab7e);
   const e = { seed, n: cf.n, cf, s, r, tin: TIN, used: 0, rings: [{ x: s.x, y: s.y, t: 0, r: 0 }], lit: new Map(), banks: new Map(), flies: [], nextFly: Math.ceil((s.y + 0.6) / cf.fly), nextThunder: 6 + r() * 6, flash: -9, hits: 0, refills: 0, events: [] };
@@ -99,6 +102,7 @@ export function tick(e, target, spark = false) {
     const within = (x, y, pad = 0) => { const d = Math.hypot(x - g.x, y - g.y) - pad; return d <= g.r && d > r0 - 0.02 && (mutant !== 'ring-behind' || y < g.y); };
     for (const k of s.rocks) if (within(k.x, k.y, k.rad + k.len)) e.lit.set(k, s.t);
     for (const p of s.embers) if (!p.got && within(p.x, p.y)) e.lit.set(p, s.t);
+    for (const p of s.powers) if (!p.got && within(p.x, p.y)) e.lit.set(p, s.t);
     for (let i = Math.floor((g.y - g.r) / BANK); i <= Math.ceil((g.y + g.r) / BANK); i++) {
       const y = i * BANK, c = centre(s, y), h = half(s, y);
       for (const side of [-1, 1]) if (within(c + side * h, y)) e.banks.set(i * 2 + (side > 0 ? 1 : 0), s.t);
@@ -111,7 +115,15 @@ export function tick(e, target, spark = false) {
     e.nextThunder = s.t + e.cf.thunder * (0.6 + 0.8 * e.r());
     for (const k of s.rocks) if (k.y > s.y - 0.5 && k.y < s.y + 2) e.lit.set(k, s.t);
     for (const p of s.embers) if (!p.got && p.y > s.y - 0.5 && p.y < s.y + 2) e.lit.set(p, s.t);
+    for (const p of s.powers) if (!p.got && p.y > s.y - 0.5 && p.y < s.y + 2) e.lit.set(p, s.t);
     for (let i = Math.floor((s.y - 0.5) / BANK); i <= Math.ceil((s.y + 2) / BANK); i++) { e.banks.set(i * 2, s.t); e.banks.set(i * 2 + 1, s.t); }
+  }
+  // Flare (a Lantern ability): while it lasts the lantern burns again, and everything within FLARE of the boat stays lit.
+  if (s.flare > 0) {
+    const near = (x, y) => Math.hypot(x - s.x, y - s.y) < FLARE;
+    for (const k of s.rocks) if (near(k.x, k.y)) e.lit.set(k, s.t);
+    for (const p of s.embers) if (!p.got && near(p.x, p.y)) e.lit.set(p, s.t);
+    for (let i = Math.floor((s.y - FLARE) / BANK); i <= Math.ceil((s.y + FLARE) / BANK); i++) { e.banks.set(i * 2, s.t); e.banks.set(i * 2 + 1, s.t); }
   }
   // Forget what is behind and dark.
   if (e.banks.size > 400) for (const [key, t] of e.banks) if (s.t - t > GLOW) e.banks.delete(key);
@@ -177,11 +189,12 @@ export function stars(e, y0, y1) {
 // What the player can see now, the same for the page and the bots: lit rocks (where they are now), lit or near pickups,
 // lit bank samples and the fireflies. Banks are also faintly seen in starlight, so the bots may use centre and half.
 export function view(e) {
-  const s = e.s, rocks = [], embers = [], banks = [];
+  const s = e.s, rocks = [], embers = [], banks = [], powers = [];
   for (const k of s.rocks) { const g = glow(e, k); if (g > 0) rocks.push({ k, x: k.x, y: k.y, rad: k.rad, len: k.len, kind: k.kind, on: k.on, glow: g }); }
   for (const p of s.embers) if (!p.got) { const g = glow(e, p), near = Math.hypot(p.x - s.x, p.y - s.y) < NEAR; if (g > 0 || near) embers.push({ p, x: p.x, y: p.y, kind: p.kind, glow: Math.max(g, near ? 0.35 : 0) }); }
+  for (const p of s.powers) if (!p.got) { const g = glow(e, p), near = Math.hypot(p.x - s.x, p.y - s.y) < NEAR; if (g > 0 || near) powers.push({ p, x: p.x, y: p.y, kind: p.kind, glow: Math.max(g, near ? 0.35 : 0) }); }
   for (const [key, t] of e.banks) { const g = Math.max(0, 1 - (s.t - t) / GLOW); if (g > 0) { const i = key >> 1, y = i * BANK; banks.push({ y, side: key & 1 ? 1 : -1, x: centre(s, y) + (key & 1 ? 1 : -1) * half(s, y), glow: g }); } }
-  return { rocks, embers, banks, flies: e.flies, flash: Math.max(0, 1 - (s.t - e.flash) / 0.35) };
+  return { rocks, embers, banks, powers, flies: e.flies, flash: Math.max(0, 1 - (s.t - e.flash) / 0.35) };
 }
 
 // Water on rocks: the nearest rock ahead, as a stereo pan (-1 left, 1 right) and a level (0 to 1) that grows as it nears.

@@ -675,6 +675,48 @@ const GAMES = {
       await until(page, done, what, 8000); await page.click('#look');
     }
     assert.deepEqual(await saved(), saves0, 'showing an ability changes no save'); assert.equal(labSent(page).length, sent0, 'showing an ability sends nothing');
+    // Lantern Spark, a mode inside Lantern (modes/spark.js). The deep link opens it; the lab page's save carries over once; it is drawn
+    // flat; a second finger, Space and the button strike sparks; embers go to the bank; nothing else of Lantern's save changes; no board call.
+    {
+      await page.evaluate(() => { localStorage.setItem('lantern-spark:save', JSON.stringify({ v: 1, best: 3, stars: { 1: 2, 2: 1 }, played: 4 })); localStorage.setItem('lantern-view', '3d'); });
+      const before = await saved(), board = []; const spy = r => { if (r.url().includes('/lab-api/board')) board.push(r.url()); }; page.on('request', spy);
+      await page.goto(`${base}/lantern/?mode=spark`);
+      await until(page, () => window.lanternState().screen === 'mode' && window.lanternMode(), 'the deep link opens Spark');
+      let m = await page.evaluate(() => window.lanternMode());
+      assert.equal(m.best, 3, 'the lab save carries over: best'); assert.deepEqual(m.stars, { 1: 2, 2: 1 }, 'the lab save carries over: stars');
+      assert.equal((await state()).view, '2d', 'Spark is drawn flat');
+      assert.deepEqual(await page.$$eval('#modePanel .nights button', bs => bs.map(b => b.disabled)), [false, false, false, true, true, true], 'nights 1 to 3 open');
+      await page.click('#modePlay');
+      await until(page, () => window.lanternState().screen === 'play' && window.lanternMode().tin === 8, 'a Spark run');
+      assert.ok(await page.isVisible('#sparkBtn'), 'the spark button shows in a run');
+      await page.evaluate(() => { window.lanternSim().safe = 1e9; }); // no blow while the check works, so the stars below are certain
+      const touch = (type, id, x) => page.evaluate(([type, id, x]) => document.getElementById('c').dispatchEvent(new PointerEvent(type, { pointerId: id, pointerType: 'touch', isPrimary: id === 1, clientX: x, clientY: innerHeight * 0.7, bubbles: true, cancelable: true })), [type, id, x]);
+      const aim = (await state()).target;
+      await touch('pointerdown', 1, 195); await touch('pointerdown', 2, 300); await touch('pointermove', 2, 380);
+      m = await page.evaluate(() => window.lanternMode()); assert.equal(m.used, 1, 'a second finger strikes a spark'); assert.equal((await state()).target, aim, 'the second finger does not steer');
+      await touch('pointerup', 2, 380); await touch('pointerup', 1, 195);
+      await page.keyboard.press(' '); await until(page, () => window.lanternMode().used === 2, 'Space strikes a spark');
+      await page.click('#sparkBtn'); await until(page, () => window.lanternMode().used === 3, 'the button strikes a spark');
+      await page.keyboard.press('p'); assert.ok((await state()).paused, 'P pauses Spark');
+      assert.match(await page.textContent('#line'), /^Spark, night 3, \d+% of the way\.$/); assert.ok(await page.evaluate(() => document.getElementById('viewNext').hidden), 'no view switch while Spark is on');
+      await page.keyboard.press('p'); assert.ok(!(await state()).paused);
+      await page.evaluate(() => { const e = window.lanternSpark(), s = e.s; s.rocks = []; s.embers = [{ x: s.x, y: s.y + 0.02, got: false }]; s.bonus = e.cf.length * 78 - s.y - 0.05; }); // an ember just ahead, then dawn
+      await until(page, () => window.lanternState().screen === 'card', 'the end card', 12000);
+      const sim = await page.evaluate(() => ({ taken: window.lanternSim().taken, banked: window.lanternSim().banked, over: window.lanternSim().over }));
+      assert.equal(sim.over, 'dawn'); assert.ok(sim.taken >= 1, 'an ember taken in Spark');
+      assert.match(await page.textContent('#title'), /^Dawn ★★★$/, 'three stars: dawn, no blow, 6 sparks left'); assert.equal(await page.textContent('#go'), 'Play night 4');
+      const after = await saved(), mine = JSON.parse(after['lantern-mode-spark:save']);
+      assert.deepEqual(mine, { v: 1, best: 4, stars: { 1: 2, 2: 1, 3: 3 }, played: 1 }, 'Spark keeps its own save');
+      assert.equal(after['lantern-spark:save'], before['lantern-spark:save'], 'the lab save is never written');
+      assert.equal(Number(after['lantern-bank']), Number(before['lantern-bank'] ?? 0) + sim.banked, 'embers taken in Spark go to the bank');
+      for (const k of Object.keys(before)) if (!['lantern-bank'].includes(k)) assert.equal(after[k], before[k], `Spark leaves ${k} as it was`);
+      assert.deepEqual(Object.keys(after).filter(k => !(k in before)).sort(), ['lantern-mode-spark:save', 'lantern-mode-spark:spark'], 'Spark writes only its own new keys');
+      await page.click('#toMenu'); assert.equal((await state()).screen, 'mode', 'Menu goes back to the Spark card');
+      await page.click('#mode .back'); assert.equal((await state()).screen, 'menu'); assert.equal(await page.evaluate(() => window.lanternMode()), null, 'leaving Spark turns it off');
+      page.off('request', spy); assert.deepEqual(board, [], 'Spark never calls the shared board');
+      await page.evaluate(v => { if (v === undefined) localStorage.removeItem('lantern-view'); else localStorage.setItem('lantern-view', v); }, before['lantern-view'] === '3d' ? undefined : before['lantern-view']);
+      await page.goto(`${base}/lantern/`);
+    }
     // Erase everything (note #73, tester tools): two taps; every lantern- key goes and nothing else.
     await page.click('[data-test="reset"]'); assert.ok(Object.keys(await saved()).length > 3, 'one tap erases nothing');
     await Promise.all([page.waitForEvent('load'), page.click('[data-test="reset"]')]);
@@ -686,7 +728,7 @@ const GAMES = {
     await until(page, () => document.querySelector('#menu h1').textContent === 'Fener', 'the Turkish menu');
     assert.equal(await page.evaluate(() => document.documentElement.lang), 'tr');
     assert.equal(await page.textContent('#toShop'), 'Mağaza'); assert.equal(await page.textContent('#toBoard'), 'Sıralama');
-    await page.click('#toModes'); assert.deepEqual(await page.$$eval('#modes a.mode', as => as.map(a => a.getAttribute('href'))), ['/lab/lantern-race/', '/lab/lantern-spark/'], 'the other modes are one tap away'); await page.click('#modes .back');
+    await page.click('#toModes'); assert.deepEqual(await page.$$eval('#modes a.mode', as => as.map(a => a.getAttribute('href'))), ['/lab/lantern-race/'], 'Race is one tap away'); assert.deepEqual(await page.$$eval('#modes button.mode', bs => bs.map(b => [b.dataset.mode, b.textContent])), [['spark', 'Fener Kıvılcım']], 'Spark is chosen inside Lantern'); await page.click('#modes .back');
     await page.click('#menuLanguage');
     assert.equal(await page.evaluate(() => document.documentElement.lang), 'en');
     assert.equal(await page.textContent('#menu h1'), 'Lantern'); assert.equal(await page.textContent('#toShop'), 'Shop');

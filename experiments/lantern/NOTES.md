@@ -691,3 +691,87 @@ Checked: the phone check's line for the modes card; the card and Echo opened at 
 
 ### Left as a proposal (2026-11-24, note #234)
 - Echo in Turkish, and tuned past night 1. The wish to have the modes inside Lantern proper (one boat, skins and bank) is recorded above and still stands.
+
+## How a mode plugs in
+
+A mode is a way to play Lantern's river with other rules on top, chosen on the "More modes" card and played inside `/lantern/`.
+Spark is the first. Tide, Duet and Race will follow the same pattern.
+
+**Files.** A mode is `modes/<id>.js`, plus any rules of its own (`modes/<id>-sim.js`) and bots (`modes/<id>-bots.mjs`).
+A mode's rules wrap Lantern's `sim.js` state. They never edit `sim.js`.
+
+**How index.html finds it.** Three places:
+- `MODES` maps an id to a loader: `{ spark: () => import('./modes/spark.js') }`. The module loads only when chosen.
+- A button on the modes card: `<button class="mode" data-mode="<id>">`.
+- `/lantern/?mode=<id>` chooses it at load.
+
+**The interface.** The module exports `mode(page)`. It returns an object that index.html calls; `mod` is that object, or `null` when no mode is chosen.
+With `mod === null`, every line of index.html runs as it did before modes. `bots.mjs parity` checks that the rules are unchanged.
+
+| The mode gives | index.html calls it |
+| --- | --- |
+| `id` | for the recording (`mode` field) |
+| `card(box)` | to fill the mode's own screen (`#mode`, its panel `#modePanel`): title, choices, a play button that calls `page.play()` |
+| `start(powers)` | in `begin()`, instead of `create()`. Returns Lantern's state `s` for the run; hearts, embers, gifts, abilities, crashes and victories then work as in any run |
+| `step(target)` | each tick, instead of `step(s, target)`. Returns the tick's events; the page plays its own sound for each (`react`) and then calls the mode's |
+| `react(event)` | the mode's extra sound and look for an event, after the page's |
+| `reach()` | 0 to 1, for the HUD, the pause card, the recording and the music |
+| `night()` | the night or level being played, for the recording |
+| `hello()` | the line said as a run starts |
+| `pauseLine()` | the pause card's line |
+| `end()` | at the end of a run, after the embers are banked: saves the mode's own progress and returns `{ title, line, go }` for the end card |
+| `draw(now, day)` | each frame instead of the page's drawing (2D only). `day` is 0 to 1 after dawn |
+| `frame(dt, now, live)` | each frame, for the mode's own sound and timers |
+| `screen(name, box)` | when the page changes screens (show or hide the mode's own buttons; going to `menu` ends the mode) |
+| `state()`, `game()` | for the browser checks (`window.lanternMode()`, `window.lanternSpark()`) |
+
+| The page lends (`page.…`) | What it is |
+| --- | --- |
+| `canvas`, `g()`, `size()` | the 2D canvas, its context, and `{ W, H, unit, left, dpr }` |
+| `skin(kind)` | the player's boat, water and flame (`skin('flame')[2]` is an `r,g,b` string) |
+| `boat(now)`, `crashed()`, `win(now)` | draw the boat in its looks (or its crash effect); draw the victory effect |
+| `say`, `tone`, `noise`, `ctx()` | the page's spoken line, sounds and audio context (from the kit's `audio.js`) |
+| `live()`, `paused()`, `resume()`, `play()` | run state; start a run |
+
+**What a mode may change:** its drawing (flat), the light, extra input (its own listeners, which act only while a run of the mode is on), extra sounds, its own save keys (`lantern-mode-<id>:*`), its end card lines.
+**What it may not:** `sim.js`, Lantern's save keys, the shared leaderboard (a mode's runs never post), `lantern-night`, `lantern-best-*`, stats (a mode neither uses nor spends them, as on the endless river).
+**What it gets for free:** the bank (embers taken in a mode are banked by the page), the boat's looks, owned abilities, crash and victory effects, pause, the recording, Turkish (`words.js`).
+**Views:** a mode is drawn flat. Choosing it switches to 2D without saving that choice, hides the view switch on the pause card, and says so on the mode's card. Leaving the mode (Back to the menu) brings the saved view back.
+
+## 2026-11-24: Spark is a mode inside Lantern (owner, lab cleanup: "modes inside Lantern, not links")
+
+**What the player sees.** "More modes", then "Lantern Spark", opens Spark's card: six nights with their stars, Play, Back.
+The lantern goes out as the night starts (its light shrinks away over a second, with a puff), and one free spark shows the river.
+A round button with a star and the sparks left in the tin strikes a spark; so do a second finger, a mouse click and Space.
+The boat, water and flame are the player's own; the rings, lit rocks and banks take the flame's colour. Embers go to the bank.
+Owned abilities lie in Spark's river too; a ring or thunder lights them. Flare lights everything near the boat while it lasts.
+
+**Files.** `modes/spark.js` (page: drawing, sound, input, save), `modes/spark-sim.js` (the lab's layer, plus abilities and Flare),
+`modes/spark-bots.mjs` (the lab's 13 claims). index.html gained the seam above (`mod`, `pct()`, `boatAt()`, the `#mode` screen); about 25 changed lines.
+
+**Saves.** `lantern-mode-spark:save` is `{ v: 1, best, stars: { night: 0..3 }, played }`. `lantern-mode-spark:spark` is `'1'` after the first spark ever.
+`lantern-mode-spark:tips` holds the one-time tips shown (`f` fireflies, `h` holes in the stars).
+If the new save is missing and the lab page's `lantern-spark:save` exists, best and stars are copied once. The old key is never written.
+The lab's `lantern-spark:spark` also counts as "has struck a spark". Nothing is written at load unless that copy happens.
+
+**Nights and stars: kept as on the lab page.** Six nights, each a share of Lantern's river (0.5 to 0.9), stars for dawn, no blow taken, and 6 sparks left.
+Reason: the brief preferred the lab's structure, and the bot claims measure that structure. Spark's nights are not Lantern's nights; finishing one changes nothing in the climb.
+
+**Tuning: not changed.** The two weak points the lab notes named are already fixed by the lab's later retune, measured again here (150 seeds a case):
+- "The tin barely limits a steady player": a bot sparking every 3 s ends with 4.23 sparks and runs dry in 32% of runs; the clumsy bot spends 49.6 s with an empty tin.
+- "A cliff between nights 2 and 3": the clumsy bot's dawn rate goes 57, 47, 36, 30, 12, 0%; the largest drop is 18 points (nights 4 to 5), 11 points from 2 to 3.
+Still open, for the owner's play: night 6 has two lives and the careful bot reaches dawn in 77%; the clumsy bot never does. That is the last night, so it stays hard.
+Embers: a Spark night lays out 24 to 41 embers (nights 1 to 6) against 45 to 52 on a main night of the same number, in about the same time (60 seeds, ghost ride), so Spark is no faster way to fill the bank.
+
+**First ten seconds.** The light shrinking away; the free spark's ring; the button pulsing until the first spark ever;
+"Tap ✦ to strike a spark" once a run at 2.6 s for a player who has never struck one; the button glows bright when a rock is near and the player still has not struck.
+Two tips, once per player: fireflies over safe water (night 1), a gap in the stars can be a rock.
+
+**Checks.**
+- `node bots.mjs parity`: this `sim.js` and origin/main's `sim.js` (from `git show`) play the same seeds side by side with the same steering; the whole state matches at every tick. 16 cases (nights 1 to 50, endless, the tower, abilities, stats) x 40 seeds, 394,647 ticks, 0 differ. `--mutate` nudges one boat by 1e-12 and the check fails.
+  P2: Spark's river lays the same rocks and embers with abilities on as off, 240 of 240 rivers.
+- `node bots.mjs spark 150`: the lab's 13 claims pass with the lab's numbers exactly (rhythm 3/6/12 s: 150, 117, 34 of 150; cue 46; clumsy 85, 70, 54, 45, 18, 0). `--mutate` (a ring lights only behind) fails 7 claims.
+- The phone check (`kit/check/phone.mjs lantern`) gained a Spark part: the deep link, the lab save carried over, flat view, a second finger strikes and does not steer, Space and the button strike, pause, an ember taken and banked, dawn with three stars, Spark's own save, no other Lantern key changed, Menu back to Spark's card, no board call. The modes card line now expects Race as a link and Spark as a button.
+
+**Not verified.** Sound on a real phone (the murmur's pan and the puff); a real two-thumb hold on an iPhone; how dark night 6 feels.
+The lab page moved to `archive/lab/lantern-spark/`. Its old address needs `'lantern-spark': '/lantern/?mode=spark'` in `labMoved` (`worker-settings.mjs`, not edited here).

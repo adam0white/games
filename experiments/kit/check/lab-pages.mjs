@@ -7,7 +7,6 @@ const utcDay = now.toISOString().slice(0, 10);
 
 // These saves exercise the formats already read by each page. Sharing remains off.
 const saves = {
-  spark: { v: 1, best: 1, stars: { 1: 2 }, played: 3 },
   creatures: { sound: true, best: 4, big: false, day: localDay, dayBest: 3 },
   face: { v: 1, best: 300, runs: 3, stars: [2, 1, 0, 0], sound: true },
   pour: { v: 1, stars: [0, 0, 0, 0, 0, 0, 0, 0], sound: true, tries: 3 },
@@ -230,15 +229,6 @@ export const labPages = {
     hint: { key: 'lantern-race:hint', delay: 1500, start: raceStart, before: () => window.raceState().target, moved: n => window.raceState().target !== n,
       legacy: { 'lantern-race-best': '100000', 'lantern-race-sound': '1', 'lantern-race-name': 'Test boat', 'lantern-race-played': '1' } },
   },
-  'lab/lantern-spark': pageEntry('lantern-spark:save', saves.spark, 'lantern-spark:hint', {
-    menu: '#quit', pauseDown: true,
-    state: () => { const s = window.echoState?.(); return s && { ...s, paused: !!s.paused }; },
-    verify: () => { const s = window.echoState(); return { best: s.best, stars: s.stars, played: JSON.parse(localStorage.getItem('lantern-spark:save')).played, sparkHint: s.sparkHint }; },
-    expect: { best: 1, stars: { 1: 2 }, played: 3, sparkHint: false },
-    touch: dragTouch(() => window.echoState().target, n => window.echoState().target !== n),
-    hint: { delay: 1500, before: () => window.echoState().target, moved: n => window.echoState().target !== n,
-      alive: () => { const s = window.echoGame().s; s.safe = 60; s.light = 1; } },
-  }, { 'lantern-spark:spark': '1' }),
   'lab/ant-creatures': pageEntry('ant-creatures:v1', saves.creatures, 'ant-creatures:hint', {
     menu: '#paused .toMenu', sound: '#sound', soundOnMenu: true,
     state: () => { const a = window.__ant; return a && { screen: a.mode, paused: a.mode === 'paused', t: a.s?.t ?? 0 }; },
