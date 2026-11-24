@@ -92,6 +92,7 @@
   <p id="doneScore"></p>
   <p class="small" id="doneBest"></p>
   <span id="newRole" class="quiet" data-i18n="newRole" hidden></span>
+  <p class="small" id="dailyReplay" hidden></p>
   <p><button id="again" class="main" data-i18n="again"></button></p>
   <p class="album-actions"><button id="doneAlbum" data-i18n="album"></button><button id="shareCard" data-i18n="share"></button><button id="doneMenu" data-i18n="menu"></button></p>
 </div></div>
@@ -114,7 +115,7 @@
 <script type="module">
 import {
   newRun, step, walkTo, use, ready, guess, nextChapter, consistent, tileOf, dailySeed, roleId,
-  ABILITIES, COST, LIFE, LEAP_TICKS, DT, FACES, wrongCost, CHAPTERS, SELF_POINTS, PICK, SHOW, pickLie, showMe, later, keepsake,
+  ABILITIES, COST, LIFE, LEAP_TICKS, DT, FACES, wrongCost, CHAPTERS, SELF_POINTS, PICK, SHOW, pickLie, showMe, later, keepsake, solvePuzzle,
 } from './sim.js';
 import { place, person, pet, portrait, value, kindIcon, abilityIcon, hand, candle, flame, star, hat, tool, roundRect, INK, CREAM, GOLD, ABILITY_COLOUR } from './art.js';
 import { readJson, writeJson } from '../kit/save.js';
@@ -227,7 +228,7 @@ function camGoal() {
 
 // ---------------------------------------------------------------- game state
 let s = null, screen = 'menu', paused = false, clock = 0, acc = 0, last = performance.now();
-let mode = 'free', dayKey = null, seed = 0;
+let mode = 'free', dayKey = null, seed = 0, replayed = false, freshRole = false, counting = false;
 let shownLife = LIFE, walkPhase = 0, petAt = null, squash = 0, touched = false;
 let wfx = [], sfx = [], rings = [], shake = 0, litT = null, mendT = 0, bridgeT = 0, breakT = {};
 let pz = null;
@@ -254,7 +255,7 @@ function checkpoint() {
   if (!s || runOver()) return;
   try {
     sessionStorage.setItem(KEY, JSON.stringify({
-      version: 1, url: location.href, screen, mode, dayKey, touched, selected, vignette, newRoles,
+      version: 1, url: location.href, screen, mode, dayKey, touched, selected, vignette, newRoles, counting,
       s: { ...s, dark: [...s.dark], lit: [...s.lit], open: s.open?.lock ?? null },
       pz: pz ? { ...pz, spot: pz.spot.lock } : null,
     }));
@@ -272,7 +273,7 @@ function continueRun() {
   s = life.s; seed = s.seed; mode = life.mode; dayKey = life.dayKey;
   s.dark = Uint8Array.from(s.dark); s.lit = Uint8Array.from(s.lit);
   s.open = s.spots.find(spot => spot.lock === s.open) ?? null;
-  touched = life.touched; newRoles = life.newRoles; shownLife = s.life;
+  touched = life.touched; newRoles = life.newRoles; counting = !!life.counting; shownLife = s.life;
   snd.unlock(); snd.release(); paused = false;
   enterChapter();
   selected = life.selected; vignette = life.vignette; pz = life.pz;
@@ -296,7 +297,7 @@ function begin(daily = false) {
   dayKey = today();
   seed = urlSeed ?? (daily ? dailySeed(d.getFullYear(), d.getMonth() + 1, d.getDate()) : (Date.now() ^ (Math.random() * 4294967296)) >>> 0);
   s = newRun(seed, { lies: LIES });
-  shownLife = LIFE; touched = false; newRoles = 0;
+  shownLife = LIFE; touched = false; newRoles = 0; counting = false;
   hints.ability = {};
   paused = false; snd.release();
   enterChapter();
@@ -321,6 +322,16 @@ function goNext() {
 // ---------------------------------------------------------------- input: tap or hold to walk; buttons on the bar
 let finger = null;
 const inRect = (r, x, y) => x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;
+// The chapter card's Menu acts on pointerdown and shows the menu at once; the click the browser sends after the touch
+// would land on the menu button under the finger (language or sound). That one click is dropped.
+let swallowClick = 0;
+document.addEventListener('pointerdown', () => { swallowClick = 0; }, true); // a new touch is not that click
+document.addEventListener('click', e => {
+  if (!swallowClick) return;
+  const drop = performance.now() < swallowClick;
+  swallowClick = 0;
+  if (drop) { e.preventDefault(); e.stopImmediatePropagation(); }
+}, true);
 canvas.addEventListener('pointerdown', e => {
   if (paused) return;
   e.preventDefault();
@@ -329,7 +340,11 @@ canvas.addEventListener('pointerdown', e => {
   rings.push({ x, y, t: 0, screen: true });
   if (screen === 'lineup') { lineupTap(x, y); return; }
   if (screen === 'puzzle') { puzzleTap(x, y); return; }
-  if (screen === 'chapter') { if (nextBtn && inRect(nextBtn, x, y)) goNext(); else if (chapterMenuBtn && chapterCard.t >= 0.5 && inRect(chapterMenuBtn, x, y)) leaveRun(); return; }
+  if (screen === 'chapter') {
+    if (nextBtn && inRect(nextBtn, x, y)) goNext();
+    else if (chapterMenuBtn && chapterCard.t >= 0.5 && inRect(chapterMenuBtn, x, y)) { swallowClick = performance.now() + 800; leaveRun(); }
+    return;
+  }
   if (screen !== 'play') return;
   if (vignette) { vignette.k = Math.max(vignette.k, VIG_SHOW); tone(660, 0.05, 0.03, 'sine'); return; }
   touched = true;
@@ -359,8 +374,10 @@ function powerAdvice(id) {
   if (!spot) return { key: 'noMirror', mark: 'absent' };
   if (id === 'leap') {
     const distance = point => Math.hypot(s.px - point.x - .5, s.py - point.y - .5);
-    const at = distance(s.pad) <= distance(s.landing) ? s.pad : s.landing;
-    return s.bridge ? { key: 'useBridge', at, icon: 'bridge' } : { key: 'findStone', at, icon: 'stone' };
+    const near = distance(s.pad) <= distance(s.landing);
+    // Without stones: go to the nearer launch stone. With them: walk across to the far end, never the tile you stand on.
+    return s.bridge ? { key: 'useBridge', at: near ? s.landing : s.pad, icon: 'bridge' }
+      : { key: 'findStone', at: near ? s.pad : s.landing, icon: 'stone' };
   }
   if (id === 'push') {
     const rock = s.grid.indexOf('B');
@@ -509,6 +526,8 @@ function puzzleTap(x, y) {
   selectPhoto(puzzleCards.findIndex(c => inRect(c, x, y)));
 }
 
+// A live puzzle that nothing the player has found can settle yet (a 50/50 if tapped).
+const stuckPuzzle = () => !!pz && !pz.practice && !pz.fx && solvePuzzle(s.faces, s.known, pz.spot.puzzle, s.exposed) < 0;
 function layoutPuzzle() {
   const practice = !!pz.practice, form = pz.spot.puzzle.form;
   const cw0 = Math.min(W - safe.l - safe.r, 460);
@@ -690,10 +709,14 @@ function puzzleScene(time) {
       g.beginPath(); g.moveTo(x, y); g.lineTo(x - 3, y + 14); g.stroke();
     }
   }
+  const stuck = stuckPuzzle();
   if (!practice && !fx) {
     puzzleText(t(torn ? 'matchEdge' : 'findLie'), cx, ty, 23);
-    puzzleText(t('wrongTap'), cx - 13, ty + 28, 13, BAD);
-    candleCost(PICK, cx + 60, ty + 28, time);
+    if (stuck) puzzleText(t('needClue'), cx, ty + 28, 14, GOOD);
+    else {
+      puzzleText(t('wrongTap'), cx - 13, ty + 28, 13, BAD);
+      candleCost(PICK, cx + 60, ty + 28, time);
+    }
   } else if (practice) {
     if (practice.result) trueMark(cx - 23, ty + 2, 11);
     candleCost(0, cx + (practice.result ? 14 : 0), ty + 2, time);
@@ -860,6 +883,13 @@ function puzzleScene(time) {
       } else {
         arrow(g, middle - 40, b.y + b.h / 2, Math.PI);
         puzzleText(t('later'), middle + 8, b.y + b.h / 2, 16);
+        // Nothing the player knows settles this memory yet: Later is the move, so it glows and the hand points at it.
+        if (stuck) {
+          const pulse = reduced ? 0 : 2 * Math.sin(time * 6);
+          g.beginPath(); roundRect(g, b.x - 4 - pulse, b.y - 4 - pulse, b.w + 8 + 2 * pulse, b.h + 8 + 2 * pulse, 21);
+          g.strokeStyle = GOOD; g.lineWidth = 3; g.stroke();
+          hand(g, middle + b.w * 0.3, b.y + b.h * 0.7, reduced ? 0.5 : time % 1);
+        }
       }
     }
   }
@@ -993,7 +1023,8 @@ function startReveal(outcome) {
   const c = s.chapters[s.chapters.length - 1];
   if (outcome === 'right') {
     const id = roleId(s.faces[s.answer]);
-    if (!save.gallery[id]) newRoles++;
+    freshRole = !save.gallery[id];
+    if (freshRole) newRoles++;
     save.gallery[id] = (save.gallery[id] || 0) + 1;
     [0, 4, 7, 12, 16].forEach((k, i) => setTimeout(() => tone(SCALE[2] * 2 ** (k / 12), 0.7, 0.06, 'triangle'), i * 90));
   } else if (outcome === 'wrong') {
@@ -1004,11 +1035,16 @@ function startReveal(outcome) {
   } else {
     tone(392, 1.4, 0.07, 'sine', -300); noise(0.6, 0.08, 1200);
   }
+  // The first Daily of a date to show a true self is the one that counts: from here a replay, or a fresh start after
+  // leaving, already knows an answer. Its score so far is kept, and the end replaces it.
+  if (mode === 'daily' && save.daily[dayKey] === undefined) { counting = true; save.daily[dayKey] = s.score; }
+  else if (mode === 'daily' && counting) save.daily[dayKey] = s.score;
   rec.event('chapter', { chapter: c.chapter + 1, id: c.id, right: c.right, years: Math.round(c.yearsSpent), uses: c.uses, found: c.found, seconds: Math.round(c.seconds), left: Math.round(s.life) });
   if (!runOver()) { store(); return; }
   clearCheckpoint();
-  save.best = Math.max(save.best, s.score);
-  if (mode === 'daily') save.daily[dayKey] = Math.max(save.daily[dayKey] || 0, s.score);
+  // Only the Daily run that first showed an answer counts; any later Daily of the date sets neither score.
+  replayed = mode === 'daily' && !counting;
+  if (!replayed) save.best = Math.max(save.best, s.score);
   save.runs++;
   savePage(s.status);
   rec.end(s.status, {
@@ -1038,6 +1074,8 @@ function showEnd() {
   $('doneBest').textContent = details(t('found', { n: num(Object.keys(save.gallery).length), total: num(16) }), t('best', { score: num(save.best) }));
   $('doneBest').classList.toggle('new-role', newRoles > 0);
   $('newRole').hidden = newRoles === 0;
+  $('dailyReplay').hidden = !replayed;
+  if (replayed) $('dailyReplay').textContent = t('dailyReplay', { score: num(save.daily[dayKey]) });
   show('done');
 }
 
@@ -1719,7 +1757,17 @@ function chapterScene(time) {
   puzzleText(count(next + 1, CHAPTERS.length), W / 2, top + 10, 15, CREAM);
   puzzleText(ageLabel(next), W / 2, top + 44, 32);
   lifeRow(g, Math.min(W - 32, 340), W / 2, top + 76, 150, time, next);
-  chapterPreview(next, W / 2, top + 264, time);
+  // The self just named, by role; a star when the role is new to the gallery.
+  const named = s.chapters[next - 1];
+  if (named?.right) {
+    const role = t('role' + roleId(named.face));
+    const label = freshRole ? t('newRoleNamed', { role }) : role;
+    g.font = '800 16px ui-rounded, system-ui, sans-serif';
+    const lw = Math.min(g.measureText(label).width, W - 60);
+    if (freshRole) star(g, W / 2 - lw / 2 - 14, top + 240, 9, GOOD);
+    puzzleText(label, W / 2 + (freshRole ? 6 : 0), top + 240, 16, freshRole ? GOOD : CREAM);
+  }
+  chapterPreview(next, W / 2, top + 280, time);
   candle(g, W / 2 - 70, top + 339, 12, 18, time);
   puzzleText(yearsLeft(), W / 2 + 10, top + 330, 20);
   const bw = Math.min(160, (W - 60) * 0.58), mw = Math.min(112, (W - 60) * 0.42), gap = 12;
@@ -2053,11 +2101,12 @@ window.borrowedState = () => ({
     later: puzzleButtons.later ? centre(puzzleButtons.later) : null,
     show: puzzleButtons.show ? centre(puzzleButtons.show) : null, practice: !!pz.practice,
     practiceResult: !!pz.practice?.result,
-    solving: !!pz.fx, how: pz.fx ? pz.fx.how : null, wrong: pz.wrong.length,
+    solving: !!pz.fx, how: pz.fx ? pz.fx.how : null, wrong: pz.wrong.length, stuck: stuckPuzzle(),
   } : null,
   waiting: s ? s.spots.filter(p => p.puzzle && p.puzzle.seen && !p.taken).map(p => p.lock) : [],
   liesWon: s?.puzzles ? { ...s.puzzles } : null,
   tile: T, viewTop, viewBottom, mapX, cam, touched,
+  tip: nope ? { key: nope.key, tx: nope.at ? nope.at.x : null, ty: nope.at ? nope.at.y : null } : null,
 });
 window.borrowedSim = () => s; // checks may shorten a candle to reach the fading end quickly
 

@@ -316,12 +316,27 @@ export function newRun(seed, opts = {}) {
 }
 export const chapterSeed = (seed, k) => (Math.imul((seed >>> 0) ^ 0x5bd1e995, 0x9e3779b1) + Math.imul(k + 1, 0x85ebca6b)) >>> 0;
 
+// The answer of chapter k is a function of the seed alone. A life is three different people: when the drawn face has
+// the role of an earlier chapter's answer and another face has a new role, the answer is redrawn evenly among the faces
+// with new roles, from a stream of its own so the island and its memories stay as drawn.
+function answerOf(seed, k, faces, drawn) {
+  const earlier = [];
+  for (let j = 0; j < k; j++) {
+    const r = rng(chapterSeed(seed, j)); r();
+    const fj = makeFaces(r, CHAPTERS[j].apart, CHAPTERS[j].apart > 1 ? CHILD_GROUPS : GROUPS);
+    earlier.push(roleId(fj[answerOf(seed, j, fj, pick(r, FACES))]));
+  }
+  const fresh = faces.map((f, i) => i).filter(i => !earlier.includes(roleId(faces[i])));
+  if (!fresh.length || fresh.includes(drawn)) return drawn;
+  return fresh[pick(rng(chapterSeed(seed, k) ^ 0x6d2b79f5), fresh.length)];
+}
+
 function buildChapter(s, k) {
   const ch = CHAPTERS[k], r = rng(chapterSeed(s.seed, k));
   const tpl = s.order[k];
   const flip = r() < 0.5;
   const faces = makeFaces(r, ch.apart, ch.apart > 1 ? CHILD_GROUPS : GROUPS);
-  let answer = pick(r, FACES);
+  let answer = answerOf(s.seed, k, faces, pick(r, FACES));
   // Which kinds of memory sit where. The free memory by the start shows one kind at random. With a mirror: push, leap
   // and dark each guard one kind, and the mirror shows two, one of them the kind no other lock has. Without a mirror
   // (the child) push, leap and dark guard the three kinds the free memory does not show. Every kind can be found.

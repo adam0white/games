@@ -429,6 +429,35 @@ for (const [i, order] of PERMS.entries()) {
 }
 check(reached === 78, `actual ability routes reach all 78 memories across the six island orders (${reached})`);
 
+// A life is three different people: a chapter's answer never has the role of an earlier chapter's answer while one of
+// its faces has a new role. The answer stays a function of the seed alone, spread evenly over the six places.
+let repeats = 0, couldDiffer = 0, keptByRole = 0, rolePicks = 0;
+const place = [0, 0, 0, 0, 0, 0];
+for (let seed = 1; seed <= 3000; seed++) {
+  const s = newRun(seed), roles = [];
+  for (let k = 0; k < CHAPTERS.length; k++) {
+    const role = roleId(s.faces[s.answer]), fresh = s.faces.map((f, i) => i).filter(i => !roles.includes(roleId(s.faces[i])));
+    if (fresh.length) { couldDiffer++; if (roles.includes(role)) repeats++; }
+    if (k) { rolePicks++; if (fresh.length && fresh.length < FACES && fresh.includes(s.answer)) keptByRole += 1 / fresh.length; else keptByRole += 1 / FACES; }
+    place[s.answer]++;
+    roles.push(role);
+    if (k < 2) { s.status = 'named'; nextChapter(s); }
+  }
+}
+check(repeats === 0, `no chapter repeats an earlier answer's role when it can differ (${repeats} of ${couldDiffer})`);
+check(place.every(n => Math.abs(n / 9000 - 1 / FACES) < 0.02), `answers spread over the six places (${place.join(', ')})`);
+const roleGuess = keptByRole / rolePicks;
+// The old chapter has no free memory, so its Leap and dark memories opened first can nearly never be settled: the page
+// shows the missing-clue cue there (finding of the 2026-11-24 audit). Push, the entry lock, can always be settled.
+let oldStuck = 0, oldOpened = 0, pushStuck = 0;
+for (let seed = 1; seed <= 600; seed++) {
+  const s = newRun(seed); for (let k = 0; k < 2; k++) { s.status = 'named'; nextChapter(s); }
+  for (const lock of ['leap', 'dark']) { oldOpened++; if (solvePuzzle(s.faces, s.known, s.spots.find(p => p.lock === lock).puzzle, []) < 0) oldStuck++; }
+  if (solvePuzzle(s.faces, s.known, s.spots.find(p => p.lock === 'push').puzzle, []) < 0) pushStuck++;
+}
+check(oldStuck > 0.9 * oldOpened && pushStuck === 0, `old chapter: Leap and dark opened first mostly cannot be settled (${oldStuck}/${oldOpened}), Push always can (${pushStuck} stuck)`);
+console.log(`old chapter, opened before anything else: Leap or dark cannot be settled ${oldStuck}/${oldOpened}, Push ${pushStuck}/600`);
+
 // ---------------------------------------------------------------- 4. coverage: every face as an answer, every order
 const SEEDS = 180;
 const stats = (list, f) => { const v = list.map(f); return { min: Math.min(...v), mean: v.reduce((a, b) => a + b, 0) / v.length, max: Math.max(...v) }; };
@@ -584,6 +613,7 @@ console.log(`spender (opens every lock, taps the lie when it can, else pays): ${
 console.log(`gambler (names a face when two are left): score ${gambleScore.toFixed(0)}, ${(100 * gamble.filter(s => s.status === 'remembered').length / gamble.length).toFixed(0)}% name all three, faded ${(100 * gamble.filter(s => s.status === 'faded').length / gamble.length).toFixed(0)}%`);
 console.log(`guess at once: ${Object.entries(quickRows).map(([k, v]) => `${k} ${(100 * v).toFixed(1)}% right, score ${quickScore[k].toFixed(0)}, ${JSON.stringify(quickOutcome[k])}`).join('; ')} (chance ${(100 / FACES).toFixed(1)}%)`);
 console.log(`free memory (if any), then guess among the faces that fit: right ${(100 * peekRight / peekNamed).toFixed(1)}% of names, score ${(peekScore / 2000).toFixed(0)}`);
+console.log(`a guess at once that skips the faces of earlier roles (chapters 2 and 3): right ${(100 * roleGuess).toFixed(1)}% (chance ${(100 / FACES).toFixed(1)}%)`);
 console.log(`do-nothing bot: ${still.status} after ${(still.t / 60).toFixed(0)} s`);
 const cpu = process.cpuUsage(cpu0);
 const cpuSeconds = (cpu.user + cpu.system) / 1e6;

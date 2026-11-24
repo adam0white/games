@@ -1,5 +1,85 @@
 # Borrowed Time
 
+## 2026-11-24 · Middle and late game audit
+
+Evidence filenames are relative to `scratchpad/shots/deep-borrowed/` in this audit's task directory: `c-` is Chromium at 360 × 640 and `w-` is WebKit with the iPhone 13 profile. Both used locale tr-TR and touch taps at coordinates read from screenshots, with a screenshot after each action. The game has three chapters, not numbered levels, so "the middle and late game" here means the Grown-up and Old chapters, replayed lives, and Daily.
+
+Played by touch before the fixes:
+- Chromium: two full free lives (510 and 760 points), then three Dailies (640 honest, 1,790 from remembered answers, and 993 with one deliberate wrong name).
+- WebKit: one full free life from a fresh save (1,240 points), one Daily from remembered answers (1,780), and the pause menu.
+
+### Findings, ranked by how likely each is to make a player quit
+
+| Rank | Finding | Evidence | Outcome |
+| --- | --- | --- | --- |
+| 1 | **Old chapter coin flip.** Old has no free memory. A player who opens the Leap or dark memory before Push meets two photos that nothing found so far can tell apart. The screen gave no sign of this, so the player taps a 50/50 for 12 years. | c-133, c-134, c-136, c-137; w-027 to w-032 | Fixed (cue) |
+| 2 | **The same person twice.** Chapters draw answers independently, so a life can repeat a role. In the WebKit life, Child and Grown-up were both the court flute player with the same portrait, and the gallery grew by one. Before the fix, 559 of 9,000 chapters on seeds 1 to 3,000 repeated an earlier role. | w-014, w-026, w-035 | Fixed |
+| 3 | **Leap after the stones are up.** Tapping Leap while standing on the landing stone pointed an arrow at the player's own tile. The button looked usable, and the candle kept burning. | c-029, c-030 (c-031 walked back) | Fixed |
+| 4 | **Daily replay beats honest play.** A replayed Daily with remembered answers scored 1,790 against 640 honest on Chromium, and 1,780 against 1,240 on WebKit. Both the Daily score and the all-time Best took the replay. A record that is easy to inflate is worth nothing to a returning player. | c-145, c-146 to c-157, c-170; w-035, w-050 | Fixed |
+| 5 | **Leaving from the chapter card also pressed a menu button.** The card's Menu acts on the touch itself and shows the menu at once; the click the browser sends after the touch then landed on the menu button under the finger. In the Turkish game at 360 × 640 that is the language button, so the player came back to an English menu. On other layouts it can be the sound button. Found while replaying the fixes; it predates this audit. | c2-005, c2-006 | Fixed |
+| 6 | **Flat rewards between chapters.** The chapter card showed the portrait but not who the player had been, nor whether the role was new. The Daily found no new role. | c-014, c-038, c-066, c-145 | Fixed (role name and a "New" star on the card) |
+| 7 | **Same maps.** Every chapter uses one of three island templates, mirrored. By the second life the islands repeat. | c-002 vs c-067, c-015 vs c-057, c-039 vs c-081, c-100; w-015 | Left |
+| 8 | **Every entry memory is trivial.** The lie in the first memory of each chapter shows a thing no portrait has. | c-004, c-016, c-043, c-058, c-068, c-085, c-101, c-116; w-005, w-016, w-038 | Left |
+| 9 | **Late chapters can be too easy.** Life 2 Child was solved with two memories and 134 years left. A WebKit Old chapter was solved after one memory with 94 years left. | c-064, w-033 | Left |
+| 10 | **Tear matching is hard to read at phone width.** The tear profiles differ by about 9 px. | c-088, c-120, w-022 | Left |
+| 11 | Gallery circles cannot be tapped and show no names. The chapter preview is the same every life. A result row with no photos shows a dashed "0". | c-098, c-099, c-114, c-170, w-050 | Left |
+| 12 | Daily has no marker during play; only the menu button and the share card say "Daily". | c-100, w-037 | Left |
+| 13 | The privacy notice on the menu has a blank line before its last words. | c-001, c-098, w-001, c-171 | Left |
+| 14 | Long role names wrap on the result card ("Bitki / büyücüsü"). | c-097, c-145 | Left |
+
+Corrected during the audit: the Old chapter does not charge abilities × 1.5. Only the burn of time is × 1.5, and the bigger drops seen in play included walking time.
+
+Confirmed working: wrong-name feedback (c-165, c-166) and the pause menu (w-053). No English text appeared in the Turkish game.
+
+### What changed
+
+| Finding | Change | Assertion |
+| --- | --- | --- |
+| 1 | When the open memory cannot be settled from what the player knows (`solvePuzzle` returns -1), the line under "Find the lie" says "A clue is still missing" in place of the wrong-tap cost. The Later button glows, and the tap hand points at it. The cue is absent in practice and when the memory can be settled. The state hook's `puzzle` gains `stuck`. | `check.mjs` puzzle tour: the undecidable Grown-up dark memory has `stuck === true` (shot `p3a-missing-clue`). The same memory after Push has `stuck === false`. Before the change, the second check failed with `undefined`. |
+| 2 | `answerOf(seed, k)` in `sim.js` keeps the drawn answer unless an earlier chapter's answer had its role. In that case it redraws evenly among the faces with a new role, from a separate random stream. The island, the memories and the earlier draws stay as they were, and the answer is still a function of the seed alone, so old checkpoints and fixed-seed tests need no change. `opts.answers` still forces answers. | `bots.mjs`: no repeated role when one could differ (failed with 559 of 9,000 before the change, passes with 0), and the answers spread evenly over the six places. |
+| 3 | With the stones up, Leap advice points at the far end of the stones from the player. The button's look is unchanged. Without them, it still points at the nearer launch stone. The state hook gains `tip` (key and target tile). | `check.mjs` ability tour: standing on the landing stone, a Leap tap gives `tip.key === 'useBridge'` at the pad tile (shot `15a-bridge-tip`). Before the change it failed with `undefined`. |
+| 4 | The first Daily run of a date to reach a reveal (a right or wrong name, or the candle going out) is the one that counts. From that reveal on it writes its score so far to `save.daily[date]`, and only it can raise `save.best` at the end. Any later Daily of the date, including a fresh start after leaving from the chapter card or the pause menu, is a replay: it sets neither score, and its end card shows "Replay · today's Daily stays N". The save format is unchanged; the checkpoint gains `counting`, which defaults to false. | `check.mjs` Daily tour: a first Daily with one wrong name sets the Daily score and Best. A second Daily with every name right scores higher but leaves both alone, shows the replay line, and fits the screen (shot `19-daily-replay`). A first Daily reloaded on its chapter card and continued still sets both scores and is not called a replay. A Daily left at the chapter card after one wrong name keeps 0, and a fresh Daily after it counts for nothing. With the old max logic restored, the tour fails at the first replay check (see "Checks"). |
+| 5 | After the chapter card's Menu, the one click the browser sends for that touch is dropped (capture listener on `document`, armed for 800 ms and disarmed by the next pointerdown). | `check.mjs` Daily tour: the leave now uses a real touch (`page.touchscreen.tap`), and no click may reach a `#menu` button and the page language must not change. A scratch run of just this leave on Pixel 7 Chromium in tr-TR: before the change the click reached the language button and the page turned English; after it, no click arrives. On WebKit (iPhone 13) under Playwright no click followed the touch either before or after, so the check proves the fix on Chromium only. |
+| 6 | The chapter card names the role just remembered. A role new to the gallery gets a gold star and "New: …". | Replay screenshots only (no assertion; it is not a bug). |
+
+New strings (English and Turkish in `words.js`): `needClue`, `dailyReplay`, `newRoleNamed`.
+
+### Decisions and their reasons
+
+- **Leaving a Daily after its first answer uses it up.** The chapter card shows the true self even after a wrong name, so a player who left and started again would know an answer. Leaving before any answer is shown costs nothing, since nothing is known yet. A Daily left after one answer shows its score so far on the menu button, for example "Daily · 0".
+- **The role rule leaks a little.** A player who knows the earlier answers can skip faces with those roles. A guess at once that does this in chapters 2 and 3 is right 19.3% of the time, against 16.7% by chance (`bots.mjs` prints it). The other bots stay at chance. This is accepted: three different people is the story, and the gain is small.
+- **The missing-clue cue tells the player something they could work out.** It never says which photo lies. It only says that nothing found so far decides the memory, which `solvePuzzle` computes from public facts.
+
+### Left, and why
+
+- **Map templates (7).** Three hand-made islands carry the lock layout the bots prove. New templates need new solvability proofs and are a larger design task.
+- **Trivial entry memory (8).** The entry memory must be decidable with no knowledge, which needs a value no face has. A harder entry, such as a two-kind check, would show two kinds at once and collapse the later memories.
+- **Late chapters too easy (9).** The years left feed the score. Making the Old chapter harder needs retuning against the bots' slow-player margin (minimum 49.7 years left).
+- **Tear readability (10).** This is an art change. It needs the torn-paper profiles redrawn and the practice demo checked again.
+- **Gallery names, chapter preview, Daily marker, privacy gap, role wrap (11 to 14).** These are lower in rank. The privacy notice text comes from the kit, which this audit did not edit.
+
+### Replay after the fixes (touch)
+
+- Chromium: a Daily replay with guesses. The chapter cards name the role (c-175 "Kır flütçüsü", c-179 "Çilingir"). The end card says the Daily stays 1.790, and Best is unchanged (c-183). That shot shows an earlier Turkish wording.
+- Chromium, after the leave rule, from a fresh save: a Daily with a wrong first name (the card shows the true self, c3-004), Menu on the chapter card (the menu stays Turkish and shows "Günlük oyun · 0", c3-005), then the Daily again with the known first answer: the end card says "Tekrar · bugünkü Günlük oyun 0 kalır" on one line, and Best stays 0 (c3-017). The earlier attempt at this replay found finding 5: the same Menu tap turned the menu English (c2-005, c2-006).
+- WebKit, seed 28: the Grown-up dark memory opened before any clue shows "Bir ipucu hâlâ eksik", a glowing "Sonra bak" and the hand (w-065). A decidable memory shows the normal wrong-tap cost (w-060, w-070, w-076). On the landing stone with the stones up, Leap points at the far pad (w-074). The chapter card shows "★ Yeni: Çit boyacısı" (w-081), a different role from the Child chapter's "Çiçek yetiştiricisi" (w-058).
+
+### Checks
+
+- Failing before, passing after: the role-repeat check in `bots.mjs` (559 of 9,000, then 0); the Leap tip in `check.mjs` (`undefined`, then `useBridge`); the missing-clue flag (`undefined`, then `true`/`false`); the Daily tour with the old max logic put back (failed with 1800 !== 1000 at the first replay check, passes with the change). The leave case was added after that run and was not run against the old logic. The reload case fails when Continue drops `counting` (0 !== 1000 on Chromium).
+- `bots.mjs` also measures the Old chapter: opened before anything else, Leap or dark memories cannot be settled in 1,138 of 1,200 (seeds 1 to 600), Push in 0 of 600. This is a measurement, not a bug test.
+- Final run after all changes (`check.mjs` per engine, run one after the other): `bots.mjs` passes. `check.mjs` passes on WebKit (iPhone 13, plus the en and tr tours at 390 × 664) and on Chromium (Pixel 7, 360 × 640, 390 × 844, desktop 1280 × 800, and the en and tr tours at 360 × 640). `experiments/kit/check/phone.mjs borrowed` passes on WebKit and Chromium, including the kit hint.
+- Intermittent, unresolved: the puzzle tour on seed 28 (Child chapter, untouched by these changes) failed twice at 360 × 640 with "a wrong tap costs 12 years". The fail shot shows the tap landing on the right photo, so the tap and the photos' positions disagreed at that moment. It also once failed with 127 !== 128 on "the years carry over". Each passed on rerun; other checks were running on the same machine at the time. A first run of the new reload step failed on WebKit because Continue reports the card ready before the first frame draws its Menu button; the step now waits for the button.
+
+### Not verified
+
+- The Old chapter's cue was not replayed by touch, and the browser check covers it only on a Grown-up dark memory (a lie puzzle). The Old Leap and dark memories are seal puzzles with a different layout. `bots.mjs` shows that 1,138 of 1,200 of them cannot be settled when opened first (seeds 1 to 600), so the cue will appear there, but its look on a seal puzzle is unverified.
+- The Daily replay and leave rule were replayed by touch on Chromium only. A reload of the counting Daily is covered by `check.mjs` only.
+- Whether real iOS Safari sends the click after the chapter card's Menu touch is unknown; Playwright's WebKit did not.
+- WebKit got one free life and one Daily before the fixes, not three of each. After the fixes it got a part of one free life (Child, Grown-up and the start of Old).
+- The Turkish strings have not been reviewed by a Turkish speaker.
+- Whether the cue keeps players from guessing is unmeasured; no outside player has seen it.
+
 ## 2026-11-24 · Words and pictures
 
 | Earlier wording | What the player sees |
@@ -425,7 +505,7 @@ How the build differs from this plan: a wrong tap costs 12 years, not 8; "Rememb
   - Walking is free.
   - A tap on an ability with nothing to use it on costs nothing and says "Not here".
 - **Naming.** "Who?" opens the six portraits. Pick one and press "That's me!", or tap it twice.
-- **Seeds.** `?seed=<n>` fixes every run's seed. The Daily button seeds from the local date (`dailySeed`), so everyone gets the same three chapters on a date.
+- **Seeds.** `?seed=<n>` fixes every run's seed. The Daily button seeds from the local date (`dailySeed`), so everyone gets the same three chapters on a date. Only the first Daily run of a date to show an answer counts toward the Daily score and Best.
 
 ## Input
 
@@ -544,7 +624,8 @@ The puzzle coverage added on 2026-11-24 is listed in "memories that lie" at the 
 - no sideways scroll;
 - the island, the bar, all six portraits and the lineup buttons are on screen;
 - one full run with a portrait screenshot in every chapter, the chapter card, and an end card that fits;
-- Daily uses the date's seed.
+- Daily uses the date's seed;
+- only the first Daily of a date to show an answer sets the Daily score and Best; a replay, or a fresh start after leaving, does not.
 
 **Chromium desktop 1280 × 800:** keys and mouse walk. Enter, arrows and Enter name a face. Enter goes on from the chapter cards. All three chapters end `remembered`, and the end card fits.
 
