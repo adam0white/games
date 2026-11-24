@@ -13,7 +13,7 @@ import { dirname, extname, join, normalize, resolve } from 'node:path';
 import { homedir, tmpdir } from 'node:os';
 import { gunzipSync } from 'node:zlib';
 import assert from 'node:assert/strict';
-import { newRun, nextChapter, roleId, solvePuzzle, LIFE, WRONG, PICK, SHOW } from './sim.js';
+import { newRun, nextChapter, roleId, solvePuzzle, dailySeed, LIFE, WRONG, PICK, SHOW } from './sim.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SHOTS = process.env.SHOTS || join(tmpdir(), 'borrowed-shots');
@@ -379,6 +379,13 @@ async function abilityTour(page, phone) {
   await solve(page, phone, SEED, 1, 'leap', {});
   await skipMemory(page, phone, null);
   await sleep(700); await shot(page, phone, '15-bridge');
+  // With the stones up, Leap points at the far end of the stones, never at the tile the player stands on.
+  const ends = await page.evaluate(() => { const s = window.borrowedSim(); return { pad: s.pad, landing: s.landing }; });
+  await goTo(page, ends.landing.x, ends.landing.y);
+  await tap(page, (await state(page)).buttons.leap);
+  const tip = (await state(page)).tip;
+  assert.ok(tip && tip.key === 'useBridge' && tip.tx === ends.pad.x && tip.ty === ends.pad.y, `Leap after the stones points across them (${JSON.stringify(tip)})`);
+  await sleep(300); await shot(page, phone, '15a-bridge-tip');
   // Rewind
   const mirror = st.spots.find(p => p.lock === 'rewind');
   await goTo(page, mirror.tx, mirror.ty, s => s.ready.rewind);
@@ -624,7 +631,10 @@ async function puzzleTour(page, tag, seed) {
   const grown = decks[1], dark = puzzleOf(seed, 1, 'dark');
   assert.equal(solvePuzzle(grown.faces, (await state(page)).known, dark), -1, 'entry alone leaves two explanations');
   await openMemory(page, seed, 1, 'dark');
-  await tap(page, (await waitPuzzle(page)).later);
+  const unsettled = await waitPuzzle(page);
+  assert.equal(unsettled.stuck, true, 'a memory that cannot be settled yet says so and points at Later');
+  await sleep(300); await shot(page, tag, 'p3a-missing-clue');
+  await tap(page, unsettled.later);
   await until(page, () => window.borrowedState().screen === 'play', 'Later closes the dark memory');
   assert.ok((await state(page)).waiting.includes('dark'), 'the dark memory waits');
   await shot(page, tag, 'p3-later');
@@ -639,6 +649,7 @@ async function puzzleTour(page, tag, seed) {
   assert.equal((await state(page)).life, life);
   await page.keyboard.press('p');
   assert.equal((await state(page)).puzzle.lock, 'dark', 'the same puzzle resumes');
+  assert.equal((await state(page)).puzzle.stuck, false, 'a memory that can be settled shows no missing-clue cue');
   await solve(page, tag, seed, 1, 'dark', { shots: { open: 'p5-chained-photos' } });
   await skipMemory(page, tag, null);
   await nameFace(page, grown.answer); await goOn(page, tag, null);
@@ -989,6 +1000,7 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
     await firstHint(page);
     if (phone === 'webkit') await puzzleTour(page, phone, 28);
     await reloadTour(page);
+    await dailyTour(page, phone);
     assert.deepEqual(errors, [], 'page errors');
     console.log(`ok   borrowed on ${phone}`);
   } catch (e) {
@@ -1151,6 +1163,83 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
   try { await languageTour(browser, device, phone); }
   catch (e) { failed++; console.error(`FAIL borrowed languages on ${phone}:`, e); }
   await browser.close();
+}
+// Only the first finished Daily of a date sets the Daily score and can raise Best. A replay with remembered answers
+// says it does not count, and leaves both alone.
+async function dailyTour(page, phone) {
+  await page.goto(base + '/borrowed/');
+  await until(page, () => window.borrowedState?.().screen === 'menu', 'menu before the Daily');
+  await page.evaluate(() => { const v = JSON.parse(localStorage.getItem('borrowed-save')); v.daily = {}; v.best = 0; localStorage.setItem('borrowed-save', JSON.stringify(v)); });
+  await page.reload(); await until(page, () => window.borrowedState?.().screen === 'menu', 'menu with no Daily');
+  const d = new Date(), answers = [0, 1, 2].map(k => chapterOf(dailySeed(d.getFullYear(), d.getMonth() + 1, d.getDate()), k).answer);
+  const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem('borrowed-save')));
+  const life = async wrongFirst => {
+    for (let k = 0; k < 3; k++) {
+      if (k === 0 && wrongFirst) await nameFace(page, (answers[0] + 1) % 6, false);
+      else await nameFace(page, answers[k]);
+      if (k < 2) await goOn(page, phone, null);
+    }
+    await until(page, () => window.borrowedState().screen === 'done', 'Daily end card');
+    return (await state(page)).score;
+  };
+  await page.locator('#daily').tap();
+  const first = await life(true);
+  let v = await saved();
+  assert.equal(Object.values(v.daily)[0], first, 'the first Daily sets the Daily score');
+  assert.equal(v.best, first, 'the first Daily can set Best');
+  assert.ok(await page.locator('#dailyReplay').isHidden(), 'the first Daily is not called a replay');
+  await page.click('#again');
+  const second = await life(false);
+  assert.ok(second > first, `the replay scores higher (${second} > ${first})`);
+  v = await saved();
+  assert.equal(Object.values(v.daily)[0], first, 'a Daily replay leaves the Daily score alone');
+  assert.equal(v.best, first, 'a Daily replay leaves Best alone');
+  assert.ok(await page.locator('#dailyReplay').isVisible(), 'the replay end card says it does not count');
+  const box = await page.locator('#done > div').boundingBox(), vh = page.viewportSize().height;
+  assert.ok(box.y >= 0 && box.y + box.height <= vh, `the replay end card fits (${Math.round(box.y)} + ${Math.round(box.height)})`);
+  await shot(page, phone, '19-daily-replay');
+  // A reload on the chapter card of the counting Daily keeps it counting.
+  await page.evaluate(() => { const v = JSON.parse(localStorage.getItem('borrowed-save')); v.daily = {}; v.best = 0; localStorage.setItem('borrowed-save', JSON.stringify(v)); });
+  await page.reload(); await until(page, () => window.borrowedState?.().screen === 'menu', 'menu before the reloaded Daily');
+  await page.locator('#daily').tap();
+  await nameFace(page, (answers[0] + 1) % 6, false);
+  await until(page, () => window.borrowedState().screen === 'chapter' && window.borrowedState().nextReady, 'chapter card before the reload');
+  await page.reload();
+  await until(page, () => window.borrowedState?.().screen === 'menu', 'menu after reloading the Daily');
+  await page.locator('#continueRun').tap();
+  await until(page, () => window.borrowedState().screen === 'chapter' && window.borrowedState().chapterMenu, 'the Daily resumes at its chapter card');
+  await goOn(page, phone, null);
+  await nameFace(page, answers[1]); await goOn(page, phone, null);
+  await nameFace(page, answers[2]);
+  await until(page, () => window.borrowedState().screen === 'done', 'reloaded Daily end card');
+  const resumed = (await state(page)).score;
+  v = await saved();
+  assert.equal(Object.values(v.daily)[0], resumed, 'a reloaded first Daily still sets the Daily score');
+  assert.equal(v.best, resumed, 'a reloaded first Daily still sets Best');
+  assert.ok(await page.locator('#dailyReplay').isHidden(), 'a reloaded first Daily is not called a replay');
+  // Leaving after the first answer is shown also uses up the Daily: a fresh start already knows that answer.
+  await page.evaluate(() => { const v = JSON.parse(localStorage.getItem('borrowed-save')); v.daily = {}; v.best = 0; localStorage.setItem('borrowed-save', JSON.stringify(v)); });
+  await page.reload(); await until(page, () => window.borrowedState?.().screen === 'menu', 'menu with no Daily again');
+  await page.locator('#daily').tap();
+  await nameFace(page, (answers[0] + 1) % 6, false);
+  await until(page, () => window.borrowedState().screen === 'chapter' && window.borrowedState().nextReady, 'chapter card after a wrong name');
+  // A real touch: the click that follows it must not reach the menu button that appears under the finger.
+  const langBefore = await page.evaluate(() => document.documentElement.lang);
+  await page.evaluate(() => { window.lateClicks = 0; window.addEventListener('click', () => { window.lateClicks++; }); });
+  const leave = (await state(page)).chapterMenu;
+  await page.touchscreen.tap(Math.round(leave.x), Math.round(leave.y));
+  await until(page, () => window.borrowedState().screen === 'menu', 'menu after leaving the Daily');
+  await sleep(400);
+  assert.equal(await page.evaluate(() => window.lateClicks), 0, 'the click after the chapter card Menu touch reaches nothing on the menu');
+  assert.equal(await page.evaluate(() => document.documentElement.lang), langBefore, 'leaving from the chapter card keeps the language');
+  v = await saved();
+  assert.equal(Object.values(v.daily)[0], 0, 'a Daily left after its first answer keeps its score so far');
+  await page.locator('#daily').tap();
+  await life(false);
+  v = await saved();
+  assert.equal(Object.values(v.daily)[0], 0, 'a fresh Daily after leaving does not count');
+  assert.equal(v.best, 0, 'a fresh Daily after leaving leaves Best alone');
+  assert.ok(await page.locator('#dailyReplay').isVisible(), 'a fresh Daily after leaving says it does not count');
 }
 async function reloadTour(page) {
   for (const button of ['#play', '#daily']) {
