@@ -614,10 +614,11 @@ const GAMES = {
     // The ember melody (kit/music.js, 2026-11-24): with the music on, each ember plays the next note of the night's melody, on the score's
     // sixteenth grid when the audio clock runs; the end card says how much of the melody was played.
     await page.click('#play'); await page.evaluate(() => { const s = window.lanternSim(); s.safe = 60; s.light = 1; });
-    for (let i = 0; i < 4; i++) { await page.evaluate(() => { const s = window.lanternSim(); s.embers.push({ x: s.x, y: s.y + 0.02, got: false, kind: 'ember' }); }); await until(page, n => window.lanternMusic().played > n, 'an ember plays a note of the melody', 10000, i); }
+    for (let i = 0; i < 4; i++) { await page.evaluate(() => { const s = window.lanternSim(); s.embers.push({ x: s.x, y: s.y + 0.02, got: false, kind: 'ember' }); }); await until(page, n => window.lanternMusic().played > n, 'an ember is taken', 10000, i); }
     const tune = await page.evaluate(() => window.lanternMusic()), embers = tune.log.filter(l => l.kind === 'ember'), ticks = tune.log.filter(l => l.kind === 'walk' || l.kind === 'pad' || l.kind === 'bass');
+    if (page.context().browser().browserType().name() === 'chromium') { assert.equal(tune.ctx, 'running', 'the audio clock runs after Play'); assert.equal(embers.length, 4, 'four embers, four melody notes'); }
     if (tune.ctx === 'running' && ticks.length) { const a = ticks[0].at - ticks[0].step * tune.STEP; assert.ok(embers.length >= 1 && embers.every(l => { const g = (l.at - a) / tune.HALF; return Math.abs(g - Math.round(g)) < 1e-3; }), `ember notes on the sixteenth grid (${embers.length})`); }
-    await page.evaluate(() => { const s = window.lanternSim(); s.safe = 0; s.light = 0.0001; }); await until(page, () => window.lanternState().screen === 'card' && !window.lanternState().playing, 'end card after the melody');
+    await page.evaluate(() => { const s = window.lanternSim(); s.safe = 0; s.light = 0.0001; s.warm = 0; }); await until(page, () => window.lanternState().screen === 'card' && !window.lanternState().playing, 'end card after the melody');
     assert.match(await page.textContent('#sub'), /Melody played: 100%\./, 'the end card says how much of the melody was played'); await page.click('#toMenu');
     await sleep(400); await page.reload(); st = await state(); assert.equal(st.name, 'Rio <b>river</b'); assert.equal(st.board.length, 5, 'the board is kept');
     await page.evaluate(() => localStorage.setItem('hf-lab-recording-off', '1')); await page.reload(); // recording off again, as the steps below expect

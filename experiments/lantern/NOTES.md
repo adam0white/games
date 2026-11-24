@@ -711,11 +711,14 @@ From the lab's Lantern Rhythm, the melody made of embers. With the music on, in 
   the shield taken, or a wisp) ends it too and drops pad, bass, walk and harmony for two bars (16 eighths, about 6.7 s);
   the ember notes, the heartbeat and the high note stay.
 - The end card adds "Melody played: N%." (Turkish "Çalınan ezgi: %N.") when the music is on and at least four embers
-  came by.
+  came by. Pickups count only while the music is on, so turning it on or off mid-run from the pause card makes that
+  share wrong for that run.
 
 With the music off, or in the shop's showings, an ember chimes exactly as before. Nothing is in `sim.js`.
 
 Checked by machine:
+- An ember note takes the key of its chord's pad: past 86% the pad of the chord already sounding may still be minor,
+  and the note waits for the next major chord. Without this, 150 of the bot's notes clashed with the pad at the turn.
 - `node bots.mjs 30 music`: the greedy bot on nights 1, 3, 8, 12 and with magnet on 3 and 8, 30 seeds each, on a
   stand-in audio clock: 3,296 ember notes, every one on the sixteenth grid, 30 to 233 ms after its pickup, in the
   chord at its step and in the tune's order; 138 blows, each thinned for 16 to 18 eighths with no harmony scheduled
@@ -725,8 +728,8 @@ Checked by machine:
 - Chromium (Pixel 7) and WebKit (iPhone 13), real audio clock: over 12 s of play with a 1.5 s pause, every score note
   sat on one eighth-note clock (0 ms spread), every ember note on its sixteenth grid (0 ms off), and the clock did not
   move while paused. Peak of the whole mix through an analyser, light low, heartbeat on and an ember every 0.45 s:
-  0.20 with music, 0.16 without (WebKit 0.19). The kit self-test renders each preset at its loudest offline:
-  lantern 0.31 at volume 1 (Lantern plays it at 0.8).
+  0.20 to 0.23 with music, 0.16 without (WebKit 0.22); during a rock crash with music on 0.38 (WebKit 0.43). The kit
+  self-test renders each preset at its loudest offline: lantern 0.31 at volume 1 (Lantern plays it at 0.8).
 - The phone check takes four embers with the music on, checks their notes on the grid where the audio clock runs,
   and reads "Melody played: 100%." on the end card.
 

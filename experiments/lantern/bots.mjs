@@ -4,6 +4,7 @@ import { create, step, centre, half, sight, score, progress, towerStage, GOAL, B
 const make = (seed, stage, set, stats) => stage <= -100 ? create(seed, towerStage(-stage - 100), 'tower', set, stats, -stage - 100) : create(seed, Math.abs(stage) || 1, stage < 0 ? 'tower' : !stage, set, stats);
 const label = stage => stage <= -100 ? `tower level ${-stage - 100}` : stage < 0 ? `tower ${-stage}` : stage ? `stage ${stage}` : 'endless';
 const flags = process.argv.filter(a => a.startsWith('--')); process.argv = process.argv.filter(a => !a.startsWith('--'));
+if (flags.includes('--mutate') && process.argv[3] !== 'music') process.argv.splice(2, 2, process.argv[2] ?? '30', 'music'); // a bare --mutate breaks the music (the only mutation here)
 const runs = Number(process.argv[2] ?? 300);
 const policies = {
   // Sees nothing but the banks.
@@ -97,7 +98,7 @@ if (process.argv[3] === 'music') {
           if (late > 0.03 + 5 * song.HALF) fail.push(`seed ${seed}: note ${(late * 1000).toFixed(0)} ms after the pickup`);
           if (Math.abs(grid - Math.round(grid)) > 1e-6) fail.push(`seed ${seed}: note off the sixteenth grid (${grid.toFixed(3)})`);
           if (late < 0.03 - 1e-9) fail.push(`seed ${seed}: note ${(late * 1000).toFixed(0)} ms after the pickup, sooner than 30 ms`);
-          const c = (p > 0.86 ? DAWN : NIGHT)[(n.step >> 4) & 3];
+          const pad = song.log.findLast(l => l.kind === 'pad' && l.step === (n.step & ~15)), c = ((pad ? pad.major : p > 0.86) ? DAWN : NIGHT)[(n.step >> 4) & 3]; // the key of the pad sounding
           if (!c.some(m => (n.midi - m) % 12 === 0)) fail.push(`seed ${seed}: ${n.midi} is not in the chord at step ${n.step}`);
           if (n.midi !== ladder(c, melody[k++ % melody.length])) fail.push(`seed ${seed}: note ${k} is not the tune's`);
         }

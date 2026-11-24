@@ -33,7 +33,7 @@ import { stick } from './stick.js';
 import { drag } from './drag.js';
 import { hint } from './hint.js';
 import { table, newCode, cleanCode, linkFor, codeFromLink } from './room.js';
-import { music, PRESETS, NIGHT, DAWN, tune, ladder } from './music.js';
+import { music, PRESETS, VOICES, NIGHT, DAWN, tune, ladder } from './music.js';
 
 const results = [], out = document.getElementById('out');
 function check(name, fn) {
@@ -88,7 +88,7 @@ document.getElementById('beep').addEventListener('click', () => { snd.unlock(); 
   const notes = timing.got.filter(([, n]) => n);
   check('music: a pickup plays the next note of the tune on the next sixteenth, 30 to 240 ms later, inside its chord', () => notes.length > 10 && notes.every(([t, n, p, planT], i) => {
     const a = Number(groups[planT > 12 ? 1 : 0]), grid = (n.at - a) / (STEP / 2), c = (n.step >> 4) & 3;
-    return Math.abs(grid - Math.round(grid)) < 1e-4 && n.at - t >= 0.03 - 1e-9 && n.at - t <= 0.24 && n.midi === ladder((p > 0.86 ? DAWN : NIGHT)[c], tune(42)[n.index % 16]) && n.index === i; }));
+    return Math.abs(grid - Math.round(grid)) < 1e-4 && n.at - t >= 0.03 - 1e-9 && n.at - t <= 0.24 && n.midi === ladder(((timing.song.log.find(l => l.kind === 'pad' && l.step === (n.step & ~15))?.major ?? p > 0.86) ? DAWN : NIGHT)[c], tune(42)[n.index % 16]) && n.index === i; }));
   check('music: a blow thins the music for two bars', () => { const b = timing.song.log.find(l => l.kind === 'bare'), r = timing.song.log.find(l => l.kind === 'back'); return !!b && !!r && (r.at - b.at) / STEP >= 16 - 1e-6 && (r.at - b.at) / STEP <= 18 + 1e-6 && timing.got.streakAfterHit === 0; });
   check('music: a pickup while the song is off plays nothing and still counts', () => { const s2 = music(new Off(1, 441, 44100), { timer: false, now: () => 1, running: () => true }); s2.start(1); return s2.ember() === null && s2.melody.played === 1; });
   // Loudness, the worst case for each preset: full danger, the ending, a nearly-out light, a pickup every 0.2 s (harmony and arpeggio on), a blow.
@@ -98,6 +98,7 @@ document.getElementById('beep').addEventListener('click', () => { snd.unlock(); 
     drive(ac, preset, { len: 13, at: t => ({ on: true, progress: Math.min(1, t / 10), danger: 1, light: 0.2, ember: t > 1 && Math.round(t * 10) % 2 === 0, hit: t === 9 }) });
     const d = (await ac.startRendering()).getChannelData(0); let peak = 0; for (const v of d) peak = Math.max(peak, Math.abs(v));
     window.kitMusic[preset] = +peak.toFixed(3);
+    check(`music: the ${preset} preset's echo is ${VOICES[PRESETS[preset].voice].echo.steps} eighths long`, () => { const e = music(new Off(1, 441, 44100), { preset, timer: false }); return Math.abs(e.echoTime - e.STEP * VOICES[PRESETS[preset].voice].echo.steps) < 1e-4; });
     check(`music: the ${preset} preset at its loudest stays well under clipping`, () => peak > 0.02 && peak < 0.6);
   }
 }

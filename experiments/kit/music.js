@@ -9,7 +9,7 @@
 //   song.miss()  song.hit()           a pickup passed by (the streak ends); a blow (the streak ends and the layers drop for two bars)
 //   song.chime(n)                     a pitch (hertz) inside the chord now playing, for a sound the game plays itself
 //   song.volume(v)  song.stop()       0 to 1; stop the clock and fade out
-//   song.melody                       { played, missed, streak, best, share }   song.log: what was scheduled (tests read it)
+//   song.melody                       { played, missed, streak, best, share }; a pickup note takes the key (minor or major) of its chord's pad   song.log: what was scheduled (tests read it)
 // How it works: a clock of eighth notes scheduled a little ahead on the audio clock, so it stays in time when frames drop
 // and stands still when the context is suspended for a pause. Layers: a slow pad on the chord, a bass, a plucked walk that
 // gets busier towards the end, a low pulse with danger, one high held note when the light is nearly out, and the tune the
@@ -99,7 +99,7 @@ export function music(ac, opts = {}) {
   const now = P.now ?? (() => ac.currentTime), running = P.running ?? (() => ac.state === 'running'); // a test may drive both
   const out = ac.createGain(); out.gain.value = 0; out.connect(P.dest ?? ac.destination);
   // a soft echo, so single notes sit in a space
-  const echo = ac.createDelay(1.5), back = ac.createGain(), wet = ac.createGain(); echo.delayTime.value = STEP * V.echo.steps; back.gain.value = V.echo.back; wet.gain.value = V.echo.wet;
+  const echo = ac.createDelay(Math.max(1.5, STEP * V.echo.steps + 0.1)), back = ac.createGain(), wet = ac.createGain(); echo.delayTime.value = STEP * V.echo.steps; back.gain.value = V.echo.back; wet.gain.value = V.echo.wet;
   echo.connect(back).connect(echo); echo.connect(wet).connect(out);
   // The layers a blow drops (pad and bass, walk, harmony) each have a gain; the pickups' tune has its own.
   const gain = to => { const g = ac.createGain(); g.gain.value = 1; g.connect(to); return g; };
@@ -108,9 +108,10 @@ export function music(ac, opts = {}) {
   const bus = { pad: padTone, base, walk: walkG, out, echo, harm, lead };
   let rand = rng(1), notes = tune(1), step = 0, next = 0, walk = 2, timer = 0, level = 1;
   let k = 0, streak = 0, best = 0, played = 0, missed = 0, lastSlot = -1, bareTo = -1;
+  const modes = new Map(); // chord span (16 eighths) -> major or not, as its pad was scheduled, so a pickup note never turns before the pad does
   const st = { on: false, progress: 0, danger: 0, light: 1 };
   const log = [];
-  const chords = s => (st.progress > P.turn ? P.major : P.minor)[(s >> 4) & 3].map(n => n + KEY);
+  const chords = (s, major = st.progress > P.turn) => (major ? P.major : P.minor)[(s >> 4) & 3].map(n => n + KEY);
   const chord = () => chords(step);
 
   function play(freq, at, dur, vol, type, to, attack = 0.01, vib = 0) {
@@ -119,10 +120,10 @@ export function music(ac, opts = {}) {
     if (vib) { const l = ac.createOscillator(), d = ac.createGain(); l.frequency.value = vib; d.gain.value = freq * 0.006; l.connect(d).connect(o.frequency); l.start(at); l.stop(at + dur + 0.05); }
     o.connect(g); for (const d of to) g.connect(bus[d]); o.start(at); o.stop(at + dur + 0.05);
   }
-  function note(kind, at, s, n) { log.push({ kind, at, step: s, n }); if (log.length > LOG) log.splice(0, log.length - LOG); }
+  function note(kind, at, s, n, major) { log.push(major === undefined ? { kind, at, step: s, n } : { kind, at, step: s, n, major }); if (log.length > LOG) log.splice(0, log.length - LOG); }
   function tick(at) {
     const c = chord(), beat = step & 15, p = st.progress;
-    if (beat === 0) { for (const [i, n] of c.entries()) V.pad(play, n, i, at, STEP * 17); note('pad', at, step, c[0]); } // the whole chord, in over a second
+    if (beat === 0) { for (const [i, n] of c.entries()) V.pad(play, n, i, at, STEP * 17); modes.set(step >> 4, p > P.turn); if (modes.size > 8) modes.delete(modes.keys().next().value); note('pad', at, step, c[0], p > P.turn); } // the whole chord, in over a second
     if (beat === 0 || (beat === 8 && p > 0.4)) { V.bass(play, c[0] - 12, at, STEP * 7); note('bass', at, step, c[0] - 12); }
     // the walk: two octaves of the chord; rests thin out towards the end
     const busy = 0.28 + 0.5 * p, strong = beat % 4 === 0;
@@ -148,7 +149,7 @@ export function music(ac, opts = {}) {
   const duck = () => walkG.gain.setTargetAtTime(streak >= 2 ? 0.45 : 1, Math.max(now(), bareTo), 0.15);
   return {
     start(seed = 1) {
-      rand = rng(seed); notes = tune(seed); step = 0; walk = 2; next = 0; k = streak = best = played = missed = 0; lastSlot = bareTo = -1; log.length = 0;
+      rand = rng(seed); notes = tune(seed); modes.clear(); step = 0; walk = 2; next = 0; k = streak = best = played = missed = 0; lastSlot = bareTo = -1; log.length = 0;
       const t = now(); for (const g of [base, walkG, harm]) { g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(1, t); }
       clearInterval(timer); timer = P.timer === false ? 0 : setInterval(pump, 100);
     },
@@ -168,7 +169,7 @@ export function music(ac, opts = {}) {
       if (slot <= lastSlot + 1e-6) slot = lastSlot + HALF;
       if (slot > t + 4 * HALF) return null;
       lastSlot = slot;
-      const s = Math.floor(step - (next - slot) / STEP + 1e-6), c = P.mutate === 'chord' ? chord() : chords(s), d = notes[k++ % notes.length], n = ladder(c, d); // mutate 'chord', test only: the chord the clock has scheduled up to
+      const s = Math.floor(step - (next - slot) / STEP + 1e-6), c = P.mutate === 'chord' ? chord() : chords(s, modes.has(s >> 4) ? modes.get(s >> 4) : undefined), d = notes[k++ % notes.length], n = ladder(c, d); // mutate 'chord', test only: the chord the clock has scheduled up to
       V.lead(play, n, slot, STEP); note('ember', slot, s, n);
       if (streak >= 4 && slot >= bareTo) { const h = ladder(c, d - 2); V.harm(play, h, slot, STEP); note('harm', slot, s, h); }
       return { at: slot, midi: n, freq: midi(n), step: s, index: k - 1 };
@@ -186,6 +187,6 @@ export function music(ac, opts = {}) {
     get melody() { return { played, missed, streak, best, index: k, share: played + missed ? played / (played + missed) : 1 }; },
     get bare() { return now() < bareTo; },
     get step() { return step; }, get state() { return { ...st }; }, get next() { return next; },
-    log, out, STEP, HALF, tune: () => notes.slice(),
+    log, out, STEP, HALF, tune: () => notes.slice(), get echoTime() { return echo.delayTime.value; },
   };
 }
