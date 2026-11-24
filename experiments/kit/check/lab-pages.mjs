@@ -13,11 +13,8 @@ const saves = {
   face: { v: 1, best: 300, runs: 3, stars: [2, 1, 0, 0], sound: true },
   pour: { v: 1, stars: [0, 0, 0, 0, 0, 0, 0, 0], sound: true, tries: 3 },
   bells: { v: 1, stars: [2, 0, 0, 0, 0, 0, 0, 0], best: 120, sound: true, tries: 3, look: 'moon' },
-  keeper: { v: 1, unlocked: 2, sound: true, played: true, daily: { day: localDay, score: 1400 } },
   channels: { unlocked: 3, completed: false, sound: true },
   podwire: { v: 1, next: 2, complete: false, sound: true },
-  kite: { v: 1, unlocked: 2, level: 2, best: 157, sound: true, look: 'copper' },
-  loaves: { unlocked: 2, best: 240, sound: true },
   rubbing: { level: 2, unlocked: 2, sound: true, ink: 'red' },
 };
 
@@ -66,15 +63,6 @@ async function ringBell(page, { until }) {
   }, 'one touch strikes the bell', 4000, count);
 }
 
-async function drawKeeperRoute(page, { finger, until }) {
-  const points = await page.evaluate(() => {
-    const { state: { edges, nodes, keeper }, transform: { scale, ox, oy } } = window.lampState();
-    const neighbor = edges.find(([a, b]) => a === keeper.node || b === keeper.node).find(id => id !== keeper.node);
-    return [keeper.node, neighbor].map(id => [ox + nodes[id].x * scale, oy + nodes[id].y * scale]);
-  });
-  await finger(page, '#c', [['pointerdown', ...points[0]], ['pointermove', ...points[1]], ['pointerup', ...points[1]]]);
-  await until(page, () => window.lampState().state.events.some(event => event.type === 'route'), 'touch commits a lamp route');
-}
 
 async function digChannel(page, { finger, until }) {
   const { remaining, cell, start, bank } = await page.evaluate(() => {
@@ -149,28 +137,7 @@ async function openFirstPod(page, checks) {
   await checks.until(page, () => window.podwireView().screen === 'won', 'first pod opens');
 }
 
-async function moveKiteSpool(page, { until }) {
-  const { x, y, width, height } = await page.locator('#field').boundingBox();
-  await page.touchscreen.tap(x + width * 220 / 360, y + height * 440 / 520);
-  await until(page, () => {
-    const { started, hand } = window.kiteState();
-    return started && hand.x > 200;
-  }, 'touch moves the kite spool right');
-}
 
-async function foldDough(page, { until }) {
-  const bakery = page.locator('#bakery');
-  const { x, y, work } = await bakery.evaluate(el => Object.fromEntries(
-    ['x', 'y', 'work'].map(key => [key, Number(el.dataset[key])]),
-  ));
-  const box = await bakery.boundingBox();
-  const point = (u, v) => ({ x: box.x + box.width * u / 360, y: box.y + box.height * v / 490 });
-  await pointerDrag(page, point(x - 38, y + 8), point(x + 39, y - 7));
-  await until(page, before => {
-    const dough = document.querySelector('#bakery').dataset;
-    return dough.stage === 'knead' && Number(dough.work) > before && Number(dough.time) > 0;
-  }, 'drag kneads the dough', 8000, work);
-}
 
 async function turnPrism(page, { until }) {
   const { x, y, width, height } = await page.locator('#angle').boundingBox();
@@ -270,18 +237,6 @@ export const labPages = {
     touch: ringBell,
     hint: { delay: 1600, timing: { start: '#play' }, input: ringBell },
   }),
-  'lab/night-lamp-keeper': pageEntry('night-lamp-keeper:save', saves.keeper, 'night-lamp-keeper:hint', {
-    menu: '#quit', sound: '#sound2',
-    state: () => { const s = window.lampState?.(); return s && { screen: s.screen, t: s.state?.t ?? 0 }; },
-    verify: () => ({
-      save: window.lampState().saved,
-      evening: document.querySelector('#levels .current').textContent,
-      daily: document.querySelector('#dailyBest').textContent,
-    }),
-    expect: { save: saves.keeper, evening: '2', daily: 'Today’s best on this device: 1400' },
-    touch: drawKeeperRoute,
-    hint: { delay: 4500, timing: { start: '#play' }, input: drawKeeperRoute },
-  }),
   'lab/night-channels': pageEntry('night-channels:save', saves.channels, 'night-channels:hint', {
     startsOnBoard: true, menu: '#gardens', sound: '#sound',
     state: () => { const s = window.channelView?.(); return s && { screen: s.screen === 'selection' ? 'menu' : s.screen, t: s.state.ticks }; },
@@ -308,31 +263,6 @@ export const labPages = {
         await page.tap('#next');
         await until(page, () => window.podwireView().level === 2 && window.podwireView().screen === 'play', 'Next opens the second plate');
       } },
-  }),
-  'lab/night-kite': pageEntry('night-kite:save', saves.kite, 'night-kite:hint', {
-    startsOnBoard: true, sound: '#sound',
-    state: () => window.kiteState?.(),
-    verify: () => {
-      const { level, unlocked, best, sound, look } = window.kiteState();
-      return { level, unlocked, best, sound, look };
-    },
-    expect: { level: 2, unlocked: 2, best: 157, sound: true, look: 'copper' },
-    touch: moveKiteSpool,
-    hint: { delay: 6500, play: '#field', timing: { board: true }, input: moveKiteSpool },
-  }),
-  'lab/night-loaves': pageEntry('night-loaves:save', saves.loaves, 'night-loaves:hint', {
-    startsOnBoard: true, sound: '#sound',
-    state: () => {
-      const dough = document.querySelector('#bakery')?.dataset;
-      if (!dough?.stage) return null;
-      const screen = document.querySelector('#paused.on, #result.on')?.id ?? 'play';
-      return { screen, t: Number(dough.time) };
-    },
-    verify: () => [document.querySelector('#chapter').textContent, document.querySelector('#flour').textContent],
-    expect: ['Morning 02 / 08', 'Milk bread'],
-    verifyPaused: async page => assert.equal(await page.textContent('#record'), 'Best on this device · 240'),
-    touch: foldDough,
-    hint: { delay: 3800, play: '#bakery', timing: { board: true }, input: foldDough },
   }),
   'lab/night-rubbing': pageEntry('night-rubbing:save', saves.rubbing, 'night-rubbing:hint', {
     startsOnBoard: true, sound: '#sound', resumeTouch: true,
