@@ -1,6 +1,6 @@
 {
   // Writes the rival ("Nemesis") persona for the lab experiment experiments/lab/ant-nemesis/.
-  // POST /lab-api/persona, and the shared leaderboard at /lab-api/board/<game>. No secrets. One Durable Object holds the daily call count. See README.md for the guards and the cost.
+  // POST /lab-api/persona and /lab-api/quest, race rooms and the shared leaderboard at /lab-api/board/<game>. No secrets. One Durable Object holds the shared daily call count. See README.md for the guards and the cost.
   "name": "games-lab-ai",
   "account_id": "a20259cba74e506296745f9c67c1f3bc",
   "main": "./src/index.mjs",
@@ -19,11 +19,12 @@
   },
   // The daily counter, and one shared leaderboard per game: SQLite-backed Durable Objects.
   "durable_objects": {
-    "bindings": [{ "name": "DAILY", "class_name": "DailyCounter" }, { "name": "BOARD", "class_name": "Board" }]
+    "bindings": [{ "name": "DAILY", "class_name": "DailyCounter" }, { "name": "BOARD", "class_name": "Board" }, { "name": "ROOM", "class_name": "Room" }]
   },
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["DailyCounter"] },
-    { "tag": "v2", "new_sqlite_classes": ["Board"] }
+    { "tag": "v2", "new_sqlite_classes": ["Board"] },
+    { "tag": "v3", "new_sqlite_classes": ["Room"] }
   ],
   // Spend guards. Counts are kept per Cloudflare location and are approximate (see README).
   "ratelimits": [

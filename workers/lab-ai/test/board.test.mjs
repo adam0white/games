@@ -132,3 +132,17 @@ test('the endpoint: the per-address limit, a limiter error and a broken board al
   assert.deepEqual(await (await handleBoard(get(), e, c, { cache })).json(), { rows: [{ n: 'A', s: 5 }] }, 'answered from the cache');
   await handleBoard(req({ id: ID(2), n: 'B', s: 9 }), e, c, { cache }); await Promise.all(c.waits); assert.equal(cache.store.size, 0, 'a post clears the cached read');
 });
+
+test('all six boards have independent rows and cache entries; unlisted games remain refused', async () => {
+  assert.deepEqual(BOARD.games, ['lantern', 'sling', 'breath', 'matchmaker', 'lantern-fp', 'ant-swarm']);
+  const env = fakeEnv(), cache = fakeCache(), c = ctx();
+  for (const [i, game] of BOARD.games.entries()) {
+    const path = `/lab-api/board/${game}`;
+    assert.equal((await handleBoard(req({ id: ID(1), n: game, s: i + 1 }, { path }), env, c, { cache })).status, 200);
+    const res = await handleBoard(get({ path }), env, c, { cache });
+    assert.deepEqual(await res.json(), { rows: [{ n: game, s: i + 1 }] });
+    await Promise.all(c.waits);
+  }
+  assert.equal(env.objects.size, 6); assert.equal(cache.store.size, 6);
+  assert.equal((await handleBoard(get({ path: '/lab-api/board/lantern-race' }), env, c)).status, 404);
+});
