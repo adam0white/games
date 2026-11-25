@@ -167,6 +167,17 @@ async function labChecks() {
   rec.start({ n: 1 }); rec.event('buy', { x: 1 }); rec.end('won', { s: 1 }); await flushed();
   check('lab: nothing is recorded or sent before the notice is on the page', () => sent.length === 0 && localStorage.getItem('hf-lab-player') === keepPlayer);
   check('lab: the notice says what the lab records and links to the privacy page', () => { const p = rec.notice(document.getElementById('labbox')); return /keeps it for 180 days/.test(p.textContent) && p.querySelector('a').href.endsWith('/lab/privacy/'); });
+  // The notice names the switch, so the switch is on this page too (nothing changes unless it is unticked).
+  check('lab: the notice names the switch, and the switch says the same words', () => { const l = rec.toggle(document.getElementById('labbox')); return rec.notice && document.querySelector('#labbox .lab-notice').textContent.includes(`“${l.textContent.trim()}”`); });
+  {
+    // The words hook: the page's own language (kit/i18n.js lang()), Turkish or English, and a language change follows.
+    let now = 'tr'; const box = document.createElement('div'), was = document.documentElement.lang;
+    const r = lab('kit-selftest', { fetch: fake, lang: () => now }), p = r.notice(box), l = r.toggle(box);
+    check('lab: with lang() = tr the notice, its link and the switch are in Turkish', () => p.textContent.startsWith('Oyun laboratuvarı') && p.querySelector('a').textContent === 'Gizlilik' && l.textContent.trim() === 'Bu oyunu oyun laboratuvarı için kaydet' && p.textContent.includes(`“${l.textContent.trim()}”`));
+    now = 'en'; document.documentElement.lang = 'en-x-check'; await flushed(); document.documentElement.lang = was;
+    check('lab: after the page switches language, they follow', () => p.textContent.startsWith('The game lab records play') && p.querySelector('a').textContent === 'Privacy' && l.textContent.trim() === 'Record this play for the game lab');
+    check('lab: without a language they are in English', () => { const q = lab('kit-selftest', { fetch: fake }).notice(document.createElement('div')); return q.textContent.startsWith('The game lab records play'); });
+  }
   if (!rec.on) { check('lab: recording is switched off in this browser, so the send checks are skipped', () => true); return; }
   rec.event('before', 1); await flushed(); const between = sent.splice(0);
   rec.start({ night: 3 }); rec.event('buy', { pack: 'boat' }); rec.end('dawn', { embers: 7 }); await flushed();

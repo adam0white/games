@@ -9,7 +9,9 @@ import assert from 'node:assert/strict';
 import { gunzipSync } from 'node:zlib';
 
 export const LAB_ORIGIN = 'https://human.adamwhite.work';
-export const LAB_NOTICE = /The game lab records play, links it to other lab play on this device, and keeps it for 180 days\. Turn recording off in the pause menu\./;
+// The kit's sentence (kit/lab.js NOTICE, since 2026-11-25 it names the switch) or the older one that games with their
+// own words still show on a page whose switch is on the pause menu.
+export const LAB_NOTICE = /The game lab records play, links it to other lab play on this device, and keeps it for 180 days\. (Turn recording off in the pause menu\.|To stop it, untick “Record this play for the game lab”\.)/;
 export const sleep = ms => new Promise(done => setTimeout(done, ms));
 
 export async function answerLab(context, pageOrigin) {

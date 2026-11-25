@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
+import { checkDay } from './clock.mjs';
 
 const json = JSON.stringify;
-const now = new Date();
-const localDay = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-const utcDay = now.toISOString().slice(0, 10);
+// The UTC day these pages see: their Date is pinned to the run's clock (clock.mjs, `clock: true` below).
+const utcDay = checkDay;
 
 // These saves exercise the formats already read by each page. Sharing remains off.
 const saves = {
@@ -158,7 +158,7 @@ const splitlightLegacy = { 'night-splitlight:plate': '2', 'night-splitlight:soun
 
 export const labPages = {
   'lab/wild2-face-shift': pageEntry('wild2-face-shift:save', saves.face, 'wild2-face-shift:hint', {
-    menu: '#toMenu', sound: '#sound',
+    clock: true, menu: '#toMenu', sound: '#sound',
     state: () => { const s = window.faceShiftState?.(); return s && { screen: s.mode, paused: s.mode === 'paused', t: s.state?.elapsed ?? 0 }; },
     verify: () => { const s = window.faceShiftState(); return { saved: s.saved, booth: s.booth, daily: s.daily, line: document.querySelector('#dailyLine').textContent }; },
     expect: { saved: saves.face, booth: saves.faceBooth, daily: { v: 1, day: utcDay, best: 412 }, line: 'Today: best 412' },
@@ -166,7 +166,7 @@ export const labPages = {
     hint: { delay: 1600, before: () => window.faceShiftState().state.x, moved: n => window.faceShiftState().state.x > n },
   }, { 'wild2-face-shift:booth': json(saves.faceBooth), 'wild2-face-shift:daily': json({ v: 1, day: utcDay, best: 412 }) }),
   'lab/wild-pour': pageEntry('wild-pour:save', saves.pour, 'wild-pour:hint', {
-    menu: '#quit', sound: '#sound2', changed: { 'wild-pour:save': { tries: 1 } },
+    clock: true, menu: '#quit', sound: '#sound2', changed: { 'wild-pour:save': { tries: 1 } },
     state: () => { const s = window.pourState?.(); return s && { ...s, paused: !!s.paused }; },
     verify: () => ({ stars: window.pourState().saved, tries: JSON.parse(localStorage.getItem('wild-pour:save')).tries, sound: document.querySelector('#sound1').textContent, daily: document.querySelector('#dailyBest').textContent }),
     expect: { stars: saves.pour.stars, tries: 3, sound: 'Sound: on', daily: `${utcDay} UTC · Best on this device: 1 from the line · 2 spilled` },

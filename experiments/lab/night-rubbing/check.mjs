@@ -7,6 +7,7 @@ import { homedir } from 'node:os';
 import { dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { assertHomeLinks } from '../../kit/check/home-link.mjs';
 import { answerLab, allowLocalSend, withAgent, assertNotice, assertRun, assertNoLeak, assertOffSendsNothing, waitForRuns } from '../../kit/check/lab-record.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -435,6 +436,8 @@ async function run({ name, engine, device }) {
     assert.deepEqual(await page.evaluate(() => Object.keys(localStorage).filter(key =>
       key.startsWith('hf-lab-') && !['hf-lab-send-localhost', 'hf-lab-player'].includes(key))), [], 'no other recording keys');
     assert.ok(lab.sent.every(r => r.game === 'night-rubbing' && r.runSource === 'agent'), 'every record is named and marked as an agent run');
+    // The page is in English only: asked for Turkish, the way back is still in English.
+    await assertHomeLinks(context, `${origin}${path}?from=small&lang=tr`, ['paused', 'cabinet'], '‹ Small games');
     assert.deepEqual(errors, [], 'browser and resource errors');
     assert.deepEqual(unexpected, [], 'external requests or recording');
     await recording({ name, engine, device }, browser);

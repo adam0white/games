@@ -10,12 +10,17 @@
 //   A run counts as a win when its outcome is 'won' (the word the lab pages use). The home shows a win on tonight's
 //   three only when it came after the player opened that stop.
 // - slug: the folder name, taken from the address (/lab/night-bells/ → night-bells); pass { slug } to override.
+// - lang: optional, the page's own language (`lang` from kit/i18n.js words()). The link then follows it and changes
+//   when the page switches language. Without it the link uses ?lang=, then the player's saved choice, then the browser,
+//   so an English-only page passes { lang: () => 'en' }.
 // Never throws; a page without storage still plays. The game's own keys are never read or written.
 const HOME = '/small/', FROM = 'small', RESULTS = 'hub:results', TAB = 'kit-home:from';
 const WORDS = { en: 'Small games', tr: 'Küçük oyunlar' };
 const WINS = new Set(['won', 'win']);
 
+let pageLang = null;
 function lang() {
+  try { if (pageLang) return String(pageLang() || '').slice(0, 2).toLowerCase() === 'tr' ? 'tr' : 'en'; } catch {}
   try { const q = new URLSearchParams(location.search).get('lang'); if (q) return q.slice(0, 2).toLowerCase() === 'tr' ? 'tr' : 'en'; } catch {}
   try { const s = localStorage.getItem('kit:lang'); if (s) return s === 'tr' ? 'tr' : 'en'; } catch {}
   try { return (navigator.languages?.[0] || navigator.language || '').toLowerCase().startsWith('tr') ? 'tr' : 'en'; } catch { return 'en'; }
@@ -59,9 +64,16 @@ export function homeResult(slug, outcome) {
   } catch { return false; }
 }
 
-export function home(rec, { back = [], slug = slugHere() } = {}) {
+// Every link on the page in the language in use now.
+function relabel() { try { for (const a of document.querySelectorAll('a.kit-home')) { a.textContent = `‹ ${WORDS[lang()]}`; a.href = HOME + (lang() === 'tr' ? '?lang=tr' : ''); } } catch {} }
+
+export function home(rec, { back = [], slug = slugHere(), lang: given = null } = {}) {
+  if (typeof given === 'function') {
+    pageLang = given;
+    try { new MutationObserver(relabel).observe(document.documentElement, { attributes: true, attributeFilter: ['lang'] }); } catch {}
+  }
   if (fromHome()) for (const where of back) backLink(where);
-  const base = rec && typeof rec === 'object' ? rec : { notice() {}, toggle() {}, start() {}, event() {}, end() {}, on: false, sent: 0 };
+  const base = rec && typeof rec === 'object' ? rec : { notice() {}, toggle() {}, retext() {}, start() {}, event() {}, end() {}, on: false, sent: 0 };
   const self = Object.create(base);
   self.end = (outcome, summary) => { homeResult(slug, outcome); return base.end(outcome, summary); };
   return self;

@@ -17,6 +17,8 @@ import { experimentPath } from '../../../src/worker.mjs';
 import { experimentRoots } from '../../../scripts/experiments.mjs';
 import { pages, pageRuns } from './pages.mjs';
 import { labPages } from './lab-pages.mjs';
+import { NOTICE } from '../lab.js';
+import { pinClock } from './clock.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 // The notes page builds its games menu and game picker from kit/games.json, so every experiment has to be in it.
@@ -97,6 +99,7 @@ async function readyRenderer(page, g) {
 
 // Registrations name the page's own save format, state hook and controls. Keep these contracts in the page's section.
 async function savedPhone(page, g) {
+  if (g.clock) await pinClock(page); // the page's day is the day its seeds were made for (clock.mjs)
   if (g.prepare) await g.prepare(page);
   const state = () => page.evaluate(g.state);
   const wait = async (predicate, what) => {
@@ -450,7 +453,7 @@ const GAMES = {
     const before = st; await page.reload(); st = await state();
     assert.equal(st.bank, before.bank); assert.deepEqual(st.owned.sort(), before.owned.sort()); assert.deepEqual(st.worn, before.worn); assert.equal(st.opened, 3);
     // Lab recording: the notice is on the menu, the ended run was sent with its outcome, the purchase rides with the next run.
-    assert.match(await page.textContent('#menu'), /The game lab records play, links it to other lab play on this device, and keeps it for 180 days\. Turn recording off in the pause menu\. Privacy/);
+    assert.ok((await page.textContent('#menu')).includes(NOTICE + ' Privacy'), 'the kit\'s recording notice is on the menu');
     let runs = labRuns(page, 'lantern'); assert.equal(runs.length, 2, 'the run and the purchase sent');
     assert.equal(runs[0].data.outcome, 'dark'); assert.equal(runs[0].data.summary.embers, 7); assert.equal(runs[0].data.start.night, 3);
     assert.ok(labSent(page).some(r => r.game === 'lantern' && r.kind === 'events' && r.runId === runs[0].runId), 'events record for the dashboard');
@@ -1338,7 +1341,7 @@ for (const [slug, g] of Object.entries({ ...pages, ...labPages })) {
   GAMES[slug] = page => savedPhone(page, { ...g, path });
   for (const hint of g.hints ?? (g.hint ? [g.hint] : [])) {
     const name = hint.name ? `hint ${slug} ${hint.name}` : `hint ${slug}`;
-    GAMES[name] = page => hinted(page, { path, play: g.play ?? '#play', resume: g.resume ?? '#resume', prepare: g.prepare, start: g.start, waitInput: true, waitHintState: true, ...hint });
+    GAMES[name] = async page => { if (g.clock) await pinClock(page); return hinted(page, { path, play: g.play ?? '#play', resume: g.resume ?? '#resume', prepare: g.prepare, start: g.start, waitInput: true, waitHintState: true, ...hint }); };
   }
 }
 

@@ -76,3 +76,7 @@ Known trade-off, unresolved: the band now ends above the words (no flower hides 
 Cutoff: the new flowers start on 2026-11-25 (`CUTOFF` in `sim.js`); days before it keep the old flowers. If this merges later, days grown between the cutoff and the merge change flower; move the date to the merge day if that matters. The parity claim in `bots.mjs` reads main's `sim.js` from git history and reports "skipped" without it (a shallow clone).
 
 Not verified: a real phone, how the sounds feel (they were counted, not heard), the share sheet itself (headless downloads the picture instead), a real second day, Turkish wording, and whether the new flowers read as the flowers they are named after at button size (foxglove and fern are the weakest drawings).
+
+## 2026-11-25 — the way back to the small games home
+
+Already wired to the home. The way back and the recording notice and switch now follow the page's language when it changes (`lang` passed to `kit/home.js` and `kit/lab.js`). The home shows this game's progress out of the count in `experiments/small/catalog.js`, which `scripts/small-catalog.test.mjs` keeps equal to the game's own.

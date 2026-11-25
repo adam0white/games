@@ -22,7 +22,7 @@ const LABEL = { quick: 'warm', think: 'think', calm: 'calm' };
 const homeUrl = () => { const u = new URL(location.href); u.search = ''; u.hash = ''; if (W.lang() !== 'en') u.searchParams.set('lang', W.lang()); return u.href; };
 function toast(key) { const el = $('toast'); el.textContent = t(key); el.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove('on'), 1600); }
 
-const rec = lab('small');
+const rec = lab('small', { lang: W.lang });
 const set = threeFor(today);
 const pick = pickFor(today);
 // The deck starts on today's pick and runs on round the catalogue.

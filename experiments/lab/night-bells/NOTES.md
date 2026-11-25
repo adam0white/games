@@ -200,3 +200,7 @@ The careful timing bot clears every night on all 32 seeds (7.72–15.38 s). Dela
 - Sound by ear: the bell voice, the music preset and the replayed tune.
 - Real phones, one-thumb reach and human difficulty of nights 9–24; the bots prove solvability and the shape of the curve, not enjoyment.
 - The home card at `/small/` still counts to 8 (`experiments/small/marks.js` `of: 8`, asserted '1 / 8' in `kit/check/pages.mjs`); not changed here.
+
+## 2026-11-25 — the way back to the small games home
+
+Already wired to the home. The way back and the recording notice and switch now follow the page's language when it changes (`lang` passed to `kit/home.js` and `kit/lab.js`). The home shows this game's progress out of the count in `experiments/small/catalog.js`, which `scripts/small-catalog.test.mjs` keeps equal to the game's own.

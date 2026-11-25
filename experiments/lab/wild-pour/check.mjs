@@ -10,6 +10,7 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, extname, join, normalize, resolve } from 'node:path';
 import assert from 'node:assert/strict';
+import { assertHomeLinks } from '../../kit/check/home-link.mjs';
 import { answerLab, allowLocalSend, withAgent, assertNotice, assertRun, assertOffSendsNothing, assertNoLeak, waitForRuns, runRecords } from '../../kit/check/lab-record.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url)), root = resolve(here, '../..');
@@ -280,6 +281,7 @@ async function run(name) {
     await page.tap('#quit'); await page.tap('#play'); await sleep(300);
     await page.tap('#pause'); await page.tap('#quit');
   } });
+  await assertHomeLinks(ctx, `${base}/lab/wild-pour/?from=small&lang=tr`, ['menu', 'end'], '‹ Küçük oyunlar');
   assert.deepEqual(errors, [], 'no page or console errors');
   console.log(`${name}: ok`);
   } finally { try { await browser?.close(); } finally { awake?.kill(); } }

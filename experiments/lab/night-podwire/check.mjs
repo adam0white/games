@@ -1,4 +1,5 @@
 // Exercise the game through the board and its buttons. The view exposes observations only.
+import { assertHomeLinks } from '../../kit/check/home-link.mjs';
 import { answerLab, assertNotice, assertRun, assertOffSendsNothing, waitForRuns } from '../../kit/check/lab-record.mjs';
 import assert from 'node:assert/strict';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -590,6 +591,7 @@ async function run(name, base) {
     await budgetContext.close();
     assert.ok(budgetFrames.p95 < 8, 'page work per frame at 390x844 stays under 8 ms (p95 ' + budgetFrames.p95 + ')');
 
+    await assertHomeLinks(context, `${base}${route}?from=small&lang=tr`, ['paused', 'won'], '‹ Küçük oyunlar');
     console.log(name, JSON.stringify({ budget390x844: budgetFrames, firstWinSeconds: +seconds.toFixed(3), plucks: won.plucks,
       opened: won.opened, total: won.total, campaignPlucks: campaign,
       portraitBoardWidth: +portraitBoard.width.toFixed(2), landscapeBoardWidth: +landscapeBoard.width.toFixed(2),

@@ -153,3 +153,11 @@ Inspected all 84 captures from the qualifying streaks. All 6 final WebKit Vine o
 The latest standalone `check.mjs` runs exited 0 on all 6 page/profile pairs, with zero reported browser errors. Flock II brought 16/16 sheep home in the hold lesson and 20/20 in the outrun lesson on both profiles. Vine cleared its first bed in 8.00 simulated seconds and recorded one cut on each profile. Rubbing filed 6/6 plates per profile. A final Podwire rerun passed 4/4 sections after the native gesture helper changed. Syntax checks passed for all 3 shared modules, and the scoped whitespace check passed.
 
 Physical handset behavior, audible output, the causes of the capture differences, and the full shared catalogue remain unverified.
+
+## 2026-11-25 — checks that failed around midnight UTC
+
+The cause: `pages.mjs` (Night Flock's daily stars) and `lab-pages.mjs` (Pour's daily best, Face Shift's daily best) took "today" in Node when the module loaded, and the page took its own "today" when it loaded, minutes later in a long run. A run that crossed midnight UTC seeded yesterday's result and the page showed none. The old-save fixture for `ant-creatures` that was also reported left the check when that page went to `archive/lab/` (Ant Promotion's Living look); its check has no date in it now.
+
+The fix: `clock.mjs` holds one moment for the run (`CHECK_NOW=<ISO time>`, or the moment the run started). The seeds take their day from it, and a registration with `clock: true` (flock, lab/wild-pour, lab/wild2-face-shift, and their first-time help runs) pins its pages' `Date` to it with Playwright's `clock.setFixedTime`. Only `Date` stands still; timers, animation frames and `performance.now()` run, so play and the pause checks are as before. These three pages read `Date` only for the day.
+
+Also changed on purpose: the Lantern menu assertion and `LAB_NOTICE` in `lab-record.mjs` follow the kit's new notice sentence (it names the switch instead of the pause menu); `LAB_NOTICE` still accepts the older sentence that games with their own words show.

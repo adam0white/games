@@ -12,6 +12,7 @@ const experiments = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const pagePath = '/lab/night-sand/';
 const saveKey = 'night-sand:save';
 const shots = process.env.SHOTS || '/tmp/claude-improve-night-sand/check';
+import { assertHomeLinks } from '../../kit/check/home-link.mjs';
 import { answerLab, withAgent, assertNotice, assertRun, assertOffSendsNothing, assertNoLeak, waitForRuns } from '../../kit/check/lab-record.mjs';
 const notes = '/notes/button.js';
 const require = createRequire(join(resolve(process.env.PLAYWRIGHT ||
@@ -439,6 +440,7 @@ async function run(profile, origin) {
     assert.deepEqual(await page.evaluate(() => Object.keys(localStorage).filter(k =>
       k.startsWith('hf-lab-') && !['hf-lab-send-localhost', 'hf-lab-player'].includes(k))), [], 'no other play-recording keys');
     assert.ok(page.lab.sent.length > 0 && page.lab.sent.every(r => r.game === 'night-sand' && r.runSource === 'agent'), 'every record is named and marked as an agent run');
+    await assertHomeLinks(context, `${origin}${pagePath}?from=small&lang=tr`, ['paused', 'result'], '‹ Küçük oyunlar');
     await context.close();
     await recording(profile, origin, browser, errors, requests);
     await oldSave(profile, origin, browser, errors, requests);

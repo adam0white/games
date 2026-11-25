@@ -11,7 +11,7 @@ noZoom();
 // Play recording for the game lab. One run is the day's thanks: it starts with the first thank given in this
 // visit and ends 'won' with the third. Only the kind of each thanks is sent, never the typed words.
 // Opened from the small games' home (?from=small): a way back on the settings card and under the tray, and a finished day reported there.
-const rec=home(lab('thankful'),{back:['#settingsCard .card','#ritual']});let running=false,opened=0;
+const rec=home(lab('thankful',{lang}),{back:['#settingsCard .card','#ritual'],lang});let running=false,opened=0;
 rec.notice($('ritual'));rec.toggle($('settingsCard').firstElementChild);
 function recGive(k,n){if(isDemo)return;if(!running){running=true;opened=n-1;rec.start({day:today===localDay()?'today':'set',look:state.look,already:n-1,lang:lang()});}rec.event('thanks',{kind:k,n,flower:species(today,k)});if(n===3){running=false;rec.event('daily-finished',{look:state.look});rec.end('won',{thanks:3,look:state.look,kinds:(state.days[today]||[]).map(i=>i.k),flowers:(state.days[today]||[]).map(i=>species(today,i.k))});}}
 

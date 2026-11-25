@@ -191,7 +191,7 @@ function lift() {
   if (id !== null && canvas.hasPointerCapture(id)) canvas.releasePointerCapture(id);
 }
 // Play recording for the game lab: one run is one garden, from the first cut to bloom, replant or leaving it.
-const rec = home(lab('night-channels'), { back: ['#paused .card', '#selection .card'] });
+const rec = home(lab('night-channels', { lang }), { back: ['#paused .card', '#selection .card'], lang });
 let running = false;
 function recEnd(outcome) {
   if (!running) return;

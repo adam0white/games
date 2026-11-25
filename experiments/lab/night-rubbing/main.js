@@ -8,6 +8,7 @@ import { screens } from '../../kit/screens.js';
 import { stick } from '../../kit/stick.js';
 import { noZoom } from '../../kit/zoom.js';
 import { lab } from '../../kit/lab.js';
+import { home } from '../../kit/home.js';
 
 noZoom();
 const el = id => document.getElementById(id);
@@ -28,7 +29,10 @@ const show = screens(['paused', 'result'], next => {
 });
 const audio = sound({ on: () => soundOn });
 // Play recording for the game lab (kit/lab.js): one run for each plate the player starts to rub.
-const rec = lab('night-rubbing');
+// Opened from the small games' home (?from=small): a way back on the pause card and under the title (the page
+// has no menu or end card: a filed print shows Next plate in the status row, too narrow for a link). The page is
+// in English only, so the link is too.
+const rec = home(lab('night-rubbing'), { back: ['#paused .card', 'header .heading'], lang: () => 'en' });
 let runOpen = false;
 function runBegin() { if (runOpen || s.done) return; runOpen = true; rec.start({ level: s.level, red: displayRed }); }
 function runEnd(outcome) {

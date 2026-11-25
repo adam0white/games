@@ -36,21 +36,27 @@ export function threeFor(day) {
 const J = k => readJson(k, null);
 const count = a => (Array.isArray(a) ? a.filter(n => Number(n) > 0).length : 0);
 const num = (v, max) => (Number.isFinite(v) ? Math.max(0, Math.min(max, Math.trunc(v))) : 0);
+// Totals come from the catalogue (`of`), which a test keeps equal to each game's own level count.
+const OF = Object.fromEntries(SMALL.filter(game => game.of).map(game => [game.slug, game.of]));
+const levels = (slug, n) => { const of = OF[slug]; const score = num(n, of); return { score, of, finished: score >= of }; };
 const P = {
   thankful() { const d = J('thankful:v1')?.days || {}; const n = Object.keys(d).filter(k => Array.isArray(d[k]) && d[k].length).length; const now = d[localDay()]?.length || 0; return { score: n * 3 + Math.min(3, now), today: now >= 3 }; },
   pitch() { const s = J('pitch:v1') || {}; return { score: num(s.played, 1e6) + Object.keys(s.daily || {}).length }; },
-  'night-channels'() { const s = J('night-channels:save') || {}, g = J('night-channels:gardens') || {}; const n = Math.max(s.completed === true ? 10 : 0, num(s.unlocked, 30) - 1, Object.keys(g).length); const done = g[30] !== undefined; return { score: done ? 30 : Math.min(30, n), of: 30, finished: done }; },
+  // `completed` (garden 10 flowered, from before gardens 11-30), the next garden open, and the fewest cuts kept per garden
+  'night-channels'() { const of = OF['night-channels'], s = J('night-channels:save') || {}, g = J('night-channels:gardens') || {}; const n = Math.max(s.completed === true ? 10 : 0, num(s.unlocked, of) - 1, Object.keys(g).length); const done = g[of] !== undefined; return { score: done ? of : Math.min(of, n), of, finished: done }; },
   ring() { const s = J('ring:v1') || {}; return { score: num(s.nights, 1e6), finished: num(s.dawns, 1e6) > 0 }; },
-  'night-sand'() { const n = num(J('night-sand:save')?.completed, 10); return { score: n, of: 10, finished: n >= 10 }; },
-  'night-bells'() { const n = count(J('night-bells:save')?.stars); return { score: n, of: 8, finished: n >= 8 }; },
-  'night-podwire'() { const s = J('night-podwire:progress') || {}, b = J('night-podwire:book') || {}; const six = s.complete === true ? 6 : Math.max(0, num(s.next, 6) - 1); const n = b.done === true ? 18 : Math.max(six, num(b.reached, 18) - 1); return { score: n, of: 18, finished: n >= 18 }; },
-  'night-saltplate'() { const n = num(J('night-saltplate:save')?.cleared, 18); return { score: n, of: 18, finished: n >= 18 }; },
+  'night-sand'() { return levels('night-sand', J('night-sand:save')?.completed); },
+  // nights 1-8 keep their stars in night-bells:save, nights 9 on in night-bells:more (2026-11-24)
+  'night-bells'() { return levels('night-bells', count(J('night-bells:save')?.stars) + count(J('night-bells:more')?.stars)); },
+  'night-podwire'() { const of = OF['night-podwire'], s = J('night-podwire:progress') || {}, b = J('night-podwire:book') || {}; const six = s.complete === true ? 6 : Math.max(0, num(s.next, 6) - 1); return levels('night-podwire', b.done === true ? of : Math.max(six, num(b.reached, of) - 1)); },
+  'night-saltplate'() { return levels('night-saltplate', J('night-saltplate:save')?.cleared); },
   // the highest plate reached, a plain number; since 2026-11-24 the last plate's clear writes night-splitlight:done
-  'night-splitlight'() { const done = read('night-splitlight:done') === '1'; return { score: done ? 18 : Math.max(0, num(readNumber('night-splitlight:plate', 1), 18) - 1), of: 18, finished: done }; },
-  'wild-pour'() { const n = count(J('wild-pour:save')?.stars); return { score: n, of: 8, finished: n >= 8 }; },
-  'wild2-face-shift'() { const s = J('wild2-face-shift:save') || {}; return { score: num(s.runs, 1e6), finished: count(s.stars) >= 4 }; },
-  // the next print opens when one is filed: the sixth print's filing is not visible here
-  'night-rubbing'() { return { score: Math.max(0, num(J('night-rubbing:save')?.unlocked, 6) - 1), of: 6 }; },
+  'night-splitlight'() { const of = OF['night-splitlight']; return levels('night-splitlight', read('night-splitlight:done') === '1' ? of : Math.max(0, num(readNumber('night-splitlight:plate', 1), of) - 1)); },
+  'wild-pour'() { return levels('wild-pour', count(J('wild-pour:save')?.stars)); },
+  // classic rounds keep wild2-face-shift:save; booth runs (the default game since 2026-11-24) count in wild2-face-shift:booth
+  'wild2-face-shift'() { const s = J('wild2-face-shift:save') || {}, b = J('wild2-face-shift:booth') || {}; return { score: num(s.runs, 1e6) + num(b.runs, 1e6), finished: count(s.stars) >= 4 }; },
+  // a filed print keeps its pigment under night-rubbing:proof:<n>, so the last print's filing shows too
+  'night-rubbing'() { const of = OF['night-rubbing']; let filed = 0; for (let n = 1; n <= of; n++) if (read('night-rubbing:proof:' + n) !== null) filed++; return levels('night-rubbing', Math.max(filed, num(J('night-rubbing:save')?.unlocked, of) - 1)); },
 };
 export function progress(slug) { try { return { score: 0, of: null, ...P[slug]?.() }; } catch { return { score: 0, of: null }; } }
 export const results = () => { const r = readJson('hub:results', {}); return r && typeof r === 'object' ? r : {}; };

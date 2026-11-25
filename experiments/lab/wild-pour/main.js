@@ -7,9 +7,10 @@ import { noZoom } from '../../kit/zoom.js';
 import { screens } from '../../kit/screens.js';
 import { hint } from '../../kit/hint.js';
 import { lab } from '../../kit/lab.js';
+import { home } from '../../kit/home.js';
 import { liquidSurface } from './liquid.js';
 import { DAILY_KEY, dailyPour, validBest, dailyBest } from './daily.js';
-import { t, apply } from './words.js';
+import { t, apply, lang } from './words.js';
 
 noZoom();
 apply();
@@ -104,7 +105,8 @@ const show = screens(['menu', 'paused', 'end'], name => {
 const COLORS = { juice: ['#ff8a3d', '#ffc078', '#e8692a'], honey: ['#e39a12', '#ffd36b', '#b86f05'], soda: ['#7a3b1c', '#c98b5e', '#55260f'] };
 
 // Play recording for the game lab (kit/lab.js): one run for each pour, started by Play, Daily pour, Next or Again.
-const rec = lab('wild-pour');
+// Opened from the small games' home (?from=small): a way back on the menu and end cards.
+const rec = home(lab('wild-pour', { lang }), { back: ['#menu .card', '#end .card'], lang });
 let runOpen = false;
 function runEnd(outcome) {
   if (!runOpen || !s) return;

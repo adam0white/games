@@ -238,3 +238,7 @@ No assertion was loosened.
 - The daily par is checked against Node for 2 dates in the browsers, not across many dates; WebKit could round `Math.sin`/`Math.exp` differently.
 - On Peony (XVIII) the fret peg sits under the winding, so a low touch may toggle the fret instead of gripping the wire.
 - In Turkish, the kit's recording checkbox on the pause card is still in English (kit text, not this page's).
+
+## 2026-11-25 — the way back to the small games home
+
+Opened from `/small/` (`?from=small`), the page shows "‹ Small games" ("‹ Küçük oyunlar" in Turkish) on the pause card and beside Next plate when a plate is won, through `kit/home.js`; a finished plate is reported to the home as a win. The recording notice, its Privacy link and the switch are now in the page's language (`lab('night-podwire', { lang })`). `check.mjs` asserts the two links in Turkish. Nothing else changed: same keys, same records.

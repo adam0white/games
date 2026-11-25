@@ -339,3 +339,7 @@ All player-facing strings are in `words.js` (English and Turkish, through `kit/i
 ### Not verified
 
 A real phone (frame time, the tilt sensor, touch feel), the sound by ear, the Turkish wording, and difficulty for real people: the thumb bot is a model, not a person. Paint and compositing time are not in the frame numbers.
+
+## 2026-11-25 — the way back to the small games home
+
+Opened from `/small/` (`?from=small`), the page shows "‹ Small games" ("‹ Küçük oyunlar" in Turkish) on the menu and end cards, through `kit/home.js`; a filled glass is reported to the home as a win. The recording notice and switch are now in the page's language. `check.mjs` asserts the two links in Turkish. The shared phone check pins this page's `Date` (`kit/check/clock.mjs`) so its daily-best line no longer fails when a run crosses midnight UTC. Same keys, same records.

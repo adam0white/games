@@ -8,6 +8,7 @@ import { dirname, extname, join, resolve, sep } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { LEVELS, answerHandle, dailySpec } from './sim.js';
+import { assertHomeLinks } from '../../kit/check/home-link.mjs';
 import { answerLab, withAgent, assertNotice, assertRun, assertOffSendsNothing, assertNoLeak, waitForRuns, runRecords } from '../../kit/check/lab-record.mjs';
 
 const mount = '/lab/night-saltplate/';
@@ -615,6 +616,7 @@ async function extras({ name, engine, device }) {
     assert.ok(perf.grains === 700 && perf.frames > 60, `frames measured with every grain: ${JSON.stringify(perf)}`);
     assert.ok(perf.p95 < 8, `page work per frame under 8 ms: ${JSON.stringify(perf)}`);
     await page.setViewportSize(portrait);
+    await assertHomeLinks(context, `${url}?from=small&lang=tr`, ['paused', 'result'], '‹ Küçük oyunlar');
 
     assert.deepEqual(unexpected, [], 'no external requests');
     assert.deepEqual(errors, [], 'no browser errors');
