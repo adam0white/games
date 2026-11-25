@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
+import { SMALL } from '../../small/catalog.js';
 import { fieldPoint, pointerDrag } from './lab-pages.mjs';
 
 const stars = (n, first = 2) => [first, ...Array(n - 1).fill(0)];
@@ -198,3 +200,132 @@ export const pages = {
     hint: { key: 'night-vine:hint', delay: 3100, play: '#field', timing: { board: true }, input: moveVineLamp, legacy: { 'night-vine:save': '{"v":1,"unlocked":3,"level":2,"best":7,"sound":true,"look":"cobalt"}' } },
   },
 };
+
+// The home for the small games (/small/). It is not a game, so it has its own run instead of the save, pause and touch
+// contract: both languages, every game link is a page in this checkout and says it came from the home, marks and a
+// streak made on the three draft homes carry over, the home never writes a game's own keys, a game opened from it
+// comes back with the browser's back, tonight's result card and streak, the first-visit card, and kit/home.js.
+const checkoutRoot = new URL('../../../', import.meta.url);
+export function linkTarget(href) {
+  const path = new URL(href, 'http://x').pathname;
+  const file = path.startsWith('/crumbwar/') ? `workers/crumbwar/public${path}index.html` : `experiments${path}index.html`;
+  return existsSync(new URL(file, checkoutRoot)) ? file : null;
+}
+const json = JSON.stringify;
+// 2026-11-24: today's pick is Podwire; tonight is Pour, Night Sand, Thankful Garden. Night Bells has one level
+// cleared (1 / 8). The rest is what the drafts left: Saltplate opened, a two-night streak up to yesterday, and
+// tonight's first stop opened on a draft (no time, so a win reported later can never be counted for it).
+const DAY = '2026-11-24';
+const smallSeed = {
+  'night-bells:save': json({ v: 1, stars: [2, 0, 0, 0, 0, 0, 0, 0], best: 0, sound: true, tries: 1, look: 'amber' }), 'night-bells:hint': '1',
+  'hub:opened': json({ 'night-saltplate': '2026-11-20', 'wild-pour': DAY }),
+  'hub:c:streak': json({ last: '2026-11-23', run: 2, best: 2 }),
+  'hub:c:night': json({ day: DAY, stops: { 'wild-pour': { before: 0 } } }),
+  'hf-lab-send-localhost': '1',
+};
+const smallState = page => page.evaluate(() => window.smallState());
+async function smallGo(page, until, base, query = `?lang=en&day=${DAY}`) { await page.goto(`${base}/small/${query}`); await until(page, () => window.smallState, 'home script'); }
+export const pageRuns = {
+  async small(page, { base, until }) {
+    const gameKeys = () => page.evaluate(() => Object.fromEntries(Object.keys(localStorage).filter(k => !/^(hub:|kit:|hf-lab-)/.test(k)).map(k => [k, localStorage.getItem(k)])));
+    await page.goto(`${base}/notes/button.js`);
+    await page.evaluate(seed => { localStorage.clear(); sessionStorage.clear(); for (const [k, v] of Object.entries(seed)) localStorage.setItem(k, v); }, smallSeed);
+    await smallGo(page, until, base);
+    const before = await gameKeys();
+    let state = await smallState(page);
+    assert.equal(state.lang, 'en');
+    assert.deepEqual(state.three, ['wild-pour', 'night-sand', 'thankful'], 'tonight is seeded by the day');
+    assert.equal(state.pick, 'night-podwire', 'so is the pick');
+    assert.deepEqual(state.three.map(slug => SMALL.find(game => game.slug === slug).kind), ['quick', 'think', 'calm'], 'one of each kind');
+    assert.ok(!state.three.includes(state.pick), 'the pick is not one of tonight’s three');
+    assert.deepEqual(state.links.filter(l => l.where === 'deck').map(l => l.slug).sort(), SMALL.map(game => game.slug).sort(), 'the deck has every small game');
+    for (const { href } of state.links) {
+      assert.match(href, /\?from=small$/, `${href} says it came from the home`);
+      assert.ok(linkTarget(href), `${href} is a page in this checkout`);
+    }
+    // What the drafts left carries over.
+    assert.equal(state.run, '2 nights in a row so far', 'a streak from the drafts carries over');
+    assert.equal(await page.getAttribute('#stops li:nth-child(1)', 'class'), 'opened', 'a stop opened on a draft stays opened');
+    assert.equal(await page.getAttribute('#stops li:nth-child(2)', 'class'), 'now', 'the next stop is the one to play');
+    assert.equal(await page.textContent('.card.night-saltplate .mark'), 'Opened', 'a game opened from a draft is marked');
+    assert.equal(await page.textContent('.card.night-bells .mark'), '1 / 8', 'a cleared level shows on the card');
+    assert.equal(state.intro, false, 'no first-visit card for a player who has played a night');
+    // Both languages.
+    const noSideways = () => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth);
+    assert.equal(await noSideways(), true, 'no sideways scroll in English');
+    const title = await page.textContent('h1');
+    await page.click('#lang'); await until(page, () => document.documentElement.lang === 'tr', 'Turkish');
+    assert.notEqual(await page.textContent('h1'), title, 'the title is Turkish');
+    assert.equal(await page.evaluate(() => [...document.querySelectorAll('[data-i18n]')].filter(el => !el.textContent.trim()).length), 0, 'every string filled in Turkish');
+    assert.equal(await noSideways(), true, 'no sideways scroll in Turkish');
+    await page.reload(); await until(page, () => window.smallState?.().lang === 'tr', 'Turkish is remembered');
+    await page.click('#lang'); await until(page, () => document.documentElement.lang === 'en', 'English again');
+    // Taken before a game is opened: the games themselves write their own keys once they load.
+    assert.deepEqual(await gameKeys(), before, 'the home wrote no game key');
+    // The deck: opens on today's pick; the arrows move it; a side card's tap brings it to the middle and opens nothing.
+    assert.equal(state.at, 0, 'the deck opens on today’s pick'); assert.ok(await page.isVisible('.card:first-child .pickTag'));
+    await page.click('#next'); await until(page, () => window.smallState().at === 1, 'next card');
+    await page.waitForTimeout(500);
+    // The edge of the next card that shows at the right of the deck, tapped where it is (no scrolling into view first).
+    await page.evaluate(() => document.getElementById('deck').scrollIntoView({ block: 'center' })); await page.waitForTimeout(200);
+    const edge = await page.evaluate(() => { const d = document.getElementById('deck').getBoundingClientRect(), c = document.querySelector('.card[data-i="2"]').getBoundingClientRect(); return { x: Math.min(d.right, c.right) - 10, y: c.top + c.height * .8, seen: c.left < d.right }; });
+    assert.ok(edge.seen, 'the next card shows at the edge of the deck');
+    await page.touchscreen.tap(edge.x, edge.y); await until(page, () => window.smallState().at === 2, 'a side card comes to the middle');
+    assert.equal(new URL(page.url()).pathname, '/small/', 'a side card’s tap opens nothing');
+    await page.click('#surprise'); await until(page, () => window.smallState().at !== 2, 'surprise moves the deck', 4000);
+    await page.waitForTimeout(700);
+    const slug = await page.evaluate(() => document.querySelectorAll('.card')[window.smallState().at].classList[1]);
+    await smallOpen(page, until, `.card.${slug} a.play`, slug);
+    await until(page, s => document.querySelector(`.card.${s} .mark`).textContent !== 'New', 'the opened game is marked after back', 4000, slug);
+    // Tonight: play the other two stops.
+    for (const [i, stop] of [[2, 'night-sand'], [3, 'thankful']]) {
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await smallOpen(page, until, `li.now a.stop.${stop}`, stop);
+      await until(page, n => document.querySelector(`#stops li:nth-child(${n})`).className === 'opened', 'the stop is marked after back', 4000, i);
+    }
+    await page.waitForSelector('.result');
+    state = await smallState(page);
+    assert.equal(state.signs, '○○○');
+    assert.equal(await page.textContent('.result .big'), 'You played all three.');
+    assert.match(await page.textContent('.result'), /3 nights in a row · Best: 3/, 'the streak goes on from the drafts');
+    await until(page, () => window.smallState().picture, 'the share picture is made', 8000);
+    const picture = await page.evaluate(() => window.smallPicture());
+    assert.ok(picture.startsWith('data:image/png') && picture.length > 40000, `a share picture (${picture.length} bytes as text)`);
+    const sent = () => page.context().labSent.filter(r => r.game === 'small');
+    for (let i = 0; i < 60 && !sent().some(r => r.kind === 'run'); i++) await page.waitForTimeout(100);
+    assert.ok(sent().some(r => r.kind === 'run' && JSON.stringify(r).includes('night-done')), 'the finished night is recorded under small');
+    // Safari often restores the home from the back-forward cache; the page must read the saves again on pageshow.
+    await page.evaluate(() => { const n = JSON.parse(localStorage.getItem('hub:c:night')); n.stops['night-sand'].before = -1; localStorage.setItem('hub:c:night', JSON.stringify(n)); });
+    await page.evaluate(() => dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
+    await until(page, () => document.querySelector('#stops li:nth-child(2) .lamp').textContent === '✦', 'a page restored from the cache redraws its marks');
+    // kit/home.js, as a wired game would use it. Opened without ?from=small: no link back.
+    await page.goto(`${base}/kit/`);
+    assert.equal(await page.evaluate(async () => { const { home } = await import('/kit/home.js'); const d = document.createElement('div'); document.body.append(d); home(null, { back: [d] }); return d.children.length; }), 0, 'no back link when not opened from the home');
+    await page.goto(`${base}/kit/?from=small`);
+    const back = await page.evaluate(async () => {
+      const { home } = await import('/kit/home.js'); const d = document.createElement('div'); document.body.append(d);
+      const ends = []; const rec = home({ end: (o) => ends.push(o), start() {}, event() {} }, { back: [d], slug: 'thankful' });
+      rec.end('won', { n: 1 });
+      home(null, { slug: 'wild-pour' }).end('won'); // tonight's first stop was opened on a draft, with no time
+      return { href: d.querySelector('a.kit-home')?.getAttribute('href'), ends, results: JSON.parse(localStorage.getItem('hub:results')) };
+    });
+    assert.equal(back.href, '/small/', 'opened from the home: a link back');
+    assert.deepEqual(back.ends, ['won'], 'the game’s own recorder still gets the end');
+    assert.equal(back.results.thankful.wins, 1);
+    await smallGo(page, until, base);
+    assert.equal((await smallState(page)).signs, '○✦★', 'a win reported by a game shows on tonight’s three; a draft stop never counts a win');
+    assert.equal(await page.textContent('.result .big'), 'You won 1 of 3.');
+    // The first-visit card: shown to a new player, gone after Start and after a reload.
+    await page.evaluate(() => { for (const k of Object.keys(localStorage)) if (k.startsWith('hub:')) localStorage.removeItem(k); });
+    await smallGo(page, until, base);
+    assert.equal((await smallState(page)).intro, true, 'a new player sees the first-visit card');
+    await page.waitForTimeout(2400); await page.click('#introOk');
+    await until(page, () => !window.smallState().intro, 'Start hides it');
+    await page.reload(); await until(page, () => window.smallState && !window.smallState().intro, 'and it stays hidden');
+  },
+};
+async function smallOpen(page, until, selector, slug) {
+  await page.click(selector);
+  await page.waitForURL(url => url.pathname === `/lab/${slug}/`);
+  await page.goBack(); await until(page, () => window.smallState, 'back on the home');
+}
