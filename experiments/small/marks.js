@@ -44,7 +44,7 @@ const P = {
   'night-sand'() { const n = num(J('night-sand:save')?.completed, 10); return { score: n, of: 10, finished: n >= 10 }; },
   'night-bells'() { const n = count(J('night-bells:save')?.stars); return { score: n, of: 8, finished: n >= 8 }; },
   'night-podwire'() { const s = J('night-podwire:progress') || {}; const n = s.complete === true ? 6 : Math.max(0, num(s.next, 6) - 1); return { score: n, of: 6, finished: n >= 6 }; },
-  'night-saltplate'() { const n = num(J('night-saltplate:save')?.cleared, 6); return { score: n, of: 6, finished: n >= 6 }; },
+  'night-saltplate'() { const n = num(J('night-saltplate:save')?.cleared, 18); return { score: n, of: 18, finished: n >= 18 }; },
   // the highest plate reached, a plain number: the last plate's clear is not visible here
   'night-splitlight'() { return { score: Math.max(0, num(readNumber('night-splitlight:plate', 1), 6) - 1), of: 6 }; },
   'wild-pour'() { const n = count(J('wild-pour:save')?.stars); return { score: n, of: 8, finished: n >= 8 }; },

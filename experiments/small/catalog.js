@@ -15,7 +15,7 @@ export const SMALL = [
   g('night-splitlight', '/lab/night-splitlight/', { en: 'Splitlight' }, { en: 'Turn the glass so each colour finds its receiver.', tr: 'Camı çevir, her renk kendi alıcısını bulsun.' }, ['minLevel', 1], 'think'),
   g('ring', '/lab/ring/', { en: 'Firefly Ring', tr: 'Ateş Böceği Halkası' }, { en: 'Draw a ring around fireflies of one colour.', tr: 'Aynı renkteki ateş böceklerinin çevresine halka çiz.' }, ['minLevel', 1], 'think', { tr: true }),
   g('pitch', '/lab/pitch/', { en: 'Paper Pitch', tr: 'Kâğıt Futbolu' }, { en: 'The old pencil game: draw the ball into the goal.', tr: 'Eski kalem oyunu: topu kaleye çiz.' }, ['minMatch', 3], 'think', { tr: true, friend: 'byLink' }),
-  g('night-saltplate', '/lab/night-saltplate/', { en: 'Saltplate' }, { en: 'Tune a ringing plate until the salt draws the engraving.', tr: 'Çınlayan levhayı akort et, tuz oymadaki deseni çizsin.' }, ['minLevel', 1], 'calm'),
+  g('night-saltplate', '/lab/night-saltplate/', { en: 'Saltplate', tr: 'Tuz Levha' }, { en: 'Tune a ringing plate until the salt draws the engraving.', tr: 'Çınlayan levhayı akort et, tuz oymadaki deseni çizsin.' }, ['minLevel', 1], 'calm', { tr: true }),
   g('night-rubbing', '/lab/night-rubbing/', { en: 'Carbon Cabinet' }, { en: 'Rub graphite over a fossil and bring out its ridges.', tr: 'Fosilin üstüne grafit sür, kabartmalarını ortaya çıkar.' }, ['minLevel', 1], 'calm'),
   g('thankful', '/lab/thankful/', { en: 'Thankful Garden', tr: 'Teşekkür Bahçesi' }, { en: 'Three thanks a day. Each one grows a flower in your garden.', tr: 'Günde üç teşekkür. Her biri bahçende bir çiçek açtırır.' }, ['minDay', 1], 'calm', { tr: true }),
 ];
