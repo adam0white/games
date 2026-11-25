@@ -356,7 +356,7 @@ const GAMES = {
     assert.equal(await page.locator('#fStatus').textContent(), 'Arkadaşına ulaşılamadı.');
     assert.equal(await page.locator('#fBot').textContent(), 'Bota karşı oyna');
     await page.click('#fBack'); await until(page, () => window.duelState().screen === 'menu', 'back on the menu');
-    await page.click('#toFriend'); await page.fill('#fJoin', 'wx-yz'); assert.equal(await page.locator('#fJoin').inputValue(), 'WXYZ', 'a typed code is cleaned');
+    await page.click('#toFriend'); await page.locator('#fJoin').pressSequentially('wx-yz'); assert.equal(await page.locator('#fJoin').inputValue(), 'WXYZ', 'a typed code is cleaned');
     await page.click('#fJoinGo'); await until(page, () => window.duelState().link?.role === 'guest' && window.duelState().link.code === 'WXYZ', 'a typed code joins as the guest');
     await page.click('#fBack'); await until(page, () => window.duelState().screen === 'menu' && window.duelState().link === null, 'back on the menu again');
     assert.deepEqual(JSON.parse(await page.evaluate(() => localStorage.getItem('duel-save'))), save, 'the saves are untouched');

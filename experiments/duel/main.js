@@ -250,6 +250,7 @@ function endMatch() {
     $(`re${i}`).classList.remove('ready'); $(`re${i}`).textContent = 'Rematch';
   }
   $('half1').classList.toggle('ghost', !!solo);
+  $('half0').classList.add('c0'); $('half0').classList.remove('c1');
   ready = [false, !!solo]; // the bot is always ready
   screen = 'end'; show('end');
   confetti = calm ? 40 : 160; burst(w);
@@ -338,6 +339,7 @@ function endLinkMatch(w) { // my half of the end card only; the friend sees thei
   $('endL0').textContent = link.f.peerReady ? tr('friendReady') : '';
   $('re0').classList.remove('ready'); $('re0').textContent = 'Rematch';
   $('half1').classList.add('ghost');
+  $('half0').classList.toggle('c0', me === 0); $('half0').classList.toggle('c1', me === 1); // my half in my colour
   ready = [false, false]; $('wait').hidden = true;
   screen = 'end'; show('end');
   confetti = calm ? 40 : 160; burst(w);
@@ -364,7 +366,7 @@ function linkFrame(now, dt) {
     else L.stalledAt = null;
     if (r.stalled && waited >= WAIT_SHOW) L.wait = true;
     else if (!r.stalled && now - L.clearAt >= WAIT_HIDE) L.wait = false;
-    $('wait').hidden = !L.wait;
+    $('wait').hidden = !L.wait || paused;
     if (L.wait) {
       $('waitLine').textContent = tr(L.f.state === 'lost' ? 'slow' : 'waitBanner');
       $('waitButtons').hidden = waited < WAIT_OFFER;

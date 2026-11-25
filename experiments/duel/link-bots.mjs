@@ -52,7 +52,7 @@ export function linkClaims({ claim, quick = false, late = false }) {
   // phone applied gives the same match. Each match draws its network at random.
   {
     const N = quick ? 40 : 160, rnd = mulberry(2026);
-    let same = 0, over = 0, replayed = 0, quiet = 0, maxChars = 0, perSecond = 0, ticks = 0, cuts = 0, lost = 0, sent = 0;
+    let same = 0, over = 0, replayed = 0, quiet = 0, maxChars = 0, maxInts = 0, perSecond = 0, ticks = 0, cuts = 0, lost = 0, sent = 0;
     for (let i = 0; i < N; i++) {
       const latency = Math.round(10 + rnd() * 390), jitter = Math.round(rnd() * Math.min(150, latency)), drop = rnd() < 0.5 ? 0 : rnd() * 0.15;
       const cut = rnd() < 0.35 ? (() => { const a = 3000 + Math.round(rnd() * 20000); return [a, a + 500 + Math.round(rnd() * 3000)]; })() : null;
@@ -63,12 +63,12 @@ export function linkClaims({ claim, quick = false, late = false }) {
       if (r.same) same++; if (r.over) over++; if (r.mismatch.every(m => m === null)) quiet++;
       const rp = replay(opts, r.phones[0].pairs);
       if (rp.hashes.length === r.phones[0].hashes.length && rp.hashes.every((h, j) => h === r.phones[0].hashes[j]) && JSON.stringify(rp.s.duels) === JSON.stringify(r.phones[1].s.duels)) replayed++;
-      maxChars = Math.max(maxChars, r.maxChars); perSecond = Math.max(perSecond, r.perSecond); ticks += r.ticks[0]; if (cut) cuts++; lost += r.lost; sent += r.sent;
+      maxChars = Math.max(maxChars, r.maxChars); maxInts = Math.max(maxInts, r.maxInts); perSecond = Math.max(perSecond, r.perSecond); ticks += r.ticks[0]; if (cut) cuts++; lost += r.lost; sent += r.sent;
     }
     claim(same === N && over === N, `lockstep: ${same}/${N} matches identical on both phones to the last tick (${over} finished; ${ticks} ticks; one-way 10-400 ms, jitter to 150 ms, up to 15% of frames lost (${lost}/${sent}), ${cuts} cuts with a reconnect, one phone at 30-120 fps in some)`);
     claim(replayed === N, `replay: in ${replayed}/${N} matches the inputs one phone applied, replayed with no network, give the same match`);
     claim(quiet === N, `checks: the phones' state checks every 30 ticks and at the end agree in ${quiet}/${N} matches`);
-    claim(maxChars <= 200 && perSecond <= 30, `frames: the longest is ${maxChars} bytes (the relay takes 200) and a phone sends at most ${perSecond} a second (the relay takes 30)`);
+    claim(maxChars <= 200 && maxInts <= 64 && perSecond <= 30, `frames: the longest is ${maxChars} bytes and ${maxInts} integers (the relay takes 200 and 64) and a phone sends at most ${perSecond} a second (the relay takes 30)`);
   }
 
   // 8d. The detector: a phone that files the friend's inputs one tick early comes apart, and both phones notice.
@@ -100,10 +100,11 @@ export function linkClaims({ claim, quick = false, late = false }) {
   }
 
   // 8f. Hockey is left out of the friend deck: a delay takes the skill out of it. A careful player's share of duels
-  // against a clumsy one, from either seat, with no network and a delay of 1 tick vs 6 (the smallest a link uses).
+  // against a clumsy one, from either seat, with no network and a delay of 1 tick vs 6 (the smallest a link uses);
+  // hockey also at 14 (the delay for 150 ms one way).
   {
     const N = quick ? 6 : 15, share = {};
-    for (const only of KINDS) for (const D of [1, 6]) {
+    for (const only of KINDS) for (const D of only === 'hockey' ? [1, 6, 14] : [1, 6]) {
       let cw = 0, n = 0;
       for (let seed = 1; seed <= N; seed++) for (const flip of [0, 1]) {
         const r = linkMatch({ seed, only, intro: 0.5, delay: D, latency: 0, sendMs: 1, bots: flip ? ['clumsy', 'careful'] : ['careful', 'clumsy'] });
@@ -112,7 +113,7 @@ export function linkClaims({ claim, quick = false, late = false }) {
       share[`${only}${D}`] = cw / n;
     }
     console.log(`     careful's share of duels v clumsy, 1 tick → 6 ticks of delay: ${KINDS.map(k => `${k} ${pct(share[k + 1], 1)}→${pct(share[k + 6], 1)}`).join(', ')}`);
-    claim(share.hockey1 >= 0.85 && share.hockey6 <= 0.65 && !FRIEND_KINDS.includes('hockey'), `hockey loses its skill to a delay (careful wins ${pct(share.hockey1, 1)} at 1 tick, ${pct(share.hockey6, 1)} at 6), so the friend deck leaves it out`);
+    claim(share.hockey1 >= 0.85 && share.hockey6 <= 0.65 && share.hockey14 <= 0.65 && !FRIEND_KINDS.includes('hockey'), `hockey loses its skill to a delay (careful wins ${pct(share.hockey1, 1)} at 1 tick, ${pct(share.hockey6, 1)} at 6, ${pct(share.hockey14, 1)} at 14), so the friend deck leaves it out`);
     const kept = FRIEND_KINDS.filter(k => share[k + 6] >= share[k + 1] - 0.15);
     claim(kept.length === FRIEND_KINDS.length, `every duel in the friend deck keeps its skill at 6 ticks of delay (within 15 points): ${kept.length}/${FRIEND_KINDS.length}`);
   }

@@ -28,10 +28,10 @@ export function linkMatch({ seed = 1, only = null, intro = 3, delay = 6, latency
     return p;
   });
   const wire = [];
-  let now = 0, sent = 0, lost = 0, maxChars = 0, perSecond = 0;
+  let now = 0, sent = 0, lost = 0, maxChars = 0, maxInts = 0, perSecond = 0;
   const window = [[], []];
   const send = (from, ints) => {
-    const text = JSON.stringify({ t: 'r', d: ints }); maxChars = Math.max(maxChars, text.length);
+    const text = JSON.stringify({ t: 'r', d: ints }); maxChars = Math.max(maxChars, text.length); maxInts = Math.max(maxInts, ints.length);
     const w = window[from]; w.push(now); while (w[0] <= now - 1000) w.shift(); perSecond = Math.max(perSecond, w.length);
     sent++;
     if ((cut && now >= cut[0] && now < cut[1]) || rnd() < drop) { lost++; return; }
@@ -63,7 +63,7 @@ export function linkMatch({ seed = 1, only = null, intro = 3, delay = 6, latency
   const [a, b] = phones, n = Math.min(a.hashes.length, b.hashes.length);
   let firstDiff = -1; for (let i = 0; i < n; i++) if (a.hashes[i] !== b.hashes[i]) { firstDiff = i; break; }
   return {
-    phones, now, sent, lost, maxChars, perSecond, firstDiff, ticks: [a.hashes.length, b.hashes.length],
+    phones, now, sent, lost, maxChars, maxInts, perSecond, firstDiff, ticks: [a.hashes.length, b.hashes.length],
     same: firstDiff < 0 && a.hashes.length === b.hashes.length && JSON.stringify(a.s.duels) === JSON.stringify(b.s.duels) && a.s.winner === b.s.winner,
     over: a.s.over && b.s.over, mismatch: [a.ls.mismatch, b.ls.mismatch],
     speed: phones.map(p => p.playMs ? p.playTicks / (p.playMs / 1000) / 60 : 1),
