@@ -7,6 +7,7 @@ import { onLeave, isPauseKey } from '../../kit/pause.js';
 import { lab } from '../../kit/lab.js';
 import { home } from '../../kit/home.js';
 import { shareLink } from '../../kit/room.js';
+import { shareImage } from '../../kit/share.js';
 import { noZoom } from '../../kit/zoom.js';
 import { screens } from '../../kit/screens.js';
 import { hint } from '../../kit/hint.js';
@@ -240,8 +241,8 @@ const shareText = () => t('shareText', { day: dayLabel(today), rings: daily.ring
 async function shareDaily() {
   const url = location.origin + location.pathname, text = shareText();
   rec.event('share', { what: 'daily', picture: !!picture });
-  try { if (picture && navigator.canShare?.({ files: [picture] })) { await navigator.share({ files: [picture], text: `${text}\n${url}` }); return; } }
-  catch (e) { if (e?.name === 'AbortError') return; }
+  // The picture through the kit (share sheet, else a download); the text and link when there is no picture.
+  if (picture && await shareImage(picture, { name: picture.name, text: `${text}\n${url}` }) !== 'failed') return;
   if (await shareLink(url, text) === 'copied') { $('toast').textContent = t('copied'); $('toast').hidden = false; }
 }
 

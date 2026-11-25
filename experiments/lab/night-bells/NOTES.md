@@ -174,7 +174,7 @@ The careful timing bot clears every night on all 32 seeds (7.72–15.38 s). Dela
 ### What else was added
 
 - **The village plays your tune.** Each strike is one note of `kit/music.js` preset `bell` (`chime(rank)`: the longest bell is the lowest note) when music and sound are on; otherwise fixed C5/E5/G5. A bell voice is three partials. A won night replays the last 24 strikes with the gaps tightened (×0.5, 0.16–0.42 s) and lights windows in order. `music.js` was not edited.
-- **Daily peal.** `?day=YYYY-MM-DD` or the UTC date → FNV seed (`dayNumber`) → one of eight three-bell ideas (`dailySpec`), the same on every phone. The result card offers Share: a 1080×1350 PNG drawn from SVG (the peal as dots by bell and time, the date and counts) through `navigator.share` with files, then `shareLink` text and URL as the fallback. `kit/share.js` was not on main when this was written; re-check at merge.
+- **Daily peal.** `?day=YYYY-MM-DD` or the UTC date → FNV seed (`dayNumber`) → one of eight three-bell ideas (`dailySpec`), the same on every phone. The result card offers Share: a 1080×1350 PNG drawn from SVG (the peal as dots by bell and time, the date and counts) through `kit/share.js` `shareImage` (the share sheet with the file, else a download of the picture); `kit/room.js` `shareLink` shares the text and URL when there is no picture.
 - **English and Turkish** through `kit/i18n.js` words (`words.js`); `?lang=tr`. Catalog entry `tr: true`. Opened from `/small/` the menu and result cards carry a back link, and results reach the home through `kit/home.js`.
 - **Chapters**: nights 1–8, 9–16, 17–24 on the menu; a chapter opens when its first night is reached.
 - Play recording: the run summary adds `daily`, `chords`; a new event `daily-finished` and `share`.
