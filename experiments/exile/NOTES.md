@@ -33,3 +33,9 @@ its switch sit in the bottom left corner while the build loads, on the title scr
   the lab's Cloudflare account; `.exile-records/` is git-ignored and holds private play records). It prints how far runs got,
   where unfinished runs stopped, falls by place, stranger and stat choices, camera time, combat counts and frame rate,
   and one row per run. `--agents` includes agent runs; `--csv=FILE` writes the rows.
+
+## On hold (2026-11-25)
+
+The owner put Exile on hold on 2026-11-25. The page stays up on build 0.4. The source repository's `main` holds an
+undeployed build 0.5 (difficulty levels, and a reign after the crown); its README has an "On hold" section with the
+second owner's full list and the steps to resume. `telemetry.mjs` already reads the 0.5 events.
