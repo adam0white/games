@@ -2978,9 +2978,9 @@ ninja==1.13.0 \
     # via
     #   flashinfer-python
     #   vllm
-notebook==7.6.1 \
-    --hash=sha256:0b45fd1010668dd4808c40914d957706dbf044a677d28764dc881b74dfcede82 \
-    --hash=sha256:6ea1e4c926f0dc490444ddcc335797a3dacda470a805d01031872fb119988ba2
+notebook==7.6.3 \
+    --hash=sha256:ad7e0eb765fba836cd4a2ab0c7a3a26cde1d91665fbf6f533b6ae7b2de6d88d2 \
+    --hash=sha256:e2c08e469c0ae20bb0b3214f0ab77e79653317a2f8e5b34c10361c66874a5b50
     # via jupyter
 notebook-shim==0.2.4 \
     --hash=sha256:411a5be4e9dc882a074ccbcae671eda64cceb068767e9a3419096986560e1cef \
