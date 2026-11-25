@@ -714,6 +714,13 @@ The skills (note #238) and the Living look were built at the same time. After th
 - In Chromium and WebKit at 390x844 the button of every animal was pressed in Living: 40 and 36 of 51 fired with animals placed near, the rest had no fitting target; no page error.
 - Left as a proposal: Living has no body language of its own for the new skills. The rings and marks of `skillMarks` show them.
 
+## 2026-11-25: the cards and the book say what a skill does (follows note #238)
+
+- With 51 different skills, a promotion card that said only "Skill: Dung ball" made the pick a guess. Each card now also has the skill's line (`does.<animal>`, English and Turkish), and the animal book has it for every animal you have been. Long words wrap inside a card. My own addition, not asked for; to remove it, delete the two `does` lines in `index.html`.
+- Checked in Chromium: one promotion from each of levels 1 to 17, in English and Turkish, at 390x844 and 320x568: every card has its line, inside the card and on the screen. The phone check asserts the line on the first card.
+- Not verified: a real phone; whether four lines of small text on a card is too much to read.
+- Left as a proposal (2026-11-25): meeting an old hunter sooner than after a full climb. The tester has not met one (#244), and they only come after a climb that reaches the top ends in a new game.
+
 ## 2026-11-24: rocks and tall grass (lab page ant-hide folded in, "but less prevalent")
 
 ### Done
