@@ -12,8 +12,8 @@ import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
 const experiments = resolve(here, '../..');
 const route = '/lab/night-podwire/';
-const progressKey = 'night-podwire:progress';
-const shots = '/private/tmp/night-r4-review/podwire';
+const progressKey = 'night-podwire:progress', bookKey = 'night-podwire:book', dayKey = 'night-podwire:daily';
+const shots = process.env.SHOTS || '/private/tmp/night-r4-review/podwire';
 const modules = process.env.PLAYWRIGHT || join(homedir(), 'code/human-framework/node_modules');
 const require = createRequire(join(resolve(modules), 'check.cjs'));
 const { webkit, chromium, devices } = require('playwright');
@@ -83,6 +83,25 @@ async function shot(page, name) {
   throw new Error(name + ': captured board is blank');
 }
 const ready = page => page.waitForFunction(() => window.podwireView?.().screen === 'play', null, { polling: 100 });
+// Every save this page writes: the shipped progress key and the two new ones.
+const clearSaves = page => page.evaluate(keys => keys.forEach(k => localStorage.removeItem(k)), [progressKey, bookKey, dayKey]);
+
+// A player who only copies the drawn finger: find the cue's target dot (the lowest blush-red pixels under the
+// wire) on the canvas itself, grab the wire above it and pull down to it.
+async function copyDrawnFinger(page) {
+  const handle = await page.waitForFunction(() => {
+    const board = document.querySelector('#board'), c = board.getContext('2d');
+    const { width, height } = board, data = c.getImageData(0, 0, width, height).data;
+    const sx = width / 360, sy = height / 380;
+    let best = null;
+    for (let wy = 262; wy < 372; wy += .5) for (let wx = 30; wx < 330; wx += .5) {
+      const i = (Math.round(wy * sy) * width + Math.round(wx * sx)) * 4;
+      if (Math.abs(data[i] - 0xb6) < 26 && Math.abs(data[i + 1] - 0x51) < 26 && Math.abs(data[i + 2] - 0x32) < 26) best = { x: wx, y: wy };
+    }
+    return best;
+  }, null, { polling: 100, timeout: 30_000 });
+  return handle.jsonValue();
+}
 
 function timingSummary(samples) {
   samples.sort((a, b) => a - b);
@@ -325,14 +344,142 @@ async function run(name, base) {
     const saved = await page.evaluate(key => JSON.parse(localStorage.getItem(key)), progressKey);
     assert.equal(saved.complete, true, 'collecting every plate persists completion');
     assert.equal(saved.next, 6);
+    // Changed on purpose: plates VII-XVIII follow plate VI, so Next goes on instead of back to plate I.
     await page.tap('#next');
     await ready(page);
-    assert.equal((await view(page)).level, 1, 'play again returns to the first plate');
+    assert.equal((await view(page)).level, 7, 'next after plate VI opens plate VII');
     await page.reload();
     await ready(page);
-    assert.equal((await view(page)).level, 6, 'a finished collection retains the last plate after reload');
+    assert.equal((await view(page)).level, 7, 'the book of plates keeps plate VII after reload');
 
-    await page.evaluate(key => localStorage.setItem(key, '{invalid'), progressKey);
+    // A save from before the eighteen plates (only the shipped key) loads and continues at plate VII.
+    await page.evaluate(([key, book]) => { localStorage.setItem(key, JSON.stringify({ v: 1, next: 6, complete: true, sound: true })); localStorage.removeItem(book); }, [progressKey, bookKey]);
+    await page.reload();
+    await ready(page);
+    assert.equal((await view(page)).level, 7, 'an old finished save continues at plate VII');
+    assert.equal(await page.locator('#marks .done').count(), 6, 'an old finished save shows six plates done');
+    // VII: a pull at the drawn grip sounds the second harmonic and opens the tuned pod.
+    const seventh = await view(page);
+    assert.equal(seventh.pods[0].type, 'tuned');
+    await hand.pull(100, 118);
+    await hand.release();
+    await page.waitForFunction(() => window.podwireView().screen === 'won', null, { timeout: 20_000 });
+    assert.match(await page.locator('#count').innerText(), /1 pluck · par 1/);
+    await shot(page, name + '-plate-7-end');
+    // XVII: a tap on the brass peg clamps the wire; a pull left of it leaves the right side still.
+    await page.evaluate(book => localStorage.setItem(book, JSON.stringify({ v: 1, reached: 17, done: false, best: {} })), bookKey);
+    await page.reload();
+    await ready(page);
+    assert.equal((await view(page)).level, 17);
+    const peg = (await view(page)).frets[0];
+    await page.tap('#board', { position: await page.evaluate(([x]) => { const r = document.querySelector('#board').getBoundingClientRect(); return { x: r.width * x / 360, y: r.height * 304 / 380 }; }, [peg.x]) });
+    assert.equal((await view(page)).frets[0].on, true, 'a tap on the peg clamps the wire');
+    await hand.pull(84, 118);
+    await hand.release();
+    assert.equal((await view(page)).plucks, 1, 'the pull beside the clamped fret plucks');
+    let farSide = 0, nearSide = 0;
+    for (let k = 0; k < 10; k++) {
+      await delay(120);
+      const wire = (await view(page)).wire;
+      farSide = Math.max(farSide, ...wire.slice(28, 52).map(Math.abs));
+      nearSide = Math.max(nearSide, ...wire.slice(1, 26).map(Math.abs));
+    }
+    assert.ok(nearSide > 10, 'the near side rings (' + nearSide + ')');
+    assert.ok(farSide < 1, 'the wire beyond the clamped fret stays still (' + farSide + ')');
+    await shot(page, name + '-plate-17-fret');
+    // The language switch on the pause card turns the plate heading Turkish and back.
+    await page.tap('#pause');
+    await page.tap('#lang');
+    assert.match(await page.locator('#number').innerText(), /Levha XVII \/ XVIII/i);
+    assert.equal((await view(page)).lang, 'tr');
+    await shot(page, name + '-09-paused-tr');
+    await page.tap('#lang');
+    assert.match(await page.locator('#number').innerText(), /Plate XVII of XVIII/i);
+    await page.tap('#resume');
+
+    // A long plant name stays on one line, so the board keeps its height (the coordinator's rule, 2026-11-24).
+    const layout = () => page.evaluate(() => {
+      const h = document.querySelector('#species'), lh = parseFloat(getComputedStyle(h).lineHeight) || parseFloat(getComputedStyle(h).fontSize) * 1.05;
+      return { lines: Math.round(h.getBoundingClientRect().height / lh), fits: h.scrollWidth <= h.clientWidth + 1, font: parseFloat(getComputedStyle(h).fontSize),
+        board: document.querySelector('#board').getBoundingClientRect().height, share: document.querySelector('#board').getBoundingClientRect().height / innerHeight };
+    });
+    const shortName = await layout();
+    for (const [level, lang] of [[10, 'en'], [7, 'en'], [12, 'tr'], [10, 'tr']]) {
+      await page.evaluate(([book, level]) => localStorage.setItem(book, JSON.stringify({ v: 1, reached: level, done: false, best: {} })), [bookKey, level]);
+      await page.goto(page.url().replace(/[?].*$/, '') + (lang === 'tr' ? '?lang=tr' : '?lang=en'));
+      await ready(page);
+      assert.equal((await view(page)).level, level);
+      const long = await layout();
+      assert.equal(long.lines, 1, 'plate ' + level + ' (' + lang + ') name on one line');
+      assert.ok(long.fits, 'plate ' + level + ' (' + lang + ') name fits without an ellipsis');
+      assert.ok(long.board >= shortName.board - 1, 'plate ' + level + ' (' + lang + ') board does not shrink (' + long.board + ' vs ' + shortName.board + ')');
+      if (level === 10 && lang === 'en') await shot(page, name + '-plate-10-title');
+    }
+    const boardShare = +shortName.share.toFixed(3);
+    await page.goto(page.url().replace(/[?].*$/, '') + '?lang=en');
+    await ready(page);
+
+    // Today's plate: the same plate and par for everyone on a date; the result can be shared.
+    await page.goto(base + route + '?daily&date=2026-12-04');
+    await ready(page);
+    const day = await view(page);
+    assert.deepEqual([day.mode, day.level], ['daily', 8], 'the daily plate for 2026-12-04 is plate VIII for everyone');
+    await page.waitForFunction(() => window.podwireView().par !== null, null, { timeout: 30_000 });
+    assert.equal((await view(page)).par, 1, 'the daily par is worked out in the page');
+    await hand.pull(74, 118);
+    await hand.release();
+    await page.waitForFunction(() => window.podwireView().screen === 'won', null, { timeout: 20_000 });
+    assert.match(await page.locator('#count').innerText(), /1 pluck · par 1/);
+    assert.equal(await page.locator('#share').isVisible(), true);
+    await shot(page, name + '-10-daily-end');
+    // The share sheet gets the result line and the link; without one, both go to the clipboard.
+    await page.evaluate(() => {
+      window.checkShared = [];
+      Object.defineProperty(navigator, 'share', { configurable: true, value: async data => { window.checkShared.push(data.text + ' ' + data.url); } });
+    });
+    await page.tap('#share');
+    await page.waitForFunction(() => window.checkShared.length === 1);
+    await page.evaluate(() => {
+      Object.defineProperty(navigator, 'share', { configurable: true, value: undefined });
+      Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async text => { window.checkShared.push(text); } } });
+    });
+    await page.tap('#share');
+    await page.waitForFunction(() => window.checkShared.length === 2);
+    for (const line of await page.evaluate(() => window.checkShared)) {
+      assert.match(line, /^Podwire 2026-12-04 · Sweet pea: 1 pluck, par 1 ◆ http:\/\/[^ ]+\/lab\/night-podwire\/\?daily$/, 'shared result line: ' + line);
+    }
+    assert.equal(await page.locator('#status').innerText(), 'Copied');
+    const daySaved = await page.evaluate(key => JSON.parse(localStorage.getItem(key)), dayKey);
+    assert.deepEqual(daySaved.days['2026-12-04'], { plucks: 1, par: 1 });
+    assert.match(await page.locator('#today').innerText(), /✓/);
+    // A second go at today's plate is practice: the first result stands.
+    await page.tap('#next');
+    await ready(page);
+    assert.equal((await view(page)).mode, 'plates', 'Plates leaves today\'s plate');
+    await page.tap('#today');
+    await ready(page);
+    assert.equal((await view(page)).mode, 'daily');
+    await hand.pull(74, 118);
+    await hand.release();
+    await page.waitForFunction(() => window.podwireView().screen === 'won', null, { timeout: 20_000 });
+    assert.match(await page.locator('#status').innerText(), /first result today stands/);
+    assert.deepEqual((await page.evaluate(key => JSON.parse(localStorage.getItem(key)), dayKey)).days['2026-12-04'], { plucks: 1, par: 1 });
+
+    // The first ten seconds, played only from the picture: copy the drawn finger's target on a fresh save.
+    await clearSaves(page);
+    const fresh = performance.now();
+    await page.goto(base + route);
+    if (name === 'webkit') await wakeDisplay(page);
+    await ready(page);
+    const target = await copyDrawnFinger(page);
+    assert.ok(target, 'the drawn target can be found on the canvas');
+    await hand.pull(target.x, target.y - 6);
+    await hand.release();
+    await page.waitForFunction(() => window.podwireView().opened > 0, null, { timeout: 30_000 });
+    const copySeconds = (performance.now() - fresh) / 1000;
+    console.log(name, 'copying the drawn finger opened the first pod after', copySeconds.toFixed(1), 's at', JSON.stringify(target));
+
+    await page.evaluate(([key, book]) => { localStorage.setItem(key, '{invalid'); localStorage.setItem(book, '{invalid'); }, [progressKey, bookKey]);
     await page.reload();
     await ready(page);
     assert.equal((await view(page)).level, 1, 'invalid save recovers');
@@ -365,7 +512,7 @@ async function run(name, base) {
     await page.tap('#sound');
     assert.deepEqual(await page.evaluate(key => JSON.parse(localStorage.getItem(key)), progressKey),
       { v: 1, next: 6, complete: true, sound: true }, 'a stale tab sound tap preserves newer progress and toggles current sound');
-    await page.evaluate(key => localStorage.removeItem(key), progressKey);
+    await clearSaves(page);
 
     // Play recording: the notice is on the page before the first pull; a won plate sends one run record under
     // 'night-podwire'; with the switch off in the pause card the next plate sends nothing.
@@ -381,7 +528,19 @@ async function run(name, base) {
     await waitForRuns(lab, 'night-podwire', 1);
     const recorded = assertRun(lab, 'night-podwire', { outcomes: ['won'], summaryKeys: ['plate', 'plucks', 'opened'] });
     assert.deepEqual(recorded.data.events.map(e => e.type), ['plate-complete']);
-    await page.evaluate(key => localStorage.removeItem(key), progressKey);
+    assert.equal(recorded.data.summary.mode, 'plates');
+    // The daily plate is recorded the same way, marked with its mode and par.
+    await page.goto(base + route + '?labRunSource=agent&daily&date=2026-12-04');
+    await ready(page);
+    await page.waitForFunction(() => window.podwireView().par !== null, null, { timeout: 30_000 });
+    await hand.pull(74, 118);
+    await hand.release();
+    await page.waitForFunction(() => window.podwireView().screen === 'won', null, { timeout: 20_000 });
+    await waitForRuns(lab, 'night-podwire', 2);
+    const dailyRun = assertRun(lab, 'night-podwire', { outcomes: ['won'], count: 2, summaryKeys: ['plate', 'plucks', 'mode', 'par'] });
+    assert.deepEqual([dailyRun.data.summary.mode, dailyRun.data.summary.plate, dailyRun.data.summary.par], ['daily', 8, 1]);
+    await clearSaves(page);
+    await page.goto(base + route + '?labRunSource=agent');
     await page.reload();
     await ready(page);
     await page.tap('#pause');
@@ -391,7 +550,7 @@ async function run(name, base) {
       await hand.release();
       await page.waitForFunction(() => window.podwireView().screen === 'won');
     } });
-    await page.evaluate(key => localStorage.removeItem(key), progressKey);
+    await clearSaves(page);
     await page.evaluate(() => localStorage.removeItem('hf-lab-recording-off'));
 
     // A blocked write still permits play and progression for this visit.
@@ -410,12 +569,33 @@ async function run(name, base) {
     assert.ok(assets.has('/notes/button.js'), 'tester notes script loaded');
     assert.deepEqual(errors, [], 'browser errors');
     assert.deepEqual(unapproved, [], 'unexpected requests');
-    console.log(name, JSON.stringify({ firstWinSeconds: +seconds.toFixed(3), plucks: won.plucks,
+    // Frame budget at 390x844 on both engines: today's par being worked out inside the frame, then a ringing wire.
+    const budgetContext = await browser.newContext({ ...profile, viewport: { width: 390, height: 844 } });
+    const budget = await budgetContext.newPage();
+    await budget.addInitScript(() => {
+      const requestFrame = window.requestAnimationFrame.bind(window);
+      window.checkFrames = { work: [] };
+      window.requestAnimationFrame = callback => callback.name !== 'frame' ? requestFrame(callback)
+        : requestFrame(now => { const began = performance.now(); callback(now); window.checkFrames.work.push(performance.now() - began); });
+    });
+    await budget.goto(base + route + '?daily&date=2026-11-27');
+    if (name === 'webkit') await wakeDisplay(budget);
+    await ready(budget);
+    await budget.waitForFunction(() => window.podwireView().par !== null, null, { timeout: 30_000 });
+    const budgetHand = await finger(budget, name);
+    await budgetHand.pull(186, 118);
+    await budgetHand.release();
+    await delay(3000);
+    const budgetFrames = timingSummary((await budget.evaluate(() => window.checkFrames.work)).slice(5));
+    await budgetContext.close();
+    assert.ok(budgetFrames.p95 < 8, 'page work per frame at 390x844 stays under 8 ms (p95 ' + budgetFrames.p95 + ')');
+
+    console.log(name, JSON.stringify({ budget390x844: budgetFrames, firstWinSeconds: +seconds.toFixed(3), plucks: won.plucks,
       opened: won.opened, total: won.total, campaignPlucks: campaign,
       portraitBoardWidth: +portraitBoard.width.toFixed(2), landscapeBoardWidth: +landscapeBoard.width.toFixed(2),
       openingTiming: { work: timingSummary(openingFrames.work), intervals: timingSummary(openingFrames.intervals) },
       laterTiming: { work: timingSummary(laterFrames.work), intervals: timingSummary(laterFrames.intervals) },
-      errors: errors.length, unexpectedRequests: unapproved.length }));
+      copySeconds: +copySeconds.toFixed(1), boardShare, errors: errors.length, unexpectedRequests: unapproved.length }));
   } finally {
     await browser.close();
   }

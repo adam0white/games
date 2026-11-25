@@ -1,9 +1,12 @@
-// Checks and measured play: node experiments/ant-promotion/bots.mjs [seeds] [minutes] [--mutate[=gait|clamp|spine]]
+// Checks and measured play: node experiments/ant-promotion/bots.mjs [seeds] [minutes] [--mutate[=gait|clamp|spine|rocks]] [--ref=<main's sim.js>]
 // 0. the Living look's rig and drawing (rig-bots.mjs, run first; --mutate breaks the rig, runs only those checks and fails)
+// 0b. cover: rocks and tall grass (cover-bots.mjs, run second; --mutate=rocks makes rocks see-through, runs only its rule checks and fails)
 // 1. the contact rule, every cell   2. the form tree   3. food exists for every form   4. bots play
 // 5. the rival: a death makes one, it persists and gains power, no animal eats it, temperaments differ, it can be eaten
 import assert from 'node:assert/strict';
+import { SKILLS, skillFor } from './skills.js';
 import './rig-bots.mjs';
+import './cover-bots.mjs';
 import { SPAWN_WEIGHTS, HIDE_S, hideReady, SAME_FAST, FAST_CAP, crown, powerOf, nemesisMob, nemesisSave, cleanKnobs, TEMPERAMENT_NAMES, NEM_STEP, NEM_MAX_BONUS, NEM_PRIZE, MOBS,
   FORMS, ANT, TOP, CONE, encounter, create, step, choose, revive, me, level, catchable, optionsFor, article, chasePace, PACE_UP, PREY, TIRE, POWER, powerFor, powerReady, POUNCE, pounces, sightOf, placeOld, OLD_EVERY, OLD_HUNT, OLD_WEAK, OLD_PRIZE, OLD_SKILL, WORLD } from './sim.js';
 const args = process.argv.slice(2).filter(a => !a.startsWith('--')), seeds = Number(args[0] ?? 20), minutes = Number(args[1] ?? 12);
@@ -142,15 +145,8 @@ console.log('wild rules: hide and hunt checks pass; hunters tire');
   const as = (name, wild = false) => { const s = create(3, [ANT, named(name).id], 0, SPAWN_WEIGHTS, wild); s.player.safe = 0; s.mobs.length = 0; return s; };
   // no input, no power: the sim is unchanged for the other bots
   { const s = as('Wasp'); s.mobs.push(mob(named('Dog'), s.player.x + 60, s.player.y)); step(s, { x: 0, y: 0 }); assert.equal(s.powers, 0); assert.equal(s.player.cd || 0, 0); }
-  // sting: a stronger animal in reach is stunned, cannot bite, wakes up; then the wait runs down
-  { const s = as('Wasp'), p = s.player, dog = mob(named('Dog'), p.x + 60, p.y); s.mobs.push(dog);
-    step(s, { x: 0, y: 0, power: true }); assert.ok(dog.stun > 0 && !dog.alert, 'sting stuns the nearest animal'); assert.equal(s.powers, 1); assert.ok(Math.abs(p.cd - POWER.sting.cd) < 0.05);
-    assert.equal(powerReady(s), false); dog.x = p.x + 3; step(s, { x: 0, y: 0, power: true }); assert.equal(s.dead, null, 'a stunned animal cannot bite'); assert.equal(s.powers, 1, 'no second use while waiting');
-    for (let i = 0; i < 60 * POWER.sting.stun + 5; i++) { dog.x = p.x + 400; dog.y = p.y; if (!s.mobs.includes(dog)) s.mobs.push(dog); s.mobs.length = 1; step(s, null); } assert.ok(!(dog.stun > 0), 'the stun ends');
-    for (let i = 0; i < 60 * POWER.sting.cd; i++) step(s, null); assert.equal(powerReady(s), true, 'ready again after the wait'); }
-  { const s = as('Wasp'); step(s, { x: 0, y: 0, power: true }); assert.equal(s.powers, 0, 'a sting with nothing in reach is not spent'); assert.ok(s.player.cd <= 1); }
   // leap: moves at once along the heading, safe in the air
-  { const s = as('Frog'), p = s.player; step(s, { x: 1, y: 0 }); const x0 = p.x; step(s, { x: 1, y: 0, power: true }); assert.ok(p.x - x0 > POWER.leap.jump, `a leap covers ${Math.round(p.x - x0)} units at once`); assert.ok(p.safe > 0); }
+  { const s = as('Rabbit'), p = s.player; step(s, { x: 1, y: 0 }); const x0 = p.x; step(s, { x: 1, y: 0, power: true }); assert.ok(p.x - x0 > POWER.leap.jump, `a leap covers ${Math.round(p.x - x0)} units at once`); assert.ok(p.safe > 0); }
   // shell: a bite does nothing while it lasts
   { const s = as('Turtle'), p = s.player, big = mob(named('Bear'), p.x + 3, p.y); s.mobs.push(big); step(s, { x: 0, y: 0, power: true }); for (let i = 0; i < 60 * (POWER.shell.time - 0.2); i++) { big.x = p.x + 3; big.y = p.y; step(s, null); } assert.equal(s.dead, null, 'the shell holds');
     for (let i = 0; i < 60 * POWER.shell.daze + 30 && !s.dead; i++) { big.x = p.x + 3; big.y = p.y; step(s, null); } assert.ok(s.dead, 'and then it does not, once the biter wakes'); }
@@ -165,23 +161,76 @@ console.log('wild rules: hide and hunt checks pass; hunters tire');
     for (let i = 0; i < 60 * POWER[kind].time + 2; i++) { s.mobs.length = 0; step(s, null); } x0 = p.x; step(s, { x: 1, y: 0 }); assert.ok(Math.abs(p.x - x0 - plain) < 1e-6, 'and then the plain speed again');
   }
   // hunting uses: a leap pins weaker animals where it lands and no others; a sprint catches prey that is faster and has noticed; a bitten shell dazes the biter
-  { const s = as('Frog'), p = s.player; step(s, { x: 1, y: 0 }); const d = POWER.leap.jump + me(s).r * 3, prey = mob(named('Beetle'), p.x + d + 20, p.y, { alert: true }), far = mob(named('Beetle'), p.x + d + 200, p.y, { id: 2 }), big = mob(named('Bear'), p.x + d + 20, p.y + 30, { id: 3, a: 0 }); s.mobs.push(prey, far, big);
+  { const s = as('Rabbit'), p = s.player; step(s, { x: 1, y: 0 }); const d = POWER.leap.jump + me(s).r * 3, prey = mob(named('Beetle'), p.x + d + 20, p.y, { alert: true }), far = mob(named('Beetle'), p.x + d + 200, p.y, { id: 2 }), big = mob(named('Bear'), p.x + d + 20, p.y + 30, { id: 3, a: 0 }); s.mobs.push(prey, far, big);
     step(s, { x: 1, y: 0, power: true }); assert.ok(prey.stun > 0 && !(far.stun > 0) && !(big.stun > 0), 'a leap pins weaker animals by the landing only'); }
-  for (const boosted of [false, true]) { const s = as('Panther'), p = s.player, F = me(s), quick = FORMS.filter(f => f.power < F.power && f.speed > F.speed && f.speed < F.speed * POWER.sprint.speed).pop(); assert.ok(quick, 'there is prey faster than a Panther');
-    const m = mob(quick, p.x + 2, p.y, { alert: true, timer: 99 }); s.mobs.push(m); const n = s.eaten; step(s, { x: 0, y: 0, power: boosted }); m.x = p.x + 2; m.y = p.y; if (s.mobs.includes(m)) step(s, { x: 0, y: 0 });
-    assert.equal(s.eaten - n, boosted ? 1 : 0, boosted ? 'a sprinting Panther catches faster prey' : 'a plain Panther does not'); }
   { const s = as('Turtle'), p = s.player, big = mob(named('Bear'), p.x + 3, p.y, { alert: true }); s.mobs.push(big); step(s, { x: 0, y: 0, power: true }); big.x = p.x + 3; big.y = p.y; step(s, null); assert.ok(big.stun > 0 && !s.dead, 'biting a shell dazes the biter'); }
   // found by a second reviewer: a leap pressed with a new direction goes that way; a stunned hunter does not eat its prey; a promotion ends the old animal's sprint
-  { const s = as('Frog'), p = s.player; step(s, { x: 1, y: 0 }); const x0 = p.x, y0 = p.y; step(s, { x: 0, y: 1, power: true }); assert.ok(p.y - y0 > POWER.leap.jump && Math.abs(p.x - x0) < 1, 'the leap follows the stick of the same step'); }
-  { const s = as('Wasp'), p = s.player, hunter = mob(named('Dog'), p.x + 60, p.y), prey = mob(named('Beetle'), p.x + 62, p.y, { id: 2 }); hunter.chase = prey; s.mobs.push(hunter, prey); const n = s.mobEats;
-    step(s, { x: 0, y: 0, power: true }); for (let i = 0; i < 30; i++) { hunter.chase = prey; step(s, null); } assert.ok(hunter.stun > 0); assert.equal(s.mobEats, n, 'a stunned hunter does not eat'); }
+  { const s = as('Rabbit'), p = s.player; step(s, { x: 1, y: 0 }); const x0 = p.x, y0 = p.y; step(s, { x: 0, y: 1, power: true }); assert.ok(p.y - y0 > POWER.leap.jump && Math.abs(p.x - x0) < 1, 'the leap follows the stick of the same step'); }
   { const s = as('Cheetah'), p = s.player; step(s, { x: 1, y: 0, power: true }); s.choosing = optionsFor(3); choose(s, 0); assert.ok(!(p.boost > 0) && !(p.veil > 0), 'a promotion ends the old sprint'); }
   // a promotion and a revive both reset the wait
   { const s = as('Wasp'); s.mobs.push(mob(named('Dog'), s.player.x + 60, s.player.y)); step(s, { x: 0, y: 0, power: true }); s.choosing = optionsFor(3); choose(s, 0); assert.equal(s.player.cd, 0); }
+  // 4c. Every animal has its own skill (note #238): no two alike, and each one's effect shown on a small stage
+  { const list = FORMS.filter(f => f.level > 1).map(skillFor); assert.equal(list.length, 51); assert.ok(list.every(Boolean)); assert.equal(new Set(list.map(k => k.label)).size, 51, '51 names'); assert.equal(new Set(list.filter(k => !k.kept).map(k => String(k.use))).size, 46, '46 rules of their own'); assert.equal(new Set(list.filter(k => k.kept).map(k => powerFor(named(k.name)).kind)).size, 5, 'and the five kept ones differ'); }
+  const W0 = name => { const me1 = named(name); return { weakF: FORMS.filter(f => f.level === Math.max(1, me1.level - 1) && f.power < me1.power)[0], strongF: FORMS.find(f => f.level === Math.min(TOP, me1.level + 2) && f.power > me1.power) || me1 }; };
+  const stage = (name, mobs) => { const s = as(name), p = s.player; p.safe = 0; p.a = 0; let id = 100; s.placed = mobs.map(([k, x, y, extra = {}]) => { const m = mob(k === 'weak' ? W0(name).weakF : W0(name).strongF, p.x + x, p.y + (y || 0), { id: id++, a: 0, ...extra }); if (k === 'strong' && powerOf(m) <= me(s).power) m.bonus = 15; s.mobs.push(m); return m; }); return s; };
+  const press = s => step(s, { x: 0, y: 0, power: true }), go = (s, n, inp = { x: 0, y: 0 }) => { for (let i = 0; i < n; i++) { for (let j = s.mobs.length - 1; j >= 0; j--) if (!s.placed.includes(s.mobs[j])) s.mobs.splice(j, 1); if (s.choosing || s.dead) return; step(s, inp); } };
+  const far = (s, m) => Math.hypot(m.x - s.player.x, m.y - s.player.y);
+  const OWN = {
+    Beetle() { const s = stage('Beetle', [['strong', 90]]), [m] = s.placed, d = far(s, m); press(s); go(s, 60); assert.ok(far(s, m) > d + 60 && !s.dead); },
+    'Fire Ant'() { const s = stage('Fire Ant', [['weak', 150, 0, { a: 0 }]]), [m] = s.placed, e = s.eaten; press(s); go(s, 120); assert.ok(s.eaten > e || far(s, m) < 80); },
+    Spider() { const s = stage('Spider', [['strong', 60, 0, { a: 0, walk: true }]]), [m] = s.placed, x = m.x; press(s); go(s, 30); const slow = m.x - x; const s2 = stage('Spider', [['strong', 60, 0, { a: 0, walk: true }]]); const x2 = s2.placed[0].x; go(s2, 31); assert.ok(Math.abs(slow) < Math.abs(s2.placed[0].x - x2) * 0.6); },
+    Scorpion() { const s = stage('Scorpion', [['strong', 80]]), [m] = s.placed, was = powerOf(m); press(s); assert.equal(powerOf(m), Math.max(1, was - 25)); assert.ok(powerOf(m) < me(s).power); go(s, 60 * 7 + 2); assert.equal(powerOf(m), was); },
+    Wasp() { const s = stage('Wasp', [['strong', 60]]), [m] = s.placed; press(s); m.x = s.player.x + 3; m.y = s.player.y; go(s, 5); assert.equal(s.dead, null); go(s, 60 * 6); m.x = s.player.x + 3; m.y = s.player.y; go(s, 2); assert.ok(s.dead); },
+    Mantis() { for (const still of [true, false]) { const s = stage('Mantis', [['strong', 300]]), [m] = s.placed; m.bonus = me(s).power + 5 - named('Mantis').power - (FORMS[m.f].power - named('Mantis').power); press(s); m.x = s.player.x + 5; m.y = s.player.y; go(s, 1, still ? { x: 0, y: 0 } : { x: 0.5, y: 0 }); assert.equal(s.eaten, still ? 1 : 0); assert.equal(!!s.dead, !still); } },
+    Crab() { const s = stage('Crab', [['strong', 60]]), [m] = s.placed; press(s); go(s, 60, { x: 0, y: 1 }); assert.ok(far(s, m) < 60 && !s.dead, 'dragged along'); },
+    Mouse() { const s = stage('Mouse', [['weak', 200, 60]]), [m] = s.placed; press(s); go(s, 60, { x: -1, y: 0 }); assert.ok(Math.hypot(m.x - s.items[0].x, m.y - s.items[0].y) < 170); },
+    Frog() { const s = stage('Frog', [['weak', 120]]), e = s.eaten; press(s); assert.equal(s.eaten, e + 1); const b = stage('Frog', [['weak', -120]]); press(b); assert.equal(b.eaten, 0, 'not behind'); },
+    Mole() { const s = stage('Mole', [['strong', 5]]); press(s); go(s, 200); assert.equal(s.dead, null); },
+    Lizard() { const s = stage('Lizard', [['strong', 200, 40]]), [m] = s.placed; press(s); go(s, 90, { x: -1, y: 0 }); assert.ok(Math.hypot(m.x - s.items[0].x, m.y - s.items[0].y) < 100 && !m.alert); },
+    Bat() { const s = stage('Bat', [['weak', 60, 0, { a: Math.PI }]]), [m] = s.placed; press(s); go(s, 10); assert.equal(m.alert, false); const b = stage('Bat', [['weak', 60, 0, { a: Math.PI }]]); go(b, 10); assert.equal(b.placed[0].alert, true); },
+    Porcupine() { const s = stage('Porcupine', [['strong', 5]]), [m] = s.placed; press(s); go(s, 5); assert.ok(!s.dead && far(s, m) > 100); },
+    Squirrel() { const s = stage('Squirrel', []); press(s); assert.equal(s.items.length, 4); s.items[0].x = s.player.x; s.items[0].y = s.player.y; const x = s.player.xp; go(s, 1); assert.equal(s.player.xp, x + 1); },
+    Snake() { const s = stage('Snake', [['weak', 180, 0]]), [m] = s.placed; press(s); const d = far(s, m); go(s, 90); assert.ok(far(s, m) < d - 30 || s.eaten); },
+    Owl() { const R = k => stage('Owl', [['strong', k, 0, { a: Math.PI }]]); const r = FORMS[R(1).placed[0].f].range * sightOf(FORMS[R(1).placed[0].f])[0] * 0.6; const a = R(r); go(a, 3); const b = R(r); press(b); go(b, 3); assert.ok(a.placed[0].alert && !b.placed[0].alert); },
+    Badger() { const s = stage('Badger', [['strong', 60]]), [m] = s.placed; press(s); go(s, 60); assert.ok(far(s, m) >= 119 && !s.dead); },
+    Cat() { const s = stage('Cat', [['strong', 5]]), [m] = s.placed; press(s); go(s, 3); assert.ok(!s.dead && s.player.safe > 0); s.player.safe = 0; m.fx = null; m.x = s.player.x + 3; m.y = s.player.y; go(s, 2); assert.ok(s.dead, 'only once'); },
+    Fox() { const s = stage('Fox', [['strong', 150, 0, { alert: true, a: Math.PI }]]), [m] = s.placed; press(s); go(s, 60); assert.ok(!m.alert && m.fx?.go === 'to' && s.items[0].k === 'fox'); },
+    Dog() { const s = stage('Dog', [['strong', 120]]), [m] = s.placed; press(s); const d = far(s, m); go(s, 60); assert.ok(far(s, m) > d + 40); },
+    Lynx() { const s = stage('Lynx', [['strong', 70, 0, { a: Math.PI }]]), [m] = s.placed; press(s); go(s, 5); assert.equal(m.alert, false); const x = s.player.x; go(s, 10, { x: -1, y: 0 }); assert.ok(x - s.player.x < me(s).speed / 6 * 0.8); },
+    Boar() { const s = stage('Boar', [['strong', 40]]), x = s.player.x; press(s); go(s, 40, { x: 0, y: 1 }); assert.ok(!s.dead && s.player.x - x > me(s).speed * 0.6 * 1.5); },
+    Deer() { const s = stage('Deer', [['strong', 100], ['weak', 260, 100]]), [m, o] = s.placed; press(s); assert.equal(m.fx.at, o); assert.equal(m.alert, false); },
+    Wolf() { const s = stage('Wolf', [['weak', 150, 0, { a: 0 }]]); press(s); go(s, 120); assert.ok(s.eaten >= 1, 'the pack brings one down'); },
+    Gorilla() { const s = stage('Gorilla', []), p0 = me(s).power; press(s); go(s, 1); assert.equal(me(s).power, p0 + 12); go(s, 310); assert.equal(me(s).power, p0); },
+    Ostrich() { const s = stage('Ostrich', [['strong', 80, 0, { a: Math.PI }]]), [m] = s.placed; press(s); go(s, 5); assert.equal(m.alert, false); },
+    Panther() { const s = stage('Panther', [['strong', 5, 0, { a: 0 }]]), [m] = s.placed; m.bonus = 15 - (FORMS[m.f].power - me(s).power); m.a = 0; m.x = s.player.x + 5; press(s); go(s, 1); assert.ok(s.eaten === 1 && !s.dead); },
+    Crocodile() { const s = stage('Crocodile', [['strong', 40]]), [m] = s.placed; m.bonus = 5 - (FORMS[m.f].power - me(s).power); press(s); go(s, 90); assert.ok(s.eaten === 1 && !s.dead); },
+    Python() { const s = stage('Python', [['weak', 100, 0, { a: 0, alert: true }]]), [m] = s.placed, x0 = s.player.x, y0 = s.player.y; press(s); go(s, 90); assert.ok(Math.hypot(m.x - x0, m.y - y0) <= 151); },
+    Bear() { const s = stage('Bear', [['strong', 5]]), x = s.player.x, xp = s.player.xp; press(s); go(s, 140, { x: 1, y: 0 }); assert.ok(!s.dead && s.player.x === x); s.mobs.length = 0; s.placed = []; go(s, 20); assert.equal(s.player.xp, xp + 3); },
+    Zebra() { const s = stage('Zebra', [['strong', 120, 0, { a: Math.PI, alert: true }]]), [m] = s.placed; press(s); go(s, 5); assert.equal(m.alert, false); },
+    Tiger() { const s = stage('Tiger', [['weak', 150]]), [m] = s.placed; press(s); m.x = s.player.x; m.y = s.player.y; const xp = s.player.xp; go(s, 1); assert.equal(s.player.xp - xp, 9); },
+    Hippo() { const s = stage('Hippo', [['weak', 70]]), n = me(s).r; press(s); go(s, 1); assert.ok(s.eaten === 1, 'bites wide ' + n); },
+    Komodo() { const s = stage('Komodo', [['strong', 90]]), [m] = s.placed; m.bonus = 5 - (FORMS[m.f].power - me(s).power); press(s); s.player.x -= 400; go(s, 250); assert.ok(m.gone && s.items.some(i => i.k === 'meal')); },
+    Elephant() { const s = stage('Elephant', [['strong', 120], ['strong', -120]]), [m, n] = s.placed, d = far(s, n); press(s); assert.ok(far(s, m) > 270 && Math.abs(far(s, n) - d) < 10); },
+    Giraffe() { const s = stage('Giraffe', []); press(s); assert.ok(s.player.fx.view > 1); },
+    Sabertooth() { const s = stage('Sabertooth', [['weak', 90, 0, { a: 0 }]]), [m] = s.placed, xp = s.player.xp; press(s); for (let i = 0; i < 200; i++) { m.x = s.player.x + 90; m.y = s.player.y; go(s, 1); } assert.ok(s.player.xp >= xp + 2 && s.player.xp <= xp + 4); },
+    'T-Rex'() { const s = stage('T-Rex', [['strong', 150, 0, { a: 1, want: 3, alert: false }]]), [m] = s.placed; press(s); go(s, 60); assert.ok(Math.abs(m.a - 1) < 0.05); },
+    Raptor() { const s = stage('Raptor', [['weak', 200, 0, { alert: true, a: 0 }]]), [m] = s.placed; press(s); const d = far(s, m); go(s, 90); assert.ok(far(s, m) < d || s.eaten); },
+    Pterodactyl() { const s = stage('Pterodactyl', [['strong', 60]]), [m] = s.placed; press(s); assert.ok(far(s, m) > 500); },
+    Yeti() { const s = stage('Yeti', [['strong', 120, 0, { alert: true, a: Math.PI }]]), [m] = s.placed; press(s); go(s, 5); assert.ok(!m.alert && m.winded > 3); },
+    Griffin() { const s = stage('Griffin', [['strong', 5]]); press(s); go(s, 200); assert.equal(s.dead, null); },
+    Basilisk() { const s = stage('Basilisk', [['strong', 120, 0, { a: Math.PI, alert: true }]]), [m] = s.placed; press(s); go(s, 30); assert.ok(!m.alert && Math.abs(m.a) < 0.3); },
+    Dragon() { const s = stage('Dragon', [['weak', 120]]), [m] = s.placed; press(s); assert.ok(m.gone && s.items[0].k === 'meal' && s.items[0].xp > 0); },
+    Thunderbird() { const s = stage('Thunderbird', [['weak', 180]]), [m] = s.placed; press(s); go(s, 60); assert.ok(far(s, m) < 160 && Math.abs(m.y - s.player.y) > 30); },
+    Hydra() { const s = stage('Hydra', [['weak', 60], ['weak', -80], ['weak', 0, 90], ['weak', 0, -90]]); press(s); assert.equal(s.eaten, 3); },
+  };
+  for (const [name, k] of Object.entries(SKILLS)) if (!k.kept) { assert.ok(OWN[name], name + ' has a test'); try { OWN[name](); } catch (e) { console.error('SKILL FAILS', name, e.message.slice(0, 120)); process.exitCode = 1; } }
+  { const s = stage('Scorpion', [['strong', 400]]); press(s); assert.equal(s.powers, 0, 'nothing in reach: not spent'); assert.ok(s.player.cd <= 1); }
+  { const s = stage('Gorilla', []); press(s); s.choosing = optionsFor(11); choose(s, 0); assert.equal(s.player.fx, null, 'a promotion ends the old skill'); }
+  console.log('51 animals, 51 skills: each effect shown');
   // a bot that uses its power when a hunter has noticed it, or (roar) when two weaker animals are close
-  const withPower = s => { const inp = careful(s); if (powerReady(s)) { const p = s.player, F = me(s), W = powerFor(F); let danger = false, prey = 0;
+  const withPower = s => { const inp = careful(s); if (powerReady(s)) { const p = s.player, F = me(s), W = skillFor(F); let danger = false, prey = 0;
       for (const m of s.mobs) { const d = Math.hypot(m.x - p.x, m.y - p.y); if (powerOf(m) > F.power && m.alert && d < 130) danger = true; if (powerOf(m) < F.power && d < 200) prey++; }
-      inp.power = W.kind === 'roar' ? prey >= 2 : danger; } return inp; };
+      inp.power = W.name === 'Lion' ? prey >= 2 : danger || prey >= 3; } return inp; };
   for (const wild of [false, true]) for (const pick of [0, 1, 2]) { const tops = [], deaths = []; let used = 0;
     for (let seed = 1; seed <= seeds; seed++) { const s = create(seed, [ANT], 0, SPAWN_WEIGHTS, wild); let top = 1, dead = 0;
       for (let i = 0; i < minutes * 3600; i++) { step(s, withPower(s)); if (s.choosing) choose(s, pick); if (s.dead) { dead++; revive(s, false); } top = Math.max(top, level(s)); if (s.won) break; }

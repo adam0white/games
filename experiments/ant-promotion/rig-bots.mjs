@@ -15,7 +15,8 @@ import { update, numbers, mutate } from './rig.js';
 import { speciesFor, creature, drawCreature } from './creature.js';
 import { living, portraitLiving } from './living.js';
 
-const arg = process.argv.find(a => a.startsWith('--mutate'));
+const RIG_MUTATIONS = ['gait', 'clamp', 'spine'], asked = process.argv.find(a => a.startsWith('--mutate'));
+const arg = asked && RIG_MUTATIONS.includes(asked.split('=')[1] || 'gait') ? asked : null; // other names (rocks) belong to bots.mjs section 7
 if (arg) { const m = arg.split('=')[1] || 'gait'; mutate(m); console.log(`MUTATION ON: ${m}`); }
 let failed = 0;
 const claim = (ok, text) => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${text}`); if (!ok) failed++; };
@@ -167,7 +168,8 @@ function ride(seed, secs, L, stack = [ANT], nem = null, old = []) { // a run as 
   claim(a.m.nan === 0 && a.m.seg < 1e-6 && a.m.chain < 1e-6 && a.m.stretch <= 0.98 + 1e-9, `on the real sim: up to ${a.most} rigs at once near the player, ${took.toFixed(1)} s for ${secs * 60} ticks; no NaN, worst segment error ${(a.m.seg * 100).toExponential(1)}%, worst foot ${(a.m.stretch * 100).toFixed(1)}% of leg`);
   const count = k => a.seen[k] || 0;
   console.log(`     body language seen (rig-ticks): ${Object.entries(a.seen).sort().map(([k, v]) => `${k} ${v}`).join(', ')}`);
-  claim(count('crouch') > 0 && count('quick') > 0 && count('stretch') > 0 && count('pant') > 0, `in a real run animals crouch (${count('crouch')}), stretch out (${count('stretch')}), take quick steps (${count('quick')}) and pant (${count('pant')})`);
+  // No crouch here: on this seed every crouch was a stun by a player's skill, and since note #238 only the Lion's skill stuns. The runs with a rival below still need crouches that are not stuns.
+  claim(count('quick') > 0 && count('stretch') > 0 && count('pant') > 0, `in a real run animals crouch (${count('crouch')}, stuns only), stretch out (${count('stretch')}), take quick steps (${count('quick')}) and pant (${count('pant')})`);
 }
 { // the same with a rival and old animals: pounces, wind-ups, skills and a temperament on rigs against the real sim, rules unchanged
   const at = (level, role) => FORMS.find(f => f.level === level && f.role === role).id; // a fast animal is what gets pounced on
