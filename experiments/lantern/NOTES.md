@@ -766,7 +766,7 @@ Not verified: tilt, slide and the tutorial on a real phone; whether a new player
 ## How a mode plugs in
 
 A mode is a way to play Lantern's river with other rules on top, chosen in the "Game mode" group and played inside `/lantern/`.
-Spark is the first. Tide, Duet and Race will follow the same pattern.
+Spark is the first, Tide the second. Duet and Race will follow the same pattern.
 
 **Files.** A mode is `modes/<id>.js`, plus any rules of its own (`modes/<id>-sim.js`) and bots (`modes/<id>-bots.mjs`).
 A mode's rules wrap Lantern's `sim.js` state. They never edit `sim.js`.
@@ -791,7 +791,8 @@ With `mod === null`, every line of index.html runs as it did before modes. `bots
 | `hello()` | the line said as a run starts |
 | `pauseLine()` | the pause card's line |
 | `end()` | at the end of a run, after the embers are banked: saves the mode's own progress and returns `{ title, line, go }` for the end card |
-| `draw(now, day)` | each frame instead of the page's drawing (2D only). `day` is 0 to 1 after dawn |
+| `draw(now, day)` | optional. Each frame instead of the page's drawing (2D only). `day` is 0 to 1 after dawn |
+| `water(now)` | optional, for a mode without `draw` (Tide, 2026-11-24): each frame, on the page's own flat river after the current streaks and before the rocks and the dark. The mode draws on `page.g()` in the page's transform |
 | `frame(dt, now, live)` | each frame, for the mode's own sound and timers |
 | `screen(name, box)` | when the page changes screens (show or hide the mode's own buttons; going to `menu` ends the mode) |
 | `state()`, `game()` | for the browser checks (`window.lanternMode()`, `window.lanternSpark()`) |
@@ -850,3 +851,56 @@ Two tips, once per player: fireflies over safe water (night 1), a gap in the sta
 The lab page moved to `archive/lab/lantern-spark/`. Its old address goes to `/lantern/?mode=spark` (`labMoved` in `worker-settings.mjs`, added in this branch with the lead's leave). The worker adds the old address's own query after it (`?mode=spark?lang=tr`), so the page reads the mode up to a second `?`; the old `lang` is lost on that hop.
 
 **The ember melody in Spark** (kit/music.js, merged the same day). With Music on, an ember taken in Spark plays the next note of the night's melody, as in any run, and a passed ember counts as a missed note. The end card shows the melody share under the same rule as a night (Music on, at least four notes laid). `song.start()` resets the counts every run, so a Spark run does not change a later night's share.
+
+## 2026-11-24: Tide is a mode inside Lantern (owner, lab cleanup: fold it "but improve")
+
+**What the player sees.** "Game mode", then "Lantern Tide", opens Tide's card: five stages with their stars, the stage's one new idea, Play, Back.
+A bright channel of fast water winds down the river, with flecks running in it. In the channel the boat runs faster and the flame holds; in slack water it burns down.
+An ember path along the channel opens every stage. Stage by stage: the bright water; shoulders of rock (fast water squeezed round rocks); the lee
+(the tide goes slack in stretches, and the still, warm water behind a rock relights the wick); the tide turns (the channel slides across with time); ice.
+The end card says why a run ended, how far it got and the best so far on that stage, or at dawn how long was spent in bright water and the next stage's idea.
+
+**The lab page played cold first (390x844, Chromium), and its five weakest things.** Each has a fix in the mode.
+1. The first seconds punished instead of taught: a boat left alone lost its first hull at about 4.8 s and the run at 10.3 s, with rocks on screen at once.
+   Fix: no rock in the first 4.5 river units of any stage; for the first 6 s the bank holds the boat in instead of costing a hull; an ember path lies along the channel,
+   so following the embers finds the fast water without a word. Hands off, no blow comes before 3.6 s on any of 120 seeds and stage (median 6 to 9 s), and the boat lasts 11 s (median).
+2. Reading the water decided little on night 1: 192 bot runs on the lab page ended dark only once; the flame rule hardly mattered.
+   Fix: the flame burns 0.12 a second in slack water and 5% of that in the channel. On stage 1 the bot that reads the water reaches dawn on 120 of 120 seeds; the same bot blind to the water on 73%, and goes dark on 33 seeds.
+3. A cliff: the lab's own bots went 48/48 on night 1 to 22/48 (reader) and 9/48 (plain) on night 2; with a 300 ms delay, 29/48 to 0/48.
+   Fix: five stages; the careful bot that acts 300 ms late reaches dawn on 100, 92, 78, 69, 53% (120 seeds). No step is more than 20 points.
+4. Everything arrived at once, and the eddy rings looked like Lantern's whirlpools, which pull the boat in.
+   Fix: one new idea a stage (above). A lee is drawn as still, warm water with level ripples; a whirlpool spins and is dark in the middle. Rocks are a share of Lantern's (0.45 to 0.55) so the water can be read between them.
+5. The end card said only "Boat lost / 29% to dawn": no cause, no best; two fixed nights; English only.
+   Fix: the cause and the best on the card; five stages with three stars each (dawn, no blow, bright water half the night); English and Turkish.
+
+**What each stage's bot claim shows** (`node bots.mjs tide`, 120 seeds a case; the "late" bot acts 300 ms late and leaves more room round rocks and banks):
+- stage 1, bright water: reader 100% against 73% blind (above).
+- stage 2, shoulders: the late reader rides 31.3 s of fast water a run against 16.6 s blind. No lee yet: nothing relights.
+- stage 3, the lee: the late reader that rests in lees reaches dawn on 78%, the same bot passing them by on 43%.
+- stage 4, the turn: at one spot the channel slides 0.36 half-widths in 3 s (stage 3: 0.10). A bot reading the water as it was 2 s before rides 20.2 s of fast water against 23.5 s (a small effect; see below).
+- stage 5: ice comes, and no stage before has it.
+- `--mutate` makes the channel burn the flame instead of saving it; six claims fail and the run exits 1.
+
+**Rules.** `modes/tide-sim.js` wraps Lantern's state, as Spark's layer does, and never edits `sim.js`. Each tick it scales `s.calm` by the water's rate and sets
+`s.st.wick` to 12.5 for the step (that zeroes Lantern's own fade), sets `s.light` from the tide's burn and relight, and puts both back after the step.
+After the step it removes the rocks the stage does not have, thins Lantern's embers to the stage's share, and lays the ember path. It draws nothing from Lantern's random streams.
+Lantern's own whirlpools, fog and so on do not come up on the story nights 1 and 2 that Tide uses.
+**Abilities are not laid in Tide**, as on the lab page: a flare or a boost holds the flame up or carries the boat, and the water would stop mattering.
+
+**Drawing.** Tide has no `draw()`. The page draws its own flat river, boat, rocks, dark and embers; Tide draws the channel, its flecks and the lees through the new optional `water(now)` hook (see "How a mode plugs in").
+index.html: `MODES.tide`, `mod.draw` now optional, the one `water()` call, and the Tide button. With no mode chosen nothing changes (`bots.mjs parity`: 394,647 ticks, 0 differ).
+
+**Menu.** With Race, Spark and Tide the Game mode card ran past a 320x568 screen (657 px tall). The modes inside Lantern now sit two to a row (`.more`): 586 px in English, 571 in Turkish, Back on screen after a short scroll in English.
+The phone check's assertion on the mode buttons now lists Spark and Tide (changed on purpose).
+
+**Saves.** `lantern-mode-tide:save` is `{ v: 1, best, stars: { stage: 0..3 }, far: { stage: best % }, played }`.
+If it is missing and the lab page's `lantern-tide:night` is `'2'` (its first night won), stage 2 opens once. The lab's keys are never written.
+
+**Sound.** A band of noise under the hull rises with the fast water; entering fast water gives a short rush, entering a lee a soft two-note chime.
+The ember melody (kit/music.js) plays as in any run: `begin()` starts the song for every run, embers play its notes, and a low flame raises the music's danger as on a night.
+
+**bots.mjs parity --mutate was not failing on main.** The music check (same day) takes `--` flags out of `process.argv` before the parity part reads `--mutate`; the parity part now reads the saved flags. It fails again under `--mutate` (1 differ).
+
+**Not verified.** Whether the channel reads at a glance on a real phone in bright light; the rush sound's level on a phone speaker; how stage 4's turn feels (the bot effect is small:
+3.3 s more fast water for reading the water now, and no difference in dawn rate). Stage 5 at 53% for the careful bot may be hard for a thumb; the owner's play decides.
+The lab page moved to `archive/lab/lantern-tide/`. Its old address needs `'lantern-tide': '/lantern/?mode=tide'` in `labMoved` (`worker-settings.mjs`, the lead adds it).

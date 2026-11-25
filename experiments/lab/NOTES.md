@@ -127,6 +127,8 @@ The owner went through the lab and decided each page that came from a live game.
 
 Landed: `lantern-spark` is a mode inside Lantern (2026-11-24, branch `fold-lantern-spark`). It is chosen in Lantern's "Game mode" group or at `/lantern/?mode=spark`; its code is `experiments/lantern/modes/`. The page is in `archive/lab/lantern-spark/`; its old address needs `'lantern-spark': '/lantern/?mode=spark'` in `labMoved`.
 
+Landed: `lantern-tide` is a mode inside Lantern (2026-11-24, branch `fold-lantern-tide`), rebuilt as five stages with one new idea each (the lab page's five weak points and the before and after numbers are in `experiments/lantern/NOTES.md`, "Tide is a mode inside Lantern"). It is chosen in Lantern's "Game mode" group or at `/lantern/?mode=tide`. The page is in `archive/lab/lantern-tide/`; its old address needs `'lantern-tide': '/lantern/?mode=tide'` in `labMoved`.
+
 2026-11-24, landed: Lantern's score moved to the kit as `experiments/kit/music.js` (presets `lantern`, `river`, `bell`, `flute`; recipe in the kit README); Lantern's `music.js` is now a thin preset over it and sounds as before. The melody made of embers from `lantern-rhythm` is in Lantern: each ember plays the next note of the night's tune on the next sixteenth inside the chord, a streak adds harmony, a blow thins the music for two bars, and the end card says how much of the melody was played. `lantern-rhythm` is in `archive/lab/`.
 `ant-creatures` landed (2026-11-24): its rig and drawing are Ant Promotion's fifth look, Living (`/ant-promotion/?look=4`, on the Look button), with the rig checks in `ant-promotion/rig-bots.mjs`. The page is in `archive/lab/ant-creatures/`; the zoo was not carried over.
 

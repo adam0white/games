@@ -13,6 +13,7 @@
   .groups { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: .35em 0; } #menu .groups button { width: 15em; max-width: 100%; min-height: 54px; margin: 0; padding: .3em 1em; border-radius: 18px; background: #ffffff18; } .groups b { display: block; font-weight: normal; font-size: 1.1em; color: #ffd9a0; } .groups small { display: block; font-size: .72em; opacity: .75; line-height: 1.2; }
   #menu .foot button { min-width: 7.6em; font-size: .85em; border-color: #ffd9a044; }
   .opt { margin: .55em 0; } .opt button, .opt a.mode { display: inline-block; box-sizing: border-box; width: 100%; max-width: 17em; margin: 0; } .opt a.mode { font-size: 1em; color: #ffe6bd; background: #ffffff10; border: 1.5px solid #ffd9a088; padding: .55em 1.2em; } .opt small { display: block; font-size: .78em; opacity: .75; line-height: 1.25; margin: .2em auto 0; max-width: 20em; } .opt #anew { margin-top: .3em; font-size: .85em; min-height: 40px; } .opt button[hidden] { display: none; }
+  .more { display: grid; grid-template-columns: 1fr 1fr; gap: .45em .5em; margin: .55em auto 0; max-width: var(--opt-w, 17em); align-items: start; } .more .opt { margin: 0; min-width: 0; } .more .opt button, .more .opt a.mode { display: flex; align-items: center; justify-content: center; } .more .opt button, .more .opt a.mode { padding: .5em .25em; font-size: .92em; min-height: 44px; } .more .opt small { font-size: .72em; } /* the modes inside Lantern, two to a row so the card fits a small phone; as wide as the buttons above */
   #modes > div, #perspective > div { max-height: 100dvh; box-sizing: border-box; overflow-y: auto; touch-action: pan-y; } #modes h2, #perspective h2 { margin: 0; }
   h3 { font-weight: normal; font-size: 1.1em; letter-spacing: .06em; color: #ffd9a0; margin: .6em 0 0; }
   #steers button { min-width: 0; min-height: 44px; margin: .15em; padding: .4em .8em; font-size: .85em; } #steers button.on { color: #2a1606; background: #ffb45a; border-color: #ffb45a; }
@@ -112,8 +113,11 @@
   <p class="opt"><button id="endless">Endless river</button><small data-i18n="endlessWhat"></small></p>
   <p class="opt"><button id="daily" data-i18n="daily">Today's river</button><small data-i18n="dailyWhat"></small></p>
   <p class="opt"><button id="tower">Tower climb</button><small data-i18n="towerWhat"></small><button id="anew" hidden>New climb from level 1</button></p>
-  <p class="opt"><a class="mode" href="/lab/lantern-race/" data-i18n="modeRace">Lantern Race</a><small data-i18n="modeRaceWhat">Race other boats on the same river, with friends or bots.</small></p>
-  <p class="opt"><button class="mode" data-mode="spark" data-i18n="modeSpark">Lantern Spark</button><small data-i18n="modeSparkWhat">The lantern is out. Strike sparks to see the river.</small></p>
+  <div class="more">
+    <p class="opt"><a class="mode" href="/lab/lantern-race/" data-i18n="modeRace">Lantern Race</a><small data-i18n="modeRaceWhat">Race other boats on the same river, with friends or bots.</small></p>
+    <p class="opt"><button class="mode" data-mode="spark" data-i18n="modeSpark">Lantern Spark</button><small data-i18n="modeSparkWhat">The lantern is out. Strike sparks to see the river.</small></p>
+    <p class="opt"><button class="mode" data-mode="tide" data-i18n="modeTide">Lantern Tide</button><small data-i18n="modeTideWhat">Ride the bright water. Slack water burns the flame.</small></p>
+  </div>
   <p><button class="back" data-i18n="back">Back</button></p>
 </div></div>
 <div id="mode" class="screen veil"><div><div id="modePanel"></div><p><button class="back" data-i18n="back">Back</button></p></div></div>
@@ -302,7 +306,7 @@ window.lanternSim = () => s; // the browser checks use this to reach late stretc
 const cards = screens(['menu', 'shop', 'credits', 'card', 'board', 'modes', 'perspective', 'tutor', 'mode']);
 // More modes (NOTES.md, "How a mode plugs in"): a mode is a module in modes/ that index.html loads when it is chosen. mod is the mode
 // chosen, or null; with null, every line below runs as before modes. A mode is drawn flat: the view the player chose comes back after.
-const MODES = { spark: () => import('./modes/spark.js') }, made = {};
+const MODES = { spark: () => import('./modes/spark.js'), tide: () => import('./modes/tide.js') }, made = {};
 let mod = null;
 const pct = () => mod ? mod.reach() : progress(s);
 async function chooseMode(id) {
@@ -1102,7 +1106,8 @@ let lastDraw = 0;
 function draw(now) {
   const step3 = Math.min(0.1, (now - lastDraw) / 1000 || 0); lastDraw = now;
   const dawn = looking === 'win' ? 1 : s.endless ? 0 : Math.max(0, (progress(s) - 0.86) / 0.14), day = looking === 'win' ? 0.7 : s.over === 'dawn' ? Math.max(0, Math.min(1, (now - ended) / 2500)) : 0; // a frame's time can be a little older than ended, and a day below 0 gave the dawn light a negative radius
-  if (mod && !looking) { canvas3.hidden = true; mod.draw(now, day); return; } // a mode draws its own river, flat
+  if (mod && !looking) canvas3.hidden = true; // a mode is drawn flat
+  if (mod?.draw && !looking) { mod.draw(now, day); return; } // a mode that draws its own river (Spark); one without draw() (Tide) draws on the page's river through water()
   const solid = view !== '2d' && R3 && !looking; canvas3.hidden = !solid; if (solid) { draw3(now, step3, dawn, day); return; } // a look in the shop stays flat
   const ox = shake * (Math.random() - 0.5) * 14 * dpr, oy = shake * (Math.random() - 0.5) * 14 * dpr;
   g.setTransform(1, 0, 0, 1, ox, oy);
@@ -1135,6 +1140,7 @@ function draw(now) {
     const x = c + (Math.abs(k) * 2 - 1) * (h - 0.03);
     g.beginPath(); g.moveTo(sx(x), sy(y)); g.lineTo(sx(x + (centre(s, y + 0.14) - c)), sy(y + 0.14)); g.stroke();
   }
+  g.globalAlpha = 1; if (mod && !looking) mod.water?.(now); // a mode's water on the river (Tide's channel and lees), under the rocks and the dark
   // the waterfall: bands of white water across the river, sliding with the current
   g.strokeStyle = '#eaf6ff'; g.lineWidth = 3 * dpr;
   for (let i = Math.floor(bot * 14); i < top * 14; i++) {

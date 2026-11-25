@@ -759,6 +759,53 @@ const GAMES = {
       await page.evaluate(v => { if (v === undefined) localStorage.removeItem('lantern-view'); else localStorage.setItem('lantern-view', v); }, before['lantern-view'] === '3d' ? undefined : before['lantern-view']);
       await page.goto(`${base}/lantern/`); await until(page, () => document.getElementById('notes-button'), 'notes button'); await page.click('#toShop'); // back where the erase below starts
     }
+    // Lantern Tide, a mode inside Lantern (modes/tide.js). The deep link opens it; the lab page's save opens stage 2 once; it is drawn
+    // flat on the page's own river; fast water holds the flame; the end card says why a run ended and the best so far; embers go to
+    // the bank; nothing else of Lantern's save changes; no board call.
+    {
+      await page.evaluate(() => { localStorage.setItem('lantern-tide:night', '2'); localStorage.setItem('lantern-view', '3d'); });
+      const before = await saved(), board = []; const spy = r => { if (r.url().includes('/lab-api/board')) board.push(r.url()); }; page.on('request', spy);
+      await page.goto(`${base}/lantern/?mode=tide`);
+      await until(page, () => window.lanternState().screen === 'mode' && window.lanternMode()?.id === 'tide', 'the deep link opens Tide');
+      assert.equal((await page.evaluate(() => window.lanternMode())).best, 2, 'the lab save opens stage 2');
+      assert.equal((await state()).view, '2d', 'Tide is drawn flat');
+      assert.deepEqual(await page.$$eval('#modePanel .nights button', bs => bs.map(b => b.disabled)), [false, false, true, true, true], 'stages 1 and 2 open');
+      await page.click('#modePlay');
+      await until(page, () => window.lanternState().screen === 'play' && window.lanternMode().stage === 2, 'a Tide run on stage 2');
+      await page.evaluate(() => { window.lanternSim().safe = 1e9; }); // no blow while the check works
+      // Hold the boat in the channel: the water there is fast, and the flame burns at a twentieth of the slack-water rate.
+      await page.evaluate(async () => { const sim = await import('/lantern/modes/tide-sim.js'); window.__hold = setInterval(() => { const e = window.lanternSpark(); if (!e || e.s.over) return; const s = e.s; s.x = sim.centre(s, s.y) + sim.half(s, s.y) * sim.jet(e, s.y, s.t); }, 16); });
+      await until(page, () => window.lanternMode().rush > 0.8, 'the channel is fast water');
+      const l0 = (await state()).light; await sleep(1500); const l1 = (await state()).light;
+      assert.ok(l0 - l1 < 0.12 * 1.5 * 0.5, `in the channel the flame holds (${l0.toFixed(3)} to ${l1.toFixed(3)} in 1.5 s)`);
+      await page.keyboard.press('p'); assert.ok((await state()).paused, 'P pauses Tide');
+      assert.match(await page.textContent('#line'), /^Tide 2, \d+% of the way\.$/); assert.ok(await page.evaluate(() => document.getElementById('viewNext').hidden), 'no view switch while Tide is on');
+      await page.keyboard.press('p');
+      await page.evaluate(() => { const s = window.lanternSim(); s.rocks = []; s.embers = [{ x: s.x, y: s.y + 0.02, got: false, kind: 'ember' }]; s.bonus = 78 - s.y - 0.05; }); // an ember just ahead, then dawn
+      await until(page, () => window.lanternState().screen === 'card', 'the end card', 12000);
+      const sim = await page.evaluate(() => ({ taken: window.lanternSim().taken, banked: window.lanternSim().banked, over: window.lanternSim().over }));
+      assert.equal(sim.over, 'dawn'); assert.ok(sim.taken >= 1, 'an ember taken in Tide');
+      assert.match(await page.textContent('#title'), /^Dawn ★★[★☆]$/, 'dawn and no blow'); assert.equal(await page.textContent('#go'), 'Play tide 3');
+      assert.match(await page.textContent('#line'), /^\d+ s in bright water\. Tide 3: the lee\./, 'the card names the next stage\'s one new idea');
+      let mine = JSON.parse((await saved())['lantern-mode-tide:save']);
+      assert.equal(mine.best, 3); assert.equal(mine.played, 1); assert.ok(mine.stars[2] >= 2); assert.equal(mine.far[2], 100);
+      // A run lost to the dark: the card says why, how far, and the best so far on that stage.
+      await page.click('#go'); await until(page, () => window.lanternState().screen === 'play' && window.lanternMode().stage === 3, 'a Tide run on stage 3');
+      await page.evaluate(() => { clearInterval(window.__hold); const s = window.lanternSim(); s.safe = 1e9; s.light = 0.002; });
+      await until(page, () => window.lanternState().screen === 'card', 'the flame goes out', 12000);
+      assert.match(await page.textContent('#line'), /^The flame went out\. \d+% of the way \(best \d+%\)\./, 'the card says why the run ended and the best');
+      const after = await saved(); mine = JSON.parse(after['lantern-mode-tide:save']);
+      assert.equal(mine.played, 2); assert.equal(mine.best, 3, 'a loss opens nothing');
+      assert.equal(after['lantern-tide:night'], '2', 'the lab save is never written');
+      assert.ok(Number(after['lantern-bank']) >= Number(before['lantern-bank'] ?? 0) + sim.banked, 'embers taken in Tide go to the bank');
+      for (const k of Object.keys(before)) if (!['lantern-bank'].includes(k)) assert.equal(after[k], before[k], `Tide leaves ${k} as it was`);
+      assert.deepEqual(Object.keys(after).filter(k => !(k in before)).sort(), ['lantern-mode-tide:save'], 'Tide writes only its own new key');
+      await page.click('#toMenu'); assert.equal((await state()).screen, 'mode', 'Menu goes back to the Tide card');
+      await page.click('#mode .back'); assert.equal((await state()).screen, 'menu'); assert.equal(await page.evaluate(() => window.lanternMode()), null, 'leaving Tide turns it off');
+      page.off('request', spy); assert.deepEqual(board, [], 'Tide never calls the shared board');
+      await page.evaluate(v => { localStorage.removeItem('lantern-tide:night'); if (v === undefined) localStorage.removeItem('lantern-view'); else localStorage.setItem('lantern-view', v); }, before['lantern-view'] === '3d' ? undefined : before['lantern-view']);
+      await page.goto(`${base}/lantern/`); await until(page, () => document.getElementById('notes-button'), 'notes button'); await page.click('#toShop'); // back where the erase below starts
+    }
     // Erase everything (note #73, tester tools): two taps; every lantern- key goes and nothing else.
     await page.click('[data-test="reset"]'); assert.ok(Object.keys(await saved()).length > 3, 'one tap erases nothing');
     await Promise.all([page.waitForEvent('load'), page.click('[data-test="reset"]')]);
@@ -770,7 +817,7 @@ const GAMES = {
     await until(page, () => document.querySelector('#menu h1').textContent === 'Fener', 'the Turkish menu');
     assert.equal(await page.evaluate(() => document.documentElement.lang), 'tr');
     assert.equal(await page.textContent('#toShop b'), 'Mağaza'); assert.equal(await page.textContent('#toBoard'), 'Sıralama');
-    await page.click('#toModes'); assert.deepEqual(await page.$$eval('#modes a.mode', as => as.map(a => a.getAttribute('href'))), ['/lab/lantern-race/'], 'Race is one tap away'); assert.deepEqual(await page.$$eval('#modes button.mode', bs => bs.map(b => [b.dataset.mode, b.textContent])), [['spark', 'Fener Kıvılcım']], 'Spark is chosen inside Lantern'); await page.click('#modes .back');
+    await page.click('#toModes'); assert.deepEqual(await page.$$eval('#modes a.mode', as => as.map(a => a.getAttribute('href'))), ['/lab/lantern-race/'], 'Race is one tap away'); assert.deepEqual(await page.$$eval('#modes button.mode', bs => bs.map(b => [b.dataset.mode, b.textContent])), [['spark', 'Fener Kıvılcım'], ['tide', 'Fener Gelgit']], 'Spark and Tide are chosen inside Lantern'); await page.click('#modes .back');
     await page.click('#menuLanguage');
     assert.equal(await page.evaluate(() => document.documentElement.lang), 'en');
     assert.equal(await page.textContent('#menu h1'), 'Lantern'); assert.equal(await page.textContent('#toShop b'), 'Shop');

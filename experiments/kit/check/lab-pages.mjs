@@ -147,15 +147,6 @@ async function turnPrism(page, { until }) {
   }, 'touch turns the prism and starts exposure', 8000, previous);
 }
 
-async function steerTide(page, { until }) {
-  const { point: [x, y], game: { river }, target, scale } = await page.evaluate(() => window.tideState());
-  await pointerDrag(page, { x, y }, { x: x + 40, y });
-  await until(page, ({ minimumTarget, minimumX }) => {
-    const s = window.tideState();
-    return s.target > minimumTarget && s.game.river.x > minimumX;
-  }, 'drag steers the boat right', 8000, { minimumTarget: target + 24 / scale, minimumX: river.x + 4 / scale });
-}
-
 export async function fieldPoint(page, width, height) {
   const box = await page.locator('#field').boundingBox();
   return (x, y) => ({ x: box.x + x * box.width / width, y: box.y + y * box.height / height });
@@ -183,7 +174,6 @@ async function rubPlate(page, { until, knob }) {
 }
 
 const splitlightLegacy = { 'night-splitlight:plate': '2', 'night-splitlight:sound': 'on' };
-const tideLegacy = { 'lantern-tide:night': '2', 'lantern-tide:sound': '1' };
 
 export const labPages = {
   'lab/lantern-race': {
@@ -282,23 +272,6 @@ export const labPages = {
     touch: turnPrism,
     hint: { key: 'night-splitlight:hint', delay: 2200, play: '#angle', timing: { board: true },
       input: turnPrism, legacy: splitlightLegacy },
-  },
-  'lab/lantern-tide': {
-    query: 'check=1', play: '#start', sound: '#sound', soundKey: 'lantern-tide:sound', soundOff: '0',
-    start: page => page.tap('#start'),
-    seeds: { ...tideLegacy, 'lantern-tide:hint': '1' },
-    state: () => {
-      const s = window.tideState?.();
-      return s && { screen: s.screen, t: s.game.river.t };
-    },
-    verify: () => {
-      const { night, screen } = window.tideState();
-      return { night, screen };
-    },
-    expect: { night: 2, screen: 'ready' },
-    touch: steerTide,
-    hint: { key: 'lantern-tide:hint', delay: 1500, timing: { start: '#start' },
-      input: steerTide, legacy: tideLegacy },
   },
 };
 
