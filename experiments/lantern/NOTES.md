@@ -850,3 +850,38 @@ Two tips, once per player: fireflies over safe water (night 1), a gap in the sta
 The lab page moved to `archive/lab/lantern-spark/`. Its old address goes to `/lantern/?mode=spark` (`labMoved` in `worker-settings.mjs`, added in this branch with the lead's leave). The worker adds the old address's own query after it (`?mode=spark?lang=tr`), so the page reads the mode up to a second `?`; the old `lang` is lost on that hop.
 
 **The ember melody in Spark** (kit/music.js, merged the same day). With Music on, an ember taken in Spark plays the next note of the night's melody, as in any run, and a passed ember counts as a missed note. The end card shows the melody share under the same rule as a night (Music on, at least four notes laid). `song.start()` resets the counts every run, so a Spark run does not change a later night's share.
+
+## 2026-11-24: 3D ripples (owner, lab cleanup: `lantern-ripples` accepted "but improve it and only into 3d version")
+
+The water in the 3D and first-person views is now a simulated surface. The 2D view, the modes (drawn flat) and the rules are unchanged: the water is drawn and never pushes the boat.
+
+**The lab page, played cold first (Chromium, night 13). Its five weakest things as water:**
+1. Flat, soft, low-contrast shading: the water read as cloth, not as a surface that mirrors.
+2. Hard walls (h = 0) at the grid's ends threw back rings nothing made; the pickup ring was cut off at the screen's bottom; the wake was blotchy. Banks reflected rings upside down (h = 0 is the wrong wall for water).
+3. No refraction: the lantern's light made broad lit and dark patches, never lines or a broken reflection.
+4. Aliasing: dotted pixels and a jagged bank line on a 72-wide grid.
+5. Cost and speed: a separate full-screen pass plus a 2D overlay, loops over 48 rocks and 64 drops in every texel; waves ran slower than the boat, so reflections landed behind it.
+
+**What was built.**
+- `ripples.js` (no DOM): a damped wave equation on a height field fixed to the river (shifts by whole rows as the boat moves), 1.04 river widths across, 0.45 behind the boat to 2.3 ahead. Walls are zero-flux (banks and rocks send rings back the right way up); a sponge at the two ends soaks waves up. Waves run at 0.98 river units a second, faster than the boat at most speeds. What disturbs it is read from the game state each frame: the wake, embers and powers, lost hearts and shields (bigger rings, a foam crest), crashes, grazes, rain, pools, geysers, the current at rocks. A CPU solver here is what `ripple-bots.mjs` checks.
+- `ripples-gl.js`: the same rules on the GPU (half-float textures, a wall-mask pass, a splash pass, 2 or 3 solver passes per game tick). Without float render targets it runs the CPU solver and uploads the field.
+- `view3d.js`: the ground and reflection shaders built a second time with `#define RIPPLES` (level 0 draws exactly main's shader). Ripple slope bends the normals; the lantern's mirror glint widens where the normal changes faster than a pixel (no flicker); the light under the surface shifts with the slope and gathers under crests (caustics); a blow's ring crest breaks white; the ember and lantern reflection streaks are bent and broken by the rings.
+- Quality: level 2 (128 columns, 3 steps a tick), level 1 (64, 2), 0 (off). 90 frames in play averaging over 25 ms step it down a level, never back up. Without float targets it starts at level 1. Reduced motion turns it off. `?ripples=0|1|2` pins a level, `?ripples=cpu` forces the CPU solver; nothing is saved, no storage key is new or changed.
+- The water steps by game ticks (at most 4 a frame) and resets on a new run, a jump of the river or a gap over 1 s. On the pause card it keeps settling by real time.
+
+**Checks.**
+- `node bots.mjs ripples` (`ripple-bots.mjs`), levels 2 and 1: R1 ring speed 0.89 and 0.93 river units a second (wanted 0.98 within 12%); R2 energy left after 1 s 13.8% and 13.7%, after 3 s 0.06% and 0.05%; R3 banks send a ring back 535 and 78 times open water; R4 a rock shades the water behind it (49% and 51% of open water) and echoes the ring (146 and 62 times); R5 the sponge leaves 3% and 2% of a hard end; R6 five nights with 57,172 disturbances stay finite, highest 1.09; R7 reading the game changes nothing in it, tick for tick. `--mutate` (rocks that leak, ends without a sponge) fails 4 claims and exits 1.
+- `node bots.mjs parity`: 0 of 394,647 ticks differ from origin/main's `sim.js`. `node bots.mjs spark 150`: 14 claims pass.
+- Phone check `phone.mjs 'lantern ripples'` (also run by `phone.mjs lantern`), WebKit iPhone 13 and Chromium Pixel 7: level 2 runs on the GPU path; the GPU field against the CPU one after 30 ticks with a rock; a ring dropped ahead of the held boat changes the water on screen several times more than nothing does; reduced motion turns it off and back on; long frames step 2, 1, 0 and short frames never bring it back; the pause card comes up. `phone.mjs 'lantern ripples' --mutate` computes the field but does not draw it, and fails on the ring.
+- Page work per frame (JS time inside requestAnimationFrame), 3D, night 13, 12 s of play, 390x844: see the table below. Headless Chromium draws with software GL, so its frame gaps say nothing about a phone's GPU; WebKit's timer counts whole milliseconds.
+
+| Browser | CPU | main: mean / p95 | ripples level 2: mean / p95 | CPU solver (level 1): mean / p95 |
+| --- | --- | --- | --- | --- |
+| Chromium Pixel 7 | 1x | 0.32 / 0.5 ms | 0.35 / 0.6 ms | 0.75 / 1.0 ms |
+| WebKit iPhone 13 | 1x | 0.31 / 1 ms | 0.30 / 1 ms | 0.66 / 1 ms (level 2) |
+| Chromium Pixel 7 | 4x slower | 1.48 / 3.4 ms | 1.73 / 3.1 ms | 3.09 / 4.3 ms |
+
+WebKit frame gaps: 13.9 ms mean, 15 ms p95, with and without ripples.
+
+**Not verified.** A real phone: GPU time per frame (the extra passes are about 4 texture reads per cell per step plus one texture read per water pixel), heat and battery, whether the rings read at arm's length, whether the step-down fires on a phone that holds 30 frames a second (it would turn the ripples off; 25 ms is the line). GPU against CPU agreement on WebKit is within 8% of the highest wave (half floats); on Chromium within 0.3%. Before and after screenshots were compared at calm, pickup, hit and rain, but the moments are only roughly the same: frame timing changes the runs.
+The lab page moved to `archive/lab/lantern-ripples/`. Its old address needs `'lantern-ripples': '/lantern/'` in `labMoved`; there is no `?view=3d` query, so that address opens the player's saved view (2D for a new player).

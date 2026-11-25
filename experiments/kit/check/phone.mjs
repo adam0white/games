@@ -1032,6 +1032,52 @@ const GAMES = {
       await page.goto(`${base}/lantern/`); await page.click('#play');
     }
   },
+  // Lantern's 3D water (experiments/lantern/ripples.js, ripples-gl.js): the rippled view runs, the GPU field matches the CPU one
+  // that bots.mjs checks, a ring shows on the screen, long frames step it down and never back up, and less motion turns it off.
+  // With --mutate the field is computed but not drawn, and the ring check must fail.
+  async 'lantern ripples'(page) {
+    if (MUTATE) await page.route(/\/lantern\/view3d\.js/, async route => { const r = await route.fetch(), body = (await r.text()).replace('* uRip.w, c) * k;', '* uRip.w, c) * 0.;'); return route.fulfill({ response: r, body }); });
+    await page.goto(`${base}/lantern/`);
+    await page.evaluate(() => { for (const [k, v] of Object.entries({ 'lantern-view': '3d', 'lantern-tutorial': '1', 'lantern-hint': '1' })) localStorage.setItem(k, v); });
+    await page.goto(`${base}/lantern/?ripples=2`);
+    await until(page, () => window.lanternState?.().view === '3d' && window.lanternState().viewReady, '3D starts', 20000);
+    await page.click('#play'); await until(page, () => window.lanternState().playing, 'playing');
+    const rip = () => page.evaluate(() => window.lanternRipples());
+    await until(page, () => window.lanternRipples().steps > 60, 'the water steps with the game');
+    let r = await rip(); assert.equal(r.level, 2, 'pinned at level 2'); assert.ok(['gpu', 'cpu'].includes(r.path)); assert.ok(r.drops > 0, 'the wake disturbs the water');
+    const agree = await page.evaluate(() => window.lanternRipples.agree());
+    assert.ok(agree.top > 0.05 && agree.diff < 0.15 * agree.top, `the GPU field (half floats) follows the CPU one within 15%: largest difference ${agree.diff.toFixed(4)} of ${agree.top.toFixed(3)}`);
+    // Hold the boat on open water, stop the clock the water and the light use, let the wake die away, and compare the screen before and after one ring.
+    await page.evaluate(() => { const s = window.lanternSim(); for (const k of ['y', 'x']) { const v = s[k]; Object.defineProperty(s, k, { get: () => v, set() {}, configurable: true }); } (function hold() { Object.assign(s, { safe: 0, shield: 0, light: 1, rocks: [], embers: [] }); requestAnimationFrame(hold); })(); window.lanternRipples.still(true); document.getElementById('say').style.visibility = 'hidden'; });
+    const vs = page.viewportSize(), clip = { x: Math.round(vs.width * 0.25), y: Math.round(vs.height * 0.42), width: Math.round(vs.width * 0.5), height: Math.round(vs.height * 0.26) } /* open water ahead of the boat, clear of the boat, its light, the night's title and the swaying grass */, look = async () => (await page.screenshot({ clip })).toString('base64');
+    // Per pixel: what changed between two plain shots (grass sways) is left out; on the rest, how far the ringed shot is from the plain one.
+    const differ = (a, b, c) => page.evaluate(async ([a, b, c]) => {
+      const px = async src => { const im = new Image(); im.src = 'data:image/png;base64,' + src; await im.decode(); const cv = document.createElement('canvas'); cv.width = im.width; cv.height = im.height; const x = cv.getContext('2d'); x.drawImage(im, 0, 0); return x.getImageData(0, 0, cv.width, cv.height).data; };
+      const [p, q, r] = [await px(a), await px(b), await px(c)], d = (u, i) => Math.abs(p[i] - u[i]) + Math.abs(p[i + 1] - u[i + 1]) + Math.abs(p[i + 2] - u[i + 2]);
+      let kept = 0, noise = 0, ring = 0; for (let i = 0; i < p.length; i += 4) { const n = d(q, i); if (n > 6) continue; kept++; noise += n; ring += d(r, i); }
+      return { kept: kept / (p.length / 4), noise: noise / kept, ring: ring / kept };
+    }, [a, b, c]);
+    await page.evaluate(() => window.lanternRipples.run(240)); await sleep(500); // the wake dies away
+    await sleep(300);
+    const plain = await look(); await sleep(500); const plain2 = await look(); // the water's slow drift over as long as the ringed shot below takes
+    await page.evaluate(() => { const s = window.lanternSim(); window.lanternRipples.drop(s.x, s.y + 0.3, 0.04, 0.6); window.lanternRipples.run(14); }); await sleep(300);
+    const ringed = await look(), { kept, noise, ring } = await differ(plain2, plain, ringed);
+    assert.ok(kept > 0.6, `most of the water holds still between two shots (${(100 * kept).toFixed(0)}%)`);
+    assert.ok(ring > 0.6, `a ring shows on the water: ${ring.toFixed(2)} per pixel changed (wanted over 0.6; drawn rings gave 1.2 to 2.2, a field that is not drawn 0 to 0.25); the water drifted ${noise.toFixed(2)} in as long with nothing dropped`);
+    console.log(`     ripples on ${page.context().checkName}: ${r.path}, GPU against CPU ${agree.diff.toFixed(4)} of ${agree.top.toFixed(3)}, ring ${ring.toFixed(2)} against ${noise.toFixed(2)} per pixel`);
+    const e = await page.evaluate(() => window.lanternRipples.sample()); assert.ok(e.h.some(v => Math.abs(v) > 0.01), 'the ring is in the field');
+    // Less motion: off while the setting is on, back when it is not.
+    await page.emulateMedia({ reducedMotion: 'reduce' }); await page.evaluate(() => window.lanternRipples.pin(null));
+    await until(page, () => window.lanternRipples().level === 0 && window.lanternRipples().reduced, 'reduced motion turns the ripples off');
+    await page.emulateMedia({ reducedMotion: 'no-preference' }); await until(page, () => window.lanternRipples().level === 2, 'and back on without it');
+    // Long frames: 90 frames at 40 ms step it down a level; again to off; short frames then never bring it back.
+    await page.evaluate(() => window.lanternRipples.feed(40, 90)); await until(page, () => window.lanternRipples().level === 1, 'long frames step down to level 1');
+    await page.evaluate(() => window.lanternRipples.feed(40, 90)); await until(page, () => window.lanternRipples().level === 0, 'and then off');
+    await page.evaluate(() => window.lanternRipples.feed(10, 400)); await sleep(300);
+    r = await rip(); assert.equal(r.level, 0, 'short frames do not bring the ripples back'); assert.deepEqual(r.fell, [40, 40]);
+    // The pause card still comes up over the 3D view.
+    await page.evaluate(() => window.lanternRipples.still(false)); await finger(page, '#pause', [['pointerdown', 0, 0]]); assert.equal(await page.isVisible('#viewNext'), true, 'the pause card comes up over the rippled view');
+  },
 };
 
 // Every new page has its own save seed, controls and first-time help contract beside its registration.
@@ -1046,10 +1092,11 @@ for (const [slug, g] of Object.entries({ ...pages, ...labPages })) {
 
 for (const [slug, run] of Object.entries(pageRuns)) GAMES[slug] = page => run(page, { base, until }); // pages that are not games: the small games' home
 
-const [onlyGame, onlyPhone] = process.argv.slice(2);
+const MUTATE = process.argv.includes('--mutate'); // only 'lantern ripples' reads it: its check must then fail
+const [onlyGame, onlyPhone] = process.argv.slice(2).filter(a => a !== '--mutate');
 // The first argument is 'all' or a comma list of experiments. An experiment's name picks its own check, its
 // first-time help check, and for Lantern the three checks below that play Lantern.
-const WITH = { lantern: ['old links', 'lab down', 'leaving mid-run'], duel: ['duel friend'] };
+const WITH = { lantern: ['old links', 'lab down', 'leaving mid-run', 'lantern ripples'], duel: ['duel friend'] };
 const picked = game => !onlyGame || onlyGame === 'all' || onlyGame.split(',').some(only => game === only || game === `hint ${only}` || game.startsWith(`hint ${only} `) || WITH[only]?.includes(game));
 // A check that never answers becomes a FAIL line naming it, not a job that runs until its time limit.
 const within = (p, ms, what) => { let t; return Promise.race([p, new Promise((_, no) => { t = setTimeout(() => no(new Error(`no answer in ${ms / 1000}s: ${what}`)), ms); })]).finally(() => clearTimeout(t)); };
@@ -1092,7 +1139,7 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
     page.on('pageerror', e => errors.push(String(e))); page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
     page.on('requestfailed', r => errors.push(`request failed: ${r.url()}`)); page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
     // Lantern's check is the longest: its seven ability showings (note #123) took it past 150 s on WebKit.
-    try { await within(run(page), game === 'lantern' ? 240000 : 150000, 'the whole check'); assert.deepEqual(errors.filter(e => !(context.labDown && /human\.adamwhite\.work|Load failed|Failed to fetch|ERR_CONNECTION_REFUSED/.test(e))).filter(e => !(context.boardBad && /\/lab-api\/board\/|status of 401/.test(e))).filter(e => !(context.badFrame && /lab check: one bad frame/.test(e))).filter(e => !(context.viewBad && /view3d\.js|net::ERR_FAILED|Failed to load resource|Importing a module/.test(e))), [], 'page errors'); console.log(`ok   ${game} on ${phone}`); }
+    try { await within(run(page), game === 'lantern' ? 240000 : 150000, 'the whole check'); assert.deepEqual(errors.filter(e => !(context.labDown && /human\.adamwhite\.work|Load failed|Failed to fetch|ERR_CONNECTION_REFUSED/.test(e))).filter(e => !(context.boardBad && /\/lab-api\/board\/|status of 401/.test(e))).filter(e => !(context.badFrame && /lab check: one bad frame/.test(e))).filter(e => !(context.viewBad && /view3d\.js|ripples(-gl)?\.js|net::ERR_FAILED|Failed to load resource|Importing a module/.test(e))), [], 'page errors'); console.log(`ok   ${game} on ${phone}`); }
     catch (e) { failed++; console.log(`FAIL ${game} on ${phone}: ${e.message}`); if (process.env.CHECK_STACK) console.log(e.stack); if (errors.length) console.log('     ' + errors.join('\n     ')); await shot(page, 'failure').catch(() => {}); }
     try { await within(context.close(), 15000, 'closing the page'); }
     catch (e) { console.log(`     ${e.message}; starting the browser again`); browser.close().catch(() => {}); browser = await engine.launch(); }

@@ -333,7 +333,7 @@ function size3() { if (R3) { const k = Math.min(1.5, dpr) / dpr; R3.resize(Math.
 async function setView(v, keep = true) {
   if (!VIEWS.includes(v)) v = '2d';
   if (v !== '2d' && !R3) {
-    loading3 ??= import('./view3d.js?v=2').then(m => m.createRenderer(canvas3)).catch(() => null);
+    loading3 ??= import('./view3d.js?v=3').then(m => m.createRenderer(canvas3)).catch(() => null);
     const made = await loading3;
     if (!made || made.errors.length) { v = '2d'; loading3 = null; noteView('viewNoStart'); }
     else if (!R3) { R3 = made; canvas3.addEventListener('webglcontextlost', () => { setView('2d', false); R3 = null; noteView('viewStopped'); }); size3(); }

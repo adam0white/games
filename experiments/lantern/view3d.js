@@ -707,6 +707,8 @@ export function createRenderer(canvas) {
     if (!lv) return null;
     if (!PR) { PR = { ground: variant(GROUND_VS, GROUND_FS, P.ground, ['aP']), decal: variant(DECAL_VS, DECAL_FS, P.decal, ['aC', 'aA', 'aB', 'aCol']) }; if (!PR.ground || !PR.decal) { RIP.broken = true; return null; } }
     RIP.water = createWaterGL(gl, lv, { cpu: RIP.cpu });
+    // Without float render targets the field runs on the CPU: start it at level 1 (a quarter of the work) unless a level is pinned.
+    if (RIP.water?.path === 'cpu' && lv === 2 && RIP.pinned === null) { RIP.water.dispose(); RIP.level = 1; RIP.water = createWaterGL(gl, 1, { cpu: true }); }
     if (!RIP.water) RIP.broken = true;
     return RIP.water;
   }
@@ -728,6 +730,7 @@ export function createRenderer(canvas) {
     RIP.t = s.t; RIP.y = s.y;
     if (jump) { w.reset(); RIP.mem = {}; RIP.since = 0; RIP.gaps = []; ticks = 0; }
     else { RIP.since++; if (f.playing && ticks > 0) frameTook(gap); }
+    if (RIP.still) ticks = 0; // held for a check: only run(n) moves the water
     const drops = disturb(s, RIP.mem, ticks, f.now / 1000).concat(RIP.queued.splice(0));
     ticks = Math.max(0, Math.min(4, ticks)) + RIP.extra; RIP.extra = 0;
     if (!ticks && !drops.length && !jump) return w;
