@@ -6,6 +6,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve, join, extname, sep } from 'node:path';
 import { tmpdir } from 'node:os';
+import { answerLab, allowLocalSend, withAgent, assertNotice, assertRun, assertNoLeak, assertOffSendsNothing, waitForRuns, runRecords, eventRecords } from '../../kit/check/lab-record.mjs';
 const here=dirname(fileURLToPath(import.meta.url)), root=resolve(here,'../..');
 const shots=process.env.SHOTS || join(tmpdir(),'thankful-shots'); await mkdir(shots,{recursive:true});
 const server=createServer(async(req,res)=>{try {
@@ -59,5 +60,28 @@ async function run(name,engine,device,base){
  }
  assert.deepEqual(external,[],'no external network requests');assert.deepEqual(errors,[],'no browser exceptions');console.log(`ok thankful ${name}`);
  }finally{await browser.close();}}
+// Play recording: the notice is on the page before the first thanks, a day's three thanks send one run record
+// under the page's name, typed words are never sent, and with the switch off nothing is sent.
+async function recording(name,engine,device,base){
+ const browser=await engine.launch();
+ try{const context=await browser.newContext({...device});const page=await context.newPage();const errors=[];
+ page.on('pageerror',e=>errors.push(String(e)));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
+ await context.route('**/*',route=>new URL(route.request().url()).origin===base?route.continue():route.abort());
+ const lab=await answerLab(context,base);await allowLocalSend(context);
+ const url=day=>withAgent(`${base}/lab/thankful/?day=${day}&look=lamps`);
+ await page.goto(url('2026-11-24'));await page.waitForFunction(()=>!!window.__thankful);await page.evaluate(()=>localStorage.removeItem('thankful:v1'));await page.reload();await page.waitForFunction(()=>!!window.__thankful);
+ await assertNotice(page);assert.equal(lab.sent.length,0,'nothing is sent before a thanks is given');
+ await page.locator('[data-kind="bread"]').tap();await page.locator('[data-kind="water"]').tap();
+ assert.equal(lab.sent.length,0,'a run that is not finished sends nothing yet');
+ await page.locator('[data-kind="spark"]').tap();await page.fill('#word','SECRETWORD');await page.locator('#wordForm button[type=submit]').tap();
+ await waitForRuns(lab,'thankful',1);
+ const run=assertRun(lab,'thankful',{outcomes:['won'],summaryKeys:['thanks','kinds']});
+ assert.equal(run.data.summary.thanks,3);assert.deepEqual(run.data.summary.kinds,['bread','water','spark']);
+ const events=run.data.events.map(e=>e.type);assert.deepEqual(events,['thanks','thanks','thanks','daily-finished']);
+ assertNoLeak(lab,['SECRETWORD']);assert.equal(await page.evaluate(()=>window.__thankful.state.days['2026-11-24'][2].t),'SECRETWORD','the words stay on the device');
+ await page.locator('#settings').tap();await assertOffSendsNothing(page,lab,'thankful',{play:async()=>{await page.locator('#settingsCard .close').tap();await page.goto(url('2026-11-25'));await page.waitForFunction(()=>!!window.__thankful);for(const k of ['bread','water','home'])await page.locator(`[data-kind="${k}"]`).tap();}});
+ assert.equal(runRecords(lab,'thankful').length,1,'one run record in all');assert.equal(eventRecords(lab,'thankful').length,1);
+ assert.deepEqual(errors,[],'no browser exceptions');console.log(`ok thankful recording ${name}`);
+ }finally{await browser.close();}}
 await new Promise(done=>server.listen(0,'127.0.0.1',done));const base=`http://127.0.0.1:${server.address().port}`;
-try{const failures=[];for(const [name,engine,device] of [['iphone13',webkit,devices['iPhone 13']],['pixel7',chromium,devices['Pixel 7']]]){try{await run(name,engine,device,base);}catch(error){console.error(`${name}: ${error.stack || error}`);failures.push(error);}}if(failures.length)throw new AggregateError(failures,'Phone checks failed');console.log(`Screenshots: ${shots}`);}finally{await new Promise(done=>server.close(done));}
+try{const failures=[];for(const [name,engine,device] of [['iphone13',webkit,devices['iPhone 13']],['pixel7',chromium,devices['Pixel 7']]]){try{await run(name,engine,device,base);await recording(name,engine,device,base);}catch(error){console.error(`${name}: ${error.stack || error}`);failures.push(error);}}if(failures.length)throw new AggregateError(failures,'Phone checks failed');console.log(`Screenshots: ${shots}`);}finally{await new Promise(done=>server.close(done));}

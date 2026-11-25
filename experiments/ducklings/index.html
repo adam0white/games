@@ -203,7 +203,7 @@
 </div></div>
 
 <script type="module">
-import { create, step, stars, timeLeft, pathAt, view, DT, SPEED, R_MOM, hits, LAST_STAGE, ENDLESS_AFTER, ENDLESS_TIME, TRAITS, QUACK_COOL, HEARTS, duskRate, NAMES } from './sim.js?v=5';
+import { create, step, stars, timeLeft, pathAt, view, DT, SPEED, R_MOM, hits, LAST_STAGE, ENDLESS_AFTER, ENDLESS_TIME, TRAITS, QUACK_COOL, HEARTS, duskRate, NAMES, NEST_R, SETTLE } from './sim.js?v=6';
 import { starFeedback, warningOnScreen, nestMarkerShows, padCueShows, leafLeft, leafQuackCue, LEAF_QUACK, driftMarks } from './feedback.js?v=5';
 import { CHAPTERS, LEVELS, chapterOf } from './levels.js';
 import * as art from './art.js?v=5';
@@ -224,7 +224,7 @@ const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // ---------------------------------------------------------------- save: one JSON blob
 const KEY = 'ducklings-save';
-const data = { v: 1, sound: true, opened: 1, stars: {}, best: {}, endless: 0, home: 0, album: {}, taught: false, ...save.readJson(KEY, {}) };
+const data = { v: 1, sound: true, opened: 1, stars: {}, best: {}, endless: 0, home: 0, album: {}, looks: {}, taught: false, ...save.readJson(KEY, {}) };
 const store = () => save.writeJson(KEY, data);
 const preview = Math.min(LAST_STAGE, Math.max(0, Math.trunc(Number(query.get('level'))) || 0));
 let stage = preview || Math.max(1, Math.min(LAST_STAGE, Number(data.opened) || 1));
@@ -427,7 +427,8 @@ function finish() {
   playing = false;
   const won = s.over === 'nest', got = stars(s), n = s.arrived.length;
   rec.end(won ? 'nest' : 'lost-all', { stage: s.stage, arrived: n, collected: s.joins, stars: got, score: s.score, why: s.why, mode });
-  data.home += n; for (const f of s.arrived) data.album[f.name] = (data.album[f.name] || 0) + 1;
+  data.home += n; data.looks ||= {};
+  for (const f of s.arrived) { data.album[f.name] = (data.album[f.name] || 0) + 1; data.looks[f.name.split(' ')[0]] = f.trait; }
   const chapter = chapterOf(s.stage), need = LEVELS[s.stage]?.need;
   const endLine = $('endLine');
   endLine.replaceChildren();
@@ -919,6 +920,14 @@ function drawNest(now) {
   const px = sx(s.nest.x), py = sy(s.nest.y);
   if (py < -0.4 * u || py > H + 0.4 * u) return;
   art.nest(g, px, py, u, now / 1000, homeGlow);
+  // Settling: with enough home and a bird still waiting, a ring fills while she stays. Swimming out cancels it.
+  if (s.settle > 0) {
+    const r = (NEST_R - 0.02) * u;
+    g.lineWidth = 5 * dpr; g.lineCap = 'round';
+    g.strokeStyle = '#ffffff88'; g.beginPath(); g.arc(px, py, r, 0, Math.PI * 2); g.stroke();
+    g.strokeStyle = '#ffb627'; g.beginPath(); g.arc(px, py, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, s.settle / SETTLE)); g.stroke();
+    g.lineCap = 'butt';
+  }
   // the ducklings already home, each hopping in from where it reached the nest
   nestDucks.forEach((d, i) => {
     const a = i / Math.max(6, nestDucks.length) * Math.PI * 2 - Math.PI / 2, tx = s.nest.x + Math.cos(a) * 0.075, ty = s.nest.y + Math.sin(a) * 0.065;
@@ -1132,7 +1141,7 @@ function drawHud(now) {
     const flock = $('flockCount');
     flock.replaceChildren(graphic(countText('following', following), icon('duck') + number(following)));
     if (waiting && !s.endless) flock.append(graphic(countText('waiting', waiting), icon('waiting') + number(waiting)));
-    if (s.home) flock.append(graphic(countText('homeCount', home), icon('nest') + number(home)));
+    if (s.home || home) flock.append(graphic(countText('homeCount', home), icon('nest') + number(home)));
     if (!s.endless) {
       const need = LEVELS[s.stage].need, met = home >= need;
       const label = t('goal', { n: number(need), total: number(s.total) });
@@ -1162,7 +1171,7 @@ function drawHud(now) {
   if (timed) $('lightFill').style.width = `${Math.min(100, Math.max(0, leftTime / (s.endless ? ENDLESS_TIME : s.time) * 100))}%`;
 
   const roadGuideActive = s.stage === 5 && pathAt(s, s.line.at(-1)?.delay ?? 0).y <= s.hazards[0].y1;
-  const nestAhead = !s.endless && !s.home && !roadGuideActive && following >= LEVELS[s.stage].need &&
+  const nestAhead = !s.endless && !s.home && !roadGuideActive && following + home >= LEVELS[s.stage].need && following > 0 &&
     nestMarkerShows(sy(s.nest.y), (inset.top + 79) * dpr, u);
   const marker = $('nestDirection');
   marker.hidden = !nestAhead;
@@ -1311,7 +1320,6 @@ function drawPostcard(won, kind = 'plain') {
   if (kind === 'final') { water.addColorStop(0, '#ffcf8a'); water.addColorStop(.45, '#f7a27a'); water.addColorStop(.46, '#9fcbc4'); water.addColorStop(1, '#6fb1b0'); }
   else { water.addColorStop(0, '#d5ead1'); water.addColorStop(1, '#94cbc3'); }
   q.fillStyle = water; q.beginPath(); q.roundRect(12, 12, w - 24, h - 24, 70); q.fill();
-  const looks = Object.keys(TRAITS);
   if (kind === 'final') {
     // sunset over the pond: the sun sits on the water line, its light trailing across
     q.save(); q.beginPath(); q.roundRect(12, 12, w - 24, h - 24, 70); q.clip();
@@ -1333,7 +1341,7 @@ function drawPostcard(won, kind = 'plain') {
     q.strokeStyle = col; q.lineWidth = 6; q.stroke();
     art.chapterBadge(q, 78, 122, 160, CHAPTERS[chapterOf(s.stage)].icon);
   }
-  const group = kind === 'final' ? albumCounts().map((n, i) => n ? { trait: looks[i % looks.length] } : null).filter(Boolean)
+  const group = kind === 'final' ? albumCounts().map((n, i) => n ? { trait: lookOf(i) } : null).filter(Boolean)
     : s.endless ? s.line : s.arrived;
   if (won) art.nest(q, w / 2, h * .54, 390, 0, 1);
   art.mother(q, w / 2, h * .42, -.22, 610, 0, 0, false, !won && s.why === 'hearts');
@@ -1348,6 +1356,9 @@ function drawPostcard(won, kind = 'plain') {
 
 // ---------------------------------------------------------------- the album: every name, met or not yet
 let albumFrom = 'menu', postcardKind = 'plain';
+// Each name shows the look of the bird of that name last brought home (saved as it arrives); a name met
+// before looks were saved falls back to a look by its place in the list.
+function lookOf(i) { const looks = Object.keys(TRAITS); return data.looks?.[NAMES[i]] in TRAITS ? data.looks[NAMES[i]] : looks[i % looks.length]; }
 function albumCounts() {
   const counts = NAMES.map(() => 0);
   for (const [name, n] of Object.entries(data.album || {})) {
@@ -1357,7 +1368,7 @@ function albumCounts() {
   return counts;
 }
 function drawAlbum() {
-  const c = $('albumArt'), q = c.getContext('2d'), counts = albumCounts(), looks = Object.keys(TRAITS);
+  const c = $('albumArt'), q = c.getContext('2d'), counts = albumCounts();
   const cols = 4, cell = c.width / cols;
   q.clearRect(0, 0, c.width, c.height);
   counts.forEach((n, i) => {
@@ -1366,7 +1377,7 @@ function drawAlbum() {
     // each name keeps one look; a name not met yet is a grey shape with a question mark
     const sprite = document.createElement('canvas'); sprite.width = sprite.height = cell;
     const p = sprite.getContext('2d');
-    art.duckling(p, cell / 2, cell * .44, 0, 1250, 0, i, { trait: looks[i % looks.length], open: n > 0, moving: 0 });
+    art.duckling(p, cell / 2, cell * .44, 0, 1250, 0, i, { trait: lookOf(i), open: n > 0, moving: 0 });
     if (!n) { p.globalCompositeOperation = 'source-atop'; p.fillStyle = '#a9b39f'; p.fillRect(0, 0, cell, cell); }
     q.drawImage(sprite, x0, y0);
     q.font = 'bold 30px ui-rounded, system-ui, sans-serif'; q.textAlign = 'center'; q.textBaseline = 'middle';
@@ -1526,6 +1537,7 @@ window.ducklingsState = () => ({
   opened: data.opened, sound: data.sound, taught: data.taught, hudPeeks, rollCalls,
   playTop: playTop / dpr, intro: intro?.kind ?? null, introRun: [...introRun], met: Object.keys(data.met || {}), postcard: postcardKind,
   quackCue: $('quack').classList.contains('cue'),
+  albumLooks: NAMES.map((_, i) => lookOf(i)), arrivedLooks: s.arrived.map(f => [NAMES.indexOf(f.name.split(' ')[0]), f.trait]),
   padGain: padGain && performance.now() - padGain.t0 < 1700 ? { add: padGain.add, scares: padGain.scares } : null,
 });
 

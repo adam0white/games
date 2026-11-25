@@ -1,10 +1,11 @@
 // Draws every creature from its data, seen from above, facing right, centred on the origin. r is the body radius, t a walk phase.
 const TAU = Math.PI * 2;
-// Looks: 0 flat, 1 cartoon (dark outline, shaded), 2 soft (thin outline, shaded, glossy), 3 3D (look3d.js records these calls and builds solids).
+// Looks: 0 flat, 1 cartoon (dark outline, shaded), 2 soft (thin outline, shaded, glossy), 3 3D (look3d.js records these calls and builds solids),
+// 4 living (living.js: rigged animals; anything it hands back to drawForm is drawn as cartoon).
 // Extra detail is drawn in looks 1 to 3.
 let look = 0, ink = null, ow = 0, lx = -0.6, ly = -0.8, unit = 10;
-export const LOOKS = ['Flat', 'Cartoon', 'Soft', '3D'];
-export const setLook = n => { look = LOOKS[n] ? n : 0; };
+export const LOOKS = ['Flat', 'Cartoon', 'Soft', '3D', 'Living'];
+export const setLook = n => { look = n === 4 ? 1 : LOOKS[n] ? n : 0; };
 const tones = new Map();
 const tone = (hex, k) => { const key = hex + k; let v = tones.get(key); if (!v) tones.set(key, v = shade(hex, k)); return v; };
 const path = (g, x, y, rx, ry, rot) => { g.beginPath(); g.ellipse(x, y, Math.max(0.1, rx), Math.max(0.1, ry), rot, 0, TAU); };

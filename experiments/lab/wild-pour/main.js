@@ -6,6 +6,7 @@ import { onLeave, isPauseKey } from '../../kit/pause.js';
 import { noZoom } from '../../kit/zoom.js';
 import { screens } from '../../kit/screens.js';
 import { hint } from '../../kit/hint.js';
+import { lab } from '../../kit/lab.js';
 import { liquidSurface } from './liquid.js';
 import { DAILY_KEY, dailyPour, validBest, dailyBest } from './daily.js';
 
@@ -73,12 +74,22 @@ const show = screens(['menu', 'paused', 'end'], name => {
 });
 const PALETTE = [['#ff8a3d', '#ffc078'], ['#e8436a', '#ff9db3'], ['#7cc242', '#c3ec8e'], ['#8a5cf0', '#c9b2ff'], ['#ffb400', '#ffe38a'], ['#e8436a', '#ff9db3'], ['#25a7d6', '#9be3ff'], ['#ff8a3d', '#ffc078']];
 
+// Play recording for the game lab (kit/lab.js): one run for each pour, started by Play, Daily pour, Next or Again.
+const rec = lab('wild-pour');
+let runOpen = false;
+function runEnd(outcome) {
+  if (!runOpen || !s) return;
+  runOpen = false;
+  rec.end(outcome, { level: lvl, daily: !!daily, why: s.why || null, stars: s.won ? s.stars : 0, inGlass: s.inGlass, target: s.L.target, spilled: s.spilled, seconds: Math.round(s.t * 10) / 10 });
+}
 function start(n, challenge = null) {
+  runEnd('quit');
   daily = challenge;
   lvl = n; save.tries++; store();
   const seed = daily ? daily.seed : query.has('seed') ? +query.get('seed') : save.tries * 101 + n;
   s = create(n, seed); finger = null; keyDown = false; keyTilt = 0; want = 0; fx = []; shake = 0; acc = 0; endAt = 0; lineFlash = 0;
   mode = 'play'; paused = false; show('play'); snd.release();
+  runOpen = true; rec.start({ level: n, daily: !!daily });
   tone(520, 0.12, 0.08, 'triangle', 200);
 }
 function pause() { if (mode !== 'play' || paused) return; paused = true; finger = null; snd.hold(); show('paused'); }
@@ -163,6 +174,8 @@ function splash(x, y, color, n) { if (calm) return; for (let i = 0; i < n; i++) 
 function finish() {
   if (daily) { const best = dailyBest(readJson(DAILY_KEY), daily.day, s); if (best) writeJson(DAILY_KEY, best); }
   finger = null; endAt = performance.now() + (s.won ? 900 : 1100);
+  rec.event(daily ? 'daily-finished' : 'level-finished', { level: lvl, won: s.won, stars: s.won ? s.stars : 0 });
+  runEnd(s.won ? 'won' : 'lost');
   if (s.won) {
     if (!daily && s.stars > save.stars[lvl - 1]) save.stars[lvl - 1] = s.stars; store();
     [523, 659, 784, 1047, 1319].forEach((f, i) => setTimeout(() => tone(f, 0.3, 0.08, 'triangle'), i * 90));
@@ -306,10 +319,13 @@ $('play').addEventListener('click', () => { snd.unlock(); askSensor(); start(lvl
 $('daily').addEventListener('click', () => { snd.unlock(); askSensor(); const d = dailyPour(); start(d.level, d); });
 $('pause').addEventListener('click', pause);
 $('resume').addEventListener('click', resume);
-$('quit').addEventListener('click', () => { paused = false; snd.release(); mode = 'menu'; s = null; levelsCard(); show('menu'); });
+$('quit').addEventListener('click', () => { runEnd('quit'); paused = false; snd.release(); mode = 'menu'; s = null; levelsCard(); show('menu'); });
 $('next').addEventListener('click', () => start(Math.min(LEVELS, lvl + 1)));
 $('retry').addEventListener('click', () => start(lvl, daily));
 $('toMenu').addEventListener('click', () => { mode = 'menu'; s = null; levelsCard(); show('menu'); });
+// The recording notice is on the menu card, which the player sees before Play; its switch is on the pause card.
+rec.notice($('menu').firstElementChild);
+rec.toggle($('paused').firstElementChild);
 levelsCard(); soundLabel();
 // Refresh a menu left open across UTC midnight; an in-progress run keeps its date.
 setInterval(() => { if (mode === 'menu') dailyLabel(); }, 60000);

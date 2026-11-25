@@ -70,6 +70,7 @@ export const labMoved = {
   'ant-draft-b': '/ant-promotion/',
   'ant-quests': '/ant-promotion/',
   'ant-nest': '/ant-promotion/',
+  'ant-creatures': '/ant-promotion/?look=4',
   'night-flock': '/flock/',
   'night-flock-2': '/flock/',
   'night-vine': '/vine/',

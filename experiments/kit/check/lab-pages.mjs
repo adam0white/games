@@ -8,7 +8,6 @@ const utcDay = now.toISOString().slice(0, 10);
 
 // These saves exercise the formats already read by each page. Sharing remains off.
 const saves = {
-  creatures: { sound: true, best: 4, big: false, day: localDay, dayBest: 3 },
   face: { v: 1, best: 300, runs: 3, stars: [2, 1, 0, 0], sound: true },
   pour: { v: 1, stars: [0, 0, 0, 0, 0, 0, 0, 0], sound: true, tries: 3 },
   bells: { v: 1, stars: [2, 0, 0, 0, 0, 0, 0, 0], best: 120, sound: true, tries: 3, look: 'moon' },
@@ -197,13 +196,6 @@ export const labPages = {
     hint: { key: 'lantern-race:hint', delay: 1500, start: raceStart, before: () => window.raceState().target, moved: n => window.raceState().target !== n,
       legacy: { 'lantern-race-best': '100000', 'lantern-race-sound': '1', 'lantern-race-name': 'Test boat', 'lantern-race-played': '1' } },
   },
-  'lab/ant-creatures': pageEntry('ant-creatures:v1', saves.creatures, 'ant-creatures:hint', {
-    menu: '#paused .toMenu', sound: '#sound', soundOnMenu: true,
-    state: () => { const a = window.__ant; return a && { screen: a.mode, paused: a.mode === 'paused', t: a.s?.t ?? 0 }; },
-    verify: () => ({ ...window.__ant.save }), expect: saves.creatures,
-    touch: dragTouch(() => window.__ant.s.player.x, n => window.__ant.s.player.x > n),
-    hint: { moved: () => window.__ant.input.x !== 0 },
-  }),
   'lab/wild2-face-shift': pageEntry('wild2-face-shift:save', saves.face, 'wild2-face-shift:hint', {
     menu: '#toMenu', sound: '#sound',
     state: () => { const s = window.faceShiftState?.(); return s && { screen: s.mode, paused: s.mode === 'paused', t: s.state?.elapsed ?? 0 }; },

@@ -8,7 +8,7 @@ import { noZoom } from '../kit/zoom.js';
 import {
   create, step, dailyKey, dailyNight, aimFor, EXITS, HATCH, deadline, spread, DEFAULT_SEED, LAST, WIDTH, HEIGHT, DT, LIFT, REST, FUSE, CASE,
 } from './sim.js';
-import { renderer, cover, clock, lessonArt, lossArt } from './art.js';
+import { renderer, cover, clock, lessonArt, lossArt, WAKE_LIFE } from './art.js';
 import { apply, count, date, lang, langs, number, padded, setLang, t, time } from './words.js';
 
 const $ = id => document.getElementById(id);
@@ -32,6 +32,10 @@ const profile = {
   lossShown: Array.from({ length: LAST }, (_, i) => old?.lossShown?.[i] === true),
 };
 const persist = () => save.writeJson(KEY, profile);
+// Long Night and Daily put every rule on the floor at once, so they open after night 15 has
+// taught the last rule. A player who already ran either mode keeps them.
+const MODES_AFTER = 15;
+const modesOpen = () => profile.cleared >= MODES_AFTER || profile.best > 0 || profile.daily.date !== '';
 const params = new URLSearchParams(location.search);
 const parse = (key, max) => {
   const value = params.get(key);
@@ -142,6 +146,14 @@ function renderMenu() {
   $('streak').textContent = count('streakMark', streak);
   $('daily').setAttribute('aria-label', [t('daily'), count('streak', streak)].join(' · '));
   $('long').setAttribute('aria-label', [t('long'), t('endless'), t('best', { time: time(profile.best) })].join(' · '));
+  const open = modesOpen();
+  for (const id of ['long', 'daily']) {
+    const button = $(id);
+    button.classList.toggle('locked', !open);
+    button.setAttribute('aria-disabled', String(!open));
+    button.querySelector('.lockStat b').textContent = number(MODES_AFTER);
+    if (!open) button.setAttribute('aria-label', t('modeLocked', { mode: t(id), n: number(MODES_AFTER) }));
+  }
   $('progress').replaceChildren(...Array.from({ length: LAST }, (_, i) => {
     const mark = document.createElement('i');
     if (i + 1 === level) mark.className = 'current';
@@ -488,8 +500,21 @@ noZoom();
 $('play').onclick = () => start();
 $('progress').onclick = showNights;
 $('nightsBack').onclick = showMenu;
-$('long').onclick = () => start('long');
-$('daily').onclick = () => start('daily');
+// A locked mode shakes its padlock and bounces Play, the way forward.
+function tryMode(mode) {
+  if (modesOpen()) return start(mode);
+  for (const el of [$(mode), $('play')]) {
+    el.classList.remove('nudge');
+    void el.offsetWidth;
+    el.classList.add('nudge');
+    // Reduced motion shows an outline with no animation to end, so clear it on a timer.
+    setTimeout(() => el.classList.remove('nudge'), 700);
+  }
+  snd.unlock();
+  snd.tone(196, .14, .07, 'triangle', -40);
+}
+$('long').onclick = () => tryMode('long');
+$('daily').onclick = () => tryMode('daily');
 $('pause').onclick = pause;
 $('resume').onclick = resume;
 $('toMenu').onclick = leave;
@@ -571,7 +596,7 @@ function react(event, now) {
   }
   if (type === 'cat') {
     snd.tone(655, .19, .061, 'sine', -210);
-    if (event.woke) effects.push({ type: 'wake', x: event.x, y: event.y, tx: event.woke.x, ty: event.woke.y, at: now, life: 1100 });
+    if (event.woke) effects.push({ type: 'wake', id: event.woke.id, x: event.x, y: event.y, tx: event.woke.x, ty: event.woke.y, at: now, life: WAKE_LIFE });
   }
   if (type === 'trip') snd.tone(160, .32, .1, 'sawtooth', -60);
   if (type === 'fuse') {

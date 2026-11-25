@@ -7,6 +7,7 @@ import { isPauseKey, onLeave } from '../../kit/pause.js';
 import { screens } from '../../kit/screens.js';
 import { stick } from '../../kit/stick.js';
 import { noZoom } from '../../kit/zoom.js';
+import { lab } from '../../kit/lab.js';
 
 noZoom();
 const el = id => document.getElementById(id);
@@ -26,6 +27,15 @@ const show = screens(['paused', 'result'], next => {
   el('cabinet').inert = mode === 'paused';
 });
 const audio = sound({ on: () => soundOn });
+// Play recording for the game lab (kit/lab.js): one run for each plate the player starts to rub.
+const rec = lab('night-rubbing');
+let runOpen = false;
+function runBegin() { if (runOpen || s.done) return; runOpen = true; rec.start({ level: s.level, red: displayRed }); }
+function runEnd(outcome) {
+  if (!runOpen) return;
+  runOpen = false;
+  rec.end(outcome, { level: s.level, coverage: Math.round(s.coverage / s.goal * 100), distance: Math.round(s.distance), unlocked });
+}
 const pad = stick(field, { when: () => mode !== 'paused', reach: 32, leash: 60, dead: 0 });
 
 function save() {
@@ -126,6 +136,7 @@ function setMode(next, keepStroke = false) {
 }
 
 function open(level, fresh = false) {
+  runEnd('quit');
   fileProof();
   const proof = fresh ? null : (sessionProofs.get(level) || readJson(proofKey(level)));
   s = createPlate(level, Number.isInteger(proof?.grain) ? proof.grain : 19023 + level * 583);
@@ -176,6 +187,7 @@ function stroke(a, b) {
   const before = s.distance, filed = s.done;
   rub(s, a.x, a.y, b.x, b.y);
   if (s.distance === before) return;
+  if (before === 0) runBegin();
   paper.classList.remove('unused');
   moveTool(b);
   if (performance.now() - soundAt > 85) {
@@ -188,6 +200,8 @@ function stroke(a, b) {
     fileProof();
     save();
     audio.tone(392, 0.24, 0.075, 'sine', 132);
+    rec.event('plate-filed', { level: s.level, ink: displayRed ? 'red' : 'graphite' });
+    runEnd('won');
     setMode('result', true);
   } else if (filed) {
     tool.hidden = false;
@@ -270,5 +284,8 @@ addEventListener('keyup', e => { if (e.key.startsWith('Arrow')) fileProof(); });
 
 hint(field, { kind: 'drag', key: 'night-rubbing:hint', when: () => mode === 'play',
   played: unlocked > 1, delay: 2200, reach: 38, label: 'Rub back and forth' });
+// The recording notice sits on the page under the drawer, so it is on screen from the first look; its switch is on the pause card.
+rec.notice(el('cabinet'));
+rec.toggle(el('paused').firstElementChild);
 window.rubbingState = () => ({ screen: mode, level: s.level, unlocked, sound: soundOn, coverage: s.coverage, goal: s.goal, distance: s.distance });
 open(plateNumber(prefs.level) && prefs.level <= unlocked ? prefs.level : unlocked);
