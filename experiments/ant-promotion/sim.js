@@ -269,7 +269,8 @@ function teachCover(s, C, F) {
   const p = s.player, L = F.level;
   const M = FORMS.filter(f => f.level > L && f.level <= L + 2).map(f => ({ f, reach: f.range * sightOf(f)[0] * F.stealth + F.r })).sort((a, b) => b.reach - a.reach)[0];
   if (!M) return;
-  const D = M.reach * 0.8, r = Math.max(26, Math.min(44, D * 0.17)), at = D * 0.42;
+  // inside its reach, and on a phone screen (the page shows about 0.34 x (480 + 14 x level) world units either side of the player)
+  const D = Math.min(M.reach * 0.8, 0.25 * (480 + 14 * L)), r = Math.max(26, Math.min(44, D * 0.17)), at = D * 0.42;
   for (let i = 0; i < 13; i++) {
     const a = p.a + (i % 2 ? 1 : -1) * Math.ceil(i / 2) * 0.5, hx = p.x + Math.cos(a) * D, hy = p.y + Math.sin(a) * D;
     if (hx < 90 || hy < 90 || hx > WORLD - 90 || hy > WORLD - 90) continue;

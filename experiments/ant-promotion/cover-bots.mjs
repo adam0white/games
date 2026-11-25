@@ -7,7 +7,7 @@
 //    loses you behind a rock gives up within COVER.lose s and rests; creeping in grass hides you, running in it gives you away,
 //    and a looker in the same patch sees you; a hunter does not start on prey behind a rock; nobody walks into a rock, and a
 //    run straight at one slides round it; the layout is seeded, keeps out of the middle and is sparse; the first rock is taught.
-// 3. Measured play (held-out seeds from 101): the careful bot with cover against without (cover must not be a tax), the share
+// 3. Measured play (held-out seeds from 101; alone, or with --cover-play from bots.mjs): the careful bot with cover against without (cover must not be a tax), the share
 //    of chases that cover broke, and a bot that uses cover against one that ignores it.
 // --mutate=rocks makes rocks see-through (a test-only switch in cover.js). A rule check must fail; this file then exits non-zero.
 import { FORMS, ANT, COVER, coverOn, create, step, choose, revive, me, level, powerOf, sightOf, optionsFor, nemesisMob, OLD_HUNT, SPAWN_WEIGHTS, PREY, WORLD } from './sim.js';
@@ -20,8 +20,11 @@ const nums = process.argv.slice(2).filter(a => !a.startsWith('--')), seeds = Num
 let failed = 0;
 const claim = (ok, text) => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${text}`); if (!ok) failed++; };
 const stackAt = (L, k = 1) => { const st = [ANT]; while (st.length < L) st.push(optionsFor(st.length)[(k + st.length) % 3].id); return st; };
-const snap = s => JSON.stringify([s.tick, s.player, s.mobs.map(m => ({ ...m, chase: m.chase?.id, fear: m.fear?.id })), s.events, s.dead, s.nemesis, s.eaten, s.deaths, s.choosing?.map(f => f.id)],
-  (k, v) => (typeof v === 'function' ? undefined : v));
+const snap = s => { // the whole state; an animal held inside another (what it chases or fears) is written as its id
+  const mobs = s.mobs;
+  return JSON.stringify([s.tick, s.player, mobs, s.events, s.dead, s.nemesis, s.eaten, s.deaths, s.choosing?.map(f => f.id)],
+    function (k, v) { if (typeof v === 'function') return undefined; if (v && typeof v === 'object' && this !== mobs && 'f' in v && 'id' in v && 'x' in v) return `mob ${v.id}`; return v; });
+};
 const input = (i, seed) => ({ x: Math.sin(i / 50 + seed), y: Math.cos(i / 70), power: i % 400 === 0 });
 
 // ---- 1. Parity
@@ -46,7 +49,7 @@ const input = (i, seed) => ({ x: Math.sin(i / 50 + seed), y: Math.cos(i / 70), p
         if (snap(a) !== snap(b)) { ok = false; console.log(`  first difference: seed ${seed}, level ${L}, ${wild ? 'Wild' : 'Classic'}, tick ${i}`); break; } n++;
       }
     }
-    claim(ok, `{ cover: false } plays as main (${ref}): ${n} ticks identical at levels 1, 6, 12, 18, Classic and Wild, with power presses`);
+    claim(ok, `{ cover: false } plays as the reference sim (${ref}): ${n} ticks identical at levels 1, 6, 12, 18, Classic and Wild, with power presses`);
   } else console.log('     (no --ref given: the check against main was skipped)');
 }
 
@@ -180,7 +183,9 @@ function play(policy, cover, wild, pick, n) {
   tops.sort((a, b) => a - b);
   return { chases, broken, deaths, deathsHigh, top: tops[tops.length >> 1] };
 }
-if (seeds > 0) { // seeds 0: rules only
+// Measured play takes about 8 minutes, so bots.mjs runs it only with --cover-play; run alone, this file always does (seeds 0: rules only).
+const alone = !!process.argv[1]?.endsWith('cover-bots.mjs');
+if (seeds > 0 && (alone || process.argv.includes('--cover-play'))) {
   const n = Math.max(4, Math.ceil(seeds / 2)), rows = [], sum = { off: 0, on: 0, hide: 0, offC: 0, onC: 0, hideC: 0, onB: 0, hideB: 0 };
   for (const wild of [true, false]) for (const pick of [0, 1, 2]) {
     const off = play(careful, false, wild, pick, n), on = play(careful, true, wild, pick, n), hide = play(hider, true, wild, pick, n);

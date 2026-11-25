@@ -795,6 +795,21 @@ const GAMES = {
     await until(page, () => window.__ant.living && window.__ant.living.stat.drawn > 3 && window.__ant.living.rig(null), 'living bodies after a death');
     await toMenu(); await lookTo(['Flat', 'Cartoon', 'Soft', '3D', 'Living'][lookWas]); assert.equal((await saved()).look, lookWas, 'the look goes back round');
     await page.click('#continue'); assert.equal(await page.evaluate(() => window.__ant.living), null, 'no rigs in the other looks');
+    // Cover (ant-promotion/cover.js, from the lab page ant-hide): none below level 4. At level 4 or above, a device that has not seen it
+    // is taught once: a rock ahead and a hunter behind it that does not see the player. Every look draws rocks and grass; the save keeps its format.
+    await toMenu(); await page.evaluate(([k, st]) => { localStorage.setItem(k, JSON.stringify({ skin: { c: '#3a2a22', p: 'plain' }, stack: st, xp: 0, sound: true, look: 1, wild: true })); localStorage.removeItem('ant-promotion:cover'); }, [KEY, ladder.slice(0, 3)]);
+    await page.reload(); await page.click('#continue'); await sleep(200);
+    assert.equal(await page.evaluate(() => window.__ant.s.cover.rocks.some(r => r.teach) || localStorage.getItem('ant-promotion:cover')), null, 'no cover and no teaching below level 4');
+    await page.click('#pause'); await page.click('#paused .toMenu');
+    await page.evaluate(([k, st]) => localStorage.setItem(k, JSON.stringify({ skin: { c: '#3a2a22', p: 'plain' }, stack: st, xp: 0, sound: true, look: 1, wild: true })), [KEY, ladder.slice(0, 6)]);
+    await page.reload(); await page.click('#continue');
+    await until(page, () => JSON.parse(localStorage.getItem('ant-promotion:cover') || '{}').taught && window.__ant.s.cover.rocks.some(r => r.teach), 'the first rock is taught');
+    await sleep(500); assert.equal(await page.evaluate(() => window.__ant.s.mobs.find(m => m.teach)?.alert), false, 'the hunter behind the teaching rock has not seen the player');
+    for (const look of [0, 1, 2, 3, 4]) { await page.evaluate(n => window.__ant.look(n), look); await sleep(250); assert.equal(await mode(), 'play', `look ${look} draws cover`); }
+    await page.evaluate(() => { const { s, FORMS, me } = window.__ant, p = s.player, m = s.mobs.find(m => FORMS[m.f].power > me(s).power); p.safe = 0; p.hideAt = 1e9; p.x = m.x; p.y = m.y; });
+    await until(page, () => window.__ant.mode === 'dead', 'death card with cover');
+    const after = await saved(); assert.ok(!('cover' in after) && !('taught' in after), 'cover is not in the save');
+    await page.click('#goOn'); await page.click('#pause'); await page.click('#paused .toMenu'); await page.evaluate(([k, v]) => localStorage.setItem(k, v), [KEY, kept]);
   },
   // The three games of 2026-11-23. Each has its own full check (experiments/<slug>/check.mjs); this is the shared part:
   // the page loads through the kit with no error, a run starts from Play, pause holds it, and leaving for the menu

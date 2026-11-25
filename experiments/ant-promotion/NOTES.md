@@ -679,3 +679,59 @@ Compared on one frozen moment (the same seed and placements; `__ant.look(n)` swi
 - At play size the dog and the lynx are still close (both tan with dark spots); at 9 pixels most mammals read by colour and size more than by outline.
 - The ostrich's plumes and the gorilla's face are first drafts.
 - A rig's heading lags when an animal is moved at once (a revive, a check placing animals); in play animals walk, so this shows only in tests.
+
+## 2026-11-24: rocks and tall grass (lab page ant-hide folded in, "but less prevalent")
+
+### Done
+- From level 4, the meadow has a few rocks and patches of tall grass: about 11 rocks and 13 patches in the 2000 x 2000 world (the lab page had 53 of each), none within 330 of the middle. A phone screen shows one or two at most. Levels 1 to 3 have none, so a new player's first minute is the meadow as it was. The world keeps its layout across promotions; cover is switched on by level each tick, not when the world is made.
+- The code is in `cover.js` (layout, sight tests, the push out of rocks, the cut sight outline; pure geometry, no drawing, node-safe) and `cover-draw.js` (drawing in every look). `sim.js` calls them in a few marked lines: `coverOn`, `coverPlayer`, `teachCover`, the `hid` test in the animal loop, and `pushOut` after each move. The builder adding evolution across runs can treat cover as one switch: `create(..., opts)` with `opts.cover`.
+- **Rocks block sight and movement.** A hunter cannot notice you through a rock, and nothing walks through one: a body that steps into a rock is put back on its edge and the part of its step that went in becomes a slide round it, toward the side it was heading. Why solid: a rock you can walk through reads wrong when it is drawn as a boulder. A plain push straight out pinned a body that ran at a rock's middle; in staged chases (a faster hunter behind, a rock ahead, 60 trials) a bot that ignores cover then survived 67 % instead of 82 % at level 6, and 57 % instead of 77 % at level 12. With the slide it was 78 % and 77 %, close to no rock at all.
+- **Tall grass hides you while you creep.** Inside a patch, moving at most 0.45 of your top speed (or standing), you cannot be seen from outside the patch unless the looker is within 2.2 times your two radii. Running in grass rustles: you are seen as usual. A looker in the same patch sees you. Grass does not slow you (the lab page slowed by 20 %), so it costs nothing to cross.
+- **Losing a hunter.** An alert hunter that loses sight of you to a rock or grass walks at 0.55 of its speed to where it last saw you. After 0.6 s out of sight (or its own hold time if shorter) it gives up, and then it does not notice anyone for 2 s, like a tired hunter. The lab page let a hunter sweep for 3 s and rest 1 s. Without the rest, half the hunters that lost the bot found it again within 3 s, so a break was not an escape.
+- Cover applies to everyone who looks: the rival, old animals on the hunt and Wild hunts (which otherwise see you wherever they face) do not see through a rock or into grass. Animals hunting each other do not start or keep a chase on prey behind a rock or creeping in grass.
+- **Fair both ways.** An animal creeping in grass is drawn as two eyes only, with no number, unless you share its patch or are very close; you are drawn faint with your eyes showing when you creep in grass. Rocks do not hide animals in the drawing, since the view is from above; the dimmed ground of your own sight is cut by rocks, so you see the shadows.
+- **Sight drawn with shadows.** Every hunter's sight wedge and your own dimmed-ground sight are cut by rocks with real shadow outlines (`sightCut`: rays at each rock's edges), in Flat, Cartoon, Soft, Living and 3D (3D draws the cut wedge as a fan of triangles).
+- **Taught without words.** The first time cover comes on, on a device that has not seen it, a rock appears ahead of the player with a hunter behind it facing the player; its drawn sight visibly stops at the rock. The hunter is the next-two-levels animal that sees furthest, placed inside its reach and on a phone screen. It waits a few seconds, then lives as usual. The device remembers in a new key `ant-promotion:cover` (`{ taught: true }`); `ant-promotion:v1` is unchanged and old saves load as before.
+- **Seeds and boards.** Ant Promotion has no daily or shared board: the page makes a random seed each visit, or uses `?seed=`. The layout comes from its own random stream (seed xor a constant), so animals, spawns and moves come out exactly as without cover; levels 1 to 3 play tick for tick as on main, and a `?seed=` link shows the same rocks every time. `?cover=0` turns cover off.
+- No new words, in English or Turkish.
+- The lab page `ant-hide` is in `archive/lab/ant-hide/`. The redirect `'ant-hide': '/ant-promotion/'` is for the owner to add to `labMoved` in `worker-settings.mjs`.
+
+### Checks
+- `cover-bots.mjs`, run by `bots.mjs` after `rig-bots.mjs`, and alone (`node experiments/ant-promotion/cover-bots.mjs [seeds] [minutes] [--ref=<main's sim.js>] [--mutate=rocks]`):
+  - Below level 4 a world with cover plays as one without: 86,400 ticks identical (seeds 1 to 3, Classic and Wild), whole state and every event.
+  - With `--ref=` main's `sim.js` (from `git archive origin/main experiments`), `{ cover: false }` plays as main: 86,400 ticks identical at levels 1, 6, 12 and 18, Classic and Wild, with power presses.
+  - Staged rules: a rock stops a hunter noticing you; an alert hunter loses you behind a rock in 0.58 s and rests, and stays on you in the open; grass hides you standing, not running, and not from a looker in the same patch; the rival and an old animal on the hunt do not see through a rock; a hunter starts on prey in the open and not behind a rock; running straight at a rock slides round it with no step inside; the layout is seeded and keeps out of the middle; the teaching rock and hunter appear at level 4 only, once.
+  - `--mutate=rocks` (a test-only switch in `cover.js` that makes rocks see-through) fails 5 of those checks and exits 1. `rig-bots.mjs` now hands any mutation that is not its own (gait, clamp, spine) to `cover-bots.mjs` instead of treating it as a rig mutation.
+  - Measured play runs only alone or with `--cover-play` (about 8 minutes).
+- Sections 4 to 6 of `bots.mjs` now play with cover on (`create` makes cover unless told `{ cover: false }`), so their printed numbers above level 3 differ a little from main. Their claims still pass.
+- The phone check (`kit/check/phone.mjs ant-promotion`, WebKit iPhone 13 and Chromium Pixel 7) now also: no cover and no teaching at level 3; at level 6 on a fresh device the first rock is taught and saved in `ant-promotion:cover`, and the hunter behind it has not seen the player; all five looks draw with cover; a death with cover; `ant-promotion:v1` holds no cover field.
+- Played headless at 390x844 and looked at: the menu, the first minute as an Ant (no cover), promoting to level 4 and the teaching rock with the hunter's sight cut by it, the pause card, the death card; rocks and grass in Flat, Soft, 3D and Living at level 6; eyes in grass in Cartoon and Living.
+- Trial merge with PR 242 (`ant-skills`, not pushed): conflicts in `sim.js` (the imports, `create`'s first line, and the `sees` line, where both changes are kept: `!unseen(...)`, `seenK(s)`, and `&& !hid`), `bots.mjs` (imports), `index.html` (imports) and `NOTES.md`. Resolved that way, the cover checks pass and `{ cover: false }` plays as `ant-skills`'s own `sim.js` for 86,400 ticks.
+
+### Numbers
+- Measured play, held-out seeds 101 to 110, 12 minutes, Classic and Wild, each of the three picks, deaths at level 4 and above:
+
+| | no cover | careful bot, cover on | hider bot, cover on |
+| --- | --- | --- | --- |
+| deaths (total of 6 settings) | 173 | 147 | 170 |
+| deaths per 100 chases | 30.1 | 24.2 | 26.3 |
+| chases broken by cover | | 10.0 % | 9.4 % |
+
+  The careful bot does not know about cover. The hider bends its run toward a rock ahead when chased and keeps the rock between, and stands still in grass when a stronger animal is near.
+- **The brief's bot target is not met.** Cover is no tax (147 deaths against 173 without; within noise of 10 seeds it may be a small help), but the bot that uses cover does no better than the one that ignores it (26.3 against 24.2 per 100 chases). Tried and dropped: three hider policies, the search walk at 0 and 0.55 of speed, and staged chases. In staged chases with a faster hunter close behind, cover never broke line of sight: a hunter on your tail stays on the same side of the rock as you. Breaks happen when you already have a lead, and those are chases the careful bot survives anyway (a hunter tires after 10 s). Deaths were 0 to 3 within 10 s of a cover break in 20-seed runs. At twice the density (still under half the lab page's) cover broke about 26 % of chases, the "one chase in four" of the brief, and the hider was still no better (146 against 153, and 68 against 69, in Wild with the fast and sneaky picks). The lab page's hider halved its deaths with 53 rocks and 53 patches; at this density the effect is too small to measure with these bots.
+- Page work per frame (`__ant.work`), headless at 390x844, standing next to a rock on seed 7 (the same spot on main), mean / 95th percentile in ms, main then this branch:
+
+| | level 6 | level 12 | level 18 |
+| --- | --- | --- | --- |
+| Chromium, Cartoon | 0.83 / 1.0 → 0.92 / 1.1 | 0.88 / 1.0 → 1.07 / 1.2 | 0.87 / 1.0 → 0.96 / 1.1 |
+| WebKit (1 ms clock), Cartoon | 0.71 / 1 → 0.96 / 2 | 0.79 / 1 → 1.09 / 2 | 0.96 / 1 → 1.18 / 2 |
+| Chromium, 3D | 2.29 / 17.6 → 2.65 / 16.3 | 2.36 / 13.6 → 2.56 / 13.6 | 2.55 / 14.7 → 2.91 / 14.8 |
+| Chromium, Living | 0.81 / 1.0 → 0.95 / 1.4 | 0.93 / 1.2 → 1.16 / 1.6 | 1.02 / 1.3 → 1.12 / 1.5 |
+
+  Cover costs about 0.1 to 0.35 ms a frame.
+
+### Not verified
+- A real phone, and whether the owner finds cover "less prevalent" enough, or now too rare to matter.
+- Whether hiding feels worth doing to a person; the bots say it does not change survival at this density (see above).
+- Frame time at a 4x CPU slowdown, and WebKit in 3D and Living.
+- Balance was tuned on seeds 1 to 40 and reported on seeds 101 to 110.
