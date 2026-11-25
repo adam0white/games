@@ -14,6 +14,8 @@
   #bar { width: 260px; height: 8px; margin: 18px auto 0; background: #26323a; border-radius: 4px; overflow: hidden; }
   #fill { width: 0; height: 100%; background: #d9b24a; }
   #turn { display: none; position: fixed; inset: 0; z-index: 5; background: #0e1418; place-content: center; text-align: center; padding: 24px; font-size: 20px; }
+  #rec { position: fixed; left: 10px; bottom: 8px; z-index: 4; max-width: 30em; padding: 6px 10px; border-radius: 8px; background: rgba(14, 20, 24, 0.72); text-align: left; font-size: 12px; -webkit-user-select: none; user-select: none; }
+  #rec .lab-notice { margin: 0; }
   @media (pointer: coarse) and (orientation: portrait) { #turn { display: grid; } }
 </style>
 </head>
@@ -25,6 +27,7 @@
   <p id="status">Loading</p>
   <div id="bar"><div id="fill"></div></div>
 </div>
+<div id="rec"></div>
 <div id="turn"><div>Turn your phone sideways to play.</div></div>
 <script src="Build/webgl.loader.js"></script>
 <script>
@@ -46,6 +49,27 @@
   for (const type of ['gesturestart', 'gesturechange', 'dblclick']) addEventListener(type, e => e.preventDefault(), { passive: false });
   addEventListener('touchmove', e => e.preventDefault(), { passive: false });
   canvas.addEventListener('contextmenu', e => e.preventDefault());
+</script>
+<script type="module">
+  // Play records for the game lab (kit/lab.js). The game calls window.exileEvent(name, json) for a start, an end,
+  // a snapshot every 20 s and each choice; this page decides whether anything is kept. The notice and its switch
+  // sit in the corner while the game loads, on the title screen and after an ending; nothing is recorded before
+  // the notice is on the page. A bot run (autoplay=1) records nothing unless it says it is an agent's run.
+  import { lab } from '../kit/lab.js';
+  const q = new URLSearchParams(location.search), box = document.getElementById('rec');
+  if (q.get('autoplay') === '1' && q.get('labRunSource') !== 'agent') box.remove();
+  else {
+    const rec = lab('exile', { version: '0.4' });
+    rec.notice(box); rec.toggle(box);
+    let errors = 0;
+    window.exileEvent = (name, json) => {
+      let data = null; try { data = JSON.parse(json); } catch { data = { bad: String(json).slice(0, 200) }; }
+      if (name === 'start') { rec.start(data); box.style.display = 'none'; }
+      else if (name === 'end') { rec.end(data.outcome, data); box.style.display = ''; }
+      else rec.event(name, data);
+    };
+    addEventListener('error', e => { if (errors++ < 3) rec.event('pageError', { msg: String(e.message).slice(0, 200) }); });
+  }
 </script>
 </body>
 </html>

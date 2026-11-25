@@ -17,3 +17,19 @@ Not checked by `kit/check/phone.mjs`. Touch play was checked by hand-written Pla
 Built from the second owner's two design sheets: title menu (Play, Shop, Customize, Credits, Sounds and options), XP and five stats (P), stamina, strangers with six choices (V), three rulers, a horse (G), wolves and hogs, coins and a coins-only shop, items, equip and travel menu (M). The hero wakes by the fire after falling; the game is lost only when the fire dies. Nothing takes payment. Not built: bow, PvP, Mountains region, orbs, real animal models (the horse and animals are boxes made in code).
 
 Extra test flags: `coins=N`, `at=x,z`, `test=strangers`, `test=fall`.
+
+## Play records
+
+The page records play for the game lab under the slug `exile` (`kit/lab.js`; the lab accepts the slug in
+human-framework `LAB_PROTOTYPES`). The Unity build calls `window.exileEvent(name, json)`; the module script at the foot
+of `index.html` turns `start` into `rec.start`, `end` into `rec.end` and everything else into `rec.event`. The notice and
+its switch sit in the bottom left corner while the build loads, on the title screen and after an ending.
+
+- What is sent: a start record, a snapshot every 20 s, one event per choice and an end record. The list is in the
+  exile-unity README under "Play records". No GPU name, screen size or other device detail.
+- A run the player walks away from is still sent when the tab is hidden; it has no outcome and reads as `left`.
+- `autoplay=1` records nothing unless the address also has `labRunSource=agent`, which marks the run as an agent's.
+- To read them: `npm run lab:inbox` in the human-framework checkout, then
+  `node experiments/exile/telemetry.mjs <that checkout>/.lab-inbox --html=report.html`. It prints how far runs got,
+  where unfinished runs stopped, falls by place, stranger and stat choices, camera time, combat counts and frame rate,
+  and one row per run. `--agents` includes agent runs; `--csv=FILE` writes the rows.
