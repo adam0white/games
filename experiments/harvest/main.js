@@ -2,8 +2,11 @@
 import * as sim from './sim.js';
 import { DT, LEVELS, HELP, HELPERS, RIVAL, LANE, SWEEP, STAND, LYING, GONE, NEST_BONUS } from './sim.js';
 import { C, TAU, rrect, ell, grain, star, person, sheaf, cart, crow, stone, hare, whetstone, reason, job, cloud, sun, wheat } from './art.js';
-import { readJson, writeJson } from '../kit/save.js';
+import { read, write, readJson, writeJson } from '../kit/save.js';
 import { sound } from '../kit/audio.js';
+import { music } from '../kit/music.js';
+import { SONG, mood, heard } from './song.js';
+import { t } from './words.js';
 import { onLeave, isPauseKey } from '../kit/pause.js';
 import { screens } from '../kit/screens.js';
 import { lab } from '../kit/lab.js';
@@ -36,7 +39,11 @@ const today = /^\d{4}-\d{2}-\d{2}$/.test(query.get('date') ?? '') ? query.get('d
 const dateSeed = sim.dateSeed;
 
 // ---------- sound: all synthesized through the kit
-const snd = sound({ on: () => save.sound });
+// Music (kit/music.js, 2026-11-24): the flute preset in a morning's chords, played by the sheaves the farmer bundles
+// (song.js). Its own key, '0' when turned off; the rest of the save is untouched.
+const MUSIC_KEY = 'harvest-music';
+let musicOn = read(MUSIC_KEY) !== '0', song = null, songFor = null, sung = 0;
+const snd = sound({ on: () => save.sound, setup: ac => { song = music(ac, { ...SONG }); song.volume(SONG.volume); } });
 const tone = (f, d, v, type = 'sine', slide = 0) => { if (snd.ctx) snd.tone(f, d, v, type, slide); };
 const noise = (d, v, hz) => { if (snd.ctx) snd.noise(d, v, hz); };
 const later = (ms, fn) => setTimeout(() => { if (!paused) fn(); }, ms);
@@ -117,7 +124,10 @@ const show = screens(['menu', 'levels', 'paused', 'end'], name => {
   if (name === 'menu') menu();
   if (name === 'levels') levels();
   for (const id of ['sound1', 'sound2']) $(id).textContent = `Sound: ${save.sound ? 'on' : 'off'}`;
+  musicLabels();
 });
+function musicLabels() { for (const id of ['music1', 'music2']) { $(id).textContent = t(musicOn ? 'musicOn' : 'musicOff'); $(id).setAttribute('aria-pressed', String(musicOn)); } }
+musicLabels();
 
 function menu() {
   const n = unlocked(), total = save.stars.reduce((a, b) => a + b, 0);
@@ -236,6 +246,7 @@ $('next').addEventListener('click', () => { snd.unlock(); begin(level + 1, false
 $('again').addEventListener('click', () => { snd.unlock(); begin(level, daily); });
 $('toMenu').addEventListener('click', () => show('menu'));
 for (const id of ['sound1', 'sound2']) $(id).addEventListener('click', () => { save.sound = !save.sound; store(); if (save.sound) { snd.unlock(); snd.release(); SFX.tap(); } show(screen); });
+for (const id of ['music1', 'music2']) $(id).addEventListener('click', () => { musicOn = !musicOn; write(MUSIC_KEY, musicOn ? '1' : '0'); show(screen); });
 onLeave(pause);
 
 // ---------- the verge: neighbours to hire, and the whetstone
@@ -304,6 +315,8 @@ function snapshot() {
 }
 function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  if (song && playing && s && songFor !== s) { songFor = s; song.start(s.seed); } // each morning its own tune, from its seed
+  song?.set({ on: musicOn && save.sound && screen === 'play' && playing && !paused && !!s && !s.over, ...(s ? mood(s) : {}) });
   if (!paused) clock += dt;
   if (screen === 'play' && !paused && playing && s) {
     if (!s.over) {
@@ -324,11 +337,17 @@ function frame(now) {
 
 // Events from the rules become sound, particles and shake.
 function drain() {
+  // With the music on, each sheaf the farmer bundles plays the next note of the morning's tune instead of the pick sound;
+  // a lost sheaf is a note not played; the stone and the rain thin the music. With it off, the sounds as before.
+  const h = heard(s.ev); sung = 0;
+  if (musicOn && song && playing) for (let i = 0; i < h.notes; i++) if (song.ember()) sung++;
+  for (let i = 0; i < h.misses; i++) song?.miss();
+  for (let i = 0; i < h.blows; i++) song?.hit();
   for (const e of s.ev) {
     const X = sx(e.x ?? 0), Y = sy(e.y ?? 0);
     switch (e.type) {
       case 'cut': SFX.cut(); burst(X, Y, 5, ['#f0c24f', '#ffe08a', '#c9962e'], 70, 'chaff'); break;
-      case 'pick': if (e.who === 'me') { SFX.pick(e.n); floats.push({ x: X, y: Y - c * 0.3, text: '+1', t: 0, col: '#fff4dc' }); } break;
+      case 'pick': if (e.who === 'me') { if (sung > 0) sung--; else if (musicOn && song) tone(song.chime(e.n), 0.09, 0.06, 'triangle'); else SFX.pick(e.n); floats.push({ x: X, y: Y - c * 0.3, text: '+1', t: 0, col: '#fff4dc' }); } break;
       case 'drop': cartBounce = 1; if (e.who === 'me') { SFX.drop(e.n); buzz(12); } else tone(600, 0.08, 0.04, 'triangle'); floats.push({ x: sx(s.cart.x), y: sy(s.cart.y) - c, text: `+${Math.round(e.grain)}`, t: 0, col: '#ffe08a', big: true }); burst(sx(s.cart.x), sy(s.cart.y) - c * 0.3, 10, ['#ffd34d', '#fff4dc'], 120, 'spark'); break;
       case 'crow': SFX.crow(); break;
       case 'scare': SFX.scare(); burst(X, Y, 7, ['#232631', '#3c4352'], 120, 'feather'); break;
@@ -615,8 +634,9 @@ function drawEndStars(dt) {
 }
 
 // ---------- for browser checks: a picture of the state
+window.harvestMusic = () => song && { ...song.melody, on: song.state.on, step: song.step, notes: song.log.length, kinds: song.log.map(l => l.kind) }; // read by the phone check
 window.harvestState = () => ({
-  screen, paused, playing, level: level + 1, daily, today, t: s ? s.t : 0, time: s ? s.L.time : 0, over: s ? s.over : false, result: s?.result ?? null,
+  screen, paused, playing, music: musicOn, level: level + 1, daily, today, t: s ? s.t : 0, time: s ? s.L.time : 0, over: s ? s.over : false, result: s?.result ?? null,
   me: s ? { x: s.me.x, y: s.me.y, carryN: s.me.carryN, blunt: s.me.blunt, whet: s.me.whet } : null,
   cart: s ? Math.floor(s.cart.grain) : 0, need: s?.L.stars ? s.L.stars[0] : null, cols: s?.cols, rows: s?.rows,
   view: { ox, oy, c, lift: LIFT, W, H, vergeTop, st, sb },

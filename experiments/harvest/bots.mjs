@@ -11,9 +11,72 @@ import * as sim from './sim.js';
 import { careful, clumsy, play } from './brain.js';
 
 const MUTATE = process.argv.includes('--mutate');
-if (MUTATE) { sim.mutate('free-help'); console.log('MUTATION: wages are never taken from the cart'); }
+// node bots.mjs music [--mutate]: only the music claims (section 6), and --mutate then breaks the music, not the rules.
+const MUSIC_ONLY = process.argv.includes('music');
+if (MUTATE && !MUSIC_ONLY) { sim.mutate('free-help'); console.log('MUTATION: wages are never taken from the cart'); }
 const t0 = Date.now();
 let failures = 0;
+
+// ---------------------------------------------------------------- 6. music (kit/music.js through song.js, 2026-11-24)
+// The careful bot (with the level's best simple roster) and the clumsy bot play mornings on a stand-in audio clock that runs
+// with the sim (kit/check/music-claims.mjs). Claims: each sheaf the farmer bundles plays exactly one note of the morning's
+// tune (or waits when four notes already wait), and nothing else plays one (not the neighbours' sheaves, not a lost one); a
+// sheaf eaten, trampled or the nest cut is a missed note; the stone and the rain are blows that thin the music for two bars;
+// every note is on the score's grid, in its chord and in the tune's order; the heartbeat sounds through the rain; the chords
+// turn major only once four fifths of the field is cleared; the high note only in the last of the time before the rain;
+// and the music never changes the rules (a twin morning without it ends the same, tick for tick).
+// --mutate runs twice with song.js broken on purpose (the neighbours' sheaves play notes; a lost sheaf plays one) and must fail.
+async function musicClaims(mutate) {
+  const { bench } = await import('../kit/check/music-claims.mjs');
+  const { readFile } = await import('node:fs/promises');
+  let code = await readFile(new URL('./song.js', import.meta.url), 'utf8');
+  const right = "notes: count(ev, e => e.type === 'pick' && e.who === 'me'),";
+  if (!code.includes(right)) throw new Error('music mutation target is missing');
+  if (mutate === 'anyone') code = code.replace(right, "notes: count(ev, e => e.type === 'pick'),");
+  if (mutate === 'lost') code = code.replace(right, "notes: count(ev, e => e.type === 'pick' && e.who === 'me' || e.type === 'eaten'),");
+  const { SONG, mood, heard } = await import('data:text/javascript;base64,' + Buffer.from(code).toString('base64'));
+  const fail = [], sum = { runs: 0, minutes: 0, notes: 0, waits: 0, misses: 0, blows: 0, pulses: 0, highs: 0, storms: 0, worst: 0 };
+  for (const lv of [0, 1, 3, 5, 6, 9, 11]) for (let seed = 1; seed <= 6; seed++) for (const who of ['careful', 'clumsy']) {
+    const hires = who === 'careful' ? (lv >= 6 ? ['fast'] : lv >= 2 ? ['strong'] : []) : [];
+    const s = sim.create({ level: lv, seed }), twin = sim.create({ level: lv, seed }), b = bench({ ...SONG }, s.seed);
+    const brain = who === 'careful' ? careful() : clumsy(seed), where = `level ${lv + 1} seed ${seed} ${who}`;
+    let hired = false, rainFrom = -1;
+    for (let n = 0; !s.over && n < 30 * 400; n++) {
+      if (!hired && s.t >= 1) { hired = true; for (const id of hires) { sim.hire(s, id); sim.hire(twin, id); } }
+      let out = brain(s);
+      if (out && out.whet) { sim.whet(s); sim.whet(twin); out = null; }
+      sim.step(s, out); sim.step(twin, out);
+      const ev = s.ev.splice(0), m = mood(s); b.mood({ on: !s.over, ...m });
+      const h = heard(ev), got = b.heard(h), mine = ev.filter(e => e.type === 'pick' && e.who === 'me').length;
+      if (h.notes !== mine) fail.push(`${where}: ${h.notes} notes for ${mine} sheaves the farmer bundled`);
+      if (got.length && !mine) fail.push(`${where}: a note with no sheaf bundled`);
+      if (h.misses !== ev.filter(e => ['eaten', 'trample', 'hare'].includes(e.type)).length) fail.push(`${where}: a lost sheaf is not a missed note`);
+      if (h.blows !== ev.filter(e => e.type === 'stone' || e.type === 'storm').length) fail.push(`${where}: the stone or the rain is not a blow`);
+      if (ev.some(e => e.type === 'storm')) { rainFrom = b.clock; sum.storms++; }
+      const pads = b.song.log.length; b.advance(sim.DT);
+      for (const l of b.song.log.slice(pads)) {
+        if (l.kind === 'pad' && l.major && m.progress <= b.P.turn) fail.push(`${where}: the chords turned major before four fifths of the field was cleared`);
+        if (l.kind === 'high' && s.L.time - s.t > 0.28 * s.L.time + 0.5) fail.push(`${where}: the high note before the time runs low`);
+      }
+    }
+    if (rainFrom >= 0 && s.t - s.L.time > 2 && !b.song.log.some(l => l.kind === 'pulse' && l.at >= rainFrom)) fail.push(`${where}: no heartbeat in the rain`);
+    const log = b.close();
+    if (sim.digest(s) !== sim.digest(twin) || JSON.stringify(s.result) !== JSON.stringify(twin.result) || JSON.stringify(s.stats) !== JSON.stringify(twin.stats)) fail.push(`${where}: the music changed the morning`);
+    fail.push(...b.fail.map(f => `level ${lv + 1} ${who} ${f}`));
+    sum.runs++; sum.minutes += s.t / 60; sum.highs += log.filter(l => l.kind === 'high').length; sum.pulses += log.filter(l => l.kind === 'pulse').length;
+    for (const k of ['notes', 'waits', 'misses', 'blows']) sum[k] += b.n[k]; sum.worst = Math.max(sum.worst, b.n.worst);
+  }
+  console.log(`music${mutate ? ` (mutate ${mutate})` : ''}: ${sum.runs} mornings, ${sum.minutes.toFixed(1)} minutes: ${sum.notes} tune notes (${(sum.notes / sum.minutes).toFixed(1)} a minute), ${sum.waits} sheaves with no note (four waiting), ${sum.misses} lost sheaves (missed notes), ${sum.blows} blows (stones and rain), ${sum.storms} rains, ${sum.pulses} heartbeat pulses, ${sum.highs} high notes; latest note ${(sum.worst * 1000).toFixed(0)} ms after its sheaf; ${fail.length} failures${fail.length ? ': ' + [...new Set(fail)].slice(0, 4).join('; ') : ''}`);
+  return fail.length;
+}
+if (MUSIC_ONLY) {
+  if (MUTATE) {
+    const caught = [await musicClaims('anyone'), await musicClaims('lost')].map(Boolean);
+    console.log(caught.every(Boolean) ? 'mutation caught: both broken versions of the music fail' : 'MUTATION MISSED');
+    process.exit(caught.every(Boolean) ? 1 : 2);
+  }
+  process.exit(await musicClaims() ? 1 : 0);
+}
 const check = (ok, text) => { if (!ok) { failures++; console.log('FAIL ' + text); } return ok; };
 const avg = a => a.reduce((x, y) => x + y, 0) / a.length;
 const run = (s, n, inp = null) => { for (let i = 0; i < n && !s.over; i++) sim.step(s, inp); };
@@ -202,5 +265,6 @@ check(Math.max(...secs, ...cs) <= 240, 'no morning is longer than 4 minutes');
   console.log(`today's field (2026-11-23, ${L.shape}, ${L.rows} rows): best ${name(pol[0].h)} keeps ${pol[0].k.toFixed(0)}, nobody ${pol.find(p => !p.h.length).k.toFixed(0)}`);
 }
 
+check(await musicClaims() === 0, 'the music claims hold (section 6)');
 console.log(`${failures ? 'FAILED' : 'ok'}: ${failures} failure(s) in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
 process.exit(failures ? 1 : 0);

@@ -13,6 +13,8 @@ Served at `/harvest/`. It rebuilds the archived "The Valley" idea as a fresh gam
 | `brain.js` | the careful and clumsy players, used by `bots.mjs` and to steer the finger in `check.mjs` |
 | `bots.mjs` | rule tests and balance proof; `--mutate` breaks the pay rule and must fail |
 | `check.mjs` | Playwright phone check (WebKit iPhone 13, Chromium Pixel 7, plus 360x640 and desktop) |
+| `song.js` | what the music hears: preset and volume, the run's mood, and which events play, miss or thin the tune (2026-11-24) |
+| `words.js` | English and Turkish words, so far only the Music switch (2026-11-24) |
 
 ## Rules
 
@@ -201,3 +203,26 @@ The check now brings each new context forward and uses `startGame` to wait for a
 - The target curve uses the fixed hires above. Solo clumsy play still fails fields 7–12; solo and hired results are not interchangeable.
 - The lab transport in the phone check is mocked. Live lab acceptance is unverified; this folder cannot register or deploy the slug in the external lab service.
 - The shared kit suite did not pass in this environment. The broad run failed unrelated kit/3D/hint cases with timeouts and WebGL context loss. The post-change `phone.mjs kit` run passed Chromium but timed out after 150 s on WebKit. No shared files or thresholds were changed to hide those failures.
+
+## 2026-11-24 — Music
+
+The kit's score (`kit/music.js`, Lantern's music) now plays under a morning, and the player plays its tune.
+
+- **Preset.** `flute` (slow attack, a little vibrato: the kit's "garden" voice) with three overrides in `song.js`, no change to the kit: 88 a minute (the flute's 80 is a stroll; a harvest walks), `turn` 0.8, and morning chords in place of Lantern's night ones. Written in D like the kit's: D add9, Bm7, G, A sus4 while the field stands; the kit's bright D, G maj7, A, D once four fifths of the field is cleared. The flute preset plays them a fourth up, in G. A night minor did not suit a sunny field.
+- **What plays it** (`song.js`, read by the page and by `bots.mjs`; `sim.js` is unchanged and never calls it):
+  - each sheaf the farmer bundles (`pick` by `me`, 29 a minute for the bots, median 0.4 s apart) plays the next note of the morning's tune, in place of the pick sound. The neighbours' sheaves play nothing. When four notes already wait, a pitch from the chord sounding plays as the pick sound (never with the bots: 0 of 2647);
+  - a sheaf lost (eaten by a crow, trampled by the fast one, the hare's nest cut) is a note not played: the streak ends, its harmony stops;
+  - the hidden stone and the start of the rain are blows: pad, bass and walk drop for two bars;
+  - progress: the share of the field cleared; danger: 0.35 for each crow eating, rising over the last 10 s before the rain, full in the rain (a low heartbeat); light: the time left before the rain (below 28% one thin high note each bar).
+  - The cart drop, the crows, the stone and every other sound are unchanged.
+- **Switch.** "Music: on" beside each Sound button (menu and pause card), on by default because Sound is. Its own key `harvest-music` (`'0'` when off); `harvest-save` is untouched. With Sound off the music is off too.
+- **Words.** `words.js` (kit `i18n.js`) holds only `musicOn`/`musicOff` in English and Turkish ("Müzik: açık", "Müzik: kapalı"). The rest of Harvest Morning is still English, so a Turkish phone sees "Sound: on" beside "Müzik: açık".
+- **Volume 0.4**, from rendering offline in headless Chromium (the score at volume 1, preset with these overrides; linear in volume): bed (calm, mid-morning, after a 6 s fade-in) peak 0.161, RMS 0.0243; a single melody note peak 0.085; the kit's worst case (full danger, the ending, light nearly out, a pickup every 0.2 s, a blow) peak 0.279. Game effects: a kit tone peaks at its volume; the kit's band-passed noise measured offline (median of 20): cut noise 0.052 (with a 0.015 tone), footstep 0.0084, trample 0.030, soak 0.039. Criteria, fixed before choosing: (1) bed RMS at most a quarter of the quietest effect that signals something, the cut (0.052): 0.0097 ≤ 0.013; (2) the melody note within half to twice the pick sound it replaces (0.06): 0.034 (−5 dB); (3) worst music peak plus the loudest effect (the storm, about 0.47) under 0.9: 0.11 + 0.47. Footsteps (0.0084 peak) are under the bed's RMS: they will be masked while the music plays. I counted them as texture, not a signal; a person should judge that.
+- **Checks.**
+  - `node bots.mjs music`: 84 mornings (levels 1, 2, 4, 6, 7, 10, 12; 6 seeds; careful with a simple roster and clumsy alone), 91.5 minutes: 2647 tune notes, 0 without a note, 648 lost sheaves (missed notes), 89 blows, 48 rains, latest note 362 ms after its sheaf; 0 failures. Claims: one note for each of the farmer's sheaves and none otherwise; misses and blows as above; every note on the score's grid, in its chord, in the tune's order (`kit/check/music-claims.mjs`); a heartbeat in the rain; no major chord before four fifths is cleared; no high note before the last 28% of the time; a twin morning stepped without music ends identical (digest, result and stats).
+  - `node bots.mjs music --mutate`: exit 1. The neighbours' sheaves playing notes: 2866 failures; a sheaf eaten playing a note: 1023 failures.
+  - `node bots.mjs`: exit 0 (runs the music claims as section 6). `node bots.mjs --mutate`: exit 1, 17 failures, as before.
+  - `phone.mjs harvest`: both phones pass, the hint included. The shared check now also asserts the switch says on at first, the score schedules notes in a run, off is saved under `harvest-music` and schedules nothing after resuming, and off survives a reload.
+  - `check.mjs`: exit 0 on both phones (field 1 by touch kept 25, 3 stars, 25 s and 26 s).
+  - Looked at: the pause card (Sound and Music side by side, WebKit iPhone 13) and the Turkish menu at Pixel 7 size.
+- **Not verified.** Nobody has listened: every number above is measured, none heard. What to listen for: does each sheaf picked up sound like a note of a tune rather than a blip, and does a quick run of pickups sound like a phrase; does a crow taking a sheaf leave a gap you notice; do the stone and the rain make the music drop out for a moment and come back; does the heartbeat with one crow down feel too much (it starts with a single eating crow); do the chords brighten near the end of a good morning; are the cut swish and the footsteps still heard under the music; is the volume right on a phone speaker.

@@ -1,7 +1,10 @@
 // node bots.mjs            proves the rules and measures difficulty; exits non-zero on failure
 // node bots.mjs --mutate   breaks one rule (the player's ripples and pebbles no longer bend the current); must exit non-zero
-import { create, step, play, advise, rng, items, stars, score, chunk, LEVELS, DT, CH, pebbleHint, grateParted } from './sim.js';
-const mutate = process.argv.includes('--mutate'), quick = process.argv.includes('--quick');
+// node bots.mjs music [--mutate]   only the music claims (section 7); --mutate then breaks song.js, not the rules
+import { readFile } from 'node:fs/promises';
+import { create, step, play, advise, rng, items, stars, score, chunk, length, LEVELS, DT, CH, pebbleHint, grateParted } from './sim.js';
+const musicOnly = process.argv.includes('music');
+const mutate = process.argv.includes('--mutate') && !musicOnly, quick = process.argv.includes('--quick');
 const mut = mutate ? 'touch' : null;
 let failures = 0;
 const check = (ok, text) => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${text}`); if (!ok) failures++; };
@@ -33,6 +36,72 @@ function clumsy(seed) {
   };
 }
 const runClumsy = (level, seed) => play(create({ level, seed, mut }), clumsy(seed * 31 + level), { every: 30, rest: 55 });
+
+// 7. Music (kit/music.js through song.js, 2026-11-24). The careful bot and the clumsy one play streets and today's stream
+// on a stand-in audio clock that runs with the sim. Claims: each passenger taken and each drain or paw got past plays exactly
+// one note of the run's tune (or waits when four already wait) and nothing else plays one; a drain that takes the boat plays
+// none; a passenger gone past untaken is a missed note; a swat is a blow that thins the music for two bars; every note is on
+// the score's grid, in its chord and in the tune's order (kit/check/music-claims.mjs); the heartbeat sounds in the 2.5 s before a drain (a heartbeat comes twice every four eighths, 1.6 s at 76 a minute)
+// takes the boat; the chords turn major only near the pond; the high note sounds only once the paper is over 72% soaked; and
+// the music never changes the rules (a twin run without it ends byte for byte the same).
+// --mutate runs twice with song.js broken on purpose (a passenger left behind plays a note; notes on a clock) and must fail.
+async function musicClaims(mutation) {
+  const { bench } = await import('../kit/check/music-claims.mjs');
+  let code = await readFile(new URL('./song.js', import.meta.url), 'utf8');
+  const right = 'notes: s.riders.length - before.riders + safe.length,';
+  if (!code.includes(right)) throw new Error('music mutation target is missing');
+  if (mutation === 'left') code = code.replace(right, `notes: s.riders.length - before.riders + safe.length + past(s, before.y, y1, ['bug']).filter(it => !s.got[it.id]).length,`);
+  if (mutation === 'clock') code = code.replace(right, 'notes: Math.floor(s.tick / 60) - Math.floor((s.tick - 1) / 60),');
+  code = code.replace("from './sim.js'", `from '${new URL('./sim.js', import.meta.url).href}'`).replace("from '../kit/music.js'", `from '${new URL('../kit/music.js', import.meta.url).href}'`);
+  const { SONG, mood, look, heard } = await import('data:text/javascript;base64,' + Buffer.from(code).toString('base64'));
+  const fail = [], sum = { runs: 0, minutes: 0, notes: 0, waits: 0, misses: 0, blows: 0, pulses: 0, drains: 0, drainHeard: 0, highs: 0, worst: 0 };
+  const crossed = (s, y0, y1, k) => items(s, y0 - 1, y1 + 1).filter(it => it.k === k && it.y + 0.15 > y0 && it.y + 0.15 <= y1);
+  const runs = [];
+  for (const l of LEVELS) { runs.push([l.n, 1, 'careful']); for (let seed = 1; seed <= (quick ? 2 : 6); seed++) runs.push([l.n, seed, 'clumsy']); }
+  for (const seed of [20261124, 20261125]) { runs.push([0, seed, 'careful']); runs.push([0, seed, 'clumsy']); }
+  for (const [level, seed, who] of runs) {
+    const opts = level ? { level, seed } : { daily: true, seed }, s = create(opts), twin = create(opts), b = bench(SONG, seed);
+    const policy = who === 'careful' ? q => advise(q) : clumsy(seed * 31 + level), twinPolicy = who === 'careful' ? q => advise(q) : clumsy(seed * 31 + level);
+    const where = `${level ? 'street ' + level : 'daily'} seed ${seed} ${who}`;
+    let wait = 0, twinWait = 0;
+    const pick = (q, f, w) => { if (w > 0) return [[], w - 1]; const a = f(q); return a ? [[a], (who === 'careful' ? 26 : 55) - 1] : [[], (who === 'careful' ? 10 : 30) - 1]; };
+    while (!s.over && s.tick < 60 * 400) {
+      let acts, tacts; [acts, wait] = pick(s, policy, wait); [tacts, twinWait] = pick(twin, twinPolicy, twinWait);
+      const before = look(s), y0 = s.b.y, riders = s.riders.length;
+      step(s, acts); step(twin, tacts);
+      const m = mood(s); b.mood({ on: !s.over, ...m });
+      const h = heard(before, s), got = b.heard(h), y1 = s.b.y;
+      const safe = s.over === 'drain' || s.over === 'soak' ? 0 : crossed(s, y0, y1, 'drain').length + crossed(s, y0, y1, 'paw').length;
+      const left = crossed(s, y0, y1, 'bug').filter(it => !s.got[it.id]).length;
+      if (h.notes !== s.riders.length - riders + safe) fail.push(`${where}: ${h.notes} notes for ${s.riders.length - riders} passengers and ${safe} hazards passed`);
+      if (got.length && s.riders.length === riders && !safe) fail.push(`${where}: a note with nothing taken or passed`);
+      if (h.misses !== left) fail.push(`${where}: a passenger left behind is not a missed note`);
+      if (h.blows !== s.ev.filter(e => e.type === 'swat').length) fail.push(`${where}: a swat is not a blow`);
+      if (s.over === 'drain') { sum.drains++; if (b.song.log.some(l => l.kind === 'pulse' && l.at > b.clock - 2.5)) sum.drainHeard++; else console.log('     no heartbeat before the drain:', where, s.tick, (b.song.log.filter(l => l.kind === 'pulse').at(-1)?.at ?? -1).toFixed(2), b.clock.toFixed(2)); }
+      const log = b.song.log.length; b.advance(DT);
+      for (const l of b.song.log.slice(log)) {
+        if (l.kind === 'pad' && l.major && m.progress <= b.P.turn) fail.push(`${where}: the chords turned major before the pond was near`);
+        if (l.kind === 'high' && m.light >= 0.28) fail.push(`${where}: the high note while the paper is still dry`);
+      }
+    }
+    b.close();
+    if (JSON.stringify(s) !== JSON.stringify(twin)) fail.push(`${where}: the music changed the run`);
+    fail.push(...b.fail.map(f => `${where}: ${f}`));
+    sum.runs++; sum.minutes += s.tick * DT / 60; sum.highs += b.song.log.filter(l => l.kind === 'high').length; sum.pulses += b.song.log.filter(l => l.kind === 'pulse').length;
+    for (const k of ['notes', 'waits', 'misses', 'blows']) sum[k] += b.n[k]; sum.worst = Math.max(sum.worst, b.n.worst);
+  }
+  if (sum.drains && sum.drainHeard < sum.drains * 0.8) fail.push(`the heartbeat sounded before only ${sum.drainHeard} of ${sum.drains} drains`);
+  console.log(`music${mutation ? ` (mutate ${mutation})` : ''}: ${sum.runs} runs, ${sum.minutes.toFixed(1)} minutes: ${sum.notes} tune notes (${(sum.notes / sum.minutes).toFixed(1)} a minute), ${sum.waits} with no note (four waiting), ${sum.misses} passengers left behind (missed notes), ${sum.blows} swats (blows), ${sum.pulses} heartbeat pulses, heartbeat in the 2.5 s before ${sum.drainHeard} of ${sum.drains} drains, ${sum.highs} high notes; latest note ${(sum.worst * 1000).toFixed(0)} ms after its moment; ${fail.length} failures${fail.length ? ': ' + [...new Set(fail)].slice(0, 4).join('; ') : ''}`);
+  return fail.length;
+}
+if (musicOnly) {
+  if (process.argv.includes('--mutate')) {
+    const caught = [await musicClaims('left'), await musicClaims('clock')].map(Boolean);
+    console.log(caught.every(Boolean) ? 'mutation caught: both broken versions of the music fail' : 'MUTATION MISSED');
+    process.exit(caught.every(Boolean) ? 1 : 2);
+  }
+  process.exit(await musicClaims() ? 1 : 0);
+}
 
 // 1. A boat left alone: street 1 is safe, street 2 is not. The rules, not a policy.
 {
@@ -156,5 +225,6 @@ const runClumsy = (level, seed) => play(create({ level, seed, mut }), clumsy(see
   }
   check(true, `daily pieces 1 to 59 (piece length ${CH}) checked for a passable gap between paired drains`);
 }
+if (!mutate) check(await musicClaims() === 0, 'the music claims hold (node bots.mjs music)');
 console.log(failures ? `\n${failures} check(s) failed` : '\nall checks passed');
 process.exit(failures ? 1 : 0);
