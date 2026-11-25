@@ -74,7 +74,28 @@
   body .kit-hint .ring { border-color: #1d4fb877; background: #1d4fb80d; }
   body .kit-hint .ripple { border-color: #1d4fb8; }
   body .kit-hint .knob { background: #1d4fb840; box-shadow: none; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .grid2 button { padding: 8px 6px; font-size: 15px; line-height: 1.2; min-height: 52px; }
+  .grid2 .dots { display: flex; justify-content: center; margin-top: 3px; }
+  .grid2 .dots i { width: 10px; height: 10px; }
+  #puzzles small { display: block; font-size: 13px; font-weight: 600; color: #5d5a52; margin-top: 2px; }
+  #bookGrid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-top: 12px; }
+  .tile { min-height: 48px; min-width: 0; padding: 0; display: grid; place-items: center; font-family: var(--hand); font-size: 22px; line-height: 1; border-radius: 10px; }
+  .tile small { font: 700 12px system-ui, sans-serif; color: var(--blue); }
+  .tile.done { background: #e9efff; border-color: var(--blue); color: var(--blue); }
+  .tile:disabled { opacity: .35; }
+  /* Motion through CSS: a card arrives, the turn pill bumps, the paper shakes on a goal or a miss. */
+  .screen.on .card { animation: cardIn .22s ease-out; }
+  @keyframes cardIn { from { transform: translateY(14px) scale(.98); opacity: 0; } }
+  #turn.bump { animation: bump .32s ease-out; }
+  @keyframes bump { 40% { transform: translateX(-50%) scale(1.12); } }
+  canvas.bump { animation: shake .34s ease-out; }
+  @keyframes shake { 20% { transform: translate(-4px, 2px); } 40% { transform: translate(4px, -2px); } 60% { transform: translate(-2px, 1px); } 80% { transform: translate(2px, 0); } }
+  @media (prefers-reduced-motion: reduce) { .screen.on .card, #turn.bump, canvas.bump { animation: none; } }
   @media (max-height: 680px) { h1 { font-size: 40px; } .card { padding: 16px; } .stack { margin-top: 12px; gap: 8px; } #pic { max-height: calc(100dvh - 270px); } }
+  /* The return link to the small games takes one more row on the end card. */
+  #end .card:has(> .kit-home) #pic { max-height: calc(100dvh - 350px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+  @media (max-height: 680px) { #end .card:has(> .kit-home) #pic { max-height: calc(100dvh - 318px); } }
 </style>
 </head>
 <body>
@@ -88,9 +109,12 @@
   <p class="quiet" data-i18n="tagline">Draw the ball into the top goal. Land on ink and you go again.</p>
   <div class="stack">
     <button id="play" class="primary"><span data-i18n="play">Play</span><small id="playSub"></small></button>
-    <button id="daily"><span data-i18n="daily">Today's pitch</span> <span id="dailyDots" class="dots"></span></button>
-    <button id="friend" data-i18n="friend">Play a friend</button>
-    <button id="two" data-i18n="two">Two players, one phone</button>
+    <div class="grid2">
+      <button id="daily"><span data-i18n="daily">Today's pitch</span> <span id="dailyDots" class="dots"></span></button>
+      <button id="puzzles"><span data-i18n="puzzles">Puzzles</span> <small id="bookDone"></small></button>
+      <button id="friend" data-i18n="friend">Play a friend</button>
+      <button id="two" data-i18n="two">Two players, one phone</button>
+    </div>
   </div>
   <div class="row"><button id="soundMenu"></button><button id="langMenu" class="lang" data-i18n-aria="switchLanguage"><span data-i18n="languageButton"></span></button></div>
 </div></section>
@@ -111,6 +135,12 @@
   </div>
   <p id="lobbyStatus" class="quiet" role="status"></p>
   <div class="row"><button id="roomLeave" data-i18n="menu">Menu</button></div>
+</div></section>
+<section id="book" class="screen veil" aria-labelledby="bookTitle"><div class="card">
+  <h2 id="bookTitle" data-i18n="bookTitle">Puzzle book</h2>
+  <p class="quiet"><span data-i18n="bookLine">Score in one turn. Each page has one new trick.</span> <b id="bookCount"></b></p>
+  <div id="bookGrid"></div>
+  <div class="row"><button id="bookMenu" data-i18n="menu">Menu</button></div>
 </div></section>
 <section id="paused" class="screen veil"><div class="card">
   <h2 id="pauseTitle" data-i18n="pencilsDown">Pencils down</h2>

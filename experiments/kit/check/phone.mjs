@@ -932,11 +932,21 @@ const GAMES = {
     await page.goto(`${base}/lab/pitch/`); await until(page, () => window.__pitch?.ready, 'game script');
     const kept = await page.evaluate(() => window.__pitch.save());
     assert.equal(kept.played, 1, 'old save: games played survive'); assert.equal(kept.wins, 1, 'old save: wins survive'); assert.equal(kept.level, 1, 'old save: level survives');
+    assert.equal(await page.evaluate(() => window.__pitch.rung), 6, 'old save: Medium becomes the Medium rung (level 7 of 8)');
     await page.click('#play'); await until(page, () => window.__pitch.canTap, 'the player may move');
     const at = await page.evaluate(() => window.__pitch.legal[0]);
     await page.mouse.click(at.sx, at.sy); await until(page, () => window.__pitch.segments > 0, 'a tap on a legal point draws a line');
     await page.evaluate(() => dispatchEvent(new Event('blur'))); await until(page, () => window.__pitch.paused, 'leaving the page pauses');
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no sideways scroll');
+    // The puzzle book (2026-11-24): its own key, and a tap in a puzzle counts a try.
+    await page.goto(`${base}/lab/pitch/`); await until(page, () => window.__pitch?.ready, 'game script again');
+    await page.click('#puzzles'); await until(page, () => window.__pitch.screen === 'book', 'the puzzle book opens');
+    await page.click('#bookGrid button:first-child'); await until(page, () => window.__pitch.mode === 'puzzle' && window.__pitch.canTap, 'puzzle 1 is in play');
+    const start = await page.evaluate(() => window.__pitch.segments), p1 = await page.evaluate(() => window.__pitch.legal[0]);
+    await page.mouse.click(p1.sx, p1.sy); await until(page, n => window.__pitch.segments > n, 'a tap in a puzzle draws a line', 8000, start);
+    const more = await page.evaluate(() => JSON.parse(localStorage.getItem('pitch:more')));
+    assert.equal(more.book.net.tries, 1, 'the puzzle try is saved under pitch:more');
+    assert.deepEqual(Object.keys(JSON.parse(await page.evaluate(() => localStorage.getItem('pitch:v1')))).sort(), ['daily', 'level', 'lossStreak', 'played', 'sound', 'wins'], 'pitch:v1 keeps its old shape');
   },
   async 'lab/ring'(page) {
     // Firefly Ring: an old save survives, a dragged finger lays thread, leaving the page pauses.
