@@ -1,0 +1,65 @@
+/* Shared look for the three draft homes: the lab index's night colours and Georgia, plus the A · B · C strip. */
+:root { --bg: #0b0d14; --ink: #efe8da; --gold: #ffd9a0; --dim: #efe8da99; --line: #ffd9a033; --card: #ffffff0a; --green: #a8e0a0; --safe-top: env(safe-area-inset-top, 0px); }
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--ink); font: 17px/1.45 Georgia, 'Times New Roman', serif; -webkit-text-size-adjust: 100%; }
+body { overflow-x: hidden; }
+a { color: inherit; }
+button { font: inherit; color: inherit; }
+h1 { font-weight: normal; letter-spacing: .06em; color: var(--gold); margin: 0; line-height: 1.15; }
+h2 { font-weight: normal; color: var(--gold); margin: 0; font-size: 1.25em; }
+
+.hub-strip { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: .35em; padding: calc(.45em + var(--safe-top)) 1em .45em; background: #0b0d14ee; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); border-bottom: 1px solid var(--line); font: 13px/1 -apple-system, system-ui, sans-serif; letter-spacing: .04em; }
+.hub-strip-label { opacity: .6; margin-right: .3em; text-transform: uppercase; font-size: 11px; letter-spacing: .12em; }
+.hub-strip a { display: inline-grid; place-items: center; min-width: 30px; height: 30px; border-radius: 15px; text-decoration: none; color: var(--gold); opacity: .7; font-weight: 600; }
+.hub-strip a.on { background: var(--gold); color: var(--bg); opacity: 1; }
+.hub-strip i { opacity: .35; font-style: normal; }
+.hub-lang { margin-left: auto; height: 30px; min-width: 44px; border: 1px solid var(--line); border-radius: 15px; background: none; font-size: 12px; letter-spacing: .08em; cursor: pointer; }
+
+.hub-art { display: block; width: 100%; height: 100%; }
+.mark { display: inline-block; font: 11px/1 -apple-system, system-ui, sans-serif; letter-spacing: .05em; padding: .35em .6em; border-radius: 99px; white-space: nowrap; }
+.mark.new { background: var(--gold); color: var(--bg); }
+.mark.opened { border: 1px solid var(--line); color: var(--dim); }
+.mark.played { border: 1px solid #a8e0a066; color: var(--green); }
+.mark.finished { background: #a8e0a022; color: var(--green); }
+.mark.finished::before { content: '✓ '; }
+.tag { font: 11px/1 -apple-system, system-ui, sans-serif; color: var(--dim); letter-spacing: .03em; }
+
+/* the previews move a little; never under reduced motion */
+@keyframes swing { 0%, 100% { transform: rotate(-12deg); } 50% { transform: rotate(12deg); } }
+@keyframes swing2 { 0%, 100% { transform: rotate(9deg); } 50% { transform: rotate(-9deg); } }
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+@keyframes tip { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(28deg); } }
+@keyframes bob { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+@keyframes pluck { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(-.6); } }
+@keyframes stretch { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(1.25, .8); } }
+@keyframes flow { from { stroke-dashoffset: 90; } to { stroke-dashoffset: 0; } }
+@keyframes fall { from { transform: translateY(-6px); opacity: 0; } 40% { opacity: 1; } to { transform: translateY(14px); opacity: 0; } }
+@keyframes turn { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg); } }
+@keyframes draw { from { stroke-dashoffset: 210; } 60%, to { stroke-dashoffset: 0; } }
+@keyframes drift { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(3px, -3px); } }
+@keyframes ink { from { stroke-dashoffset: 100; } 70%, to { stroke-dashoffset: 0; } }
+@keyframes settle { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
+@keyframes slide { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(30px); } }
+@keyframes rub { from { opacity: 0; } 70%, to { opacity: 1; } }
+@keyframes ball { 0%, 100% { transform: translateY(-14px); } 50% { transform: translateY(14px); } }
+@keyframes march { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(6px, 4px); } }
+.hub-art .s1 { animation: swing 2.4s ease-in-out infinite; }
+.hub-art .s2 { animation: swing2 3.1s ease-in-out infinite; }
+.hub-art .s3 { animation: blink 2.6s ease-in-out infinite; }
+.hub-art .s18 { animation: tip 3.2s ease-in-out infinite; }
+.hub-art .s4 { animation: bob 2s ease-in-out infinite; }
+.hub-art .s5 { animation: pluck 1.6s ease-in-out infinite; }
+.hub-art .s6 { animation: stretch 2.8s ease-in-out infinite; }
+.hub-art .s7 { animation: flow 3s ease-out infinite; }
+.hub-art .s8 { animation: fall 1.4s linear infinite; }
+.hub-art .s9 { animation: turn 3.4s ease-in-out infinite; }
+.hub-art .s10 { animation: draw 3.6s ease-out infinite; }
+.hub-art .s11 { animation: drift 4s ease-in-out infinite; }
+.hub-art .s12 { animation: ink 3.4s ease-out infinite; }
+.hub-art .s13 { animation: settle 2.2s ease-in-out infinite; }
+.hub-art .s14 { animation: slide 4s ease-in-out infinite; }
+.hub-art .s15 { animation: rub 3s ease-out infinite; }
+.hub-art .s16 { animation: ball 1.8s ease-in-out infinite; }
+.hub-art .s17 { animation: march 2.6s ease-in-out infinite; }
+.hub-art g, .hub-art path, .hub-art rect { transform-box: view-box; }
+@media (prefers-reduced-motion: reduce) { .hub-art * { animation: none !important; } }

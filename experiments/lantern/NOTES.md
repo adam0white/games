@@ -691,3 +691,27 @@ Checked: the phone check's line for the modes card; the card and Echo opened at 
 
 ### Left as a proposal (2026-11-24, note #234)
 - Echo in Turkish, and tuned past night 1. The wish to have the modes inside Lantern proper (one boat, skins and bank) is recorded above and still stands.
+
+## 2026-11-24: groups on the menu, a tutorial, slide steering (tester t1, notes #239 and #236)
+
+The note #239: the menu is messy; put it in groups called Game mode, Shop and Perspective; leave Play night alone; endless, tower, spark, echo and the rest go in Game mode; Shop opens the whole shop with its stats; Perspective holds 2D, 3D and first person, says what each does, and offers tilt or slide. The note #236 answers #230: the first-time tutorial, which may be skipped, was meant for Lantern.
+
+| Part | What changed |
+| --- | --- |
+| Menu | Title, embers and the Play night row are as they were. Under them: Game mode, Shop, Perspective. Under those, smaller: Leaderboard, How to play, Music, Credits. |
+| Game mode | Endless, Today's river, Tower climb (with New climb), Race and Spark, each with one line about it. The card that was "More modes". |
+| Shop | Opens as before: stats first, then the packs. |
+| Perspective | 2D, 3D and first person with one line each, then Steering. 2D and 3D steer by sliding a finger; the tilt and press buttons are off there. First person offers tilt, slide and press. |
+| Slide in first person (new) | The drag of 2D and 3D. The target stays inside the banks, so a slide alone does not cost a heart on the bank, as with tilt and press. `lantern-steer` gains the value `'slide'`; `'tilt'`, `'press'` and absent mean what they meant. The pause card's button goes tilt, press, slide. |
+| Tutorial | Offered once when Play is tapped on a save with no bank and no night; Skip plays at once. Always under How to play. Six steps on an empty slow river: steer, take two embers, the lantern fades, a heart, three rocks, the force field. Nobody can lose; it banks, scores and unlocks nothing, uses no stats, and is recorded as mode `tutorial`. New key `lantern-tutorial`, `'1'` once played or skipped. |
+| My own small experiment | Each group button says in small words what is inside, and Perspective names the view in use. |
+
+Decisions. #239 names Echo; it left the lab in the cleanup of 2026-11-24, before this change landed, so it is not in the group and the tester is told. #214 closed tilt in 2D and 3D ("leave it as it is"), and #239 can be read as tilt in every view. It is built for first person only; the tester is asked.
+
+Checks: `phone.mjs lantern` opens each group, steers first person by a slide, and shows that the tutorial cannot be lost, changes no bank, night, best or stats key, is offered once and can be skipped. A scripted player finished all six steps in 36 s in Chromium at phone size.
+
+Not verified: tilt, slide and the tutorial on a real phone; whether a new player understands the six steps; the Turkish wording by a native reader.
+
+### Left as a proposal (2026-11-24, note #239)
+
+- Tilt in 2D and 3D, if the tester wants it.

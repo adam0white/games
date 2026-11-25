@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0d14">
+<title>Three tonight · C</title>
+<link rel="stylesheet" href="../hub-a/hub.css">
+<style>
+  main { max-width: 40em; margin: 0 auto; padding: 1.2em 16px 3em; }
+  .top { display: flex; align-items: baseline; justify-content: space-between; gap: .6em; }
+  .date { font: 12px/1 -apple-system, system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--gold); border: 1px solid var(--line); border-radius: 99px; padding: .5em .8em; white-space: nowrap; }
+  .lead { color: var(--dim); margin: .45em 0 0; font-size: .92em; }
+  .run { margin: .6em 0 0; font: 13px/1.3 -apple-system, system-ui, sans-serif; color: var(--green); min-height: 1.3em; }
+  ol { list-style: none; margin: 1.2em 0 0; padding: 0; position: relative; }
+  ol::before { content: ''; position: absolute; left: 17px; top: 20px; bottom: 30px; border-left: 2px dotted #ffd9a055; }
+  li { position: relative; padding-left: 48px; margin-bottom: 14px; }
+  .lamp { position: absolute; left: 4px; top: 14px; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font: 600 13px/1 -apple-system, system-ui, sans-serif; background: var(--bg); border: 2px solid #ffd9a066; color: var(--gold); }
+  li.now .lamp { background: var(--gold); color: var(--bg); border-color: var(--gold); box-shadow: 0 0 14px #ffd9a088; }
+  li.opened .lamp, li.moved .lamp { background: #a8e0a022; border-color: var(--green); color: var(--green); }
+  .stop { display: flex; gap: 12px; align-items: stretch; border-radius: 16px; overflow: hidden; background: var(--card); border: 1px solid var(--line); text-decoration: none; }
+  .stop .pic { width: 92px; flex: none; min-height: 92px; }
+  .stop .txt { padding: .6em .7em .6em 0; display: flex; flex-direction: column; gap: .15em; min-width: 0; flex: 1; }
+  .kind { font: 11px/1.2 -apple-system, system-ui, sans-serif; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
+  .stop b { font-weight: normal; color: var(--gold); font-size: 1.15em; line-height: 1.2; }
+  .stop span { font-size: .82em; opacity: .85; line-height: 1.35; }
+  .stop small { font: 11px/1.3 -apple-system, system-ui, sans-serif; color: var(--dim); margin-top: auto; padding-top: .2em; }
+  li.now .stop { flex-direction: column; gap: 0; border-color: #ffd9a088; background: #ffd9a00f; }
+  li.now .stop .pic { width: 100%; aspect-ratio: 16 / 9; min-height: 0; }
+  li.now .stop .txt { padding: .8em .9em .9em; }
+  li.now .stop b { font-size: 1.45em; }
+  .stop span.go { opacity: 1; }
+  .go { display: block; margin-top: .6em; text-align: center; padding: .7em; border-radius: 12px; background: var(--gold); color: var(--bg); font-size: 1.05em; letter-spacing: .03em; }
+  li.opened .stop, li.moved .stop { opacity: .72; }
+  .state { font: 12px/1 -apple-system, system-ui, sans-serif; color: var(--green); }
+  .result { margin: 1.2em 0 0; padding: 1.2em 1.1em; border-radius: 18px; text-align: center; background: radial-gradient(circle at 50% 0, #ffd9a022, transparent 70%), #151823; border: 1px solid #ffd9a066; }
+  .result h2 { font-size: 1.4em; }
+  .marks { font-size: 2.1em; letter-spacing: .25em; color: var(--gold); margin: .2em 0 .1em; padding-left: .25em; }
+  .result p { margin: .3em 0; font-size: .95em; }
+  .result .dim { color: var(--dim); font-size: .85em; }
+  .result button { margin-top: .6em; min-height: 44px; padding: 0 1.3em; border-radius: 22px; border: 0; background: var(--gold); color: var(--bg); cursor: pointer; font-size: 1em; }
+  .legend { font: 11px/1.3 -apple-system, system-ui, sans-serif; color: var(--dim); margin: .2em 0 0 48px; }
+  h3 { font-weight: normal; color: var(--gold); margin: 2.2em 0 .6em; font-size: 1.05em; letter-spacing: .04em; }
+  .all { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .all a { display: flex; align-items: center; gap: 8px; text-decoration: none; border-radius: 12px; background: var(--card); border: 1px solid #ffd9a01f; overflow: hidden; min-height: 48px; }
+  .all .pic { width: 48px; height: 48px; flex: none; }
+  .all b { font-weight: normal; font-size: .85em; line-height: 1.2; flex: 1; min-width: 0; }
+  .all .dot { width: 8px; height: 8px; border-radius: 4px; margin-right: 10px; flex: none; }
+  .dot.new { background: var(--gold); } .dot.opened { border: 1px solid var(--dim); } .dot.played, .dot.finished { background: var(--green); }
+  .toast { position: fixed; left: 50%; bottom: 30px; transform: translateX(-50%); background: var(--gold); color: var(--bg); padding: .5em 1em; border-radius: 99px; font-size: .9em; opacity: 0; transition: opacity .3s; pointer-events: none; }
+  .toast.on { opacity: 1; }
+</style>
+</head>
+<body>
+<main>
+  <div class="top"><h1 data-i18n="cTitle"></h1><span class="date" id="date"></span></div>
+  <p class="lead" data-i18n="cLead"></p>
+  <p class="run" id="run"></p>
+  <ol id="stops"></ol>
+  <p class="legend" data-i18n="cLegend"></p>
+  <div id="result"></div>
+  <h3 data-i18n="cAll"></h3>
+  <div class="all" id="all"></div>
+</main>
+<div class="toast" id="toast" data-i18n="shared"></div>
+<script type="module">
+import { W, t, SMALL, today, dayBefore, dayLabel, seeded, artOf, nameOf, lineOf, timeOf, hrefOf, mark, markOpened, progress, todaysPick, englishOnly, strip, onShow, esc } from '../hub-a/hub.js';
+import { readJson, writeJson } from '../../kit/save.js';
+import { noZoom } from '../../kit/zoom.js';
+import { shareLink } from '../../kit/room.js';
+const $ = id => document.getElementById(id);
+// Tonight's three: one quick game, one to think about, one calm one, seeded by the UTC date so everyone has the same three.
+// B's pick of the day is left out, so the two drafts do not open on the same game.
+const KINDS = ['quick', 'think', 'calm'], LABEL = { quick: 'warm', think: 'think', calm: 'calm' };
+const rand = seeded('tonight ' + today);
+const set = KINDS.map(kind => { const pool = SMALL.filter(game => game.kind === kind && game !== todaysPick()); return pool[Math.floor(rand() * pool.length)]; });
+// What the hub knows about tonight: which stops were opened, and each game's progress score when it was opened.
+// A game's own save is only read. "Moved" means its score grew after the stop was opened.
+const NIGHT = 'hub:c:night', STREAK = 'hub:c:streak';
+const night = () => { const n = readJson(NIGHT, null); return n && n.day === today && n.stops ? n : { day: today, stops: {} }; };
+function open(slug) {
+  const n = night();
+  if (!n.stops[slug]) n.stops[slug] = { before: progress(SMALL.find(game => game.slug === slug)).score };
+  writeJson(NIGHT, n); markOpened(slug);
+}
+const status = game => { const s = night().stops[game.slug]; if (!s) return null; return progress(game).score > s.before ? 'moved' : 'opened'; };
+function streak() {
+  const s = readJson(STREAK, null) || { last: null, run: 0, best: 0 };
+  if (set.every(game => status(game)) && s.last !== today) {
+    s.run = s.last === dayBefore(today) ? s.run + 1 : 1; s.best = Math.max(s.best, s.run); s.last = today; writeJson(STREAK, s);
+  }
+  const alive = s.last === today || s.last === dayBefore(today);
+  return { ...s, run: alive ? s.run : 0 };
+}
+const marks = () => set.map(game => (status(game) === 'moved' ? '✦' : status(game) ? '○' : '·')).join('');
+function draw() {
+  W.apply(); document.title = `${t('cTitle')} · C`;
+  $('date').textContent = dayLabel(today);
+  const now = set.findIndex(game => !status(game)), s = streak(), done = now === -1;
+  $('run').textContent = s.run > 1 ? t('streak', { n: s.run }) : '';
+  $('stops').innerHTML = set.map((game, i) => {
+    const st = status(game), cls = st || (i === now ? 'now' : '');
+    return `<li class="${cls}"><span class="lamp">${st === 'moved' ? '✦' : st ? '○' : i + 1}</span>
+      <a class="stop ${game.slug}" href="${hrefOf(game, 'hub-c')}" data-slug="${game.slug}">
+      <div class="pic">${artOf(game)}</div>
+      <div class="txt"><span class="kind">${esc(t('stop', { n: i + 1 }))} · ${esc(t(LABEL[game.kind]))}</span><b>${esc(nameOf(game))}</b>
+      ${i === now ? `<span>${esc(lineOf(game))}</span>` : ''}
+      <small>${esc(timeOf(game))}${englishOnly(game) ? ' · ' + esc(t('english')) : ''}${st ? ` · <span class="state">${esc(t(st === 'moved' ? 'played' : 'opened'))}</span>` : ''}</small>
+      ${i === now ? `<span class="go">${esc(t('nowPlay'))} ›</span>` : ''}</div></a></li>`;
+  }).join('');
+  if (done) {
+    const moved = set.filter(game => status(game) === 'moved').length;
+    $('result').innerHTML = `<div class="result"><h2>${esc(t('cDone'))}</h2><div class="marks">${marks()}</div>
+      <p>${esc(moved ? t('cMoved', { n: moved }) : t('cOpened'))}</p>
+      <p>${esc(s.run > 1 ? t('streak', { n: s.run }) : t('streak1'))}${s.best > 1 ? ` · ${esc(t('best', { n: s.best }))}` : ''}</p>
+      <button type="button" id="share">${esc(t('cShare'))}</button><p class="dim">${esc(t('cBack'))}</p></div>`;
+    $('share').onclick = async () => {
+      const u = new URL(location.href); u.search = ''; if (W.lang() !== 'en') u.searchParams.set('lang', W.lang());
+      const text = t('cShareText', { day: dayLabel(today), marks: marks() }) + (s.run > 1 ? ` · ${t('streak', { n: s.run })}` : '');
+      if (await shareLink(u.href, text) === 'copied') { $('toast').classList.add('on'); setTimeout(() => $('toast').classList.remove('on'), 1600); }
+    };
+  } else $('result').innerHTML = '';
+  $('all').innerHTML = SMALL.map(game => { const m = mark(game); return `<a href="${hrefOf(game, 'hub-c')}" data-slug="${game.slug}" class="${game.slug}"><div class="pic">${artOf(game)}</div><b>${esc(nameOf(game))}</b><i class="dot ${m.cls}" title="${esc(m.text)}"></i></a>`; }).join('');
+}
+document.addEventListener('click', e => {
+  const a = e.target.closest('a[data-slug]'); if (!a) return;
+  if (a.classList.contains('stop')) open(a.dataset.slug); else markOpened(a.dataset.slug);
+});
+strip('c', draw); onShow(draw); noZoom(); draw();
+window.hubState = () => ({ variant: 'c', lang: W.lang(), set: set.map(game => game.slug), marks: marks(), streak: readJson(STREAK, null), links: [...document.querySelectorAll('a[data-slug]')].map(a => a.getAttribute('href')) });
+</script>
+</body>
+</html>
