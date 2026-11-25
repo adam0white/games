@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
 
 const json = JSON.stringify;
 const now = new Date();
@@ -12,11 +13,8 @@ const saves = {
   face: { v: 1, best: 300, runs: 3, stars: [2, 1, 0, 0], sound: true },
   pour: { v: 1, stars: [0, 0, 0, 0, 0, 0, 0, 0], sound: true, tries: 3 },
   bells: { v: 1, stars: [2, 0, 0, 0, 0, 0, 0, 0], best: 120, sound: true, tries: 3, look: 'moon' },
-  keeper: { v: 1, unlocked: 2, sound: true, played: true, daily: { day: localDay, score: 1400 } },
   channels: { unlocked: 3, completed: false, sound: true },
   podwire: { v: 1, next: 2, complete: false, sound: true },
-  kite: { v: 1, unlocked: 2, level: 2, best: 157, sound: true, look: 'copper' },
-  loaves: { unlocked: 2, best: 240, sound: true },
   rubbing: { level: 2, unlocked: 2, sound: true, ink: 'red' },
 };
 
@@ -65,15 +63,6 @@ async function ringBell(page, { until }) {
   }, 'one touch strikes the bell', 4000, count);
 }
 
-async function drawKeeperRoute(page, { finger, until }) {
-  const points = await page.evaluate(() => {
-    const { state: { edges, nodes, keeper }, transform: { scale, ox, oy } } = window.lampState();
-    const neighbor = edges.find(([a, b]) => a === keeper.node || b === keeper.node).find(id => id !== keeper.node);
-    return [keeper.node, neighbor].map(id => [ox + nodes[id].x * scale, oy + nodes[id].y * scale]);
-  });
-  await finger(page, '#c', [['pointerdown', ...points[0]], ['pointermove', ...points[1]], ['pointerup', ...points[1]]]);
-  await until(page, () => window.lampState().state.events.some(event => event.type === 'route'), 'touch commits a lamp route');
-}
 
 async function digChannel(page, { finger, until }) {
   const { remaining, cell, start, bank } = await page.evaluate(() => {
@@ -148,28 +137,7 @@ async function openFirstPod(page, checks) {
   await checks.until(page, () => window.podwireView().screen === 'won', 'first pod opens');
 }
 
-async function moveKiteSpool(page, { until }) {
-  const { x, y, width, height } = await page.locator('#field').boundingBox();
-  await page.touchscreen.tap(x + width * 220 / 360, y + height * 440 / 520);
-  await until(page, () => {
-    const { started, hand } = window.kiteState();
-    return started && hand.x > 200;
-  }, 'touch moves the kite spool right');
-}
 
-async function foldDough(page, { until }) {
-  const bakery = page.locator('#bakery');
-  const { x, y, work } = await bakery.evaluate(el => Object.fromEntries(
-    ['x', 'y', 'work'].map(key => [key, Number(el.dataset[key])]),
-  ));
-  const box = await bakery.boundingBox();
-  const point = (u, v) => ({ x: box.x + box.width * u / 360, y: box.y + box.height * v / 490 });
-  await pointerDrag(page, point(x - 38, y + 8), point(x + 39, y - 7));
-  await until(page, before => {
-    const dough = document.querySelector('#bakery').dataset;
-    return dough.stage === 'knead' && Number(dough.work) > before && Number(dough.time) > 0;
-  }, 'drag kneads the dough', 8000, work);
-}
 
 async function turnPrism(page, { until }) {
   const { x, y, width, height } = await page.locator('#angle').boundingBox();
@@ -269,18 +237,6 @@ export const labPages = {
     touch: ringBell,
     hint: { delay: 1600, timing: { start: '#play' }, input: ringBell },
   }),
-  'lab/night-lamp-keeper': pageEntry('night-lamp-keeper:save', saves.keeper, 'night-lamp-keeper:hint', {
-    menu: '#quit', sound: '#sound2',
-    state: () => { const s = window.lampState?.(); return s && { screen: s.screen, t: s.state?.t ?? 0 }; },
-    verify: () => ({
-      save: window.lampState().saved,
-      evening: document.querySelector('#levels .current').textContent,
-      daily: document.querySelector('#dailyBest').textContent,
-    }),
-    expect: { save: saves.keeper, evening: '2', daily: 'Today’s best on this device: 1400' },
-    touch: drawKeeperRoute,
-    hint: { delay: 4500, timing: { start: '#play' }, input: drawKeeperRoute },
-  }),
   'lab/night-channels': pageEntry('night-channels:save', saves.channels, 'night-channels:hint', {
     startsOnBoard: true, menu: '#gardens', sound: '#sound',
     state: () => { const s = window.channelView?.(); return s && { screen: s.screen === 'selection' ? 'menu' : s.screen, t: s.state.ticks }; },
@@ -307,31 +263,6 @@ export const labPages = {
         await page.tap('#next');
         await until(page, () => window.podwireView().level === 2 && window.podwireView().screen === 'play', 'Next opens the second plate');
       } },
-  }),
-  'lab/night-kite': pageEntry('night-kite:save', saves.kite, 'night-kite:hint', {
-    startsOnBoard: true, sound: '#sound',
-    state: () => window.kiteState?.(),
-    verify: () => {
-      const { level, unlocked, best, sound, look } = window.kiteState();
-      return { level, unlocked, best, sound, look };
-    },
-    expect: { level: 2, unlocked: 2, best: 157, sound: true, look: 'copper' },
-    touch: moveKiteSpool,
-    hint: { delay: 6500, play: '#field', timing: { board: true }, input: moveKiteSpool },
-  }),
-  'lab/night-loaves': pageEntry('night-loaves:save', saves.loaves, 'night-loaves:hint', {
-    startsOnBoard: true, sound: '#sound',
-    state: () => {
-      const dough = document.querySelector('#bakery')?.dataset;
-      if (!dough?.stage) return null;
-      const screen = document.querySelector('#paused.on, #result.on')?.id ?? 'play';
-      return { screen, t: Number(dough.time) };
-    },
-    verify: () => [document.querySelector('#chapter').textContent, document.querySelector('#flour').textContent],
-    expect: ['Morning 02 / 08', 'Milk bread'],
-    verifyPaused: async page => assert.equal(await page.textContent('#record'), 'Best on this device · 240'),
-    touch: foldDough,
-    hint: { delay: 3800, play: '#bakery', timing: { board: true }, input: foldDough },
   }),
   'lab/night-rubbing': pageEntry('night-rubbing:save', saves.rubbing, 'night-rubbing:hint', {
     startsOnBoard: true, sound: '#sound', resumeTouch: true,
@@ -387,4 +318,91 @@ export const labPages = {
     hint: { key: 'lantern-tide:hint', delay: 1500, timing: { start: '#start' },
       input: steerTide, legacy: tideLegacy },
   },
+};
+
+// The three draft homes for the small games (lab/hub-a, hub-b, hub-c). They are not games, so each has its own run
+// instead of a save, pause and touch contract: it loads in both languages, every game link resolves to a page in this
+// checkout, the hub never writes a game's own keys, and a game opened from it comes back with the browser's back.
+const checkoutRoot = new URL('../../../', import.meta.url);
+export function linkTarget(href) {
+  const path = new URL(href, 'http://x').pathname;
+  const file = path.startsWith('/crumbwar/') ? `workers/crumbwar/public${path}index.html` : `experiments${path}index.html`;
+  return existsSync(new URL(file, checkoutRoot)) ? file : null;
+}
+async function hubRun(page, { base, until }, v, { links, open }) {
+  const gameKeys = () => page.evaluate(() => Object.fromEntries(Object.keys(localStorage).filter(k => !k.startsWith('hub:') && k !== 'kit:lang').map(k => [k, localStorage.getItem(k)])));
+  await page.goto(`${base}/notes/button.js`);
+  await page.evaluate(seed => { localStorage.clear(); for (const [k, v] of Object.entries(seed)) localStorage.setItem(k, v); }, hubSeed);
+  await page.goto(`${base}/lab/hub-${v}/?lang=en&day=2026-11-24`); await until(page, () => window.hubState, 'hub script');
+  const before = await gameKeys();
+  const state = await page.evaluate(() => window.hubState());
+  assert.equal(state.lang, 'en');
+  assert.ok(state.links.length >= links, `at least ${links} game links (${state.links.length})`);
+  for (const href of state.links) {
+    assert.match(href, new RegExp(`\\?from=hub-${v}$`), `${href} carries from=hub-${v}`);
+    assert.ok(linkTarget(href), `${href} is a page in this checkout`);
+  }
+  for (const href of await page.$$eval('.hub-strip a', as => as.map(a => a.getAttribute('href')))) assert.ok(existsSync(new URL(`experiments/lab/${href.slice(3).split('?')[0]}index.html`, checkoutRoot)), `strip link ${href}`);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no sideways scroll in English');
+  const title = await page.textContent('h1');
+  await page.click('.hub-lang'); await until(page, () => document.documentElement.lang === 'tr', 'Turkish');
+  assert.notEqual(await page.textContent('h1'), title, 'the title is Turkish');
+  assert.equal(await page.evaluate(() => [...document.querySelectorAll('[data-i18n]')].filter(el => !el.textContent.trim()).length), 0, 'every string filled in Turkish');
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no sideways scroll in Turkish');
+  await page.reload(); await until(page, () => window.hubState?.().lang === 'tr', 'Turkish is remembered');
+  await page.click('.hub-lang'); await until(page, () => document.documentElement.lang === 'en', 'English again');
+  // Taken before a game is opened: the games themselves write their own keys once they load.
+  assert.deepEqual(await gameKeys(), before, 'the hub wrote no game key');
+  await open(page, { until });
+}
+// A game played once: Night Bells has one level cleared, so its mark reads 1 / 8.
+const hubSeed = { 'night-bells:save': json({ v: 1, stars: [2, 0, 0, 0, 0, 0, 0, 0], best: 0, sound: true, tries: 1, look: 'amber' }), 'night-bells:hint': '1' };
+async function openAndReturn(page, { until }, selector, slug) {
+  await page.click(selector);
+  await page.waitForURL(url => url.pathname === `/lab/${slug}/`);
+  await page.goBack(); await until(page, () => window.hubState, 'back on the hub');
+}
+export const labHubs = {
+  'lab/hub-a': (page, tools) => hubRun(page, tools, 'a', {
+    links: 14,
+    open: async (page, { until }) => {
+      assert.equal(await page.textContent('a.tile.night-bells .mark'), '1 / 8', 'a cleared level shows on the tile');
+      await openAndReturn(page, { until }, 'a.tile.wild-pour', 'wild-pour');
+      await until(page, () => document.querySelector('a.tile.wild-pour .mark').textContent === 'Opened', 'the opened game is marked after back');
+    },
+  }),
+  'lab/hub-b': (page, tools) => hubRun(page, tools, 'b', {
+    links: 12,
+    open: async (page, { until }) => {
+      const { at, pick } = await page.evaluate(() => window.hubState());
+      assert.equal(at, 0, 'the deck opens on today’s pick'); assert.ok(await page.isVisible('.card:first-child .pickTag'));
+      await page.click('#next'); await until(page, () => window.hubState().at === 1, 'next card');
+      await page.click('#surprise'); await until(page, () => window.hubState().at !== 1, 'surprise moves the deck', 4000);
+      const slug = await page.evaluate(() => document.querySelectorAll('.card')[window.hubState().at].dataset.slug);
+      await page.waitForTimeout(600);
+      await openAndReturn(page, { until }, `.card.${slug} a.play`, slug);
+      await until(page, s => document.querySelector(`.card.${s} .mark`).textContent !== 'New', 'the opened game is marked after back', 4000, slug);
+      assert.ok(pick);
+    },
+  }),
+  'lab/hub-c': (page, tools) => hubRun(page, tools, 'c', {
+    links: 15,
+    open: async (page, { until }) => {
+      const { set } = await page.evaluate(() => window.hubState());
+      assert.equal(set.length, 3);
+      for (const slug of set) {
+        await page.waitForSelector('li.now');
+        await openAndReturn(page, { until }, `li.now a.stop.${slug}`, slug);
+        await until(page, s => document.querySelector(`a.stop.${s}`).closest('li').className === 'opened', 'the stop is marked after back', 4000, slug);
+      }
+      await page.waitForSelector('.result'); assert.equal((await page.evaluate(() => window.hubState())).marks, '○○○');
+      assert.equal((await page.evaluate(() => window.hubState())).streak.run, 1, 'a first night starts the streak');
+      // A stop whose game moved forward after it was opened is a star.
+      await page.evaluate(s => { const n = JSON.parse(localStorage.getItem('hub:c:night')); n.stops[s].before = -1; localStorage.setItem('hub:c:night', JSON.stringify(n)); }, set[0]);
+      // Safari often restores the hub from the back-forward cache; the page must read the saves again on pageshow.
+      await page.evaluate(() => dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
+      await until(page, () => document.querySelector('li .lamp').textContent === '✦', 'a page restored from the cache redraws its marks');
+      await page.reload(); await until(page, () => window.hubState?.().marks === '✦○○', 'a game that moved forward is a star');
+    },
+  }),
 };

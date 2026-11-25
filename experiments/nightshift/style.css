@@ -149,6 +149,24 @@ button.primary {
 .row { display: flex; gap: 8px; margin-top: 10px; }
 .row button { flex: 1; }
 .modeStat { display: block; margin-top: 2px; font-size: .8rem; color: #f0d1af; }
+/* Long Night and Daily before night 15: a padlock and the night that opens them. */
+.lockStat { display: none; }
+.row button.locked { opacity: .62; filter: saturate(.5); }
+.row button.locked .modeStat { display: none; }
+.row button.locked .lockStat {
+  display: flex; align-items: center; justify-content: center; gap: 3px;
+  margin-top: 2px; font: 800 .85rem/1 system-ui, sans-serif; color: #ffdfad;
+}
+.lockStat .icon { width: 16px; height: 16px; stroke-width: 2; }
+.row button.locked.nudge { animation: refuse .42s ease-in-out; }
+#play.nudge { animation: beckon .6s ease-out; }
+@keyframes refuse {
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+@keyframes beckon {
+  30% { transform: scale(1.08); box-shadow: 0 0 0 6px #ffe8a966, 0 3px 0 #986777; }
+}
 .row button small, #play small {
   display: inline-block;
   padding: 2px 6px;
@@ -308,6 +326,7 @@ button.language {
 }
 @media (prefers-reduced-motion: reduce) {
   button:active { transform: none; }
+  .row button.locked.nudge, #play.nudge { animation: none; outline: 3px solid #ffe8a9; outline-offset: 2px; }
 }
 
 #medals { margin-bottom: 3px; letter-spacing: .035em; }
