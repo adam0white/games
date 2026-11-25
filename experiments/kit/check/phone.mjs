@@ -990,6 +990,7 @@ const GAMES = {
     await page.goto(`${base}/lab/ring/`); await until(page, () => window.__ring, 'game script');
     const kept = await page.evaluate(() => window.__ring.save());
     assert.equal(kept.best, 412, 'old save: best score survives'); assert.equal(kept.nights, 2, 'old save: nights survive'); assert.equal(kept.bestRing, 16, 'old save: best ring survives');
+    assert.equal(await page.evaluate(() => window.__ring.nights()), null, 'nights 2 and 3 have their own key, not written at load'); assert.equal(await page.isVisible('#nights'), true, 'old save with a dawn: night 2 is open');
     await page.click('#play'); await until(page, () => window.__ring.phase === 'play', 'the night is in play', 8000);
     const box = await page.evaluate(() => { const r = document.getElementById('c').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height * 0.6 }; });
     await page.mouse.move(box.x, box.y); await page.mouse.down(); await page.mouse.move(box.x + 60, box.y + 20, { steps: 8 });

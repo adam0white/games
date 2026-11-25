@@ -122,3 +122,86 @@ The Turkish was written by an AI and has not been read by a native speaker. Open
 The page sends play records to the lab under the name `ring` through `kit/lab.js` (the name is in human-framework `LAB_PROTOTYPES` once its pull request lands; until then every send is refused). The recording notice is on the menu card; the off switch is on the pause card. A run is one night, today's meadow, an endless meadow or a practice jar; it ends `won` at dawn or `lost` when the wicks run out (summary: kind, score, level, jars cleared, best ring, stars), or `quit` through Menu or Restart. Events: `dawn` and, for the daily, `daily-finished`.
 
 `check.mjs` answers the lab address itself (no check reaches the real one), loads the page with `?labRunSource=agent`, and asserts: the notice is on the page before play, a played run sends one run record under `ring` with its events record, and after the switch is turned off a further run sends nothing and the player id is removed. Not verified: delivery to the real lab (the Worker does not accept this name yet), a real phone.
+
+## Improve: nights, fair moths, feedback (2026-11-24)
+
+The owner's word on this page was "Good but improve". What was built, from a cold play on both engines and the bots:
+
+| # | Weak thing (cold play, main) | Before | What changed | After |
+|---|---|---|---|---|
+| 1 | One moth touch costs a wick, with no warning; a hand that is not exact loses the whole night. A moth chases the thread from 260 away at once. | Whole night, shaky hand: dawn 0%, 2.3 of 8 levels full. Clumsy: dawn 23%. Single levels, shaky: 100 90 **43** 48 63 50 57 58 (a 47-point cliff at level 3, where moths arrive). A finger that ignores moths lost the night at level 3 (Chromium) and 5 (WebKit). | Fair moths: a moth notices the thread only within 150, hovers 30 steps (half a second) with a red ring closing on it and a two-note call, then chases as before. Relight: a level that ends with full jars relights one wick (up to 3). Both are options in sim.js, off by default. | Whole night, shaky: dawn 63%, 6.5 of 8 full; clumsy: dawn 97%. Single levels, shaky: 100 90 87 88 93 93 88 90, largest step down 7. |
+| 2 | The frame that ends a night spikes: the share picture was drawn and PNG-encoded inside it. | 31 ms WebKit, 22.9 ms Chromium (the only frame over 8 ms in a whole night). | The picture is drawn 300 ms after the card is up, and encoded in a separate task. | Frames at 390x844 (rAF callback time): end card max 1.0 ms WebKit, 0.8 ms Chromium; crowd level (32 fireflies) 1.0 / 0.4; gale 1.0 / 0.9; a 200 s cold play of night 1, 16420 and 13761 frames, max 2 / 2.3 ms. The encode now runs in its own task, which a rAF timer does not see; its length on WebKit was not measured. |
+| 3 | Many actions are silent: a button, the pen going down, a press while the lamp rekindles, a moth arriving, the level banner, a jar filling. | 6 actions with no sound and no motion. | Every sound and motion goes through `kit/fx.js` (`fx(name, sound, motion)`), which logs the name; `__ring.fx` reads it. New answers: button (click and bump), penDown (spark), rekindleWait (dull tick), moth (low hum), level (two notes and a lantern flare), jar (rising note and a glow on the jar), and for the new ideas thorn, fade, call, relight, mothNotice, night, nightOpened. | 0 silent actions. The check asserts names over a whole night and on night 2. |
+| 4 | One night of 8 levels, then nothing new. A moth-aware finger got a perfect night on its first try on both engines. | 8 levels. | Nights 2 and 3, 8 levels each, one new idea per level (below). Night n+1 opens when night n ends with 4 or more levels full; a chooser on the menu picks among open nights. | 24 levels. |
+| 5 | Save picture shares a file with no words. | No text. | `kit/share.js` with a share line: "Firefly Ring · <card top>: <score>, biggest ring <n> ★★☆" and the page address. | Text on every share. |
+
+Level 1 is short (2.6 to 9.5 s in cold play; careful keeps 66% of dawn). Left as it is: it is the first ring.
+
+### The sixteen ideas (sim.js `NIGHTS[1]`, `NIGHTS[2]`)
+
+Each level reads its parameters from `DEFAULTS`, which equal main's constants, and changes one of them or adds one rule.
+
+Night 2 (two colours, no bat): crowd (32 fireflies, 6 jars) · big (every 4th firefly is big and counts as two) · call (one colour, shown under the score, pays double; the call moves on after it is ringed) · short (thread 420 instead of 600) · quick (fireflies' top speed 0.85 instead of 0.55) · restless (cohesion 0.014 instead of 0.02) · thorns (3 thorn bushes; touching one with the thread cuts it, no wick lost; fireflies keep off them) · sleep (a firefly in its dark blink is asleep: not caught, does not spoil a ring).
+
+Night 3 (three colours, bat): pull (the lantern pulls 6 times harder) · life (fireflies fade after 16 s) · hungry (the bat comes every 2 s instead of 7) · swarm (5 moths) · mingle (repel 0.012 instead of 0.03) · shy (fireflies keep away from the finger) · slowLamp (72 steps between rings instead of 30) · gale (gusts twice as strong, twice as often).
+
+Endless and today's meadow stay on night 1's levels. All of them, and night 1, play with fair moths and relight: the daily and endless change on purpose.
+
+### Saves
+
+- `ring:v1` is unchanged in shape and meaning; `save.best` stays the best of night 1.
+- New key `ring:nights` = `{ v: 1, open, pick, best: [_, night2, night3] }`. It is written only when it changes (a night ends, or the player picks a night).
+- A player from before with at least one dawn in `ring:v1` finds night 2 open. Reason: that player has finished night 1 already.
+- `?night=N` plays night N whole as practice (open or not); with `?level=L` one level of it.
+
+### Home, recording, share
+
+- `kit/home.js`: `home(lab('ring'), { back: ['#menu > div', '#end > div'] })`. The ring cards have no `.card` class. The catalog entry (`ring`, think, tr: true) is right and was not changed.
+- Outcome change on purpose: a single practice level now ends `won` only when its jars filled, else `lost`. Before, any practice level that reached dawn was `won`, which the home would count as a win. A night is still `won` at dawn and `lost` when the wicks run out.
+- Recording carries `night` (1 to 3) in the run start, in the summary and in the `dawn` event; a new event `night-opened`.
+- Friend play does not apply: the game is one finger on one meadow. Solo against a bot does not apply either.
+
+### Bot claims (bots.mjs)
+
+- Parity: with `fair` and `relight` off and night 0, digests of nights, endless, single levels and 30 dailies equal main's (`6b475af2 33afed55 b6a972e7 ee1491b0`).
+- Ladder, page rules, 60 seeds per level, all 24 levels: careful at least 85% on every level (lowest 92); clumsy at least 70% (lowest 80); shaky level 1 at least 90%, largest step down at most 15, night 3 mean below night 2 mean.
+  - careful: 100 100 98 98 100 100 100 100 / 100 100 100 100 100 95 98 98 / 100 92 100 97 100 100 97 97
+  - clumsy: 100 97 100 100 100 98 98 100 / 100 98 100 100 93 97 95 80 / 100 97 95 100 98 100 92 97
+  - shaky: 100 90 87 88 93 93 88 90 / 97 97 100 97 93 95 93 88 / 95 92 92 87 87 95 85 80
+- Whole nights, page rules (40 seeds in the suite, 60 with `--nights --seeds=60`): clumsy reaches dawn 97/93/97% and opens the next night 98/100/97%; shaky dawn 63/58/50%, opens 82/85/65%. Main rules, night 1: shaky dawn 0%, opens 5%; clumsy dawn 23%, opens 58%.
+- Constructed tests for each idea: big counts two, the call doubles, thorns cut without a wick and push fireflies off, sleepers are not caught and do not mix a ring, life fades and refills, the short thread holds at most 420, the slow lamp, fair moths hover where main moths move, relight gives a wick only on page rules.
+- Mutations, each caught: `--mutate` (mixed rings score), `--mutate=fair` (careful's weakest level 82%), `--mutate=sleep`, `--mutate=thorns`.
+- The hands: `clumsy` checks moths 8 steps late, keeps 25 from them, rushes at 3, aims 14 off centre with 25% size error; `shaky` 14 late, 10 gap, rush 2, 22 off, 35%. They are bots, not people.
+
+### Kit
+
+`kit/fx.js` is new: `feedback({ canSound })` gives `fx`, `bump` and `log`. lab/pitch has the same helper inline (its own pull request); it can move to the kit once both are merged.
+
+### Small screens
+
+The card's own overflow at 320x568 (scrollHeight minus clientHeight of the menu card), both engines, with `?from=small`:
+
+| Case | main | now |
+|---|---|---|
+| fresh, English | 0 | 0 |
+| fresh, Turkish | 26 to 27 px | 0 |
+| fullest (3 nights open, bests, home link, lab notice), English | 0 (main has no home link or night line) | 0 |
+| fullest, Turkish | 53 to 54 px | 0 |
+
+Below 620 px of height the menu is tighter (smaller title, 44 px buttons, small notes) and hides the second intro line ("Mixed colours scatter. Moths snap the thread."); the level banners still say both. check.mjs `tiny` asserts this at 320x568 in both languages.
+
+### Check changes on purpose
+
+- check.mjs: the whole-night block (Chromium) used to replay today's meadow as practice; it now plays a night, because only a night opens night 2. It asserts at least 4 levels full, "Night 2 is open.", `ring:nights.open` = 2, the menu offering night 2, and feedback names over the night. Last run: 8/8 full, 3 wicks, 170 s; names seen: button level penDown ring jar levelFull moth mothNotice bat eat gust mixed golden over nightOpened.
+- New in check.mjs: `improved` (old save untouched, night 2 open from it, chooser, pick kept over a reload, night 2 page rules, daily on night 1, `?night=3`, thorns on screen, the home link on menu and end card, `hub:results` counted, the share line, Save picture) and `tiny` (320x568).
+- phone.mjs `lab/ring`: also asserts `ring:nights` is not written at load and the chooser shows for an old save with a dawn.
+- Save picture tapped before the deferred picture is made draws it at once and shares the canvas; the check taps at once, so this path is the one it covers.
+
+### Not verified
+
+- No person played nights 2 and 3. The ideas were tuned on bots only; whether "sleep" and "call" read clearly on a phone is a judgement for a person.
+- No real phone; headless WebKit and Chromium on a loaded machine.
+- Sounds were not heard.
+- The Turkish for the new lines was written by an AI and has not been read by a native speaker (the idea lines, "{n}. gece / {open}", "Bir gecede {k} seviyenin kavanozları dolunca {n}. gece açılır.").
+- Real share sheet on a phone: headless browsers download instead.
+- The lab Worker accepting `night` in the summary: the check answers the lab address itself.

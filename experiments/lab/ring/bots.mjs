@@ -167,6 +167,26 @@ function ladder(levels, n, opts = OPTS) {
   return out;
 }
 const ALL = NIGHTS.flatMap((levels, night) => levels.map((_, l) => [night, l]));
+// Whole nights, wicks carried from level to level as the page plays them. OPEN is the page's rule for the next night.
+export const OPEN = 4;
+function wholeNights(night, n, hand, opts) {
+  let full = 0, dawn = 0, open = 0;
+  for (let i = 0; i < n; i++) {
+    const sd = 5000 + i * 7919 + night * 131, s = create(sd, { ...opts, night }), b = hand ? careful({ ...HANDS[hand], seed: sd * 17 + i }) : careful();
+    let guard = 0;
+    while (s.phase !== 'done' && guard++ < 60 * 60 * 10) { const p = b(s); step(s, p ? p[0] : NaN, p ? p[1] : NaN); }
+    full += s.cleared; if (s.reason !== 'wicks') dawn++; if (s.cleared >= OPEN) open++;
+  }
+  return { full: +(full / n).toFixed(1), dawn: Math.round(100 * dawn / n), open: Math.round(100 * open / n) };
+}
+if (process.argv.includes('--nights')) {
+  const main = process.argv.includes('--main'), opts = main ? OPTS : { ...OPTS, ...PAGE };
+  for (const night of main ? [0] : [0, 1, 2]) for (const hand of [null, 'clumsy', 'shaky']) {
+    const r = wholeNights(night, SEEDS, hand, opts);
+    console.log(`night ${night + 1} ${(hand || 'careful').padEnd(7)} levels full ${r.full}/8  dawn ${r.dawn}%  opens next ${r.open}%`);
+  }
+  process.exit(0);
+}
 if (process.argv.includes('--ladder')) {
   const lad = ladder(process.argv.includes('--first') ? ALL.slice(0, NIGHT) : ALL, SEEDS, process.argv.includes('--main') ? OPTS : { ...OPTS, ...PAGE });
   for (const k in lad) console.log(`${k.padEnd(8)} ${lad[k].join(' ')}`);
@@ -346,6 +366,17 @@ check('careful clears every one of the 24 levels in at least 85% of seeds; a sha
   assert.ok(Math.max(...drops) <= 15, `shaky's largest step down is ${Math.max(...drops)} points`);
   assert.ok(Math.min(...lad.clumsy) >= 70, `clumsy's weakest level ${Math.min(...lad.clumsy)}%`);
   assert.ok(mean(sh.slice(2 * n)) < mean(sh.slice(n, 2 * n)), 'the third night is harder for the shaky hand than the second');
+});
+check(`whole nights: a clumsy hand reaches dawn and opens every next night (${OPEN} levels full); a shaky hand often does; on main rules it never saw dawn`, () => {
+  const n = Math.max(SEEDS, 40), page = [0, 1, 2].map(night => ({ clumsy: wholeNights(night, n, 'clumsy', { ...OPTS, ...PAGE }), shaky: wholeNights(night, n, 'shaky', { ...OPTS, ...PAGE }) }));
+  const main = wholeNights(0, n, 'shaky', OPTS);
+  page.forEach((r, i) => console.log(`     night ${i + 1}: clumsy dawn ${r.clumsy.dawn}% opens ${r.clumsy.open}% · shaky dawn ${r.shaky.dawn}% opens ${r.shaky.open}%`));
+  console.log(`     main rules night 1: shaky dawn ${main.dawn}% opens ${main.open}%`);
+  for (const [i, r] of page.entries()) {
+    assert.ok(r.clumsy.dawn >= 85 && r.clumsy.open >= 90, `night ${i + 1}: clumsy dawn ${r.clumsy.dawn}% opens ${r.clumsy.open}%`);
+    assert.ok(r.shaky.dawn >= 35 && r.shaky.open >= 50, `night ${i + 1}: shaky dawn ${r.shaky.dawn}% opens ${r.shaky.open}%`);
+  }
+  assert.ok(main.dawn <= 20, `main rules: shaky dawn ${main.dawn}%`);
 });
 check('a moth touching the live thread always costs a wick (200 placements)', () => {
   for (let trial = 0; trial < 200; trial++) {

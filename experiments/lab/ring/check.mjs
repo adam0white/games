@@ -253,8 +253,11 @@ async function run(test, phone) {
   await page.click('#endMenu');
 
   if (!QUICK && phone === 'chromium') {
-    // The whole of today's meadow (practice now), to see the real end card with eight jars.
-    await page.click('#daily');
+    // A whole night, to see the real end card with eight jars and the next night opening. (Until 2026-11-24 this played
+    // today's meadow again as practice; the end card is the same, and a night is what opens night 2.)
+    await menu(page);
+    assert.equal(await ring(page, 'r.nights()'), null, 'night 2 is not open before a night is played');
+    await page.click('#play');
     const t0 = Date.now();
     while (Date.now() - t0 < 420000) {
       const s = await snapshot(page);
@@ -270,7 +273,14 @@ async function run(test, phone) {
     const [download] = await Promise.all([page.waitForEvent('download', { timeout: 5000 }).catch(() => null), page.click('#savePic')]);
     assert.ok(download || /Shared|saved/i.test(await page.textContent('#saveNote')), 'Save picture gives a file');
     if (download) { await download.saveAs(join(SHOTS, `${phone}-8-picture.png`)); console.log(`     ${phone}: picture saved as ${download.suggestedFilename()}`); }
+    assert.ok(end.cleared >= 4, `the scripted finger fills at least 4 levels of night 1 (${end.cleared})`);
+    assert.match(await page.textContent('#endLine'), /Night 2 is open\./, 'the end card says night 2 is open');
+    assert.equal((await ring(page, 'r.nights()')).open, 2, 'ring:nights opens night 2');
+    const fx = await ring(page, 'r.fx');
+    for (const name of ['ring', 'jar', 'levelFull', 'level', 'over', 'nightOpened']) assert.ok(fx.includes(name), `feedback over a night: ${name}`);
+    console.log(`     ${phone}: feedback names over the night: ${[...new Set(fx)].join(' ')}`);
     await page.click('#endMenu');
+    assert.equal(await page.textContent('#play'), 'Play night 2', 'the menu offers night 2 at once');
   }
   await sleep(200);
   assert.deepEqual(errors, [], 'no page, console or network errors');
@@ -419,6 +429,98 @@ async function small(browser) {
   }
 }
 
+// The improvements of 2026-11-24: nights 2 and 3 behind their own key, the way back to the small games' home, feedback
+// for every action, and the menu at 320x568 in the fullest case.
+const OLD = '{"v":1,"sound":true,"nights":2,"dawns":1,"best":412,"bestRing":16,"endless":true,"endlessBest":90,"daily":{}}';
+async function seeded(page, items, q = '', language = 'en') {
+  await page.goto(`${base}/kit/save.js`); await page.evaluate(items => { localStorage.clear(); for (const k in items) localStorage.setItem(k, items[k]); }, items);
+  await menu(page, q, language);
+}
+async function improved(browser, device, phone) {
+  const test = await open(browser, device), { page } = test;
+  try {
+    // A fresh device: night 1 only, one quiet line says how night 2 opens.
+    await seeded(page, {});
+    assert.equal(await page.isVisible('#nights'), false, 'fresh: no night chooser');
+    assert.equal(await page.textContent('#nightNote'), 'Night 2 opens when 4 levels of a night end with full jars.');
+    // A player from before: ring:v1 loads unchanged, and having seen dawn, night 2 is open. ring:nights is written only when it changes.
+    await seeded(page, { 'ring:v1': OLD, 'ring:hint': '1' });
+    assert.deepEqual(await ring(page, 'r.save()'), JSON.parse(OLD), 'old save loads and is not rewritten');
+    assert.equal(await ring(page, 'r.nights()'), null, 'no new key until the player changes something');
+    assert.ok(await page.isVisible('#nights'), 'old save with a dawn: the night chooser shows');
+    assert.equal(await page.textContent('#nightName'), 'Night 1 of 2'); assert.equal(await page.textContent('#play'), 'Play the night');
+    assert.equal(await page.isDisabled('#nightPrev'), true); assert.equal(await page.isDisabled('#nightNext'), false);
+    await page.click('#nightNext');
+    assert.equal(await page.textContent('#nightName'), 'Night 2 of 2'); assert.equal(await page.textContent('#play'), 'Play night 2');
+    assert.deepEqual(await ring(page, 'r.nights()'), { v: 1, open: 2, pick: 1, best: [0, 0, 0] }, 'the pick is kept in ring:nights');
+    assert.ok((await ring(page, 'r.fx')).includes('night'), 'picking a night answers');
+    await page.reload(); await until(page, () => window.__ring?.ready, 'menu after reload');
+    assert.equal(await page.textContent('#play'), 'Play night 2', 'the pick survives a reload');
+    await page.click('#play');
+    assert.deepEqual(await ring(page, '[r.kind, r.night, r.idea, r.rules]'), ['night', 1, 'crowd', { fair: true, relight: true }], 'night 2 starts on its first idea with page rules');
+    await sleep(900); await shot(page, phone, 'n2-banner');
+    // Feedback: the pen going down answers; so does the button that started the run.
+    const box = await page.evaluate(() => { const r = document.getElementById('c').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height * 0.75 }; });
+    await page.mouse.move(box.x, box.y); await page.mouse.down(); await page.mouse.move(box.x + 30, box.y, { steps: 4 }); await page.mouse.up();
+    const fx = await ring(page, 'r.fx');
+    for (const name of ['button', 'level', 'penDown']) assert.ok(fx.includes(name), `feedback: ${name} in ${fx.join(',')}`);
+    assert.ok(await noOverflow(page), 'night 2: no overflow');
+    // The daily and endless runs stay on night 1's levels.
+    await page.click('#pause'); await page.click('#toMenu'); await page.click('#daily');
+    assert.deepEqual(await ring(page, '[r.kind, r.night, r.rules.fair]'), ['daily', 0, true], 'the daily is night 1 with page rules');
+    await page.click('#pause'); await page.click('#toMenu');
+    // Practice a later night by address, open or not.
+    await menu(page, '&night=3');
+    assert.equal(await page.textContent('#play'), 'Practise night 3'); assert.equal(await page.isVisible('#nights'), false);
+    await page.click('#play'); assert.deepEqual(await ring(page, '[r.kind, r.night, r.idea]'), ['practice', 2, 'pull']);
+    await page.click('#pause'); await page.click('#toMenu');
+    // Thorns are drawn where the sim has them; a level with thorns has them on screen.
+    await menu(page, '&night=2&level=7'); await page.click('#play'); await sleep(400);
+    const th = await ring(page, 'r.thorns()'), vp = page.viewportSize();
+    assert.equal(th.length, 6, 'three thorns on the thorns level');
+    for (let k = 0; k < th.length; k += 2) assert.ok(th[k] > 0 && th[k] < vp.width && th[k + 1] > 0 && th[k + 1] < vp.height, 'a thorn is on screen');
+    await shot(page, phone, 'n2-thorns');
+    await page.click('#pause'); await page.click('#toMenu');
+    // From the small games' home: the way back on the menu and the end card, and a finished run reported to hub:results.
+    await menu(page, '&level=1&from=small');
+    assert.equal(await page.locator('#menu .kit-home').count(), 1, 'from=small: the way back is on the menu');
+    const runs0 = await page.evaluate(() => JSON.parse(localStorage.getItem('hub:results') || '{}').ring?.runs || 0);
+    await page.click('#play');
+    await until(page, () => window.__ring.mode === 'end', 'practice level left alone ends', 60000);
+    assert.equal(await page.locator('#end .kit-home').count(), 1, 'from=small: the way back is on the end card');
+    const hub = await page.evaluate(() => JSON.parse(localStorage.getItem('hub:results') || '{}'));
+    assert.equal(hub.ring?.runs, runs0 + 1, 'the run is reported to the home (quits count as runs too, as kit/home.js says)'); assert.equal(hub.ring?.last, 'lost', 'a practice level with no full jar is not a win');
+    assert.match(await ring(page, 'r.shareText'), /^Firefly Ring · Practice · level 1: 0, biggest ring 0$/, 'the share line');
+    await until(page, () => window.__ring.picture, 'the picture is made after the card shows', 4000);
+    const [download] = await Promise.all([page.waitForEvent('download', { timeout: 5000 }).catch(() => null), page.click('#savePic')]);
+    assert.ok(download || /Shared|saved/i.test(await page.textContent('#saveNote')), 'Save picture gives a file through kit/share.js');
+    assert.deepEqual(test.errors, [], `${phone} improvements: no errors`); assert.deepEqual(test.outside, []);
+    console.log(`ok   ring nights, home and feedback on ${phone}`);
+  } finally { await test.context.close(); }
+}
+// 320x568, the fullest menu: from the home, three nights open, a best score, and the lab notice; in both languages.
+async function tiny(browser) {
+  const device = { viewport: { width: 320, height: 568 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 };
+  const test = await open(browser, device), { page } = test;
+  try {
+    for (const language of ['en', 'tr']) {
+      await seeded(page, { 'ring:v1': OLD, 'ring:nights': '{"v":1,"open":3,"pick":2,"best":[0,0,300]}', 'ring:hint': '1' }, '&from=small', language);
+      assert.ok(await page.isVisible('#nights'), `320 ${language}: chooser shows`);
+      assert.ok(await noOverflow(page), `320 ${language}: the menu does not scroll`);
+      const inner = await page.evaluate(() => { const d = document.querySelector('#menu > div'); return d.scrollHeight - d.clientHeight; });
+      assert.ok(inner <= 1, `320 ${language}: the menu card does not scroll inside (${inner} px over)`);
+      for (const id of ['#play', '#nightPrev', '#nightNext', '#daily', '#endless', '#sound', '#lang', '#menu .kit-home']) assert.ok(await visibleIn(page, id), `320 ${language}: ${id} visible`);
+      await cleanWords(page, `320 ${language} menu`, language === 'tr');
+      await shot(page, `tiny-${language}`, '1-menu');
+      await page.click('#play'); await sleep(800);
+      assert.ok(await noOverflow(page), `320 ${language}: play does not scroll`);
+      await shot(page, `tiny-${language}`, '2-play');
+    }
+    assert.deepEqual(test.errors, [], '320: no errors');
+    console.log('ok   ring at 320x568 with every menu line');
+  } finally { await test.context.close(); }
+}
+
 // Play recording: the notice is on the menu before Play; a played practice level sends one record under 'ring';
 // with the switch off in the pause card the next level sends nothing.
 async function recording(browser, device, phone) {
@@ -451,7 +553,7 @@ try {
     if (only && only !== phone) continue;
     const browser = await engine.launch();
     const test = await open(browser, device);
-    try { await run(test, phone); console.log(`ok   ring on ${phone} (${device.viewport.width}x${device.viewport.height})`); await turkish(browser, device, phone); await recording(browser, device, phone); await turkishHint(browser, device, phone); if (phone === 'chromium') { await small(browser); await turkishSmall(browser); } }
+    try { await run(test, phone); console.log(`ok   ring on ${phone} (${device.viewport.width}x${device.viewport.height})`); await turkish(browser, device, phone); await recording(browser, device, phone); await turkishHint(browser, device, phone); await improved(browser, device, phone); await tiny(browser); if (phone === 'chromium') { await small(browser); await turkishSmall(browser); } }
     catch (e) { failed++; console.error(`FAIL ring on ${phone}: ${e.stack}`); if (test.errors.length) console.error(test.errors.join('\n')); await shot(test.page, phone, 'failure').catch(() => {}); }
     finally { await test.context.close(); await browser.close(); }
   }
