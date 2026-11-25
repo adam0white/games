@@ -356,6 +356,33 @@ const clumsyTotal = clumsy.reduce((sum, [, cleared]) => sum + cleared, 0);
 console.log(clumsyLine());
 check(clumsy.every(([, cleared]) => cleared >= GROUP_SIZE - 1), `the clumsy player clears every plate at least ${GROUP_SIZE - 1}/${GROUP_SIZE}`);
 
+// How far off the bow or finger can be before a plate stops printing: the clumsy player again,
+// with the handle 0.03 and 0.045 of the plate off (about 10 and 15 px on a phone). Reported, not asserted.
+const spread = [];
+for (const spec of ALL.filter(spec => spec.handle)) {
+  const answer = answerHandle(spec);
+  const rates = [0.03, 0.045].map(radius => seeds.filter((seed, index) => play(spec, seed, {
+    drive: thumb(spec.target, seed), seconds: 8,
+    handle: [answer[0] + radius * Math.cos(index * 2.4), answer[1] + radius * Math.sin(index * 2.4)],
+  }).won).length);
+  spread.push(`${spec.level} ${rates.join(' / ')}`);
+}
+console.log(`Handle off by 0.03 / 0.045 of the plate, clears of ${GROUP_SIZE}: ${spread.join(', ')}.`);
+
+// A new plate forgives a wrong start: settle 2.5 s on a wrong pitch below, then slide up to the figure.
+const retunes = [];
+for (const spec of MODAL) {
+  const low = Math.max(0, spec.target - 0.15);
+  const results = seeds.map(seed => play(spec, seed, { handle: spec.handle ? answerHandle(spec) : undefined, seconds: 8,
+    drive: frame => frame < 150 ? low
+      : frame < 190 ? low + (spec.target - low) * (frame - 150) / 40
+      : spec.target + 0.017 * Math.sin(frame * 2.17 + seed) }));
+  const cleared = results.filter(state => state.won).length;
+  retunes.push(`${spec.level} ${cleared}/${GROUP_SIZE}`);
+  check(cleared >= GROUP_SIZE - 1, `${spec.name}: settling on a wrong pitch, then retuning, still prints (${cleared}/${GROUP_SIZE})`);
+}
+console.log(`Wrong pitch, then retune: ${retunes.join(', ')}.`);
+
 // The daily figure: the same for everyone on a day, different across days, and always printable.
 check(dailySpec('2026-11-24').mode === dailySpec('2026-11-24').mode && dailySpec('2026-11-24').seed === dailySpec('2026-11-24').seed, 'one daily figure per date');
 const month = new Set(Array.from({ length: 30 }, (_, day) => { const spec = dailySpec(`2026-12-${String(day + 1).padStart(2, '0')}`); return spec.shape + spec.mode; }));

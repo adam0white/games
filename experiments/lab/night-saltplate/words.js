@@ -5,6 +5,9 @@ import { words } from '../../kit/i18n.js';
 export const { t, lang, setLang, apply, langs } = words({
   en: {
     title: 'Saltplate',
+    titleA: 'Salt',
+    titleB: 'plate',
+    hintTouch: 'Touch the copper mark',
     eyebrow: 'Resonance studies',
     pause: 'Pause',
     frequency: 'Frequency',
@@ -96,6 +99,9 @@ export const { t, lang, setLang, apply, langs } = words({
   },
   tr: {
     title: 'Tuz Levha',
+    titleA: 'Tuz',
+    titleB: 'levha',
+    hintTouch: 'Bakır işarete dokun',
     eyebrow: 'Rezonans çalışmaları',
     pause: 'Duraklat',
     frequency: 'Frekans',

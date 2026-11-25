@@ -118,8 +118,8 @@ function settings() {
 function texts() {
   apply();
   document.title = t('title');
-  byId('title-a').textContent = lang() === 'tr' ? 'Tuz' : 'Salt';
-  byId('title-b').textContent = lang() === 'tr' ? 'levha' : 'plate';
+  byId('title-a').textContent = t('titleA');
+  byId('title-b').textContent = t('titleB');
   tuner.setAttribute('aria-label', t('tunerLabel'));
   plate.setAttribute('aria-label', t('plateLabel'));
   settings();
@@ -179,15 +179,20 @@ function tools() {
 // one for the daily figure, one for each visit to the instrument.
 const rec = lab('night-saltplate');
 let runOpen = false;
+// The mode and shape the open run was started in: begin*() change them before start() ends the old run.
+let runMode = 'plates';
+let runShape = freeShape;
 function runEnd(outcome) {
   if (!runOpen) return;
   runOpen = false;
-  if (mode === 'free') rec.end(outcome, { mode, shape: freeShape, pictures });
-  else rec.end(outcome, { level: state.level, match: Math.round(state.match * 100), grains: state.grains.length, cleared, mode, ...(mode === 'daily' ? { day: today } : {}) });
+  if (runMode === 'free') rec.end(outcome, { mode: runMode, shape: runShape, pictures });
+  else rec.end(outcome, { level: state.level, match: Math.round(state.match * 100), grains: state.grains.length, cleared, mode: runMode, ...(runMode === 'daily' ? { day: today } : {}) });
 }
 function runStart() {
   if (runOpen) return;
   runOpen = true;
+  runMode = mode;
+  runShape = freeShape;
   if (mode === 'free') rec.start({ mode, shape: freeShape, look });
   else rec.start({ level: state.level, look, mode, ...(mode === 'daily' ? { day: today, figure: state.spec.shape + ':' + state.spec.mode } : {}) });
 }
@@ -524,7 +529,7 @@ else begin(cleared % LEVELS.length + 1);
 resize();
 requestAnimationFrame(frame);
 hint(tuner, { kind: 'tap', key: 'night-saltplate:hint', when: () => screen === 'play' && mode === 'plates' && state.level === 1,
-  played: cleared > 0, delay: 1600, reach: 38, label: 'Touch the copper mark',
+  played: cleared > 0, delay: 1600, reach: 38, label: t('hintTouch'),
   bottom: () => innerHeight - tuner.getBoundingClientRect().top - tuner.offsetHeight / 2 });
 // The bow and the finger: once the tuner has been touched on a plate that has one, show a finger
 // moving on the plate if the player has not touched it.

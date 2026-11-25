@@ -8,7 +8,7 @@ import { dirname, extname, join, resolve, sep } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { LEVELS, answerHandle, dailySpec } from './sim.js';
-import { answerLab, withAgent, assertNotice, assertRun, assertOffSendsNothing, assertNoLeak, waitForRuns } from '../../kit/check/lab-record.mjs';
+import { answerLab, withAgent, assertNotice, assertRun, assertOffSendsNothing, assertNoLeak, waitForRuns, runRecords } from '../../kit/check/lab-record.mjs';
 
 const mount = '/lab/night-saltplate/';
 const experiments = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -79,6 +79,25 @@ async function waitFor(page, predicate, description, timeout = 6000) {
     await sleep(40);
   } while (performance.now() < deadline);
   assert.fail(`${description}: ${JSON.stringify(current)}`);
+}
+
+// Every visible box in the page is inside the screen and no button's words overflow it; returns the plate width.
+async function fits(page, what) {
+  const fit = await page.evaluate(() => {
+    const out = [];
+    for (const el of document.querySelectorAll('#work *')) {
+      if (!el.getClientRects().length || getComputedStyle(el).visibility === 'hidden') continue;
+      const box = el.getBoundingClientRect();
+      if (!box.width || !box.height) continue;
+      const name = el.id || el.className || el.tagName;
+      if (box.bottom > innerHeight + 0.5 || box.right > innerWidth + 0.5 || box.top < -0.5 || box.left < -0.5) out.push([name, Math.round(box.top), Math.round(box.bottom)]);
+      if (el.tagName === 'BUTTON' && el.scrollWidth > el.clientWidth + 1) out.push([name, 'words overflow', el.scrollWidth, el.clientWidth]);
+    }
+    return { out, wide: document.documentElement.scrollWidth - innerWidth, plate: document.getElementById('plate').getBoundingClientRect().width };
+  });
+  assert.deepEqual(fit.out, [], `${what}: everything is on the screen`);
+  assert.ok(fit.wide <= 0, `${what}: no sideways scroll`);
+  return fit.plate;
 }
 
 async function checkBounds(page, ids) {
@@ -515,6 +534,12 @@ async function extras({ name, engine, device }) {
     await screenshot(page, name, '10-plate-list');
     await page.locator('#plate-list button').nth(1).tap();
     await waitFor(page, s => s?.screen === 'play' && s.mode === 'plates' && s.level === 2, 'a listed plate opens');
+    // Leaving the instrument for a plate ends its run as an instrument run, on the shape it was played on.
+    await waitForRuns(lab, 'night-saltplate', 4);
+    const freeRuns = runRecords(lab, 'night-saltplate').filter(r => r.data.outcome !== 'between-runs').slice(2);
+    assert.deepEqual(freeRuns.map(r => [r.data.outcome, r.data.summary.mode, r.data.summary.shape, r.data.summary.pictures]),
+      [['quit', 'free', 'square', 0], ['quit', 'free', 'disk', 1]], 'each instrument visit is recorded as the instrument, with its shape');
+    assert.ok(freeRuns[1].data.events.some(event => event.type === 'picture'), 'the instrument picture is an event');
 
     // Turkish: every string through words.js.
     await page.tap('#pause');
@@ -528,18 +553,54 @@ async function extras({ name, engine, device }) {
     await page.tap('#lang');
     await page.tap('#resume');
 
-    // Nothing scrolls, from a 320 x 568 phone up, and the plate takes what is left.
+    // Every box on the page is inside the screen (#work hides its overflow, so a scroll height
+    // alone would not see a clipped control), from a 320 x 568 phone up, and the plate takes what is left.
     const portrait = page.viewportSize();
     const sizes = [];
     for (const [width, height] of [[320, 568], [375, 667], [390, 844]]) {
       await page.setViewportSize({ width, height });
       await sleep(120);
-      const fit = await page.evaluate(() => ({ scroll: document.documentElement.scrollHeight - innerHeight, wide: document.documentElement.scrollWidth - innerWidth,
-        plate: document.getElementById('plate').getBoundingClientRect().width }));
-      assert.ok(fit.scroll <= 0 && fit.wide <= 0, `${width} x ${height} does not scroll: ${JSON.stringify(fit)}`);
-      sizes.push(`${width}x${height} plate ${Math.round(fit.plate)}`);
+      const plate = await fits(page, `${width} x ${height}`);
+      sizes.push(`${width}x${height} plate ${Math.round(plate)}`);
     }
     assert.ok(Number(sizes[0].split(' ').at(-1)) >= 250, `the plate fills a 320 x 568 phone: ${sizes[0]}`);
+
+    // The longest words: Turkish at 320 x 568 on the plates with the longest idea lines, the plate
+    // with two gauges, and a Turkish result card with its three buttons. The plate keeps its size
+    // when the print appears.
+    await page.setViewportSize({ width: 320, height: 568 });
+    await page.evaluate(() => localStorage.setItem('night-saltplate:save', JSON.stringify({ v: 1, cleared: 17, look: 'blue', sound: true })));
+    await page.goto(at('&lang=tr'));
+    await waitFor(page, s => s?.screen === 'play' && s.level === 18 && s.lang === 'tr', 'Turkish, plate 18');
+    const turkish = [];
+    for (const level of [10, 13, 15, 17, 18]) {
+      await page.tap('#pause');
+      await page.tap('#to-plates');
+      await waitFor(page, s => s?.screen === 'chooser', 'the plate list opens');
+      await page.locator('#plate-list button').nth(level - 1).tap();
+      await waitFor(page, s => s?.screen === 'play' && s.level === level, `plate ${level} opens`);
+      turkish.push(`${level}:${Math.round(await fits(page, `Turkish plate ${level}`))}`);
+      if (level === 17) {
+        await tapTuner(page, { fraction: 0.1 });
+        await sleep(300);
+        assert.ok(await page.locator('#salt-gauge').isVisible(), 'the salt gauge shows on plate 17');
+        await fits(page, 'Turkish plate 17 with two gauges');
+        await screenshot(page, name, '12-turkish-320-two-gauges');
+      }
+    }
+    await page.tap('#pause');
+    await page.tap('#to-plates');
+    await page.locator('#plate-list button').nth(1).tap();
+    await waitFor(page, s => s?.screen === 'play' && s.level === 2, 'plate 2 opens');
+    const before = await fits(page, 'Turkish plate 2');
+    await clear(page, 2);
+    await sleep(400);
+    const after = await fits(page, 'Turkish result card');
+    assert.ok(Math.abs(after - before) < 1, `the plate keeps its size when the print appears: ${before} ${after}`);
+    for (const id of ['next', 'replay', 'share']) assert.ok(await page.locator('#' + id).isVisible(), `${id} shows on the result card`);
+    await checkBounds(page, ['next', 'replay', 'share']);
+    await screenshot(page, name, '13-turkish-320-result');
+    await page.evaluate(() => localStorage.setItem('kit:lang', 'en'));
 
     // Page work per frame at 390 x 844 with the most grains (the Powder plate: 700).
     await page.setViewportSize({ width: 390, height: 844 });
@@ -557,7 +618,7 @@ async function extras({ name, engine, device }) {
 
     assert.deepEqual(unexpected, [], 'no external requests');
     assert.deepEqual(errors, [], 'no browser errors');
-    console.log(JSON.stringify({ browser: name, extras: { daily: daily.shape + ':' + daily.mode, dailySeconds: printed.t, sizes, perf } }));
+    console.log(JSON.stringify({ browser: name, extras: { daily: daily.shape + ':' + daily.mode, dailySeconds: printed.t, sizes, turkish, perf } }));
   } finally {
     await browser.close();
   }
