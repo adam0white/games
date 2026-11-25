@@ -2,10 +2,15 @@
 // Modes (exit non-zero on a failed check):
 //   node experiments/lantern/bots.mjs parity [seeds] [--mutate]   with no mode chosen, sim.js plays exactly as on main (see parity below)
 //   node experiments/lantern/bots.mjs spark [runs] [--mutate[=flies-anywhere]]   Spark's claims (modes/spark-bots.mjs)
+//   node experiments/lantern/bots.mjs ripples [--mutate]   the 3D view's water (ripple-bots.mjs)
 //   node experiments/lantern/bots.mjs tide [seeds] [--mutate]   Tide's claims (modes/tide-bots.mjs)
 //   node experiments/lantern/bots.mjs duet [--mutate]   Duet's claims (modes/duet-bots.mjs)
 //   node experiments/lantern/bots.mjs race [--mutate]   Race's claims (modes/race-bots.mjs)
 import { create, step, centre, half, sight, score, progress, towerStage, GOAL, BOAT, DT } from './sim.js';
+if (process.argv[2] === 'ripples') { // the 3D view's water: its own claims (ripple-bots.mjs), in its own process
+  const { spawnSync } = await import('node:child_process');
+  process.exit(spawnSync(process.execPath, [new URL('./ripple-bots.mjs', import.meta.url).pathname, ...process.argv.slice(3)], { stdio: 'inherit' }).status ?? 1);
+}
 const SUB = ['parity', 'spark', 'tide', 'duet', 'race'].includes(process.argv[2]) ? process.argv[2] : '';
 if (SUB === 'spark' || SUB === 'tide' || SUB === 'duet' || SUB === 'race') { // its own process: the mode's bots read their own arguments (spark-bots.mjs runs worker threads)
   const { spawnSync } = await import('node:child_process');
