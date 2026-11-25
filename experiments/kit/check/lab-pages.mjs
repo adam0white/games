@@ -8,6 +8,7 @@ const utcDay = now.toISOString().slice(0, 10);
 // These saves exercise the formats already read by each page. Sharing remains off.
 const saves = {
   face: { v: 1, best: 300, runs: 3, stars: [2, 1, 0, 0], sound: true },
+  faceBooth: { v: 1, best: 2400, runs: 2, bestStreak: 6, photos: 40 },
   pour: { v: 1, stars: [0, 0, 0, 0, 0, 0, 0, 0], sound: true, tries: 3 },
   bells: { v: 1, stars: [2, 0, 0, 0, 0, 0, 0, 0], best: 120, sound: true, tries: 3, look: 'moon' },
   channels: { unlocked: 3, completed: false, sound: true },
@@ -188,10 +189,11 @@ export const labPages = {
   'lab/wild2-face-shift': pageEntry('wild2-face-shift:save', saves.face, 'wild2-face-shift:hint', {
     menu: '#toMenu', sound: '#sound',
     state: () => { const s = window.faceShiftState?.(); return s && { screen: s.mode, paused: s.mode === 'paused', t: s.state?.elapsed ?? 0 }; },
-    verify: () => window.faceShiftState().saved, expect: saves.face,
+    verify: () => { const s = window.faceShiftState(); return { saved: s.saved, booth: s.booth, daily: s.daily, line: document.querySelector('#dailyLine').textContent }; },
+    expect: { saved: saves.face, booth: saves.faceBooth, daily: { v: 1, day: utcDay, best: 412 }, line: 'Today: best 412' },
     touch: dragTouch(() => window.faceShiftState().state.x, n => window.faceShiftState().state.x > n),
     hint: { delay: 1600, before: () => window.faceShiftState().state.x, moved: n => window.faceShiftState().state.x > n },
-  }),
+  }, { 'wild2-face-shift:booth': json(saves.faceBooth), 'wild2-face-shift:daily': json({ v: 1, day: utcDay, best: 412 }) }),
   'lab/wild-pour': pageEntry('wild-pour:save', saves.pour, 'wild-pour:hint', {
     menu: '#quit', sound: '#sound2', changed: { 'wild-pour:save': { tries: 1 } },
     state: () => { const s = window.pourState?.(); return s && { ...s, paused: !!s.paused }; },
