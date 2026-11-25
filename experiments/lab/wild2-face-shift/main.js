@@ -1,5 +1,5 @@
 import {create, step, DT, LEVELS, starsFor} from './sim.js';
-import {createBooth, stepBooth, RUNGS, PARAMS, PART_PARAM, REACH, PHOTO_TIME, NEXT_TIME, MEMORY_TIME, targetNow, portraitVisible, partAt, likeness, errorOf, tolOf, neutral} from './booth.js';
+import {createBooth, stepBooth, RUNGS, PARAMS, PART_PARAM, REACH, PHOTO_TIME, NEXT_TIME, MEMORY_TIME, targetNow, portraitVisible, partAt, likeness, errorOf, tolOf, neutral, CUE_SPOT} from './booth.js';
 import {t, lang, setLang, apply} from './words.js';
 import {readJson, writeJson} from '../../kit/save.js';
 import {sound} from '../../kit/audio.js';
@@ -214,7 +214,7 @@ function drawBooth(){const state=b,ri=state.ri,rung=state.rung,color=rungColor(r
  if(pad.touch&&!calm){const p=pad.touch;ellipse(g,p.x,p.y,10,10,'#fff6');}
 }
 // A ring on a part and an arrow for the way to pull it (part directions as in booth.js; mirror flips them).
-const CUE={w:[0,0,'x'],o:[0,40,'y'],b:[0,-52,'-y'],m:[0,46,'-y'],l:[-32,-19,'-y'],n:[0,11,'y'],e:[-78,-92,'-y']};
+const CUE=CUE_SPOT;
 function drawCue(k,need,v,mirror,pulse=false){const [x,y,axis]=CUE[k];const pa=pulse?.5+.5*Math.sin(clock*8):.5+.5*Math.sin(clock*6);g.strokeStyle=`rgba(217,246,129,${.45+.45*pa})`;g.lineWidth=4;g.beginPath();g.arc(x*(1+v.w*.3),y*(1-v.w*.2),18+pa*5,0,Math.PI*2);g.stroke();
  if(pulse||Math.abs(need)<1e-6)return;let dir=Math.sign(need)*(axis.startsWith('-')?-1:1)*(mirror?-1:1);const ax=x*(1+v.w*.3)+(axis.endsWith('x')?dir*34:0),ay=y*(1-v.w*.2)+(axis.endsWith('y')?dir*34:0);const bx=x*(1+v.w*.3)+(axis.endsWith('x')?dir*54:0),by=y*(1-v.w*.2)+(axis.endsWith('y')?dir*54:0);
  g.beginPath();g.moveTo(ax,ay);g.lineTo(bx,by);g.stroke();const ang=Math.atan2(by-ay,bx-ax);g.beginPath();g.moveTo(bx,by);g.lineTo(bx-Math.cos(ang-.6)*10,by-Math.sin(ang-.6)*10);g.moveTo(bx,by);g.lineTo(bx-Math.cos(ang+.6)*10,by-Math.sin(ang+.6)*10);g.stroke();}

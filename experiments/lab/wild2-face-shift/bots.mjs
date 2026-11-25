@@ -143,7 +143,7 @@ console.log('PASS: 1,600 seeded bot runs; independent behavioral examples; deter
 // The booth (2026-11-24): a ladder of sitters in booth.js. The classic claims above stay as they were; they are the
 // parity run for the unchanged four rounds. `--mutate-part` makes every grab move the head, whatever part it lands on.
 const booth = await import('./booth.js');
-const { createBooth, stepBooth, RUNGS, PARAMS, PART_PARAM, targetNow, portraitVisible, partAt, likeness, errorOf, tolOf, MEMORY_TIME } = booth;
+const { createBooth, stepBooth, RUNGS, PARAMS, PART_PARAM, targetNow, portraitVisible, partAt, likeness, errorOf, tolOf, MEMORY_TIME, CUE_SPOT } = booth;
 const mutatePart = process.argv.includes('--mutate-part');
 const bstart = opts => createBooth({ ...opts, ...(mutatePart ? { mutate: 'part' } : {}) });
 const PART_OF = { w: 'head', o: 'head', b: 'brow', m: 'mouth', l: 'eyes', n: 'nose', e: 'ears' };
@@ -177,6 +177,12 @@ const SIGN = { head: 1, brow: -1, mouth: -1, eyes: -1, nose: 1, ears: -1 };
   assert.equal(partAt(0, -50, ['w']), 'head');
   assert.equal(partAt(-32, -19, PARAMS), 'eyes');
   assert.equal(partAt(0, 10, PARAMS), 'nose');
+  // The cue for each number sits on the part that moves it, with every part open and with only that number open.
+  const partOf = k => k === 'w' || k === 'o' ? 'head' : Object.keys(PART_PARAM).find(p => PART_PARAM[p] === k);
+  for (const [k, [x, y]] of Object.entries(CUE_SPOT)) {
+    assert.equal(partAt(x, y, PARAMS), partOf(k), `the cue for ${k} is on the ${partOf(k)} with every part open`);
+    assert.equal(partAt(x, y, [k]), partOf(k), `the cue for ${k} is on the ${partOf(k)} when it opens`);
+  }
   assert.equal(partAt(0, 45, PARAMS), 'mouth');
   assert.equal(partAt(-90, -90, PARAMS), 'ears');
   assert.equal(partAt(-90, 10, PARAMS), 'head');

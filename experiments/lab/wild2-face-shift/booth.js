@@ -192,6 +192,10 @@ export function likeness(state) {
 
 // Which part a finger lands on. x and y are in the face's own frame: the unstretched head is about 100 across
 // from the centre to the cheek, nose at (0, 11), eyes at (+-32, -19), mouth at (0, 43). Locked parts are head.
+// Where the game points when a number is furthest off: [x, y, drag axis] in face units. Head numbers point at the
+// cheek, because the centre and the chin belong to the nose and the mouth once those open.
+export const CUE_SPOT = { w: [-66, 18, 'x'], o: [66, 18, 'y'], b: [0, -52, '-y'], m: [0, 46, '-y'], l: [-32, -19, '-y'], n: [0, 11, 'y'], e: [-78, -92, '-y'] };
+
 export function partAt(x, y, open) {
   const has = p => open.includes ? open.includes(p) : open.has(p);
   const ax = Math.abs(x);
