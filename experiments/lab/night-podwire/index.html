@@ -12,26 +12,35 @@
 body { margin:0; background:var(--paper); color:var(--ink); font:15px/1.4 'Gill Sans',system-ui,sans-serif; -webkit-tap-highlight-color:transparent }
 button { color:inherit; font:inherit; cursor:pointer; min-height:44px; touch-action:manipulation }
 button:focus-visible,canvas:focus-visible { outline:2px solid var(--spot); outline-offset:3px }
-#folio { width:min(100%,550px); height:100svh; margin:auto; padding:calc(env(safe-area-inset-top) + 10px) 22px calc(env(safe-area-inset-bottom) + 16px); display:flex; flex-direction:column; }
+#folio { width:min(100%,550px); height:100svh; margin:auto; padding:calc(env(safe-area-inset-top) + 10px) 16px calc(env(safe-area-inset-bottom) + 16px); display:flex; flex-direction:column; }
 header { display:flex; align-items:center; border-bottom:1px solid var(--ink); padding:0 0 6px; gap:10px }
 .brand { font-weight:750; font-size:13px; letter-spacing:.24em; text-transform:uppercase }
 .emblem { width:17px; height:21px; border:1.5px solid var(--ink); border-radius:80% 10% 80% 10%; transform:rotate(-14deg); position:relative }
 .emblem::after { content:''; position:absolute; width:1px; height:19px; background:var(--ink); left:7px; transform:rotate(35deg) }
-#pause { margin-left:auto; background:transparent; border:0; width:44px; display:grid; place-items:center }
+#today { margin-left:auto; background:transparent; border:1px solid var(--line); border-radius:2px; padding:4px 12px; font-size:13px; letter-spacing:.08em; text-transform:uppercase; min-height:40px }
+#today[aria-pressed=true] { background:var(--ink); color:var(--paper); border-color:var(--ink) }
+#pause { background:transparent; border:0; width:44px; display:grid; place-items:center }
 #pause span { height:14px; width:12px; border-left:3px solid; border-right:3px solid }
 #pause:disabled { visibility:hidden }
 #heading { margin-top:clamp(13px,4svh,36px); }
 .plate { text-transform:uppercase; font-size:10px; font-weight:700; letter-spacing:.19em; color:var(--soft) }
 h1,h2 { font:normal clamp(42px,8svh,66px)/1.05 'Baskerville','Palatino',Georgia,serif; letter-spacing:-.048em; margin:5px 0 2px }
+/* One line for every plant name, so a long name never takes height from the board: main.js shrinks the type to fit, then ellipsis. */
+#species { white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
 #latin { margin:0; color:var(--soft); font:italic 18px/1.4 'Baskerville',Georgia,serif }
 #stage { flex:1; min-height:0; width:100%; display:grid; place-items:center; container-type:size }
 #board { display:block; width:min(100cqw,94.7368cqh); height:auto; aspect-ratio:360 / 380; touch-action:none; user-select:none; -webkit-user-select:none }
 footer { border-top:1px solid var(--ink); padding-top:10px; }
 #controls { display:flex; align-items:center; justify-content:space-between; min-height:48px; gap:8px }
 #count { font:normal 22px/1.2 'Baskerville','Palatino',Georgia,serif; }
+#won { display:flex; gap:8px }
+#share { border:1px solid var(--ink); background:transparent; padding:10px 14px; border-radius:2px }
+#share[hidden] { display:none }
 #next,#resume { border:0; background:var(--ink); color:var(--paper); padding:10px 16px; border-radius:2px }
-#marks { display:flex; gap:4px; margin:12px 0 3px }
+#marks { display:flex; gap:3px; margin:12px 0 3px }
+#marks[hidden] { display:none }
 #marks i { height:3px; flex:1; background:var(--line); opacity:.35 }
+#marks i.par { height:6px; margin-top:-3px }
 #marks i.done { background:var(--ink); opacity:1 }
 #marks i.current { background:var(--spot); opacity:1 }
 #status { color:var(--spot); font-size:13px; margin:3px 0 0 }
@@ -63,14 +72,14 @@ footer { border-top:1px solid var(--ink); padding-top:10px; }
 </head>
 <body>
 <main id="folio">
-<header><span class="emblem" aria-hidden="true"></span><span class="brand">Podwire</span><button id="pause" aria-label="Pause"><span aria-hidden="true"></span></button></header>
+<header><span class="emblem" aria-hidden="true"></span><span class="brand" lang="en" data-i18n="brand">Podwire</span><button id="today" aria-pressed="false" data-i18n="today">Today</button><button id="pause" aria-label="Pause" data-i18n-aria="pause"><span aria-hidden="true"></span></button></header>
 <div id="heading"><div class="plate" id="number"></div><h1 id="species"></h1><p id="latin"></p></div>
-<div id="stage"><canvas id="board" width="360" height="380" aria-label="Pull a marked section of wire down, then release to open the hanging seed pods."></canvas></div>
+<div id="stage"><canvas id="board" width="360" height="380" data-i18n-aria="board" aria-label="Pull a marked section of wire down, then release to open the hanging seed pods."></canvas></div>
 <footer>
-<div id="controls"><span id="count" role="status"></span><div id="won"><button id="next">Next plate →</button></div></div>
-<div id="marks" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div><p role="status" id="status"></p>
+<div id="controls"><span id="count" role="status"></span><div id="won"><button id="share" hidden data-i18n="share">Share</button><button id="next">Next plate →</button></div></div>
+<div id="marks" aria-hidden="true"></div><p role="status" id="status"></p>
 </footer></main>
-<div id="paused" role="dialog" aria-modal="true" aria-labelledby="pause-title"><div class="sheet"><div class="plate">Podwire</div><h2 id="pause-title">Paused</h2><div class="actions"><button id="resume">Resume</button><button id="retry">Restart plate</button><button id="sound"></button></div></div></div>
+<div id="paused" role="dialog" aria-modal="true" aria-labelledby="pause-title"><div class="sheet"><div class="plate" lang="en">Podwire</div><h2 id="pause-title" data-i18n="paused">Paused</h2><div class="actions"><button id="resume" data-i18n="resume">Resume</button><button id="retry" data-i18n="restart">Restart plate</button><button id="sound"></button><button id="lang" data-i18n="otherLang">Türkçe</button></div></div></div>
 <script type="module" src="./main.js"></script>
 <script src="/notes/button.js" defer></script>
 </body></html>
