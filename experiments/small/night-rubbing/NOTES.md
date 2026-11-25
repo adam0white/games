@@ -93,6 +93,8 @@ The owner's decision (2026-11-25): keep it for now, though it is too basic. This
 4. The one interesting rule (direction decides the flank) only changed shading; play never asked for it.
 5. Nothing to come back for: six plates, no daily, no share, English only.
 
+What became of each: 1 to 4 are answered by the stick, glaze, grit and stars below. 5: twelve plates, a daily plate, share and Turkish. Also seen on the first sheet and left as it is: the pencil demo and the kit hand show at the same time (two teachers at once). The first plate is unchanged on purpose.
+
 ### What changed
 
 - Plates 7 to 12 (`plates.js`): young ammonite, crinoid stem, brittle star, sea urchin, horseshoe crab, feather. Plates 1 to 6 are unchanged.
@@ -132,6 +134,10 @@ The original claims for plates 1 to 6 are unchanged and pass. Parity: plates 1 t
 
 Filed count over eight papers; stars on the plate's own paper. Before this change the naive sweep filed 48/48 with no score. Now it scores one star on plates 1 to 6 and files none of plates 7 to 12; the careful rubber files all 96 with three stars, using 50% of the stick and about 80% of par on its own paper. Daily: all 72 specimen, way and mirror combinations are filed by the careful rubber; over 60 days the careful rubber gets three stars 60/60 and the old sweep files 0/60.
 
+A shaky careful rubber, closer to a thumb (every stroke starts and ends up to 6 cells off and bows sideways by up to 6), still files plates 7 to 12 on all eight papers: 48/48, three stars each, at most 59% of the stick, no smudges. It still plans its lines from the clean sheet; a person who does not plan will use more.
+
+The page computes the daily par and stick itself. Its numbers are the same in WebKit, Chromium and Node for all 72 combinations and for 60 days from 2026-11-25 (checked once with a scratch script on 2026-11-25, not part of `check.mjs`), so the daily plate is the same for everyone on these engines.
+
 Mutations, each exits 1: `--mutate` (no direction in transfer) fails at the original direction claim; `--mutate=glaze` (glaze ignores direction) fails at the par drift check for plate 8; `--mutate=stone` (grit takes no smudges) fails at "rows that cross the grit spoil a stone plate"; `--mutate=lead` (the stick never wears) fails at "the old sweep cannot file plate 7".
 
 ### Phone check (`check.mjs`)
@@ -144,7 +150,7 @@ Changed on purpose in the existing check: unlocked after plate 6 is now 7, not 6
 
 - Turkish wording: not read by a native speaker.
 - Sound and music by ear.
-- Whether a thumb reaches par and stays within the stick and the smudge limit; the careful rubber needs half the stick, a person may need more. The numbers are in `plates.js` and in `rate()` if they need loosening.
+- Whether a thumb reaches par and stays within the stick and the smudge limit. The careful rubber needs half the stick, the shaky one at most 59%; the phone check files plate 7 and one daily plate by pointer, but plates 8 to 12 are filed only in the simulation. The numbers are in `plates.js` and in `rate()` if they need loosening.
 - How grit and glaze read on a real phone screen, and the denser two-row drawer under a thumb.
 - The live recording endpoint.
 - The kit's recording switch on the pause card stays English in Turkish ("Record this play for the game lab"); that string is the kit's, not this page's.

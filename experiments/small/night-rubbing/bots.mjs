@@ -24,8 +24,8 @@ if (mutation) {
   });
 }
 const { createPlate, createSheet, rub, stars } = await import(source);
-const { PLATES, DAILY_KINDS, dailySpec, kindOf } = await import(new URL('./plates.js', import.meta.url));
-const { careful, rate } = await import(new URL('./plan.js', import.meta.url));
+const { PLATES, DAILY_KINDS, SMUDGE_LIMIT, dailySpec, kindOf } = await import(new URL('./plates.js', import.meta.url));
+const { careful, plan, rate } = await import(new URL('./plan.js', import.meta.url));
 const seeds = [0, 1, 47, 301, 7907, 16777213, 2147483648, 4294967295];
 
 // Pick a long horizontal line across the fossil that crosses both relief and
@@ -322,6 +322,41 @@ for (const k of ['free', 'lead', 'glaze', 'stone', 'glaze-stone']) {
 console.log('\nCareful rubber, share of the stick used on its own paper: '
   + table.filter(r => r.margin.stick !== null).map(r => `${r.level} ${(100 * r.margin.stick).toFixed(0)}%`).join(', ')
   + '. Share of par: ' + table.map(r => `${r.level} ${(100 * r.margin.par).toFixed(0)}%`).join(', ') + '.');
+
+// A shaky careful rubber, closer to a thumb: the same plan, but every stroke starts and ends up to 6 cells off and
+// bows sideways by up to 6 cells. It still files every new plate on every paper, so the stick and the grit leave
+// room for an imprecise hand. Its least margin is printed.
+function rng(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+function shaky(s, wobble, random) {
+  const off = () => (random() * 2 - 1) * wobble;
+  for (const offset of [0, 0.5, 0.25]) {
+    if (s.done || s.spoiled) break;
+    for (const [x0, y0, x1, y1] of plan(s, { offset })) {
+      if (s.done || s.spoiled) break;
+      const ax = x0 + off(), ay = y0 + off(), bx = x1 + off(), by = y1 + off(), bow = off();
+      const dx = bx - ax, dy = by - ay, length = Math.hypot(dx, dy) || 1, n = Math.max(1, Math.ceil(length / 10));
+      let px = ax, py = ay;
+      for (let k = 1; k <= n && !s.done && !s.spoiled; k++) {
+        const t = k / n, side = bow * Math.sin(Math.PI * t), x = ax + dx * t - dy / length * side, y = ay + dy * t + dx / length * side;
+        rub(s, px, py, x, y); px = x; py = y;
+      }
+    }
+  }
+  return s;
+}
+let shakyMost = { stick: 0, smudge: 0 }, shakyStars = [];
+for (const [i] of PLATES.entries()) {
+  const level = i + 1;
+  if (level < 7) continue;
+  for (const [n, seed] of SEEDS.entries()) {
+    const s = shaky(createPlate(level, n === 0 ? plateSeed(level) : seed), 6, rng(seed + level * 101));
+    assert.ok(s.done, `plate ${level}: a careful rubber whose strokes are 6 cells off still files it (paper ${seed}, ${s.spoiled ?? 'not filed'})`);
+    shakyMost = { stick: Math.max(shakyMost.stick, s.filedAt / s.lead), smudge: Math.max(shakyMost.smudge, s.smudge) };
+    shakyStars.push(stars(s));
+  }
+}
+console.log(`Shaky careful rubber (strokes up to 6 cells off), plates 7 to 12 on eight papers: ${shakyStars.length}/${shakyStars.length} filed, `
+  + `mean ${(shakyStars.reduce((a, b) => a + b, 0) / shakyStars.length).toFixed(2)} stars, at most ${(100 * shakyMost.stick).toFixed(0)}% of the stick, at most ${shakyMost.smudge} smudges of ${SMUDGE_LIMIT}.`);
 
 // The daily plate: every specimen in every way is filed by the careful rubber; sixty days from 2026-11-25 are
 // each filed by it with three stars and never by the old sweep; the same date gives the same plate.
