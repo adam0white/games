@@ -38,7 +38,7 @@ export const NIGHTS = [
     { ...N2, idea: 'quick', speed: 0.85, secs: 31 },
     { ...N2, idea: 'restless', cohesion: 0.014, jars: 4, secs: 34 },
     { ...N2, idea: 'thorns', thorns: 3, secs: 32 },
-    { ...N2, idea: 'sleep', sleep: true, secs: 38 },
+    { ...N2, idea: 'sleep', sleep: true, jars: 4, secs: 38 },
   ],
   [
     { ...N3, idea: 'pull', pull: 0.03, secs: 32 },

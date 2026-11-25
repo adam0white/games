@@ -365,6 +365,8 @@ check('careful clears every one of the 24 levels in at least 85% of seeds; a sha
   assert.ok(sh[0] >= 90, `shaky on level 1: ${sh[0]}%`);
   assert.ok(Math.max(...drops) <= 15, `shaky's largest step down is ${Math.max(...drops)} points`);
   assert.ok(Math.min(...lad.clumsy) >= 70, `clumsy's weakest level ${Math.min(...lad.clumsy)}%`);
+  const cdrops = lad.clumsy.slice(1).map((v, i) => lad.clumsy[i] - v);
+  assert.ok(Math.max(...cdrops) <= 12, `clumsy's largest step down is ${Math.max(...cdrops)} points`);
   assert.ok(mean(sh.slice(2 * n)) < mean(sh.slice(n, 2 * n)), 'the third night is harder for the shaky hand than the second');
 });
 check(`whole nights: a clumsy hand reaches dawn and opens every next night (${OPEN} levels full); a shaky hand often does; on main rules it never saw dawn`, () => {

@@ -681,8 +681,10 @@ function drawBanner(dt) {
   banner -= dt;
   const a = Math.min(1, banner / 0.5, (2.2 - banner) / 0.3 + (calm ? 1 : 0));
   g.globalAlpha = Math.max(0, a); g.textAlign = 'center';
-  g.fillStyle = '#ffd9a0'; g.font = '34px Georgia, serif'; g.fillText(t(...bannerTitle), VW / 2, Y(150));
-  g.fillStyle = '#f3e6cf'; g.font = '18px Georgia, serif'; g.fillText(t(...bannerTip), VW / 2, Y(150) + 32);
+  // Each line shrinks to fit the screen: the longest Turkish tips are wider than a 320 px phone at full size.
+  const fit = (text, px, y) => { g.font = `${px}px Georgia, serif`; const w = g.measureText(text).width, room = VW - 24; if (w > room) g.font = `${Math.floor(px * room / w)}px Georgia, serif`; g.fillText(text, VW / 2, y); };
+  g.fillStyle = '#ffd9a0'; fit(t(...bannerTitle), 34, Y(150));
+  g.fillStyle = '#f3e6cf'; fit(t(...bannerTip), 18, Y(150) + 32);
   g.globalAlpha = 1;
 }
 function render(t, dt) {

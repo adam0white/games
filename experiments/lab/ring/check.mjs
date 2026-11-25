@@ -498,6 +498,52 @@ async function improved(browser, device, phone) {
     console.log(`ok   ring nights, home and feedback on ${phone}`);
   } finally { await test.context.close(); }
 }
+// Every new level in the browser: it draws without page errors and without a frame over 8 ms (rAF callback time), with a
+// finger moving about so the thread, the noticing moths and the shy fireflies all run. Then a thread dragged across a thorn.
+async function ideas(browser, device, phone) {
+  const test = await open(browser, device), { page } = test;
+  await page.addInitScript(() => { const raf = requestAnimationFrame.bind(window); window.__worst = 0; window.requestAnimationFrame = cb => raf(t => { const a = performance.now(); cb(t); window.__worst = Math.max(window.__worst, performance.now() - a); }); });
+  try {
+    const worst = {};
+    for (let night = 2; night <= 3; night++) for (let level = 1; level <= 8; level++) {
+      await menu(page, `&night=${night}&level=${level}`); await page.click('#play');
+      await until(page, () => window.__ring.phase === 'play', 'level in play', 8000);
+      await page.evaluate(() => { window.__worst = 0; });
+      const vp = page.viewportSize(), cx = vp.width / 2, cy = vp.height * 0.6;
+      await page.mouse.move(cx - 80, cy); await page.mouse.down();
+      for (let k = 0; k < 40; k++) { await page.mouse.move(cx + 80 * Math.cos(k / 6), cy + 60 * Math.sin(k / 5)); await sleep(40); }
+      await page.mouse.up(); await sleep(1200);
+      const idea = await ring(page, 'r.idea');
+      worst[idea] = +(await page.evaluate(() => window.__worst)).toFixed(1);
+      if (level === 2 || level === 3 || level === 8 || (night === 3 && level === 2)) await shot(page, phone, `idea-${night}-${level}-${idea}`);
+    }
+    console.log(`     ${phone}: worst frame per idea (ms) ${JSON.stringify(worst)}`);
+    for (const [idea, ms] of Object.entries(worst)) assert.ok(ms < 8, `${idea}: a frame took ${ms} ms`);
+    // A thread pulled across a thorn is cut with no wick lost, and the cut answers.
+    await menu(page, '&night=2&level=7'); await page.click('#play');
+    await until(page, () => window.__ring.phase === 'play', 'thorn level in play', 8000);
+    // A drag can meet a moth on the way (one Chromium run had no cut at the first thorn), so try each thorn in turn
+    // and judge the first drag that reached a thorn with no moth snap in it.
+    const thorns = await ring(page, 'r.thorns()'), tries = [];
+    const state = () => page.evaluate(() => { const r = window.__ring; return { wicks: r.wicks, snaps: r.counts.snaps || 0, cuts: r.counts.thorns || 0, fxCuts: r.fx.filter(n => n === 'thorn').length }; });
+    for (let m = 0; m < thorns.length && !tries.some(x => x.cut && !x.snapped); m += 2) {
+      await until(page, () => window.__ring.rekindle === 0, 'lamp ready', 3000);
+      const [tx, ty] = [thorns[m], thorns[m + 1]], before = await state();
+      await page.mouse.move(tx - 70, ty + 4); await page.mouse.down();
+      for (let k = 0; k <= 28; k++) { await page.mouse.move(tx - 70 + k * 5, ty + 4); await sleep(20); }
+      await page.mouse.up(); await sleep(300);
+      const after = await state();
+      // Each step after a cut starts a new thread that touches the thorn again, so one drag can count several cuts.
+      tries.push({ thorn: m / 2, cut: after.cuts > before.cuts && after.fxCuts > before.fxCuts, snapped: after.snaps > before.snaps, wickLost: before.wicks - after.wicks });
+    }
+    const clean = tries.find(x => x.cut && !x.snapped);
+    assert.ok(clean, `a thread across a thorn is cut, and the cut answers: ${JSON.stringify(tries)}`);
+    assert.equal(clean.wickLost, 0, `no wick lost to a thorn: ${JSON.stringify(clean)}`);
+    if (tries.length > 1) console.log(`     ${phone}: thorn drags ${JSON.stringify(tries)}`);
+    assert.deepEqual(test.errors, [], `${phone} ideas: no page or console errors`);
+    console.log(`ok   ring's sixteen new levels draw on ${phone}`);
+  } finally { await test.context.close(); }
+}
 // 320x568, the fullest menu: from the home, three nights open, a best score, and the lab notice; in both languages.
 async function tiny(browser) {
   const device = { viewport: { width: 320, height: 568 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 };
@@ -516,8 +562,15 @@ async function tiny(browser) {
       assert.ok(await noOverflow(page), `320 ${language}: play does not scroll`);
       await shot(page, `tiny-${language}`, '2-play');
     }
+    // The card's own scroll at the heights where the compact rule (max-height 760px) matters most.
+    for (const [w, h] of [[360, 640], [390, 700], [390, 760]]) {
+      await page.setViewportSize({ width: w, height: h });
+      await seeded(page, { 'ring:v1': OLD, 'ring:nights': '{"v":1,"open":3,"pick":2,"best":[0,0,300]}', 'ring:hint': '1' }, '&from=small', 'tr');
+      const over = await page.evaluate(() => { const d = document.querySelector('#menu > div'); return d.scrollHeight - d.clientHeight; });
+      assert.ok(over <= 1 && await noOverflow(page), `${w}x${h} tr: the fullest menu does not scroll (${over} px over)`);
+    }
     assert.deepEqual(test.errors, [], '320: no errors');
-    console.log('ok   ring at 320x568 with every menu line');
+    console.log('ok   ring at 320x568 with every menu line, and 360x640, 390x700, 390x760 in Turkish');
   } finally { await test.context.close(); }
 }
 
@@ -553,7 +606,7 @@ try {
     if (only && only !== phone) continue;
     const browser = await engine.launch();
     const test = await open(browser, device);
-    try { await run(test, phone); console.log(`ok   ring on ${phone} (${device.viewport.width}x${device.viewport.height})`); await turkish(browser, device, phone); await recording(browser, device, phone); await turkishHint(browser, device, phone); await improved(browser, device, phone); await tiny(browser); if (phone === 'chromium') { await small(browser); await turkishSmall(browser); } }
+    try { await run(test, phone); console.log(`ok   ring on ${phone} (${device.viewport.width}x${device.viewport.height})`); await turkish(browser, device, phone); await recording(browser, device, phone); await turkishHint(browser, device, phone); await improved(browser, device, phone); await ideas(browser, device, phone); await tiny(browser); if (phone === 'chromium') { await small(browser); await turkishSmall(browser); } }
     catch (e) { failed++; console.error(`FAIL ring on ${phone}: ${e.stack}`); if (test.errors.length) console.error(test.errors.join('\n')); await shot(test.page, phone, 'failure').catch(() => {}); }
     finally { await test.context.close(); await browser.close(); }
   }

@@ -4,7 +4,7 @@
 //   fx('ring', () => snd.tone(660, 0.2, 0.05), () => bump('#pause'));
 // fx(name, sound, motion): names the action in the log, plays the sound when canSound() is true, then runs the motion.
 // bump(selectorOrElement): restarts a short scale pulse on an element (class kit-bump; reduced motion gets none).
-// log() returns a copy of the last 200 names, oldest first. Never throws.
+// log() returns a copy of the last 200 names, oldest first. Never throws; an error in a sound or motion goes to console.error.
 // Written for lab/ring when lab/pitch had grown the same helper.
 let sheet = false;
 function style() {
@@ -19,8 +19,9 @@ export function feedback({ canSound = () => true, size = 200 } = {}) {
   const names = [];
   function fx(name, sound, motion) {
     names.push(String(name)); if (names.length > size) names.shift();
-    try { if (sound && canSound()) sound(); } catch {}
-    try { if (motion) motion(); } catch {}
+    // A broken handler never stops the game, but it is reported, so a check that watches console errors sees it.
+    try { if (sound && canSound()) sound(); } catch (error) { console.error(`fx ${name} sound:`, error); }
+    try { if (motion) motion(); } catch (error) { console.error(`fx ${name} motion:`, error); }
   }
   function bump(where) {
     try {
