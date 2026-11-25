@@ -1117,6 +1117,33 @@ const GAMES = {
     await until(page, () => window.__ant.mode === 'dead', 'death card with cover');
     const after = await saved(); assert.ok(!('cover' in after) && !('taught' in after), 'cover is not in the save');
     await page.click('#goOn'); await page.click('#pause'); await page.click('#paused .toMenu'); await page.evaluate(([k, v]) => localStorage.setItem(k, v), [KEY, kept]);
+    // The evolving meadow (ant-promotion/meadow.js, from the lab page ant-evolve): its own key, never the save. Nothing changes before
+    // 6 counted runs; a meadow that has learned is on the world, in the field guide and on the death card, and its numbers go into
+    // the life's lab record; the reset asks twice. Seeded through meadow.js, the way a player's device would hold it.
+    const MK = 'ant-promotion:meadow', meadowOf = () => page.evaluate(k => JSON.parse(localStorage.getItem(k)), MK);
+    const seed = runs => page.evaluate(async ([k, runs]) => { const MW = await import('./meadow.js'), M = MW.newMeadow(); M.runs = runs; for (const f of window.__ant.FORMS.filter(f => f.level >= 1)) { M.sp[f.name] = [0.8, 0.6, 0.5, 0.5, 0.7, 0.3]; M.shown[f.name] = [3, 2, 2, 2, 2, 1]; } localStorage.setItem(k, JSON.stringify(M)); }, [MK, runs]);
+    await page.evaluate(k => localStorage.removeItem(k), MK); await page.reload(); await page.click('#continue');
+    assert.equal(await page.evaluate(() => 'meadow' in window.__ant.s), false, 'a new player plays the plain meadow');
+    await toMenu(); assert.equal(await meadowOf(), null, 'a run shorter than 30 s does not count');
+    await seed(5); await page.reload(); await page.click('#continue'); assert.equal(await page.evaluate(() => 'meadow' in window.__ant.s), false, 'five runs: still the plain meadow');
+    await toMenu(); await page.click('#toMeadow'); assert.equal(await mode(), 'meadow'); assert.match(await page.textContent('#meadowSay'), /after 6 runs \(1 to go\)/, 'the field guide says when it starts');
+    await page.click('#meadow .back'); await seed(9); await page.reload();
+    assert.equal(await page.textContent('#toMeadow'), 'Field guide · gen 9');
+    await page.click('#toMeadow'); assert.ok(await page.$$eval('#meadowList .mspecies', l => l.length) > 20, 'the field guide lists each changed species'); await page.click('#meadow .back');
+    await page.click('#continue'); assert.ok(await page.evaluate(() => { const { s } = window.__ant; return !!s.meadow && s.mobs.some(m => s.meadow.form(window.__ant.FORMS[m.f], true, false).ev); }), 'nine runs: the world has the evolved animals');
+    for (const look of [0, 1, 2, 3, 4]) { await page.evaluate(n => window.__ant.look(n), look); await sleep(250); assert.equal(await mode(), 'play', `look ${look} draws evolved animals`); }
+    await page.evaluate(() => { const T = window.__ant.meadow.tally; T.time = 40; window.__ant.meadow.meadow.shown = {}; });
+    await page.evaluate(() => { const { s, FORMS, me } = window.__ant, p = s.player, m = s.mobs.find(m => FORMS[m.f].power > me(s).power && !m.nem && !m.old); p.safe = 0; p.hideAt = 1e9; p.x = m.x; p.y = m.y; });
+    await until(page, () => window.__ant.mode === 'dead', 'death card with the meadow');
+    assert.match(await page.textContent('#learned'), /^What the meadow learned/, 'the death card says what the meadow learned'); assert.equal((await meadowOf()).runs, 10, 'the run counted');
+    const told = labRuns(page, 'ant-promotion').filter(r => r.data.outcome === 'died').at(-1)?.data.events.find(e => e.type === 'meadow')?.data;
+    assert.ok(told && told.gen === 10 && told.why === 'died' && told.mean.length === 6, 'the life\'s lab record has the generation and the trait summary');
+    await page.click('#goOn'); assert.ok(await page.evaluate(() => !!window.__ant.s.meadow), 'the next life plays the meadow');
+    assert.ok(!('meadow' in await saved()) && !('sp' in await saved()), 'the meadow is not in the save');
+    await toMenu(); await page.click('#toMeadow'); await page.click('#meadowReset'); assert.match(await page.textContent('#meadowReset'), /Tap again/); assert.equal((await meadowOf()).runs, 10, 'one tap forgets nothing');
+    await page.click('#meadowReset'); assert.equal((await meadowOf()).runs, 0, 'the second tap starts the meadow over'); assert.deepEqual((await meadowOf()).sp, {});
+    await page.goto(`${base}/ant-promotion/?labRunSource=agent&lang=tr`); await until(page, () => window.__ant, 'game script'); await page.click('#toMeadow'); assert.equal(await page.textContent('#meadow h2'), 'Saha rehberi', 'the field guide in Turkish');
+    await page.evaluate(k => { localStorage.removeItem(k); localStorage.removeItem('kit:lang'); }, MK);
   },
   // The three games of 2026-11-23. Each has its own full check (experiments/<slug>/check.mjs); this is the shared part:
   // the page loads through the kit with no error, a run starts from Play, pause holds it, and leaving for the menu
