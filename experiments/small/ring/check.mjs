@@ -116,7 +116,7 @@ async function playLevel(page, wantN = 4, limitMs = 60000) {
   return rings;
 }
 async function menu(page, q = '', language = 'en') {
-  await page.goto(`${base}/lab/ring/?hint=0&lang=${language}&date=${DATE}${q}`);
+  await page.goto(`${base}/small/ring/?hint=0&lang=${language}&date=${DATE}${q}`);
   await until(page, () => window.__ring?.ready && window.__ring.mode === 'menu', 'menu');
 }
 const noOverflow = page => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth && document.documentElement.scrollHeight <= innerHeight);
@@ -312,12 +312,12 @@ async function turkish(browser, device, phone) {
     assert.equal(await page.textContent('#play'), 'Play the night'); assert.equal(await page.textContent('#lang'), 'Türkçe');
     assert.equal(await docLang(page), 'en'); assert.equal(await page.title(), 'Firefly Ring');
     await cleanWords(page, `${label} menu after switch`, false);
-    await page.goto(`${base}/lab/ring/?hint=0&date=${DATE}`);
+    await page.goto(`${base}/small/ring/?hint=0&date=${DATE}`);
     await until(page, () => window.__ring?.ready, 'menu after reload');
     assert.equal(await page.textContent('#play'), 'Play the night', 'English survives a reload');
     await page.click('#lang');
     assert.equal(await page.textContent('#play'), 'Geceyi oyna');
-    await page.goto(`${base}/lab/ring/?hint=0&date=${DATE}`);
+    await page.goto(`${base}/small/ring/?hint=0&date=${DATE}`);
     await until(page, () => window.__ring?.ready, 'menu after second reload');
     assert.equal(await page.textContent('#play'), 'Geceyi oyna', 'Turkish survives a reload');
     assert.equal(await docLang(page), 'tr');
@@ -370,7 +370,7 @@ async function turkish(browser, device, phone) {
 async function turkishHint(browser, device, phone) {
   const test = await open(browser, { ...device, reducedMotion: 'reduce' }), { page } = test;
   try {
-    await page.goto(`${base}/lab/ring/?hint=hand&lang=tr&date=${DATE}`);
+    await page.goto(`${base}/small/ring/?hint=hand&lang=tr&date=${DATE}`);
     await until(page, () => window.__ring?.ready && window.__ring.mode === 'menu', 'menu with hint');
     await page.click('#play');
     await until(page, () => document.querySelector('.kit-hint.on'), 'the hint shows', 15000);

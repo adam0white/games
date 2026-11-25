@@ -1,4 +1,4 @@
-// Two phones at one table by link: PLAYWRIGHT=<dir with playwright> node experiments/lab/pitch/link-check.mjs [webkit|chromium]
+// Two phones at one table by link: PLAYWRIGHT=<dir with playwright> node experiments/small/pitch/link-check.mjs [webkit|chromium]
 // One iPhone 13 (WebKit) and one Pixel 7 (Chromium), so the pair is also two different JavaScript engines; each run swaps
 // which one makes the table. Their sockets go to the real table (workers/lab-ai Table class and handleTable, with
 // stand-ins for the platform and its storage) through Playwright's WebSocket routing, with a delay each way, as
@@ -135,7 +135,7 @@ async function run(hostEngine, guestEngine) {
   const rng = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
   try {
     // The host has played before (an old save, no pitch:more); the guest has never opened the page.
-    await A.page.goto(`${base}/lab/pitch/?lang=en`);
+    await A.page.goto(`${base}/small/pitch/?lang=en`);
     await P(A.page, () => localStorage.setItem('pitch:v1', JSON.stringify({ played: 3, level: 2, lossStreak: 1, wins: 2, sound: false, daily: {} })));
     await A.page.reload();
     await until(A.page, () => window.__pitch?.ready && __pitch.screen === 'menu', 'host menu');

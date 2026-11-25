@@ -1,4 +1,4 @@
-// Phone check for Pour: PLAYWRIGHT=<dir with playwright> node experiments/lab/wild-pour/check.mjs [webkit|chromium]
+// Phone check for Pour: PLAYWRIGHT=<dir with playwright> node experiments/small/wild-pour/check.mjs [webkit|chromium]
 // Serves experiments/ on a free port, plays level 1 by real touch pointer events on WebKit (iPhone 13) and
 // Chromium (Pixel 7), and fails on any page or console error. Set HEADED=1 to open a window.
 // Screenshots go to $SHOTS or a new folder in the system temp directory.
@@ -78,7 +78,7 @@ async function pour(page, shot) {
 // A scripted pour that the page and Node both run: the daily seed on three levels, with a thumb that pours, pauses and
 // pours again. The same end state in both browsers and in Node means the daily pour is the same for everyone.
 async function scriptedRun() {
-  const sim = await import('/lab/wild-pour/sim.js'), { dailyPour } = await import('/lab/wild-pour/daily.js');
+  const sim = await import('/small/wild-pour/sim.js'), { dailyPour } = await import('/small/wild-pour/daily.js');
   const out = [];
   for (const n of [1, 5, 7]) {
     const s = sim.create(n, dailyPour(new Date('2026-11-24T12:00:00Z')).seed);
@@ -116,7 +116,7 @@ async function run(name) {
   const errors = [];
   page.on('pageerror', e => errors.push(`pageerror: ${e.message}`));
   page.on('console', m => { if (m.type() === 'error') errors.push(`console: ${m.text()}`); });
-  await page.goto(withAgent(`${base}/lab/wild-pour/?seed=3&perf=1`));
+  await page.goto(withAgent(`${base}/small/wild-pour/?seed=3&perf=1`));
   await until(page, () => window.pourState && window.pourState().screen === 'menu', 'menu');
   await readyRenderer(page, name, headed);
   const boot = await page.evaluate(() => new Promise(resolve => {
@@ -281,7 +281,7 @@ async function run(name) {
     await page.tap('#quit'); await page.tap('#play'); await sleep(300);
     await page.tap('#pause'); await page.tap('#quit');
   } });
-  await assertHomeLinks(ctx, `${base}/lab/wild-pour/?from=small&lang=tr`, ['menu', 'end'], '‹ Küçük oyunlar');
+  await assertHomeLinks(ctx, `${base}/small/wild-pour/?from=small&lang=tr`, ['menu', 'end'], '‹ Küçük oyunlar');
   assert.deepEqual(errors, [], 'no page or console errors');
   console.log(`${name}: ok`);
   } finally { try { await browser?.close(); } finally { awake?.kill(); } }

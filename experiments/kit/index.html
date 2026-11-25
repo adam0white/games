@@ -238,7 +238,7 @@ try { await labChecks(); } catch (e) { check(`lab: checks ran to the end (${e.me
 
 // room.js: codes, links, and a table kept in step through a stand-in socket (the real server is tested in workers/lab-ai/test/table.test.mjs).
 check('room: a new code is four letters and cleans to itself', () => { const c = newCode(); return /^[A-Z]{4}$/.test(c) && cleanCode(c.toLowerCase() + ' ') === c && cleanCode('ab1') === ''; });
-check('room: the link carries only the code, and reads back', () => { const at = { href: 'https://play.example/lab/pitch/?date=2026-01-01#x' }, link = linkFor('QWER', at); return link === 'https://play.example/lab/pitch/?room=QWER' && codeFromLink({ href: link }) === 'QWER' && codeFromLink(at) === ''; });
+check('room: the link carries only the code, and reads back', () => { const at = { href: 'https://play.example/small/pitch/?date=2026-01-01#x' }, link = linkFor('QWER', at); return link === 'https://play.example/small/pitch/?room=QWER' && codeFromLink({ href: link }) === 'QWER' && codeFromLink(at) === ''; });
 {
   const sent = [], got = [], states = []; let sock = null;
   class Fake { constructor(url) { this.url = url; this.readyState = 1; sock = this; } send(text) { sent.push(JSON.parse(text)); } close() { this.readyState = 3; } }

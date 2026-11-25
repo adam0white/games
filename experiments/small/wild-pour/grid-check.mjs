@@ -2,7 +2,7 @@
 // real runs (every level, two seeds, four thumbs, the mutation too, and some odd states) and runs one relaxation pass
 // both ways on copies. Corrections are summed then applied, so the two must agree to rounding (1e-9 units).
 // 2026-11-24: the rules changed (NOTES.md), so the old comparison with the original sim's Git blob no longer applies.
-// Run: fnm exec --using=26.12.0 node experiments/lab/wild-pour/grid-check.mjs
+// Run: fnm exec --using=26.12.0 node experiments/small/wild-pour/grid-check.mjs
 import { performance } from 'node:perf_hooks';
 import * as sim from './sim.js';
 

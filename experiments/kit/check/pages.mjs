@@ -340,7 +340,7 @@ export const pageRuns = {
     await until(page, () => !window.smallState().intro, 'Start hides it');
     await page.reload(); await until(page, () => window.smallState && !window.smallState().intro, 'and it stays hidden');
     // The way back from a real game page opened from the home: Pour adds it itself (kit/home.js, since 2026-11-25).
-    await page.click('li.now a.stop.wild-pour'); await page.waitForURL(url => url.pathname === '/lab/wild-pour/');
+    await page.click('li.now a.stop.wild-pour'); await page.waitForURL(url => url.pathname === '/small/wild-pour/');
     await until(page, () => document.querySelector('#menu .card a.kit-home'), 'Pour shows its own way back');
     assert.equal(await page.evaluate(() => document.querySelectorAll('a.kit-home').length), 2, 'Pour has the way back on its menu and end cards, once each');
     assert.equal(await page.isVisible('#menu .card a.kit-home'), true, 'the back link shows on the game’s menu card');
@@ -353,6 +353,6 @@ export const pageRuns = {
 };
 async function smallOpen(page, until, selector, slug) {
   await page.click(selector);
-  await page.waitForURL(url => url.pathname === `/lab/${slug}/`);
+  await page.waitForURL(url => url.pathname === `/small/${slug}/`);
   await page.goBack(); await until(page, () => window.smallState, 'back on the home');
 }

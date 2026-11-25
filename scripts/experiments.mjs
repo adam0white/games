@@ -2,7 +2,7 @@ import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { legacyRoutes, reservedPaths } from '../worker-settings.mjs';
 
-// Experiments are static directories, each served at /<slug>/ (a lab item at /lab/<name>/ inside lab/).
+// Experiments are static directories, each served at /<slug>/ (a lab item at /lab/<name>/ inside lab/, a small game at /small/<name>/ inside small/).
 // They live in experiments/; prototypes/ is the old name and is read the same way until it is renamed.
 export const experimentRoots = ['prototypes', 'experiments'];
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;

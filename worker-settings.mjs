@@ -86,4 +86,17 @@ export const labMoved = {
   'night-flock-2': '/flock/',
   'night-vine': '/vine/',
   'boat-b': '/boat/',
+  // The small games moved to /small/<name>/ on 2026-11-25, under the home that lists them (experiments/small/).
+  'night-bells': '/small/night-bells/',
+  'wild-pour': '/small/wild-pour/',
+  'night-podwire': '/small/night-podwire/',
+  'wild2-face-shift': '/small/wild2-face-shift/',
+  'night-channels': '/small/night-channels/',
+  'night-sand': '/small/night-sand/',
+  'night-splitlight': '/small/night-splitlight/',
+  'ring': '/small/ring/',
+  'pitch': '/small/pitch/',
+  'night-saltplate': '/small/night-saltplate/',
+  'night-rubbing': '/small/night-rubbing/',
+  'thankful': '/small/thankful/',
 };

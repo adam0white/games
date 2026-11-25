@@ -1,5 +1,5 @@
 // Share a picture the game made: the phone's share sheet with the image file where the browser can
-// share files, else a download of the same picture. Moved here from Night Sand (lab/night-sand) when
+// share files, else a download of the same picture. Moved here from Night Sand (then lab/night-sand, now small/night-sand) when
 // Saltplate needed the same thing.
 //   import { shareImage } from '../kit/share.js';
 //   const how = await shareImage(canvas, { name: 'my-garden.png', text: 'My garden, 87%' });

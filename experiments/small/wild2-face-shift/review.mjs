@@ -34,7 +34,7 @@ const server=createServer(async(req,res)=>{
   } catch {res.writeHead(404);res.end();}
 });
 await new Promise(r=>server.listen(0,'127.0.0.1',r));
-const base=`http://127.0.0.1:${server.address().port}/lab/wild2-face-shift/`;
+const base=`http://127.0.0.1:${server.address().port}/small/wild2-face-shift/`;
 const require=createRequire(join(resolve(process.env.PLAYWRIGHT||'node_modules'),'x.js'));
 const {webkit,chromium,devices}=require('playwright');
 const state=p=>p.evaluate(()=>window.faceShiftState());

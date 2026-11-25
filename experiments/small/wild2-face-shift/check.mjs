@@ -15,7 +15,7 @@ import {answerLab,allowLocalSend,withAgent,assertNotice,assertRun,assertOffSends
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'../..');
 const shots=resolve(dirname(fileURLToPath(import.meta.url)),'.review-artifacts/check');await mkdir(shots,{recursive:true});
 const server=createServer(async(req,res)=>{const url=new URL(req.url,'http://local');if(url.pathname==='/notes/button.js'){res.writeHead(200,{'content-type':'text/javascript'});res.end('');return;}try{let path=resolve(root,'.'+decodeURIComponent(url.pathname));if(!path.startsWith(root+sep))throw Error('outside root');if(url.pathname.endsWith('/'))path=join(path,'index.html');const data=await readFile(path);res.writeHead(200,{'content-type':{'.html':'text/html','.js':'text/javascript','.mjs':'text/javascript'}[extname(path)]||'application/octet-stream'});res.end(data);}catch{res.writeHead(404);res.end('not found');}});
-await new Promise(r=>server.listen(0,'127.0.0.1',r));const base=`http://127.0.0.1:${server.address().port}/lab/wild2-face-shift/?seed=17`;
+await new Promise(r=>server.listen(0,'127.0.0.1',r));const base=`http://127.0.0.1:${server.address().port}/small/wild2-face-shift/?seed=17`;
 const require=createRequire(join(resolve(process.env.PLAYWRIGHT||'/Users/abdul/code/human-framework/node_modules'),'x.js'));
 const {webkit,chromium,devices}=require('playwright');
 const state=p=>p.evaluate(()=>window.faceShiftState());

@@ -162,6 +162,7 @@ test('the daily limit stops a flood', async () => {
 test('a reply link may point at an experiment in the new or the old URL shape, and nowhere else', async () => {
   const env = fakeEnv();
   const links = { '/lantern/': '/lantern/', '/lantern/?night=6': '/lantern/?night=6', '/lab/ant-nest/': '/lab/ant-nest/', '/proto/lantern/': '/proto/lantern/', '/proto/lab/ant-nest/': '/proto/lab/ant-nest/',
+    '/small/night-sand/?daily': '/small/night-sand/?daily', '/small/a/b/': null, '/lab/small/x/': null,
     '//evil.example/': null, 'https://evil.example/': null, '/lantern/x.js': null, '/a/b/c/': null, '/../lantern/': null, '/lantern': null };
   for (const link of Object.keys(links)) await call(env, 'staff/reply', { token: STAFF, method: 'POST', body: { tester: 't1', text: 'x', translate: false, link } });
   const thread = await (await call(env, 'thread')).json();

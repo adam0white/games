@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const experiments = resolve(here, '../..');
-const route = '/lab/night-podwire/';
+const route = '/small/night-podwire/';
 const progressKey = 'night-podwire:progress', bookKey = 'night-podwire:book', dayKey = 'night-podwire:daily';
 const shots = process.env.SHOTS || '/private/tmp/night-r4-review/podwire';
 const modules = process.env.PLAYWRIGHT || join(homedir(), 'code/human-framework/node_modules');
@@ -447,7 +447,7 @@ async function run(name, base) {
     await page.tap('#share');
     await page.waitForFunction(() => window.checkShared.length === 2);
     for (const line of await page.evaluate(() => window.checkShared)) {
-      assert.match(line, /^Podwire 2026-12-04 · Sweet pea: 1 pluck, par 1 ◆ http:\/\/[^ ]+\/lab\/night-podwire\/\?daily$/, 'shared result line: ' + line);
+      assert.match(line, /^Podwire 2026-12-04 · Sweet pea: 1 pluck, par 1 ◆ http:\/\/[^ ]+\/small\/night-podwire\/\?daily$/, 'shared result line: ' + line);
     }
     assert.equal(await page.locator('#status').innerText(), 'Copied');
     const daySaved = await page.evaluate(key => JSON.parse(localStorage.getItem(key)), dayKey);

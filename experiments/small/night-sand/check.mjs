@@ -9,7 +9,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 
 const experiments = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const pagePath = '/lab/night-sand/';
+const pagePath = '/small/night-sand/';
 const saveKey = 'night-sand:save';
 const shots = process.env.SHOTS || '/tmp/claude-improve-night-sand/check';
 import { assertHomeLinks } from '../../kit/check/home-link.mjs';

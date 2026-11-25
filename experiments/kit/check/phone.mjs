@@ -1189,10 +1189,10 @@ const GAMES = {
     assert.equal(await page.evaluate(() => localStorage.getItem('alibi-save')), kept, 'practice saves nothing');
   },
   nightshift: page => started(page, 'nightshift', 'nightshiftState', '#toMenu'),
-  // Lab pages (/lab/<name>/): an old save survives, a finger steers, pause stops time, one audio context after the first tap.
-  async 'lab/thankful'(page) {
+  // Small games (/small/<name>/, until 2026-11-25 /lab/<name>/): an old save survives, a finger steers, pause stops time, one audio context after the first tap.
+  async 'small/thankful'(page) {
     const KEY = 'thankful:v1';
-    await page.goto(`${base}/lab/thankful/?day=2026-11-23`); await until(page, () => window.__thankful, 'game script');
+    await page.goto(`${base}/small/thankful/?day=2026-11-23`); await until(page, () => window.__thankful, 'game script');
     await page.evaluate(k => localStorage.setItem(k, JSON.stringify({ v: 1, days: { '2026-11-21': [{ k: 'bread' }, { k: 'water' }], '2026-11-22': [{ k: 'home' }, { k: 'family' }, { k: 'friend' }] }, look: 'sky', sound: true })), KEY);
     await page.reload(); await until(page, () => window.__thankful?.lights.length === 5, 'five old lights');
     assert.equal(await page.evaluate(() => window.__thankful.lights.length), 5, 'old save: five lights survive reload');
@@ -1207,16 +1207,16 @@ const GAMES = {
     const picture = await page.evaluate(() => window.__thankful.picture());
     assert.equal(picture.width, 1080); assert.equal(picture.height, 1350); assert.ok(picture.bytes > 20000, 'picture has PNG image data');
     // Daily flowers (2026-11-25): the buttons show the flower each kind grows that day, the same for everyone, in Turkish too.
-    await page.goto(`${base}/lab/thankful/?day=2026-11-25&lang=tr`); await until(page, () => window.__thankful, 'game script');
+    await page.goto(`${base}/small/thankful/?day=2026-11-25&lang=tr`); await until(page, () => window.__thankful, 'game script');
     assert.equal(await page.getAttribute('[data-kind="bread"]', 'aria-label'), 'ekmek: arpa', 'bread grows barley on 25 Nov, named in Turkish');
     assert.equal(await page.textContent('#line'), 'Bugün için üç teşekkür.', 'Turkish line');
-    await page.goto(`${base}/lab/thankful/?day=2026-11-24&lang=en`); await until(page, () => window.__thankful, 'game script');
+    await page.goto(`${base}/small/thankful/?day=2026-11-24&lang=en`); await until(page, () => window.__thankful, 'game script');
     assert.equal(await page.getAttribute('[data-kind="bread"]', 'aria-label'), 'bread: wheat', 'before the change bread grows wheat');
   },
-  async 'lab/pitch'(page) {
+  async 'small/pitch'(page) {
     // Paper Pitch: an old save survives, a tap on a pulsing point draws a line, leaving the page pauses.
     await page.goto(`${base}/notes/button.js`); await page.evaluate(() => { localStorage.clear(); localStorage.setItem('pitch:v1', '{"played":1,"level":1,"lossStreak":0,"wins":1,"sound":true,"daily":{}}'); localStorage.setItem('pitch:hint', '1'); });
-    await page.goto(`${base}/lab/pitch/`); await until(page, () => window.__pitch?.ready, 'game script');
+    await page.goto(`${base}/small/pitch/`); await until(page, () => window.__pitch?.ready, 'game script');
     const kept = await page.evaluate(() => window.__pitch.save());
     assert.equal(kept.played, 1, 'old save: games played survive'); assert.equal(kept.wins, 1, 'old save: wins survive'); assert.equal(kept.level, 1, 'old save: level survives');
     assert.equal(await page.evaluate(() => window.__pitch.rung), 6, 'old save: Medium becomes the Medium rung (level 7 of 8)');
@@ -1226,7 +1226,7 @@ const GAMES = {
     await page.evaluate(() => dispatchEvent(new Event('blur'))); await until(page, () => window.__pitch.paused, 'leaving the page pauses');
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no sideways scroll');
     // The puzzle book (2026-11-24): its own key, and a tap in a puzzle counts a try.
-    await page.goto(`${base}/lab/pitch/`); await until(page, () => window.__pitch?.ready, 'game script again');
+    await page.goto(`${base}/small/pitch/`); await until(page, () => window.__pitch?.ready, 'game script again');
     await page.click('#puzzles'); await until(page, () => window.__pitch.screen === 'book', 'the puzzle book opens');
     await page.click('#bookGrid button:first-child'); await until(page, () => window.__pitch.mode === 'puzzle' && window.__pitch.canTap, 'puzzle 1 is in play');
     const start = await page.evaluate(() => window.__pitch.segments), p1 = await page.evaluate(() => window.__pitch.legal[0]);
@@ -1235,10 +1235,10 @@ const GAMES = {
     assert.equal(more.book.net.tries, 1, 'the puzzle try is saved under pitch:more');
     assert.deepEqual(Object.keys(JSON.parse(await page.evaluate(() => localStorage.getItem('pitch:v1')))).sort(), ['daily', 'level', 'lossStreak', 'played', 'sound', 'wins'], 'pitch:v1 keeps its old shape');
   },
-  async 'lab/ring'(page) {
+  async 'small/ring'(page) {
     // Firefly Ring: an old save survives, a dragged finger lays thread, leaving the page pauses.
     await page.goto(`${base}/notes/button.js`); await page.evaluate(() => { localStorage.clear(); localStorage.setItem('ring:v1', '{"v":1,"sound":true,"nights":2,"dawns":1,"best":412,"bestRing":16,"endless":false,"endlessBest":0,"daily":{}}'); localStorage.setItem('ring:hint', '1'); });
-    await page.goto(`${base}/lab/ring/`); await until(page, () => window.__ring, 'game script');
+    await page.goto(`${base}/small/ring/`); await until(page, () => window.__ring, 'game script');
     const kept = await page.evaluate(() => window.__ring.save());
     assert.equal(kept.best, 412, 'old save: best score survives'); assert.equal(kept.nights, 2, 'old save: nights survive'); assert.equal(kept.bestRing, 16, 'old save: best ring survives');
     assert.equal(await page.evaluate(() => window.__ring.nights()), null, 'nights 2 and 3 have their own key, not written at load'); assert.equal(await page.isVisible('#nights'), true, 'old save with a dawn: night 2 is open');
@@ -1256,10 +1256,10 @@ const GAMES = {
   'hint ducklings': page => hinted(page, { path: '/ducklings/', play: '#play', resume: '#resume', key: 'ducklings:hint', delay: 3000, before: () => window.ducklingsState().rollCalls, moved: n => window.ducklingsState().rollCalls > n, legacy: { 'ducklings-save': '{"v":1,"sound":true,"opened":2,"stars":{"1":2},"best":{"1":140},"endless":0,"home":2,"album":{},"taught":true}' } }),
   'hint grapevine': page => hinted(page, { path: '/grapevine/', play: '#play', resume: '#resume', key: 'grapevine:hint', delay: 3000, moved: () => window.grapevineState().touched, legacy: { 'grapevine-save': '{"v":1,"sound":true,"best":{"1":3},"opened":2,"daily":{}}' } }),
   // Paper Pitch acts when the finger lifts (a press may become a drag from the ball), so it has its own first-time help check: `hinted` asserts before the lift.
-  async 'hint lab/pitch'(page) {
+  async 'hint small/pitch'(page) {
     const on = () => page.evaluate(() => !!document.querySelector('.kit-hint.on'));
     await page.goto(`${base}/notes/button.js`); await page.evaluate(() => localStorage.clear());
-    await page.goto(`${base}/lab/pitch/`); await page.waitForSelector('#play'); await sleep(3500); assert.equal(await on(), false, 'hint: not on the menu');
+    await page.goto(`${base}/small/pitch/`); await page.waitForSelector('#play'); await sleep(3500); assert.equal(await on(), false, 'hint: not on the menu');
     await page.click('#play'); await until(page, () => !!document.querySelector('.kit-hint.on'), 'hint: shown after the delay', 11000);
     const { x, y, top } = await page.evaluate(() => { const r = document.querySelector('.kit-hint .knob').getBoundingClientRect(), x = r.x + r.width / 2, y = r.y + r.height / 2; return { x, y, top: document.elementFromPoint(x, y)?.id }; });
     assert.equal(top, 'c', 'hint: the game canvas is what a finger on the hint touches');
@@ -1267,9 +1267,9 @@ const GAMES = {
     assert.equal(await page.evaluate(() => document.querySelector('.kit-hint')), null, 'hint: gone on the first input');
     assert.equal(await page.evaluate(() => localStorage.getItem('pitch:hint')), '1', 'hint: the player is remembered');
     await page.goto(`${base}/notes/button.js`); await page.evaluate(() => { localStorage.clear(); localStorage.setItem('pitch:v1', '{"played":1,"level":1,"lossStreak":0,"wins":1,"sound":true,"daily":{}}'); });
-    await page.goto(`${base}/lab/pitch/`); await page.click('#play'); await sleep(4500); assert.equal(await on(), false, 'hint: never shown to a returning player');
+    await page.goto(`${base}/small/pitch/`); await page.click('#play'); await sleep(4500); assert.equal(await on(), false, 'hint: never shown to a returning player');
   },
-  'hint lab/ring': page => hinted(page, { path: '/lab/ring/', play: '#play', resume: '#resume', key: 'ring:hint', delay: 3000, before: () => window.__ring.threadPoints, moved: n => window.__ring.threadPoints > n || window.__ring.fingerDown, legacy: { 'ring:v1': '{"v":1,"sound":true,"nights":2,"dawns":1,"best":412,"bestRing":16,"endless":false,"endlessBest":0,"daily":{}}' } }),
+  'hint small/ring': page => hinted(page, { path: '/small/ring/', play: '#play', resume: '#resume', key: 'ring:hint', delay: 3000, before: () => window.__ring.threadPoints, moved: n => window.__ring.threadPoints > n || window.__ring.fingerDown, legacy: { 'ring:v1': '{"v":1,"sound":true,"nights":2,"dawns":1,"best":412,"bestRing":16,"endless":false,"endlessBest":0,"daily":{}}' } }),
   // Old /proto/ links move to the top level with their query; the new URL plays to its first frame.
   async 'old links'(page) {
     const response = await page.goto(`${base}/proto/lantern/?x=1`);

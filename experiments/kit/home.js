@@ -9,7 +9,7 @@
 // - Every run that ends is written to the home's own key `hub:results`: { <slug>: { runs, wins, last, at, wonAt } }.
 //   A run counts as a win when its outcome is 'won' (the word the lab pages use). The home shows a win on tonight's
 //   three only when it came after the player opened that stop.
-// - slug: the folder name, taken from the address (/lab/night-bells/ → night-bells); pass { slug } to override.
+// - slug: the folder name, taken from the address (/small/night-bells/ → night-bells); pass { slug } to override.
 // - lang: optional, the page's own language (`lang` from kit/i18n.js words()). The link then follows it and changes
 //   when the page switches language. Without it the link uses ?lang=, then the player's saved choice, then the browser,
 //   so an English-only page passes { lang: () => 'en' }.

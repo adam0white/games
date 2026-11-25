@@ -35,14 +35,15 @@ const PHONE_PATHS = ['experiments/', 'prototypes/', 'workers/feedback/public/not
 export function phoneCheckNeeded(paths) {
   return paths.some(path => PHONE_PATHS.some(prefix => prefix.endsWith('/') ? path.startsWith(prefix) : path === prefix));
 }
-// Which of the phone check's checks a change needs: 'all', a comma list of experiment slugs ('lantern,lab/ant-nest'),
+// Which of the phone check's checks a change needs: 'all', a comma list of experiment slugs ('lantern,small/pitch'),
 // or '' for none. A change inside one experiment's own directory needs only that experiment's checks; anything
-// shared (the kit, the notes button, the Worker, the workflow) needs all of them. Documents need none.
+// shared (the kit, the notes button, the Worker, the workflow) needs all of them. Documents need none. A game under
+// lab/ or small/ is named with its parent ('small/pitch'); a file of the small games' home itself is 'small'.
 export function phoneChecks(paths) {
   const slugs = new Set();
   for (const path of paths) {
     if (!phoneCheckNeeded([path]) || path.endsWith('.md')) continue;
-    const own = /^experiments\/(lab\/[^/]+|(?!kit\/|lab\/)[^/]+)\/./.exec(path);
+    const own = /^experiments\/((?:lab|small)\/[^/]+(?=\/.)|(?!kit\/|lab\/)[^/]+(?=\/.))/.exec(path);
     if (own) slugs.add(own[1]);
     else if (!/^experiments\/(lab\/)?[^/]+$/.test(path)) return 'all';
   }

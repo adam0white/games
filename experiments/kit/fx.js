@@ -5,7 +5,7 @@
 // fx(name, sound, motion): names the action in the log, plays the sound when canSound() is true, then runs the motion.
 // bump(selectorOrElement): restarts a short scale pulse on an element (class kit-bump; reduced motion gets none).
 // log() returns a copy of the last 200 names, oldest first. Never throws; an error in a sound or motion goes to console.error.
-// Written for lab/ring when lab/pitch had grown the same helper.
+// Written for small/ring when small/pitch had grown the same helper.
 let sheet = false;
 function style() {
   if (sheet) return; sheet = true;
