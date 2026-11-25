@@ -165,6 +165,22 @@ Moved, 2026-11-25 (branch `small-games-move`): `thankful`, `pitch`, `ring`, `nig
 
 Play records: the lab accepted no records from any lab page up to this date (no lab page name was in human-framework `LAB_PROTOTYPES`, so every send was refused). Corrected 2026-11-25: the earlier line here said five pages import `kit/lab.js`. All twelve lab pages import it (`thankful`, `pitch`, `ring`, `night-bells`, `night-channels`, `night-podwire`, `night-rubbing`, `night-saltplate`, `night-sand`, `night-splitlight`, `wild-pour`, `wild2-face-shift`), and so does the home at `/small/` (as `small`). On 2026-11-25 all thirteen names are in `LAB_PROTOTYPES` on human-framework's default branch (`apps/site/src/lab/games.ts`, read through GitHub); whether that is deployed, so that the server now stores their records, was not checked. The site Worker's request log shows two real phones opening lab pages on 2026-11-24. Opens are the only evidence of play for these pages.
 
+Play records, checked 2026-11-25 after the move: a run started at `/small/night-sand/` on the live site, marked as an agent run, sent one record and the lab answered 200. The record name is still the bare folder name (`night-sand`), so the move did not change it. The other eleven games were not driven far enough to send; they use the same call.
+
+### Closed 2026-11-25: what was checked live, and what a person still has to judge
+
+Checked by an agent on the live site: every lab address in `labMoved` answers 302 with the query kept; the twelve games at `/small/<name>/` and the home open with no page errors (Chromium, Pixel 7 profile); a card on the home opens its game with no redirect hop and the game links back to `/small/`; Lantern's four modes, `?view=3d`, Ant Promotion's Living look, the four games with the kit music and Thumb Duel open with no page errors.
+
+Nobody has judged any of this by ear, eye or thumb, and no native reader has read the Turkish. The list:
+
+- Sound: Lantern's ember melody; the kit music in Night Flock, Night Vine, Paper Boat and Harvest Morning; Night Bells' voice and tunes; Splitlight's chord; Pour, Saltplate and Podwire; Race's countdown on a real iPhone.
+- Real phones: frame time, heat and share sheets everywhere; Lantern's ripples (readable or not, and the step down to no ripples when a frame averages over 25 ms); Night Bells' end card in WebKit (10 to 17 ms a frame); Paper Pitch's picture export in WebKit.
+- Two people: a Race between two real devices; Duet with two thumbs; Thumb Duel's lag on two phones (a stalled host is unresolved).
+- Lead's calls the owner has not confirmed: Race banks its embers in full and Duet banks half; ripples are on in both 3D views; evolution waits 6 runs and its reset sits in the field guide; `night-flock` and `ant-nest` were archived.
+- Difficulty and feel: Spark night 6 and its third star; Tide stage 5 (the careful bot clears 62%); whether Ant Promotion's evolution is noticeable (bots score 0.99 to 1.11 of plain, inside noise) and whether the spots read; the six restored hiding skills and the sparse cover (deaths per 100 chases 30.1 to 24.2); Night Bells nights 9 to 24; Splitlight plates with one control (13 of 18 yield to a sweep); Paper Pitch's top two bot levels (bots win 0%); Firefly Ring's "sleep" and "call" and its easier daily; Night Sand, Pour, Face Shift, Thankful, Channels and Saltplate as the owner asked for them.
+- Open with the owner: keep or reject Carbon Cabinet (`night-rubbing`, English only).
+- Left over: `workers/feedback` is deployed by hand and was not redeployed, so staff reply links and note tags do not yet know `/small/<name>/`.
+
 
 ## 2026-11-24: Ant Draft, bigger explosions (tester t1, note #237)
 
