@@ -1,6 +1,6 @@
 # Night Bells
 
-Served at `/lab/night-bells/`. A visual rhythm game for one thumb. Eight short levels and endless play. No lab telemetry or network score service.
+Served at `/lab/night-bells/`. A visual rhythm game for one thumb. 24 nights in three chapters, endless play and a daily peal, in English and Turkish. No network score service; play recording goes through `kit/lab.js` (below).
 
 ## Acceptance
 
@@ -123,3 +123,80 @@ The screenshot-enabled phone checks each completed all eight levels and observed
 The page sends play records to the lab under the name `night-bells` through `kit/lab.js` (the name is in human-framework `LAB_PROTOTYPES` once its pull request lands; until then every send is refused). The recording notice is on the menu card; the off switch is on the pause card. A run is one try at a night or the endless mode: it starts with Play, a level or Endless, and ends `won` or `lost` (summary: level, hits, harmony, misses, score, stars), or `quit` through Menu or Retry. Events: `level-complete` (level, stars) and `endless-finished`.
 
 `check.mjs` answers the lab address itself (no check reaches the real one), loads the page with `?labRunSource=agent`, and asserts: the notice is on the page before play, a played run sends one run record under `night-bells` with its events record, and after the switch is turned off a further run sends nothing and the player id is removed. Not verified: delivery to the real lab (the Worker does not accept this name yet), a real phone.
+
+## 2026-11-24 — "Good but improve": 24 nights, the village's tune, a daily peal, Turkish
+
+The owner's verdict was "Good but improve". This section supersedes the eight-level table above for nights 2–8 (their targets, windows, damping and clocks were retuned; main's values are kept in `sim.js` `LEGACY` and replayed by `bots.mjs`).
+
+### Five weak things from cold play, before and after
+
+Cold play on main in both phone profiles, before any change (screenshots `/tmp/claude-improve-night-bells/before/`, after `/tmp/claude-improve-night-bells/after/`; not in the repo).
+
+| # | Weak thing on main | Measure before | After |
+| --- | --- | --- | --- |
+| 1 | The lost card had "Try again" and "Again" doing the same thing and never said why | 2 identical buttons, no reason | one primary "Try again ↻", Again hidden on a loss; a reason line: "Out of time with 0 of 26 lights." or "Bell 2 swung too low…" (checked in both browsers) |
+| 2 | Dead stretch: the bar is full, the player waits for swings to line up while the clock runs | delayed-response bot losses on the clock with a full bar, nights 2/3/4: 6/13/23 of 32 | 0 on every night (`hold` rule: the clock waits while the bar is full; the cue says what is still needed). Bot claim `no night is lost on the clock with a full bar` |
+| 3 | Difficulty cliff | delayed-response bot wins nights 1–8 (main's open-loop bot): 32 26 19 1 26 11 1 0; with this branch's closed-loop bot on main's rules: 32 24 16 0 24 6 0 0 | 32 31 29 29 26 27 27 26; largest night-to-night drop over all 24 nights is 4 |
+| 4 | The village barely answered | a ring lit no particular window; a "together" was a 10% flash for 0.7 s | each ring sends a spark from the bell to one window, which pops on arrival; the end card replays the tune and lights the windows in order, with one dot per note |
+| 5 | Three-bell nights: apex rings of neighbouring bells overlapped; the objective ran into the moon | ring overlap at 390×844 from main's formula: 18.6 px on two-bell nights, 35.5 px on three-bell nights | 0: rings sit only on sides that may ring, radius 0.34·size, each swing stays in its column; worst gap −15.1 px on nights 2–8 and ≤ 0 px on 9–24 (measured from `bellsState().markers`). The objective stops 96 px from the right edge |
+
+### 24 nights: one idea each from real pendulums and bells
+
+| Night | Idea | The physics |
+| ---: | --- | --- |
+| 1 | swing | one bell; ring at the top of the swing (unchanged) |
+| 2 | periods | period ∝ √length: two lengths drift in and out of phase |
+| 3 | drift | the two swings beat: they drift apart and come back into phase |
+| 4 | together | fill the bar, then a full alignment (the held clock makes the wait fair) |
+| 5 | three | three lengths; alignment needs all three tops |
+| 6 | tight | three bells damp a little faster (0.019 vs 0.018), more lights |
+| 7 | tighter | longer night, same three bells |
+| 8 | eight | the end of main's campaign |
+| 9 | ringUp | bells start near rest (start energy 0.16): ringing up a bell from small swings |
+| 10 | handstroke | the second bell rings only on one side of its swing (handstroke/backstroke) |
+| 11 | octave | lengths 4:1 give periods 2:1; tops meet every long swing; ring a chord (two tops within 0.32 s) |
+| 12 | muffled | a leather muffle on the clapper: that bell damps 3.2× faster |
+| 13 | rounds | change ringing's rounds: 1 2 3 in order |
+| 14 | beam | two bells on one beam: energy flows at a rate ∝ sin(phase difference) (averaged coupled oscillators), so swing passes back and forth |
+| 15 | gust | a gust is a horizontal impulse: change velocity, then read amplitude and phase back; leaves warn 1.2 s ahead |
+| 16 | high | finite-amplitude pendulum: period grows about 1 + A²/16, so high swings are slower |
+| 17 | hunt | plain hunt on three: swap the front pair, then the back pair; home after six rows |
+| 18 | rope | the ringer shortens the third rope at 12 s (length × 0.55): that bell speeds up |
+| 19 | triad | lengths 36:16:9 swing 2:3:4; all three tops within 0.6 s ring a triad |
+| 20 | sympathy | sympathetic resonance: an unroped twin of the same length on the beam wakes when its energy passes a threshold |
+| 21 | chain | three bells on one beam: the swing travels along it |
+| 22 | heavy | a heavy tenor: each pull lifts it 0.55 as much |
+| 23 | huygens | Huygens' clocks: bells on one frame pull into step (phase pull ∝ sin of the difference) |
+| 24 | peal | plain hunt, then rounds, in the wind |
+
+The careful timing bot clears every night on all 32 seeds (7.72–15.38 s). Delayed-response bot wins per night of 32, after: 32 31 29 29 26 27 27 26 · 24 20 21 21 19 16 16 15 · 15 15 14 13 9 8 8 8. Nights 1–8 before: see row 3 above. No night is lower than 2/32 and the bot clears fewer nights per chapter (bot claims).
+
+### What else was added
+
+- **The village plays your tune.** Each strike is one note of `kit/music.js` preset `bell` (`chime(rank)`: the longest bell is the lowest note) when music and sound are on; otherwise fixed C5/E5/G5. A bell voice is three partials. A won night replays the last 24 strikes with the gaps tightened (×0.5, 0.16–0.42 s) and lights windows in order. `music.js` was not edited.
+- **Daily peal.** `?day=YYYY-MM-DD` or the UTC date → FNV seed (`dayNumber`) → one of eight three-bell ideas (`dailySpec`), the same on every phone. The result card offers Share: a 1080×1350 PNG drawn from SVG (the peal as dots by bell and time, the date and counts) through `kit/share.js` `shareImage` (the share sheet with the file, else a download of the picture); `kit/room.js` `shareLink` shares the text and URL when there is no picture.
+- **English and Turkish** through `kit/i18n.js` words (`words.js`); `?lang=tr`. Catalog entry `tr: true`. Opened from `/small/` the menu and result cards carry a back link, and results reach the home through `kit/home.js`.
+- **Chapters**: nights 1–8, 9–16, 17–24 on the menu; a chapter opens when its first night is reached.
+- Play recording: the run summary adds `daily`, `chords`; a new event `daily-finished` and `share`.
+
+### Storage
+
+`night-bells:save` is unchanged in format (stars stay eight long), so an old save loads and the shared lab check fixture still passes. New keys: `night-bells:more` `{v:1, stars:[16]}` for nights 9–24; `night-bells:music` `'1'|'0'`; `night-bells:daily` `{v:1, day, plays, best, won, rings, together, misses, peal:[[bell, tenths]…]}`, reset when the day changes.
+
+### Checks
+
+- `bots.mjs`: 0 failed. Parity: with every new field absent the rules hash is `92c13613`, as on main. `--mutate` (apex, 17 failures), `--mutate=order` (1), `--mutate=hold` (3) each exit 1.
+- `check.mjs` webkit and chromium: PASS. Changes made on purpose: (1) the accelerated winner skips a free bell, which has no rope and no apex to ring; (2) after night 8 the check taps Next into nights 9–24 instead of stopping, then checks the chapters; (3) a lost endless run is retried through `#next`, because `#retry` is now hidden on a loss; (4) a new block: daily peal in Turkish at 320×568 opened from the home (no screen scrolls, same seed for the same day and a different one for the next day, peal saved, picture 1080×1350, Share in Turkish, old save unchanged except `tries`, a run with `daily-finished`).
+- A new assertion: with sound and music on, every strike's pitch comes from `song.chime` (`bellsState().voices`); breaking `song.chime` makes `check.mjs` fail on it (tried).
+- `kit/check/phone.mjs lab/night-bells` and `small`: ok in both browsers. `npm test`: 73 pass.
+- Frame cost (outside probe timing every requestAnimationFrame callback, careful play of night 8 to the end card, 390×844): branch WebKit p95 1 ms, Chromium p95 0.4 ms; one frame per run exceeds 8 ms in WebKit (10–14 ms) at the moment of winning. Main measured with the same probe has the same one-off spike (WebKit 9 ms; Chromium once 10.2 ms). Timing the parts: `finish()` takes about 1 ms; on the first end-card frame 10–17 ms fall inside `tower()` (pure canvas calls right after the end card's DOM changes); a 5–8 ms play-frame spike falls outside `draw()`. The cause is unresolved. **8 ms: not met on one frame per night in WebKit.**
+- The Share picture and text both describe today's best peal (`night-bells:daily`), not necessarily the last run.
+- At heights up to 620 px in portrait the menu darkens over the tower so its buttons stay readable; the tower art is mostly hidden there.
+- 320×568: no screen scrolls in English or Turkish, menu, pause and result. Landscape (664×390): every menu button fits; the Turkish back link from the home sits 5 px below the fold and the card scrolls to it (the no-scroll rule is for portrait).
+
+### Unverified
+
+- The Turkish wording has not been read by a native speaker.
+- Sound by ear: the bell voice, the music preset and the replayed tune.
+- Real phones, one-thumb reach and human difficulty of nights 9–24; the bots prove solvability and the shape of the curve, not enjoyment.
+- The home card at `/small/` still counts to 8 (`experiments/small/marks.js` `of: 8`, asserted '1 / 8' in `kit/check/pages.mjs`); not changed here.
