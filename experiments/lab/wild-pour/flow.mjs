@@ -1,11 +1,12 @@
 // Flow against tilt: how many drops a second leave the jug when the thumb holds one tilt, at three jug fills.
-//   node flow.mjs [--sim=path/to/sim.js] [--seeds=12] [--json]
+//   node flow.mjs [--sim=path/to/sim.js] [--seeds=12] [--level=1] [--steady] [--json]
+// --steady: drops a second over the second that starts half a second after the jug reaches the tilt (the held rate).
 // For each fill, the jug first pours down to that fill and stands for 1.5 s; then the thumb asks for the tilt, and the
 // drops that leave while the jug turns there and in the second after it arrives are counted (what a thumb sees when it holds that tilt). Mean and spread are over seeds.
 const arg = (k, d) => { const a = process.argv.find(x => x.startsWith(`--${k}=`)); return a ? a.slice(k.length + 3) : d; };
 const simPath = arg('sim', './sim.js');
 const sim = await import(simPath.startsWith('/') ? simPath : new URL(simPath, import.meta.url).href);
-const seeds = +arg('seeds', 12), level = +arg('level', 1);
+const seeds = +arg('seeds', 12), level = +arg('level', 1), steady = process.argv.includes('--steady');
 
 const startFill = [];
 export function flowAt(tilt, fill, seed) {
@@ -19,7 +20,8 @@ export function flowAt(tilt, fill, seed) {
   startFill.push(s.inJug / drops);
   guard = 0;
   let out = 0;
-  while (ctrl() < tilt - 0.005 && guard++ < 600) { sim.step(s, tilt); for (const e of s.events) if (e === 'out') out++; }
+  while (ctrl() < tilt - 0.005 && guard++ < 600) { sim.step(s, tilt); if (!steady) for (const e of s.events) if (e === 'out') out++; }
+  if (steady) for (let i = 0; i < 30; i++) sim.step(s, tilt);
   for (let i = 0; i < 60; i++) { sim.step(s, tilt); for (const e of s.events) if (e === 'out') out++; }
   return out;
 }
