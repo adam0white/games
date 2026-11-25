@@ -153,12 +153,14 @@ Owner's decision on the small pages (2026-11-24, after playing them): "Good but 
 | `wild2-face-shift` | Keep; "needs more variety and gameplay" | Improved in place |
 | `pisti`, `night-lamp-keeper`, `night-kite`, `night-loaves` | Rejected | `archive/lab/`; old addresses go to `/lab/` |
 | `night-rubbing` | Undecided: the owner could not find it (the index calls it "Carbon Cabinet") | Stays |
+| Home for the small games | The owner picked hub C "Three tonight" with B's swipe deck (2026-11-25) | Built at `/small/` (`experiments/small/`) |
+| Lab index | The owner asked for the index to stop listing folded, archived and in-game pages (2026-11-25) | Done: `/lab/` has one card, to the small games home |
 
 The kept pages do not move to a top-level address or into `kit/games.json` until the owner picks a home for the small games (variants at `/lab/hub-a/`, `hub-b/`, `hub-c/` are being built for that pick), so no address changes twice.
 
 Update, 2026-11-24: the owner picked C with B's deck. The home is `/small/` (`experiments/small/`); the drafts are in `archive/lab/hub-a`, `hub-b`, `hub-c`. The games stay at `/lab/<name>/` for now: `experiments/small/catalog.js` is the one list of their addresses, so a move is one line per game there. A page that gains Turkish sets `tr: true` on its entry in that file (it was `lab/hub-a/hub.js`). Their recording names stay equal to the folder names through any move.
 
-Play records: the lab accepted no records from any lab page up to this date (no lab page name is in human-framework `LAB_PROTOTYPES`; five pages import `kit/lab.js` and are refused). The site Worker's request log shows two real phones opening lab pages on 2026-11-24. Opens are the only evidence of play for these pages.
+Play records: the lab accepted no records from any lab page up to this date (no lab page name was in human-framework `LAB_PROTOTYPES`, so every send was refused). Corrected 2026-11-25: the earlier line here said five pages import `kit/lab.js`. All twelve lab pages import it (`thankful`, `pitch`, `ring`, `night-bells`, `night-channels`, `night-podwire`, `night-rubbing`, `night-saltplate`, `night-sand`, `night-splitlight`, `wild-pour`, `wild2-face-shift`), and so does the home at `/small/` (as `small`). On 2026-11-25 all thirteen names are in `LAB_PROTOTYPES` on human-framework's default branch (`apps/site/src/lab/games.ts`, read through GitHub); whether that is deployed, so that the server now stores their records, was not checked. The site Worker's request log shows two real phones opening lab pages on 2026-11-24. Opens are the only evidence of play for these pages.
 
 
 ## 2026-11-24: Ant Draft, bigger explosions (tester t1, note #237)

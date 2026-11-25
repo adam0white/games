@@ -11,6 +11,7 @@ import { lab } from '../../kit/lab.js';
 import { home, backLink } from '../../kit/home.js';
 import { table, newCode, cleanCode, linkFor, codeFromLink, share } from '../../kit/room.js';
 import { shareImage } from '../../kit/share.js';
+import { feedback } from '../../kit/fx.js';
 
 noZoom();
 const KEY = 'pitch:v1';
@@ -44,7 +45,7 @@ let puzzle = -1, misses = 0, burst = null, againPop = null, missRing = null, sha
 let L = { cell: 40, ox: 0, oy: 0 }, W = innerWidth, H = innerHeight, dpr = 1, safe = { top: 0, bottom: 0 };
 // Play recording for the game lab. One run is a match against the bot, a two-player match, a friend's table match
 // or today's pitch. The data holds modes, levels and results only: never a name, a typed word or a table code.
-const rec = home(lab('pitch'), { back: ['#menu .card', '#end .card'] });
+const rec = home(lab('pitch', { lang }), { back: ['#menu .card', '#end .card'], lang });
 let running = false;
 function recStart(info) { recEnd('quit'); running = true; rec.start(info); }
 function recEnd(outcome) { if (!running) return; running = false; rec.end(outcome, recSummary()); }
@@ -270,13 +271,9 @@ function drawEffects(ball) {
   }
 }
 const handFont = () => getComputedStyle(document.documentElement).getPropertyValue('--hand');
-// Every sound and every motion goes through here, so the check can see that each action answered.
-const fxLog = [];
-function fx(name, sound, motion) {
-  fxLog.push(name); if (fxLog.length > 200) fxLog.shift();
-  if (sound && canSound()) sound();
-  if (motion) motion();
-}
+// Every sound and every motion goes through fx() (kit/fx.js), so the check can see that each action answered.
+// Pitch keeps its own bump: its pulses are per element (the turn pill keeps its centring, the paper shakes).
+const { fx, log: fxLog } = feedback({ canSound: () => canSound() });
 function bump(sel) { const el = document.querySelector(sel); if (!el) return; el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
 
 // ---------- game flow
@@ -1014,7 +1011,7 @@ window.__pitch = Object.freeze({
   get score() { return score.slice(); },
   get level() { return level; },
   get rung() { return more.rung; },
-  get fx() { return fxLog.slice(); },
+  get fx() { return fxLog(); },
   get puzzle() { return mode === 'puzzle' ? { n: puzzle + 1, id: PUZZLES[puzzle].id, misses, attemptStart, ...bookRec() } : null; },
   get shareLine() { return s ? shareLine() : ''; },
   more() { return JSON.parse(JSON.stringify(more)); },

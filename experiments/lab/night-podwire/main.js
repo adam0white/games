@@ -8,6 +8,7 @@ import { hint } from '../../kit/hint.js';
 import { screens } from '../../kit/screens.js';
 import { onLeave, isPauseKey } from '../../kit/pause.js';
 import { lab } from '../../kit/lab.js';
+import { home } from '../../kit/home.js';
 import { noZoom } from '../../kit/zoom.js';
 import { shareLink } from '../../kit/room.js';
 
@@ -110,7 +111,8 @@ function updateHeading() {
 }
 // Play recording for the game lab: one run is one plate, from the first pull of the wire to all pods open,
 // a restart, or leaving it for another plate. The daily plate is recorded the same way with mode 'daily'.
-const rec = lab('night-podwire');
+// Opened from the small games' home (?from=small): a way back on the pause card and beside Next plate.
+const rec = home(lab('night-podwire', { lang }), { back: ['#paused .sheet', '#won'], lang });
 let running = false;
 function recEnd(outcome) {
   if (!running) return;

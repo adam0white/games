@@ -189,3 +189,7 @@ The first section says "There is no lab recording." That stopped being true with
 - The kit's back link and the lab notice keep the language the page loaded in after the in-page language switch. That is the kit's behaviour and was not changed here.
 - On screens shorter than 700 px in portrait, the result card covers the foot of the bench instead of growing the page.
 - On taller screens the result card replaces the dial and the page grows, so the centred bench moves up when a plate is won: at 390x844 the canvas top moves from 186 to 168 px, and to 142 px on the end card with the way back. This was chosen over covering the receivers that just lit.
+
+## 2026-11-25 — the way back to the small games home
+
+Already wired to the home. The way back and the recording notice and switch now follow the page's language when it changes (`lang` passed to `kit/home.js` and `kit/lab.js`). The home shows this game's progress out of the count in `experiments/small/catalog.js`, which `scripts/small-catalog.test.mjs` keeps equal to the game's own.

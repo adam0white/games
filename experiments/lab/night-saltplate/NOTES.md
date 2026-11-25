@@ -133,3 +133,7 @@ Saves: `night-saltplate:save` keeps `{v:1, cleared, look, sound}` exactly; `clea
 - Sound on a real phone speaker, and whether the bowed voice is pleasant from 110 to 440 Hz. Feel of the bow and finger under a real thumb. Frame time on real phones.
 - Whether an unaided player understands plates 10 to 18 from one line of text and the engraving. Turning Star is the one most likely to be fiddly.
 - The Turkish wording (no native reader here). The live lab endpoint.
+
+## 2026-11-25 — the way back to the small games home
+
+Opened from `/small/` (`?from=small`), the page shows "‹ Small games" ("‹ Küçük oyunlar" in Turkish) on the pause card and under the result's buttons, through `kit/home.js`; a printed plate or daily figure is reported to the home as a win. The recording notice and switch are now in the page's language. `check.mjs` asserts the two links in Turkish. Same keys, same records.

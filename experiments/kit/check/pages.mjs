@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { SMALL } from '../../small/catalog.js';
 import { fieldPoint, pointerDrag } from './lab-pages.mjs';
+import { checkDay } from './clock.mjs';
 
 const stars = (n, first = 2) => [first, ...Array(n - 1).fill(0)];
 const saved = (key, value, hint, extra = {}) => ({ [key]: JSON.stringify(value), [hint]: '1', ...extra });
@@ -26,7 +27,7 @@ async function moveVineLamp(page, { until, knob }) {
 // lies down under a still one, and goes on an outrun after a sideways flick.
 const flockSave = { v: 1, unlocked: 2, best: 31, sound: true, played: true };
 const flockStars = { 1: 5 };
-const flockDaily = { date: new Date().toISOString().slice(0, 10), stars: 3 };
+const flockDaily = { date: checkDay, stars: 3 }; // the page's Date is pinned to the same moment (clock.mjs)
 async function driveFlock(page, { until }) {
   const at = await fieldPoint(page, 360, 520);
   const { x, y } = await page.evaluate(() => window.flockState().game.dog);
@@ -170,7 +171,7 @@ export const pages = {
     music: { button: '#music', key: 'boat-music', on: 'Music: on', off: 'Music: off', hook: () => window.boatMusic?.() },
   },
   flock: {
-    sound: '#sound', saveKey: 'night-flock-2:save', pausePosition: { x: 8, y: 23 },
+    clock: true, sound: '#sound', saveKey: 'night-flock-2:save', pausePosition: { x: 8, y: 23 },
     seeds: {
       'night-flock-2:save': JSON.stringify(flockSave),
       'night-flock-2:stars': JSON.stringify(flockStars),
@@ -217,7 +218,7 @@ export function linkTarget(href) {
 }
 const json = JSON.stringify;
 // 2026-11-24: today's pick is Podwire; tonight is Pour, Night Sand, Thankful Garden. Night Bells has one level
-// cleared (1 / 8). The rest is what the drafts left: Saltplate opened, a two-night streak up to yesterday, and
+// cleared (1 / 24). The rest is what the drafts left: Saltplate opened, a two-night streak up to yesterday, and
 // tonight's first stop opened on a draft (no time, so a win reported later can never be counted for it).
 const DAY = '2026-11-24';
 const smallSeed = {
@@ -252,7 +253,8 @@ export const pageRuns = {
     assert.equal(await page.getAttribute('#stops li:nth-child(1)', 'class'), 'opened', 'a stop opened on a draft stays opened');
     assert.equal(await page.getAttribute('#stops li:nth-child(2)', 'class'), 'now', 'the next stop is the one to play');
     assert.equal(await page.textContent('.card.night-saltplate .mark'), 'Opened', 'a game opened from a draft is marked');
-    assert.equal(await page.textContent('.card.night-bells .mark'), '1 / 8', 'a cleared level shows on the card');
+    assert.equal(await page.textContent('.card.night-bells .mark'), `1 / ${SMALL.find(game => game.slug === 'night-bells').of}`, 'a cleared level shows on the card, out of the game\'s 24 nights');
+    assert.equal(SMALL.find(game => game.slug === 'night-bells').of, 24);
     assert.equal(state.intro, false, 'no first-visit card for a player who has played a night');
     // Both languages.
     const noSideways = () => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth);
@@ -337,9 +339,10 @@ export const pageRuns = {
     await page.waitForTimeout(2400); await page.click('#introOk');
     await until(page, () => !window.smallState().intro, 'Start hides it');
     await page.reload(); await until(page, () => window.smallState && !window.smallState().intro, 'and it stays hidden');
-    // The way back from a real game page opened from the home, as a wired game would add it (game files untouched).
+    // The way back from a real game page opened from the home: Pour adds it itself (kit/home.js, since 2026-11-25).
     await page.click('li.now a.stop.wild-pour'); await page.waitForURL(url => url.pathname === '/lab/wild-pour/');
-    await page.evaluate(async () => { const { home } = await import('/kit/home.js'); home(null, { back: ['#menu .card'] }); });
+    await until(page, () => document.querySelector('#menu .card a.kit-home'), 'Pour shows its own way back');
+    assert.equal(await page.evaluate(() => document.querySelectorAll('a.kit-home').length), 2, 'Pour has the way back on its menu and end cards, once each');
     assert.equal(await page.isVisible('#menu .card a.kit-home'), true, 'the back link shows on the game’s menu card');
     await page.locator('#menu .card').screenshot({ path: `/tmp/claude-small-games-home/${page.context().checkName}-back-link.png` }).catch(() => {});
     await page.tap('#menu .card a.kit-home');

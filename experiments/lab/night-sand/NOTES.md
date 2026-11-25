@@ -164,3 +164,7 @@ In `check.mjs`: beds 1–4 are lamp, seed, stop-glass and sieve, played by follo
 - Turkish wording.
 
 The hub's entry for this page (`lab/hub-a/hub.js`) now has `tr: true` and the Turkish name, so the hub no longer marks it English only. Bed 5's buried glow was too faint to read at first; it is now a brighter additive glow with a glint on the surface above the lamp, checked in a screenshot. The shared picture is 720 × 1056 px, drawn without smoothing, and was looked at in both inks and in Turkish.
+
+## 2026-11-25 — the way back to the small games home
+
+Opened from `/small/` (`?from=small`), the page shows "‹ Small games" ("‹ Küçük oyunlar" in Turkish) on the pause card and the result card, through `kit/home.js`; a cleared bed is reported to the home as a win. The recording notice and switch are now in the page's language. `check.mjs` asserts the two links in Turkish. Same keys, same records.

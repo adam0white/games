@@ -206,3 +206,7 @@ Below 760 px of height the menu is tighter (smaller title, 44 px buttons, small 
 - The Turkish for the new lines was written by an AI and has not been read by a native speaker (the idea lines, "{n}. gece / {open}", "Bir gecede {k} seviyenin kavanozları dolunca {n}. gece açılır.").
 - Real share sheet on a phone: headless browsers download instead.
 - The lab Worker accepting `night` in the summary: the check answers the lab address itself.
+
+## 2026-11-25 — the small games home
+
+The recording notice, its Privacy link, the switch and the "‹ Small games" link now follow the page's language when it changes (`lang` passed to `kit/lab.js` and `kit/home.js`). The small games' card line now says there are three nights. The home keeps counting nights played, with no "n / of": a night has many levels and the save does not record a night as finished. Same keys, same records.

@@ -9,6 +9,7 @@ import { readJson, writeJson } from '../../kit/save.js';
 import { screens } from '../../kit/screens.js';
 import { noZoom } from '../../kit/zoom.js';
 import { lab } from '../../kit/lab.js';
+import { home } from '../../kit/home.js';
 import { shareImage } from '../../kit/share.js';
 
 noZoom();
@@ -132,7 +133,8 @@ function draw() {
   readout();
 }
 // Play recording for the game lab (kit/lab.js): one run for each bed the player starts to work.
-const rec = lab('night-sand');
+// Opened from the small games' home (?from=small): a way back on the pause card and the result card.
+const rec = home(lab('night-sand', { lang }), { back: ['#paused .card', '#result .card'], lang });
 let runOpen = false;
 function runBegin() { if (runOpen || !bed || bed.status !== 'play') return; runOpen = true; rec.start({ level: bed.level, kind: bed.kind, look: save.look }); }
 function runEnd(outcome) {

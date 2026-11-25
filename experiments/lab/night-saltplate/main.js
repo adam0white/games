@@ -8,6 +8,7 @@ import { readJson, writeJson } from '../../kit/save.js';
 import { screens } from '../../kit/screens.js';
 import { noZoom } from '../../kit/zoom.js';
 import { lab } from '../../kit/lab.js';
+import { home } from '../../kit/home.js';
 import { shareImage } from '../../kit/share.js';
 
 noZoom();
@@ -177,7 +178,8 @@ function tools() {
 
 // Play recording for the game lab (kit/lab.js): one run for each plate the player starts to tune,
 // one for the daily figure, one for each visit to the instrument.
-const rec = lab('night-saltplate');
+// Opened from the small games' home (?from=small): a way back on the pause card and under the result's buttons.
+const rec = home(lab('night-saltplate', { lang }), { back: ['#paused .card', '#result'], lang });
 let runOpen = false;
 // The mode and shape the open run was started in: begin*() change them before start() ends the old run.
 let runMode = 'plates';

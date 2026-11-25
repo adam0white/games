@@ -74,7 +74,7 @@ function applyPalette() {
   for (const b of document.querySelectorAll('[data-look]')) b.setAttribute('aria-pressed', String(b.dataset.look === save.look));
 }
 // Play recording for the game lab: one run is one try at a night, the endless mode or the daily peal.
-const rec = home(lab('night-bells'), { back: ['#menu .card', '#end .card'] });
+const rec = home(lab('night-bells', { lang: WORDS.lang }), { back: ['#menu .card', '#end .card'], lang: WORDS.lang });
 let running = false;
 function recStart(level, endless) { running = true; rec.start({ level, endless, daily: s.daily || '', idea: s.idea, look: save.look, lang: WORDS.lang(), music: musicOn }); }
 function recEnd(outcome, extra) {

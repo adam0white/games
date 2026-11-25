@@ -5,6 +5,9 @@
 //   const rec = lab('lantern');
 //   rec.notice(menuCard);          the recording notice; nothing is recorded or sent before it is on the page
 //   rec.toggle(pauseCard);         the "Record this play" switch the notice points to
+//   lab('lantern', { lang })       optional: the page's own language, e.g. `lang` from kit/i18n.js words(); the notice,
+//                                  the Privacy link and the switch then follow it (English and Turkish, from WORDS below)
+//                                  and change when the page switches language. Without it they are in English.
 //   rec.start({ night: 3 });       a run begins
 //   rec.event('buy', { pack });    a choice, a purchase; outside a run it is sent at once as its own record
 //   rec.end('dawn', { embers });   the run ends with an outcome and a small summary; this sends it
@@ -13,7 +16,14 @@
 // Storage keys are the lab client's own on this origin, so the off switch is the same switch other lab
 // games on play.adamwhite.work use, and the player id is the one they use.
 export const ENDPOINT = 'https://human.adamwhite.work/lab/api/linked';
-export const NOTICE = 'The game lab records play, links it to other lab play on this device, and keeps it for 180 days. Turn recording off in the pause menu.';
+// The notice names the switch itself rather than where it is: pages put the switch on a pause card, a settings card
+// or beside the notice, so "in the pause menu" was not true on every page. Every page that shows the notice also
+// calls rec.toggle(). The Turkish has not been read by a native speaker.
+export const WORDS = {
+  en: { notice: 'The game lab records play, links it to other lab play on this device, and keeps it for 180 days. To stop it, untick “Record this play for the game lab”.', privacy: 'Privacy', toggle: 'Record this play for the game lab' },
+  tr: { notice: 'Oyun laboratuvarı oyunu kaydeder, bu cihazdaki diğer laboratuvar oyunlarıyla ilişkilendirir ve 180 gün saklar. Durdurmak için “Bu oyunu oyun laboratuvarı için kaydet” işaretini kaldır.', privacy: 'Gizlilik', toggle: 'Bu oyunu oyun laboratuvarı için kaydet' },
+};
+export const NOTICE = WORDS.en.notice;
 export const PRIVACY = 'https://human.adamwhite.work/lab/privacy/';
 const PLAYER = 'hf-lab-player', OFF = 'hf-lab-recording-off';
 const MAX_EVENTS = 300, MAX_BYTES = 96 * 1024;
@@ -27,7 +37,7 @@ const signal = () => navigator.globalPrivacyControl === true || navigator.doNotT
 
 // options: { version, endpoint, fetch } — fetch and endpoint are for tests; version goes in build.a.
 export function lab(game, options = {}) {
-  const none = { notice() {}, toggle() {}, start() {}, event() {}, end() {}, get on() { return false; }, sent: 0 };
+  const none = { notice() {}, toggle() {}, retext() {}, start() {}, event() {}, end() {}, get on() { return false; }, sent: 0 };
   try { if (!/^[a-z0-9-]{1,40}$/.test(game) || !globalThis.crypto?.getRandomValues) return none; } catch { return none; }
   const send = options.fetch ?? ((...a) => fetch(...a));
   const endpoint = options.endpoint ?? ENDPOINT;
@@ -36,6 +46,9 @@ export function lab(game, options = {}) {
   const eventsOff = `hf-lab-events-off:${game}`, overrideKey = `hf-lab-privacy-override:${game}`;
   let noticed = false, run = null, between = 0;
   const self = { sent: 0 };
+  // Words: the page's language when it passed one (only 'en' and 'tr' have tables), English otherwise.
+  const say = key => { let l = 'en'; try { if (typeof options.lang === 'function') l = String(options.lang() || '').slice(0, 2).toLowerCase(); } catch {} return (WORDS[l] ?? WORDS.en)[key]; };
+  const made = { notices: [], toggles: [] };
 
   // Recording is on when the notice is on the page, nobody switched it off, the browser sends no
   // Do Not Track or Global Privacy Control signal (unless the player switched recording on here),
@@ -91,7 +104,7 @@ export function lab(game, options = {}) {
   self.notice = parent => { try {
     const p = document.createElement('p'); p.className = 'lab-notice'; Object.assign(p.style, { fontSize: '12px', lineHeight: '1.3', margin: '.5em 0 0', opacity: '.8', pointerEvents: 'auto' });
     const a = document.createElement('a'); a.href = PRIVACY; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = 'Privacy'; a.style.color = 'inherit';
-    p.append(NOTICE + ' ', a); parent.append(p); noticed = p.isConnected; return p;
+    a.textContent = say('privacy'); p.append(say('notice') + ' ', a); parent.append(p); noticed = p.isConnected; made.notices.push(p); watch(); return p;
   } catch { return null; } };
   self.toggle = parent => { try {
     const label = document.createElement('label'), input = document.createElement('input');
@@ -106,8 +119,24 @@ export function lab(game, options = {}) {
       sync();
     });
     addEventListener('storage', sync); sync(); // another tab or game may change the switch
-    label.append(input, ' Record this play for the game lab'); parent.append(label); return label;
+    label.append(input, ' ' + say('toggle')); parent.append(label); made.toggles.push(label); watch(); return label;
   } catch { return null; } };
+  // Puts the kit's words in the page's language again (after the page switched language). Called by itself when the
+  // page's <html lang> changes, which kit/i18n.js does on setLang. A page that rewrote the notice with its own words
+  // (Vine, Borrowed) keeps them: only text still equal to one of the kit's own is replaced.
+  const kit = key => Object.values(WORDS).map(w => w[key]);
+  self.retext = () => { try {
+    for (const p of made.notices) {
+      if (p.firstChild?.nodeType === 3 && kit('notice').includes(p.firstChild.data.trim())) p.firstChild.data = say('notice') + ' ';
+      const a = p.querySelector('a'); if (a && kit('privacy').includes(a.textContent)) a.textContent = say('privacy');
+    }
+    for (const l of made.toggles) { const n = l.lastChild; if (n?.nodeType === 3 && kit('toggle').includes(n.data.trim())) n.data = ' ' + say('toggle'); }
+  } catch {} };
+  let watching = false;
+  function watch() { try {
+    if (watching || typeof options.lang !== 'function' || typeof MutationObserver !== 'function') return; watching = true;
+    new MutationObserver(() => self.retext()).observe(document.documentElement, { attributes: true, attributeFilter: ['lang'] });
+  } catch {} }
   self.start = (info) => { try {
     if (run && run.outcome === null) { run.outcome = 'left'; flush(true); }
     run = { id: hex(), started: Date.now(), info: clean(info), events: [], outcome: null, summary: null, sentAt: -1 };

@@ -9,6 +9,7 @@ import {stick} from '../../kit/stick.js';
 import {hint} from '../../kit/hint.js';
 import {noZoom} from '../../kit/zoom.js';
 import {lab} from '../../kit/lab.js';
+import {home} from '../../kit/home.js';
 noZoom();
 const $=id=>document.getElementById(id), canvas=$('c'), g=canvas.getContext('2d');
 // Save contract (unchanged): the classic four rounds. New state lives under new keys below.
@@ -43,7 +44,8 @@ function resetInput(){pad.drop();down=null;keys.clear();input={x:0,y:0,active:fa
 let keyTravel={x:0,y:0};
 // Play recording for the game lab (kit/lab.js). Classic: one run for each go through the four rounds (unchanged).
 // Booth and daily: one run from Play (or Daily face) to the photo strip; event 'rung-cleared' for each rung.
-const rec=lab('wild2-face-shift');let runOpen=false;
+// Opened from the small games' home (?from=small): a way back on the menu and end cards.
+const rec=home(lab('wild2-face-shift',{lang}),{back:['#menu .card','#end .card'],lang});let runOpen=false;
 function runEnd(outcome){if(!runOpen)return;runOpen=false;if(game==='classic')rec.end(outcome,{rounds:cleared,round:s?s.level+1:null,score:total,photos:allShots.length,best:save.best,stars:save.stars.reduce((a,n)=>a+n,0)});else rec.end(outcome,{mode:game,rungs:b?b.results.length:0,score:b?b.score:0,photos:b?b.shots.filter(x=>!x.missed).length:0,missed:b?b.missed:0,bestStreak:b?b.bestStreak:0,best:game==='daily'?dailyBest(b?.day)??0:boothSave.best});}
 function clearFx(){flash=0;shake=0;particles=[];acc=0;visual={x:0,y:0};springs=null;pull=null;strip=[];}
 function start(kind=game){runEnd('quit');game=kind;tap();snd.release();resetInput();clearFx();allShots=[];total=0;cleared=0;

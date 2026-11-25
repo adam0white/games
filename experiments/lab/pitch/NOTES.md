@@ -141,3 +141,7 @@ The owner played the page and said "Good but improve". There was no specific com
 - A real phone and the real table Worker: `link-check.mjs` runs the real class off the platform.
 - WebKit encodes the end picture on the main thread: one task of 10 to 15 ms after the card has slid in, while nothing animates. Chromium encodes it off the main thread (0 to 2 ms).
 - The Turkish was written by an AI and has not been read by a native speaker.
+
+## 2026-11-25 — the small games home and the kit's feedback call
+
+The recording notice, its Privacy link, the switch and the "‹ Small games" link now follow the page's language when it changes (`lang` passed to `kit/lab.js` and `kit/home.js`). `fx()` and its log now come from `kit/fx.js` (written for Firefly Ring from this page's helper); the only difference in behaviour is that an error in a sound or a motion is caught and reported to the console instead of stopping the action. Pitch keeps its own `bump()`: its pulses are per element (the turn pill keeps its `translateX(-50%)` centring, the paper shakes), which the kit's single scale pulse would not keep. The small games' card line now names the three ways to play. The home shows Pitch as played or not, with no "n / of": the eighteen puzzles are one part of the game, and matches have no end. Same keys, same records.

@@ -51,7 +51,7 @@ const show = screens(['paused', 'result'], name => {
 
 // Play recording for the game lab (kit/lab.js): one run for each plate the player starts to turn. kit/home.js adds
 // the way back to /small/ and tells the home how the run ended.
-const rec = home(lab('night-splitlight'), { back: ['#paused .card', '#result .pair'] });
+const rec = home(lab('night-splitlight', { lang: lang.lang }), { back: ['#paused .card', '#result .pair'], lang: lang.lang });
 let runOpen = false;
 function summary() {
   return { level: state.id, mode, day: mode === 'daily' ? today : undefined, captured: litCount(), targets: state.targets.length,
