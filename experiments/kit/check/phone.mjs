@@ -672,6 +672,10 @@ const GAMES = {
     await page.evaluate(() => localStorage.setItem('hf-lab-recording-off', '1')); await page.reload(); // recording off again, as the steps below expect
     // Views (notes #158, #159): 2D, 3D and first person, saved under lantern-view. First person steers by pressing a side; a drag does not.
     assert.equal((await state()).view, '2d', 'a save without lantern-view is 2D'); assert.equal((await saved())['lantern-view'], undefined);
+    // ?view=3d (the lab's old ripples address, with its own query joined by the Worker) opens this visit in 3D and saves nothing.
+    await page.goto(`${base}/lantern/?view=3d&x=1`); await until(page, () => window.lanternState().view === '3d' && window.lanternState().viewReady, '?view=3d opens 3D', 20000);
+    assert.equal((await saved())['lantern-view'], undefined, '?view=3d does not change the saved view');
+    await page.goto(`${base}/lantern/`); assert.equal((await state()).view, '2d', 'without ?view the saved view (2D) comes back');
     await page.route('**/view3d.js*', r => r.abort()); page.context().viewBad = true; await page.click('#toView'); await page.click('[data-view="3d"]'); await until(page, () => !document.querySelector('#perspective .viewNote').hidden, 'a failed 3D load says so'); assert.equal((await state()).view, '2d', 'no 3D: the river stays 2D'); await page.unroute('**/view3d.js*');
     await page.reload(); await page.click('#toView'); await page.click('[data-view="3d"]'); await until(page, () => window.lanternState().view === '3d' && window.lanternState().viewReady, '3D starts', 20000); assert.equal((await saved())['lantern-view'], '3d'); assert.equal(await page.isDisabled('[data-steer="tilt"]'), true, 'tilt is for first person'); await page.click('#perspective .back');
     await page.click('#play'); await page.evaluate(() => { const s = window.lanternSim(); s.safe = 60; s.light = 1; }); const v0 = (await state()).target;
@@ -829,8 +833,8 @@ const GAMES = {
     {
       await page.evaluate(() => { localStorage.setItem('lantern-duet:v1', JSON.stringify({ best: { night: 2, pct: 40 }, unlocked: 2, sound: false })); });
       const before = await saved(), board = []; const spy = r => { if (r.url().includes('/lab-api/board')) board.push(r.url()); }; page.on('request', spy);
-      await page.goto(`${base}/lantern/?mode=duet`);
-      await until(page, () => window.lanternState().screen === 'mode' && window.lanternMode()?.id === 'duet', 'the deep link opens Duet');
+      await page.goto(`${base}/lantern/?mode=duet&view=3d`);
+      await until(page, () => window.lanternState().screen === 'mode' && window.lanternMode()?.id === 'duet', 'the deep link opens Duet'); assert.equal((await state()).view, '2d', 'Duet is drawn flat, ?view=3d or not: no ripples'); assert.ok(await page.evaluate(() => document.getElementById('c3').hidden), 'no 3D canvas in Duet');
       const m0 = await page.evaluate(() => window.lanternMode());
       assert.equal(m0.unlocked, 2, 'the lab save opens night 2'); assert.deepEqual(m0.best, { night: 2, pct: 40 }, 'and carries its best');
       assert.deepEqual(await page.$$eval('#modePanel .nights button', bs => bs.map(b => b.disabled)), [false, false, true], 'nights 1 and 2 open');
@@ -914,8 +918,8 @@ const GAMES = {
       const serve = m => page.evaluate(m => window.raceSockets.at(-1).onmessage({ data: JSON.stringify(m) }), m);
       const sent = () => page.evaluate(() => window.raceSockets.at(-1).sent);
       const race = () => page.evaluate(() => window.lanternMode());
-      await page.goto(`${base}/lantern/?mode=race&room=ABCD`);
-      await until(page, () => window.lanternState().screen === 'mode' && window.lanternMode()?.id === 'race', 'the room link opens Race');
+      await page.goto(`${base}/lantern/?mode=race&room=ABCD&view=3d`);
+      await until(page, () => window.lanternState().screen === 'mode' && window.lanternMode()?.id === 'race', 'the room link opens Race'); assert.equal((await state()).view, '2d', 'Race is drawn flat, ?view=3d or not: no ripples'); assert.ok(await page.evaluate(() => document.getElementById('c3').hidden), 'no 3D canvas in Race');
       let r = await race();
       assert.deepEqual([r.best, r.name, r.played, r.linked], [42000, 'Old boat', 1, 'ABCD'], 'the lab save carries over and the link names the room');
       assert.equal(await page.textContent('#raceQuick'), 'Join room ABCD'); assert.equal(await page.inputValue('#raceName'), 'Old boat');

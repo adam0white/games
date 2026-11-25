@@ -1289,7 +1289,9 @@ for (const id of ['menuLanguage', 'pauseLanguage']) $(id).addEventListener('clic
 });
 redraw();
 const askedMode = (query.get('mode') ?? '').split('?')[0]; // the worker's lab redirect adds the old address's own query after ?mode=spark
-views(); if (read('lantern-view', '2d') !== '2d' && !Object.hasOwn(MODES, askedMode)) setView(read('lantern-view'), false);
+const askedView = (query.get('view') ?? '').split('?')[0]; // /lantern/?view=3d opens this visit in 3D (the lab's old ripples address); the saved choice is kept
+const startView = VIEWS.includes(askedView) ? askedView : read('lantern-view', '2d');
+views(); if (startView !== '2d' && !Object.hasOwn(MODES, askedMode)) setView(startView, false);
 show('menu'); chooseMode(askedMode); // /lantern/?mode=spark opens with Spark chosen
 requestAnimationFrame(frame);
 </script>
