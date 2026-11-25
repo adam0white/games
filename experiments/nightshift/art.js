@@ -1,6 +1,16 @@
 import {
-  WIDTH, HEIGHT, EXITS, REST, CASE, MIRROR, FUSE, STAIR, HATCH, LIFT, RADIUS, GHOST_ZONE, distance, targetFor, deadline, pointAt, spread,
+  WIDTH, HEIGHT, EXITS, REST, CASE, MIRROR, FUSE, STAIR, HATCH, LIFT, RADIUS, GHOST_ZONE, distance, targetFor, deadline, pointAt, spread, beamTouches,
 } from './sim.js';
+
+// How long the line from a startled cat to the exhibit it woke stays on that exhibit.
+export const WAKE_LIFE = 2400;
+
+// Exhibits the light would stop now if the lit mask were not soaking it up.
+export function smothered(s) {
+  if (!s.masked) return [];
+  return s.actors.filter(a => a.kind!=='shy' && a.state==='roam' && !(a.kind==='ghost' && a.progress>=GHOST_ZONE) &&
+    ((!!s.bounce && beamTouches(a,s.bounce)) || ((!a.mirrored || a.y<CASE.y) && beamTouches(a,s.light))));
+}
 
 const ink = '#221e37';
 const cream = '#fff1cc';
@@ -529,8 +539,9 @@ function gesture(c,s,now,reduced,{ tutorial, waiting, firstDrag, repairCue }) {
   const mask=s.actors.find(actor => actor.kind==='shy' && actor.state!=='gone');
   if (mask && (mask.lit || (practice && s.lesson==='shy'))) {
     const {x,y}=mask;
-    crossedBeam(c,x,y-58,13);
-    if (mask.lit) arrow(c,x,y-79,0,-1,'#ffb6ac');
+    // Lit, the mask shows where it walks; the crossed beam moves onto the exhibits it frees.
+    if (mask.lit) arrow(c,x,y-66,0,-1,'#ffb6ac');
+    else crossedBeam(c,x,y-58,13);
   }
   if (s.catAt) {
     const {x,y}=s.catAt;
@@ -693,18 +704,36 @@ export function renderer(canvas) {
       }
       for (const a of [...s.actors].sort((p,q)=>p.y-q.y)) renderActor(c,s,a,alpha,reduced,shifts.get(a.id));
       if (s.catAt) cat(c,s.catAt.x,s.catAt.y,reduced ? 0 : Math.sin(time*18)*3,s.catLit);
+      if (s.masked) {
+        // The lit mask blocks the beam: a green thread runs from the light to the mask,
+        // and each exhibit the light would have stopped wears the crossed-out beam.
+        const mask=s.actors.find(a => a.kind==='shy');
+        if (mask) {
+          c.setLineDash([4,6]);
+          shape(c,[[x,y],[mask.x,mask.y-28]],null,mint,2.2);
+          c.setLineDash([]);
+        }
+        for (const a of smothered(s)) crossedBeam(c,a.x+(shifts.get(a.id) ?? 0),a.y-66,11);
+      }
       for (const e of effects) {
         if (e.type==='foot') continue;
         const age=Math.min(1,(now-e.at)/e.life);
         c.save();
-        c.globalAlpha=1-age;
+        c.globalAlpha=e.type==='wake' ? Math.min(1,(1-age)/.4) : 1-age;
         if (e.type==='touch') ring(c,e.x,e.y,8+(reduced ? 6 : age*22),cream,2);
         if (e.type==='wake') {
-          // The startled cat points at the exhibit it woke.
-          c.setLineDash([3,6]);
-          shape(c,[[e.x,e.y-12],[e.tx,e.ty-30]],null,'#ffb6ac',2.4);
-          c.setLineDash([]);
-          ring(c,e.tx,e.ty-24,24+(reduced ? 4 : age*14),'#ffb6ac',2.4);
+          // The startled cat points at the exhibit it woke, and the ring rides on that exhibit.
+          const woke=s.actors.find(a => a.id===e.id);
+          const tx=woke ? woke.x+(shifts.get(woke.id) ?? 0) : e.tx;
+          const ty=woke ? woke.y : e.ty;
+          const from=s.catAt ?? e;
+          if (age < .55) {
+            c.setLineDash([3,6]);
+            shape(c,[[from.x,from.y-12],[tx,ty-30]],null,'#ffb6ac',2.4);
+            c.setLineDash([]);
+          }
+          ring(c,tx,ty-24,27+(reduced ? 0 : Math.sin(age*Math.PI*6)*3),'#ffb6ac',2.6);
+          if (!reduced) sparkle(c,tx+21,ty-46,7,'#ffb6ac');
         }
         if (e.type==='escape') {
           ring(c,e.x,e.y-22,21+age*25,'#ff9b9f',3);
@@ -881,8 +910,11 @@ function rulePicture(c,key) {
   if (key==='shyRule') {
     exhibit(c,'shy',22,35,{scale:.5,lit:true});
     ring(c,22,24,15,mint,1.8);
-    crossedBeam(c,50,20,10);
+    c.setLineDash([3,4]);
+    shape(c,[[37,22],[64,13]],null,mint,1.7);
+    c.setLineDash([]);
     exhibit(c,'statue',76,36,{scale:.42,walk:true,motion:.3});
+    crossedBeam(c,76,12,8);
   }
   if (key==='catRule') {
     cat(c,22,29,0,true);

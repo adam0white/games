@@ -94,3 +94,9 @@ The Turkish was written by an AI and has not been read by a native speaker. Leas
 - A shared board for the daily: how many tries each player needed.
 - Harder dailies: prefer chains of 4 to 7, or require the shortest chain to start away from the goal.
 - A softer Medium (sampled rather than greedy) to smooth the steps between levels.
+
+## Play recording (2026-11-24)
+
+The page sends play records to the lab under the name `pitch` through `kit/lab.js` (the name is in human-framework `LAB_PROTOTYPES` once its pull request lands; until then every send is refused). The recording notice is on the menu card and on the friend card (a friend's link opens there); the off switch is on the pause card, which is the table menu at a friend's table. A run is one match against the bot (`won` or `lost`), a two-player match (`finished`), today's pitch (`won` if scored, `lost` otherwise; event `daily-finished`) or a match at a friend's table (`won` or `lost` for the seat). Leaving by Menu or Restart ends it `quit`. Events: `goal` (who, how) and `table-joined` (the seat only). Names, table codes and links are never sent; the check proves it with the names Ada and Ben and the code.
+
+`check.mjs` answers the lab address itself (no check reaches the real one), loads the page with `?labRunSource=agent`, and asserts: the notice is on the page before play, a played run sends one run record under `pitch` with its events record, and after the switch is turned off a further run sends nothing and the player id is removed. Not verified: delivery to the real lab (the Worker does not accept this name yet), a real phone.

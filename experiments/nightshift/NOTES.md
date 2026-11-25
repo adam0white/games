@@ -399,3 +399,73 @@ The loss picture was reached by tapping Play and letting nights 2, 10, 15 and 17
 ### Not verified
 
 Human difficulty; the bot rates describe those policies only. Physical phones.
+
+## Second cold play — 2026-11-24
+
+Played from an empty save by touch only, locale tr-TR, in WebKit (iPhone 13) and Chromium (360x640), before reading the source. The clock was paused and advanced in 0.4 to 3 s steps, so reaction time was unlimited; difficulty readings are easier than real-time play. Screenshots live outside the repo in the cold-play scratch folder (`wk2/` and `cr2/` numbers below).
+
+### Nights played
+
+| Night | Tries | Stars | Loss or escape understood? |
+|---|---|---|---|
+| 1–5 | 1 each | 3 | no losses |
+| 6 | 1 | 1 | No at first: both twins left at once, 0 to 2 escapes in one step (wk2 235). I had read the ring around them as "safe". |
+| 7 | 1 | 3 | Mirror picture taught the rule (wk2 271, 273). |
+| 8 | 1 | 2 | No: see mask below. |
+| 9 | 1 | 3 | No loss; the cat rule was never learned. |
+| 10 | 1 | 3 | No loss; the hatch read as "another way out". |
+| 11 | 1 | 2 | Yes: a bust crossed to the other window during a twins and hatch rush. |
+| 12 | reload | – | Reload mid-night returns to the menu at 12/18 (wk2 530). |
+
+Night 15 (ghost) was not reached in the campaign; the picker locks 13–18 (wk2 531). The ghost was met only in Daily and Long Night, where the ring rule was not understood (wk2 537–539, 550–551).
+
+Rule pictures, judged by whether the picture taught the rule before it cost something:
+- Mask (night 8): **no.** The crossed-beam badge over the lit mask read as "light does nothing to the mask", and the dashed green torch ring read as a ring around the knight. The knight escaped while the light sat on the mask (wk2 326, 330, 362–373).
+- Cat (night 9): **no.** The same crossed-beam badge sat on the cat. On night 11 the guess was "the cat shields what it sits on" (wk2 375, 500). The real rule, a lit cat wakes an exhibit, never showed: the 1.1 s line to the woken exhibit was missed.
+- Hatch (night 10): partly. The ring and down arrow read as a way out; nothing went down it while watched (wk2 419, 424, 468).
+- Ghost (night 15): not reached cold.
+
+### Findings, most harmful first
+
+1. Long Night and Daily open from an empty save. Both put every rule on the floor at once: mask, ghost, stairs case, twins, cat, mirror, hatch, fuse. Standing still, the Chromium run lost at 0:12 and was greeted with "Yeni rekor!" (cr2 002–004, wk2 533, 552). A first-time player who taps the second-largest buttons on the menu meets eight untaught rules.
+2. The mask picture teaches the opposite of the rule (above). It cost an escape on night 8.
+3. The cat picture does not teach the rule (above). It never cost a night, but nights 11+ use it.
+4. Twins escape together: two of three escapes in one step on night 6 (wk2 235). This is the rule (both twins count). The linked ring did not warn that both would go.
+5. A held catch needs about 1 s of light; 0.4 s dwells did nothing visible to me (wk2 241–244). The source draws a cream arc under the exhibit during the hold (art.js, `a.hold/a.holdTime`); I missed it at phone size. This is a legibility issue, not a missing cue.
+6. The ten-tile pause legend in Long Night is hard to read at phone size (wk2 547). It was the only place the ghost's rule appeared to me.
+7. Sunrise windows show 5 s or more before the night ends (wk2 267–268), which reads as "over".
+8. Night 10: the bear stood inside the drawn light for 2 s and was not caught (wk2 446–447). Settled from `lit()` in sim.js: a mirrored exhibit with `y >= CASE.y` takes only mirror light. It was in the case, so this is the night-7 rule, not a hitbox fault; I had forgotten it by night 10.
+9. Night 1 has 6–9 s stretches with nothing moving. Mildly dull.
+
+Small targets estimated by eye in phase 1 were wrong. Measured with `getBoundingClientRect` on iPhone 13: sound 78x44, language 54x44, night row 324x44, Long Night and Daily 158x56, Play 324x53, Privacy 60x44. No English on Turkish screens. No JS errors in either browser.
+
+### Fixed
+
+- **Builder: Long Night and Daily wait for night 15** (finding 1). Before night 15 is cleared, both buttons are dimmed and show a padlock with "15" in place of their stat. A tap stays on the menu, shakes the button, bounces Play, and plays a low tone. `aria-disabled` and a new `modeLocked` label ("Long Night · opens after night 15", "Uzun Gece · 15. geceden sonra açılır") carry it for screen readers. A save with `best > 0` or a Daily date keeps both modes. The Daily date is written only on a Daily win, so a player who has only lost Daily, and never ran Long Night, is locked out until night 15. Daily stays the same floor for everyone on a date; only access changed. No storage change.
+  - Assertion: `checkModeLock` in check.mjs. A fresh save has both locked, a tap leaves the screen on the menu and nudges Play, `cleared: 14` stays locked, `cleared: 15` opens Long Night, `{best: 31}` and `{daily: {date}}` saves open Daily. Against the old code it fails at "long is locked on a fresh save".
+  - Changed checks: run, the Daily loss-picture rounds and the language pass now call `graduate()` (save with `unlocked: 16, cleared: 15`, then reload) before tapping Daily or Long Night. Reason: those checks test the modes, not the lock. No assertion was removed or loosened. The locked taps in `checkModeLock` use `{ force: true }` because Playwright treats `aria-disabled` as not tappable; a real finger still reaches the button (confirmed on screen below).
+- **Builder: the lit mask marks what it frees** (finding 2). While the lit mask blocks the light, a dashed green thread runs from the light to the mask, and every roaming exhibit inside the light wears the crossed-beam badge already used for a ghost that light passes through. The badge no longer sits on the lit mask; the up arrow stays. The pause picture for the mask now shows the same story: lit mask, green thread, walking statue with the crossed beam. `smothered(s)` in art.js lists the marked exhibits with the sim's own `beamTouches`.
+  - Assertion: `checkRuleCues` renders a night-8 floor with the mask lit and a walking bust inside the light, then counts badge pixels above the bust; with the mask unlit the same spot has none. Old code: 0 badge pixels, fails.
+- **Builder: the cat's wake stays on the woken exhibit** (finding 3). The pink ring now lasts 2.4 s (`WAKE_LIFE`), follows the exhibit as it walks, pulses, and carries a spark; the line from the cat shows for the first half. Before, a 1.1 s ring stayed on the plinth the exhibit had left.
+  - Assertion: `checkRuleCues` draws a wake effect 1.6 s old for an exhibit that has walked away from its plinth and counts ring pixels where the exhibit stands now. Old code: 0, fails.
+
+Bots: sim.js is unchanged; `node bots.mjs` output is byte-identical to the run before the changes (all tables, Long Night durations, 31 Daily dates). No threshold moved.
+
+Phase 3, by touch after the fix (scratch folder `p3/`):
+- WebKit: fresh menu shows both padlocks (webkit-001); tapping Uzun Gece stays on the menu with Play enlarged and the button shifted (webkit-002); night 8, mask and a walking bust lit together, the bust wears the crossed beam (webkit-012); moving off the mask, the badge goes and the bust is caught (webkit-013); night 9, the painting the cat woke still wears the ring 1.6 s later while walking out (webkit-017).
+- Chromium 360x640: same lock and nudge (chromium-002), mask badge (chromium-009), wake ring (chromium-013), new mask picture in the pause legend (chromium-016).
+
+### Left, and why
+
+- Twins leaving together (finding 4): this was the one escape I did not understand in play. It was left because the rule is intended, the night was still won, and a stronger warning needs a design pass on the twin ring.
+- Hold arc legibility (finding 5) and the pause legend at phone size (finding 6, related to the open item on the small loss picture): both are drawing-size work across many tiles; not done in this pass.
+- Sunrise lead time (finding 7) and night 1 quiet stretches (finding 9): pacing, would move difficulty; out of scope without real-time play.
+- Late-night items already open above (nights 11, 12, 14 at the floor for the average bot, night 18's thin margin, blind patrol loops): this cold play did not find late nights too hard (night 11 in one try) and did not reach 13+, so they were left as they were.
+- "New record" on a 13 s idle Long Night loss is hollow; with the lock, only players past night 15 meet it.
+
+### Not verified
+
+- Whether a first-time player now reads the mask thread and badge correctly: I knew the rule when I checked it. Same for the wake ring.
+- The ghost rule on night 15 cold.
+- How many returning players the lock catches: anyone below night 15 whose save has no Long Night best and no Daily win. Long Night stores a best after one second of play.
+- Real-time difficulty; physical phones; the cat ring under reduced motion was rendered but not played.

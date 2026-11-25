@@ -12,6 +12,7 @@ const experiments = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const pagePath = '/lab/night-sand/';
 const saveKey = 'night-sand:save';
 const shots = process.env.SHOTS || '/private/tmp/night-r6-new6';
+import { answerLab, withAgent, assertNotice, assertRun, assertOffSendsNothing, assertNoLeak, waitForRuns } from '../../kit/check/lab-record.mjs';
 const notes = '/notes/button.js';
 const require = createRequire(join(resolve(process.env.PLAYWRIGHT ||
   join(homedir(), 'code/human-framework/node_modules')), 'check.cjs'));
@@ -23,7 +24,7 @@ const profiles = [
 assert.ok(profiles.length, 'select webkit or chromium');
 const contentTypes = { '.js': 'text/javascript', '.html': 'text/html', '.css': 'text/css' };
 const allowed = path => path === notes || path.startsWith(pagePath)
-  || (path.startsWith('/kit/') && path !== '/kit/lab.js') || path === '/favicon.ico';
+  || path.startsWith('/kit/') || path === '/favicon.ico';
 const server = createServer(async (request, response) => {
   const { pathname } = new URL(request.url, 'http://localhost');
   if (pathname === '/favicon.ico') return response.writeHead(204).end();
@@ -112,6 +113,8 @@ async function instrument(context, origin, errors, requests) {
     requests.add(url.pathname);
     return route.continue();
   });
+  // The lab endpoint is answered here (registered after the catch-all, so it wins): no check reaches the real one.
+  const lab = await answerLab(context, origin);
   await context.addInitScript(() => {
     if (location.protocol !== 'http:') return;
     localStorage.setItem('hf-lab-send-localhost', '1');
@@ -134,6 +137,7 @@ async function instrument(context, origin, errors, requests) {
   page.on('response', response => { if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`); });
   page.on('requestfailed', request => errors.push('failed ' + request.url()));
   page.on('websocket', socket => errors.push('unexpected socket ' + socket.url()));
+  page.lab = lab;
   return page;
 }
 
@@ -175,6 +179,45 @@ async function measureFrames(page, whilePlaying) {
   return sample;
 }
 
+// A played bed sends one run record under the page's name; with the switch off nothing is sent.
+async function recording(profile, origin, browser, errors, requests) {
+  const { name, device } = profile;
+  const context = await browser.newContext({ ...devices[device], serviceWorkers: 'block' });
+  const page = await instrument(context, origin, errors, requests);
+  const lab = page.lab;
+  await page.goto(withAgent(origin + pagePath));
+  await screen(page, 'play');
+  await waitForFrames(page, name);
+  await assertNotice(page);
+  const stroke = await controls(page, name);
+  const play = async () => {
+    const { x, y, toX, toY } = (await state(page)).hint;
+    for (const offset of [0, -4, 4, 0, -6, 6, 0, -3, 3]) {
+      if ((await state(page)).status !== 'play') break;
+      await stroke(x + offset, y, toX, toY);
+      await delay(260);
+    }
+    await screen(page, 'result');
+  };
+  assert.equal(lab.sent.length, 0, 'nothing is sent before the bed is touched');
+  await play();
+  await waitForRuns(lab, 'night-sand', 1);
+  const won = assertRun(lab, 'night-sand', { outcomes: ['won'], summaryKeys: ['level', 'kind', 'progress', 'completed'] });
+  assert.equal(won.data.summary.level, 1);
+  assert.ok(won.data.events.some(e => e.type === 'bed-cleared'), 'the cleared bed is an event');
+  assertNoLeak(lab, ['hf-lab']);
+  await page.tap('#retry');
+  await screen(page, 'play');
+  await page.tap('#pause');
+  await screen(page, 'paused');
+  await assertOffSendsNothing(page, lab, 'night-sand', { play: async () => {
+    await page.tap('#resume');
+    await screen(page, 'play');
+    await play();
+  } });
+  await context.close();
+}
+
 async function run(profile, origin) {
   const { name, engine, device } = profile;
   const browser = await engine.launch({ headless: true });
@@ -184,7 +227,7 @@ async function run(profile, origin) {
     const context = await browser.newContext({ ...devices[device], serviceWorkers: 'block' });
     const page = await instrument(context, origin, errors, requests);
     const url = origin + pagePath;
-    await page.goto(url);
+    await page.goto(withAgent(url));
     await screen(page, 'play');
     await waitForFrames(page, name);
     await fits(page, 'field');
@@ -312,9 +355,12 @@ async function run(profile, origin) {
     await screen(page, 'play');
     assert.equal((await state(page)).best, paired.best, 'reload preserves the garden record');
     assert.equal((await state(page)).level, 5, 'the garden preserves the campaign bed for reload');
+    // Changed deliberately on 2026-11-24: the page records play now, so the lab client's player id exists; no other lab key may.
     assert.deepEqual(await page.evaluate(() => Object.keys(localStorage).filter(k =>
-      k.startsWith('hf-lab-') && k !== 'hf-lab-send-localhost')), [], 'no play-recording identity');
+      k.startsWith('hf-lab-') && !['hf-lab-send-localhost', 'hf-lab-player'].includes(k))), [], 'no other play-recording keys');
+    assert.ok(page.lab.sent.length > 0 && page.lab.sent.every(r => r.game === 'night-sand' && r.runSource === 'agent'), 'every record is named and marked as an agent run');
     await context.close();
+    await recording(profile, origin, browser, errors, requests);
 
     for (const asset of [notes, ...['save', 'audio', 'pause', 'screens', 'zoom', 'hint'].map(n => `/kit/${n}.js`)]) {
       assert.ok(requests.has(asset), `loaded ${asset}`);

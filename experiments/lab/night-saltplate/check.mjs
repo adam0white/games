@@ -8,6 +8,7 @@ import { dirname, extname, join, resolve, sep } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { LEVELS } from './sim.js';
+import { answerLab, withAgent, assertNotice, assertRun, assertOffSendsNothing, assertNoLeak, waitForRuns } from '../../kit/check/lab-record.mjs';
 
 const mount = '/lab/night-saltplate/';
 const experiments = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -144,21 +145,22 @@ async function attachAudit(context, page) {
   await context.route('**/*', route => {
     const request = route.request();
     const address = new URL(request.url());
-    if (address.origin !== origin || request.method() !== 'GET' || !allowed(address.pathname)
-      || /(?:^|\/)lab(?:-client)?\.(?:m?js)$/.test(address.pathname)) {
+    if (address.origin !== origin || request.method() !== 'GET' || !allowed(address.pathname)) {
       unexpected.push(`${request.method()} ${request.url()}`);
       return route.abort();
     }
     assets.add(address.pathname);
     return route.continue();
   });
+  // The lab endpoint is answered here (registered after the catch-all, so it wins): no check reaches the real one.
+  const lab = await answerLab(context, origin);
   await context.addInitScript(() => {
     if (location.protocol !== 'http:') return;
     localStorage.setItem('hf-lab-send-localhost', '1');
     const setItem = Storage.prototype.setItem;
     window.saltplateCheck = { writes: [], touches: [] };
     Storage.prototype.setItem = function (key, value) {
-      if (/^(hf-lab-|night-saltplate:lab)/.test(key)) window.saltplateCheck.writes.push(key);
+      if (/^(hf-lab-|night-saltplate:lab)/.test(key) && !/^hf-lab-(send-localhost|player|session:night-saltplate)$/.test(key)) window.saltplateCheck.writes.push(key);
       return setItem.call(this, key, value);
     };
     document.addEventListener('pointerdown', event => {
@@ -167,16 +169,54 @@ async function attachAudit(context, page) {
       }
     }, { capture: true });
   });
-  return { errors, unexpected, assets };
+  return { errors, unexpected, assets, lab };
 }
 
+// The page records play (kit/lab.js), so the lab client's own player id and session keys are expected.
+// Changed deliberately on 2026-11-24 from "no hf-lab- keys at all"; any other lab key still fails.
+const recordingKey = key => key === 'hf-lab-send-localhost' || key === 'hf-lab-player' || key === 'hf-lab-session:night-saltplate';
 async function checkLabStorage(page) {
   const lab = await page.evaluate(() => ({
     writes: window.saltplateCheck.writes,
     keys: [...Object.keys(localStorage), ...Object.keys(sessionStorage)]
-      .filter(key => key !== 'hf-lab-send-localhost' && /^(hf-lab-|night-saltplate:lab)/.test(key)),
+      .filter(key => /^(hf-lab-|night-saltplate:lab)/.test(key)),
   }));
-  assert.deepEqual(lab, { writes: [], keys: [] }, 'no lab storage writes or keys');
+  lab.keys = lab.keys.filter(key => !recordingKey(key));
+  assert.deepEqual(lab, { writes: [], keys: [] }, 'no lab storage writes or keys besides the recording ids');
+}
+
+// A played plate sends one run record under the page's name; with the switch off nothing is sent.
+async function recording({ name, engine, device }) {
+  const browser = await engine.launch({ headless: true, timeout: 30000 });
+  try {
+    const context = await browser.newContext({ ...devices[device], serviceWorkers: 'block' });
+    const page = await context.newPage();
+    page.setDefaultTimeout(6000);
+    const { errors, unexpected, lab } = await attachAudit(context, page);
+    await page.goto(withAgent(url));
+    await waitFor(page, s => s?.screen === 'play', 'opening plate');
+    await assertNotice(page);
+    assert.equal(lab.sent.length, 0, 'nothing is sent before the plate is touched');
+    await clear(page, 1);
+    await waitForRuns(lab, 'night-saltplate', 1);
+    const won = assertRun(lab, 'night-saltplate', { outcomes: ['won'], summaryKeys: ['level', 'match', 'cleared'] });
+    assert.equal(won.data.summary.level, 1);
+    assert.ok(won.data.events.some(e => e.type === 'plate-printed'), 'the printed plate is an event');
+    assertNoLeak(lab, ['hf-lab']);
+    await page.tap('#replay');
+    await waitFor(page, s => s?.screen === 'play' && s.level === 1, 'replay opens the first plate');
+    await page.tap('#pause');
+    await waitFor(page, s => s?.screen === 'paused', 'paused');
+    await assertOffSendsNothing(page, lab, 'night-saltplate', { play: async () => {
+      await page.tap('#resume');
+      await waitFor(page, s => s?.screen === 'play', 'resumed');
+      await clear(page, 1);
+    } });
+    assert.deepEqual(unexpected, [], 'no external requests');
+    assert.deepEqual(errors, [], 'no browser errors');
+  } finally {
+    await browser.close();
+  }
 }
 
 async function tunerPoint(page, fraction) {
@@ -299,9 +339,9 @@ async function run({ name, engine, device }) {
     const page = await context.newPage();
     page.setDefaultTimeout(6000);
     page.setDefaultNavigationTimeout(15000);
-    const { errors, unexpected, assets } = await attachAudit(context, page);
+    const { errors, unexpected, assets, lab } = await attachAudit(context, page);
     if (name === 'webkit') await wakeDisplay(page);
-    await page.goto(url);
+    await page.goto(withAgent(url));
     await readyToPaint(page, name);
     const opening = await waitFor(page, s => s?.screen === 'play', 'opening plate');
     assert.equal(opening.level, 1);
@@ -359,6 +399,7 @@ async function run({ name, engine, device }) {
     assert.ok(assets.has('/notes/button.js'), 'the real notes button script loaded');
     assert.deepEqual(unexpected, [], 'no external or telemetry requests');
     assert.deepEqual(errors, [], 'no browser errors');
+    assert.ok(lab.sent.length > 0 && lab.sent.every(r => r.game === 'night-saltplate' && r.runSource === 'agent'), 'tried ' + lab.tried + ' every record is named: ' + JSON.stringify(lab.sent.map(r => [r.game, r.kind, r.runSource])));
     console.log(JSON.stringify({
       browser: name, device, levels, sweep, controls, savedClears: stored.cleared,
       browserErrors: errors.length, externalOrTelemetryRequests: unexpected.length, labWrites: 0,
@@ -373,6 +414,7 @@ try {
     if (process.argv[2] && process.argv[2] !== profile.name) continue;
     try {
       await run(profile);
+      await recording(profile);
     } catch (error) {
       process.exitCode = 1;
       console.error(profile.name, error);

@@ -44,7 +44,7 @@ body {
 }
 
 .instrument {
-  width: min(100%, 432px, max(216px, calc((100dvh - 224px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * .9)));
+  width: min(100%, 432px, max(216px, calc((100dvh - 284px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * .9)));
 }
 
 .masthead, .readout {
@@ -363,7 +363,7 @@ button:disabled { opacity: .45; cursor: default; }
 
 @media (max-height: 650px) {
   .instrument {
-    width: min(100%, 432px, max(216px, calc((100dvh - 188px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * .9)));
+    width: min(100%, 432px, max(216px, calc((100dvh - 248px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * .9)));
   }
 
   .masthead { margin-bottom: 8px; }
@@ -382,6 +382,7 @@ button:disabled { opacity: .45; cursor: default; }
   }
 
   .bench { display: contents; }
+  .lab-notice { grid-column: 1; grid-row: 1; align-self: end; }
   .masthead { grid-column: 1; grid-row: 2; }
 
   .window {

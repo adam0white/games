@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { dailyKey } from '../src/instrument/daily-counter.ts';
-import { createBudget, LEDGER_KEY, type Ledger, SEED_USD } from '../src/ledger.ts';
+import { createBudget, failureLabel, LEDGER_KEY, type Ledger, SEED_USD } from '../src/ledger.ts';
 import { ai, bucket } from './fakes.ts';
 
 const QWEN = '@cf/qwen/qwen3-30b-a3b-fp8';
@@ -31,6 +31,32 @@ it('turns Qwen thinking off with the /no_think switch, which the binding honours
   expect(input.messages[0]).toEqual(system);
   expect(input.messages.at(-1)?.content).toBe(`${'x'.repeat(2000)} /no_think`);
   expect(input).not.toHaveProperty('enable_thinking');
+});
+
+it('turns Gemma 4 reasoning off through chat_template_kwargs and leaves the messages alone', async () => {
+  const fake = ai(['{"ok":1}'], { prompt_tokens: 2000, completion_tokens: 60 });
+  const budget = createBudget({ LAB: bucket().api, AI: fake.binding }, at);
+  await budget.infer('@cf/google/gemma-4-26b-a4b-it', messages, 768, DAY, 'control');
+  expect(fake.calls[0]?.model).toBe('@cf/google/gemma-4-26b-a4b-it');
+  const input = fake.calls[0]?.input as { messages: unknown; chat_template_kwargs: unknown };
+  expect(input.messages).toEqual(messages);
+  expect(input.chat_template_kwargs).toEqual({ enable_thinking: false });
+});
+
+it('names a failed request by error class and code, never by its message text', async () => {
+  const retired = Object.assign(new Error('5028: model retired; prompt was SECRET PAGE TEXT'), {
+    name: 'InferenceUpstreamError',
+  });
+  const fake = ai([
+    () => {
+      throw retired;
+    },
+  ]);
+  const budget = createBudget({ LAB: bucket().api, AI: fake.binding }, at);
+  const failure = await budget.infer(QWEN, messages, 768, DAY, 'control').catch((error: Error) => error.message);
+  expect(failure).toBe('Inference unavailable (InferenceUpstreamError 5028); reservation retained');
+  expect(failureLabel('text')).toBe('unknown');
+  expect(failureLabel({ name: 'bad name!', status: 410 })).toBe('Error 410');
 });
 
 it('keeps the whole reservation when the request fails or its usage cannot be read', async () => {

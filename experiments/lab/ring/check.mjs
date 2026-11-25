@@ -1,6 +1,7 @@
 // Phone acceptance: PLAYWRIGHT=<directory containing playwright> node check.mjs [webkit|chromium] [--quick]
 // Real mouse gestures only; positions are read from window.__ring, the page's simulation is never changed.
 // Serves experiments/ (the parent of lab/), so ../../kit/ imports resolve as on the site.
+import { answerLab, allowLocalSend, assertNotice, assertRun, assertOffSendsNothing } from '../../kit/check/lab-record.mjs';
 import { createServer } from 'node:http';
 import { readFile, mkdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -49,7 +50,8 @@ async function open(browser, device) {
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('requestfailed', r => errors.push(`request failed: ${r.url()}`));
   page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
-  return { context, page, errors, outside };
+  const lab = await answerLab(context, base); // registered after the catch-all, so it takes lab requests first
+  return { context, page, errors, outside, lab };
 }
 
 // The finger: comes in from outside the ring, dips inside, goes once round and crosses its own lead-in.
@@ -417,6 +419,31 @@ async function small(browser) {
   }
 }
 
+// Play recording: the notice is on the menu before Play; a played practice level sends one record under 'ring';
+// with the switch off in the pause card the next level sends nothing.
+async function recording(browser, device, phone) {
+  const test = await open(browser, device), { page, lab } = test;
+  try {
+    await allowLocalSend(test.context);
+    await menu(page, '&level=1&labRunSource=agent');
+    await assertNotice(page, '#play');
+    assert.equal(lab.sent.length, 0, 'nothing is sent before Play');
+    await page.click('#play');
+    await sleep(1500);
+    await playLevel(page, 5, 60000);
+    await until(page, () => window.__ring.mode === 'end', 'practice end card', 15000);
+    await sleep(600);
+    const run = assertRun(lab, 'ring', { outcomes: ['won', 'lost'], summaryKeys: ['kind', 'score', 'cleared'] });
+    assert.equal(run.data.summary.kind, 'practice'); assert.ok(run.data.events.some(e => e.type === 'dawn'));
+    await page.click('#again');
+    await until(page, () => window.__ring.mode === 'play', 'second run');
+    await page.click('#pause');
+    await assertOffSendsNothing(page, lab, 'ring', { play: async () => { await page.click('#resume'); await sleep(1500); await playLevel(page, 5, 60000); await until(page, () => window.__ring.mode === 'end', 'second end card', 15000); } });
+    assert.deepEqual(test.outside, []); assert.deepEqual(test.errors, []);
+    console.log(`ok   ring recording on ${phone}`);
+  } finally { await test.context.close(); }
+}
+
 let failed = 0;
 try {
   for (const [phone, [engine, device]] of Object.entries(PHONES)) {
@@ -424,7 +451,7 @@ try {
     if (only && only !== phone) continue;
     const browser = await engine.launch();
     const test = await open(browser, device);
-    try { await run(test, phone); console.log(`ok   ring on ${phone} (${device.viewport.width}x${device.viewport.height})`); await turkish(browser, device, phone); await turkishHint(browser, device, phone); if (phone === 'chromium') { await small(browser); await turkishSmall(browser); } }
+    try { await run(test, phone); console.log(`ok   ring on ${phone} (${device.viewport.width}x${device.viewport.height})`); await turkish(browser, device, phone); await recording(browser, device, phone); await turkishHint(browser, device, phone); if (phone === 'chromium') { await small(browser); await turkishSmall(browser); } }
     catch (e) { failed++; console.error(`FAIL ring on ${phone}: ${e.stack}`); if (test.errors.length) console.error(test.errors.join('\n')); await shot(test.page, phone, 'failure').catch(() => {}); }
     finally { await test.context.close(); await browser.close(); }
   }

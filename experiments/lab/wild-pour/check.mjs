@@ -10,6 +10,7 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, extname, join, normalize, resolve } from 'node:path';
 import assert from 'node:assert/strict';
+import { answerLab, allowLocalSend, withAgent, assertNotice, assertRun, assertOffSendsNothing, assertNoLeak, waitForRuns, runRecords } from '../../kit/check/lab-record.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url)), root = resolve(here, '../..');
 const SHOTS = process.env.SHOTS || await mkdtemp(join(tmpdir(), 'wild-pour-check-'));
@@ -85,11 +86,14 @@ async function run(name) {
   try {
   browser = await type.launch({ headless: !headed });
   const ctx = await browser.newContext({ ...device });
+  // The lab endpoint is answered here, so no check reaches the real one; records are marked as agent runs.
+  const lab = await answerLab(ctx, base);
+  await allowLocalSend(ctx);
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(`pageerror: ${e.message}`));
   page.on('console', m => { if (m.type() === 'error') errors.push(`console: ${m.text()}`); });
-  await page.goto(`${base}/lab/wild-pour/?seed=3&perf=1`);
+  await page.goto(withAgent(`${base}/lab/wild-pour/?seed=3&perf=1`));
   await until(page, () => window.pourState && window.pourState().screen === 'menu', 'menu');
   await readyRenderer(page, name, headed);
   const boot = await page.evaluate(() => new Promise(resolve => {
@@ -100,6 +104,8 @@ async function run(name) {
   }));
   console.log(`${name}: renderer startup ${JSON.stringify(boot)}, errors ${JSON.stringify(errors)}`);
   await page.screenshot({ path: join(SHOTS, `${name}-1-menu.png`) });
+  await assertNotice(page, '#play');
+  assert.equal(lab.sent.length, 0, 'nothing is sent before Play');
   let st = await state(page);
   assert.ok(st.minTouchPx >= 48, `menu touch targets ${st.minTouchPx.toFixed(0)} px`);
 
@@ -221,6 +227,20 @@ async function run(name) {
   assert.deepEqual((await state(page)).daily.best, dailyEnd.daily.best, 'reload preserves exact daily best');
   console.log(`${name}: daily ${dailyEnd.inGlass}/${dailyEnd.target}, ${dailyEnd.spilled} spilled; clearance ${retry.jugClearance.toFixed(2)}px`);
 
+  // Recording: every pour was one run record under this page's name; with the switch off nothing more is sent.
+  await waitForRuns(lab, 'wild-pour', 2);
+  const runs = runRecords(lab, 'wild-pour').filter(r => r.data.outcome !== 'between-runs');
+  assert.ok(runs.some(r => r.data.outcome === 'won' && r.data.summary.level === 1 && r.data.summary.stars >= 1), 'the won first level was recorded');
+  assert.ok(runs.some(r => r.data.start?.daily === true && ['won', 'lost'].includes(r.data.outcome)), 'the finished daily pour was recorded');
+  assert.ok(runs.some(r => r.data.outcome === 'quit'), 'leaving a pour by the menu is a quit');
+  assert.ok(runs.some(r => r.data.events.some(e => e.type === 'daily-finished')) && runs.some(r => r.data.events.some(e => e.type === 'level-finished')), 'level and daily events');
+  assertRun({ sent: lab.sent.filter(r => !(r.kind === 'run' && r.data.outcome === null)) }, 'wild-pour', { outcomes: ['won', 'lost', 'quit'], summaryKeys: ['level', 'stars', 'inGlass', 'target'] });
+  assertNoLeak(lab, ['hf-lab', 'wild-pour:']);
+  await page.tap('#pause');
+  await assertOffSendsNothing(page, lab, 'wild-pour', { play: async () => {
+    await page.tap('#quit'); await page.tap('#play'); await sleep(300);
+    await page.tap('#pause'); await page.tap('#quit');
+  } });
   assert.deepEqual(errors, [], 'no page or console errors');
   console.log(`${name}: ok`);
   } finally { try { await browser?.close(); } finally { awake?.kill(); } }

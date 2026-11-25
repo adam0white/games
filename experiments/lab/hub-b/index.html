@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0d14">
+<title>A pocket of small games · B</title>
+<link rel="stylesheet" href="../hub-a/hub.css">
+<style>
+  html, body { height: 100%; }
+  body { display: flex; flex-direction: column; min-height: 100dvh; }
+  header { padding: 1em 16px .2em; max-width: 40em; width: 100%; margin: 0 auto; }
+  header h1 { font-size: 1.6em; }
+  header p { margin: .3em 0 0; color: var(--dim); font-size: .9em; }
+  .deck { flex: 1; display: flex; gap: 12px; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; padding: 14px 28px 10px; scrollbar-width: none; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; }
+  .deck::-webkit-scrollbar { display: none; }
+  .card { flex: 0 0 calc(100% - 8px); max-width: 420px; scroll-snap-align: center; display: flex; flex-direction: column; border-radius: 22px; overflow: hidden; background: #151823; border: 1px solid var(--line); box-shadow: 0 14px 30px #0009; min-height: 430px; max-height: 640px; transition: transform .25s, opacity .25s; }
+  .card.away { transform: scale(.94); opacity: .55; }
+  .card.flash { animation: flash .9s ease-out 2; }
+  @keyframes flash { 50% { box-shadow: 0 0 0 4px var(--gold), 0 14px 30px #0009; } }
+  .card .pic { position: relative; flex: 1 1 56%; min-height: 180px; }
+  .card .pic .hub-art { position: absolute; inset: 0; }
+  .badge { position: absolute; top: 12px; left: 12px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .pickTag { font: 600 11px/1 -apple-system, system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; padding: .5em .8em; border-radius: 99px; background: var(--bg); color: var(--gold); border: 1px solid var(--gold); }
+  .card .mark { box-shadow: 0 1px 6px #0006; }
+  .card .mark.opened, .card .mark.played { background: #0b0d14cc; }
+  .body { padding: 14px 18px 18px; display: flex; flex-direction: column; gap: 6px; }
+  .body b { font-weight: normal; font-size: 1.6em; color: var(--gold); line-height: 1.1; }
+  .body span { font-size: .98em; opacity: .9; }
+  .body small { font: 12px/1.3 -apple-system, system-ui, sans-serif; color: var(--dim); }
+  .play { margin-top: 8px; display: block; text-align: center; padding: .75em; border-radius: 14px; background: var(--gold); color: var(--bg); text-decoration: none; font-size: 1.1em; letter-spacing: .04em; }
+  .play:active { transform: scale(.98); }
+  .bar { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 6px 16px 4px; }
+  .arrow { width: 44px; height: 44px; border-radius: 22px; border: 1px solid var(--line); background: none; font-size: 20px; cursor: pointer; }
+  .arrow:disabled { opacity: .25; }
+  .dots { display: flex; gap: 6px; align-items: center; }
+  .dots i { width: 7px; height: 7px; border-radius: 4px; background: #efe8da40; transition: width .2s, background .2s; }
+  .dots i.pk { background: #ffd9a080; }
+  .dots i.on { width: 20px; background: var(--gold); }
+  .more { display: flex; gap: 10px; justify-content: center; padding: 8px 16px calc(14px + env(safe-area-inset-bottom)); }
+  .more button { min-height: 44px; padding: 0 1.1em; border-radius: 22px; border: 1px solid var(--gold); background: none; color: var(--gold); cursor: pointer; }
+  .more button.quiet { border-color: var(--line); color: var(--ink); opacity: .85; }
+  .toast { position: fixed; left: 50%; bottom: 90px; transform: translateX(-50%); background: var(--gold); color: var(--bg); padding: .5em 1em; border-radius: 99px; font-size: .9em; opacity: 0; transition: opacity .3s; pointer-events: none; }
+  .toast.on { opacity: 1; }
+  @media (min-height: 760px) { .card { min-height: 480px; } }
+</style>
+</head>
+<body>
+<header>
+  <h1 data-i18n="bTitle"></h1>
+  <p data-i18n="bLead"></p>
+</header>
+<div class="deck" id="deck" aria-roledescription="carousel"></div>
+<div class="bar">
+  <button class="arrow" id="prev" type="button" data-i18n-aria="prev">‹</button>
+  <div class="dots" id="dots" aria-hidden="true"></div>
+  <button class="arrow" id="next" type="button" data-i18n-aria="next">›</button>
+</div>
+<div class="more">
+  <button type="button" id="surprise">🎲 <span data-i18n="surprise"></span></button>
+  <button type="button" id="share" class="quiet" data-i18n="share"></button>
+</div>
+<div class="toast" id="toast" data-i18n="shared"></div>
+<script type="module">
+import { W, t, SMALL, todaysPick, artOf, nameOf, lineOf, timeOf, hrefOf, mark, markOpened, englishOnly, strip, onShow, esc } from '../hub-a/hub.js';
+import { noZoom } from '../../kit/zoom.js';
+import { shareLink } from '../../kit/room.js';
+const $ = id => document.getElementById(id);
+// Today's pick: the same card for everyone on a UTC day. The deck starts on it and runs on round the catalogue.
+const pickAt = SMALL.indexOf(todaysPick());
+const order = SMALL.map((_, i) => SMALL[(pickAt + i) % SMALL.length]);
+const deck = $('deck');
+let at = 0;
+function draw() {
+  W.apply(); document.title = `${t('bTitle')} · B`;
+  deck.innerHTML = order.map((game, i) => {
+    const m = mark(game);
+    return `<article class="card ${game.slug}" data-slug="${game.slug}" aria-label="${esc(t('nOf', { n: i + 1, of: order.length }))}">
+      <div class="pic">${artOf(game)}<div class="badge">${i === 0 ? `<span class="pickTag">${esc(t('pick'))}</span>` : ''}<span class="mark ${m.cls}">${esc(m.text)}</span></div></div>
+      <div class="body"><b>${esc(nameOf(game))}</b><span>${esc(lineOf(game))}</span><small>${esc(timeOf(game))}${englishOnly(game) ? ' · ' + esc(t('english')) : ''}</small>
+      <a class="play" href="${hrefOf(game, 'hub-b')}" data-slug="${game.slug}">${esc(t('play'))} ›</a></div></article>`;
+  }).join('');
+  $('dots').innerHTML = order.map((_, i) => `<i class="${i === 0 ? 'pk' : ''}"></i>`).join('');
+  show(at, false);
+}
+const cards = () => [...deck.children];
+function show(i, smooth = true) {
+  at = Math.max(0, Math.min(order.length - 1, i));
+  const card = cards()[at];
+  if (card) deck.scrollTo({ left: card.offsetLeft - (deck.clientWidth - card.offsetWidth) / 2, behavior: smooth ? 'smooth' : 'auto' });
+  sync();
+}
+function sync() {
+  cards().forEach((c, i) => c.classList.toggle('away', i !== at));
+  [...$('dots').children].forEach((d, i) => d.classList.toggle('on', i === at));
+  $('prev').disabled = at === 0; $('next').disabled = at === order.length - 1;
+  try { sessionStorage.setItem('hub:b:at', String(at)); } catch {}
+}
+let settle;
+deck.addEventListener('scroll', () => {
+  clearTimeout(settle);
+  settle = setTimeout(() => {
+    const mid = deck.scrollLeft + deck.clientWidth / 2;
+    let best = 0, gap = Infinity;
+    cards().forEach((c, i) => { const d = Math.abs(c.offsetLeft + c.offsetWidth / 2 - mid); if (d < gap) { gap = d; best = i; } });
+    if (best !== at) { at = best; sync(); }
+  }, 80);
+}, { passive: true });
+$('prev').onclick = () => show(at - 1);
+$('next').onclick = () => show(at + 1);
+// Surprise me: a game not played yet if there is one, never the card on screen.
+$('surprise').onclick = () => {
+  const others = order.map((game, i) => ({ game, i })).filter(({ i }) => i !== at);
+  const fresh = others.filter(({ game }) => ['new', 'opened'].includes(mark(game).cls));
+  const from = fresh.length ? fresh : others;
+  const { i } = from[Math.floor(Math.random() * from.length)];
+  show(i);
+  const card = cards()[i]; card.classList.remove('flash'); void card.offsetWidth; card.classList.add('flash');
+};
+$('share').onclick = async () => {
+  const u = new URL(location.href); u.search = ''; if (W.lang() !== 'en') u.searchParams.set('lang', W.lang());
+  if (await shareLink(u.href, t('shareText')) === 'copied') { $('toast').classList.add('on'); setTimeout(() => $('toast').classList.remove('on'), 1600); }
+};
+deck.addEventListener('click', e => { const a = e.target.closest('a.play'); if (a) markOpened(a.dataset.slug); });
+addEventListener('keydown', e => { if (e.key === 'ArrowRight') show(at + 1); if (e.key === 'ArrowLeft') show(at - 1); });
+addEventListener('resize', () => show(at, false));
+try { at = Number(sessionStorage.getItem('hub:b:at')) || 0; } catch {}
+strip('b', draw); onShow(draw); noZoom(); draw();
+window.hubState = () => ({ variant: 'b', lang: W.lang(), at, pick: order[0].slug, links: [...document.querySelectorAll('a.play')].map(a => a.getAttribute('href')) });
+</script>
+</body>
+</html>

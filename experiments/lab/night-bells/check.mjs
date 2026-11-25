@@ -8,6 +8,7 @@ import { readFile, mkdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { answerLab, allowLocalSend, assertNotice, assertRun, assertOffSendsNothing } from '../../kit/check/lab-record.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '../..');
@@ -263,6 +264,7 @@ async function run(name) {
       if (url.origin !== base) { errors.push(`outbound request: ${req.method()} ${req.url()}`); await r.abort(); }
       else await r.continue();
     });
+    ctx.lab = await answerLab(ctx, base); // registered after the catch-all, so it takes lab requests first; no check reaches the real endpoint
     if (init) await ctx.addInitScript(init);
     const page = await ctx.newPage();
     page.on('pageerror', e => errors.push(`pageerror: ${e.message}`));
@@ -481,6 +483,22 @@ async function run(name) {
       await palettePage.context().close();
     }
     console.log(`${name}: three palette menus ${functionalOnly ? 'checked (capture skipped: functional-only mode)' : 'captured'}`);
+    // Play recording: the notice is on the menu before Play; a played run sends one record under 'night-bells';
+    // with the switch off in the pause card the next run sends nothing.
+    {
+      const recPage = await context(() => { try { localStorage.setItem('hf-lab-send-localhost', '1'); } catch {} }, '?look=amber&test=1&labRunSource=agent');
+      const lab = recPage.context().lab, advance = () => recPage.evaluate(() => { for (let n = 0; n < 24000 && window.bellsState().screen === 'play'; n++) window.bellsAdvance(1 / 120); });
+      await assertNotice(recPage, '#play');
+      assert.equal(lab.sent.length, 0, 'nothing is sent before Play');
+      await touch(recPage, '#endless'); await advance();
+      await waitFor(recPage, () => window.bellsState().screen === 'end', 'endless run ended');
+      await delay(600);
+      const run = assertRun(lab, 'night-bells', { outcomes: ['lost', 'won'], summaryKeys: ['level', 'endless', 'hits', 'score'] });
+      assert.equal(run.data.summary.endless, true); assert.ok(run.data.events.some(e => e.type === 'endless-finished'));
+      await touch(recPage, '#retry'); await touch(recPage, '#pause');
+      await assertOffSendsNothing(recPage, lab, 'night-bells', { play: async () => { await touch(recPage, '#resume'); await advance(); await waitFor(recPage, () => window.bellsState().screen === 'end', 'second run ended'); } });
+      console.log(`${name}: play recording sent ${lab.sent.length} records and nothing more once switched off`);
+    }
     assert.ok(requests.some(r => r.url.endsWith('/notes/button.js')), 'page loads actual notes button script');
     assert.ok(requests.every(r => r.method === 'GET' && new URL(r.url).origin === base), 'no telemetry, writes, or outbound requests');
     assert.deepEqual(errors, [], 'no page, console, HTTP, or request errors');
