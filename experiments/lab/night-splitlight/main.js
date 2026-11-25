@@ -1,27 +1,40 @@
 import { sound } from '../../kit/audio.js';
 import { drag } from '../../kit/drag.js';
 import { hint } from '../../kit/hint.js';
+import { home } from '../../kit/home.js';
+import { lab } from '../../kit/lab.js';
 import { isPauseKey, onLeave } from '../../kit/pause.js';
-import { read, readNumber, write } from '../../kit/save.js';
+import { shareLink } from '../../kit/room.js';
+import { read, readJson, readNumber, write, writeJson } from '../../kit/save.js';
 import { screens } from '../../kit/screens.js';
 import { noZoom } from '../../kit/zoom.js';
-import { lab } from '../../kit/lab.js';
-import { draw } from './art.js';
-import { distanceAngle, expose, makePlate, optics, PLATES, turn } from './sim.js';
+import { bandColour, draw } from './art.js';
+import { controlsOf, denseLights, expose, fed, makeBench, setValue, trace } from './bench.js';
+import { dailyLevel, today } from './daily.js';
+import { LEVELS } from './levels.js';
+import { par as parOf } from './solver.js';
+import { lang } from './words.js';
 
+const { t } = lang;
 const el = id => document.getElementById(id);
 const canvas = el('field'), ctx = canvas.getContext('2d'), slider = el('angle');
 const key = 'night-splitlight:';
 const look = new URLSearchParams(location.search).get('look') === 'oxide' ? 'oxide' : 'nocturne';
 document.documentElement.dataset.look = look;
 noZoom();
-const lastPlate = () => Math.min(PLATES.length, Math.max(1, Math.trunc(readNumber(key + 'plate', 1))));
+const COUNT = LEVELS.length;
+// The saved plate is the highest unlocked plate, a plain number, as in the first version (1 to 6 then, 1 to 18 now).
+const lastPlate = () => Math.min(COUNT, Math.max(1, Math.trunc(readNumber(key + 'plate', 1))));
 let high = lastPlate(), audible = read(key + 'sound') !== 'off';
 const audio = sound({ on: () => audible });
-let state, field, screen, reveal = 0, previous = performance.now(), redraw = true;
-let nextTickSound = 0;
-const pitches = [261.63, 293.66, 329.63, 392, 440, 523.25];
-const litCount = () => state.targets.filter(target => target.lit).length;
+let level, state, rules, dense, screen, reveal = 0, previous = performance.now(), redraw = true, mode = 'plates';
+let parInfo = { par: 1 }, gesture = null, lastKeyTurn = -1e9, nextTickSound = 0;
+// Each colour is a pitch of a pentatonic scale on C, red lowest, so any set of receivers sounds as a chord.
+const PITCH = [261.63, 293.66, 329.63, 392, 440, 523.25];
+const WHITE = [130.81, 196, 261.63];
+const litCount = () => state.targets.filter(target => target.lit || target.fed).length;
+const best = () => { const b = readJson(key + 'best', {}); return b && typeof b === 'object' ? b : {}; };
+
 const show = screens(['paused', 'result'], name => {
   const returningToPlay = name === 'play' && (screen === 'paused' || screen === 'result');
   screen = name;
@@ -33,55 +46,164 @@ const show = screens(['paused', 'result'], name => {
   if (returningToPlay) slider.focus({ preventScroll: true });
   else if (name !== 'play') el(name === 'paused' ? 'resume' : 'next').focus({ preventScroll: true });
 });
-// Play recording for the game lab (kit/lab.js): one run for each plate the player starts to turn.
-const rec = lab('night-splitlight');
+
+// Play recording for the game lab (kit/lab.js): one run for each plate the player starts to turn. kit/home.js adds
+// the way back to /small/ and tells the home how the run ended.
+const rec = home(lab('night-splitlight'), { back: ['#paused .card', '#result .pair'] });
 let runOpen = false;
+function summary() {
+  return { level: state.id, mode, day: mode === 'daily' ? today : undefined, captured: litCount(), targets: state.targets.length,
+    seconds: Math.round(state.elapsed * 10) / 10, plate: high, turns: state.turns, par: parInfo.par };
+}
 function runEnd(outcome) {
   if (!runOpen) return;
   runOpen = false;
-  rec.end(outcome, { level: state.level, captured: litCount(), targets: state.targets.length, seconds: Math.round(state.elapsed * 10) / 10, plate: high });
+  rec.end(outcome, summary());
 }
-function startPlate(level) {
+
+// ---------- words ----------
+const CONTROL_WORD = { prism: { turn: 'turnPrism', slide: 'slidePrism' }, mirror: { turn: 'turnMirror', slide: 'slideMirror' },
+  grating: { turn: 'turnGrating', slide: 'slideGrating' }, lens: { turn: 'turnLens', slide: 'slideLens' } };
+const controlWord = ([p, dof]) => {
+  const part = level.parts[p];
+  if (part.kind === 'prism' && part.cut.length === 3 && part.cut[1] - part.cut[0] === 90 && level.parts.length > 1) return t('turnGlass');
+  return t(CONTROL_WORD[part.kind]?.[dof] || 'turnPrism');
+};
+const dayLabel = () => { try { return new Date(today + 'T12:00:00Z').toLocaleDateString(lang.lang(), { day: 'numeric', month: 'short', timeZone: 'UTC' }); } catch { return today; } };
+function texts() {
+  lang.apply();
+  document.title = t('title');
+  canvas.setAttribute('aria-label', t('canvasAria'));
+  el('pause').setAttribute('aria-label', t('pause'));
+  if (!state) return;
+  el('plate').textContent = mode === 'daily' ? t('dailyPlate', { day: dayLabel() }) : t('plate', { n: String(state.id).padStart(2, '0'), of: String(COUNT).padStart(2, '0') });
+  el('plate-name').textContent = mode === 'daily' ? t('dailyName') : t(level.key);
+  el('daily').textContent = mode === 'daily' ? t('plates') : t('today');
+  el('daily').setAttribute('aria-label', el('daily').textContent);
+  el('daily').classList.toggle('done', mode !== 'daily' && dailySave()?.day === today);
+  el('dial-label').textContent = controlWord(controlsOf(level)[state.selected]);
+  el('sound').textContent = audible ? t('soundOn') : t('soundOff');
+  el('sound').setAttribute('aria-pressed', String(audible));
+  readout();
+}
+function readout() {
+  el('captured').textContent = litCount() + ' / ' + state.targets.length;
+  const counts = { n: state.turns, par: parInfo.par };
+  el('turns').replaceChildren(Object.assign(document.createElement('span'), { className: 'long', textContent: t('turns', counts) }),
+    Object.assign(document.createElement('span'), { className: 'short', textContent: t('turnsShort', counts) }));
+}
+
+// ---------- the parts the dial can move ----------
+const ICON = {
+  prism: '<path d="M12 4 21 19H3Z"/>', mirror: '<path d="M5 19 19 5"/><path d="M8 20 20 8" opacity=".45"/>',
+  grating: '<path d="M6 4v16M10 4v16M14 4v16M18 4v16"/>', lens: '<path d="M12 3c4 4 4 14 0 18c-4-4-4-14 0-18Z"/>',
+  slide: '<path d="M12 3v18M8 7l4-4 4 4M8 17l4 4 4-4"/>', glass: '<path d="M5 19V5h0L19 19Z"/>',
+};
+function chips() {
+  const box = el('parts');
+  const list = controlsOf(level);
+  box.hidden = list.length < 2;
+  box.replaceChildren(...(list.length < 2 ? [] : list.map(([p, dof], i) => {
+    const part = level.parts[p];
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'chip'; b.dataset.control = i;
+    const glass = part.kind === 'prism' && part.cut.length === 3 && part.cut[1] - part.cut[0] === 90;
+    b.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[dof === 'slide' ? 'slide' : glass ? 'glass' : part.kind]}</svg>`;
+    b.setAttribute('aria-label', controlWord([p, dof]));
+    b.onclick = () => select(i);
+    return b;
+  })));
+  markChips();
+}
+function markChips() {
+  for (const b of el('parts').children) {
+    const on = Number(b.dataset.control) === state.selected;
+    b.setAttribute('aria-pressed', String(on));
+  }
+  document.body.classList.toggle('teach-parts', controlsOf(level).length > 1 && !read(key + 'parts'));
+}
+function select(i) {
+  if (!state || screen !== 'play' || i === state.selected) return;
+  state.selected = i;
+  if (controlsOf(level).length > 1) write(key + 'parts', '1');
+  slider.value = Math.round(state.values[i] * 1000);
+  el('dial-label').textContent = controlWord(controlsOf(level)[i]);
+  markChips();
+  redraw = true;
+}
+
+// ---------- plates ----------
+function dailySave() { const d = readJson(key + 'daily', null); return d && typeof d === 'object' ? d : null; }
+function open(next, nextMode = 'plates') {
   if (state) runEnd('quit');
   steering.reset();
-  state = makePlate(level, 0x51e17 + level * 97);
-  field = optics(state);
+  mode = nextMode;
+  level = mode === 'daily' ? dailyLevel(today) : LEVELS[next - 1];
+  state = makeBench(level);
+  parInfo = parOf(level, state.targets, state.start, level.answer);
+  retrace();
   reveal = 0;
   redraw = true;
-  slider.value = Math.round(state.position * 1000);
-  slider.setAttribute('aria-valuetext', Math.round(state.angle * 180 / Math.PI) + ' degrees');
-  document.body.classList.toggle('guide', level === 1);
-  el('plate').textContent = 'Plate ' + String(level).padStart(2, '0') + ' / 06';
-  el('plate-name').textContent = PLATES[level - 1].name;
-  el('captured').textContent = '0 / ' + state.targets.length;
+  slider.value = Math.round(state.values[0] * 1000);
+  document.body.classList.toggle('guide', mode === 'plates' && state.id === 1);
+  document.body.classList.toggle('daily', mode === 'daily');
+  chips();
+  texts();
   audio.release();
   show('play');
 }
-function aim(pos) {
+function retrace() {
+  rules = trace(level, state.values);
+  dense = trace(level, state.values, denseLights(level.parts.some(p => p.kind === 'grating') ? 15 : 25), 240);
+}
+function setControl(i, position) {
   if (screen !== 'play' || state.won) return;
   advance(performance.now());
   if (state.won) return;
-  turn(state, pos);
-  if (!runOpen && state.started) { runOpen = true; rec.start({ level: state.level }); }
-  const next = optics(state);
-  // A glint sounds once as a wavelength crosses into its receiver.
-  if (performance.now() >= nextTickSound) {
-    const crossing = next.rays.find(ray => state.targets.some(target =>
-      !target.lit && (target.band < 0 || target.band === ray.band)
-      && ray.angle !== null && distanceAngle(ray.angle, target.angle) <= target.width
-      && (field.rays[ray.band].angle === null || distanceAngle(field.rays[ray.band].angle, target.angle) > target.width)));
-    if (crossing) {
-      audio.tone(pitches[crossing.band], .12, .045, 'sine');
-      nextTickSound = performance.now() + 70;
+  const changed = setValue(state, i, position);
+  if (!runOpen && state.started) { runOpen = true; rec.start({ level: state.id, mode, day: mode === 'daily' ? today : undefined }); }
+  help.done();
+  if (!changed) return;
+  // A turn is one gesture that moves a part: a press-and-drag or tap on the dial or the bench, or a run of keys.
+  const now = performance.now();
+  if (gesture) { if (!gesture.counted) { gesture.counted = true; state.turns++; } }
+  else { if (now - lastKeyTurn > 700) state.turns++; lastKeyTurn = now; }
+  const before = rules;
+  retrace();
+  // A soft note sounds when a colour arrives at its receiver.
+  if (now >= nextTickSound) {
+    for (const target of state.targets) {
+      const was = target.fed;
+      if (fedNow(target, rules) && !was && !fedNow(target, before)) {
+        tone(target.band, .35, .04);
+        nextTickSound = now + 90;
+        break;
+      }
     }
   }
-  field = next;
   redraw = true;
-  slider.value = Math.round(state.position * 1000);
-  slider.setAttribute('aria-valuetext', Math.round(state.angle * 180 / Math.PI) + ' degrees');
-  document.body.classList.toggle('guide', state.level === 1 && state.position < .3);
-  help.done();
+  slider.value = Math.round(state.values[state.selected] * 1000);
+  slider.setAttribute('aria-valuetext', Math.round(state.values[state.selected] * 100) + '%');
+  document.body.classList.toggle('guide', mode === 'plates' && state.id === 1 && state.values[0] < .3);
+  readout();
 }
+const fedNow = (target, field) => fed(target, field.rays, state.elapsed);
+function tone(band, dur, vol) {
+  if (band < 0) { for (const f of WHITE) audio.tone(f * 2, dur, vol * .6, 'sine'); return; }
+  audio.tone(PITCH[band], dur, vol, 'sine');
+}
+// The chord of a solved bench: every receiver's pitch at once, a low root under it, and an octave shimmer above.
+function chord() {
+  const notes = new Set();
+  for (const target of state.targets) {
+    if (target.band < 0) WHITE.forEach(f => notes.add(f * 2)); else notes.add(PITCH[target.band]);
+  }
+  const list = [...notes].sort((a, b) => a - b);
+  audio.tone(65.41 * 2, 2.2, .05, 'sine');
+  list.forEach(f => { audio.tone(f, 2.4, .05, 'triangle'); audio.tone(f * 2, 1.4, .012, 'sine'); });
+  window.splitlightChord = list;
+}
+
 function pause() {
   if (screen !== 'play') return;
   advance(performance.now());
@@ -103,53 +225,82 @@ addEventListener('keydown', event => {
   event.preventDefault();
   if (screen === 'paused') resume(); else pause();
 });
-function restart(level) { startPlate(level); audio.unlock(); }
-el('restart').onclick = el('again').onclick = () => restart(state.level);
-el('next').onclick = () => restart(state.level === PLATES.length ? 1 : state.level + 1);
-el('first').onclick = () => restart(1);
-function soundLabel() {
-  el('sound').textContent = audible ? 'Sound on' : 'Sound off';
-  el('sound').setAttribute('aria-pressed', String(audible));
-}
+function restart(n, nextMode = mode) { open(n, nextMode); audio.unlock(); }
+el('restart').onclick = el('again').onclick = () => restart(state.id, mode);
+el('next').onclick = () => {
+  if (mode === 'daily') return restart(high, 'plates');
+  restart(state.id === COUNT ? 1 : state.id + 1, 'plates');
+};
+el('first').onclick = () => restart(1, 'plates');
+el('daily').onclick = () => { if (screen === 'play') restart(high, mode === 'daily' ? 'plates' : 'daily'); };
 el('sound').onclick = () => {
   audible = !audible;
   write(key + 'sound', audible ? 'on' : 'off');
-  soundLabel();
+  texts();
 };
-soundLabel();
+el('lang').onclick = () => { lang.setLang(lang.lang() === 'tr' ? 'en' : 'tr'); texts(); chips(); };
+el('share').onclick = shareResult;
 
-slider.addEventListener('pointerdown', () => audio.unlock());
-slider.addEventListener('input', () => { audio.unlock(); aim(Number(slider.value) / 1000); });
+// ---------- input ----------
+const openGesture = () => { gesture = { counted: false }; };
+const closeGesture = () => { gesture = null; };
+slider.addEventListener('pointerdown', () => { audio.unlock(); openGesture(); });
+addEventListener('pointerup', closeGesture);
+addEventListener('pointercancel', closeGesture);
+slider.addEventListener('input', () => { audio.unlock(); setControl(state.selected, Number(slider.value) / 1000); });
 canvas.style.touchAction = 'none';
 let mouseX = null;
+// A tap on a part chooses it; a drag anywhere on the bench moves the chosen part.
+function pickPart(event) {
+  const box = canvas.getBoundingClientRect();
+  const x = (event.clientX - box.left) * 360 / box.width, y = (event.clientY - box.top) * 400 / box.height;
+  const list = controlsOf(level);
+  let bestI = -1, bestD = 40;
+  for (const part of rules.parts) {
+    const i = rules.parts.indexOf(part);
+    const d = Math.hypot(part.x - x, part.y - y) - (part.vertices ? (part.r || 55) * .6 : part.len / 2 * .6);
+    if (d < bestD && list.some(([p]) => p === i)) { bestD = d; bestI = i; }
+  }
+  if (bestI < 0) return;
+  const mine = list.map(([p], c) => p === bestI ? c : -1).filter(c => c >= 0);
+  if (!mine.length) return;
+  const nextC = mine.includes(state.selected) ? mine[(mine.indexOf(state.selected) + 1) % mine.length] : mine[0];
+  if (nextC !== state.selected && (!mine.includes(state.selected) || mine.length > 1)) select(nextC);
+}
+let downAt = null;
 canvas.addEventListener('pointerdown', event => {
   if (screen !== 'play' || !event.isPrimary || event.button !== 0) { event.stopImmediatePropagation(); return; }
   canvas.setPointerCapture(event.pointerId);
   mouseX = event.clientX;
+  downAt = { x: event.clientX, y: event.clientY, moved: false };
+  openGesture();
   audio.unlock();
 });
+canvas.addEventListener('pointermove', event => { if (downAt && Math.hypot(event.clientX - downAt.x, event.clientY - downAt.y) > 6) downAt.moved = true; });
+canvas.addEventListener('pointerup', event => { if (downAt && !downAt.moved && controlsOf(level).length > 1) pickPart(event); downAt = null; });
 canvas.addEventListener('lostpointercapture', event => { if (event.isPrimary) steering.drop(); });
 const steering = drag(canvas, {
   playing: () => screen === 'play' && !state.won, paused: () => false, resume,
-  from: () => state.position, travel: dx => dx / (canvas.clientWidth * .7),
+  from: () => state.values[state.selected], travel: dx => dx / (canvas.clientWidth * .7),
   aim: position => {
-    aim(position);
+    setControl(state.selected, position);
     if (position < 0 || position > 1) steering.rebase();
   },
   settle: 0,
   mouse: event => {
     if ((event.buttons & 1) && mouseX !== null) {
-      aim(state.position + (event.clientX - mouseX) / (canvas.clientWidth * .7));
+      setControl(state.selected, state.values[state.selected] + (event.clientX - mouseX) / (canvas.clientWidth * .7));
       mouseX = event.clientX;
     }
   },
 });
 const help = hint(document.querySelector('.cue'), {
   kind: 'drag', key: key + 'hint', played: high > 1, delay: 2200, reach: 37,
-  when: () => screen === 'play' && state.level === 1 && !state.started,
-  label: 'Slide right to turn the prism',
+  when: () => screen === 'play' && mode === 'plates' && state.id === 1 && !state.started,
+  label: t('hint'),
 });
 
+// ---------- drawing ----------
 new ResizeObserver(() => { redraw = true; }).observe(canvas);
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 function paint(time) {
@@ -157,56 +308,112 @@ function paint(time) {
   const w = Math.round(360 * scale), h = Math.round(400 * scale);
   if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
   ctx.setTransform(w / 360, 0, 0, h / 400, 0, 0);
-  draw(ctx, state, field, time, look);
+  const selectedPart = controlsOf(level).length > 1 ? controlsOf(level)[state.selected][0] : -1;
+  draw(ctx, state, rules, dense, reducedMotion.matches ? 0 : time, look, selectedPart);
   redraw = false;
 }
+const moving = () => state.targets.some(target => target.swing) && state.started && !state.won;
+const glowing = () => state.won || state.targets.some(target => target.fed) || level.parts.some(p => p.kind === 'grating');
+
+// ---------- results and sharing ----------
+const turnWords = n => t(n === 1 ? 'turn1' : 'turnN', { n });
 function finishPlate() {
-  high = Math.max(high, lastPlate(), Math.min(PLATES.length, state.level + 1));
-  rec.event('plate-exposed', { level: state.level, seconds: Math.round(state.elapsed * 10) / 10 });
+  rec.event('plate-exposed', { level: state.id, mode, seconds: Math.round(state.elapsed * 10) / 10, turns: state.turns, par: parInfo.par });
+  let saved = true;
+  if (mode === 'daily') {
+    const was = dailySave();
+    const mine = { day: today, turns: state.turns, par: parInfo.par, seconds: Math.round(state.elapsed * 10) / 10 };
+    const keep = was?.day === today && was.turns <= mine.turns ? { ...was } : mine;
+    keep.first = was?.day === today ? was.first || was : mine;
+    saved = writeJson(key + 'daily', keep);
+  } else {
+    high = Math.max(high, lastPlate(), Math.min(COUNT, state.id + 1));
+    saved = write(key + 'plate', high);
+    const b = best();
+    if (!(b[state.id] <= state.turns)) { b[state.id] = state.turns; writeJson(key + 'best', b); }
+    if (state.id === COUNT) write(key + 'done', '1');
+  }
   runEnd('won');
-  const saved = write(key + 'plate', high);
-  el('result-line').textContent = saved ? '' : 'Progress lasts for this session.';
-  audio.tone(784, .62, .045, 'sine');
-  const finale = state.level === PLATES.length;
-  el('result-title').textContent = finale ? 'Spectrum complete' : 'Plate exposed';
-  el('next').textContent = finale ? 'Play from the start' : 'Next plate';
+  const secs = (Math.round(state.elapsed * 10) / 10).toFixed(1);
+  const parts = [t('resultLine', { turns: turnWords(state.turns), par: parInfo.par, secs })];
+  if (state.turns <= parInfo.par) parts.push(t('atPar'));
+  if (mode === 'daily') parts.push(t('dailyBest', { turns: turnWords(dailySave()?.turns ?? state.turns) }));
+  if (!saved) parts.push(t('savedSession'));
+  el('result-line').textContent = parts.join(' ');
+  chord();
+  const finale = mode === 'plates' && state.id === COUNT;
+  el('result-title').textContent = mode === 'daily' ? t('dailyExposed') : finale ? t('complete') : t('exposed');
+  el('next').textContent = mode === 'daily' ? t('plates') : finale ? t('fromStart') : t('next');
+  el('share').hidden = mode !== 'daily';
   slider.disabled = true;
   document.body.classList.remove('guide');
 }
-// Integrate dwell at the previous angle before a gesture changes the optics.
-// With constant rays the exposure rate is constant, even between display frames.
+function shareLine() {
+  const d = dailySave();
+  const turns = d?.day === today ? d.turns : state.turns;
+  const bar = state.targets.map(target => target.band < 0 ? '⬜' : ['🟥', '🟧', '🟨', '🟩', '🟦', '🟪'][target.band]).join('');
+  return `${t('shareText', { day: today, turns: turnWords(turns), par: parInfo.par, secs: (Math.round(state.elapsed * 10) / 10).toFixed(1) })} ${bar}`;
+}
+// The share picture: the solved bench as it looks now, with the day and the result under it (1080 × 1350).
+function picture() {
+  try {
+    const c = document.createElement('canvas'); c.width = 1080; c.height = 1350;
+    const g = c.getContext('2d');
+    g.fillStyle = '#080f1c'; g.fillRect(0, 0, 1080, 1350);
+    g.setTransform(1080 / 360, 0, 0, 1080 / 360, 0, 20);
+    draw(g, state, rules, dense, 1, look, -1);
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.fillStyle = '#f5ebd9'; g.font = '64px Georgia, serif'; g.fillText('Splitlight', 70, 1250);
+    g.font = '36px ui-monospace, monospace'; g.fillStyle = '#e8c493';
+    const d = dailySave();
+    g.fillText(`${today} · ${turnWords(d?.day === today ? d.turns : state.turns)} · par ${parInfo.par}`, 70, 1310);
+    state.targets.forEach((target, i) => { g.fillStyle = bandColour(target.band); g.beginPath(); g.arc(760 + i * 44, 1236, 16, 0, Math.PI * 2); g.fill(); });
+    return new Promise(ok => c.toBlob(blob => ok(blob), 'image/png'));
+  } catch { return Promise.resolve(null); }
+}
+async function shareResult() {
+  const text = shareLine(), url = location.origin + location.pathname;
+  rec.event('share', { mode, day: today });
+  try {
+    const blob = await picture();
+    const file = blob && new File([blob], `splitlight-${today}.png`, { type: 'image/png' });
+    if (file && navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file], text: `${text}\n${url}` }); return; }
+  } catch (e) { if (e?.name === 'AbortError') return; }
+  if (await shareLink(url, text) === 'copied') { el('share').textContent = t('copied'); setTimeout(() => { el('share').textContent = t('share'); }, 1600); }
+}
+
+// Integrate dwell at the previous setting before a gesture changes the optics.
 function advance(now) {
   const dt = Math.max(0, (now - previous) / 1000);
   previous = Math.max(previous, now);
   if (screen !== 'play') return;
   if (state.won) {
     reveal += dt;
-    if (reveal > (reducedMotion.matches ? .45 : 1.05)) show('result');
+    if (reveal > (reducedMotion.matches ? .45 : 1.4)) show('result');
     return;
   }
   if (!state.started) return;
-  const charge = state.targets.reduce((sum, t) => sum + t.charge, 0);
-  const before = litCount();
-  expose(state, field, dt);
-  const count = litCount();
-  if (charge !== state.targets.reduce((sum, t) => sum + t.charge, 0)) redraw = true;
-  if (count === before) return;
-  el('captured').textContent = count + ' / ' + state.targets.length;
-  audio.tone(330 * 2 ** (count / 6), .35, .09, 'sine');
+  const before = state.targets.map(target => target.fed).join() + state.charge;
+  expose(state, rules, dt);
+  if (before !== state.targets.map(target => target.fed).join() + state.charge) { redraw = true; readout(); }
   if (state.won) finishPlate();
 }
 function frame(now) {
   advance(now);
-  if (redraw) paint(now / 1000);
+  if (redraw || moving() || glowing()) paint(now / 1000);
   requestAnimationFrame(frame);
 }
 // The recording notice is on the page from the first look; its switch is on the pause card.
 rec.notice(document.querySelector('.instrument'));
 rec.toggle(document.querySelector('#paused .card'));
-startPlate(high);
+texts();
+open(high, new URLSearchParams(location.search).has('daily') ? 'daily' : 'plates');
 paint(0);
 window.splitlightState = () => ({
-  level: state.level, position: state.position, elapsed: state.elapsed, started: state.started,
-  won: state.won, screen, sound: audible, targets: state.targets.map(target => ({ ...target })),
+  level: state.id, mode, day: mode === 'daily' ? today : null, position: state.values[state.selected], values: state.values.slice(), selected: state.selected,
+  elapsed: state.elapsed, started: state.started, won: state.won, screen, sound: audible, turns: state.turns, par: parInfo.par, charge: state.charge,
+  targets: state.targets.map(target => ({ ...target })),
 });
+// For checks and the bots' page runs: the answer the receivers were placed from.
+window.splitlightAnswer = () => level.answer.slice();
 requestAnimationFrame(frame);
