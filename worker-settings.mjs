@@ -21,31 +21,13 @@ export const reservedPaths = ['proto', 'notes', 'lab-api', 'cdn-cgi', 'crumbwar'
 // Legacy per-game origins that still route to this Worker. scripts/check-redirects.mjs verifies this list
 // against games.json before every build and deploy.
 export const legacyRoutes = [
-  'rope.adamwhite.work/*',
-  'glance.adamwhite.work/*',
   'repair.adamwhite.work/sw.js',
-  'murmur.adamwhite.work/*',
-  'stairwell.adamwhite.work/*',
-  'pass.adamwhite.work/*',
-  'warren.adamwhite.work/*',
-  'neighbours.adamwhite.work/*',
-  'lefthand.adamwhite.work/*',
-  'word.adamwhite.work/*',
 ];
-// Hostnames of archived games (archive/README.md). This Worker answers each one with a 302 to the games shelf,
-// so the games' original deployments no longer serve old builds there. A host leaves this list (and its route in
-// wrangler.jsonc) to roll back; the original deployment then answers it again. validateRegistry keeps it apart
-// from games.json legacy origins.
-export const archivedHosts = [
-  'hearsay.adamwhite.work',
-  'goodhands.adamwhite.work',
-  'valley.adamwhite.work',
-  'commonstead.adamwhite.work',
-  'child.adamwhite.work',
-  'days.adamwhite.work',
-  'island.adamwhite.work',
-  'smoke.adamwhite.work',
-];
+// Hostnames of archived games (archive/README.md) that this Worker answers with a 302 to the games shelf.
+// Empty since 2026-11-25: the owner had every old game subdomain deleted, so the hosts no longer resolve
+// (docs/infrastructure.md, "Old game subdomains"). The list and its handling stay for a future archive that
+// keeps its host for a while. validateRegistry keeps it apart from games.json legacy origins.
+export const archivedHosts = [];
 export const archivedRoutes = archivedHosts.map(host => `${host}/*`);
 // Lab pages that left /lab/ (experiments/lab/NOTES.md, archive/README.md): the name under /lab/ and where its
 // old address goes. src/worker.mjs answers /lab/<name> and anything under it with a 302 that keeps the query, so

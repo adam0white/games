@@ -7,3 +7,13 @@ CI computes affected games from the base diff. Changes outside registered game p
 A release checks clean source, latest remote main, and successful exact-commit push CI including its `ci` job. It installs and builds from a fresh detached worktree, clears every game output, assembles all games, scopes headers and redirects, and emits `dist/<slug>/release.json` with lineage, engine, lab and save schema. It then deploys through Wrangler and checks each manifest directly at `https://play.adamwhite.work` without redirects. Hosting configuration remains separate. Verify gameplay, telemetry, identity, recording consent, CSP and offline behavior independently; a matching manifest alone does not establish them.
 
 All game simulation engines resolve to HF 4.17.0 through one root override and exact game pins. The lab client artifact retains its own HF 3 dependency for older-person continuity; it is not used as a game simulation engine. This is not a claim that only one HF package version is installed. Game-level legacy simulation aliases are not allowed. Old saves are not transferred to the play origin.
+
+## Old game subdomains (deleted 2026-11-25)
+
+The owner had the old per-game subdomains deleted on 2026-11-25. Seventeen hosts under `adamwhite.work` no longer resolve: rope, glance, murmur, stairwell, pass, warren, neighbours, lefthand, word (old addresses of games that are still live under `play.adamwhite.work/<slug>/`) and hearsay, goodhands, valley, commonstead, child, days, island, smoke (archived games). Old links to them fail; nothing redirects them. Traffic on them was not measured first.
+
+Sixteen were custom domains on each game's original Worker and were detached from it; `island` was a bare DNS record. `games-static` no longer routes any of them: `legacyRoutes` holds only the Small Works route, `archivedHosts` is empty, and the nine live games have `redirectEnabled: false` in `games.json` with `legacyOrigin` kept as a record of where they came from.
+
+Kept: `repair.adamwhite.work`, because its original Worker still serves the Small Works experiments archive under `/experiments`. The sixteen original Workers were not deleted and still answer on their `workers.dev` addresses (item `lab-5fb` in the list).
+
+To bring one host back, attach it again as a custom domain on the game's original Worker, or add a route and an `archivedHosts` or `legacyRoutes` entry here.

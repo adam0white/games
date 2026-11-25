@@ -145,9 +145,10 @@ test('Lefthand serves one precompressed WASM layer only on its scoped engine rou
 });
 
 test('archived game hosts send every path and query to the shelf with a 302', async () => {
-  const real = createHandler(games);
-  assert.ok(archivedHosts.length > 0);
-  for (const host of archivedHosts) {
+  // archivedHosts is empty since the old subdomains were deleted (2026-11-25); the handling is still tested.
+  const hosts = ['oldgame.adamwhite.work', ...archivedHosts];
+  const real = createHandler(games, hosts);
+  for (const host of hosts) {
     for (const path of ['/', '/a/b?x=1&y=2', '/sw.js', '/release.json', '//evil.example/x', '/proto/lantern/']) {
       for (const method of ['GET', 'HEAD', 'POST']) {
         const response = await real.fetch(new Request(`https://${host}${path}`, { method }), assets);
