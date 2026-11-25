@@ -162,7 +162,7 @@ export function mode(page) {
   // ------------------------------------------------------------ the room (the lab page's code)
   function disconnect() { connection++; clearTimeout(timeout); online = false; const old = socket; socket = null; if (old) { old.onclose = old.onerror = old.onmessage = old.onopen = null; old.close(); } }
   function enter(code) {
-    tone(); disconnect(); room = code; id = 1; nameNow = cleanName(nameNow); peers = new Map([[1, { id: 1, n: nameNow }]]); tracks.clear(); racers.clear(); ready = false; offline = false; roundKey = ''; finished = true; bots = [];
+    page.unlock(); tone(); disconnect(); room = code; id = 1; nameNow = cleanName(nameNow); peers = new Map([[1, { id: 1, n: nameNow }]]); tracks.clear(); racers.clear(); ready = false; offline = false; roundKey = ''; finished = true; bots = [];
     pendingRoster = null; watching.clear(); watchStart = watchUntil = readyUntil = 0; watchingOwnRound = false;
     save.name = nameNow; writeJson(KEY, save);
     connNote = t('raceConnecting'); shareStatus = ''; go('lobby');
@@ -241,7 +241,7 @@ export function mode(page) {
   function transmitReady(now) { if (send({ t: 'ready' }) && !readyUntil && now >= watchUntil) readyUntil = now + 8000; readyRetryAt = now + 2000; }
   function requestReady() {
     if (ready || !['lobby', 'end'].includes(phase)) return;
-    tone(660, 0.15); ready = true;
+    page.unlock(); tone(660, 0.15); ready = true;
     if (phase === 'end' && waitingForRacers()) { watchingOwnRound = true; watchUntil = endAt; }
     if (phase === 'end') go('lobby'); else lobby();
     if (offline) localRound(); else if (online) transmitReady(performance.now());
@@ -423,7 +423,7 @@ export function mode(page) {
       overlays();
       if (name === 'card' && !page.paused() && phase === 'end') { ranksLast = ''; renderResults(); }
     },
-    state: () => ({ phase, room, me: id, online, offline, seed, night, ready, best: save.best, name: save.name, played: save.played, peers: [...peers.values()], linked: linkedRoom,
+    state: () => ({ phase, room, me: id, sound: !!page.ctx(), online, offline, seed, night, ready, best: save.best, name: save.name, played: save.played, peers: [...peers.values()], linked: linkedRoom,
       results: ranking([...racers.values()]), ghosts: s ? ghosts(performance.now()) : [], received: { ...received }, sent: { ...sent }, d: s ? Math.round(progress(s) * DISTANCE) : 0, over: s?.over ?? null }),
     game: () => s,
   };

@@ -312,7 +312,7 @@ let mod = null;
 const pct = () => mod ? mod.reach() : progress(s);
 async function chooseMode(id) {
   if (!Object.hasOwn(MODES, id ?? '')) return;
-  const m = made[id] ??= (await MODES[id]()).mode({ canvas, g: () => g, size: () => ({ W, H, unit, left, dpr }), skin, live: () => playing && !paused, paused: () => paused, resume: () => resume(), play: () => begin(), card: () => show('mode'), screen: () => screen, say, tone, noise: (...a) => snd.ctx && snd.noise(...a), ctx: () => snd.ctx, boat: now => boatAt(now, sx(s.x), sy(s.y)), crashed: () => !!crash, win: now => { if (victory) winDraw(now); } });
+  const m = made[id] ??= (await MODES[id]()).mode({ canvas, g: () => g, size: () => ({ W, H, unit, left, dpr }), skin, live: () => playing && !paused, paused: () => paused, resume: () => resume(), play: () => begin(), card: () => show('mode'), screen: () => screen, unlock: () => audio(), say, tone, noise: (...a) => snd.ctx && snd.noise(...a), ctx: () => snd.ctx, boat: now => boatAt(now, sx(s.x), sy(s.y)), crashed: () => !!crash, win: now => { if (victory) winDraw(now); } });
   mod = m; endless = tower = daily = false; tutor = null; setView('2d', false); show('mode'); // a mode is never the endless river, a climb or the tutorial, so it never takes a board ticket
 }
 window.lanternMode = () => mod ? { id: mod.id, ...mod.state() } : null; window.lanternSpark = () => mod?.game(); // read by the browser checks

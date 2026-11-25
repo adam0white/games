@@ -922,7 +922,7 @@ const GAMES = {
       await page.click('#raceQuick');
       await until(page, () => window.raceSockets?.length === 1 && window.raceSockets[0].sent.length === 1, 'the page says hi to the room');
       assert.match(await page.evaluate(() => window.raceSockets[0].url), /^wss?:\/\/[^/]+\/lab-api\/room\/lantern-race\/ABCD$/, 'the socket is the lab room\'s');
-      assert.deepEqual((await sent())[0], { t: 'hi', n: 'Old boat' });
+      assert.deepEqual((await sent())[0], { t: 'hi', n: 'Old boat' }); assert.equal((await race()).sound, true, 'the tap that joins the room starts the sound: a live round starts from the socket, not a tap');
       await serve({ t: 'you', id: 2, peers: [{ id: 1, n: 'Ghost' }], round: null });
       r = await race(); assert.equal(r.me, 2, 'the room numbers the boat'); assert.equal(r.online, true); assert.equal(r.phase, 'lobby');
       assert.equal(await page.textContent('#raceConn'), 'Live: ABCD'); assert.match(await page.textContent('#racePeers'), /Ghost/);
