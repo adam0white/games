@@ -4,9 +4,9 @@ import { words } from '../../kit/i18n.js';
 // Common names per plate, in plate order. Latin names stay as they are in both languages.
 const names = {
   en: ['Poppy', 'Honesty', 'Flax', 'Milkweed', 'Love-in-a-mist', 'Columbine', 'Bladder campion', 'Sweet pea', 'Spanish broom',
-    'Hop', 'Rattlebox', "Job's tears", 'Lupin', 'Cotton', 'Quaking grass', 'Squirting cucumber', 'Wallflower', 'Peony'],
+    'Squirting cucumber', 'Hop', 'Rattlebox', "Job's tears", 'Lupin', 'Cotton', 'Quaking grass', 'Wallflower', 'Peony'],
   tr: ['Gelincik', 'Ay otu', 'Keten', 'İpek otu', 'Çörek otu', 'Hasekiküpesi', 'Gıvışkan otu', 'Kokulu bezelye', 'Katırtırnağı',
-    'Şerbetçiotu', 'Çıngıraklı bakla', 'Gözyaşı otu', 'Acı bakla', 'Pamuk', 'Titrek ot', 'Eşek hıyarı', 'Şebboy', 'Şakayık'],
+    'Eşek hıyarı', 'Şerbetçiotu', 'Çıngıraklı bakla', 'Gözyaşı otu', 'Acı bakla', 'Pamuk', 'Titrek ot', 'Şebboy', 'Şakayık'],
 };
 
 export const tables = {

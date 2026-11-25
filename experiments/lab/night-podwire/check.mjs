@@ -397,6 +397,28 @@ async function run(name, base) {
     assert.match(await page.locator('#number').innerText(), /Plate XVII of XVIII/i);
     await page.tap('#resume');
 
+    // A long plant name stays on one line, so the board keeps its height (the coordinator's rule, 2026-11-24).
+    const layout = () => page.evaluate(() => {
+      const h = document.querySelector('#species'), lh = parseFloat(getComputedStyle(h).lineHeight) || parseFloat(getComputedStyle(h).fontSize) * 1.05;
+      return { lines: Math.round(h.getBoundingClientRect().height / lh), fits: h.scrollWidth <= h.clientWidth + 1, font: parseFloat(getComputedStyle(h).fontSize),
+        board: document.querySelector('#board').getBoundingClientRect().height, share: document.querySelector('#board').getBoundingClientRect().height / innerHeight };
+    });
+    const shortName = await layout();
+    for (const [level, lang] of [[10, 'en'], [7, 'en'], [12, 'tr'], [10, 'tr']]) {
+      await page.evaluate(([book, level]) => localStorage.setItem(book, JSON.stringify({ v: 1, reached: level, done: false, best: {} })), [bookKey, level]);
+      await page.goto(page.url().replace(/[?].*$/, '') + (lang === 'tr' ? '?lang=tr' : '?lang=en'));
+      await ready(page);
+      assert.equal((await view(page)).level, level);
+      const long = await layout();
+      assert.equal(long.lines, 1, 'plate ' + level + ' (' + lang + ') name on one line');
+      assert.ok(long.fits, 'plate ' + level + ' (' + lang + ') name fits without an ellipsis');
+      assert.ok(long.board >= shortName.board - 1, 'plate ' + level + ' (' + lang + ') board does not shrink (' + long.board + ' vs ' + shortName.board + ')');
+      if (level === 10 && lang === 'en') await shot(page, name + '-plate-10-title');
+    }
+    const boardShare = +shortName.share.toFixed(3);
+    await page.goto(page.url().replace(/[?].*$/, '') + '?lang=en');
+    await ready(page);
+
     // Today's plate: the same plate and par for everyone on a date; the result can be shared.
     await page.goto(base + route + '?daily&date=2026-12-04');
     await ready(page);
@@ -573,7 +595,7 @@ async function run(name, base) {
       portraitBoardWidth: +portraitBoard.width.toFixed(2), landscapeBoardWidth: +landscapeBoard.width.toFixed(2),
       openingTiming: { work: timingSummary(openingFrames.work), intervals: timingSummary(openingFrames.intervals) },
       laterTiming: { work: timingSummary(laterFrames.work), intervals: timingSummary(laterFrames.intervals) },
-      copySeconds: +copySeconds.toFixed(1), errors: errors.length, unexpectedRequests: unapproved.length }));
+      copySeconds: +copySeconds.toFixed(1), boardShare, errors: errors.length, unexpectedRequests: unapproved.length }));
   } finally {
     await browser.close();
   }

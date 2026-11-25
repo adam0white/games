@@ -484,6 +484,17 @@ function wire(c, s, p, u, trail) {
     }
   }
   fittings(c, s, p, u);
+  // On the pumping plate the wire shows its own beat: a ring under the winding swells as the wire swings
+  // down to its lowest point, which is when a pull adds to the swing instead of cancelling it.
+  if (s.live && plates[s.level - 1].idea === 'pump' && s.ringing) {
+    const [left, right] = s.zones[0], mid = (left + right) / 2;
+    const beat = Math.max(0, Math.min(1, heightAt(u, mid) - 250 > 0 ? (heightAt(u, mid) - 250) / 14 : 0));
+    if (beat > .05) {
+      c.globalAlpha = .25 + .6 * beat;
+      ellipse(c, mid, 266, 6 + 10 * beat, 3 + 4 * beat, null, p.blush, 1.4 + beat);
+      c.globalAlpha = 1;
+    }
+  }
   // The crest: a bright bead rides the highest point of an upward wave.
   let top = 0, at = -1;
   for (let i = 1; i < u.length - 1; i++) if (u[i] < top) { top = u[i]; at = i; }

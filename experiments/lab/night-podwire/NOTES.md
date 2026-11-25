@@ -124,13 +124,13 @@ The par is the look-ahead player's pluck count on the plate's stable seed (`leve
 | VII | Bladder campion | Grip position and harmonics. A pluck at the exact middle has no even harmonics, so a pod tuned to the second harmonic stays shut; a pluck a quarter along opens it. | 1 |
 | VIII | Sweet pea | Free end. A ring on a stem holds the wire's right end, so the end follows the finger and the crest comes back the same way up. | 1 |
 | IX | Spanish broom | Two-crest pods. A pod cracks on one crest and opens only on a second crest within 1.2 s. Pluck twice in rhythm. | 2 |
-| X | Hop | Heavy section. A heavier stretch carries the wave more slowly, so the crest no longer lands at the mirror point. | 1 |
-| XI | Rattlebox | Harmonics again. A pluck a third along has no third harmonic. | 1 |
-| XII | Job's tears | Heavy bead. A point mass sends part of the wave back early and passes the rest on. | 1 |
-| XIII | Lupin | Two wires coupled by a bridge. A sprung bridge throws much of the wave back and drives the far span through it. | 1 |
-| XIV | Cotton | Damped section. Felt soaks up a crest that reaches it. | 1 |
-| XV | Quaking grass | Moving pod. The pod swings, so the crest must arrive as it passes. | 1 |
-| XVI | Squirting cucumber | Standing waves from repeated plucks. Small pulls in time with the wire's period (1.6 s) build up; pulls out of time cancel. | 4 |
+| X | Squirting cucumber | Standing waves from repeated plucks. Pulls in time with the wire's period (1.6 s) build up; pulls out of time cancel. A ring under the winding swells as the wire swings to its lowest point: letting go then adds to the swing. | 3 |
+| XI | Hop | Heavy section. A heavier stretch carries the wave more slowly, so the crest no longer lands at the mirror point. | 1 |
+| XII | Rattlebox | Harmonics again. A pluck a third along has no third harmonic. | 1 |
+| XIII | Job's tears | Heavy bead. A point mass sends part of the wave back early and passes the rest on. | 1 |
+| XIV | Lupin | Two wires coupled by a bridge. A sprung bridge throws much of the wave back and drives the far span through it. | 1 |
+| XV | Cotton | Damped section. Felt soaks up a crest that reaches it. | 1 |
+| XVI | Quaking grass | Moving pod. The pod swings, so the crest must arrive as it passes. | 1 |
 | XVII | Wallflower | Fret with a second finger. Tapping the brass peg clamps the wire: the short span rings an octave higher and the far side stays still. | 2 |
 | XVIII | Peony | Everything at once: fret, tuned pod and swinging pod. | 1 |
 
@@ -138,11 +138,11 @@ Reflections invert on every fixed-end plate (I–VII, IX–XVIII): the finger pu
 
 Physics notes for later sessions:
 - Pods hang above the wire. A pod below the wire was tried and dropped. In the discrete sim, the far side's downward excursion never exceeds the finger's static triangle, so such a pod tests the static shape, not the wave.
-- Live plates (IX, XVI): the wire keeps ringing under the finger, and a pull adds its triangle on release. The look-ahead player holds each pull for 0.25 s on these plates, so it cannot stack instant pulls (it did, before that change).
+- Live plates (IX, X): the wire keeps ringing under the finger, and a pull adds its triangle on release. The look-ahead player holds each pull for 0.25 s on these plates, so it cannot stack instant pulls (it did, before that change).
 
-### Rules on plates I–VI are unchanged
+### Plates I–VI keep main's wave physics
 
-`sim.js` keeps the shipped code path for plates I–VI (`plain`). The new effects run on a separate path (`rich`). `bots.mjs` carries a frozen copy of main's rules. It drives both copies with the same random fingers (grabs anywhere, pulls, cancels, releases) on plates I–VI with 12 seeds each: 288,707 ticks and 117 plucks. Wire, velocities, time, plucks, pods and wins are identical at every 60th tick. `--mutate=parity` changes one velocity by 0.1% and fails.
+`sim.js` keeps the shipped code path for plates I–VI (`plain`). Since the lead's review, plates IV–VI have lower pods (below); their physics is unchanged. The new effects run on a separate path (`rich`). `bots.mjs` carries a frozen copy of main's rules. It drives both copies with the same random fingers (grabs anywhere, pulls, cancels, releases) on plates I–VI with 12 seeds each: 288,707 ticks and 117 plucks. Wire, velocities, time, plucks, pods and wins are identical at every 60th tick. The frozen copy reads the current plate data, so the check covers the wave physics, not the plate layouts (288,701 ticks now). `--mutate=parity` changes one velocity by 0.1% and fails.
 
 Saves: `night-podwire:progress` keeps its shipped format and meaning (`{v:1,next 1–6,complete,sound}`). A save from main loads; a finished one continues at plate VII. New state uses new keys:
 - `night-podwire:book`: `{v:1,reached 1–18,done,best}`
@@ -162,15 +162,26 @@ Before. Main's rules with main's mirror bot, 32 seeds per plate (aim ±E, pull s
 | ±16 / 20 | 32 | 32 | 32 | 32 | 30 | 13 |
 | ±24 / 30 | 32 | 32 | 32 | 27 | 13 | 4 |
 
-After. 16 seeds per plate, clears at three noise levels (`node bots.mjs --report`). Plates I–VI have the same rules as before, so their rows are also their "before" for this player.
+After. 16 seeds per plate, clears at three noise levels (`node bots.mjs --report`), after the lead's review (below).
 
 | Plate | I | II | III | IV | V | VI | VII | VIII | IX | X | XI | XII | XIII | XIV | XV | XVI | XVII | XVIII |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| ±8, 10, 0.1 s | 16 | 16 | 16 | 11 | 13 | 10 | 16 | 16 | 16 | 16 | 16 | 16 | 15 | 11 | 16 | 16 | 14 | 12 |
-| ±16, 20, 0.2 s | 16 | 16 | 16 | 12 | 4 | 2 | 15 | 15 | 16 | 14 | 13 | 11 | 11 | 10 | 10 | 10 | 8 | 5 |
-| ±24, 30, 0.3 s | 16 | 16 | 14 | 7 | 4 | 4 | 11 | 12 | 14 | 12 | 10 | 11 | 10 | 9 | 7 | 1 | 6 | 4 |
+| ±8, 10, 0.1 s | 16 | 16 | 16 | 16 | 16 | 16 | 16 | 16 | 16 | 16 | 16 | 16 | 16 | 15 | 11 | 16 | 14 | 12 |
+| ±16, 20, 0.2 s | 16 | 16 | 16 | 16 | 14 | 15 | 15 | 15 | 16 | 16 | 14 | 13 | 11 | 11 | 10 | 10 | 8 | 5 |
+| ±24, 30, 0.3 s | 16 | 16 | 14 | 13 | 12 | 12 | 11 | 12 | 14 | 8 | 12 | 10 | 11 | 10 | 9 | 7 | 6 | 4 |
 
-Across VII–XVIII, the middle row falls from 15 to 5 in steps of at most 3 (one step up, at IX). The heights of the new pods were tuned by bisection to hit a straight-line target at the middle noise level. Not fixed: the cliff from IV to VI (12 → 4 → 2). Those plates' rules are frozen by the parity rule. After VI the rate rises again to 15, so a player who struggles on V–VI meets easier plates next. This needs the owner's call: change V–VI on main, or leave them. At the highest noise there is a second cliff: XVI (Squirting cucumber, four timed pulls) drops to 1 of 16 between XV at 7 and XVII at 6. Its rhythm, not its aim, is what fails under ±0.3 s timing noise. The middle row does not show it. Not fixed.
+The middle row now falls from 16 to 5 with no step larger than 3 of 16 and no plate under 5. `bots.mjs --report` asserts both. `--mutate=cliff` puts back the shipped IV–VI pods and fails.
+
+First version of this branch, for the record (same player): IV–VI were 12, 4, 2 at the middle row, and the pump plate (then XVI) cleared 1 of 16 at the highest noise.
+
+#### Lead's review, 2026-11-24
+
+The lead ruled that the parity rule covers folds into a live game, not this page: plate data may change while old saves load. Three changes followed.
+
+- **IV–VI cliff.** The pods on Milkweed, Love-in-a-mist and Columbine are lower: 56 → 47.6; 59/47/59 → 50.7/40.4/50.7; 62/48/48/62 → 53.3/41.3/41.3/53.3 (×0.85, ×0.86, ×0.86, picked from a sweep in `/tmp`). Layout and order are unchanged, so `night-podwire:progress` still maps plate for plate. Pars stay 2, 2, 2. The shipped mirror bot now clears 192/192 with a 15-unit aim error (133/192 before).
+- **Pump plate.** The clumsy player's pull is short by up to 30 units at the highest noise, which wiped out a 30-unit pull. The maximum pull is now 36 and the pod sits at 72 (was 30 and 68). Par is 3 (was 4). That made the plate easier (16/16/8), so it moved from XVI to X, next to the other rhythm plate (IX). Plates X–XV moved up by one to XI–XVI. Fret and Peony stay at XVII and XVIII. These plates are new on this branch, so no save refers to them. The daily pick is by plate number, so dates that picked X–XVI now get a different plate; 1,500 days from 2026-11-24 all remain clearable (worst par 86 ms in Node).
+- **The wire shows its own beat.** On the pump plate a ring under the winding swells as the wire under it swings down. `bots.mjs` checks the physics behind it: letting go each time the ring swells clears the plate at par (3 plucks), and letting go at the top of the swing never clears.
+- **Titles.** A plant name stays on one line: `main.js` shrinks the type in 2 px steps to 26 px, then the CSS ellipsis takes over. `check.mjs` loads Squirting cucumber and Bladder campion in English, and Eşek hıyarı and Çıngıraklı bakla in Turkish. It asserts one line, no ellipsis and a board no shorter than on a short name. The board takes 52.3% of the viewport height on the WebKit profile (iPhone 13) and 47.8% on the Chromium profile (Pixel 7), whatever the name.
 
 The two tables use different players. "Before" is main's mirror bot, which aims at the mirror point and has no timing. "After" is the look-ahead player with aim, pull and timing noise. Compare plates within a table, not one table's numbers against the other's.
 
@@ -190,8 +201,8 @@ This shows the drawing carries enough information. It does not show that a perso
 
 ### Checks run (2026-11-24, this branch, before merging main)
 
-- `node bots.mjs` exits 0 in about 35 s. It covers the shipped claims (192/192 mirror-bot clears; 133/192 with a 15-unit offset), parity, one physical claim per new idea, the aiming player on all 18 plates, the drawn finger, `PARS` equal to the solver, 30 daily plates and the clumsy table.
-- `node bots.mjs --mutate` exits 1 at the reflected-crest claim (as before). `node bots.mjs --mutations` runs 12 mutations, and each fails at its own claim: momentum, harmonic, heavy, bead, bridge, felt, moving, double, fret, pump, free, parity.
+- `node bots.mjs` exits 0 in about 35 s. It covers the shipped claims (192/192 mirror-bot clears; 192/192 with a 15-unit offset since the IV–VI change, 133/192 before), parity, one physical claim per new idea, the aiming player on all 18 plates, the drawn finger, `PARS` equal to the solver, 30 daily plates and the clumsy table.
+- `node bots.mjs --mutate` exits 1 at the reflected-crest claim (as before). `node bots.mjs --mutations` runs 13 mutations, and each fails at its own claim: momentum, cliff (the shipped IV–VI pods), harmonic, heavy, bead, bridge, felt, moving, double, fret, pump, free, parity.
 - `node check.mjs` passes on WebKit (iPhone 13) and Chromium (Pixel 7). New coverage:
   - an old finished save continuing at plate VII
   - plate VII cleared at par
@@ -210,6 +221,7 @@ Intentional check changes in `check.mjs`:
 - The corrupt-save check corrupts both `progress` and `book`.
 - Tests that cleared `progress` now clear all three keys (`clearSaves`).
 - Captures go to `$SHOTS` when it is set.
+- Added after the lead's review: long plant names stay on one line and do not shrink the board (English and Turkish). In `bots.mjs` the quarter-of-the-time clumsy check now covers every plate, not only VII–XVIII, and the per-idea claims find their plate by idea instead of by number.
 
 No assertion was loosened.
 
@@ -220,9 +232,9 @@ No assertion was loosened.
 - Not verified on a real phone in daylight: thumb feel, the fret peg's 24-unit reach, or whether the wave reads well.
 - No first-time human players have tried the new plates.
 - Frame time on a real mid-range Android phone.
-- Whether rhythm plates IX and XVI feel fair to a person. Their windows come from the bot.
+- Whether rhythm plates IX and X feel fair to a person, and whether the beat ring reads as "let go now". Their windows come from the bot.
 - The difficulty curve comes from bots with uniform noise. People make different errors.
-- No browser check plays a live-wire plate (IX, XVI) through real pointer input; their page code (holding while the wire rings) is covered only by `bots.mjs` in Node.
+- No browser check plays a live-wire plate (IX, X) through real pointer input; their page code (holding while the wire rings) is covered only by `bots.mjs` in Node.
 - The daily par is checked against Node for 2 dates in the browsers, not across many dates; WebKit could round `Math.sin`/`Math.exp` differently.
 - On Peony (XVIII) the fret peg sits under the winding, so a low touch may toggle the fret instead of gripping the wire.
 - In Turkish, the kit's recording checkbox on the pause card is still in English (kit text, not this page's).

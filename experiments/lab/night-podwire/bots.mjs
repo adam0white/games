@@ -12,7 +12,7 @@ import { followCue, par, random, solve, wait } from './solve.js';
 // node bots.mjs --mutate=X   breaks one feature (see MUTATIONS): that feature's claim must fail
 // node bots.mjs --mutations  runs every mutation and checks that each one fails
 // node bots.mjs --report     also prints the clumsy-player table on 16 seeds per plate
-const MUTATIONS = ['harmonic', 'heavy', 'bead', 'bridge', 'felt', 'moving', 'double', 'fret', 'pump', 'free', 'parity'];
+const MUTATIONS = ['cliff', 'harmonic', 'heavy', 'bead', 'bridge', 'felt', 'moving', 'double', 'fret', 'pump', 'free', 'parity'];
 const argv = process.argv.slice(2);
 if (argv.includes('--mutations')) {
   const self = fileURLToPath(import.meta.url);
@@ -29,14 +29,18 @@ if (argv.includes('--mutations')) {
 const mutate = argv.includes('--mutate');
 const broken = (argv.find(a => a.startsWith('--mutate=')) || '').slice(9);
 assert.ok(!broken || MUTATIONS.includes(broken), 'unknown mutation ' + broken);
-const report = argv.includes('--report');
+const report = argv.includes('--report') || argv.includes('--mutate=cliff');
 
 // A named mutation breaks one feature in the plate data or the state right after create.
-if (broken === 'heavy') plates[9].heavy = null;
-if (broken === 'bead') plates[11].beads = [];
-if (broken === 'bridge') plates[12].bridge = null;
-if (broken === 'felt') plates[13].felt = null;
-if (broken === 'free') plates[7].free = false;
+const byIdea = idea => plates.find(p => p.idea === idea);
+// The plate IV-VI pods as they shipped: the clumsy player's clears fell off a cliff there (12, 4, 2 of 16).
+if (broken === 'cliff') { plates[3].buds = [[90, 56], [270, 56]]; plates[4].buds = [[104, 59], [180, 47], [256, 59]]; plates[5].buds = [[83, 62], [142, 48], [218, 48], [277, 62]]; }
+if (broken === 'heavy') byIdea('heavy').heavy = null;
+if (broken === 'bead') byIdea('bead').beads = [];
+if (broken === 'bridge') byIdea('bridge').bridge = null;
+if (broken === 'felt') byIdea('felt').felt = null;
+if (broken === 'free') byIdea('free').free = false;
+const L = idea => plates.findIndex(p => p.idea === idea) + 1; // plate number of an idea
 function make(level, seed = level * 417) {
   const s = create(level, seed);
   if (broken === 'harmonic') for (const p of s.pods) if (p.type === 'tuned') p.mode = 1;
@@ -137,8 +141,9 @@ const shallow = create(1); pluck(shallow, 180, 10); advance(shallow, 720);
 assert.equal(shallow.won, false, 'a shallow pluck falls short');
 console.log('Solved', wins, 'of 192; with 15 world units of aim error', imprecise, 'of 192.');
 
-// ---------- parity: plates I-VI follow the rules on main exactly ----------
+// ---------- parity: plates I-VI keep main's wave physics exactly ----------
 // A frozen copy of main's rules (commit before this change), driven side by side with sim.js
+// on the current plate data (plates IV-VI have lower pods since 2026-11-24; the physics is frozen, the layouts are not)
 // by the same random fingers: grabs anywhere, pulls, cancels and releases at random times.
 const reference = (() => {
   const DRAG = Math.exp(-0.58 * TICK), SPEED = 67;
@@ -213,7 +218,7 @@ for (let level = 1; level <= 6; level++) for (let seed = 1; seed <= 12; seed++) 
     if (a.won) break;
   }
 }
-console.log('Parity with main on plates I-VI:', parityTicks, 'ticks,', parityPlucks, 'random plucks, identical.');
+console.log('Parity with main\'s wave physics on plates I-VI:', parityTicks, 'ticks,', parityPlucks, 'random plucks, identical.');
 
 // ---------- the new plates, one claim per idea ----------
 const after = (s, seconds) => { for (let n = Math.round(seconds / TICK); n > 0; n--) tick(s); return s; };
@@ -227,38 +232,38 @@ assert.ok(Math.abs(partials(.5)[1]) < 1e-12 && Math.abs(partials(.5)[3]) < 1e-12
 assert.ok(Math.abs(partials(1 / 3)[2]) < 1e-12, 'a pluck a third along has no third partial');
 // VII. A middle pluck leaves the second-harmonic pod shut; the drawn grip opens it.
 {
-  const mid = pullAt(make(7), 180, 84);
+  const mid = pullAt(make(L('harmonic2')), 180, 84);
   assert.ok(harmonic(mid, 2) < 0.5, 'a middle pluck has (almost) no second harmonic');
   after(mid, 4);
   assert.ok(!mid.pods[0].open, 'harmonic: a middle pluck must leave the second-harmonic pod shut');
-  const good = make(7); followCue(good);
+  const good = make(L('harmonic2')); followCue(good);
   assert.ok(good.pods[0].open, 'harmonic: the drawn grip opens the second-harmonic pod');
 }
-// XI. A pluck a third along leaves the third-harmonic pod shut.
+// XII. A pluck a third along leaves the third-harmonic pod shut.
 {
-  const third = pullAt(make(11), LEFT + 52 / 3 * SPACING, 84);
+  const third = pullAt(make(L('harmonic3')), LEFT + 52 / 3 * SPACING, 84);
   after(third, 4);
   assert.ok(!third.pods[0].open, 'harmonic: a pluck a third along has no third harmonic');
 }
-// X. A heavy stretch slows the wave: the crest reaches the far pod later than on a light wire.
+// XI. A heavy stretch slows the wave: the crest reaches the far pod later than on a light wire.
 {
-  const heavy = pullAt(make(10), 102, 84), light = pullAt(make(10), 102, 84);
+  const heavy = pullAt(make(L('heavy')), 102, 84), light = pullAt(make(L('heavy')), 102, 84);
   light.mass.fill(1);
   const tHeavy = firstTime(heavy, 258, 30, 2), tLight = firstTime(light, 258, 30, 2);
   assert.ok(tHeavy > tLight + .2, 'heavy: the crest arrives later on the heavy stretch (' + tHeavy.toFixed(2) + ' vs ' + tLight.toFixed(2) + ')');
 }
-// XII. A heavy bead sends part of the wave back early: the near side rises less while the crest is at the bead.
+// XIII. A heavy bead sends part of the wave back early: the near side rises less while the crest is at the bead.
 {
-  const bead = pullAt(make(12), 102, 84), plain = pullAt(make(12), 102, 84);
+  const bead = pullAt(make(L('bead')), 102, 84), plain = pullAt(make(L('bead')), 102, 84);
   plain.mass.fill(1);
   after(bead, .45); after(plain, .45);
   const a = peakAt(bead, 150, .2), b = peakAt(plain, 150, .2);
   assert.ok(a < b - 6, 'bead: part of the wave comes back from the bead (' + a.toFixed(1) + ' vs ' + b.toFixed(1) + ')');
 }
-// XIII. A sprung bridge sends much of the wave back into the plucked span, yet the far span still rings through it.
+// XIV. A sprung bridge sends much of the wave back into the plucked span, yet the far span still rings through it.
 {
   const run = plain => {
-    const s = make(13);
+    const s = make(L('bridge'));
     if (plain) { s.mass.fill(1); s.spring.fill(0); }
     pullAt(s, 114, 84);
     let near = 0, far = 0;
@@ -269,18 +274,18 @@ assert.ok(Math.abs(partials(1 / 3)[2]) < 1e-12, 'a pluck a third along has no th
   assert.ok(bridge.near > plain.near * 1.5, 'bridge: the bridge throws the wave back (' + bridge.near.toFixed(1) + ' vs ' + plain.near.toFixed(1) + ')');
   assert.ok(bridge.far > 30, 'bridge: the far span is driven through it (' + bridge.far.toFixed(1) + ')');
 }
-// XIV. Felt soaks up the wave.
+// XV. Felt soaks up the wave.
 {
-  const felt = pullAt(make(14), 108, 84), bare = pullAt(make(14), 108, 84);
+  const felt = pullAt(make(L('felt')), 108, 84), bare = pullAt(make(L('felt')), 108, 84);
   bare.drag = bare.drag.map(() => bare.drag[1]);
   after(felt, 3); after(bare, 3);
   assert.ok(energy(felt) < energy(bare) * .5, 'felt: the felt takes most of the energy within 3 seconds');
 }
-// XV. A swinging pod opens only when the crest arrives as it passes: the drawn timing works, the opposite one does not.
+// XVI. A swinging pod opens only when the crest arrives as it passes: the drawn timing works, the opposite one does not.
 {
-  const good = make(15); followCue(good);
+  const good = make(L('moving')); followCue(good);
   assert.ok(good.won, 'moving: the drawn timing opens the swinging pod');
-  const bad = make(15);
+  const bad = make(L('moving'));
   let misses = 0;
   for (const phase of [.1, .25, .4]) {
     const s = clone(bad); s.grip = null;
@@ -293,14 +298,14 @@ assert.ok(Math.abs(partials(1 / 3)[2]) < 1e-12, 'a pluck a third along has no th
 }
 // IX. A two-crest pod cracks on one crest and needs a second one soon after.
 {
-  const once = pullAt(make(9), 114, 70); after(once, 4);
+  const once = pullAt(make(L('double')), 114, 70); after(once, 4);
   assert.ok(!once.won, 'double: one crest alone must not open a two-crest pod');
-  const twice = make(9); followCue(twice);
+  const twice = make(L('double')); followCue(twice);
   assert.ok(twice.won, 'double: the drawn two plucks open it');
 }
 // XVII. The fret clamps the wire: the far side stays still and the short span rings an octave up.
 {
-  const s = make(17);
+  const s = make(L('fret'));
   const open = pitchOf(s, 10).freq;
   assert.ok(fret(s, 0));
   assert.ok(Math.abs(pitchOf(s, 10).freq / open - 52 / 26) < 1e-9, 'fret: half the wire rings an octave higher');
@@ -309,10 +314,10 @@ assert.ok(Math.abs(partials(1 / 3)[2]) < 1e-12, 'a pluck a third along has no th
   for (let n = 0; n < 720; n++) { tick(s); for (let i = 27; i < COUNT - 1; i++) far = Math.max(far, Math.abs(s.u[i])); }
   assert.ok(far < 1, 'fret: the wire beyond a clamped fret stays still (' + far.toFixed(2) + ')');
 }
-// XVI. Plucks in time with the wire build a standing wave; one pluck, or plucks out of time, do not.
+// X. Plucks in time with the wire build a standing wave; one pluck, or plucks out of time, do not.
 {
   const peak = gaps => {
-    const s = make(16);
+    const s = make(L('pump'));
     let m = 0;
     for (const g of gaps) { for (let n = Math.round(g / TICK); n > 0; n--) { tick(s); m = Math.max(m, -at(s, 180)); } pullAt(s, 180, 30); }
     for (let n = 0; n < 480; n++) { tick(s); m = Math.max(m, -at(s, 180)); }
@@ -321,10 +326,27 @@ assert.ok(Math.abs(partials(1 / 3)[2]) < 1e-12, 'a pluck a third along has no th
   const one = peak([0]), inTime = peak([0, 1.55, 1.55]), offTime = peak([0, .78, .78]);
   assert.ok(inTime > one * 2, 'pump: three plucks in time more than double the swing (' + inTime.toFixed(1) + ' vs ' + one.toFixed(1) + ')');
   assert.ok(inTime > offTime * 1.5, 'pump: plucks out of time cancel (' + offTime.toFixed(1) + ')');
+  // The beat ring (art.js) swells when the wire under the winding swings to its lowest point.
+  // Letting go each time it swells clears the plate at par; letting go at the top of the swing does not.
+  const byBeat = atBottom => {
+    const s = make(L('pump')), mid = Math.round((180 - LEFT) / SPACING);
+    let last = 0, prev = 0, rising = false;
+    pullAt(s, 180, 36);
+    for (let n = 0; n < 240 * 8 && !s.won; n++) {
+      tick(s);
+      const u = s.u[mid], was = rising; rising = u > prev; prev = u;
+      const turn = atBottom ? was && !rising && u > 3 : !was && rising && u < -3;
+      if (turn && s.time - last > .8) { last = s.time; pullAt(s, 180, 36); }
+    }
+    return s;
+  };
+  const beat = byBeat(true);
+  assert.ok(beat.won && beat.plucks <= PARS[L('pump') - 1], 'pump: letting go as the beat ring swells clears at par (' + beat.plucks + ' plucks)');
+  assert.ok(!byBeat(false).won, 'pump: letting go at the top of the swing does not clear');
 }
 // VIII. A free end on a sliding ring: the far end follows the finger, and its crest comes back the same way up.
 {
-  const s = make(8);
+  const s = make(L('free'));
   const y = BASE + at(s, 102); assert.ok(grab(s, 102, y)); pull(s, y + 84);
   assert.ok(s.u[COUNT - 1] > 80, 'free: a held free end sits level with the finger');
   release(s);
@@ -372,7 +394,12 @@ for (let level = 1; level <= plates.length; level++) {
     return w;
   });
   table.push(row);
-  if (level > 6) assert.ok(row[1] >= seeds / 4, 'a clumsy player still clears plate ' + level + ' a quarter of the time');
+  assert.ok(row[1] >= seeds / 4, 'a clumsy player still clears plate ' + level + ' a quarter of the time');
 }
+// The owner's curve, on 16 seeds: the middle row never drops by more than 3 from one plate to the next, and never below 5.
+if (report) table.forEach((row, i) => {
+  assert.ok(row[1] >= 5, 'plate ' + (i + 1) + ': at least 5 of 16 clumsy clears');
+  if (i) assert.ok(Math.abs(row[1] - table[i - 1][1]) <= 3, 'plate ' + (i + 1) + ': no step larger than 3 of 16');
+});
 console.log('Clumsy clears of', seeds, 'seeds (aim ±8/±16/±24, depth -10/-20/-30, timing ±.1/.2/.3 s):');
 console.log(table.map((r, i) => String(i + 1).padStart(2) + ' ' + r.map(n => String(n).padStart(2)).join(' ')).join('\n'));

@@ -25,6 +25,8 @@ header { display:flex; align-items:center; border-bottom:1px solid var(--ink); p
 #heading { margin-top:clamp(13px,4svh,36px); }
 .plate { text-transform:uppercase; font-size:10px; font-weight:700; letter-spacing:.19em; color:var(--soft) }
 h1,h2 { font:normal clamp(42px,8svh,66px)/1.05 'Baskerville','Palatino',Georgia,serif; letter-spacing:-.048em; margin:5px 0 2px }
+/* One line for every plant name, so a long name never takes height from the board: main.js shrinks the type to fit, then ellipsis. */
+#species { white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
 #latin { margin:0; color:var(--soft); font:italic 18px/1.4 'Baskerville',Georgia,serif }
 #stage { flex:1; min-height:0; width:100%; display:grid; place-items:center; container-type:size }
 #board { display:block; width:min(100cqw,94.7368cqh); height:auto; aspect-ratio:360 / 380; touch-action:none; user-select:none; -webkit-user-select:none }

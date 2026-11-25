@@ -89,10 +89,19 @@ function updateFooter() {
   $('today').textContent = days.days[today] ? t('todayDone') : t('today');
   $('today').setAttribute('aria-pressed', String(mode === 'daily'));
 }
+// Shrink a long plant name until it fits on one line (down to 26 px); past that the ellipsis in the CSS takes over.
+function fitTitle() {
+  const h = $('species');
+  h.style.fontSize = '';
+  let size = parseFloat(getComputedStyle(h).fontSize);
+  while (h.scrollWidth > h.clientWidth + 1 && size > 26) { size -= 2; h.style.fontSize = size + 'px'; }
+}
+addEventListener('resize', fitTitle);
 function updateHeading() {
   $('number').textContent = mode === 'daily' ? t('dailyPlate', { date: dateLabel(today) })
     : t('plate', { n: roman(state.level), total: roman(TOTAL) });
   $('species').textContent = plantName(state.level);
+  fitTitle();
   $('latin').textContent = plates[state.level - 1].latin;
   $('next').textContent = mode === 'daily' ? t('plates') : state.level === TOTAL ? t('again') : t('next');
   $('share').hidden = mode !== 'daily';

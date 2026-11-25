@@ -1,6 +1,6 @@
 // Vertical motion of a string with two fixed ends. A grip sets the static shape
 // under a point load. Release lets neighbouring masses exchange momentum.
-// Plates I-VI use exactly the rules they shipped with (the "plain" path below).
+// Plates I-VI use exactly the wave physics they shipped with (the "plain" path below); IV-VI have lower pods.
 // Plates VII on add one real string effect each: harmonics, beads, a bridge,
 // felt, frets, a free end, moving pods, two-crest pods and pumping.
 export const BASE = 250;
@@ -20,9 +20,9 @@ export const plates = [
   { name: 'Poppy', latin: 'Papaver', zones: [[72, 288]], buds: [[180, 19]] },
   { name: 'Honesty', latin: 'Lunaria', zones: [[73, 125]], buds: [[253, 39]] },
   { name: 'Flax', latin: 'Linum', zones: [[155, 205]], buds: [[126, 34], [234, 34]] },
-  { name: 'Milkweed', latin: 'Asclepias', zones: [[72, 114], [246, 288]], buds: [[90, 56], [270, 56]] },
-  { name: 'Love-in-a-mist', latin: 'Nigella', zones: [[93, 130], [156, 204], [230, 267]], buds: [[104, 59], [180, 47], [256, 59]] },
-  { name: 'Columbine', latin: 'Aquilegia', zones: [[72, 99], [171, 189], [261, 288]], buds: [[83, 62], [142, 48], [218, 48], [277, 62]] },
+  { name: 'Milkweed', latin: 'Asclepias', zones: [[72, 114], [246, 288]], buds: [[90, 47.6], [270, 47.6]] },
+  { name: 'Love-in-a-mist', latin: 'Nigella', zones: [[93, 130], [156, 204], [230, 267]], buds: [[104, 50.7], [180, 40.4], [256, 50.7]] },
+  { name: 'Columbine', latin: 'Aquilegia', zones: [[72, 99], [171, 189], [261, 288]], buds: [[83, 53.3], [142, 41.3], [218, 41.3], [277, 53.3]] },
   // VII. A pluck at the exact middle has no even harmonics, so a pod tuned to the second stays shut.
   { name: 'Bladder campion', latin: 'Silene', idea: 'harmonic2', tension: 1,
     zones: [[96, 264]], buds: [{ x: 180, h: 20.9, type: 'tuned', mode: 2 }], cue: [{ x: 100, depth: 86 }] },
@@ -32,27 +32,27 @@ export const plates = [
   // IX. Pods that crack on one crest and burst on a second crest that comes soon after.
   { name: 'Spanish broom', latin: 'Spartium', idea: 'double', kind: 3, tension: 1.15, live: true, maxPull: 70,
     zones: [[72, 156]], buds: [{ x: 246, h: 33, type: 'double' }], cue: [{ x: 102, depth: 70 }, { x: 102, depth: 70, after: .85 }] },
-  // X. A heavy stretch of wire carries the wave more slowly, so the crest no longer lands at the mirror point.
+  // X. Plucks in time with the wire add up to a standing wave.
+  { name: 'Squirting cucumber', latin: 'Ecballium', idea: 'pump', kind: 4, tension: .85, live: true, maxPull: 36, damping: .25,
+    zones: [[150, 210]], buds: [[180, 72]], cue: [{ x: 180, depth: 36 }, { x: 180, depth: 36, after: 1.6 }, { x: 180, depth: 36, after: 1.6 }] },
+  // XI. A heavy stretch of wire carries the wave more slowly, so the crest no longer lands at the mirror point.
   { name: 'Hop', latin: 'Humulus', idea: 'heavy', kind: 4, tension: .9,
     zones: [[72, 132]], heavy: [192, 336, 3], buds: [[252, 33.1], [300, 20.7]], cue: [{ x: 102, depth: 84 }] },
-  // XI. A pluck a third of the way along has no third harmonic.
+  // XII. A pluck a third of the way along has no third harmonic.
   { name: 'Rattlebox', latin: 'Crotalaria', idea: 'harmonic3', kind: 1, tension: 1.25,
     zones: [[72, 288]], buds: [{ x: 120, h: 12.8, type: 'tuned', mode: 3 }, [252, 46.9]], cue: [{ x: 72, depth: 86 }] },
-  // XII. A heavy bead reflects part of the wave early and passes the rest on.
+  // XIII. A heavy bead reflects part of the wave early and passes the rest on.
   { name: "Job's tears", latin: 'Coix', idea: 'bead', kind: 2, tension: 1.1,
     zones: [[72, 132]], beads: [[204, 7]], buds: [[168, 34.6], [282, 23.8]], cue: [{ x: 102, depth: 84 }] },
-  // XIII. Two spans share a sprung bridge: the plucked span drives the other through it.
+  // XIV. Two spans share a sprung bridge: the plucked span drives the other through it.
   { name: 'Lupin', latin: 'Lupinus', idea: 'bridge', kind: 3, tension: 1.2,
     zones: [[72, 156]], bridge: [180, 5, 900], buds: [[234, 46.1], [276, 46.1]], cue: [{ x: 114, depth: 84 }] },
-  // XIV. Felt on the wire soaks up the wave: a crest that reaches it dies there.
+  // XV. Felt on the wire soaks up the wave: a crest that reaches it dies there.
   { name: 'Cotton', latin: 'Gossypium', idea: 'felt', kind: 4, tension: 1,
     zones: [[72, 144]], felt: [264, 330, 18], buds: [[204, 40.5], [120, 26.2]], cue: [{ x: 108, depth: 84 }] },
-  // XV. A pod that swings: the crest has to arrive when the pod is over it.
+  // XVI. A pod that swings: the crest has to arrive when the pod is over it.
   { name: 'Quaking grass', latin: 'Briza', idea: 'moving', kind: 2, tension: 1.05,
     zones: [[72, 144]], buds: [{ x: 252, h: 61.3, swing: [56, 2.6, 0] }], cue: [{ x: 78, depth: 86, phase: .115 }] },
-  // XVI. Small plucks in time with the wire add up to a standing wave.
-  { name: 'Squirting cucumber', latin: 'Ecballium', idea: 'pump', kind: 4, tension: .85, live: true, maxPull: 30, damping: .25,
-    zones: [[150, 210]], buds: [[180, 68]], cue: [{ x: 180, depth: 30 }, { x: 180, depth: 30, after: 1.6 }, { x: 180, depth: 30, after: 1.6 }, { x: 180, depth: 30, after: 1.6 }] },
   // XVII. A brass fret clamps the wire: the shorter span rings higher and keeps the wave on one side.
   { name: 'Wallflower', latin: 'Erysimum', idea: 'fret', kind: 2, tension: 1.3,
     zones: [[72, 132]], frets: [180], buds: [[120, 66.3], [264, 60.3]], cue: [{ fret: 0 }, { x: 84, depth: 84 }] },
@@ -63,7 +63,7 @@ export const plates = [
     cue: [{ fret: 0 }, { x: 186, depth: 86 }] },
 ];
 // Par for each campaign plate (its stable seed, level * 417): the look-ahead player's pluck count. bots.mjs checks it.
-export const PARS = [1, 1, 1, 2, 2, 2, 1, 1, 2, 1, 1, 1, 1, 1, 1, 4, 2, 1];
+export const PARS = [1, 1, 1, 2, 2, 2, 1, 1, 2, 3, 1, 1, 1, 1, 1, 1, 2, 1];
 export const DOUBLE_WINDOW = 1.2;
 export const TUNED_HOLD = .25;
 
