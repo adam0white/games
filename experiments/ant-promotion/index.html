@@ -118,7 +118,7 @@
     <li>No food on the screen? A <span class="g">green arrow</span> at the edge points to the nearest animal you can eat. A red arrow points to a stronger animal that has seen you.</li>
     <li>Fill the bar to get promoted. You pick 1 of 3 new animals each time. Picking fast again makes you faster each time. Picking sneaky again makes you harder to see each time.</li>
     <li>If you are a fast animal, a medium or fast hunter close to you can pounce: one quick dash. Keep your distance, or be far when it sees you. A slow one never pounces.</li>
-    <li>Every animal after the Ant has its own skill. Tap the round yellow button (or press Space) to use it, then wait for it to fill again. A Wasp stings, a Frog hops, a Turtle hides in its shell, a Lion roars, an Eagle dives, a Cheetah sprints.</li>
+    <li>Every animal after the Ant has its own skill. Tap the round yellow button (or press Space) to use it, then wait for it to fill again. No two are alike: a Frog catches food with its tongue, a Spider leaves a web, a Mole digs under, a Wolf calls its pack, a Dragon breathes fire.</li>
     <li>A hunter gets tired. Keep running: it slows down, then gives up and rests for a few seconds.</li>
     <li>Animals hunt each other too. A red dashed line shows who is chasing whom. A hunter that is busy is easier to sneak past.</li>
     <li><b>Wild rules</b> are the normal game; the Rules button in the menu switches to Classic. Wild adds two things. A strong animal has a thick hide: it lives through one bite, then the hide needs 25 seconds. And every 45 seconds a stronger animal nearby hunts you for 5 seconds, wherever it is looking.</li>
@@ -161,7 +161,7 @@
 
 <script type="module">
 import { FORMS, ANT, WORLD, TOP, sightOf, sightWords, create, step, choose, revive, me, level, needFor, article, SPAWN_WEIGHTS, hideReady, fastBoost, SAME_SNEAK,
-  crown, powerOf, nemesisMob, nemesisSave, cleanKnobs, TEMPERAMENTS, TEMPERAMENT_NAMES, powerFor, paceAgainst, placeOld, OLD_DIM, oldAims, coverOn } from './sim.js';
+  crown, powerOf, nemesisMob, nemesisSave, cleanKnobs, TEMPERAMENTS, TEMPERAMENT_NAMES, powerFor, skillFor, paceAgainst, placeOld, OLD_DIM, oldAims, coverOn } from './sim.js';
 import { sightCut } from './cover.js';
 import { rocks2d, grassUnder, grassOver, eyes2d, hiddenFromPlayer, playerHidden, rocks3d, grass3d, eyes3d } from './cover-draw.js'; // rocks and tall grass, from level 4
 import { drawForm, setLook, LOOKS } from './art.js';
@@ -325,11 +325,11 @@ function offer() {
     const b = document.createElement('button'); b.className = 'opt';
     const pic = document.createElement('canvas'); pic.width = pic.height = 168; portrait(pic, F, 34);
     const pace = t('pace.' + F.pace);
-    b.append(pic, Object.assign(document.createElement('b'), { textContent: animal(F.name) }), Object.assign(document.createElement('small'), { textContent: t('powerPace', { p: F.power, pace }) }), Object.assign(document.createElement('small'), { textContent: trait(F.trait) }), Object.assign(document.createElement('small'), { textContent: powerFor(F) ? t('skillIs', { label: skill(powerFor(F).label) }) : '', style: 'color:#ffd23a' }));
+    b.append(pic, Object.assign(document.createElement('b'), { textContent: animal(F.name) }), Object.assign(document.createElement('small'), { textContent: t('powerPace', { p: F.power, pace }) }), Object.assign(document.createElement('small'), { textContent: trait(F.trait) }), Object.assign(document.createElement('small'), { textContent: skillFor(F) ? t('skillIs', { label: skill(skillFor(F).label) }) : '', style: 'color:#ffd23a' }));
     const k = s.player.stack.filter(id => FORMS[id].role === F.role).length; // earlier picks of this kind make this one better
     if (k && F.role === 'runner') b.append(Object.assign(document.createElement('small'), { textContent: t('fastAgain', { n: Math.round((fastBoost(k + 1) - 1) * 100) }), style: 'color:#8dff8a' }));
     if (k && F.role === 'sneak') b.append(Object.assign(document.createElement('small'), { textContent: t('sneakyAgain', { n: Math.round((1 - SAME_SNEAK ** k) * 100) }), style: 'color:#8dff8a' }));
-    b.onclick = () => { if (!s.choosing) return; choose(s, i); skillTip = powerFor(F) ? 3 : 0; save.stack = s.player.stack.slice(); save.xp = 0; keepNem(); const fresh = !save.seen.includes(F.id); saw(save.stack); store(); blip(520, 0.3, 'triangle', 0.14, 500); blip(660, 0.9, 'sine', 0.1, 1400); beam = 1; beamColour = bright(F.e) ? F.e : bright(F.c) ? F.c : '#ffe27a'; buzz([20, 30, 60]); hud(); show('play'); say(fresh ? t('newInBook', { name: animal(F.name) }) : t('youAreNow', nameVars(F.name))); };
+    b.onclick = () => { if (!s.choosing) return; choose(s, i); skillTip = skillFor(F) ? 3 : 0; save.stack = s.player.stack.slice(); save.xp = 0; keepNem(); const fresh = !save.seen.includes(F.id); saw(save.stack); store(); blip(520, 0.3, 'triangle', 0.14, 500); blip(660, 0.9, 'sine', 0.1, 1400); beam = 1; beamColour = bright(F.e) ? F.e : bright(F.c) ? F.c : '#ffe27a'; buzz([20, 30, 60]); hud(); show('play'); say(fresh ? t('newInBook', { name: animal(F.name) }) : t('youAreNow', nameVars(F.name))); };
     box.append(b);
   });
   show('evolve');
@@ -410,19 +410,21 @@ $('power').addEventListener('pointerdown', e => { e.preventDefault(); e.stopProp
 $('power').addEventListener('click', () => { if (mode === 'play' && performance.now() - powerTap > 700) wantPower = true; }); // Enter, or a screen reader's activate
 addEventListener('keydown', e => { if (e.key === ' ' && mode === 'play') { wantPower = true; e.preventDefault(); } });
 // What each kind of skill does, said once after a promotion. The button pulses when the skill would help right now.
-// The words are 'does.sting' and so on in words.js.
+// The words are 'does.Frog' and so on in words.js.
 let skillTip = 0;
+const HUNTS = new Set(['Fire Ant', 'Mouse', 'Frog', 'Snake', 'Squirrel', 'Wolf', 'Panther', 'Python', 'Tiger', 'Hippo', 'Sabertooth', 'Raptor', 'Dragon', 'Thunderbird', 'Hydra', 'Bat']); // these help when prey is close; the others when a hunter is
 function powerHelps(W) {
+  if (!W.kept) { const p = s.player, F = me(s); let near = 0; for (const m of s.mobs) { const d = Math.hypot(m.x - p.x, m.y - p.y), pw = powerOf(m); if (pw > F.power && m.alert && d < 170 && !HUNTS.has(W.name)) return true; if (pw < F.power && d < (W.reach || 160)) near++; } return HUNTS.has(W.name) && near > 0; }
   const p = s.player, F = me(s); let prey = 0;
-  for (const m of s.mobs) { const d = Math.hypot(m.x - p.x, m.y - p.y), pw = powerOf(m); if (W.kind !== 'roar' && pw > F.power && m.alert && d < 170) return true; if (pw < F.power && d < W.reach) prey++; }
-  return W.kind === 'roar' && prey >= 2;
+  for (const m of s.mobs) { const d = Math.hypot(m.x - p.x, m.y - p.y), pw = powerOf(m); if (W.name !== 'Lion' && pw > F.power && m.alert && d < 170) return true; if (pw < F.power && d < 230) prey++; }
+  return W.name === 'Lion' && prey >= 2;
 }
 function powerButton() { // once a frame while playing
-  const b = $('power'), W = s && powerFor(me(s));
+  const b = $('power'), W = s && skillFor(me(s));
   if (!W || mode !== 'play') { b.style.display = 'none'; powerShown = ''; return; }
   const cd = Math.max(0, s.player.cd || 0), key = W.label + (cd > 0 ? Math.ceil(cd) : '');
   b.style.background = cd > 0 ? `conic-gradient(#ffd23a ${(1 - cd / W.cd) * 360}deg, #00000088 0)` : '#ffd23a';
-  b.classList.toggle('now', cd <= 0 && powerHelps(W)); if (skillTip > 0 && (skillTip -= 1 / 60) <= 0) say(t('skillSay', { label: skill(W.label), does: t('does.' + W.kind) }));
+  b.classList.toggle('now', cd <= 0 && powerHelps(W)); if (skillTip > 0 && (skillTip -= 1 / 60) <= 0) say(t('skillSay', { label: skill(W.label), does: t('does.' + W.name) }));
   b.style.display = 'block'; // every frame: a pause hides the button and the text below may not have changed
   if (key === powerShown) return; powerShown = key;
   b.classList.toggle('wait', cd > 0); $('powerName').textContent = skill(W.label); $('powerWait').textContent = cd > 0 ? t('secs', { n: Math.ceil(cd) }) : t('ready');
@@ -473,7 +475,7 @@ function label(x, y, text, colour, size, extra) {
 
 // ----- shared by the flat looks and the 3D look
 // What an animal can see: [distance before the player's stealth, half-angle]. The rival's temperament changes both.
-const sight = m => { const M = FORMS[m.f], T = m.nem && s.nemesis ? TEMPERAMENTS[s.nemesis.knobs.temperament] : null; const [far, half] = sightOf(M); return [M.range * far * (T ? T.sight : 1) * (m.old && !(m.hunt > 0) && !m.alert && powerOf(m) > me(s).power ? OLD_DIM : 1), Math.min(Math.PI, half * (T ? T.cone : 1))]; };
+const sight = m => { const M = FORMS[m.f], T = m.nem && s.nemesis ? TEMPERAMENTS[s.nemesis.knobs.temperament] : null; const [far, half] = sightOf(M); return [M.range * (s.player.fx?.seenK || 1) * far * (T ? T.sight : 1) * (m.old && !(m.hunt > 0) && !m.alert && powerOf(m) > me(s).power ? OLD_DIM : 1), Math.min(Math.PI, half * (T ? T.cone : 1))]; };
 function crownMark(x, y, w, colour) { // a small crown: the rival's mark
   g.beginPath(); g.moveTo(x - w / 2, y); g.lineTo(x - w / 2, y - w * 0.5); g.lineTo(x - w / 4, y - w * 0.25); g.lineTo(x, y - w * 0.6); g.lineTo(x + w / 4, y - w * 0.25); g.lineTo(x + w / 2, y - w * 0.5); g.lineTo(x + w / 2, y); g.closePath();
   g.fillStyle = colour; g.strokeStyle = '#0b1408'; g.lineWidth = Math.max(1.5, w / 12); g.lineJoin = 'round'; g.fill(); g.stroke();
@@ -548,6 +550,24 @@ function rivalOverlay(p, view) {
     if (at && colour) speech(bubble.text, clamp(at.x, 0, W), clamp(at.y, 0, H), colour, avoid, top);
   }
 }
+// What a skill leaves on the ground and over an animal (skills.js). The same shapes in 2D and 3D, with a word of their own for the animal under it.
+const ZONE = { web: '#e8e2f2', den: '#b98a4a', dust: '#d8c090', coil: '#5aa05a' }, THING = { ball: '#6a4a2a', crumb: '#ffd98a', tail: '#8ac05a', nut: '#b5772e', meal: '#ff9a6a' };
+function skillMarks(p, F, now) {
+  for (const z of s.zones) { g.globalAlpha = 0.16 + 0.2 * Math.min(1, z.t); g.fillStyle = g.strokeStyle = ZONE[z.k]; g.beginPath(); g.arc(z.x, z.y, z.r, 0, 7); g.fill(); g.globalAlpha = 0.8; g.lineWidth = 2; g.stroke();
+    if (z.k === 'web') { g.lineWidth = 1; g.beginPath(); for (let i = 0; i < 6; i++) { const a = i * 1.047; g.moveTo(z.x - Math.cos(a) * z.r, z.y - Math.sin(a) * z.r); g.lineTo(z.x + Math.cos(a) * z.r, z.y + Math.sin(a) * z.r); } for (const k of [0.3, 0.6]) { g.moveTo(z.x + z.r * k, z.y); g.arc(z.x, z.y, z.r * k, 0, 7); } g.stroke(); } g.globalAlpha = 1; }
+  for (const it of s.items) {
+    if (it.f !== undefined && it.k !== 'meal') { const M = FORMS[it.f]; g.save(); g.translate(it.x, it.y); g.rotate(it.a ?? Math.atan2(it.vy || 0, it.vx || 1)); g.globalAlpha = 0.75; drawForm(g, M, M.r * 0.9, now / 120, null, 0); g.restore(); g.globalAlpha = 1; }
+    else { g.fillStyle = THING[it.k]; g.strokeStyle = '#00000055'; g.lineWidth = 2; g.beginPath(); g.arc(it.x, it.y, it.r * (1 + 0.08 * Math.sin(now / 150)), 0, 7); g.fill(); g.stroke(); }
+  }
+  for (const m of s.mobs) if (m.fx || m.mark || m.venom > 0) { const M = FORMS[m.f]; g.strokeStyle = m.mark ? '#ff8a1a' : m.venom > 0 || m.fx?.sap ? '#9ae05a' : m.fx?.go === 'away' ? '#ffffff' : '#c9a0ff'; g.lineWidth = 3; g.setLineDash([4, 4]); g.beginPath(); g.arc(m.x, m.y, M.r * 1.4, now / 300, now / 300 + 6.283); g.stroke(); g.setLineDash([]); }
+  if (p.fx && !s.dead) { g.strokeStyle = '#ffd23a'; g.lineWidth = 4; g.beginPath(); g.arc(p.x, p.y, F.r * 2.2 * (p.fx.wide || 1) ** 0.5, -1.57, -1.57 + 6.283 * p.fx.t / p.fx.t0); g.stroke(); }
+}
+function skillMarks3(R, p, F, now) {
+  for (const z of s.zones) { R.ring(z.x, z.y, 0, z.r, R.rgb(ZONE[z.k]), 0.16 + 0.12 * Math.min(1, z.t)); R.ring(z.x, z.y, z.r - 3, z.r, R.rgb(ZONE[z.k]), 0.8); }
+  for (const it of s.items) { const c = it.k === 'wolf' || it.k === 'fox' ? R.rgb(FORMS[it.f].c) : R.rgb(THING[it.k]); R.ball(it.x, it.r, it.y, it.r, 0, 0, it.r, it.r, c); if (it.k === 'wolf' || it.k === 'fox') R.ring(it.x, it.y, it.r * 1.5, it.r * 1.5 + 2.5, [1, 0.82, 0.23], 0.9); }
+  for (const m of s.mobs) if (m.fx || m.mark || m.venom > 0) { const M = FORMS[m.f]; R.ring(m.x, m.y, M.r * 1.4, M.r * 1.4 + 3, R.rgb(m.mark ? '#ff8a1a' : m.venom > 0 || m.fx?.sap ? '#9ae05a' : m.fx?.go === 'away' ? '#ffffff' : '#c9a0ff'), 0.9, 8, now / 300); }
+  if (p.fx && !s.dead) R.ring(p.x, p.y, F.r * 2.2, F.r * 2.2 + 4, [1, 0.82, 0.23], Math.max(0.25, p.fx.t / p.fx.t0));
+}
 function edgeArrow(a, colour, z = 1) { // an arrow at the edge of the screen, pointing along world angle a from the player
   const k = Math.min((W / 2 - 24) / Math.abs(Math.cos(a) || 1e-6), (H / 2 - 24) / Math.abs(Math.sin(a) || 1e-6)), x = W / 2 + Math.cos(a) * k, y = H / 2 + Math.sin(a) * k;
   g.save(); g.translate(x, y); g.rotate(a); g.fillStyle = colour; g.strokeStyle = '#fff'; g.lineWidth = 2; g.beginPath(); g.moveTo(14 * z, 0); g.lineTo(-10 * z, -11 * z); g.lineTo(-10 * z, 11 * z); g.closePath(); g.fill(); g.stroke(); g.restore();
@@ -583,7 +603,7 @@ function draw(now) {
   if (three) return draw3d(now);
   if (!s) { g.fillStyle = '#3f6a34'; g.fillRect(0, 0, W, H); return; }
   const p = s.player, F = me(s), N = s.nemesis, persona = P();
-  zoom = Math.sqrt(W * H) / (480 + 14 * level(s));
+  zoom = Math.sqrt(W * H) / (480 + 14 * level(s)) / (s.player.fx?.view || 1);
   const sx = shake > 0 ? (Math.random() - 0.5) * shake * 14 : 0;
   ground(p.x, p.y);
   g.translate(sx, 0); // still inside the world transform that ground() set; restored below
@@ -649,6 +669,7 @@ function draw(now) {
   }
   if (C) grassOver(g, C.grass, save.look, now, [...(s.dead ? [] : [{ x: p.x, y: p.y, r: F.r }]), ...s.mobs.filter(m => Math.abs(m.x - p.x) < vw && Math.abs(m.y - p.y) < vh).map(m => ({ x: m.x, y: m.y, r: FORMS[m.f].r }))], vbox);
   // numbers
+  skillMarks(p, F, now);
   const size = Math.max(11, 15 / zoom);
   for (const m of s.mobs) {
     const M = FORMS[m.f]; if (Math.abs(m.x - p.x) > vw || Math.abs(m.y - p.y) > vh || C && hiddenFromPlayer(C, m, M, p, F)) continue;
@@ -731,7 +752,7 @@ const pose = (M, ph) => M.kind === 'bird' ? { flat: M.r * (0.9 + Math.sin(ph * 2
 const GREEN = [[0.2, 0.42, 0.14], [0.26, 0.5, 0.18]];
 function draw3d(now) {
   const p = s.player, F = me(s), R = R3, rec = R.recorder;
-  zoom = Math.sqrt(W * H) / (480 + 14 * level(s));
+  zoom = Math.sqrt(W * H) / (480 + 14 * level(s)) / (s.player.fx?.view || 1);
   const jolt = shake > 0 ? (Math.random() - 0.5) * shake * 14 / zoom : 0;
   R.begin(W, H, dpr, p.x + jolt, p.y, W / zoom);
   const vw = W / zoom / 2 + 240, vh = H / zoom / 2 + 420, edge = [], cell = 90;
@@ -771,6 +792,7 @@ function draw3d(now) {
     if (b.ring) R.ring(b.x, b.y, b.r * (1 + k * 1.6) - 1.5, b.r * (1 + k * 1.6) + 1.5, R.rgb(b.c), 1 - k);
     else { b.vz ??= 120 + Math.random() * 220; const rr = Math.max(0.4, b.r * (1 - k * 0.6)); R.ball(b.x, Math.max(rr, rr + b.vz * b.age - 420 * b.age * b.age), b.y, rr, 0, 0, rr, rr, R.rgb(b.c)); }
   }
+  skillMarks3(R, p, F, now);
   if (!s.dead) {
     if (p.safe > 0) R.ring(p.x, p.y, F.r * 1.8, F.r * 1.8 + 3, [0.6, 0.85, 1], 0.5 + 0.3 * Math.sin(now / 90));
     R.ring(p.x, p.y, F.r * 1.5, F.r * 1.5 + 2.6, save.skin.c === '#3a2a22' ? [1, 0.97, 0.9] : R.rgb(save.skin.c), 0.95, 12, now / 900);
@@ -823,8 +845,12 @@ function frame(now) {
           else if (e.kind === 'sting') blip(900, 0.15, 'square', 0.08, 300);
           else if (e.kind === 'leap') { burst(e.x, e.y, ['#ffffff', '#d8f0c0'], 10, 120, 4); blip(300, 0.25, 'sine', 0.1, 900); }
           else if (e.kind === 'shell') blip(200, 0.3, 'triangle', 0.12, 150);
-          else blip(400, 0.35, 'sine', 0.09, 1200);
+          else if (e.kind !== 'own') blip(400, 0.35, 'sine', 0.09, 1200);
         }
+        if (e.t === 'power' && e.kind === 'own') { if (e.reach) bits.push({ x: e.x, y: e.y, r: e.reach / 2.6, c: '#ffd23a', age: 0, life: 0.5, ring: true }); const n = e.name.length * 37 % 400; blip(260 + n, 0.3, n % 2 ? 'triangle' : 'sine', 0.1, 520 + (n * 7) % 700); }
+        if (e.t === 'snack') { floats.push({ x: e.x, y: e.y - 14, text: '+' + e.gain, age: 0 }); crunch(0.05, 0.1, 1800); save.xp = s.player.xp; hud(); }
+        if (e.t === 'tongue') bits.push({ x: e.x, y: e.y, r: 16, c: '#ff7aa0', age: 0, life: 0.3, ring: true });
+        if (e.t === 'life') { say(t('lifeSaved')); blip(660, 0.4, 'triangle', 0.12, 990); buzz(60); }
         if (e.t === 'powerMiss') { say(t('nothingClose')); blip(160, 0.12, 'sine', 0.06); }
         if (e.t === 'stun') { if (e.shell) { floats.push({ x: e.x, y: e.y - 24, text: t('ouch'), age: 0, c: '#cfe8ff' }); blip(180, 0.15, 'square', 0.08, 90); } bits.push({ x: e.x, y: e.y, r: 14, c: '#cfe8ff', age: 0, life: 0.5, ring: true }); }
         if (e.t === 'tired') { floats.push({ x: e.x, y: e.y - 20, text: t('phew'), age: 0, c: '#cfe8ff', big: 1.1 }); say(t('gotTired', nameVars(e.name))); blip(520, 0.25, 'sine', 0.08, 780); }
