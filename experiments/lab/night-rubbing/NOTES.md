@@ -79,3 +79,4 @@ Records under `night-rubbing` (`kit/lab.js`). One run for each plate the player 
 ## 2026-11-25 — the way back to the small games home
 
 Opened from `/small/` (`?from=small`), the page shows "‹ Small games" on the pause card and under the title, through `kit/home.js`. The page has no menu or end card, and the status row where Next plate appears is too narrow for a second control, so the title is where the way back stays in sight. A filed print is reported to the home as a win. The page is in English only, so the link is English even for a Turkish browser (`lang: () => 'en'`). `check.mjs` asserts the two links. The home now also counts the sixth print as filed (from `night-rubbing:proof:6`, read only). Same keys, same records.
+The check serves only the files it allows; `kit/home.js` is added to that list (on purpose: the page now loads it).

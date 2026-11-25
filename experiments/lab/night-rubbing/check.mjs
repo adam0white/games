@@ -27,7 +27,7 @@ await mkdir(shots, { recursive: true });
 function allowed(url) {
   return url === path || url === away || url === notes || url === '/favicon.ico'
     || /^\/lab\/night-rubbing\/[\w.-]+$/.test(url)
-    || /^\/kit\/(?:audio|drag|hint|lab|pause|save|screens|stick|zoom)\.js$/.test(url);
+    || /^\/kit\/(?:audio|drag|hint|home|lab|pause|save|screens|stick|zoom)\.js$/.test(url);
 }
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml' };
 const server = createServer(async (request, response) => {
