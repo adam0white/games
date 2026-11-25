@@ -1,7 +1,9 @@
 // Lantern 3D renderer: draws one frame of the Lantern simulation with WebGL2.
 // It reads the simulation and never changes it. World axes: x is the sim's x (river units),
 // y is up, z points back toward the camera; the boat's row is always z = 0, so z = -(y - s.y).
-import { centre, half, fall, fog, wind, rain, sight, dazzle, boat, BOAT } from './sim.js?v=15';
+import { centre, half, fall, fog, wind, rain, sight, dazzle, boat, BOAT, DT } from './sim.js?v=15';
+import { disturb, solids, riverOf, SPONGE } from './ripples.js';
+import { createWaterGL } from './ripples-gl.js';
 
 const ROWS = 256, DY = 0.05, BEHIND = 40; // river table: 256 rows, 0.05 apart, from 2 units behind the boat
 const NEAR = -1.2, FAR = 4.2, ROW_STEP = 0.025; // ground mesh rows, boat-relative
@@ -89,6 +91,19 @@ vec3 atmos(vec3 col, vec3 p) {
   col = mix(col, uHorizon, uDawn * smoothstep(1.0, 4.5, length(p - uEye)));
   return col;
 }
+#ifdef RIPPLES
+// The ripples (ripples.js): a height field on a grid fixed to the river. uRip: grid x of its first column, cell size, river y of its
+// first row less the boat's, how high a unit of the field stands; uRipN: cells across and along.
+uniform sampler2D uH; uniform vec4 uRip; uniform vec2 uRipN;
+// At a point on the water: the slope (along x, along the river), the curvature (the Laplacian) and the height, in river units.
+// They fade out over the sponge rows at the grid's ends, and where a cell is smaller than about a pixel and a half (far), so far water does not shimmer.
+vec4 ripple(vec3 w, float far) {
+  vec2 g = vec2((w.x - uRip.x) / uRip.y, (-w.z - uRip.z) / uRip.y), e = 1. / uRipN, uv = g * e;
+  float c = texture(uH, uv).r, l = texture(uH, uv - vec2(e.x, 0)).r, r = texture(uH, uv + vec2(e.x, 0)).r, d = texture(uH, uv - vec2(0, e.y)).r, u = texture(uH, uv + vec2(0, e.y)).r;
+  float k = smoothstep(2., ${SPONGE}., min(g.y, uRipN.y - g.y)) * clamp(1.8 - 1.1 * far / uRip.y, 0., 1.);
+  return vec4(vec3((r - l) * 0.5 / uRip.y, (u - d) * 0.5 / uRip.y, (l + r + d + u - 4. * c) / (uRip.y * uRip.y)) * uRip.w, c) * k;
+}
+#endif
 `;
 // Tone mapping, gamma and a little dither against banding in the dark; fragment shaders only.
 const POST = `
@@ -164,6 +179,11 @@ void main() {
     // a little noise so the water never repeats
     float n0 = vnoise(q * 18. + uTime * 0.4), nx = vnoise((q + vec2(0.01, 0)) * 18. + uTime * 0.4), ny = vnoise((q + vec2(0, 0.01)) * 18. + uTime * 0.4);
     g += vec2(nx - n0, ny - n0) * 0.25 * clamp(1. - far * 30., 0., 1.);
+#ifdef RIPPLES
+    vec4 rp = ripple(vW, far);
+    g += rp.xy;
+    foam = max(foam, smoothstep(0.16, 0.42, rp.w) * 0.85); // the crest of a blow's ring breaks white
+#endif
     vec3 n = normalize(vec3(-g.x, 1., g.y));
     // the boat's wake: two arms of foam behind the boat along its own path
     float tx = r.w;
@@ -185,6 +205,17 @@ void main() {
     vec3 rd = reflect(-v, n);
     vec3 sky = mix(vec3(0.003, 0.005, 0.011), uHorizon * 1.2, uDawn * (1. - 0.6 * clamp(rd.y, 0., 1.)));
     col += fres * sky;
+#ifdef RIPPLES
+    // The lantern mirrored in the water: a tight glint that the ripples break into pieces. Where the normal turns faster than
+    // a pixel can show, the glint widens instead of flickering (the normal's spread lowers its sharpness).
+    vec3 hv = normalize(normalize(uLamp - vW) + v), dn = fwidth(n);
+    float sh = 1100. / (1. + 1100. * dot(dn, dn) * 1.5);
+    col += uLampCol * lampW(vW) * pow(max(dot(n, hv), 0.), sh) * (sh + 2.) / 8. * 0.035;
+    // The lantern's light under the surface, seen through it: shifted where the surface tilts, and gathered under
+    // crests and spread under troughs (the curvature), as the bright lines on a pool's floor are.
+    float caus = clamp(1. - rp.z * 0.012, 0.2, 2.6);
+    col += uLampCol * uWet * 1.6 * (lampW(vW + vec3(rp.x, 0., -rp.y) * 0.05) * caus - lampW(vW));
+#endif
     if (foam > 0.) {
       vec3 fc = shade(vW, vec3(0, 1, 0), v, vec3(0.75, 0.82, 0.85), 8., 0.05, 1.);
       col = mix(col, fc + vec3(0.015, 0.02, 0.025) * fl, clamp(foam, 0., 1.));
@@ -403,7 +434,14 @@ void main() {
   } else if (type == 7) { // a light's reflection: a shimmering streak running toward the camera
     float along = vL.y / vSize.y; // -1 far end, 1 near end
     float across = vL.x + 0.006 * sin(vL.y * 140. - uTime * 6.) * along;
-    float s = exp(-across * across / (vB.y * vB.y)) * smoothstep(1., 0.2, abs(along)) * (0.55 + 0.45 * vnoise(vec2(vL.x * 200., vL.y * 70. - uTime * 3.)));
+#ifdef RIPPLES
+    vec4 rp = ripple(vW, length(fwidth(vW.xz))); // ripples bend the streak and break it where the water is steep
+    across += rp.x * 0.02;
+    float broken = clamp(1. - 2.2 * length(rp.xy), 0.08, 1.);
+#else
+    float broken = 1.;
+#endif
+    float s = broken * exp(-across * across / (vB.y * vB.y)) * smoothstep(1., 0.2, abs(along)) * (0.55 + 0.45 * vnoise(vec2(vL.x * 200., vL.y * 70. - uTime * 3.)));
     c = vec4(vCol.rgb * s, 0.);
   }
   // tone map the colour itself, then premultiply again, so faint foam is not brightened by the gamma curve
@@ -641,6 +679,79 @@ export function createRenderer(canvas) {
 
   let W = 1, H = 1, camX = 0.5, vp = null, view = null, cam = null, trail = [], lastY = -1;
 
+  // ---------- the ripples (ripples.js, ripples-gl.js): on unless the browser cannot run them, the frames run long, or the player asks for less motion ----------
+  // ?ripples=0, 1 or 2 holds a quality level (the checks use this); ?ripples=cpu runs the CPU solver. Nothing is saved.
+  const ask = typeof location === 'undefined' ? '' : new URLSearchParams(location.search).get('ripples') ?? '';
+  const calm = typeof matchMedia === 'undefined' ? null : matchMedia('(prefers-reduced-motion: reduce)');
+  const RIP = { level: 2, pinned: /[0-2]/.test(ask) ? Number(ask.match(/[0-2]/)[0]) : null, cpu: ask.includes('cpu'), water: null, mem: {}, t: 0, y: 0, at: 0, still: false, hide: false,
+    gaps: [], since: 0, steps: 0, drops: 0, queued: [], extra: 0, broken: false, fell: [] };
+  const HEIGHT = 0.04; // how high a unit of the field stands, river units
+  // The rippled ground and water marks: the same shaders with RIPPLES defined, attributes where the plain programs have them.
+  // A failure here turns ripples off and never stops the 3D view.
+  function variant(vs, fs, base, names) {
+    const p = gl.createProgram(), def = src => src.replace('#version 300 es', '#version 300 es\n#define RIPPLES');
+    for (const [type, src] of [[gl.VERTEX_SHADER, def(vs)], [gl.FRAGMENT_SHADER, def(fs)]]) { const sh = gl.createShader(type); gl.shaderSource(sh, src); gl.compileShader(sh); gl.attachShader(p, sh); gl.deleteShader(sh); }
+    for (const n of names) { const l = base.a(n); if (l >= 0) gl.bindAttribLocation(p, l, n); }
+    gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) { console.warn('Lantern ripples: the rippled water did not build', gl.getProgramInfoLog(p)); gl.deleteProgram(p); return null; }
+    const u = {}, n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+    for (let i = 0; i < n; i++) { const info = gl.getActiveUniform(p, i); u[info.name.replace(/\[0\]$/, '')] = gl.getUniformLocation(p, info.name); }
+    return { p, u, a: n => gl.getAttribLocation(p, n) };
+  }
+  let PR = null; // { ground, decal } once built
+  const want = () => RIP.broken ? 0 : RIP.pinned ?? (calm?.matches ? 0 : RIP.level);
+  function ensure() { // the water at the level wanted, made or dropped as needed
+    const lv = want();
+    if (RIP.water && RIP.water.level === lv) return RIP.water;
+    RIP.water?.dispose(); RIP.water = null; RIP.mem = {};
+    if (!lv) return null;
+    if (!PR) { PR = { ground: variant(GROUND_VS, GROUND_FS, P.ground, ['aP']), decal: variant(DECAL_VS, DECAL_FS, P.decal, ['aC', 'aA', 'aB', 'aCol']) }; if (!PR.ground || !PR.decal) { RIP.broken = true; return null; } }
+    RIP.water = createWaterGL(gl, lv, { cpu: RIP.cpu });
+    if (!RIP.water) RIP.broken = true;
+    return RIP.water;
+  }
+  // Frames that run long step the ripples down a level, never back up: 90 frames in play averaging over 25 ms (under 40 a second).
+  // A gap over 250 ms (a hidden page, a pause in the browser) is not counted, nor the first second after a start.
+  function frameTook(ms) {
+    if (RIP.pinned !== null || !RIP.level) return;
+    if (RIP.since < 60 || ms > 250) return;
+    RIP.gaps.push(ms); if (RIP.gaps.length < 90) return;
+    const mean = RIP.gaps.reduce((a, b) => a + b, 0) / RIP.gaps.length; RIP.gaps = [];
+    if (mean > 25) { RIP.level--; RIP.fell.push(Math.round(mean)); }
+  }
+  // Each frame: what disturbs the water since the last, then the game ticks it lived through (at most four; none while paused).
+  function ripples(s, f) {
+    const w = ensure(); if (!w) return null;
+    const gap = f.now - RIP.at; RIP.at = f.now;
+    const jump = f.snap || RIP.mem.s !== s || s.t < RIP.t || Math.abs(s.y - RIP.y) > 0.6 || gap > 1000;
+    let ticks = f.playing ? Math.round((s.t - RIP.t) / DT) : Math.round(Math.min(0.1, (f.dt || 0)) / DT);
+    RIP.t = s.t; RIP.y = s.y;
+    if (jump) { w.reset(); RIP.mem = {}; RIP.since = 0; RIP.gaps = []; ticks = 0; }
+    else { RIP.since++; if (f.playing && ticks > 0) frameTook(gap); }
+    const drops = disturb(s, RIP.mem, ticks, f.now / 1000).concat(RIP.queued.splice(0));
+    ticks = Math.max(0, Math.min(4, ticks)) + RIP.extra; RIP.extra = 0;
+    if (!ticks && !drops.length && !jump) return w;
+    w.step(s.y, riverOf(s), solids(s), drops, ticks);
+    RIP.steps += ticks; RIP.drops += drops.length;
+    return w;
+  }
+  calm?.addEventListener?.('change', () => { RIP.mem = {}; });
+  // For the browser checks (experiments/kit/check/phone.mjs, 'lantern ripples'): the state, and ways to hold or test it.
+  const hook = () => ({ level: RIP.water ? RIP.water.level : 0, path: RIP.water ? RIP.water.path : 'off', pinned: RIP.pinned, reduced: !!calm?.matches, broken: RIP.broken, steps: RIP.steps, drops: RIP.drops, fell: RIP.fell, nx: RIP.water?.nx ?? 0, ny: RIP.water?.ny ?? 0 });
+  Object.assign(hook, {
+    pin: l => { RIP.pinned = l; }, feed: (ms, n) => { RIP.since = Math.max(RIP.since, 60); for (let i = 0; i < n; i++) frameTook(ms); return hook(); },
+    drop: (x, y, r, a) => RIP.queued.push({ x, y, r, a }), run: n => { RIP.extra += n; }, still: on => { RIP.still = on; }, hide: on => { RIP.hide = on; },
+    sample: () => RIP.water?.sample() ?? null,
+    // The GPU solver against the CPU one (the one bots.mjs checks): one ring by a straight bank, 30 ticks. Returns the largest difference and the highest wave.
+    agree: async () => {
+      const { createField } = await import('./ripples.js'), level = RIP.water?.level || 2, a = createWaterGL(gl, level), b = createField(level), river = () => [0.5, 0.3], d = [{ x: 0.55, y: 11, r: 0.04, a: 1 }], rock = [{ x: 0.42, y: 11.12, rad: 0.03, len: 0 }];
+      a.step(10, river, rock, d, 0); b.step(10, river, rock, d, 0); a.step(10, river, rock, [], 30); b.step(10, river, rock, [], 30);
+      const x = a.sample(); a.dispose(); let diff = 0, top = 0; for (let k = 0; k < x.h.length; k++) { diff = Math.max(diff, Math.abs(x.h[k] - b.h[k])); top = Math.max(top, Math.abs(b.h[k])); }
+      return { path: a.path, diff, top };
+    },
+  });
+  if (typeof window !== 'undefined') window.lanternRipples = hook;
+
   function resize(w, h) { W = w; H = h; canvas.width = w; canvas.height = h; }
   // Where a point on the water lands on the screen, in device pixels.
   function project(x, z, y = 0) {
@@ -686,7 +797,7 @@ export function createRenderer(canvas) {
     while (trail.length > 2 && trail[0][0] < s.y - 1.6) trail.shift();
 
     // The time and river y are kept small for the GPU: y is passed relative to a whole number of rows.
-    const time = (f.now / 1000) % 600;
+    const time = RIP.still ? 1 : (f.now / 1000) % 600;
     const yb = Math.floor(s.y / DY) * DY - BEHIND * DY;
     let ti = 0;
     for (let i = 0; i < ROWS; i++) {
@@ -721,7 +832,7 @@ export function createRenderer(canvas) {
     const grow = boat(s) / BOAT; for (let i = 0; i < 12; i++) M[i] *= grow;
     const lamp = [M[0] * LAMP[0] + M[4] * LAMP[1] + M[8] * LAMP[2] + M[12], M[1] * LAMP[0] + M[5] * LAMP[1] + M[9] * LAMP[2] + M[13], M[2] * LAMP[0] + M[6] * LAMP[1] + M[10] * LAMP[2] + M[14]];
     // the light's reach: the same circle the flat page draws, including fog, lightning and the ember glow
-    const flick = 1 + Math.sin(f.now / 90) * 0.015 + Math.sin(f.now / 37) * 0.01, R = (sight(s) + f.glow * 0.09) * flick, flash = dazzle(s) < 0;
+    const clock = RIP.still ? 1000 : f.now, flick = 1 + Math.sin(clock / 90) * 0.015 + Math.sin(clock / 37) * 0.01, R = (sight(s) + f.glow * 0.09) * flick, flash = dazzle(s) < 0;
     const lampCol = (f.fire ? f.fire.map(v => v * v * 2.4 * flick + 0.15) : [2.6 * flick, 1.55 * flick, 0.75 * flick]).map(v => v * (1 + f.glow * 0.4));
     const morning = Math.min(1, f.dawn * 0.45 + f.day);
     const night = [0.006, 0.009, 0.018];
@@ -736,12 +847,16 @@ export function createRenderer(canvas) {
 
     const c = { eye, sy: s.y, yb, time, lamp, lampCol, R, pt, ptCol, npt: near.length, amb, horizon, dawnHaze: morning * 0.8, expo: 1.6 + morning * 0.4, wet: f.wet || [0.04, 0.075, 0.09], tint: f.tint, haze: own ? 1 - morning : 0, reedK: first ? 0.6 : 1, stone: own && s.tower ? (s.climb > 50 ? 2 : 1) : 0 };
 
+    const water = ripples(s, f), rip = water && !RIP.hide && water.place(s.y);
+    const ground = rip ? PR.ground : P.ground, decal = rip ? PR.decal : P.decal;
+    const ripUniforms = prog => { if (!rip) return; water.bind(1, prog.u.uH); gl.uniform4f(prog.u.uRip, rip[0], rip[1], rip[2], HEIGHT); gl.uniform2f(prog.u.uRipN, rip[3], rip[4]); };
+
     gl.viewport(0, 0, W, H);
     gl.clearColor(0.01, 0.012, 0.02, 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.enable(gl.DEPTH_TEST); gl.depthMask(true); gl.disable(gl.BLEND); gl.disable(gl.CULL_FACE);
 
     // ground
-    setCommon(P.ground, c); gl.uniform1f(P.ground.u.uShift, ((s.y % ROW_STEP) + ROW_STEP) % ROW_STEP);
+    setCommon(ground, c); gl.uniform1f(ground.u.uShift, ((s.y % ROW_STEP) + ROW_STEP) % ROW_STEP); ripUniforms(ground);
     gl.bindVertexArray(groundVao); gl.drawElements(gl.TRIANGLES, groundCount, gl.UNSIGNED_SHORT, 0);
 
     // things in the water
@@ -822,7 +937,7 @@ export function createRenderer(canvas) {
     const nd = Math.min(MAXDEC, decals.length / 12);
     if (nd) {
       decData.set(decals.slice(0, nd * 12));
-      setCommon(P.decal, c);
+      setCommon(decal, c); ripUniforms(decal);
       gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
       gl.bindBuffer(gl.ARRAY_BUFFER, decBuf); gl.bufferSubData(gl.ARRAY_BUFFER, 0, decData, 0, nd * 12);
       gl.bindVertexArray(decVao); gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, nd);
