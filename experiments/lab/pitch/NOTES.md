@@ -100,3 +100,44 @@ The Turkish was written by an AI and has not been read by a native speaker. Leas
 The page sends play records to the lab under the name `pitch` through `kit/lab.js` (the name is in human-framework `LAB_PROTOTYPES` once its pull request lands; until then every send is refused). The recording notice is on the menu card and on the friend card (a friend's link opens there); the off switch is on the pause card, which is the table menu at a friend's table. A run is one match against the bot (`won` or `lost`), a two-player match (`finished`), today's pitch (`won` if scored, `lost` otherwise; event `daily-finished`) or a match at a friend's table (`won` or `lost` for the seat). Leaving by Menu or Restart ends it `quit`. Events: `goal` (who, how) and `table-joined` (the seat only). Names, table codes and links are never sent; the check proves it with the names Ada and Ben and the code.
 
 `check.mjs` answers the lab address itself (no check reaches the real one), loads the page with `?labRunSource=agent`, and asserts: the notice is on the page before play, a played run sends one run record under `pitch` with its events record, and after the switch is turned off a further run sends nothing and the player id is removed. Not verified: delivery to the real lab (the Worker does not accept this name yet), a real phone.
+
+## Improved in place (2026-11-24)
+
+The owner played the page and said "Good but improve". There was no specific complaint, so the targets came from playing it cold in headless WebKit (iPhone 13) and Chromium (Pixel 7) at 390 x 844 from a cleared save.
+
+### The five weakest things, and what became of each
+
+| # | Weak thing (before) | Change | Before | After |
+|---|---|---|---|---|
+| 1 | A cliff between bot levels. The first match against Easy is won 2-0 in about 8 taps; the next one, against Medium, is a long loss | Eight levels (`rungTurn`, `MIX` in `sim.js`): level 1 is Easy, levels 2 to 6 mix Easy and Medium turn by turn (Medium on 20, 32, 45, 60, 80% of turns), level 7 is Medium and level 8 is Hard. A win climbs one level; the second loss in a row steps down one | A goalward player with 25% random segments won 98% of matches against Easy and 0% against Medium | The same player wins 99 83 72 48 30 6 0 0 % on levels 1 to 8; the largest step down is 24 points (`bots.mjs`, 200 games a level) |
+| 2 | A goal was only a toast and a short arpeggio | Pencil strokes burst from the ball with a ring, the paper shakes, and an own goal and a stuck ball each have their own sound | One effect | Goal, own goal, stuck, level up, level down, match end each have a sound and a motion (`fx()`) |
+| 3 | In today's pitch the setup ink looked the same as the player's own lines, on the sheet and in the picture | Setup lines are drawn faded (alpha 0.42, width 2) in the daily and the puzzles | Not told apart | Told apart; see `after/` screenshots |
+| 4 | A bounce ("go again") was easy to miss, a tap that hits no point did nothing, and the turn coming back was silent | "again!" rises from the ball with two rising notes; a missed tap shows a small ring and a tick; the turn pill bumps with a tick when the turn comes back | No feedback for any of the three | Each fires its own `fx` name; `check.mjs` asserts button, draw, miss and goal on the daily and reset in a puzzle |
+| 5 | Frames of up to 19 ms in WebKit and 10 ms in Chromium: every new segment redrew all the ink, and the end card drew and encoded its picture inside a frame | Ink is drawn one segment at a time (`inkOne`); the picture is drawn 260 ms after the card appears and encoded with `toBlob`, each in its own task | rAF callback max 19 ms WebKit, 9.9 ms Chromium (Medium match) | rAF callback max 2 to 3 ms WebKit, 2.6 to 3.4 ms Chromium on a two-player sheet and a match against level 8; event listeners max 1.9 ms |
+
+### Beyond the five
+
+- **The puzzle book.** 18 one-turn puzzles (`puzzles.js`), each with one new idea named on its card: into the net, off the wall, off old ink, two bounces, four lines, off the post, sideways first, backwards first, a 4 x 6 pitch, five lines, the only way, a 10 x 8 pitch, crossing a line, the greedy way fails, six lines, from the corner, a 6 x 12 pitch, seven lines. Two open at the start; solving one opens the next. A miss counts a try; every third miss draws the answer in dashed pencil for 2.6 s. Saved under the new key `pitch:more` (`{ rung, book: { id: { tries, solved, at } } }`).
+- The puzzles are made by `puzzles-make.mjs` (seeded self-play; `node puzzles-make.mjs > puzzles.js`) and checked by `puzzles-rules.mjs`. Solo content before: 3 bot levels and today's pitch (4). After: 8 levels, today's pitch and 18 puzzles (27), almost seven times as many. Two on one phone and a friend by link are unchanged.
+- **Result lines worth sharing.** The picture has a footer line, and Save picture shares the same line as text with the link: "Paper Pitch: I beat the level 3 bot 2–1.", "Paper Pitch puzzle 7: solved on try 2. Book 7/18.", the daily with tries used.
+- **The small games home.** `kit/home.js` is wired with the menu and end cards. Opened with `?from=small`, both cards get "‹ Small games", and every run that ends (a solved puzzle is `won`) is written to `hub:results`. The end picture is a row shorter when the link is there, so nothing scrolls at 320 x 568. The page's line in `small/catalog.js` was already right and is unchanged.
+- **Save picture through the kit.** `kit/share.js` reached main while this was built; Save picture now calls its `shareImage` with the picture and the share line, so the share sheet and the download fallback are the kit's.
+- **Recording.** Puzzle runs are recorded like the other modes: `start` with `{ mode: 'puzzle', puzzle, n }`, the event `puzzle-solved`, and `won` on a solve (`quit` when left). A bot match now also records `rung`.
+
+### Old saves
+
+`pitch:v1` keeps its keys and format. `level` (0 to 2) is still written, as the nearest old level, so an older copy of the page reads it. A save with no `pitch:more` starts on the level that matches its old level: Easy on level 1, Medium on level 7, Hard on level 8. `phone.mjs`, `check.mjs` and `link-check.mjs` each load an old save.
+
+### Checks
+
+- `bots.mjs`: parity first: 500 random games, 60 bot games at all three old levels and 60 dailies give the same digests as `sim.js` on main (a00b4d9e). Then the ladder claim (level 1 at least 90%, level 8 at most 5%, no step easier than the one before by more than 8 points, no step down over 25 points) and the book claims (the solver clears all 18, each puzzle's idea holds for every shortest answer, a clumsy player who picks the right segment 75% of the time clears 96% of puzzle 1 and 64% of puzzle 18 with no step down over 15 points; at 60% it is 86% to 29%, no step over 20, none under 20%).
+- `bots.mjs --mutate` (boundary points do not bounce) fails as before. `--mutate=ladder` (levels 2 to 6 play like Easy) fails the no-cliff claim. `--mutate=puzzles` (one puzzle loses its setup) fails the book claims.
+- `check.mjs` changed on purpose in three places: the menu says "vs Level n bot" in place of "vs Easy/Medium/Hard bot", the Turkish score label is "Seviye 1 bot" in place of "Kolay bot", the Turkish end line names a level, and `__pitch.level` is the level index (a saved Hard plays level 8, index 7). New: the puzzle book (two open, a miss then the solver's chain, saved on try 2, the share line, the card fits), the fx names, and from the small games home at 320 x 568 on both engines (return link, nothing scrolls on the menu, book, puzzle and its card, the result reaches `hub:results`).
+- `link-check.mjs` (new): two phones at one table, WebKit iPhone 13 and Chromium Pixel 7, each order. The sockets go to the real `Table` class and `handleTable` from `workers/lab-ai` with stand-ins for the platform and its storage, through Playwright WebSocket routing with 40 to 70 ms each way. A whole match by touch (154 and 173 segments), the same sheet on both after every move, the guest's line cut for 2 s mid-match and back, the end card on both, and the rematch. Nothing broke; friend play needed no change.
+
+### Not verified
+
+- A person playing: whether level 2 feels like a step up from level 1, whether the puzzles read as one idea each, and whether the burst and shake are too much. The clumsy and naive players are models, not people.
+- A real phone and the real table Worker: `link-check.mjs` runs the real class off the platform.
+- WebKit encodes the end picture on the main thread: one task of 10 to 15 ms after the card has slid in, while nothing animates. Chromium encodes it off the main thread (0 to 2 ms).
+- The Turkish was written by an AI and has not been read by a native speaker.

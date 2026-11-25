@@ -232,3 +232,44 @@ export function restore(o, rules = RULES) {
   s.ball = o.ball; s.turn = o.turn; s.winner = o.winner; s.how = o.how;
   return s;
 }
+
+// --- Added 2026-11-24 (improve-pitch). New exports only: everything above behaves exactly as on main.
+
+// The bot ladder: eight rungs between Easy and Hard. Each turn, a rung plays Medium's whole turn with probability
+// MIX[rung] and Easy's otherwise; rung 0 is Easy and rungs 6 and 7 are Medium and Hard as before. A naive player
+// that heads for the goal wins about 99, 84, 66, 45, 28, 6, 0, 0 per cent of goals (bots.mjs measures it).
+export const MIX = [0, 0.2, 0.32, 0.45, 0.6, 0.8, 1, 1];
+export const RUNGS = MIX.length;
+export function rungTurn(s, rung, rng) {
+  if (rung >= 7) return botTurn(s, 2, rng);
+  if (rung >= 6) return botTurn(s, 1, rng);
+  return botTurn(s, rng() < MIX[rung] ? 1 : 0, rng);
+}
+// The rung an old save stands on: its level was 0 (Easy), 1 (Medium) or 2 (Hard).
+export const rungOfLevel = level => [0, 6, 7][level] ?? 0;
+// And back, for the old save field `level`, which stays meaningful: 0 at Easy, 2 at Hard, 1 between.
+export const levelOfRung = rung => (rung <= 0 ? 0 : rung >= 7 ? 2 : 1);
+
+// A position from its moves: a string of direction digits played from kick-off on a w x h pitch.
+export function fromMoves(w, h, first, moves, rules = RULES) {
+  const s = create(w, h, first, rules);
+  for (const ch of moves) apply(s, +ch);
+  return s;
+}
+// Every shortest scoring chain for the mover (up to `cap` of them), or [] when none is within maxLen.
+export function solveAll(s, maxLen = 7, cap = 50) {
+  const first = solve(s, maxLen);
+  if (!first) return [];
+  const t = clone(s), p = t.turn, path = [], out = [], L = first.length;
+  const go = depth => {
+    for (const d of legal(t)) {
+      if (out.length >= cap) return;
+      const u = apply(t, d); path.push(d);
+      if (t.winner === p && t.how === 'goal') { if (depth + 1 === L) out.push(path.slice()); }
+      else if (t.winner < 0 && t.turn === p && depth + 1 < L) go(depth + 1);
+      path.pop(); undo(t, u);
+    }
+  };
+  go(0);
+  return out;
+}
