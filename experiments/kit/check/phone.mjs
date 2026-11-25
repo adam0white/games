@@ -1078,7 +1078,7 @@ const GAMES = {
     await page.evaluate(() => { const s = window.lanternSim(); window.lanternRipples.drop(s.x, s.y + 0.3, 0.04, 0.6); window.lanternRipples.run(14); }); await sleep(300);
     const ringed = await look(), { kept, noise, ring } = await differ(plain2, plain, ringed);
     assert.ok(kept > 0.6, `most of the water holds still between two shots (${(100 * kept).toFixed(0)}%)`);
-    assert.ok(ring > 0.6, `a ring shows on the water: ${ring.toFixed(2)} per pixel changed (wanted over 0.6; drawn rings gave 1.2 to 2.2, a field that is not drawn 0 to 0.25); the water drifted ${noise.toFixed(2)} in as long with nothing dropped`);
+    assert.ok(ring > 0.6, `a ring shows on the water: ${ring.toFixed(2)} per pixel changed (wanted over 0.6; drawn rings gave 0.87 to 2.2, a field that is not drawn 0 to 0.28); the water drifted ${noise.toFixed(2)} in as long with nothing dropped`);
     console.log(`     ripples on ${page.context().checkName}: ${r.path}, GPU against CPU ${agree.diff.toFixed(4)} of ${agree.top.toFixed(3)}, ring ${ring.toFixed(2)} against ${noise.toFixed(2)} per pixel`);
     const e = await page.evaluate(() => window.lanternRipples.sample()); assert.ok(e.h.some(v => Math.abs(v) > 0.01), 'the ring is in the field');
     // Less motion: off while the setting is on, back when it is not.
