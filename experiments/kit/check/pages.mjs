@@ -281,6 +281,17 @@ export const pageRuns = {
     const slug = await page.evaluate(() => document.querySelectorAll('.card')[window.smallState().at].classList[1]);
     await smallOpen(page, until, `.card.${slug} a.play`, slug);
     await until(page, s => document.querySelector(`.card.${s} .mark`).textContent !== 'New', 'the opened game is marked after back', 4000, slug);
+    // Two quick taps on an arrow, the second while the deck still glides from the first: two cards on, and the deck
+    // comes to rest on that card (a glide used to move `at` back to the card it was passing, and WebKit could drop the
+    // second smooth scroll).
+    await page.evaluate(() => document.getElementById('deck').scrollIntoView({ block: 'center' }));
+    const twice = await page.evaluate(() => new Promise(done => {
+      const from = window.smallState().at, way = from > 5 ? 'prev' : 'next';
+      document.getElementById(way).click(); setTimeout(() => { document.getElementById(way).click(); done(from + (way === 'next' ? 2 : -2)); }, 60);
+    }));
+    await until(page, n => { const d = document.getElementById('deck'), c = document.querySelectorAll('.card')[n]; return window.smallState().at === n && Math.abs(d.scrollLeft - (c.offsetLeft - (d.clientWidth - c.offsetWidth) / 2)) <= 2; }, 'two quick arrow taps land two cards on', 4000, twice);
+    await page.waitForTimeout(400);
+    assert.equal((await smallState(page)).at, twice, 'and stay there');
     // Tonight: play the other two stops.
     for (const [i, stop] of [[2, 'night-sand'], [3, 'thankful']]) {
       await page.evaluate(() => window.scrollTo(0, 0));
