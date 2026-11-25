@@ -90,6 +90,15 @@ h1, h2 {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+#plate-name.two {
+  display: -webkit-box;
+  margin-top: 2px;
+  font-size: 14px;
+  line-height: 1.08;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
 
 .receivers {
   flex: 0 0 auto;
@@ -362,19 +371,25 @@ button:disabled { opacity: .45; cursor: default; }
 
 #result { display: none; }
 .bench { position: relative; }
-/* The result card takes the dial's place and grows upward over the empty foot of the bench, so a longer result
-   (Turkish, or the way back to the small games) never makes the page taller. */
-.bench:has(#result.on) > .dial { visibility: hidden; }
+/* The result card takes the dial's place. On short screens it grows upward over the foot of the bench instead, so a
+   longer result (Turkish, or the way back to the small games) never makes the page taller. */
+.bench:has(#result.on) > .dial { display: none; }
 
 #result.on {
-  position: absolute;
-  inset: auto 0 0;
   display: grid;
   gap: 7px;
   padding: 9px 14px 10px;
   border-top: 1px solid var(--rule);
-  background: color-mix(in srgb, var(--metal) 94%, transparent);
-  box-shadow: inset 0 1px #ffffff0c, 0 -14px 24px -12px #0009;
+  background: var(--metal);
+}
+@media (max-height: 700px) and (orientation: portrait) {
+  .bench:has(#result.on) > .dial { display: block; visibility: hidden; }
+  #result.on {
+    position: absolute;
+    inset: auto 0 0;
+    background: color-mix(in srgb, var(--metal) 94%, transparent);
+    box-shadow: inset 0 1px #ffffff0c, 0 -14px 24px -12px #0009;
+  }
 }
 #result button { white-space: nowrap; }
 
@@ -398,10 +413,12 @@ button:disabled { opacity: .45; cursor: default; }
 
 #result-line { margin: 0; color: var(--muted); font-size: 13px; }
 #result .pair { flex-wrap: wrap; align-items: center; }
+/* Buttons keep their whole label; when the row is full the way back wraps to its own line. */
+#result .pair > button { flex: 1 0 auto; }
 #share { flex: 1; border-color: var(--brass); color: var(--brass); }
 #result-line:empty { display: none; }
 #result button { padding: 6px 8px; font-size: 13px; }
-#next { flex: 1.2; }
+#result #next { flex: 1.2 0 auto; }
 
 @media (max-height: 650px) {
   .instrument {
@@ -435,6 +452,12 @@ button:disabled { opacity: .45; cursor: default; }
 
   .readout, .dial, #result { background: var(--metal); border: 1px solid var(--rule); }
   .readout { grid-column: 1; grid-row: 3; gap: 8px; padding-inline: 10px; border-radius: 8px 8px 0 0; }
+  /* The side column is narrow: the plate name takes its own line above the counts and buttons. */
+  .readout { flex-wrap: wrap; row-gap: 4px; }
+  .readout .names { flex: 1 0 100%; }
+  .readout .receivers { flex: 1 1 0; min-width: 0; border-inline-start: 0; padding-inline-start: 0; text-align: start; }
+  #turns .long { display: none; }
+  #turns .short { display: inline; }
   .dial, #result { grid-column: 1; grid-row: 4; align-self: start; border-top: 0; border-radius: 0 0 8px 8px; }
   .control > .kit-hint { top: 100%; }
   #result.on { position: static; padding-inline: 9px; box-shadow: none; }

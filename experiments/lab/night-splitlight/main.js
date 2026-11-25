@@ -86,7 +86,15 @@ function texts() {
   el('sound').textContent = audible ? t('soundOn') : t('soundOff');
   el('sound').setAttribute('aria-pressed', String(audible));
   readout();
+  fitName();
 }
+// A plate name that does not fit on one line drops to two smaller lines, so the header never grows.
+function fitName() {
+  const name = el('plate-name');
+  name.classList.remove('two');
+  if (name.scrollWidth > name.clientWidth + 1) name.classList.add('two');
+}
+addEventListener('resize', fitName);
 function readout() {
   el('captured').textContent = litCount() + ' / ' + state.targets.length;
   const counts = { n: state.turns, par: parInfo.par };
