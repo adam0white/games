@@ -42,7 +42,7 @@ test('old experiment links move permanently to the top level and keep the query'
 });
 test('a lab page that left the lab sends its old address on, with the query, by a 302', async () => {
   const cases = {
-    '/lab/night-vine/?lang=tr': '/vine/?lang=tr', '/lab/night-flock-2/': '/flock/', '/lab/night-flock-2': '/flock/',
+    '/lab/night-vine/?lang=tr': '/vine/?lang=tr', '/lab/ant-creatures/?lang=tr': '/ant-promotion/?look=4&lang=tr', '/lab/ant-creatures/': '/ant-promotion/?look=4', '/lab/night-flock-2/': '/flock/', '/lab/night-flock-2': '/flock/',
     '/lab/lantern-echo/echo.js': '/lantern/', '/lab/ant-nest/?a=b&c=d': '/ant-promotion/?a=b&c=d', '/lab/boat-b/': '/boat/',
   };
   for (const [from, to] of Object.entries(cases)) {

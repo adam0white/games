@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { performance } from 'node:perf_hooks';
 import {
-  CARRIER_LESSON, CASES, OUTLINE_LESSON, accuse, aids, claims, createCase, dailyCase, dailyWin, dossiers, floorOf,
+  CARRIER_LESSON, CASES, OUTLINE_LESSON, RETRY_VARIANTS, accuse, aids, caseVariant, claims, createCase, dailyCase, dailyWin, dossiers, floorOf,
   freshRun, observe, offsetDay, random,
 } from './sim.js';
 
@@ -419,6 +419,55 @@ assert.strictEqual(accuse(control, run, control.culprit), run);
 assert.deepEqual(dailyWin('2026-11-23', '2026-11-23', 2), { last: '2026-11-23', streak: 2 });
 assert.deepEqual(dailyWin('2026-11-23', '2026-11-24', 2), { last: '2026-11-24', streak: 3 });
 assert.deepEqual(dailyWin('2026-11-23', '2026-11-25', 2), { last: '2026-11-25', streak: 1 });
+
+// Retry variants. A lost campaign case shows its liar, so Retry deals another
+// draw of the same case. Every variant must pass the checks the original
+// cases pass, and its liar must differ from the case just lost. These run
+// apart from the tables above, which describe the original cases only.
+let variantCount = 0;
+for (const [i, spec] of CASES.entries()) {
+  const level = i + 1;
+  assert.deepEqual(caseVariant(level, 0), createCase({ level }), `case ${level}: variant 0 is the case itself`);
+  const chain = Array.from({ length: RETRY_VARIANTS + 2 }, (_, n) => caseVariant(level, n));
+  for (const [n, c] of chain.entries()) {
+    if (!n) continue;
+    const before = chain[n - 1];
+    assert.ok(c.culprit !== before.culprit && c.cast[c.culprit].species !== before.cast[before.culprit].species,
+      `case ${level}: retry ${n} has a different liar from the run it follows`);
+    assert.ok(c.culprit !== chain[0].culprit && c.cast[c.culprit].species !== chain[0].cast[chain[0].culprit].species,
+      `case ${level}: retry ${n} liar differs from the original`);
+    assert.notDeepEqual(c.frames, before.frames, `case ${level}: retry ${n} has a different layout`);
+    if (n > RETRY_VARIANTS) continue;
+    variantCount++;
+    for (const key of ['chapter', 'site', 'count', 'beats', 'rooms', 'crime', 'masks', 'blackout', 'floors', 'carrier', 'staggered', 'twoMarks', 'tutorial']) {
+      assert.equal(c.spec[key], spec[key], `case ${level}: retry ${n} keeps ${key}`);
+    }
+    assert.deepEqual(caseVariant(level, n), c, 'variants are deterministic');
+    prove(c);
+    if (level >= 3) checkAlternatives(c.seed, level);
+    if (spec.carrier) {
+      const { carrier, givers, answer } = trailBot(c);
+      assert.ok(carrier === c.carrier && givers.length >= 3 && givers.includes(c.culprit) && answer === c.culprit
+        && carrier !== c.culprit, `case ${level}: retry ${n} carrier trail`);
+    }
+    if (spec.masks) {
+      const on = c.frames.findIndex(frame => frame.some(actor => actor.mask !== null));
+      assert.ok(on > 0 && c.frames[on].every((actor, id) => actor.room === c.frames[on - 1][id].room
+        && actor.slot === c.frames[on - 1][id].slot), `case ${level}: retry ${n}: nobody moves where masks go on`);
+      if (!spec.carrier && spec.tutorial !== 'masks' && wearsMask(c, c.culprit) && !hidesLie(c, c.culprit)) {
+        assert.ok(!c.frames.at(-1).some((actor, id) => actor.mask !== null
+          && hidesLie(createCase({ seed: c.seed, level, culpritOverride: id }), id)), `case ${level}: retry ${n} hides a masked lie when it can`);
+      }
+    }
+    if (spec.floors) {
+      const liar = c.cast[c.culprit];
+      assert.notEqual(floorOf(c.spec.rooms, liar.claim.room), floorOf(c.spec.rooms, c.frames[liar.claim.beat][liar.id].room),
+        `case ${level}: retry ${n}: the lie crosses floors`);
+    }
+    if (spec.twoMarks) assert.ok(dossiers(c).every(card => card.claim2 && card.claim2.beat > card.claim.beat), 'two marks per alibi');
+  }
+}
+assert.equal(variantCount, CASES.length * RETRY_VARIANTS);
 
 console.table(rows);
 const rate = (wins, attempts) => `${(100 * wins / attempts).toFixed(2)}%`;

@@ -10,6 +10,7 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, extname, join, normalize, resolve } from 'node:path';
 import assert from 'node:assert/strict';
+import { answerLab, allowLocalSend, withAgent, assertNotice, assertRun, assertOffSendsNothing, assertNoLeak, waitForRuns, runRecords } from '../../kit/check/lab-record.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url)), root = resolve(here, '../..');
 const SHOTS = process.env.SHOTS || await mkdtemp(join(tmpdir(), 'wild-pour-check-'));
@@ -52,7 +53,7 @@ async function readyRenderer(page, name, headed) {
   throw new Error('timed out waiting for: headless WebKit animation frames');
 }
 
-// One pour by a thumb: press under the jug, slide right until the juice runs, ease off as the glass nears the line, lift.
+// One pour by a thumb: press under the jug, slide right to a steady pour, lift as the glass nears the line.
 async function pour(page, shot) {
   return page.evaluate(async shotAt => {
     const el = document.getElementById('c'), st = () => window.pourState(false);
@@ -64,8 +65,7 @@ async function pour(page, shot) {
     while (frames++ < 60 * 25) {
       const s = st(); if (s.over) break;
       if (s.inGlass + s.flying >= s.target - 3) break;
-      const need = 1.28 + (1 - s.inJug / 80) * 0.85 + 0.1; // the tilt where juice runs, as the bots use it
-      dx = Math.min(dx + 3, need / 2.4 * span);
+      dx = Math.min(dx + 3, 1.75 / 2.4 * span); // a steady half-rate pour (the flow follows the thumb, sim.js)
       send('move', x0 + dx, y);
       if (!shotTaken && s.inGlass > 2) { shotTaken = true; window.__shot = true; }
       await frame();
@@ -73,6 +73,29 @@ async function pour(page, shot) {
     send('up', x0 + dx, y);
   });
 }
+
+// A scripted pour that the page and Node both run: the daily seed on three levels, with a thumb that pours, pauses and
+// pours again. The same end state in both browsers and in Node means the daily pour is the same for everyone.
+async function scriptedRun() {
+  const sim = await import('/lab/wild-pour/sim.js'), { dailyPour } = await import('/lab/wild-pour/daily.js');
+  const out = [];
+  for (const n of [1, 5, 7]) {
+    const s = sim.create(n, dailyPour(new Date('2026-11-24T12:00:00Z')).seed);
+    for (let i = 0; i < 60 * 40 && !s.over; i++) sim.step(s, i % 200 < 110 ? 1.4 + (i % 37) / 60 : 0);
+    out.push(sim.digest(s));
+  }
+  return out.join(' ');
+}
+const nodeDigest = await (async () => {
+  const sim = await import('./sim.js'), { dailyPour } = await import('./daily.js');
+  const out = [];
+  for (const n of [1, 5, 7]) {
+    const s = sim.create(n, dailyPour(new Date('2026-11-24T12:00:00Z')).seed);
+    for (let i = 0; i < 60 * 40 && !s.over; i++) sim.step(s, i % 200 < 110 ? 1.4 + (i % 37) / 60 : 0);
+    out.push(sim.digest(s));
+  }
+  return out.join(' ');
+})();
 
 async function run(name) {
   const [type, device] = PHONES[name];
@@ -85,11 +108,14 @@ async function run(name) {
   try {
   browser = await type.launch({ headless: !headed });
   const ctx = await browser.newContext({ ...device });
+  // The lab endpoint is answered here, so no check reaches the real one; records are marked as agent runs.
+  const lab = await answerLab(ctx, base);
+  await allowLocalSend(ctx);
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(`pageerror: ${e.message}`));
   page.on('console', m => { if (m.type() === 'error') errors.push(`console: ${m.text()}`); });
-  await page.goto(`${base}/lab/wild-pour/?seed=3&perf=1`);
+  await page.goto(withAgent(`${base}/lab/wild-pour/?seed=3&perf=1`));
   await until(page, () => window.pourState && window.pourState().screen === 'menu', 'menu');
   await readyRenderer(page, name, headed);
   const boot = await page.evaluate(() => new Promise(resolve => {
@@ -100,6 +126,12 @@ async function run(name) {
   }));
   console.log(`${name}: renderer startup ${JSON.stringify(boot)}, errors ${JSON.stringify(errors)}`);
   await page.screenshot({ path: join(SHOTS, `${name}-1-menu.png`) });
+  // The same seed and thumb give the same pour here as in Node (the daily pour is the same for everyone).
+  const browserDigest = await page.evaluate(scriptedRun);
+  assert.equal(browserDigest, nodeDigest, `${name} runs the scripted pour to the same end state as Node`);
+  console.log(`${name}: scripted pour digest ${browserDigest} matches Node`);
+  await assertNotice(page, '#play');
+  assert.equal(lab.sent.length, 0, 'nothing is sent before Play');
   let st = await state(page);
   assert.ok(st.minTouchPx >= 48, `menu touch targets ${st.minTouchPx.toFixed(0)} px`);
 
@@ -166,7 +198,7 @@ async function run(name) {
   }, before);
   console.log(`${name}: frame profile ${JSON.stringify(perf)}`);
   assert.ok(perf.interval.count >= 250, 'at least 250 frames in five seconds');
-  assert.ok(perf.work.p95 < 16.67, 'p95 simulation and render work fits 60fps budget');
+  assert.ok(perf.work.p95 < 8, `p95 simulation and render work under 8 ms (${perf.work.p95.toFixed(2)})`);
   assert.ok(perf.interval.mean < 18, 'mean frame interval sustains near 60fps');
   // Full tilt must remain below both the dots and clock, including the handle stroke.
   await page.evaluate(() => {
@@ -177,11 +209,24 @@ async function run(name) {
   await until(page, () => window.pourState().angle >= 2.39, 'full tilt');
   await page.screenshot({ path: join(SHOTS, `${name}-4-full-tilt.png`) });
   assert.ok((await state(page)).jugClearance >= 0, 'full tilt clears HUD');
+  // Hold it until far too much is out, so this pour fails; then one tap must start the pour again within a second.
+  await until(page, () => { const s = window.pourState(false); return s.over || s.inGlass + s.flying > s.target + s.band + 6; }, 'too much poured', 30000);
   await page.evaluate(() => document.getElementById('c').dispatchEvent(new PointerEvent('pointerup', {pointerId:8,pointerType:'touch',bubbles:true})));
-  if ((await state(page)).over) {
-    await until(page, () => window.pourState().screen === 'end', 'full tilt result');
-    await page.tap('#toMenu');
-  } else { await page.tap('#pause'); await page.tap('#quit'); }
+  await until(page, () => window.pourState().screen === 'end', 'full tilt result', 20000);
+  const failed = await state(page);
+  assert.ok(!failed.won, `pouring everything at once fails level ${failed.level} (${failed.why})`);
+  assert.ok(failed.endShownAt - failed.overAt < 600, `the card shows ${Math.round(failed.endShownAt - failed.overAt)} ms after the pour fails`);
+  await page.screenshot({ path: join(SHOTS, `${name}-4-failed.png`) });
+  // One tap anywhere off the card (here: the dimmed scene under it) pours again.
+  const box = await page.locator('#end .card').boundingBox(), vp = page.viewportSize();
+  const tapY = Math.min(vp.height - 20, box.y + box.height + 40);
+  const tapAt = Date.now();
+  await page.touchscreen.tap(vp.width / 2, tapY);
+  await until(page, () => window.pourState().playing && !window.pourState().over, 'playing again');
+  const restartMs = Date.now() - tapAt;
+  console.log(`${name}: a failed pour (${failed.why}) restarts ${restartMs} ms after one tap off the card; card after ${Math.round(failed.endShownAt - failed.overAt)} ms`);
+  assert.ok(restartMs < 1000, `one tap off the card restarts a failed pour within a second (${restartMs} ms)`);
+  await page.tap('#pause'); await page.tap('#quit');
 
   // Daily retries share seed, do not award campaign stars, and retain the device best.
   const campaign = (await state(page)).saved;
@@ -200,7 +245,7 @@ async function run(name) {
   }, activeStart);
   console.log(`${name}: active pour profile ${JSON.stringify(active)}`);
   assert.ok(active.interval.count >= 120, 'at least two seconds of active pour measured');
-  assert.ok(active.work.p95 < 16.67, 'active pour p95 work fits 60fps budget');
+  assert.ok(active.work.p95 < 8, `active pour p95 work under 8 ms (${active.work.p95.toFixed(2)})`);
   assert.ok(active.interval.mean < 18, 'active pour mean interval sustains near 60fps');
   const dailyEnd = await state(page);
   assert.ok(dailyEnd.won, 'daily touch pour wins');
@@ -221,6 +266,20 @@ async function run(name) {
   assert.deepEqual((await state(page)).daily.best, dailyEnd.daily.best, 'reload preserves exact daily best');
   console.log(`${name}: daily ${dailyEnd.inGlass}/${dailyEnd.target}, ${dailyEnd.spilled} spilled; clearance ${retry.jugClearance.toFixed(2)}px`);
 
+  // Recording: every pour was one run record under this page's name; with the switch off nothing more is sent.
+  await waitForRuns(lab, 'wild-pour', 2);
+  const runs = runRecords(lab, 'wild-pour').filter(r => r.data.outcome !== 'between-runs');
+  assert.ok(runs.some(r => r.data.outcome === 'won' && r.data.summary.level === 1 && r.data.summary.stars >= 1), 'the won first level was recorded');
+  assert.ok(runs.some(r => r.data.start?.daily === true && ['won', 'lost'].includes(r.data.outcome)), 'the finished daily pour was recorded');
+  assert.ok(runs.some(r => r.data.outcome === 'quit'), 'leaving a pour by the menu is a quit');
+  assert.ok(runs.some(r => r.data.events.some(e => e.type === 'daily-finished')) && runs.some(r => r.data.events.some(e => e.type === 'level-finished')), 'level and daily events');
+  assertRun({ sent: lab.sent.filter(r => !(r.kind === 'run' && r.data.outcome === null)) }, 'wild-pour', { outcomes: ['won', 'lost', 'quit'], summaryKeys: ['level', 'stars', 'inGlass', 'target'] });
+  assertNoLeak(lab, ['hf-lab', 'wild-pour:']);
+  await page.tap('#pause');
+  await assertOffSendsNothing(page, lab, 'wild-pour', { play: async () => {
+    await page.tap('#quit'); await page.tap('#play'); await sleep(300);
+    await page.tap('#pause'); await page.tap('#quit');
+  } });
   assert.deepEqual(errors, [], 'no page or console errors');
   console.log(`${name}: ok`);
   } finally { try { await browser?.close(); } finally { awake?.kill(); } }

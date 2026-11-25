@@ -89,3 +89,9 @@ Both final browser checks exited 0. Each used real taps and drags to complete ga
 | Chromium, Pixel 7 | 11.54 | 53.6 | 27.64 | 192, 150, 225, 222, 281, 259, 511, 256, 542, 388 | 11 / 20 | 0 |
 
 Fourteen accepted captures were inspected. They show the opening, growing bed, first bloom, rotated second garden, completed campaign and dry and completed daily. They live under `/private/tmp/night-r4-review/channels/`. First-time human play, difficulty without the tested routes, audio by ear, physical-phone frame rate and deployment remain unverified.
+
+## Play recording (2026-11-24)
+
+The page sends play records to the lab under the name `night-channels` through `kit/lab.js` (the name is in human-framework `LAB_PROTOTYPES` once its pull request lands; until then every send is refused). This page has no start card, so the recording notice sits in the footer under the garden from the first moment, and the off switch is on the pause card. A run is one garden, from the first cut to bloom (`won`), a replant or leaving for the list (`lost` if the cuts ran out, else `quit`). Opening the page and not cutting records nothing. Events: `garden-complete` and, for the daily, `daily-finished`. The check no longer blocks `/kit/lab.js`; it answers the lab address itself and asserts nothing else is written.
+
+`check.mjs` answers the lab address itself (no check reaches the real one), loads the page with `?labRunSource=agent`, and asserts: the notice is on the page before play, a played run sends one run record under `night-channels` with its events record, and after the switch is turned off a further run sends nothing and the player id is removed. Not verified: delivery to the real lab (the Worker does not accept this name yet), a real phone.

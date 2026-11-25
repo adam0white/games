@@ -6,6 +6,7 @@ import { isPauseKey, onLeave } from '../../kit/pause.js';
 import { noZoom } from '../../kit/zoom.js';
 import { screens } from '../../kit/screens.js';
 import { hint } from '../../kit/hint.js';
+import { lab } from '../../kit/lab.js';
 
 noZoom();
 const get = id => document.getElementById(id);
@@ -100,7 +101,16 @@ function lift() {
   previous = null;
   if (id !== null && canvas.hasPointerCapture(id)) canvas.releasePointerCapture(id);
 }
+// Play recording for the game lab: one run is one garden, from the first cut to bloom, replant or leaving it.
+const rec = lab('night-channels');
+let running = false;
+function recEnd(outcome) {
+  if (!running) return;
+  running = false;
+  rec.end(outcome, { garden: level, daily: Boolean(day), cuts: state.budget - state.remaining, budget: state.budget, bloomed: blooms, beds: state.beds.length, secs: Math.round(elapsed * 10) / 10 });
+}
 function start(n, date = null) {
+  recEnd(state.won ? 'won' : state.remaining === 0 ? 'lost' : 'quit');
   lift();
   level = n; day = date; state = create(n,date); touched = false; blooms = 0;
   elapsed = carry = 0; lastFrame = null;
@@ -119,6 +129,9 @@ function win() {
     if (level === 10) saved.completed = true;
     store();
   }
+  rec.event('garden-complete', { garden: level, daily: Boolean(day), cuts: state.budget - state.remaining, budget: state.budget });
+  if (day) rec.event('daily-finished', { cuts: state.budget - state.remaining });
+  recEnd('won');
   show('won');
   update();
 }
@@ -133,6 +146,7 @@ function back() {
   get(state.won ? 'next' : 'pause').focus({preventScroll:true});
 }
 function choose() {
+  recEnd(state.won ? 'won' : state.remaining === 0 ? 'lost' : 'quit');
   lift(); audio.hold();
   const list = get('levels');
   list.replaceChildren();
@@ -204,6 +218,7 @@ function clippedStroke(a,b) {
 }
 function cut(x,y) {
   if (!dig(state,y * state.cols + x)) return;
+  if (!touched && !running) { running = true; rec.start({ garden: level, daily: Boolean(day), budget: state.budget }); }
   touched = true; hintControl.done();
   const now = performance.now();
   if (now - lastSound > 65) {
@@ -295,3 +310,7 @@ window.channelView = () => ({screen, state:structuredClone(state), geometry:geom
   level, day, best:bestOn(day), unlocked:saved.unlocked, look});
 update();
 requestAnimationFrame(frame);
+
+// The notice is under the garden from the first moment (this page has no start card); the switch is on the pause card.
+rec.notice(document.querySelector('footer'));
+rec.toggle(get('paused').firstElementChild);

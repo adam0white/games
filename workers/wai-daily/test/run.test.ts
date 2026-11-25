@@ -15,7 +15,8 @@ function deps(
   b: ReturnType<typeof bucket>,
   replies: Parameters<typeof ai>[0],
   start = DUE,
-  usage?: Parameters<typeof ai>[1],
+  // A prompt of 3,000 tokens: the fake's default of 6,000 exceeds what Gemma's reservation covers here.
+  usage: Parameters<typeof ai>[1] = { prompt_tokens: 3000, completion_tokens: 60 },
 ) {
   let clock = start;
   const fake = ai(replies, usage);

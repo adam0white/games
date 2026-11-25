@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
 
 const json = JSON.stringify;
 const now = new Date();
@@ -8,7 +7,6 @@ const utcDay = now.toISOString().slice(0, 10);
 
 // These saves exercise the formats already read by each page. Sharing remains off.
 const saves = {
-  spark: { v: 1, best: 1, stars: { 1: 2 }, played: 3 },
   face: { v: 1, best: 300, runs: 3, stars: [2, 1, 0, 0], sound: true },
   pour: { v: 1, stars: [0, 0, 0, 0, 0, 0, 0, 0], sound: true, tries: 3 },
   bells: { v: 1, stars: [2, 0, 0, 0, 0, 0, 0, 0], best: 120, sound: true, tries: 3, look: 'moon' },
@@ -197,15 +195,6 @@ export const labPages = {
     hint: { key: 'lantern-race:hint', delay: 1500, start: raceStart, before: () => window.raceState().target, moved: n => window.raceState().target !== n,
       legacy: { 'lantern-race-best': '100000', 'lantern-race-sound': '1', 'lantern-race-name': 'Test boat', 'lantern-race-played': '1' } },
   },
-  'lab/lantern-spark': pageEntry('lantern-spark:save', saves.spark, 'lantern-spark:hint', {
-    menu: '#quit', pauseDown: true,
-    state: () => { const s = window.echoState?.(); return s && { ...s, paused: !!s.paused }; },
-    verify: () => { const s = window.echoState(); return { best: s.best, stars: s.stars, played: JSON.parse(localStorage.getItem('lantern-spark:save')).played, sparkHint: s.sparkHint }; },
-    expect: { best: 1, stars: { 1: 2 }, played: 3, sparkHint: false },
-    touch: dragTouch(() => window.echoState().target, n => window.echoState().target !== n),
-    hint: { delay: 1500, before: () => window.echoState().target, moved: n => window.echoState().target !== n,
-      alive: () => { const s = window.echoGame().s; s.safe = 60; s.light = 1; } },
-  }, { 'lantern-spark:spark': '1' }),
   'lab/wild2-face-shift': pageEntry('wild2-face-shift:save', saves.face, 'wild2-face-shift:hint', {
     menu: '#toMenu', sound: '#sound',
     state: () => { const s = window.faceShiftState?.(); return s && { screen: s.mode, paused: s.mode === 'paused', t: s.state?.elapsed ?? 0 }; },
@@ -310,91 +299,4 @@ export const labPages = {
     hint: { key: 'lantern-tide:hint', delay: 1500, timing: { start: '#start' },
       input: steerTide, legacy: tideLegacy },
   },
-};
-
-// The three draft homes for the small games (lab/hub-a, hub-b, hub-c). They are not games, so each has its own run
-// instead of a save, pause and touch contract: it loads in both languages, every game link resolves to a page in this
-// checkout, the hub never writes a game's own keys, and a game opened from it comes back with the browser's back.
-const checkoutRoot = new URL('../../../', import.meta.url);
-export function linkTarget(href) {
-  const path = new URL(href, 'http://x').pathname;
-  const file = path.startsWith('/crumbwar/') ? `workers/crumbwar/public${path}index.html` : `experiments${path}index.html`;
-  return existsSync(new URL(file, checkoutRoot)) ? file : null;
-}
-async function hubRun(page, { base, until }, v, { links, open }) {
-  const gameKeys = () => page.evaluate(() => Object.fromEntries(Object.keys(localStorage).filter(k => !k.startsWith('hub:') && k !== 'kit:lang').map(k => [k, localStorage.getItem(k)])));
-  await page.goto(`${base}/notes/button.js`);
-  await page.evaluate(seed => { localStorage.clear(); for (const [k, v] of Object.entries(seed)) localStorage.setItem(k, v); }, hubSeed);
-  await page.goto(`${base}/lab/hub-${v}/?lang=en&day=2026-11-24`); await until(page, () => window.hubState, 'hub script');
-  const before = await gameKeys();
-  const state = await page.evaluate(() => window.hubState());
-  assert.equal(state.lang, 'en');
-  assert.ok(state.links.length >= links, `at least ${links} game links (${state.links.length})`);
-  for (const href of state.links) {
-    assert.match(href, new RegExp(`\\?from=hub-${v}$`), `${href} carries from=hub-${v}`);
-    assert.ok(linkTarget(href), `${href} is a page in this checkout`);
-  }
-  for (const href of await page.$$eval('.hub-strip a', as => as.map(a => a.getAttribute('href')))) assert.ok(existsSync(new URL(`experiments/lab/${href.slice(3).split('?')[0]}index.html`, checkoutRoot)), `strip link ${href}`);
-  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no sideways scroll in English');
-  const title = await page.textContent('h1');
-  await page.click('.hub-lang'); await until(page, () => document.documentElement.lang === 'tr', 'Turkish');
-  assert.notEqual(await page.textContent('h1'), title, 'the title is Turkish');
-  assert.equal(await page.evaluate(() => [...document.querySelectorAll('[data-i18n]')].filter(el => !el.textContent.trim()).length), 0, 'every string filled in Turkish');
-  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no sideways scroll in Turkish');
-  await page.reload(); await until(page, () => window.hubState?.().lang === 'tr', 'Turkish is remembered');
-  await page.click('.hub-lang'); await until(page, () => document.documentElement.lang === 'en', 'English again');
-  // Taken before a game is opened: the games themselves write their own keys once they load.
-  assert.deepEqual(await gameKeys(), before, 'the hub wrote no game key');
-  await open(page, { until });
-}
-// A game played once: Night Bells has one level cleared, so its mark reads 1 / 8.
-const hubSeed = { 'night-bells:save': json({ v: 1, stars: [2, 0, 0, 0, 0, 0, 0, 0], best: 0, sound: true, tries: 1, look: 'amber' }), 'night-bells:hint': '1' };
-async function openAndReturn(page, { until }, selector, slug) {
-  await page.click(selector);
-  await page.waitForURL(url => url.pathname === `/lab/${slug}/`);
-  await page.goBack(); await until(page, () => window.hubState, 'back on the hub');
-}
-export const labHubs = {
-  'lab/hub-a': (page, tools) => hubRun(page, tools, 'a', {
-    links: 14,
-    open: async (page, { until }) => {
-      assert.equal(await page.textContent('a.tile.night-bells .mark'), '1 / 8', 'a cleared level shows on the tile');
-      await openAndReturn(page, { until }, 'a.tile.wild-pour', 'wild-pour');
-      await until(page, () => document.querySelector('a.tile.wild-pour .mark').textContent === 'Opened', 'the opened game is marked after back');
-    },
-  }),
-  'lab/hub-b': (page, tools) => hubRun(page, tools, 'b', {
-    links: 12,
-    open: async (page, { until }) => {
-      const { at, pick } = await page.evaluate(() => window.hubState());
-      assert.equal(at, 0, 'the deck opens on today’s pick'); assert.ok(await page.isVisible('.card:first-child .pickTag'));
-      await page.click('#next'); await until(page, () => window.hubState().at === 1, 'next card');
-      await page.click('#surprise'); await until(page, () => window.hubState().at !== 1, 'surprise moves the deck', 4000);
-      const slug = await page.evaluate(() => document.querySelectorAll('.card')[window.hubState().at].dataset.slug);
-      await page.waitForTimeout(600);
-      await openAndReturn(page, { until }, `.card.${slug} a.play`, slug);
-      await until(page, s => document.querySelector(`.card.${s} .mark`).textContent !== 'New', 'the opened game is marked after back', 4000, slug);
-      assert.ok(pick);
-    },
-  }),
-  'lab/hub-c': (page, tools) => hubRun(page, tools, 'c', {
-    links: 15,
-    open: async (page, { until }) => {
-      const { set } = await page.evaluate(() => window.hubState());
-      assert.equal(set.length, 3);
-      for (const slug of set) {
-        await page.waitForSelector('li.now');
-        await openAndReturn(page, { until }, `li.now a.stop.${slug}`, slug);
-        await until(page, s => document.querySelector(`a.stop.${s}`).closest('li').className === 'opened', 'the stop is marked after back', 4000, slug);
-      }
-      await page.waitForSelector('.result'); assert.equal((await page.evaluate(() => window.hubState())).marks, '○○○');
-      assert.equal((await page.evaluate(() => window.hubState())).streak.run, 1, 'a first night starts the streak');
-      // A stop whose game moved forward after it was opened is a star.
-      await page.evaluate(s => { const n = JSON.parse(localStorage.getItem('hub:c:night')); n.stops[s].before = -1; localStorage.setItem('hub:c:night', JSON.stringify(n)); }, set[0]);
-      // Safari often restores the hub from the back-forward cache; the page must read the saves again on pageshow.
-      await page.evaluate(() => dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
-      await until(page, () => document.querySelector('li .lamp').textContent === '✦', 'a page restored from the cache redraws its marks');
-      await page.reload(); await until(page, () => window.hubState?.().marks === '✦○○', 'a game that moved forward is a star');
-    },
-  }),
 };
