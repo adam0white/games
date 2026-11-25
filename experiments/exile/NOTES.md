@@ -39,3 +39,21 @@ its switch sit in the bottom left corner while the build loads, on the title scr
 The owner put Exile on hold on 2026-11-25. The page stays up on build 0.4. The source repository's `main` holds an
 undeployed build 0.5 (difficulty levels, and a reign after the crown); its README has an "On hold" section with the
 second owner's full list and the steps to resume. `telemetry.mjs` already reads the 0.5 events.
+
+## Tester t1's notes after the hold (2026-11-25, notes #262 and #263)
+
+Both came in shortly before the hold was written down. Nothing was built: the game is on hold and its source is outside this repository.
+
+- **#263** answers #258: the small line under the title on the design sheet is "The medieval hunt". The second half of #258, what that line means for the game, is still unanswered. It was not asked again while the game is on hold.
+- **#262** answers #257 (which part of the sheets to make deeper first) with a wider list, not one of the choices.
+
+### Left as a proposal (2026-11-25, note #262)
+
+For whoever resumes Exile. In the tester's order, in my words:
+
+1. More regions: a forest region; a tower and an ancient, unexplored tower; caves; mountains the hero can climb.
+2. Looks: a better horse; better animations; better strike effects and death effects; buildings still look bad, though better than before; the characters look bad. The tester asks for real 3D models, made in a tool such as Blender, in place of the code-made boxes and the stock figures.
+3. The game should not end when the king is beaten. After the crown the hero should have to invest in politics so the new kingdom survives. Build 0.5's reign after the crown, which is undeployed, is a start on this.
+4. People's needs: the hero should tend to them, and people should come to the hero with requests.
+5. Difficulty: far too easy. Build 0.5's difficulty levels, also undeployed, are a start.
+6. "Add anything else that would make it better": an open licence for the lab's own ideas.
