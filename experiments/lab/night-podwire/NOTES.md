@@ -94,3 +94,9 @@ The combined run exited 0. The opening sample runs through the first result capt
 Work measures synchronous script and canvas calls. Intervals report callback delivery and include gaps during screen capture and scheduling on the shared host. The largest Chromium opening gap occurred in a run with host load above 170. Physical-device frame pacing remains unverified.
 
 All 34 phone captures were inspected, 17 per profile. They show the untouched cue, held wire, first opening, pause card, landscape before and after a pluck, the partially completed plate IV, and each later plate before and after its pods opened. Physical touch, audible sound and first-time human play remain unverified.
+
+## Play recording (2026-11-24)
+
+The page sends play records to the lab under the name `night-podwire` through `kit/lab.js` (the name is in human-framework `LAB_PROTOTYPES` once its pull request lands; until then every send is refused). This page has no start card, so the recording notice sits in the footer under the plate from the first moment, and the off switch is on the pause sheet. A run is one plate, from the first pluck of the wire to all pods open (`won`), or a restart or the next plate (`quit`). Opening the page and not plucking records nothing. Event: `plate-complete`. The check allows `/kit/lab.js` and answers the lab address itself.
+
+`check.mjs` answers the lab address itself (no check reaches the real one), loads the page with `?labRunSource=agent`, and asserts: the notice is on the page before play, a played run sends one run record under `night-podwire` with its events record, and after the switch is turned off a further run sends nothing and the player id is removed. Not verified: delivery to the real lab (the Worker does not accept this name yet), a real phone.

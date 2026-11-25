@@ -29,3 +29,9 @@ The owner picked the garden look and asked for more variation and polish. The ga
 - The page is in the shared phone check (`kit/check/phone.mjs lab/thankful`) and carries the shared notes button.
 
 Not checked: a real phone, sound, the share sheet itself (the check only confirms a picture is made), a real second day.
+
+## Play recording (2026-11-24)
+
+The page sends play records to the lab under the name `thankful` through `kit/lab.js` (the name is in human-framework `LAB_PROTOTYPES` once its pull request lands; until then every send is refused). The page has no start card, so the recording notice sits at the foot of the page where the thanks tray is, and the off switch is on the settings card (the notice says "pause menu"; this page's menu is the settings card). A run is one day's thanks: it starts with the first thank given in a visit and ends `won` with the third. Events: `thanks` (the kind and its number) and `daily-finished`. The words typed under "something else" are never sent, only the kind `spark`. Demo mode (`?demo=`) records nothing. Existing storage keys are unchanged.
+
+`check.mjs` answers the lab address itself (no check reaches the real one), loads the page with `?labRunSource=agent`, and asserts: the notice is on the page before play, a played run sends one run record under `thankful` with its events record, and after the switch is turned off a further run sends nothing and the player id is removed. Not verified: delivery to the real lab (the Worker does not accept this name yet), a real phone.

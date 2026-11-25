@@ -7,6 +7,7 @@ import { homedir } from 'node:os';
 import { dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { answerLab, allowLocalSend, withAgent, assertNotice, assertRun, assertNoLeak, assertOffSendsNothing, waitForRuns } from '../../kit/check/lab-record.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const path = '/lab/night-rubbing/';
@@ -25,7 +26,7 @@ await mkdir(shots, { recursive: true });
 function allowed(url) {
   return url === path || url === away || url === notes || url === '/favicon.ico'
     || /^\/lab\/night-rubbing\/[\w.-]+$/.test(url)
-    || /^\/kit\/(?:audio|drag|hint|pause|save|screens|stick|zoom)\.js$/.test(url);
+    || /^\/kit\/(?:audio|drag|hint|lab|pause|save|screens|stick|zoom)\.js$/.test(url);
 }
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml' };
 const server = createServer(async (request, response) => {
@@ -158,6 +159,43 @@ async function rubPlate(page, input, level, capture) {
   assert.fail('broad strokes could not complete plate ' + level + ' ' + JSON.stringify(await state(page)));
 }
 
+// Recording: a played plate sends one run record under the page's name; with the switch off nothing is sent.
+async function recording({ name, device }, browser) {
+  const context = await browser.newContext(devices[device]);
+  await context.route('**/*', route => {
+    const r = route.request(), url = new URL(r.url());
+    if (url.origin === origin && r.method() === 'GET' && allowed(url.pathname)) return route.continue();
+    return route.abort();
+  });
+  const lab = await answerLab(context, origin);
+  await allowLocalSend(context);
+  const page = await context.newPage();
+  page.setDefaultTimeout(8000);
+  try {
+    await page.goto(withAgent(origin + path));
+    await screen(page, 'play');
+    await assertNotice(page);
+    assert.equal(lab.sent.length, 0, 'nothing is sent before a plate is rubbed');
+    let input = await pointer(page, name);
+    await rubPlate(page, input, 1, async () => {});
+    await input.close();
+    await waitForRuns(lab, 'night-rubbing', 1);
+    const won = assertRun(lab, 'night-rubbing', { outcomes: ['won'], summaryKeys: ['level', 'coverage', 'unlocked'] });
+    assert.equal(won.data.summary.level, 1);
+    assert.ok(won.data.events.some(e => e.type === 'plate-filed'), 'the filed plate is an event');
+    assertNoLeak(lab, ['rubbing-test-away']);
+    await page.locator('#pause').tap();
+    await screen(page, 'paused');
+    await assertOffSendsNothing(page, lab, 'night-rubbing', { play: async () => {
+      await page.locator('#restart').tap();
+      await screen(page, 'play');
+      input = await pointer(page, name);
+      await rubPlate(page, input, 1, async () => {});
+      await input.close();
+    } });
+  } finally { await context.close(); }
+}
+
 async function run({ name, engine, device }) {
   const browser = await engine.launch({ headless: true });
   try {
@@ -175,6 +213,7 @@ async function run({ name, engine, device }) {
       requests.add(url.pathname);
       return route.continue();
     });
+    const lab = await answerLab(context, origin);
     await context.addInitScript(() => {
       // The kit otherwise suppresses telemetry on localhost. Exercise its production setting.
       localStorage.setItem('hf-lab-send-localhost', '1');
@@ -198,7 +237,7 @@ async function run({ name, engine, device }) {
     const rotate = () => page.setViewportSize({ width: portrait.height, height: portrait.width });
     const restorePortrait = () => page.setViewportSize(portrait);
 
-    await page.goto(origin + path);
+    await page.goto(withAgent(origin + path));
     await screen(page, 'play');
     const fresh = await state(page);
     assert.equal(fresh.level, 1);
@@ -392,10 +431,13 @@ async function run({ name, engine, device }) {
     const retouchError = comparePrints(retouchedPixels, await printPixels(page));
     await capture('retouched');
     assert.ok(requests.has(notes), 'feedback button script loaded');
+    // The page now records play (kit/lab.js), so the player id exists; no other recording key may.
     assert.deepEqual(await page.evaluate(() => Object.keys(localStorage).filter(key =>
-      key.startsWith('hf-lab-') && key !== 'hf-lab-send-localhost')), [], 'no recording keys');
+      key.startsWith('hf-lab-') && !['hf-lab-send-localhost', 'hf-lab-player'].includes(key))), [], 'no other recording keys');
+    assert.ok(lab.sent.every(r => r.game === 'night-rubbing' && r.runSource === 'agent'), 'every record is named and marked as an agent run');
     assert.deepEqual(errors, [], 'browser and resource errors');
     assert.deepEqual(unexpected, [], 'external requests or recording');
+    await recording({ name, engine, device }, browser);
     console.log(JSON.stringify({ device, input: kind, results, firstPrintError, finalPrintError, darkenedHingePixels, retouchError, errorCount: errors.length, unexpectedRequests: unexpected.length }));
   } finally {
     await browser.close();

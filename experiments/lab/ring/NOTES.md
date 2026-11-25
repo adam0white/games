@@ -116,3 +116,9 @@ Title: Turkish is "Ateş Böceği Halkası" (a literal, natural rendering; "Fire
 The Turkish was written by an AI and has not been read by a native speaker. Open items for the reader: "Mumlar söndü" / "Fitiller söndü" for the lost wicks, "çayır" for meadow, "Alıştırma" for practice, and the second line of the intro paragraph.
 
 `check.mjs` covers it on iPhone 13 (WebKit) and Pixel 7 (Chromium) plus 360x640: key parity of the two tables (and `{placeholder}` parity), no raw keys or English left on the Turkish menu, pause and end cards, exact Turkish strings, `lang="tr"`, the switch and its survival of a reload, the hint's words, no overflow, no console errors. The English checks open pages with `?lang=en`.
+
+## Play recording (2026-11-24)
+
+The page sends play records to the lab under the name `ring` through `kit/lab.js` (the name is in human-framework `LAB_PROTOTYPES` once its pull request lands; until then every send is refused). The recording notice is on the menu card; the off switch is on the pause card. A run is one night, today's meadow, an endless meadow or a practice jar; it ends `won` at dawn or `lost` when the wicks run out (summary: kind, score, level, jars cleared, best ring, stars), or `quit` through Menu or Restart. Events: `dawn` and, for the daily, `daily-finished`.
+
+`check.mjs` answers the lab address itself (no check reaches the real one), loads the page with `?labRunSource=agent`, and asserts: the notice is on the page before play, a played run sends one run record under `ring` with its events record, and after the switch is turned off a further run sends nothing and the player id is removed. Not verified: delivery to the real lab (the Worker does not accept this name yet), a real phone.

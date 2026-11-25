@@ -7,6 +7,7 @@ import { isPauseKey, onLeave } from '../../kit/pause.js';
 import { readJson, writeJson } from '../../kit/save.js';
 import { screens } from '../../kit/screens.js';
 import { noZoom } from '../../kit/zoom.js';
+import { lab } from '../../kit/lab.js';
 
 noZoom();
 const el = id => document.getElementById(id);
@@ -101,7 +102,17 @@ function draw() {
     focused:keyboardFocus && document.activeElement === field, time:reduce.matches ? 0 : elapsed });
   readout();
 }
+// Play recording for the game lab (kit/lab.js): one run for each bed the player starts to work.
+const rec = lab('night-sand');
+let runOpen = false;
+function runBegin() { if (runOpen || !bed || bed.status !== 'play') return; runOpen = true; rec.start({ level: bed.level, kind: bed.kind, look: save.look }); }
+function runEnd(outcome) {
+  if (!runOpen) return;
+  runOpen = false;
+  rec.end(outcome, { level: bed.level, kind: bed.kind, progress: Math.round(bed.progress * 100), score: bed.score, completed: save.completed });
+}
 function start(level) {
+  runEnd('quit');
   drop();
   hush();
   bed = create(level, level ? 553 + level * 971 : crypto.getRandomValues(new Uint32Array(1))[0]);
@@ -154,6 +165,8 @@ function finish() {
     save.unlocked = Math.max(save.unlocked, save.level);
     store();
   }
+  if (won) rec.event('bed-cleared', { level: bed.level, kind: bed.kind });
+  runEnd(won ? 'won' : 'lost');
   audio.hold();
   el('next').hidden = !won;
   setText('advance', bed.level === 10 ? 'Enter the garden' : 'Next bed');
@@ -221,6 +234,7 @@ field.addEventListener('pointerdown', e => {
   if (field.setPointerCapture && e.isTrusted) field.setPointerCapture(pointer);
   const {x,y} = locationInBed(e);
   started = true;
+  runBegin();
   audio.unlock();
   if (bed.kind === 'glass') {
     mouseStart = x; mouseGate = bed.gate.x;
@@ -261,6 +275,7 @@ window.addEventListener('keydown', e => {
     else {
       const {x,y} = bed.hand;
       started = keyboard = true;
+      runBegin();
       audio.unlock();
       press(bed,x,y);
     }
@@ -302,6 +317,9 @@ function frame(now) {
   }
   requestAnimationFrame(frame);
 }
+// The recording notice is on the page from the first look; its switch is on the pause card.
+rec.notice(el('table'));
+rec.toggle(document.querySelector('#paused .card'));
 window.sandState = () => ({
   screen, level:bed.level, kind:bed.kind, status:bed.status, tick:bed.ticks,
   best:save.best, score:bed.score, progress:bed.progress, flow:bed.flow,
