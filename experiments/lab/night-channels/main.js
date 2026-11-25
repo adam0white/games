@@ -145,12 +145,21 @@ function update() {
   if (state.won) result.textContent = p === null ? t('wonPar', { n: spent, par: '–' })
     : spent < p ? t('underPar', { n: spent, d: p - spent }) : t('wonPar', { n: spent, par: p });
   else if (state.remaining === 0 && isolatedBed()) result.textContent = t('isolated');
+  else if (said && performance.now() < saidUntil) result.textContent = t(said);
   else if (thirsty()) result.textContent = t('thirsty');
   else if (state.remaining === 0 && !hurry) result.textContent = t('waitOrReplant');
   else if (hurry) result.textContent = t('running');
   else if (!touched && day && bestOn(day) !== null) result.textContent = t('bestCuts', { n: bestOn(day), par: p ?? '–' });
   else if (!touched && p !== null) result.textContent = t('parOnly', { par: p });
   else result.textContent = '';
+}
+// A short word after a refused cut, for 1.6 seconds.
+let said = null, saidUntil = 0;
+function say(word) {
+  if (said === word && performance.now() < saidUntil) return;
+  said = word; saidUntil = performance.now() + 1600;
+  update();
+  setTimeout(() => { if (performance.now() >= saidUntil) update(); }, 1650);
 }
 // Every bed is joined to a spring and 25 seconds of game time passed after the last cut, yet a bed never started.
 function thirsty() {
@@ -327,8 +336,10 @@ function cut(x,y) {
   if (i === lastCell) return;
   lastCell = i;
   const what = line.enter(i);
-  if (what === 'rock' || what === 'spent' || (what === 'broken' && state.cells[i].kind !== 'rock' && !state.cells[i].dug)) {
+  const c = state.cells[i];
+  if (what === 'rock' || what === 'spent' || (what === 'broken' && (c.kind === 'soil' || c.kind === 'sand') && !c.dug)) {
     feel.refuse(i, what);
+    say(what === 'spent' ? 'noCuts' : 'stoneStops');
     return;
   }
   if (what !== 'cut') return;

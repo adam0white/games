@@ -7,8 +7,11 @@ import { createRequire } from 'node:module';
 import { homedir } from 'node:os';
 import { extname, join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
+import * as sim from './sim.js';
+import { par, PARS } from './plan.js';
+import { tables } from './words.js';
 
-const shots = '/private/tmp/night-r4-review/channels';
+const shots = process.env.SHOTS || '/private/tmp/night-r4-review/channels';
 const experiments = resolve(import.meta.dirname, '../..');
 const modules = process.env.PLAYWRIGHT || join(homedir(), 'code/human-framework/node_modules');
 const require = createRequire(join(resolve(modules), 'check.cjs'));
@@ -229,6 +232,36 @@ async function checkRotation(page, session, profile, name, initial) {
   return +landscapeGap.toFixed(2);
 }
 
+// At 320 x 568 nothing scrolls: the footer ends inside the screen and no card needs scrolling, in both
+// languages, on a won garden and with the thirty-garden list open.
+async function checkFit(page) {
+  await page.setViewportSize({ width: 320, height: 568 });
+  await delay(200);
+  const measure = () => page.evaluate(() => {
+    const card = document.querySelector('.screen.on .card');
+    return { footer: Math.round(document.querySelector('footer').getBoundingClientRect().bottom), height: innerHeight,
+      doc: document.documentElement.scrollHeight, card: card ? card.scrollHeight - card.clientHeight : 0 };
+  });
+  const out = {};
+  for (const lang of ['en', 'tr']) {
+    const won = await measure();
+    assert.ok(won.footer <= won.height && won.doc <= won.height, lang + ': the won garden fits 320 x 568 ' + JSON.stringify(won));
+    await page.tap('#next');
+    const list = await measure();
+    assert.ok(list.card <= 0, lang + ': the garden list fits without scrolling ' + JSON.stringify(list));
+    await page.tap('#return');
+    out[lang] = { footer: won.footer, list: list.card };
+    if (lang === 'en') {
+      await page.evaluate(() => document.querySelector('#lang').click());
+      assert.equal(await page.locator('#folio').innerText().then(t => t.toLowerCase()), 'bahçe 30 / 30');
+      assert.equal(await page.locator('#gardenName').innerText(), tables.tr.t30);
+    }
+  }
+  await page.evaluate(() => document.querySelector('#lang').click());
+  assert.equal(await page.locator('#gardenName').innerText(), tables.en.t30);
+  return out;
+}
+
 async function run(name, engine, profile, origin) {
   const browser = await engine.launch();
   try {
@@ -236,6 +269,12 @@ async function run(name, engine, profile, origin) {
     const page = await context.newPage();
     page.setDefaultTimeout(30000);
     await page.addInitScript(() => {
+      // Page work per animation frame, for the frame budget below.
+      const raf = window.requestAnimationFrame.bind(window);
+      window.frameWork = [];
+      window.requestAnimationFrame = cb => raf(t => { const a = performance.now(); cb(t); window.frameWork.push(performance.now() - a); });
+      // The share sheet is not available headless; the page falls back to copying the line.
+      try { Object.defineProperty(navigator, 'share', { value: undefined, configurable: true }); } catch {}
       const fillRect = CanvasRenderingContext2D.prototype.fillRect;
       window.terrainPaints = 0;
       CanvasRenderingContext2D.prototype.fillRect = function (...args) {
@@ -337,7 +376,7 @@ async function run(name, engine, profile, origin) {
     assert.equal((await view(page)).screen, 'paused');
     await page.tap('#gardens');
     assert.equal((await view(page)).screen, 'selection');
-    assert.equal(await page.locator('#levels button').count(), 10, 'all ten gardens have entries');
+    assert.equal(await page.locator('#levels button').count(), sim.GARDENS, 'all thirty gardens have entries');
     assert.equal(await page.locator('#levels button:enabled').count(), 2, 'only the first two gardens are unlocked');
     await page.tap('#return');
     const bank = second.state.cells.flatMap((c, i) => c.kind === 'soil' && !c.dug ? [i] : []);
@@ -359,22 +398,42 @@ async function run(name, engine, profile, origin) {
     assert.equal((await view(page)).level, 2, 'returning from a different page opens the garden');
 
     const campaign = [{ cuts: 3, ticks: finished.state.ticks, beds: 1 }];
-    for (let level = 2; level <= 10; level++) {
+    let lastWork = null;
+    for (let level = 2; level <= sim.GARDENS; level++) {
       assert.equal((await view(page)).level, level);
-      const paths = routesToBeds((await view(page)).state, 2000);
+      if (level === sim.GARDENS) {
+        // The frame budget is measured on the wettest garden (two springs, five beds) at 390 x 844.
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.evaluate(() => { window.frameWork = []; });
+      }
+      // Gardens 2-10 use this check's own planner, as before; 11-30 draw the par route, which the rules confirm.
+      const paths = level <= 10 ? routesToBeds((await view(page)).state, 2000) : par(sim, level).drags;
       for (const path of paths) await draw(page, session, path);
       await page.waitForFunction(() => window.channelView().screen === 'won', null, { timeout: 55000 });
-      const { state } = await view(page);
+      const { state, par: shown } = await view(page);
       campaign.push({ cuts: state.budget - state.remaining, ticks: state.ticks, beds: state.beds.length });
-      if (level < 10) await page.tap('#next');
+      if (level > 10) assert.equal(state.budget - state.remaining, shown, 'garden ' + level + ' flowers at par');
+      if (level === 11) await stamp(page, name + '-08-garden-11');
+      if (level < sim.GARDENS) await page.tap('#next');
     }
+    lastWork = await page.evaluate(() => {
+      const w = [...window.frameWork].sort((a, b) => a - b);
+      return { n: w.length, p95: w[Math.floor(w.length * .95)], max: w.at(-1) };
+    });
+    assert.ok(lastWork.n > 30 && lastWork.p95 < 8, 'page work per frame p95 under 8 ms: ' + JSON.stringify(lastWork));
+    assert.match(await page.locator('#result').innerText(), /par/, 'the win shows cuts against par');
     await stamp(page, name + '-07-last-garden');
+    const fit = await checkFit(page);
+    await page.setViewportSize(profile.viewport);
     await page.tap('#next');
-    assert.equal(await page.locator('#levels .completed').count(), 10, 'all ten gardens show their blooms as complete');
+    assert.equal(await page.locator('#levels .completed').count(), sim.GARDENS, 'all thirty gardens show their blooms as complete');
+    const atPar = campaign.filter((g, k) => g.cuts <= PARS[k]).length;
+    assert.ok(atPar >= 21, 'garden 1 and gardens 11-30 were played at par');
+    assert.equal(await page.locator('#levels .par').count(), atPar, 'gardens played at par carry the par mark');
 
     await page.goto(url + '?look=clay');
     await waitForPlay(page);
-    assert.equal((await view(page)).unlocked, 10, 'reloading keeps campaign progress');
+    assert.equal((await view(page)).unlocked, sim.GARDENS, 'reloading keeps campaign progress');
     assert.equal(await page.locator('html').getAttribute('data-look'), 'clay');
     await page.tap('#daily');
     let daily = await view(page);
@@ -388,6 +447,12 @@ async function run(name, engine, profile, origin) {
     const digs = daily.state.budget - daily.state.remaining;
     assert.equal(daily.best, digs, 'the saved daily best counts spent digs');
     await stamp(page, name + '-05-daily-flower');
+    assert.equal(await page.locator('#share').isVisible(), true, 'a finished daily offers its result to share');
+    await page.tap('#share');
+    await page.waitForFunction(() => !!window.lastShare);
+    const line = await page.evaluate(() => window.lastShare);
+    assert.match(line, new RegExp('2026-11-24[\\s\\S]*' + digs + ' cuts · (par \\d+|\\d+ under par)'), 'the share line has the date, cuts and par');
+    assert.ok(!line.includes('#') && line.split('\n').length === 3, 'the share line is three lines and shows no map');
     await page.reload();
     await page.waitForFunction(() => !!window.channelView);
     if (!(await view(page)).day) await page.tap('#daily');
@@ -423,6 +488,15 @@ async function run(name, engine, profile, origin) {
     const recorded = assertRun(lab, 'night-channels', { outcomes: ['won'], summaryKeys: ['garden', 'cuts', 'budget'] });
     assert.equal(recorded.data.summary.daily, true);
     assert.deepEqual(recorded.data.events.map(e => e.type), ['garden-complete', 'daily-finished']);
+    // A garden past the first ten is recorded the same way.
+    await page.tap('#next');
+    await page.locator('#levels button').nth(11).tap();
+    for (const ids of par(sim, 12).drags) await draw(page, session, ids);
+    await page.waitForFunction(() => window.channelView().screen === 'won', null, { timeout: 60000 });
+    await waitForRuns(lab, 'night-channels', 2);
+    const twelve = assertRun(lab, 'night-channels', { outcomes: ['won'], count: 2, summaryKeys: ['garden', 'cuts', 'par'] });
+    assert.equal(twelve.data.summary.garden, 12);
+    await page.tap('#next'); await page.tap('#openList'); await page.tap('#pickDaily');
     await page.tap('#retry'); await page.tap('#pause');
     await assertOffSendsNothing(page, lab, 'night-channels', { play: async () => {
       await page.tap('#resume');
@@ -437,6 +511,15 @@ async function run(name, engine, profile, origin) {
     assert.equal(tomorrow.day, '2026-11-25');
     assert.equal(tomorrow.best, null);
     assert.notDeepEqual(levelGeometry(tomorrow.state), dailyMap);
+    // Saves from before gardens 11-30: a finished garden 10 opens garden 11; an unfinished one does not.
+    for (const [save, expected] of [[{ unlocked: 10, completed: true, sound: true }, 11], [{ unlocked: 10, completed: false, sound: true }, 10]]) {
+      await page.evaluate(v => { localStorage.setItem('night-channels:save', JSON.stringify(v)); localStorage.removeItem('night-channels:gardens'); }, save);
+      await page.reload();
+      await page.waitForFunction(() => !!window.channelView);
+      const opened = await view(page);
+      assert.equal(opened.level, expected, 'an old save with completed ' + save.completed + ' opens garden ' + expected);
+      assert.equal(opened.unlocked, expected);
+    }
     assert.equal(await page.locator('#notes-button').count(), 0);
     await page.evaluate(() => localStorage.setItem('notes.k', 'check'));
     await page.reload();
@@ -447,7 +530,7 @@ async function run(name, engine, profile, origin) {
     assert.deepEqual(telemetry, [], 'telemetry or outbound writes');
     console.log(JSON.stringify({ name, firstSeconds: +firstSeconds.toFixed(2), firstDigs: 3,
       dailyDigs: digs, replayDigs: digs + 1, dailyBeds: daily.state.beds.length, dailyBudget: daily.state.budget,
-      cellPx: +first.geometry.size.toFixed(1), landscapeGap, campaign,
+      cellPx: +first.geometry.size.toFixed(1), landscapeGap, campaign, frameWork: lastWork, fit,
       screenshots: 7, errors: errors.length, outside: outside.length }));
   } finally {
     await browser.close();
