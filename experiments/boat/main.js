@@ -1,7 +1,10 @@
 // Paper Boat: the page. Rules live in sim.js; this file draws, listens and saves.
 import { create, step, flow, items, advise, stars, score, pawState, length, dailySeed, pebbleHint, grateParted, STAR_SOAK, LEVELS, DT, BOAT_R, RIPPLE_LIFE, STONE_LIFE, PAW_R, PAW_WARN } from './sim.js';
-import { readJson, writeJson } from '../kit/save.js';
+import { read, write, readJson, writeJson } from '../kit/save.js';
 import { sound } from '../kit/audio.js';
+import { music } from '../kit/music.js';
+import { SONG, mood, look, heard } from './song.js';
+import { t, lang } from './words.js';
 import { onLeave, isPauseKey } from '../kit/pause.js';
 import { noZoom } from '../kit/zoom.js';
 import { screens } from '../kit/screens.js';
@@ -18,7 +21,10 @@ const persist = () => writeJson(KEY, save);
 const rec = lab('boat');
 rec.notice($('menu').firstElementChild);
 rec.toggle($('paused').firstElementChild);
-const snd = sound({ on: () => save.sound });
+// Music (kit/music.js, 2026-11-24): the river preset, played by the boat's run (song.js). Its own key, '0' when turned off.
+const MUSIC = 'boat-music';
+let musicOn = read(MUSIC) !== '0', song = null, songFor = null;
+const snd = sound({ on: () => save.sound, setup: ac => { song = music(ac, SONG); song.volume(SONG.volume); } });
 const tone = (...a) => snd.tone(...a), noise = (...a) => snd.noise(...a);
 const later = (ms, f) => setTimeout(() => { if (mode === 'play' || mode === 'end') f(); }, ms);
 
@@ -133,6 +139,9 @@ $('again').onclick = () => (daily ? $('choose').onclick() : start(level));
 $('next').onclick = () => (daily ? start(0, true) : level < 10 ? start(level + 1) : start(0, true));
 $('sound').onclick = () => { save.sound = !save.sound; persist(); $('sound').textContent = `Sound: ${save.sound ? 'on' : 'off'}`; if (save.sound) { snd.unlock(); } };
 $('sound').textContent = `Sound: ${save.sound ? 'on' : 'off'}`;
+const musicShow = () => { $('music').textContent = t(musicOn ? 'musicOn' : 'musicOff'); $('music').lang = lang(); $('music').setAttribute('aria-pressed', String(musicOn)); };
+$('music').onclick = () => { musicOn = !musicOn; write(MUSIC, musicOn ? '1' : '0'); musicShow(); };
+musicShow();
 onLeave(pause);
 
 // ---- input: a swipe draws a ripple that pushes the water its way; a tap drops a pebble the water bends round ----
@@ -178,11 +187,14 @@ function burst(x, y, n, colour, speed = 0.5, life = 0.6, size = 3) {
   fxCount += n;
 }
 const ring = (x, y, max = 0.2, life = 0.7, w = 2) => rings.push({ x, y, max, life, age: 0, w });
-function events() {
+// With the music on, each passenger taken and each drain or paw got past plays the next note of the street's tune
+// (song.js); the passenger's own two notes play only when the tune's queue is full (as chord tones then). With it off,
+// every sound as before.
+function events(sung) {
   for (const e of s.ev) {
     if (e.type === 'ripple') { noise(0.2, 0.1, 700 + Math.random() * 500); tone(260 + Math.random() * 80, 0.16, 0.035, 'sine', 180); burst(e.x, e.y, 5, '#ffffff', 0.25, 0.5, 2.5); }
     else if (e.type === 'pebble') { tone(210, 0.14, 0.1, 'sine', -120); noise(0.07, 0.16, 2600); ring(e.x, e.y, 0.2); ring(e.x, e.y, 0.12, 0.5); burst(e.x, e.y, 9, '#e9fbff', 0.5, 0.45); }
-    else if (e.type === 'pickup') { tone(e.kind === 'snail' ? 523 : 659, 0.1, 0.07, 'triangle'); later(90, () => tone(e.kind === 'snail' ? 784 : 988, 0.2, 0.07, 'triangle')); burst(e.x, e.y, 14, '#ffc857', 0.55, 0.7, 3.5); ring(e.x, e.y, 0.22, 0.6, 3); rec.event('pickup', { kind: e.kind, y: Math.round(e.y * 10) / 10 }); }
+    else if (e.type === 'pickup') { if (!(musicOn && song)) { tone(e.kind === 'snail' ? 523 : 659, 0.1, 0.07, 'triangle'); later(90, () => tone(e.kind === 'snail' ? 784 : 988, 0.2, 0.07, 'triangle')); } else if (!sung) { tone(song.chime(s.riders.length), 0.1, 0.07, 'triangle'); later(90, () => tone(song.chime(s.riders.length + 2), 0.2, 0.07, 'triangle')); } burst(e.x, e.y, 14, '#ffc857', 0.55, 0.7, 3.5); ring(e.x, e.y, 0.22, 0.6, 3); rec.event('pickup', { kind: e.kind, y: Math.round(e.y * 10) / 10 }); }
     else if (e.type === 'swat') { noise(0.3, 0.32, 420); tone(110, 0.25, 0.1, 'square', -50); shake = 14; burst(e.x, e.y, 22, '#e9fbff', 0.9, 0.7, 4); ring(e.x, e.y, 0.35, 0.8, 4); rec.event('swat', { y: Math.round(e.y * 10) / 10 }); }
     else if (e.type === 'paw') { if (Math.abs(e.y - s.b.y) < 2) { noise(0.22, 0.2, 600); shake = Math.max(shake, 5); burst(e.x, e.y, 14, '#e9fbff', 0.7, 0.6, 3.5); ring(e.x, e.y, 0.3, 0.7, 3); } }
     else if (e.type === 'bump') { tone(150, 0.07, 0.06, 'triangle', -40); shake = Math.max(shake, 4); burst(e.x, e.y, 6, '#e9fbff', 0.35, 0.4); }
@@ -195,11 +207,22 @@ function events() {
 }
 let drip = 0;
 function update(dt) {
+  if (song && live && songFor !== s) { songFor = s; song.start((s.seed * 31 + s.level) >>> 0); } // each run its own tune, from its seed
+  song?.set({ on: musicOn && save.sound && live && mode === 'play' && !s.over, ...(live ? mood(s) : {}) });
   if (mode === 'play') {
     acc += Math.min(dt, 0.1);
     while (acc >= DT) {
       acc -= DT;
-      if (!s.over) { step(s, queue); queue = []; events(); if (s.over) overAt = now; }
+      if (!s.over) {
+        const before = look(s);
+        step(s, queue); queue = [];
+        const h = heard(before, s); let sung = 0;
+        if (musicOn && song) for (let i = 0; i < h.notes; i++) if (song.ember()) sung++;
+        for (let i = 0; i < h.misses; i++) song?.miss();
+        for (let i = 0; i < h.blows; i++) song?.hit();
+        events(sung);
+        if (s.over) overAt = now;
+      }
       else if (s.over === 'win') { s.b.y += 0.25 * DT; s.b.wob *= 0.97; }
     }
     if (s.over && now - overAt > (s.over === 'win' ? 1500 : 1300)) finish();
@@ -516,7 +539,8 @@ requestAnimationFrame(frame);
 
 // For check.mjs and for looking at a run from the console. Nothing here changes the game.
 window.boatState = () => ({ screen: mode, over: s.over, level, daily, seed: s.seed, x: s.b.x, y: s.b.y, soak: s.soak, riders: s.riders.length, t: s.tick * DT, tick: s.tick, moves: s.acts,
-  ripples: s.ripples.length, stones: s.stones.length, fx: fxCount, stars: endStars, sound: save.sound, len: length(s), boat: { x: sx(s.b.x), y: sy(s.b.y) }, cw, ghostTap: pebbleHint(s) ? { x: sx(pebbleHint(s).x), y: sy(pebbleHint(s).y) } : null });
+  ripples: s.ripples.length, stones: s.stones.length, fx: fxCount, stars: endStars, sound: save.sound, music: musicOn, len: length(s), boat: { x: sx(s.b.x), y: sy(s.b.y) }, cw, ghostTap: pebbleHint(s) ? { x: sx(pebbleHint(s).x), y: sy(pebbleHint(s).y) } : null });
+window.boatMusic = () => song && { ...song.melody, on: song.state.on, step: song.step, notes: song.log.length, kinds: song.log.map(l => l.kind) }; // read by the phone check
 window.boatAdvice = () => {
   if (mode !== 'play' || s.over) return null;
   const a = advise(s);

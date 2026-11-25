@@ -20,6 +20,7 @@ Shared code for the games under `experiments/`. It is served at `/kit/` as plain
 | `lockstep.js` | `lockstep({ id, delay, adapt, fill })`: two phones step one seeded game tick by tick, each tick only once both players' inputs for it are here; inputs stamped `delay` ticks ahead (optionally adapting), resent until confirmed, state checks every 30 ticks; pure, no timers; see below |
 | `samemath.js` | `sameMath` (`exp`, `sin`, `cos`, `hypot`): the same bits on every JavaScript engine, for a sim that two phones run in lockstep; see below |
 | `lab.js` | `lab(slug)`: play recording for the game lab, with its notice and off switch; see below |
+| `share.js` | `shareImage(source, { name, text })`: share a picture the game drew (a canvas or a Blob) through the phone's share sheet, or download it where files cannot be shared; returns `'shared'`, `'saved'`, `'cancelled'` or `'failed'` and never throws. `canvasBlob(canvas)`. Used by `lab/night-sand` (its garden) and `lab/night-saltplate` (prints, the daily figure, the instrument) |
 | `home.js` | `home(rec, { back })`: the way back to the small games' home at `/small/` and a finished run reported to it, in one line; see below |
 | `/notes/button.js` | the notes button for testers (it lives in `workers/feedback/public/notes/`) |
 | `check/phone.mjs` | phone runs of every live experiment, of the lab pages under `/lab/` and of this kit, on WebKit iPhone 13 and Chromium Pixel 7 |
@@ -88,6 +89,10 @@ A score made in code (Web Audio only, no samples) that follows play. It came fro
 5. On a pickup: `if (!(musicOn && song?.ember())) snd.tone(...)` (the game's own sound when the music is off or not in play). On a blow: `song?.hit()`. When a pickup passes by: `song?.miss()`.
 6. Optional: `song.melody.share` on the end card (Lantern: "Melody played: 92%.", `melodyPlayed`).
 7. Music must never touch the rules: call it from the page, never from `sim.js`, and show it with the game's `bots.mjs` (Lantern's `node experiments/lantern/bots.mjs 30 music` is a model).
+8. Put what the music hears in the game's own `song.js` (`SONG`: preset, overrides and volume; `mood(game)` for `set`; `heard(...)`: notes, misses and blows for a step), so the page and `bots.mjs` use the same mapping. `check/music-claims.mjs` gives a bot a stand-in clock and the note claims (`bench(opts, seed)`); a game's `node bots.mjs music [--mutate]` runs them. In `check/pages.mjs` a `music: { button, key, on, off, hook }` entry makes the phone check test the switch, its key and that off schedules nothing.
+9. Set the volume by measuring: the game's effects are usually far quieter than Lantern's. The four games below render the score offline and keep the bed's RMS under a quarter of the quietest regular effect's peak, and the tune's note within half to twice the tone it replaces.
+
+Used by (2026-11-24): `lantern` (`lantern`, 0.8), `flock` (`bell`, 0.22), `vine` (`flute`, 0.3), `boat` (`river` with a louder pickup note, 0.35), `harvest` (`flute` at 88 a minute in morning chords, 0.4). Each game's `NOTES.md` says why and what to listen for.
 
 ## Friends' tables (`room.js`)
 

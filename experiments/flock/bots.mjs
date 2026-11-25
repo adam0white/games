@@ -2,9 +2,11 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 const mutation = process.argv.includes('--mutate');
+// node bots.mjs music [--mutate]: only the music claims (below), and --mutate then breaks the music, not the rules.
+const musicOnly = process.argv.includes('music');
 const source = new URL('./sim.js', import.meta.url);
 let simulation = await import(source);
-if (mutation) {
+if (mutation && !musicOnly) {
   const normal = 'vy += dogY * force;';
   const broken = 'vy -= dogY * force;';
   const code = await readFile(source, 'utf8');
@@ -114,6 +116,65 @@ function checkPen(game) {
       assert.ok(animal.homeAt <= game.time);
     }
   }
+}
+
+// ---------- Music (kit/music.js through song.js, 2026-11-24): node bots.mjs music [--mutate]
+// The careful shepherd and two clumsy ones (a quarter, then three fifths, of their targets a random spot) play evenings on a stand-in audio clock
+// that runs with the sim. Claims: each sheep into the fold plays exactly one note of the evening's tune (or waits when four
+// notes already wait) and nothing else plays one; a sheep breaking away is a missed note; a sheep lost is a blow that thins
+// the music for two bars; every note is on the score's grid, in its chord and in the tune's order (kit/check/music-claims.mjs);
+// the heartbeat sounds while the wolf runs; the chords turn major only once four fifths of the flock is home; the high note
+// sounds only in the last of the light; and the music never changes the rules (a twin evening without it ends the same).
+// --mutate runs twice with song.js broken on purpose (a stray plays a note; notes on a clock instead of on the fold) and must fail.
+async function musicClaims(mutate) {
+  const { bench } = await import('../kit/check/music-claims.mjs');
+  let code = await readFile(new URL('./song.js', import.meta.url), 'utf8');
+  const right = 'notes: now.home - before.home,';
+  assert.ok(code.includes(right), 'music mutation target exists');
+  if (mutate === 'stray') code = code.replace(right, 'notes: now.home - before.home + now.strays - before.strays,');
+  if (mutate === 'clock') code = code.replace(right, 'notes: Math.floor(game.time) - Math.floor(game.time - 1 / 30),');
+  const { SONG, mood, look, heard } = await import('data:text/javascript;base64,' + Buffer.from(code).toString('base64'));
+  const fail = [], sum = { runs: 0, minutes: 0, notes: 0, waits: 0, misses: 0, blows: 0, pulses: 0, wolfRuns: 0, highs: 0, worst: 0 };
+  for (const level of [1, 3, 4, 8, 12, 16, 20, 23]) for (let seed = 1; seed <= 8; seed++) for (const wrong of [0, .25, .6]) {
+    const game = createGame(level, seed), twin = createGame(level, seed), b = bench({ preset: SONG.preset }, seed), random = randomFrom(seed * 31 + level);
+    let target = game.dog, twinTarget = twin.dog, wolfFrom = -1, wolfHeard = true;
+    for (let frame = 0; game.status === 'play' && frame <= (game.limit + 1) / FRAME; frame++) {
+      if (frame % 3 === 0) {
+        if (wrong && random() < wrong) target = twinTarget = { x: 40 + random() * 280, y: 130 + random() * 370 };
+        else { target = careful(game); twinTarget = careful(twin); }
+      }
+      const before = look(game), home = game.home, lost = game.lost, strays = game.sheep.filter(s => s.stray).length;
+      step(game, FRAME, steerable(game) ? target : null); step(twin, FRAME, steerable(twin) ? twinTarget : null);
+      const m = mood(game); b.mood({ on: game.status === 'play', ...m });
+      const h = heard(before, game), got = b.heard(h);
+      if (h.notes !== game.home - home) fail.push(`evening ${level} seed ${seed}: ${h.notes} notes for ${game.home - home} sheep into the fold`);
+      if (h.misses !== game.sheep.filter(s => s.stray).length - strays) fail.push(`evening ${level} seed ${seed}: a stray is not a missed note`);
+      if (h.blows !== game.lost - lost) fail.push(`evening ${level} seed ${seed}: a lost sheep is not a blow`);
+      if (got.length && game.home === home) fail.push(`evening ${level} seed ${seed}: a note with no sheep into the fold`);
+      if (m.light >= .28 && b.song.log.some(l => l.kind === 'high' && l.at > b.clock + .4)) fail.push(`evening ${level} seed ${seed}: the high note before the light runs low`);
+      // The wolf's run: some heartbeat must be scheduled while it lasts (it lasts up to 4 s).
+      if (game.wolf?.active && wolfFrom < 0) { wolfFrom = b.clock; sum.wolfRuns++; }
+      if (!game.wolf?.active && wolfFrom >= 0) { if (b.clock - wolfFrom > 1.2 && !b.song.log.some(l => l.kind === 'pulse' && l.at >= wolfFrom && l.at <= b.clock + .4)) wolfHeard = false; wolfFrom = -1; }
+      const pads = b.song.log.length; b.advance(FRAME);
+      if (b.song.log.slice(pads).some(l => l.kind === 'pad' && l.major) && m.progress <= b.P.turn) fail.push(`evening ${level} seed ${seed}: the chords turned major before four fifths of the flock was home`);
+    }
+    if (!wolfHeard) fail.push(`evening ${level} seed ${seed}: no heartbeat while the wolf ran`);
+    const log = b.close();
+    if (JSON.stringify(game) !== JSON.stringify(twin)) fail.push(`evening ${level} seed ${seed}: the music changed the evening`);
+    fail.push(...b.fail.map(f => `evening ${level} ${f}`));
+    sum.runs++; sum.minutes += game.time / 60; sum.highs += log.filter(l => l.kind === 'high').length; sum.pulses += log.filter(l => l.kind === 'pulse').length;
+    for (const k of ['notes', 'waits', 'misses', 'blows']) sum[k] += b.n[k]; sum.worst = Math.max(sum.worst, b.n.worst);
+  }
+  console.log(`music${mutate ? ` (mutate ${mutate})` : ''}: ${sum.runs} evenings, ${sum.minutes.toFixed(1)} minutes: ${sum.notes} tune notes (${(sum.notes / sum.minutes).toFixed(1)} a minute), ${sum.waits} sheep with no note (four waiting), ${sum.misses} strays (missed notes), ${sum.blows} lost sheep (blows), ${sum.wolfRuns} wolf runs, ${sum.pulses} heartbeat pulses, ${sum.highs} high notes; latest note ${(sum.worst * 1000).toFixed(0)} ms after its sheep; ${fail.length} failures${fail.length ? ': ' + [...new Set(fail)].slice(0, 4).join('; ') : ''}`);
+  return fail.length;
+}
+if (musicOnly) {
+  if (mutation) {
+    const caught = [await musicClaims('stray'), await musicClaims('clock')];
+    console.log(caught.every(Boolean) ? 'mutation caught: both broken versions of the music fail' : 'MUTATION MISSED');
+    process.exit(caught.every(Boolean) ? 1 : 2);
+  }
+  process.exit(await musicClaims() ? 1 : 0);
 }
 
 const waiting = createGame(1, 1);
@@ -587,3 +648,5 @@ assert.ok(worse.slice(1).every((rate, i) => rate <= table.clumsy[[12, 20][i] - 1
 for (let level = 1; level <= 7; level++) {
   assert.ok(table.clumsy[level - 1] >= .5, `clumsy bot (150 ms late, 15% wrong) wins evening ${level} on at least half of 60 seeds: ${percent(table.clumsy[level - 1])}`);
 }
+// The music claims (above) run with the rest; `node bots.mjs music` runs them alone.
+assert.equal(await musicClaims(), 0, 'the music claims hold');

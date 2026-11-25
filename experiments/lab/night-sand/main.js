@@ -9,6 +9,7 @@ import { readJson, writeJson } from '../../kit/save.js';
 import { screens } from '../../kit/screens.js';
 import { noZoom } from '../../kit/zoom.js';
 import { lab } from '../../kit/lab.js';
+import { shareImage } from '../../kit/share.js';
 
 noZoom();
 const el = id => document.getElementById(id);
@@ -264,7 +265,7 @@ el('look').onclick = () => {
 onLeave(pause);
 
 // The raked garden as a picture: the bed itself, with its score and the game's name under it.
-// The kit has a share helper for links only (room.js shareLink), so the image share lives here.
+// The picture goes out through the kit's image share (kit/share.js).
 async function gardenImage() {
   const scale = 6, foot = 96;
   const out = document.createElement('canvas');
@@ -285,22 +286,9 @@ async function gardenImage() {
 async function shareGarden() {
   const blob = await gardenImage();
   if (!blob) return;
-  const file = new File([blob], 'night-sand-garden.png', { type: 'image/png' });
-  const text = t('shareCaption', { n: bed.score });
-  try {
-    if (navigator.canShare?.({ files: [file] })) {
-      await navigator.share({ files: [file], text });
-      rec.event('garden-shared', { score: bed.score });
-      return;
-    }
-  } catch (e) { if (e?.name === 'AbortError') return; }
-  // No file sharing here (most desktop browsers): save the picture instead.
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = file.name;
-  link.click();
-  setTimeout(() => URL.revokeObjectURL(link.href), 4000);
-  rec.event('garden-saved', { score: bed.score });
+  const how = await shareImage(blob, { name: 'night-sand-garden.png', text: t('shareCaption', { n: bed.score }) });
+  if (how === 'shared') rec.event('garden-shared', { score: bed.score });
+  if (how === 'saved') rec.event('garden-saved', { score: bed.score });
 }
 
 function locationInBed(e) {

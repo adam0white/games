@@ -129,9 +129,21 @@ async function savedPhone(page, g) {
   if (!g.startsOnBoard) assert.equal(await page.evaluate(() => window.audioLog.made), 1, 'Play starts one audio context');
   await g.touch(page, { finger, until, sleep });
   if (g.startsOnBoard) assert.equal(await page.evaluate(() => window.audioLog.made), 1, 'first input starts one audio context');
+  // Music (kit/music.js): on at first, playing the run's score while the run is in play.
+  const tune = () => page.evaluate(g.music.hook);
+  if (g.music) {
+    assert.equal(await page.textContent(g.music.button), g.music.on, 'music: on at first');
+    await until(page, hook => { const m = (0, eval)(hook)(); return m && m.on && m.kinds.includes('pad'); }, 'music: the score plays during a run', 8000, g.music.hook.toString());
+  }
   await shot(page, 'play');
   await pause();
   const t = (await state()).t;
+  // Turned off on the pause card: its own key is '0', and after resuming the score is silent and schedules nothing.
+  if (g.music) {
+    await page.click(g.music.button);
+    assert.equal(await page.textContent(g.music.button), g.music.off, 'music: the switch says off');
+    assert.equal(await page.evaluate(k => localStorage.getItem(k), g.music.key), '0', 'music: off saved under its own key');
+  }
   await g.verifyPaused?.(page, { finger });
   if (hasTimedHint(g)) await observeFrames(page, 300); else await sleep(300);
   assert.equal((await state()).t, t, 'play state stands still while paused'); await shot(page, 'paused');
@@ -144,6 +156,10 @@ async function savedPhone(page, g) {
   await page.click(g.resume ?? '#resume'); await wait(s => s.screen === 'play' && !s.paused, 'resume');
   if (g.resumeTouch) await g.touch(page, { finger, until, sleep });
   await wait(s => s.screen === 'play' && !s.paused && s.t > t, 'play state advances after resume');
+  if (g.music) {
+    await sleep(500); const a = await tune(); await sleep(800); const b = await tune();
+    assert.ok(!a.on && !b.on && a.notes === b.notes, `music: off schedules nothing (${a.notes} then ${b.notes} notes)`);
+  }
   await page.evaluate(() => dispatchEvent(new Event('blur'))); await wait(s => s.paused || s.screen === 'paused', 'losing focus pauses');
   await page.keyboard.press('P'); await wait(s => s.screen === 'play' && !s.paused, 'capital P resumes');
   await page.evaluate(() => dispatchEvent(new Event('pagehide'))); await wait(s => s.paused || s.screen === 'paused', 'putting the page away pauses');
@@ -167,6 +183,7 @@ async function savedPhone(page, g) {
   await play();
   if (g.startsOnBoard) await g.touch(page, { finger, until, sleep });
   assert.equal(await page.evaluate(() => window.audioLog.made), g.sound ? 0 : 1, 'sound choice survives reload');
+  if (g.music) assert.equal(await page.textContent(g.music.button), g.music.off, 'music: off survives reload');
   await pause();
   if (g.menu) await page.click(g.menu);
 }
@@ -906,7 +923,15 @@ const GAMES = {
     await until(page, () => window.fixitSim().rival.hurry, 'the rival speeds up'); await page.evaluate(() => { const s = window.fixitSim(); s.rival.next = s.clock; }); await until(page, () => window.fixitSim().rival.gag, 'it makes a mistake');
   },
   borrowed: page => started(page, 'borrowed', 'borrowedState', '#toMenu'),
-  alibi: page => started(page, 'alibi', 'alibiState', '#toMenu'),
+  async alibi(page) {
+    await started(page, 'alibi', 'alibiState', '#toMenu');
+    // The practice case (note #245): from the menu, one step at a time, and nothing of it is saved.
+    const kept = await page.evaluate(() => localStorage.getItem('alibi-save'));
+    await page.click('#learn'); await until(page, () => window.alibiState().step === 0 && !document.querySelector('#coach').hidden, 'practice starts');
+    await page.click('#coachOk'); assert.equal(await page.evaluate(() => window.alibiState().step), 1);
+    await page.click('#pause'); await page.click('#toMenu'); assert.equal(await page.evaluate(() => window.alibiState().step), null, 'leaving ends practice');
+    assert.equal(await page.evaluate(() => localStorage.getItem('alibi-save')), kept, 'practice saves nothing');
+  },
   nightshift: page => started(page, 'nightshift', 'nightshiftState', '#toMenu'),
   // Lab pages (/lab/<name>/): an old save survives, a finger steers, pause stops time, one audio context after the first tap.
   async 'lab/thankful'(page) {
@@ -925,6 +950,12 @@ const GAMES = {
     assert.equal(await page.evaluate(() => window.__thankful.state.days['2026-11-23'].length), 3, 'the fourth thanks did not change today');
     const picture = await page.evaluate(() => window.__thankful.picture());
     assert.equal(picture.width, 1080); assert.equal(picture.height, 1350); assert.ok(picture.bytes > 20000, 'picture has PNG image data');
+    // Daily flowers (2026-11-25): the buttons show the flower each kind grows that day, the same for everyone, in Turkish too.
+    await page.goto(`${base}/lab/thankful/?day=2026-11-25&lang=tr`); await until(page, () => window.__thankful, 'game script');
+    assert.equal(await page.getAttribute('[data-kind="bread"]', 'aria-label'), 'ekmek: arpa', 'bread grows barley on 25 Nov, named in Turkish');
+    assert.equal(await page.textContent('#line'), 'Bugün için üç teşekkür.', 'Turkish line');
+    await page.goto(`${base}/lab/thankful/?day=2026-11-24&lang=en`); await until(page, () => window.__thankful, 'game script');
+    assert.equal(await page.getAttribute('[data-kind="bread"]', 'aria-label'), 'bread: wheat', 'before the change bread grows wheat');
   },
   async 'lab/pitch'(page) {
     // Paper Pitch: an old save survives, a tap on a pulsing point draws a line, leaving the page pauses.
