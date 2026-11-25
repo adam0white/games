@@ -203,3 +203,7 @@ Also not exercised: a network freeze of 2 s or more that then delivers its whole
 - **Words face the reader by link.** Canvas text whose drawing is turned upside down on this phone is turned back round its own centre (`text()` in main.js), only while linked.
 - **First duel from the seed.** friend.js no longer forces tug; the sim deals the first duel from the match seed on both phones. link-check now plays the full deck (no `only=tug`) and asserts at least three kinds across the matches.
 
+
+### 2026-11-24 (live) — first match through the deployed relay
+
+`DUEL_BASE=https://play.adamwhite.work node experiments/duel/link-check.mjs` (from main 5f5cc375, the relay Worker deployed): WebKit iPhone 13 hosting, Chromium Pixel 7 joining by the shared link, both headless on one Mac, lab recording switched off. Two full matches (5067 and 4205 ticks) ended identically on both phones (2-3 and 3-1, same final hash); no console or network errors; both left by Menu. Measured round trip 60 ms; delay started at 8 ticks (133 ms). Stalls host 11 and 15, guest 3 and 5; by the end the host's delay had climbed to 14-15 ticks (233-250 ms), the guest's to 9 (150 ms). Unresolved: why the WebKit host stalls this often on a 60 ms line when the pretend network gives 0. Likely candidates, not tested: headless WebKit frame timing, or the Chromium guest sending in bursts. Two real phones on separate networks are still not tried.

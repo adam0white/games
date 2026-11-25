@@ -20,6 +20,7 @@ Shared code for the games under `experiments/`. It is served at `/kit/` as plain
 | `lockstep.js` | `lockstep({ id, delay, adapt, fill })`: two phones step one seeded game tick by tick, each tick only once both players' inputs for it are here; inputs stamped `delay` ticks ahead (optionally adapting), resent until confirmed, state checks every 30 ticks; pure, no timers; see below |
 | `samemath.js` | `sameMath` (`exp`, `sin`, `cos`, `hypot`): the same bits on every JavaScript engine, for a sim that two phones run in lockstep; see below |
 | `lab.js` | `lab(slug)`: play recording for the game lab, with its notice and off switch; see below |
+| `home.js` | `home(rec, { back })`: the way back to the small games' home at `/small/` and a finished run reported to it, in one line; see below |
 | `/notes/button.js` | the notes button for testers (it lives in `workers/feedback/public/notes/`) |
 | `check/phone.mjs` | phone runs of every live experiment, of the lab pages under `/lab/` and of this kit, on WebKit iPhone 13 and Chromium Pixel 7 |
 | `index.html` | a self-test page at `/kit/` |
@@ -125,6 +126,22 @@ A game calls `const rec = lab('<slug>')`, then `rec.notice(menuCard)`, `rec.togg
 - **Never in the way.** Every call returns at once and never throws. A failed send is dropped; nothing is queued or retried. Pages on localhost send nothing unless `localStorage['hf-lab-send-localhost'] = '1'` (the phone check sets it and answers the endpoint itself).
 - **Why not `@adam0white/lab-client`.** Its ES modules import `@adam0white/human-framework` (the cast and life code), so a no-build page would need a bundle of about 800 KB (the size of the archived experiments' `hf.js`). Its full recording also expects replay exports these games do not have. `lab.js` is about 130 lines and uses the same wire format and storage keys.
 - **Not covered, compared with the lab client:** the central identity frame at `/lab/identity/` (so linking is per origin: play.adamwhite.work only), the shared first-visit notice claim (this notice shows on every visit), retries and the offline queue, console error logs, and a run that is still open when the tab closes (a snapshot is sent when the page is hidden, which can be cut short).
+
+## The way back to the small games (`home.js`)
+
+The home at `/small/` opens every game with `?from=small`. A game wired to it shows a "‹ Small games" link ("‹ Küçük oyunlar" in Turkish) on the cards it names, and tells the home how each run ended, so "Three tonight" can show a win (★) and not only "moved forward" (✦). The one line, in place of the game's `const rec = lab('<slug>')`:
+
+```js
+import { home } from '../../kit/home.js';           // from a page in experiments/lab/<slug>/ (top-level games: '../kit/home.js')
+const rec = home(lab('night-bells'), { back: ['#menu .card', '#end .card'] });
+```
+
+- `back`: the menu and end cards, as selectors or elements, that get the link. Nothing is added when the page was not opened from the home (the `from` is remembered for the tab, so a reload or the next level keeps it). The link goes back in history when the player came from the home, so the home keeps its scroll and its deck position.
+- `rec` is the same recorder: `notice`, `toggle`, `start` and `event` are unchanged, and `end(outcome, summary)` still goes to the lab. A run whose outcome is `'won'` counts as a win. A game with other words for a win passes `'won'` or calls `homeResult('<slug>', 'won')` itself.
+- What it writes: the home's own key `hub:results` (`{ <slug>: { runs, wins, last, at, wonAt } }`). It never reads or writes the game's keys. `home(null, ...)` works without a recorder.
+- `home()` adds the links once, when it is called. A game that redraws a card with `innerHTML` calls `backLink(card)` (also exported) after drawing it; it adds nothing when the page was not opened from the home, and never adds a second link.
+- Until a game has this line, nothing changes for it: the browser's back button returns to the home, and the home reads the game's own save to mark it "moved forward".
+- The slug comes from the folder in the address and must be the game's name in `experiments/small/catalog.js` (they are equal today).
 
 ## Deliberate differences from the code the kit replaced
 
