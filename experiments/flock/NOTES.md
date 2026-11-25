@@ -202,7 +202,7 @@ Checks:
 - `node bots.mjs music --mutate`: song.js broken two ways (a stray plays a note: 436 failures; notes every second instead of on the fold: 22641 failures); exits 1.
 - `node bots.mjs` runs the music claims at its end and exits 0; `node bots.mjs --mutate` still breaks the rules and exits 1 as before.
 - `node experiments/kit/check/phone.mjs flock`: 8 of 8 pass on WebKit iPhone 13 and Chromium Pixel 7. New in the shared check: the switch says on at first, the score schedules notes during a run, turning it off on the pause card writes `'0'` under the new key, after resuming nothing more is scheduled, and off survives a reload.
-- `node check.mjs`: see the pull request.
+- `node check.mjs`: passes on WebKit iPhone 13 and Chromium Pixel 7, 0 page errors (music on by default throughout, since its key is new).
 - Looked at the pause card screenshot (WebKit, 390 wide): the Music button is a full-width row under Valley map and Sound.
 
 Not verified: any of it by ear. Nobody has listened. What a person should listen for:
