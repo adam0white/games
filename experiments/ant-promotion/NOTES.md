@@ -769,3 +769,90 @@ The skills (note #238) and the Living look were built at the same time. After th
 - Whether hiding feels worth doing to a person; the bots say it does not change survival at this density (see above).
 - Frame time at a 4x CPU slowdown, and WebKit in 3D and Living.
 - Balance was tuned on seeds 1 to 40 and reported on seeds 101 to 110.
+
+## 2026-11-24: the meadow evolves with how you play (lab page ant-evolve folded in)
+
+The owner on the lab page: evolution "can make things interesting for long time players". Read as: per player, on this device, over many runs, strong enough to notice.
+
+### Done
+- **What a run is.** A life of at least 30 s of play, ended by a death, the win, the menu or leaving the page. A life longer than 240 s is counted every 240 s. A shorter life does not count.
+- **Six traits per species**, kept in a new key `ant-promotion:meadow` (`{v:1, runs, way, sp:{species:[6 numbers]}, shown}`). `ant-promotion:v1` and `ant-promotion:cover` are unchanged, and the save holds no meadow field.
+  - Hunters (stronger than you when they meet you):
+    - grass: looks into tall grass, up to 1.6 times as far;
+    - stay: from -1 to 1, chases longer and rests less, or gives up sooner and rests longer;
+    - lead: aims ahead of where you run, up to 0.55 s ahead;
+    - shake: shakes off a stun or a skill's effect, up to 0.9 sooner.
+  - Prey (weaker than you):
+    - wary: sees further, and is up to 12 % bigger and up to 6 % slower ("slower but bigger");
+    - bold: lets you closer, with up to 25 % shorter sight ("bolder but careless");
+    - prey also learns shake if you stun it.
+- **What drives each trait.** Each trait follows what the player did against that species in the run:
+  - grass follows creeping in grass;
+  - stay follows hunters that tired or were dashed from (up), and lost you behind a rock (down);
+  - lead follows the player's average flight direction across runs;
+  - shake follows stuns and skills used;
+  - wary and bold follow the share of met prey that you ate.
+- **How fast and how far.** Each run moves a trait 25 % of the way to its target, and never more than 0.15. Every trait is clamped.
+- **Speed and power.** Speed only ever falls, to at most x0.912, so no pair of species changes who is faster. No trait changes power.
+- **First runs are today's game.** For 6 counted runs (`GRACE`) the page passes no meadow to `create`, and `formOf(s, m)` is `FORMS[m.f]` itself. The rival, old animals and the teaching hunter are never evolved.
+- **Why 6.** In the habit runs below, every two habits first stand apart after run 7. With a smaller GRACE the first change would come from noise, and with a larger one a player who plays a few runs a day waits more than a week. 6 is also inside the brief's 5 to 10.
+- **What the player sees.**
+  - "What the meadow learned" on the death card (and on the menu, after leaving from a run): up to two lines, each with the animal as it now looks and a dot in the trait's colour, then "n more in the field guide". A line appears when a trait crosses a quarter of its range.
+  - The menu's "Field guide · gen n" lists each changed species: a picture at the start and now, and a bar per trait from its starting line.
+  - In play, evolved animals are tinted up to 55 % toward their strongest trait's colour, and wary prey is bigger. Dots to the left of the number show each trait at a quarter of its range or more. This works in all five looks; the Living look rebuilds the rig when the form changes.
+  - A win or a long life shows a toast instead of the card.
+- **Reset.** "Start the meadow over" is at the bottom of the field guide. It is there because the game has no settings screen. The first tap asks, and a second tap within 5 s resets.
+- **Words** are in `meadow-words.js`, English and Turkish, merged into `words.js`'s tables, so `words.js` itself is not edited.
+- **Lab recording.** The page records `rec.event('meadow', {why, gen, species, mean[6], most[6]})` at each counted run end, with numbers only and no free text. A reset records `meadow reset`.
+- **Code.** `meadow.js` holds the rules and is node-safe. `meadow-page.js` holds the page: the card, the guide, the dots and the reset. `sim.js` has `formOf` and five marked lines (stun and skill wear-off, grass look, lead aim, tire and rest). `index.html` calls `meadowPage` at a few points.
+- The lab page `ant-evolve` is in `archive/lab/ant-evolve/`. The redirect `'ant-evolve': '/ant-promotion/'` is for the owner to add to `labMoved` in `worker-settings.mjs`.
+
+### Checks
+- `evolve-bots.mjs` runs third from `bots.mjs`, and also alone: `node experiments/ant-promotion/evolve-bots.mjs [--ref=<main's sim.js>] [--quick] [--mutate=meadow]`. Give `--ref` only when running it alone. `cover-bots.mjs` reads the same flag and expects a sim from before cover, so through `bots.mjs` its parity check fails at tick 0.
+- **Parity.** With `--ref` = main's `sim.js` after PR 242, a new player's world plays 86,400 ticks identically at levels 1, 6, 12 and 18, Classic and Wild, with cover on and power presses. The page's own path under GRACE plays 14,400 ticks identically.
+- **Staged traits.**
+  - stay: a plain hunter tires after 10.0 s, a persistent one after 15.0 s, and a quitter after 6.3 s;
+  - shake: after 1 s of a 2 s stun, 1.00 s is left for a plain animal and 0.10 s for one that shakes it off;
+  - grass, lead, wary and bold each change what they should;
+  - 0 speed pairs flip.
+- **Habits.** 4 bots, 2 series each, 30 runs of up to 90 s. Means over species after 30 runs:
+
+| habit | grass | stay | lead | shake |
+| --- | --- | --- | --- | --- |
+| always flees left | 0.00 / 0.00 | -0.02 / -0.05 | **0.35 / 0.32** | 0.00 / 0.00 |
+| always creeps | **0.21 / 0.24** | -0.10 / -0.13 | 0.09 / 0.09 | 0.00 / 0.00 |
+| always uses the skill | 0.00 / 0.00 | -0.11 / -0.03 | 0.12 / 0.07 | **0.12 / 0.15** |
+| zigzags | 0.00 / 0.00 | 0.00 / 0.00 | 0.06 / 0.12 | 0.00 / 0.00 |
+
+  Every two habits are apart on some trait, with both series of one beyond both of the other by 0.05. The pairs and their traits are: left/power lead, left/zig lead, creep/left lead, creep/power grass, creep/zig grass, power/zig shake. Prey traits are alike for all four (wary about 0.3, bold about 0.17), because all four eat what they meet. An earlier claim that habits differ more than two series of one habit failed, because stay wanders from run to run. I replaced it with the per-trait claim above.
+- **Clear rate.**
+  - The band 0.75 to 1.15 of the plain meadow was stated before measuring.
+  - The measure is the highest level a competent bot (skill user, revives on death) reaches from an Ant in 8 minutes, as a mean over 10 seeds:
+    - plain 7.60 (23 deaths);
+    - its own meadow after 30 runs 7.80 (21 deaths), ratio 1.03;
+    - every trait at its bound 7.70 (24 deaths), ratio 1.01;
+    - hunters' traits at their bounds 8.40 (25 deaths), ratio 1.11.
+  - Seed noise is 0.99.
+  - The measure changed twice and the band did not:
+    - bar points a minute of single lives was dropped because it rewards dying early (it gave 1.26 and 1.71);
+    - levels climbed in a minute from mid levels was dropped because the values sat near 0 and the ratios ran from -2.37 to 2.37.
+  - The prey traits were turned down three times until the own meadow fell inside the band.
+- **Bounds.** At the strongest corner, a fresh world has at least 31 catchable animals (bots.mjs asks for 8). Over 300 runs with real tallies and bursts of the most extreme possible: no NaN, 0 values out of bounds, largest step 0.150. A stored meadow survives a round trip, and a broken one is cleaned. Every trait has words, up and down, in English and Turkish.
+- **Mutation.** `--mutate=meadow` (a test-only switch in `meadow.js` that removes the clamp and the step cap) fails 5 checks and exits 1, both alone and through `bots.mjs`.
+- **Phone check.** The `ant-promotion` section of `kit/check/phone.mjs` ran on WebKit iPhone 13 and Chromium Pixel 7. It checks that:
+  - a new player has no meadow, and a short run does not count;
+  - after 5 runs the world is still plain and the guide says "(1 to go)";
+  - after 9 runs the button reads "Field guide · gen 9", over 20 species are listed, the world is evolved and all five looks draw;
+  - a death shows the card, runs become 10, and the lab record holds a `meadow` event with gen 10;
+  - the next life has the meadow, and the save has no meadow keys;
+  - reset needs two taps;
+  - the Turkish title is right.
+- **Looked at, headless at 390x844.** The first seconds (no meadow), the pause card, an evolved menu, the field guide in English and Turkish, the reset, all five looks with evolved animals, and the death card with the card. There were no page errors.
+
+### Not verified
+- No person has played 30 runs. Whether the drift is noticeable but fair is not known.
+- No person has judged the tint and dots. In the card, a grass-tinted Wolf at 96 px reads as a green lizard.
+- The bots do not show the meadow making the game harder. A competent bot does as well against the hunters-at-bounds meadow as against the plain one, within noise. The winnable half of the claim is shown; the warier half is not.
+- Frame cost was not measured. A real phone and thumb feel were not checked.
+- **Rules left on plain forms.** `paceAgainst` and `catchable` use `FORMS` speed, which is a few percent off for slowed prey. `skills.js` `within` uses the plain radius.
+- "{n} more in the field guide" counts changes, not species.

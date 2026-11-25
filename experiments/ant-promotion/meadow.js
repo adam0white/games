@@ -9,7 +9,7 @@
 //            you broke its sight behind rocks         -> it gives up sooner, and comes back sooner     (down to -1)
 //     lead   you run away the same way each time      -> it runs at where you will be, not where you are (a sharp turn makes it overshoot)
 //   Any role:
-//     shake  your skills stun it                     -> it shakes off a stun sooner; it is a little slower
+//     shake  your skills stun it or work on it       -> it shakes off a stun or a skill sooner; it is a little slower
 //   As prey (weaker than you):
 //     wary   you eat a lot of it                      -> it sees you from further off, but it grows fat: bigger and slower
 //     bold   you meet it and leave it alone          -> it lets you come closer before it runs
@@ -118,7 +118,7 @@ export function makeMeadow(M) {
 export const useMeadow = (s, mw) => { if (mw) s.meadow = mw; else delete s.meadow; };
 
 // ---------- watching a run (the page and the bots call observe() after every step)
-export const newTally = () => ({ tick: -1, time: 0, hunt: {}, prey: {}, stun: {}, hx: 0, hy: 0, runs: 0, dash: 0, trail: [] });
+export const newTally = () => ({ tick: -1, time: 0, hunt: {}, prey: {}, stun: {}, hx: 0, hy: 0, runs: 0, dash: 0, trail: [], hit: new WeakSet() }); // hit: skill effects already counted
 const H = (T, n) => (T.hunt[n] ??= { chase: 0, grass: 0, rock: 0, tired: 0, dash: 0 });
 const P = (T, n) => (T.prey[n] ??= { met: 0, eaten: 0 });
 const DASH = new Set(['leap', 'dive', 'sprint']);
@@ -131,6 +131,7 @@ export function observe(s, T) {
     else if (e.t === 'coverLost' && e.strong) { const m = byId(e.id); if (plain(m) && s.cover) H(T, name(m))[rockBetween(s.cover.rocks, m.x, m.y, p.x, p.y) ? 'rock' : 'grass']++; }
     else if (e.t === 'tired') { const m = byId(e.id); if (plain(m)) H(T, name(m)).tired++; }
     else if (e.t === 'power' && DASH.has(e.kind)) { T.dash++; for (const m of s.mobs) if (plain(m) && m.alert && FORMS[m.f].power > mine && Math.hypot(m.x - p.x, m.y - p.y) < 400) H(T, name(m)).dash++; }
+    else if (e.t === 'power' && e.kind === 'own') { for (const m of s.mobs) if (plain(m) && m.fx && !T.hit.has(m.fx)) { T.hit.add(m.fx); T.stun[name(m)] = (T.stun[name(m)] || 0) + 1; } } // skills.js: what the skill put on an animal
     else if (e.t === 'stun') { let best = null, bd = 30; for (const m of s.mobs) { const d = Math.hypot(m.x - e.x, m.y - e.y); if (d < bd) { bd = d; best = m; } } if (plain(best)) T.stun[name(best)] = (T.stun[name(best)] || 0) + 1; }
     else if (e.t === 'eat' && !e.nem && !s.events.some(o => o.t === 'oldEaten') && NAMES.has(e.name)) { const r = P(T, e.name); r.eaten++; r.met = Math.max(r.met, r.eaten); } // the rival and an old animal are not their species
   }

@@ -6,10 +6,10 @@
 // 2. Rules on staged scenes: each trait does what its words say, and no trait changes who is faster than whom.
 // 3. Habits. Four simulated players with one habit each (flee left, creep in grass, use the skill, zigzag) play 30 runs, twice each from
 //    different seeds. The meadows they leave must differ by habit more than by seed, and each habit must move its own trait most.
-// 4. Clear rate. BAND was stated before any evolved run: a competent bot's levels climbed a minute (sessions where a death costs a level
-//    and play goes on) in an evolved meadow (its own after 30 runs, every trait at its hardest bound, and the hunters alone at theirs)
-//    stay within BAND times its rate in the plain meadow, and food stays. (A first measure, bar points a minute of single lives,
-//    rewarded dying early and was dropped; the band was not changed.)
+// 4. Clear rate. BAND was stated before any evolved run: a competent bot's highest level from an Ant in a fixed time (a death costs a
+//    level and play goes on, as in bots.mjs section 4) in an evolved meadow (its own after 30 runs, every trait at its hardest bound, and the hunters alone at theirs)
+//    stay within BAND times its level in the plain meadow, and food stays. (Two first measures were dropped, the band was not changed:
+//    bar points a minute of single lives rewarded dying early; levels climbed a minute from mid levels sat near 0, so ratios meant nothing.)
 // 5. 300 runs of the update, fed with the tallies the habits produced and with extreme ones: every trait stays in its bounds, no step
 //    is larger than STEP, nothing is NaN. --mutate=meadow removes the step cap and the clamp; this check must then fail.
 import { FORMS, ANT, COVER, needFor, create, step, choose, revive, me, level, powerOf, sightOf, optionsFor, SPAWN_WEIGHTS, TIRE, powerReady, catchable, formOf, encounter, chasePace } from './sim.js';
@@ -173,22 +173,23 @@ for (let r = 0; r < RUNS; r++) if (pairs.every(([a, b]) => apart(r, a, b) >= 0))
 // ---- 4. Clear rate
 const BAND = [0.75, 1.15]; // stated before any evolved run was measured
 {
-  // levels climbed a minute in sessions played as the game is played: a death costs a level and play goes on (as bots.mjs section 4)
-  const SESSION = quick ? 3 : 5, N = quick ? 6 : 16;
+  // the game's own measure (bots.mjs section 4): from an Ant, a careful bot that uses its skill when chased plays on through deaths
+  // (each costs a level); the highest level it reaches in SESSION minutes, averaged over N seeds
+  const SESSION = quick ? 5 : 8, N = quick ? 4 : 10;
   const rate = (M, from = 9100) => {
-    let lv = 0, died = 0;
+    let top = 0, died = 0;
     for (let k = 0; k < N; k++) {
-      const L = 4 + (k % 6), s = create(from + k, stackAt(L, k % 3), 0, SPAWN_WEIGHTS, true, null, [], { meadow: M ? MW.makeMeadow(M) : null });
-      for (let i = 0; i < SESSION * 3600 && !s.won; i++) { step(s, bot('plain', s)); if (s.choosing) choose(s, k % 3); if (s.dead) { died++; revive(s, false); } }
-      lv += level(s) + s.player.xp / needFor(level(s)) - L;
+      const s = create(from + k, [ANT], 0, SPAWN_WEIGHTS, true, null, [], { meadow: M ? MW.makeMeadow(M) : null }); let best = 1;
+      for (let i = 0; i < SESSION * 3600 && !s.won; i++) { step(s, bot('power', s)); if (s.choosing) choose(s, k % 3); if (s.dead) { died++; revive(s, false); } best = Math.max(best, level(s)); }
+      top += best;
     }
-    return { per: lv / (N * SESSION), died };
+    return { per: top / N, died };
   };
   let ownM = MW.newMeadow(); // the competent bot's own meadow: 30 runs of its own play
   for (let r = 0; r < RUNS; r++) { const t = MW.newTally(); playRun('plain', 8000 + r, 5 + (r % 5), r % 3, ownM, t); t.time = Math.max(t.time, MW.MIN_RUN); ownM = MW.advance(ownM, t).meadow; }
   const base = rate(null), own = rate(ownM), worst = rate(fill(WORST, 99)), hunters = rate(fill(HUNTERS, 99)), other = rate(null, 9500);
   console.log(`     seed noise: the plain meadow on other seeds gives ${(other.per / base.per).toFixed(2)} of the first`);
-  console.log(`     competent bot, levels climbed a minute over ${N} sessions of ${SESSION} min (a death costs a level): plain ${base.per.toFixed(2)} (${base.died} deaths), its own meadow after ${RUNS} runs ${own.per.toFixed(2)} (${own.died}), every trait at its bound ${worst.per.toFixed(2)} (${worst.died}), hunters' traits at their bounds ${hunters.per.toFixed(2)} (${hunters.died})`);
+  console.log(`     competent bot, highest level reached from an Ant in ${SESSION} min, mean of ${N} seeds (deaths cost a level): plain ${base.per.toFixed(2)} (${base.died} deaths), its own meadow after ${RUNS} runs ${own.per.toFixed(2)} (${own.died}), every trait at its bound ${worst.per.toFixed(2)} (${worst.died}), hunters' traits at their bounds ${hunters.per.toFixed(2)} (${hunters.died})`);
   const k = r => r.per / base.per, inBand = r => k(r) >= BAND[0] && k(r) <= BAND[1];
   claim([own, worst, hunters].every(inBand), `clear rate stays within ${BAND[0]} to ${BAND[1]} of the plain meadow's (own: ${k(own).toFixed(2)}, every trait at its bound: ${k(worst).toFixed(2)}, hunters at their bounds: ${k(hunters).toFixed(2)})`);
   let least = Infinity; for (const L of [2, 6, 10, 14, 18]) for (let seed = 1; seed <= 5; seed++) least = Math.min(least, catchable(create(seed, stackAt(L), 0, SPAWN_WEIGHTS, false, null, [], { meadow: MW.makeMeadow(fill(WORST, 99)) })).length);

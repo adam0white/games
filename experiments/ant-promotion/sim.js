@@ -327,7 +327,7 @@ export function step(s, input) {
     if (m.hunt > 0) m.hunt -= dt;
     const T = m.nem ? TEMPERAMENTS[N.knobs.temperament] : null, power = powerOf(m);
     const [far, half] = sightOf(M), range = M.range * far * (T ? T.sight : 1) * (m.old && !(m.hunt > 0) && !m.alert && power > F.power ? OLD_DIM : 1), cone = Math.min(Math.PI, half * (T ? T.cone : 1));
-    if (m.fx && (m.fx.t -= dt) <= 0) m.fx = null;
+    if (m.fx && (m.fx.t -= dt * (M.shake || 1)) <= 0) m.fx = null; // meadow: M.shake also wears off a skill sooner
     if (m.winded > 0) m.winded -= dt;
     if (m.spring > 0) m.spring -= dt; if (m.pounce > 0) m.pounce -= dt;
     if (m.stun > 0) m.stun -= dt * (M.shake || 1); // meadow: an evolved animal shakes off a stun sooner

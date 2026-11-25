@@ -133,6 +133,8 @@ Landed: `lantern-spark` is a mode inside Lantern (2026-11-24, branch `fold-lante
 
 `ant-creatures` landed (2026-11-24): its rig and drawing are Ant Promotion's fifth look, Living (`/ant-promotion/?look=4`, on the Look button), with the rig checks in `ant-promotion/rig-bots.mjs`. The page is in `archive/lab/ant-creatures/`; the zoo was not carried over.
 
+`ant-evolve` landed (2026-11-24, branch `fold-ant-evolve`): Ant Promotion's meadow learns from how one player plays, between runs, and keeps it on the device (`ant-promotion/meadow.js`, key `ant-promotion:meadow`). Six bounded traits per species (looks into grass, chases longer or gives up sooner, cuts you off, shakes off skills; prey grows wary but fat and slow, or bold); nothing changes for the first 6 runs; a card says what the meadow learned, a field guide on the menu shows each species then and now, and evolved animals are tinted and carry coloured dots by their number. Checks in `ant-promotion/evolve-bots.mjs`. The in-session gene pool and the mercy rule were not carried over. The page is in `archive/lab/ant-evolve/`; its old address needs `'ant-evolve': '/ant-promotion/'` in `labMoved`.
+
 Owner's decision on the small pages (2026-11-24, after playing them): "Good but improve: Thankful Garden, Paper pitch, channels, ring, sand needs a lot of improvements, bells, podwire good but improve/extend, pour but improve sim and it's too difficult right now, face shift but improve as it needs more variety and gameplay, saltplate but improve and extend, splitlight. Reject: pisti, keeper, kite, loaves. We should collect small games into 1-2 URLs, maybe split by single/multi player, or open to other ideas."
 
 | Page | Decision | State |
