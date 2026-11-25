@@ -776,3 +776,149 @@ The skills (note #238) and the Living look were built at the same time. After th
 - Whether hiding feels worth doing to a person; the bots say it does not change survival at this density (see above).
 - Frame time at a 4x CPU slowdown, and WebKit in 3D and Living.
 - Balance was tuned on seeds 1 to 40 and reported on seeds 101 to 110.
+
+## 2026-11-24: the meadow evolves with how you play (lab page ant-evolve folded in)
+
+The owner on the lab page: evolution "can make things interesting for long time players". Read as: per player, on this device, over many runs, strong enough to notice.
+
+### Done
+- **What a run is.** A life of at least 30 s of play, ended by a death, the win, the menu or leaving the page. A life longer than 240 s is counted every 240 s. A shorter life does not count.
+- **Six traits per species**, kept in a new key `ant-promotion:meadow` (`{v:1, runs, way, sp:{species:[6 numbers]}, shown}`). `ant-promotion:v1` and `ant-promotion:cover` are unchanged, and the save holds no meadow field.
+  - Hunters (stronger than you when they meet you):
+    - grass: looks into tall grass, up to 1.6 times as far;
+    - stay: from -1 to 1, chases longer and rests less, or gives up sooner and rests longer;
+    - lead: aims ahead of where you run, up to 0.55 s ahead;
+    - shake: shakes off a stun or a skill's effect, up to 0.9 sooner.
+  - Prey (weaker than you):
+    - wary: sees further, and is up to 12 % bigger and up to 6 % slower ("slower but bigger");
+    - bold: lets you closer, with up to 25 % shorter sight ("bolder but careless");
+    - prey also learns shake if you stun it.
+- **What drives each trait.** Each trait follows what the player did against that species in the run:
+  - grass follows creeping in grass;
+  - stay follows hunters that tired or were dashed from (up), and lost you behind a rock (down);
+  - lead follows the player's average flight direction across runs;
+  - shake follows stuns and skills used;
+  - wary and bold follow the share of met prey that you ate.
+- **How fast and how far.** Each run moves a trait 25 % of the way to its target, and never more than 0.15. Every trait is clamped.
+- **Speed and power.** Speed only ever falls, to at most x0.912, so no pair of species changes who is faster. No trait changes power.
+- **First runs are today's game.** For 6 counted runs (`GRACE`) the page passes no meadow to `create`, and `formOf(s, m)` is `FORMS[m.f]` itself. The rival, old animals and the teaching hunter are never evolved.
+- **Why 6.** In the habit runs below, every two habits first stand apart after run 7. With a smaller GRACE the first change would come from noise, and with a larger one a player who plays a few runs a day waits more than a week. 6 is also inside the brief's 5 to 10.
+- **What the player sees.**
+  - "What the meadow learned" on the death card (and on the menu, after leaving from a run): up to two lines, each with the animal as it now looks and a dot in the trait's colour, then "n more in the field guide". A line appears when a trait crosses a quarter of its range.
+  - The menu's "Field guide · gen n" lists each changed species: a picture at the start and now, and a bar per trait from its starting line.
+  - In play, evolved animals are tinted up to 55 % toward their strongest trait's colour, and wary prey is bigger. Dots to the left of the number show each trait at a quarter of its range or more. This works in all five looks; the Living look rebuilds the rig when the form changes.
+  - A win or a long life shows a toast instead of the card.
+- **Reset.** "Start the meadow over" is at the bottom of the field guide. It is there because the game has no settings screen. The first tap asks, and a second tap within 5 s resets.
+- **Words** are in `meadow-words.js`, English and Turkish, merged into `words.js`'s tables, so `words.js` itself is not edited.
+- **Lab recording.** The page records `rec.event('meadow', {why, gen, species, mean[6], most[6]})` at each counted run end, with numbers only and no free text. A reset records `meadow reset`.
+- **Code.** `meadow.js` holds the rules and is node-safe. `meadow-page.js` holds the page: the card, the guide, the dots and the reset. `sim.js` has `formOf` and five marked lines (stun and skill wear-off, grass look, lead aim, tire and rest). `index.html` calls `meadowPage` at a few points.
+- The lab page `ant-evolve` is in `archive/lab/ant-evolve/`. The redirect `'ant-evolve': '/ant-promotion/'` is for the owner to add to `labMoved` in `worker-settings.mjs`.
+
+### Checks
+- `evolve-bots.mjs` runs third from `bots.mjs`, and also alone: `node experiments/ant-promotion/evolve-bots.mjs [--ref=<main's sim.js>] [--quick] [--mutate=meadow]`. Give `--ref` only when running it alone. `cover-bots.mjs` reads the same flag, and through `bots.mjs` with main's current `sim.js` its `{ cover: false }` parity check failed at tick 0. The evolve parity shows this branch's sim plays as main's for 86,400 ticks with cover on, so the same check should fail on main itself with that ref; it was written against a sim from before cover. I did not run it on main to confirm.
+- **Parity.** With `--ref` = main's `sim.js` after PR 242, a new player's world plays 86,400 ticks identically at levels 1, 6, 12 and 18, Classic and Wild, with cover on and power presses. The page's own path under GRACE plays 14,400 ticks identically.
+- **Staged traits.**
+  - stay: a plain hunter tires after 10.0 s, a persistent one after 15.0 s, and a quitter after 6.3 s;
+  - shake: after 1 s of a 2 s stun, 1.00 s is left for a plain animal and 0.10 s for one that shakes it off;
+  - grass, lead, wary and bold each change what they should;
+  - 0 speed pairs flip.
+- **Habits.** 4 bots, 2 series each, 30 runs of up to 90 s. Means over species after 30 runs:
+
+| habit | grass | stay | lead | shake |
+| --- | --- | --- | --- | --- |
+| always flees left | 0.00 / 0.00 | -0.02 / -0.05 | **0.35 / 0.32** | 0.00 / 0.00 |
+| always creeps | **0.21 / 0.24** | -0.10 / -0.13 | 0.09 / 0.09 | 0.00 / 0.00 |
+| always uses the skill | 0.00 / 0.00 | -0.11 / -0.03 | 0.12 / 0.07 | **0.12 / 0.15** |
+| zigzags | 0.00 / 0.00 | 0.00 / 0.00 | 0.06 / 0.12 | 0.00 / 0.00 |
+
+  Every two habits are apart on some trait, with both series of one beyond both of the other by 0.05. The pairs and their traits are: left/power lead, left/zig lead, creep/left lead, creep/power grass, creep/zig grass, power/zig shake. Prey traits are alike for all four (wary about 0.3, bold about 0.17), because all four eat what they meet. An earlier claim that habits differ more than two series of one habit failed, because stay wanders from run to run. I replaced it with the per-trait claim above.
+- **What a player would see in those habit runs.** Over 30 runs, 18 to 23 runs end with a "what the meadow learned" card, with 30 to 68 lines in all. After 30 runs, 13 to 19 species carry dots in play (a trait at 0.25 or more). The first card comes at run 6, and it can hold several lines at once, because changes before GRACE are held back.
+- **Clear rate.**
+  - The band 0.75 to 1.15 of the plain meadow was stated before measuring.
+  - The measure is the highest level a competent bot (skill user, revives on death) reaches from an Ant in 8 minutes, as a mean over 10 seeds:
+    - plain 7.60 (23 deaths);
+    - its own meadow after 30 runs 7.80 (21 deaths), ratio 1.03;
+    - every trait at its bound 7.70 (24 deaths), ratio 1.01;
+    - hunters' traits at their bounds 8.40 (25 deaths), ratio 1.11.
+  - Seed noise is 0.99.
+  - The measure changed twice and the band did not:
+    - bar points a minute of single lives was dropped because it rewards dying early (it gave 1.26 and 1.71);
+    - levels climbed in a minute from mid levels was dropped because the values sat near 0 and the ratios ran from -2.37 to 2.37.
+  - The prey traits were turned down three times until the own meadow fell inside the band.
+- **Bounds.** At the strongest corner, a fresh world has at least 31 catchable animals (bots.mjs asks for 8). Over 300 runs with real tallies and bursts of the most extreme possible: no NaN, 0 values out of bounds, largest step 0.150. A stored meadow survives a round trip, and a broken one is cleaned. Every trait has words, up and down, in English and Turkish.
+- **Mutation.** `--mutate=meadow` (a test-only switch in `meadow.js` that removes the clamp and the step cap) exits 1: 5 checks fail through `bots.mjs`, 4 alone with `--quick`.
+- **`node bots.mjs 6 12`** (1800 s limit) exits 1, from six skill stage tests in section 4c: Bat, Owl, Fox, Lynx, Ostrich and Zebra. Main fails the same six. A harness with section 4b and 4c alone, built from `bots.mjs` the same way for both trees, fails these six on `origin/main` and on this branch. Every other section passes: rig, cover, the evolving meadow, rule table, tree, food, bots, wild rules, powers, same-kind picks, rival and old animals. I did not fix them here; they belong to PR 242's skills meeting cover, not to the meadow. Bare `--mutate` exits 1 through the rig mutation (3 rig checks fail).
+- **Phone check.** The `ant-promotion` section of `kit/check/phone.mjs` ran on WebKit iPhone 13 and Chromium Pixel 7. It checks that:
+  - a new player has no meadow, and a short run does not count;
+  - after 5 runs the world is still plain and the guide says "(1 to go)";
+  - after 9 runs the button reads "Field guide · gen 9", over 20 species are listed, the world is evolved and all five looks draw;
+  - a death shows the card, runs become 10, and the lab record holds a `meadow` event with gen 10;
+  - the next life has the meadow, and the save has no meadow keys;
+  - reset needs two taps;
+  - the Turkish title is right.
+- **Looked at, headless at 390x844.** The first seconds (no meadow), the pause card, an evolved menu, the field guide in English and Turkish, the reset, all five looks with evolved animals, and the death card with the card. There were no page errors.
+
+### Not verified
+- No person has played 30 runs. Whether the drift is noticeable but fair is not known.
+- No person has judged the tint and dots. In the card, a grass-tinted Wolf at 96 px reads as a green lizard.
+- The bots do not show the meadow making the game harder. A competent bot does as well against the hunters-at-bounds meadow as against the plain one, within noise. The winnable half of the claim is shown; the warier half is not.
+- Frame cost was not measured. A real phone and thumb feel were not checked.
+- **Rules left on plain forms.** `paceAgainst` and `catchable` use `FORMS` speed, which is a few percent off for slowed prey. `skills.js` `within` uses the plain radius.
+- "{n} more in the field guide" counts changes, not species.
+
+## 2026-11-25: hiding skills restored; meadow marks, card cap, plain-form checks (follow-up to PR 276)
+
+### Six skills that hide you did nothing on main
+- `node bots.mjs 6 12` failed six skill stage tests in section 4c on main: Bat, Owl, Fox, Lynx, Ostrich and Zebra.
+- **Cause.** The test was right; the game was wrong. In 29528436 ("Merge origin/main into ant-skills: skills with rocks and grass", part of PR 242), the conflict on the `sees` line kept cover's `&& !hid` and dropped two things from skills:
+  - `!unseen(s, m, d, ...)` and `seenK(s)`;
+  - the line `if (m.alert && unseen(...)) m.alert = false`.
+  `sim.js` still imported `unseen` and `seenK` but never used them. So on main, every skill that hides you, blinds an animal or shrinks how far you are seen had no effect.
+- **Bisect.** A harness with sections 4b and 4c alone, built from each commit's `bots.mjs`:
+  - passes at 29528436^1, at 4daf2feb and at 2213e407;
+  - fails the six at 29528436, at PR 242's tip and at its merge 09ac6741.
+- **Fix.** Both lines are back, beside `&& !hid`.
+- **Parity.** The `--ref` for `evolve-bots.mjs` is now main's `sim.js` with these two lines restored, because main itself has the bug.
+
+### The meadow: do species differ? (measured from bot play, not hand-seeded)
+- The look the owner saw (every species the same green, "102 more") came from the checks' hand-seeded meadow, in which every species was given grass 0.8.
+- **Measurement.** `/tmp` scratch, rules as in PR 276. 30 runs per habit bot. For each species, its look = its strongest trait and its band (in quarters of the range).
+
+| habit | species changed | trait sd across species (lead / grass / wary / bold) | distinct looks | most common look |
+| --- | --- | --- | --- | --- |
+| flees left | 27 | 0.23 / 0.00 / 0.18 / 0.12 | 9 | 7 of 27 |
+| creeps | 26 | 0.05 / 0.12 / 0.22 / 0.10 | 7 | 7 of 26 |
+| uses its skill | 25 | 0.03 / 0.00 / 0.20 / 0.11 | 7 | 9 of 25 |
+| zigzags | 23 | 0.04 / 0.00 / 0.18 / 0.11 | 6 | 5 of 23 |
+| plain | 24 | 0.05 / 0.00 / 0.19 / 0.08 | 6 | 11 of 24 |
+
+- Species do not all move together. Prey traits follow each species' own share eaten. Hunter traits move only for species that chased you, and by how often each did.
+- **Tried and dropped.** Each species learns only from its own encounters, with a step weighted by its own chases (4 for a full step) and no run-wide pooling. It made species *less* distinct (lead sd 0.23 to 0.07, grass 0.12 to 0.11, wary 0.18 to 0.16) and weakened every habit, because one species chases you only once or twice a run. The rule is unchanged.
+- **Card cap.** A run tells at most `SHOW` = 4 changes, strongest first. The card shows 2 lines and at most "2 more in the field guide". When more than 4 changed, it says "More in the field guide." with no number. All changes are marked as told, so none pile up for later cards. The field guide lists everything.
+
+### Marks, not paint
+- The tint is now at most 15 % (`TINT`, was 55 %), so a red Fire Ant stays red and a white Rabbit stays white.
+- An evolved animal carries a row of spots down its back, one in each strong trait's colour (a quarter of its range or more), with a dark rim. This is in Flat, Cartoon, Soft and Living (2D, in the body's frame) and in 3D (small balls on the back). The same spots are on the card and field-guide portraits. The dots beside the number are unchanged.
+- Screenshots before and after, from a meadow made by 30 runs of mixed-habit bot play, are at `/tmp/claude-fold-ant-evolve/shots/{before,after}-*.png` (outside the repo).
+
+### Plain forms in the » mark, `catchable` and skill reach
+- These are not bugs a player can feel. Evolution only ever slows an animal, by at most x0.912, and the speed claim shows no pair changes who is faster or who can eat whom.
+- A new claim checks the actual readers on real worlds: in evolved worlds at levels 2 to 18 with every trait at its slowest, the » mark (`paceAgainst`) and `catchable` read from plain forms agree with the evolved forms for all 1152 animals, 0 differ. A planted bad case (wary slowing by 30 %) makes it fail on 284 animals.
+- Skill reach (`within` in `skills.js`) uses the plain radius. A wary animal is at most 12 % bigger, so reach is off by about 1 to 4 units in reaches of 150 to 320. Left as is.
+
+### Checks (2026-11-25)
+- `node bots.mjs 6 12` (1800 s limit): exits 0, every section.
+- `evolve-bots.mjs --ref=<main's sim.js with the two lines restored>`:
+  - 86,400 ticks identical;
+  - habits as before (every pair apart from run 7);
+  - in the habit runs, 18 to 23 of 30 runs end with a card and 13 to 19 species carry spots;
+  - clear rate within the band: own 1.07, every trait at its bound 0.99, hunters at their bounds 1.06 (plain 8.00 levels in 8 min, 10 seeds);
+  - the card cap holds over 300 runs: at most 4 told, up to 245 left to the field guide in the extreme bursts.
+- **Mutations.** `bots.mjs --mutate=meadow` exits 1 (4 checks). Bare `--mutate` exits 1 through the rig (3 checks).
+- **Phone check** `ant-promotion`: ok on WebKit iPhone 13 and Chromium Pixel 7. The death card now has exactly two lines and "More in the field guide."
+- **`npm test`:** 73 pass.
+- **Looked at, headless at 390x844.** All five looks with a bot-made meadow, before and after. The field guide, the death card, and the earlier play script's screens. No page errors.
+
+### Not verified
+- No person has judged whether the spots read as "this animal changed" without the field guide. A real phone was not used.
+- In the Living look, the spots follow the heading `m.a`, not the rig's own body bend.

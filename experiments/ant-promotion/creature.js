@@ -137,8 +137,8 @@ function shape(name, spec, look) {
     case 'Lion': look.bigMane = 1; break;
   }
 }
-const cache = new Map();
-export function speciesFor(F) { let s = cache.get(F.id); if (!s) cache.set(F.id, s = make(F)); return s; }
+const cache = new Map(), evolved = new WeakMap(); // evolved: a form the meadow changed (meadow.js shape(), F.ev) has its own colours
+export function speciesFor(F) { const c = F.ev ? evolved : cache, k = F.ev ? F : F.id; let s = c.get(k); if (!s) c.set(k, s = make(F)); return s; }
 export function creature(F, x, y, a) { const { spec, look } = speciesFor(F); const c = build(spec, F.r, x, y, a); c.look2 = look; c.F = F; c.seed = (F.id * 7919 + Math.round(x * 13 + y * 7)) % 1000; return c; }
 export const SPECIES = FORMS;
 
