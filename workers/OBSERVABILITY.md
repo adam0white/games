@@ -43,19 +43,19 @@ Some Workers answer 5xx on purpose (`games-lab-ai` at its daily cap, `games-crum
 
 ## The routine
 
-Cloudflare starts a Claude routine when an issue appears. Nothing runs on a timer, and nothing needs watching.
+Cloudflare starts a Claude routine when an issue appears. A daily run of the same routine sweeps for anything missed. Nothing needs watching.
 
-1. Two Issues automations cover every Worker in the account, now and later: "All Workers: new issue to Claude routine" fires on an issue's first occurrence, and "All Workers: issue returned to Claude routine" fires when an issue recurs after one quiet hour. List them with `cf o11y issues automations list`.
+1. Two Issues automations cover every Worker in the account, now and later: "All Workers: new issue to Claude routine" fires on an issue's first occurrence, and "All Workers: issue returned to Claude routine" fires when an issue recurs after 24 quiet hours. List them with `cf o11y issues automations list`.
 2. Both send to the routine "Fix Cloudflare Worker issues" (`trig_01RSFhq8pXhq1p4W79gh6xh3`, https://claude.ai/code/routines). Cloudflare's summary of the issue, with the issue id, arrives in the run as untrusted data.
 3. The routine runs on the lab's Mac, because the fix needs the `cf`, `wrangler` and `gh` sign-ins there. It works in a fresh clone under `~/code/lab/issue-runs/`. It fixes the fault, merges, deploys and marks the issue resolved, or it leaves the issue active for the owner. If the Mac is off, the run does not start; run the routine by hand afterwards.
 4. The record is a GitHub issue in this repository with the label `worker-issue`. An open one with the label `needs-owner` is a decision waiting for the owner: https://github.com/adam0white/games/issues?q=is%3Aopen+label%3Aneeds-owner
-5. Issues on Workers outside this project and Cloudflare's "Potential vulnerability scan" issues (type `security`) are out of scope. A run that Cloudflare starts for one ends without acting (seen for a Worker outside the project; expected, not yet seen, for a `security` issue).
+5. Issues on Workers outside this project and Cloudflare's "Potential vulnerability scan" issues (type `security`) are out of scope. A run that Cloudflare starts for one ends without acting (seen for a Worker outside the project and for `security` issues). On 2026-11-25 scanner traffic started nine such runs in one night while the return window was one hour, five of them in the same second, so the window went back to 24 hours.
 
 The routine's prompt is `workers/observability/routine/prompt.md`. The routine holds its own copy: after a change here merges, save the same text into the routine. Every run, fired or started by hand with the Run button, also sweeps every active issue that has no open record.
 
 Tested 2026-11-24: a throwaway Worker that threw on every request started a run 20 seconds after its first error, with the issue id in the payload, and the run left it alone as out of scope. The same day a hand-started run recorded one issue as `needs-owner` and resolved one that had recovered. Not yet exercised by a real issue: the fix, merge and deploy path.
 
-Known gap, measured the same day: an issue that is marked resolved and returns within the quiet hour reopens in Cloudflare but starts no run. The next run for any other issue sweeps it up. The routine has no schedule of its own.
+Known gap, measured the same day: an issue that is marked resolved and returns within the quiet window reopens in Cloudflare but starts no run. The next run sweeps it up: the routine also runs every day at 13:00 UTC (owner decision, 2026-11-25).
 
 Until 2026-11-24 a launchd job on the Mac polled for issues every five minutes (`workers/observability/watch/`, removed). The owner replaced it because nobody watched the watcher.
 
