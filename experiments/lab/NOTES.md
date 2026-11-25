@@ -152,7 +152,7 @@ Owner's decision on the small pages (2026-11-24, after playing them): "Good but 
 | `wild-pour` | Keep; "improve sim and it's too difficult right now" | Improved in place |
 | `wild2-face-shift` | Keep; "needs more variety and gameplay" | Improved in place |
 | `pisti`, `night-lamp-keeper`, `night-kite`, `night-loaves` | Rejected | `archive/lab/`; old addresses go to `/lab/` |
-| `night-rubbing` | Undecided: the owner could not find it (the index calls it "Carbon Cabinet") | Stays |
+| `night-rubbing` | Keep for now, though it's too basic (owner, 2026-11-25). Deepened on branch `deepen-carbon-cabinet`: twelve plates, stick length, glaze, grit, stars against par, a daily plate, share, Turkish; the old sweep files none of plates 7 to 12, a careful rubber files all of them | Stays at `/small/night-rubbing/` |
 | Home for the small games | The owner picked hub C "Three tonight" with B's swipe deck (2026-11-25) | Built at `/small/` (`experiments/small/`) |
 | Lab index | The owner asked for the index to stop listing folded, archived and in-game pages (2026-11-25) | Done: `/lab/` has one card, to the small games home |
 | The twelve kept small games | The owner asked to collect the small games under one address and clear the lab (2026-11-25) | Moved to `/small/<name>/` (`experiments/small/<name>/`); each game's `NOTES.md` moved with it. Old `/lab/<name>/` addresses are 302s in `labMoved`, query kept |

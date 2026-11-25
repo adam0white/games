@@ -168,9 +168,9 @@ function setMode(next, keepStroke = false) {
   show(next);
   const finished = s.done, spoiled = !!s.spoiled, plate = daily ? PLATES.find(p => p.id === daily.spec.plate) : PLATES[s.level - 1];
   const percent = Math.min(100, Math.floor(s.coverage / s.goal * 100)), k = kind(), got = shownStars();
-  el('figure').textContent = (daily ? t('dailyFigure', { day: daily.day.slice(5) }) : t('figure', { n: String(s.level).padStart(2, '0') }))
+  el('figure').textContent = (daily ? t('dailyFigure') : t('figure', { n: String(s.level).padStart(2, '0') }))
     + (finished ? ' · ' + (got ? starText(got) : t('filed')) : '');
-  el('kind').textContent = { free: '', lead: '✎', glaze: '✎ ✧', stone: '✎ ⁘', 'glaze-stone': '✎ ✧ ⁘' }[k];
+  el('kind').textContent = { free: '', lead: '✎', glaze: '✎✧', stone: '✎⁘', 'glaze-stone': '✎✧⁘' }[k];
   el('taxon').textContent = plate.taxon;
   el('medium').textContent = t('age.' + plate.age);
   el('status').textContent = spoiled ? t('spoiled.' + s.spoiled) : finished ? plateName()

@@ -8,7 +8,10 @@ import { dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { assertHomeLinks } from '../../kit/check/home-link.mjs';
-import { answerLab, allowLocalSend, withAgent, assertNotice, assertRun, assertNoLeak, assertOffSendsNothing, waitForRuns } from '../../kit/check/lab-record.mjs';
+import { createPlate, createSheet } from './sim.js';
+import { PLATES, dailySpec } from './plates.js';
+import { plan, play, rate } from './plan.js';
+import { answerLab, allowLocalSend, withAgent, assertNotice, assertRun, assertNoLeak, assertOffSendsNothing, waitForRuns, runRecords } from '../../kit/check/lab-record.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const path = '/small/night-rubbing/';
@@ -27,7 +30,7 @@ await mkdir(shots, { recursive: true });
 function allowed(url) {
   return url === path || url === away || url === notes || url === '/favicon.ico'
     || /^\/small\/night-rubbing\/[\w.-]+$/.test(url)
-    || /^\/kit\/(?:audio|drag|hint|home|lab|pause|save|screens|stick|zoom)\.js$/.test(url);
+    || /^\/kit\/(?:audio|drag|fx|hint|home|i18n|lab|music|pause|save|screens|share|stick|zoom)\.js$/.test(url);
 }
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml' };
 const server = createServer(async (request, response) => {
@@ -142,7 +145,7 @@ async function rubPlate(page, input, level, capture) {
         const result = await state(page);
         assert.equal(result.level, level);
         assert.ok(result.coverage >= result.goal);
-        assert.equal(result.unlocked, Math.min(level + 1, 6));
+        assert.equal(result.unlocked, Math.min(level + 1, PLATES.length));
         const seconds = (Date.now() - start) / 1000;
         if (level === 1) {
           assert.ok(partial?.coverage > fresh.coverage, 'a partial first print appears during the strokes');
@@ -194,6 +197,206 @@ async function recording({ name, device }, browser) {
       await rubPlate(page, input, 1, async () => {});
       await input.close();
     } });
+  } finally { await context.close(); }
+}
+
+// The strokes the careful rubber (plan.js) actually uses on a sheet, worked out in Node on the same plate and paper.
+function carefulStrokes(make) {
+  const s = make(), used = [];
+  for (const offset of [0, 0.5, 0.25]) {
+    if (s.done || s.spoiled) break;
+    for (const line of plan(s, { offset })) {
+      if (s.done || s.spoiled) break;
+      play(s, [line]);
+      used.push(line);
+    }
+  }
+  return used;
+}
+async function line(input, [x0, y0, x1, y1]) {
+  await input.down(x0, y0);
+  try {
+    const n = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 10));
+    for (let k = 1; k <= n; k++) await input.move(x0 + (x1 - x0) * k / n, y0 + (y1 - y0) * k / n);
+  } finally { await input.up(); }
+}
+async function replay(page, input, lines) {
+  for (let round = 0; round < 2; round++) {
+    for (const l of lines) {
+      await line(input, l);
+      const s = await state(page);
+      if (s.screen !== 'play') return s;
+    }
+  }
+  return state(page);
+}
+
+// Plates 7 to 12, stars, the daily plate, sharing and Turkish (2026-11-25).
+async function deeper({ name, device }, browser) {
+  const context = await browser.newContext(devices[device]);
+  const errors = [], unexpected = [];
+  await context.route('**/*', route => {
+    const r = route.request(), url = new URL(r.url());
+    if (url.origin === origin && r.method() === 'GET' && allowed(url.pathname)) return route.continue();
+    unexpected.push(r.method() + ' ' + r.url());
+    return route.abort();
+  });
+  const lab = await answerLab(context, origin);
+  await allowLocalSend(context);
+  await context.addInitScript(() => {
+    if (sessionStorage.getItem('deeper-seeded')) return;
+    sessionStorage.setItem('deeper-seeded', '1');
+    localStorage.setItem('hf-lab-send-localhost', '1');
+    // A save from before plates 7 to 12: the old page could only reach unlocked 6, with plate 6 filed.
+    localStorage.setItem('night-rubbing:save', JSON.stringify({ level: 6, unlocked: 6, sound: true, ink: 'black' }));
+    localStorage.setItem('night-rubbing:proof:6', JSON.stringify({ grain: 1, marks: '', coverage: 0.9, distance: 2000, red: false }));
+    localStorage.setItem('night-rubbing:hint', '1');
+    localStorage.setItem('kit:lang', 'en');
+    window.rubbingShared = [];
+  });
+  await context.addInitScript(() => {
+    window.rubbingShared = [];
+    navigator.canShare = () => true;
+    navigator.share = async data => { window.rubbingShared.push({ files: data.files?.map(file => [file.type, file.size]), text: data.text }); };
+  });
+  const page = await context.newPage();
+  page.setDefaultTimeout(8000);
+  page.on('pageerror', e => errors.push(e.message));
+  page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+  // The sheet paints on the next animation frame: wait two frames so the picture matches the state.
+  const capture = async scene => {
+    await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+    await page.screenshot({ path: join(shots, name + '-' + scene + '.png'), scale: 'css' });
+  };
+  const day = '2026-11-25';
+  const out = {};
+  try {
+    await page.goto(withAgent(origin + path) + '&date=' + day);
+    await screen(page, 'play');
+    let s = await state(page);
+    assert.equal(s.level, 6, 'the old save opens on its plate');
+    assert.equal(s.unlocked, 7, 'an old save with plate 6 filed opens plate 7');
+    assert.equal(await page.locator('#collection button:enabled').count(), 7);
+    await controls(page, '#pause, #daily, #collection button');
+
+    // Plate 7: the stick wears down. The old way (whole-sheet sweeps) runs out; the careful way files it.
+    await page.locator('#collection button').nth(6).tap();
+    await screen(page, 'play');
+    s = await state(page);
+    assert.equal(s.level, 7);
+    assert.equal(s.kind, 'lead');
+    assert.equal(await page.locator('#status').innerText(), 'The stick wears down. Rub only the fossil.');
+    assert.ok(await page.locator('#lead').isVisible(), 'the stick meter shows');
+    await capture('plate7-start');
+    let input = await pointer(page, name);
+    for (let y = 30, n = 0; y < 270 && (await state(page)).screen === 'play'; y += 15, n++) await stroke(input, y, n % 2 === 1);
+    s = await state(page);
+    assert.equal(s.screen, 'result');
+    assert.equal(s.spoiled, 'lead', 'whole-sheet sweeps wear the stick out on plate 7');
+    assert.match(await page.locator('#next').innerText(), /Try again/);
+    assert.ok(s.fx.includes('spoiled-lead') && s.fx.includes('stick-low'), 'the stick running low and out answers with sound and motion');
+    out.plate7Spoiled = Math.round(s.distance);
+    await capture('plate7-spoiled');
+    await page.locator('#next').tap();
+    await screen(page, 'play');
+    assert.equal((await state(page)).distance, 0, 'Try again gives a clean sheet');
+    s = await replay(page, input, carefulStrokes(() => createPlate(7, 19023 + 7 * 583)));
+    assert.equal(s.screen, 'result');
+    assert.ok(!s.spoiled && s.stars >= 2, `the careful strokes file plate 7 with two or three stars (${s.stars})`);
+    out.plate7 = { stars: s.stars, distance: Math.round(s.distance), par: s.par, lead: s.lead };
+    await capture('plate7-filed');
+    await controls(page, '#share, #next');
+    await page.locator('#share').tap();
+    await page.waitForFunction(() => window.rubbingShared.length === 1);
+    const [shared] = await page.evaluate(() => window.rubbingShared);
+    assert.ok(shared.files.length === 1 && shared.files[0][0] === 'image/png' && shared.files[0][1] > 20000, 'one PNG picture is shared');
+    assert.match(shared.text, /Young ammonite: ★+☆* with \d+% of the stick left/);
+    const saved = await page.evaluate(() => ({ save: JSON.parse(localStorage.getItem('night-rubbing:save')), more: JSON.parse(localStorage.getItem('night-rubbing:more')),
+      stars: JSON.parse(localStorage.getItem('night-rubbing:stars')) }));
+    assert.deepEqual(Object.keys(saved.save).sort(), ['ink', 'level', 'sound', 'unlocked'], 'the old key keeps its format');
+    assert.ok(saved.save.unlocked <= 6 && saved.save.level <= 6, 'the old key stays within plates 1 to 6');
+    assert.equal(saved.more.unlocked, 8);
+    assert.equal(saved.stars.best[7], out.plate7.stars);
+
+    // Plate 8 is glazed: a stroke along its level discs leaves less than the same stroke across them.
+    await page.locator('#next').tap();
+    await screen(page, 'play');
+    assert.equal((await state(page)).kind, 'glaze');
+    await line(input, [80, 160, 160, 160]);
+    const along = (await state(page)).coverage;
+    await page.locator('#pause').tap(); await screen(page, 'paused');
+    assert.match(await page.locator('#tip').innerText(), /glazed plate/i);
+    await capture('plate8-paused');
+    await page.locator('#restart').tap(); await screen(page, 'play');
+    await line(input, [120, 120, 120, 200]);
+    const across = (await state(page)).coverage;
+    assert.ok(across > along * 1.5, `on a glazed plate a stroke across the ridges marks more than one along them (${across} / ${along})`);
+    out.glaze = { along, across };
+    await capture('plate8-across');
+
+    // Plate 9 sits in grit: a stroke through it smudges.
+    await page.evaluate(() => localStorage.setItem('night-rubbing:more', JSON.stringify({ v: 1, level: 9, unlocked: 12 })));
+    await page.reload();
+    await screen(page, 'play');
+    s = await state(page);
+    assert.equal(s.level, 9);
+    assert.equal(s.kind, 'stone');
+    assert.equal(await page.locator('#collection button:enabled').count(), 12);
+    await input.close();
+    input = await pointer(page, name);
+    await line(input, [10, 20, 230, 20]);
+    s = await state(page);
+    assert.ok(s.smudge > 0 && s.fx.includes('smudge'), 'a stroke through the grit smudges, and says so');
+    assert.ok(await page.locator('#smudge').isVisible());
+    out.smudge = s.smudge;
+    await capture('plate9-smudge');
+    for (const level of [10, 11, 12]) {
+      await page.locator('#collection button').nth(level - 1).tap();
+      await screen(page, 'play');
+      await capture('plate' + level);
+    }
+
+    // The daily plate: the same for everyone on the day, filed by the careful strokes, its best kept, shared with its day.
+    await page.locator('#daily').tap();
+    await screen(page, 'play');
+    s = await state(page);
+    const spec = dailySpec(day), rated = rate(spec, spec.seed, createSheet);
+    assert.equal(s.daily, day);
+    assert.equal(s.kind, spec.kind);
+    assert.equal(s.par, rated.par);
+    await capture('daily-start');
+    s = await replay(page, input, carefulStrokes(() => createSheet({ ...spec, ...rated }, spec.seed)));
+    assert.equal(s.screen, 'result');
+    assert.ok(s.stars >= 2 && s.dailyRecord.stars === s.stars, `the daily plate is filed (${s.stars} stars) and kept`);
+    out.daily = { plate: spec.plate, kind: spec.kind, stars: s.stars };
+    await capture('daily-filed');
+    await page.evaluate(() => { window.rubbingShared = []; });
+    await page.locator('#share').tap();
+    await page.waitForFunction(() => window.rubbingShared.length === 1);
+    assert.match((await page.evaluate(() => window.rubbingShared))[0].text, new RegExp('daily ' + day));
+    await input.close();
+
+    // Turkish: every string on the board and the pause card.
+    await page.goto(withAgent(origin + path) + '&date=' + day + '&lang=tr');
+    await screen(page, 'play');
+    assert.equal((await state(page)).lang, 'tr');
+    assert.equal(await page.locator('[data-i18n=eyebrow]').textContent(), 'Fosil frotajları');
+    assert.equal(await page.locator('#status').innerText(), 'Sırlı ve taşlı: iki yönde, taşa değmeden', 'plate 12 teaches in Turkish');
+    await page.locator('#pause').tap(); await screen(page, 'paused');
+    assert.equal(await page.locator('#pause-title').innerText(), 'Frotaj durdu');
+    assert.equal(await page.locator('#resume').innerText(), 'Sürmeye devam et');
+    await capture('turkish-paused');
+    await page.locator('#resume').tap();
+
+    await waitForRuns(lab, 'night-rubbing', 3);
+    const runs = runRecords(lab, 'night-rubbing');
+    const outcomes = runs.map(r => r.data.outcome);
+    assert.ok(outcomes.includes('lost') && outcomes.includes('won'), 'a spoiled plate ends lost, a filed one won: ' + outcomes);
+    const filed = runs.flatMap(r => r.data.events || []).filter(e => e.type === 'plate-filed');
+    assert.ok(filed.some(e => e.data?.stars >= 2), 'the filed event carries stars');
+    assert.deepEqual(errors, [], 'browser errors');
+    assert.deepEqual(unexpected, [], 'unexpected requests');
+    console.log(JSON.stringify({ device, deeper: out }));
   } finally { await context.close(); }
 }
 
@@ -372,7 +575,8 @@ async function run({ name, engine, device }) {
         await screen(page, 'play');
       }
     }
-    assert.equal(await page.locator('#collection button:enabled').count(), 6, 'every plate can be selected');
+    // Changed on purpose (2026-11-25): filing plate 6 now opens plate 7 of twelve.
+    assert.equal(await page.locator('#collection button:enabled').count(), 7, 'every filed plate and the next can be selected');
     const finalPrint = await printPixels(page);
     await rotate();
     await controls(page, '#pause, #next, #collection button');
@@ -436,11 +640,13 @@ async function run({ name, engine, device }) {
     assert.deepEqual(await page.evaluate(() => Object.keys(localStorage).filter(key =>
       key.startsWith('hf-lab-') && !['hf-lab-send-localhost', 'hf-lab-player'].includes(key))), [], 'no other recording keys');
     assert.ok(lab.sent.every(r => r.game === 'night-rubbing' && r.runSource === 'agent'), 'every record is named and marked as an agent run');
-    // The page is in English only: asked for Turkish, the way back is still in English.
-    await assertHomeLinks(context, `${origin}${path}?from=small&lang=tr`, ['paused', 'cabinet'], '‹ Small games');
+    // Changed on purpose (2026-11-25): the page now plays in Turkish, so asked for Turkish the way back is Turkish too.
+    await assertHomeLinks(context, `${origin}${path}?from=small&lang=tr`, ['paused', 'cabinet'], '‹ Küçük oyunlar');
+    await context.addInitScript(() => localStorage.setItem('kit:lang', 'en'));
     assert.deepEqual(errors, [], 'browser and resource errors');
     assert.deepEqual(unexpected, [], 'external requests or recording');
     await recording({ name, engine, device }, browser);
+    await deeper({ name, engine, device }, browser);
     console.log(JSON.stringify({ device, input: kind, results, firstPrintError, finalPrintError, darkenedHingePixels, retouchError, errorCount: errors.length, unexpectedRequests: unexpected.length }));
   } finally {
     await browser.close();

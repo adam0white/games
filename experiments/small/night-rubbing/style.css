@@ -89,6 +89,8 @@ box-shadow:1px 2px 1px #dac8a6,3px 6px #bbb294,3px 7px 0 #6d745e,6px 14px 15px #
 .status-row #status{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .result.on{display:flex;gap:8px;flex:none}
 #share{width:44px;min-height:44px;border:1px solid #a2b19c70;border-radius:3px;font:18px var(--sans)}
-.card .tip{font-size:14px;color:#ffd2b0}
-@media(max-height:650px){#collection{grid-auto-rows:40px}#collection button{height:40px}.silhouette{width:26px;height:26px}}
-@media (orientation:landscape) and (max-height:500px){.smudge{margin:-4px 0 6px}#collection{grid-auto-rows:38px}#collection button{height:38px}}
+.card .tip{font:14px/1.4 var(--serif);color:#ffd2b0;margin:-6px 0 12px}
+@media(max-height:650px){#collection{grid-auto-rows:44px}#collection button{height:44px}.silhouette{width:26px;height:26px}}
+@media (orientation:landscape) and (max-height:500px){.smudge{margin:-4px 0 6px}#collection{grid-auto-rows:44px}#collection button{height:44px}}
+/* The label stays on one line: the sheet canvas covers anything below it. A long taxon is cut short instead. */
+.plate-label{gap:6px}#figure,#kind{flex:none;white-space:nowrap}.plate-label #taxon{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-bottom:2px}
