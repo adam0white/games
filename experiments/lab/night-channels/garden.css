@@ -46,7 +46,7 @@ footer { border-top:1px solid var(--line) }
 #retry { font:28px/1 Georgia,serif;color:var(--muted) }
 .controls { display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--line);margin-top:10px;gap:6px;min-height:45px }
 .text-button { padding:0 4px;display:flex;align-items:center;gap:8px;color:var(--cool);font-weight:500;font-size:13px }
-.text-button span { font-size:21px }
+.text-button span[aria-hidden] { font-size:21px }
 .calendar-icon { width:15px;height:14px;border:1.5px solid currentColor;border-radius:3px;position:relative }
 .calendar-icon::before { content:"";position:absolute;left:0;right:0;top:3px;border-top:1px solid currentColor }
 .calendar-icon::after { content:"";position:absolute;left:3px;right:3px;height:4px;top:-3px;border-inline:1.5px solid currentColor }
@@ -61,10 +61,10 @@ footer { border-top:1px solid var(--line) }
 .card-mark { font:32px/1 Georgia,serif;color:var(--bud) }
 .card h2 { font-size:34px;letter-spacing:-.045em;font-style:italic;margin:5px 0 18px }
 .card .primary,.secondary-action { width:100% }
-.secondary { display:flex;justify-content:space-around;margin-top:10px }
+.secondary { display:flex;justify-content:space-around;margin-top:10px;gap:4px;flex-wrap:wrap }
 .secondary button,.secondary-action { color:var(--cool);font-size:14px }
-#levels { display:grid;grid-template-columns:repeat(5,1fr);gap:5px }
-#levels button { border:1px solid var(--line);border-radius:3px;font:18px Georgia,serif }
+#levels { display:grid;grid-template-columns:repeat(6,1fr);gap:4px }
+#levels button { border:1px solid var(--line);border-radius:3px;font:17px Georgia,serif;padding:0;min-width:0 }
 #levels button[aria-current=true] { border-color:var(--bud);color:var(--bud) }
 #levels button:disabled { opacity:.4;cursor:default }
 #return { margin-top:12px }
@@ -78,3 +78,20 @@ footer { border-top:1px solid var(--line) }
 
 #levels button.completed { position:relative }
 #levels button.completed::after { position:absolute;content:"";height:3px;width:3px;background:var(--bud);border-radius:50%;bottom:4px;left:calc(50% - 1.5px) }
+
+#levels button.par::after { content:"✿";font-size:9px;width:auto;height:auto;background:none;bottom:1px;left:0;right:0;color:var(--bud) }
+#result.won { font:italic 15px/1.1 Georgia,serif;letter-spacing:0;color:var(--ink) }
+.share-icon { width:13px;height:13px;border:1.5px solid currentColor;border-top:0;border-radius:0 0 3px 3px;position:relative;margin-top:4px }
+.share-icon::before { content:"";position:absolute;left:4px;top:-9px;width:1.5px;height:11px;background:currentColor }
+.share-icon::after { content:"";position:absolute;left:1.6px;top:-9px;width:5px;height:5px;border-left:1.5px solid currentColor;border-top:1.5px solid currentColor;transform:rotate(45deg) }
+/* Motion for player actions: a press dips, a count pops, a refused cut shakes the counter, a new garden fades in. */
+button { transition:transform .08s ease-out }
+button:active { transform:scale(.94) }
+.pop { animation:pop .32s ease-out }
+.shake { animation:shake .36s ease-out }
+#garden.fresh { animation:fresh .45s ease-out }
+@keyframes pop { 40% { transform:scale(1.22) } }
+@keyframes shake { 20%,60% { transform:translateX(-4px) } 40%,80% { transform:translateX(4px) } }
+@keyframes fresh { from { opacity:.35 } }
+@media (prefers-reduced-motion: reduce) { button,button:active { transition:none;transform:none } .pop,.shake,#garden.fresh { animation:none } }
+@media(max-height:660px) { .card { padding:14px 18px 14px } .card-mark { display:none } .card h2 { font-size:28px;margin:0 0 10px } #levels button { min-height:40px } }

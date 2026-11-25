@@ -421,9 +421,64 @@ function dragHint(ctx, s, time) {
   ctx.restore();
 }
 
+// A ring round each bed fills as the plant grows: blue while the soil is wet enough, amber while it dries out.
+function thirst(ctx, c, x, y, p) {
+  const g = clamp(c.growth), wet = c.moisture >= .065;
+  if (g >= 1) return;
+  ctx.lineWidth = .035;
+  ctx.strokeStyle = '#0b1a1566';
+  ctx.beginPath(); ctx.arc(x, y + .02, .43, 0, TAU); ctx.stroke();
+  if (!g && !wet) return;
+  ctx.strokeStyle = wet ? p.light : '#efb479';
+  ctx.lineWidth = .05;
+  ctx.beginPath(); ctx.arc(x, y + .02, .43, -Math.PI / 2, -Math.PI / 2 + TAU * Math.max(.04, g)); ctx.stroke();
+}
+
+// Short motion for each player action. `clock` runs while the garden is on screen; reduced motion keeps
+// the colour change and drops the movement.
+const LIFE = { cut:.55, refuse:.4, wet:.9, bloom:1.2, win:1.6 };
+function effect(ctx, s, f, clock, reduced) {
+  const u = (clock - f.at) / LIFE[f.kind];
+  if (u < 0 || u >= 1) return;
+  const x = f.i % s.cols + .5, y = Math.floor(f.i / s.cols) + .5;
+  ctx.save();
+  if (f.kind === 'cut') {
+    for (let j = 0; j < 6; j++) {
+      const a = hash(f.i, j + 140) * TAU, r = reduced ? .18 : .1 + .42 * u;
+      ctx.globalAlpha = 1 - u;
+      ellipse(ctx, x + Math.cos(a) * r, y + Math.sin(a) * r * .7 + (reduced ? 0 : .5 * u * u - .2 * u), .045 * (1 - u * .5), .035, j % 2 ? '#7a573f' : '#c69563');
+    }
+  } else if (f.kind === 'refuse') {
+    const shake = reduced ? 0 : Math.sin(u * 28) * .05 * (1 - u);
+    ctx.globalAlpha = .9 * (1 - u);
+    ctx.strokeStyle = '#ff8f6b'; ctx.lineWidth = .05;
+    ctx.beginPath(); ctx.arc(x + shake, y, .36, 0, TAU); ctx.stroke();
+    line(ctx, x + shake - .14, y - .14, x + shake + .14, y + .14, .05, '#ff8f6b');
+    line(ctx, x + shake - .14, y + .14, x + shake + .14, y - .14, .05, '#ff8f6b');
+  } else if (f.kind === 'wet') {
+    ctx.globalAlpha = .8 * (1 - u);
+    ctx.strokeStyle = '#d2fff0'; ctx.lineWidth = .04;
+    ctx.beginPath(); ctx.arc(x, y, reduced ? .45 : .25 + .45 * u, 0, TAU); ctx.stroke();
+  } else if (f.kind === 'bloom') {
+    for (let j = 0; j < 12; j++) {
+      const a = j * TAU / 12 + hash(f.i, j) * .4, r = reduced ? .5 : .25 + .9 * u;
+      ctx.globalAlpha = 1 - u;
+      ellipse(ctx, x + Math.cos(a) * r, y - .2 + Math.sin(a) * r - (reduced ? 0 : .3 * u), .07, .045, j % 3 ? '#f4c77d' : '#eb9c78', a);
+    }
+  } else if (f.kind === 'win') {
+    for (const b of s.beds) {
+      const bx = b % s.cols + .5, by = Math.floor(b / s.cols) + .5;
+      ctx.globalAlpha = .7 * (1 - u);
+      ctx.strokeStyle = '#fff5c5'; ctx.lineWidth = .06;
+      ctx.beginPath(); ctx.arc(bx, by, reduced ? .7 : .3 + 1.4 * u, 0, TAU); ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
 const landscapes = new WeakMap();
 
-export function render(canvas, terrain, s, {time=0, hint=false, look='moon', reduced=false}={}) {
+export function render(canvas, terrain, s, {time=0, clock=0, effects=[], hint=false, look='moon', reduced=false}={}) {
   if (reduced) time=1.5;
   const g=geometry(canvas,s);
   if (!(g.size>0)) return;
@@ -446,6 +501,8 @@ export function render(canvas, terrain, s, {time=0, hint=false, look='moon', red
   ctx.lineCap='round';ctx.lineJoin='round';
   channels(ctx,s,p);
   water(ctx,s,time,p);
+  for (const i of s.beds) thirst(ctx,s.cells[i],i%s.cols+.5,Math.floor(i/s.cols)+.5,p);
   for (const i of s.beds) seedbed(ctx,s.cells[i],i%s.cols+.5,Math.floor(i/s.cols)+.5,time,i,p);
+  for (const f of effects) effect(ctx,s,f,clock,reduced);
   if (hint && s.beds.length) dragHint(ctx,s,time);
 }
