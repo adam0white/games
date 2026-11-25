@@ -49,7 +49,7 @@ Cloudflare starts a Claude routine when an issue appears. A daily run of the sam
 2. Both send to the routine "Fix Cloudflare Worker issues" (`trig_01RSFhq8pXhq1p4W79gh6xh3`, https://claude.ai/code/routines). Cloudflare's summary of the issue, with the issue id, arrives in the run as untrusted data.
 3. The routine runs on the lab's Mac, because the fix needs the `cf`, `wrangler` and `gh` sign-ins there. It works in a fresh clone under `~/code/lab/issue-runs/`. It fixes the fault, merges, deploys and marks the issue resolved, or it leaves the issue active for the owner. If the Mac is off, the run does not start; run the routine by hand afterwards.
 4. The record is a GitHub issue in this repository with the label `worker-issue`. An open one with the label `needs-owner` is a decision waiting for the owner: https://github.com/adam0white/games/issues?q=is%3Aopen+label%3Aneeds-owner
-5. Issues on Workers outside this project and Cloudflare's "Potential vulnerability scan" issues (type `security`) are out of scope. A run that Cloudflare starts for one ends without acting (seen for a Worker outside the project and for `security` issues). On 2026-11-25 scanner traffic started nine such runs in one night while the return window was one hour, five of them in the same second, so the window went back to 24 hours.
+5. Issues on Workers outside this project are out of scope. `security` issues ("Potential vulnerability scan") on this project's Workers are in scope since 2026-11-25 (owner decision): see "Scanner probes". On 2026-11-25 scanner traffic started nine runs in one night while the return window was one hour, five of them in the same second, so the window went back to 24 hours.
 
 The routine's prompt is `workers/observability/routine/prompt.md`. The routine holds its own copy: after a change here merges, save the same text into the routine. Every run, fired or started by hand with the Run button, also sweeps every active issue that has no open record.
 
@@ -60,6 +60,17 @@ Known gap, measured the same day: an issue that is marked resolved and returns w
 Until 2026-11-24 a launchd job on the Mac polled for issues every five minutes (`workers/observability/watch/`, removed). The owner replaced it because nobody watched the watcher.
 
 Any session can look by hand, from a folder outside the checkout: `CLOUDFLARE_ACCOUNT_ID=a20259cba74e506296745f9c67c1f3bc cf o11y issues list --status active --quiet`.
+
+## Scanner probes
+
+Cloudflare Issues reports a request for a known probe path (`/.env`, `/.git/config`, `/wp-login.php`) that reaches a Worker. There is no setting for this issue type alone, and the automations cannot filter by type (docs and CLI read 2026-11-25).
+
+- Measured on `games-static`, 2026-11-25: when the Worker passed the path to the static assets, one request made one high-risk occurrence. When the Worker answered 404 itself, twelve probes made no high-risk occurrence and twelve low-risk ones. Worker code lowers the grade and does not stop the report.
+- The fix is a WAF custom rule that blocks the paths before any Worker runs: `lab_scanner_probe_paths` on the zone `adamwhite.work`, for `play.adamwhite.work` and `human.adamwhite.work`. Its body is `workers/observability/scanner-probe-rule.json`. Measured the same day: 134 recorded paths on each host got 403 and made no occurrence; real pages answered as before.
+- The zone's plan has five custom rules and no regular expressions. Two rules belong to other services; leave them alone. Add and change a rule with `cf rulesets rules create` and `cf rulesets rules update <rule-id> --ruleset-id <id>`, never `cf rulesets entrypoint update`, which replaces all of them.
+- A change to the rule is an owner decision. A run proposes it; it does not make it. After a change, update the JSON file in the same pull request.
+- A new site file must not match the rule: no dotfiles except `/.well-known/`, and none of the extensions in it. The `games-static` build fails on most of these (`src/probe.mjs`).
+- A path the rule does not cover still makes an issue and starts a run.
 
 ## Ignored on purpose
 
