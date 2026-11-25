@@ -906,7 +906,15 @@ const GAMES = {
     await until(page, () => window.fixitSim().rival.hurry, 'the rival speeds up'); await page.evaluate(() => { const s = window.fixitSim(); s.rival.next = s.clock; }); await until(page, () => window.fixitSim().rival.gag, 'it makes a mistake');
   },
   borrowed: page => started(page, 'borrowed', 'borrowedState', '#toMenu'),
-  alibi: page => started(page, 'alibi', 'alibiState', '#toMenu'),
+  async alibi(page) {
+    await started(page, 'alibi', 'alibiState', '#toMenu');
+    // The practice case (note #245): from the menu, one step at a time, and nothing of it is saved.
+    const kept = await page.evaluate(() => localStorage.getItem('alibi-save'));
+    await page.click('#learn'); await until(page, () => window.alibiState().step === 0 && !document.querySelector('#coach').hidden, 'practice starts');
+    await page.click('#coachOk'); assert.equal(await page.evaluate(() => window.alibiState().step), 1);
+    await page.click('#pause'); await page.click('#toMenu'); assert.equal(await page.evaluate(() => window.alibiState().step), null, 'leaving ends practice');
+    assert.equal(await page.evaluate(() => localStorage.getItem('alibi-save')), kept, 'practice saves nothing');
+  },
   nightshift: page => started(page, 'nightshift', 'nightshiftState', '#toMenu'),
   // Lab pages (/lab/<name>/): an old save survives, a finger steers, pause stops time, one audio context after the first tap.
   async 'lab/thankful'(page) {
