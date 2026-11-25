@@ -1,8 +1,10 @@
 // Measured play: node experiments/lantern/bots.mjs [runs] [stages, comma-separated]. Three policies of rising skill; prints how runs end.
-import { create, step, centre, half, sight, score, progress, towerStage, GOAL, BOAT } from './sim.js';
+import { create, step, centre, half, sight, score, progress, towerStage, GOAL, BOAT, DT } from './sim.js';
 // A stage of -100 - L is tower level L (with that level's things); -n above -100 is the old tower holding night n's things at level 1.
 const make = (seed, stage, set, stats) => stage <= -100 ? create(seed, towerStage(-stage - 100), 'tower', set, stats, -stage - 100) : create(seed, Math.abs(stage) || 1, stage < 0 ? 'tower' : !stage, set, stats);
 const label = stage => stage <= -100 ? `tower level ${-stage - 100}` : stage < 0 ? `tower ${-stage}` : stage ? `stage ${stage}` : 'endless';
+const flags = process.argv.filter(a => a.startsWith('--')); process.argv = process.argv.filter(a => !a.startsWith('--'));
+if (flags.includes('--mutate') && process.argv[3] !== 'music') process.argv.splice(2, 2, process.argv[2] ?? '30', 'music'); // a bare --mutate breaks the music (the only mutation here)
 const runs = Number(process.argv[2] ?? 300);
 const policies = {
   // Sees nothing but the banks.
@@ -24,7 +26,7 @@ function steer(s, wantEmbers) {
   }
   return best;
 }
-if (process.argv[3] !== 'audit') for (const stage of (process.argv[3] ? process.argv[3].split(',').map(Number) : [1, 3, 5, 6, 8, 11, 12, 15, 17, 18, 20, 21, 30, 40, 50, 0, -3, -12, -101, -110, -125, -150, -151, -175, -200])) for (const [name, policy] of Object.entries(policies)) {
+if (process.argv[3] !== 'audit' && process.argv[3] !== 'music') for (const stage of (process.argv[3] ? process.argv[3].split(',').map(Number) : [1, 3, 5, 6, 8, 11, 12, 15, 17, 18, 20, 21, 30, 40, 50, 0, -3, -12, -101, -110, -125, -150, -151, -175, -200])) for (const [name, policy] of Object.entries(policies)) {
   const ends = {}, dist = []; let grazes = 0, embers = 0, gifts = 0, powers = 0;
   for (let seed = 1; seed <= runs; seed++) {
     const s = make(seed, stage); // stage 0 is the endless river, -n the tower
@@ -63,4 +65,54 @@ if (process.argv[3] === 'audit') for (const stage of (process.argv[4] ? process.
     }
   }
   console.log(`${label(stage)} narrowest gap ${worst.toFixed(3)} (big boat ${worstBig.toFixed(3)}) rides with a gap under 0.03: ${tight}; buried pickups ${buried}/${pickups};`, 'moving share by tenth', swing.map((n, i) => (all[i] ? Math.round(100 * n / all[i]) : 0)).join(' '));
+}
+
+// The melody the embers play (kit/music.js, 2026-11-24): node experiments/lantern/bots.mjs 30 music [--mutate].
+// The greedy bot plays nights on a stand-in audio clock that runs with the sim (pumped every 0.1 s, as the page's timer does);
+// each ember event asks the score for its note. Claims: every note sits on the sixteenth grid of the score's clock, no sooner
+// than 30 ms and no later than one sixteenth (plus any notes already waiting) after the pickup; its pitch is a note of the
+// chord sounding at its step; the notes follow the night's tune in order; a blow thins the music for two bars and no harmony
+// note sounds inside them; and the rules do not change: the same seed ends the same way with the music driven or not.
+// --mutate runs twice with the score broken on purpose (no quantising; the chord of the clock instead of the note's own) and must fail.
+if (process.argv[3] === 'music') {
+  const { music, NIGHT, DAWN, tune, ladder } = await import('../kit/music.js');
+  const param = () => ({ value: 0, setValueAtTime() {}, exponentialRampToValueAtTime() {}, setTargetAtTime() {}, cancelScheduledValues() {} });
+  const node = x => ({ connect(d) { return d; }, ...x });
+  const fakeAc = () => ({ destination: node(), createGain: () => node({ gain: param() }), createDelay: () => node({ delayTime: param() }), createBiquadFilter: () => node({ frequency: param(), Q: param() }), createOscillator: () => node({ frequency: param(), start() {}, stop() {} }) });
+  const nights = (process.argv[4] ?? '1,3,8,12,3m,8m').split(','); // m: with the magnet, which brings embers in bunches
+  function trial(mutate) {
+    const fail = []; let notes = 0, slow = 0, waits = 0, hits = 0, harm = 0, worst = 0, played = 0, missed = 0;
+    for (const night of nights) for (let seed = 1; seed <= runs; seed++) {
+      let clock = 0; const song = music(fakeAc(), { preset: 'lantern', timer: false, now: () => clock, running: () => true, mutate, log: 1e6 });
+      const n0 = parseInt(night), set = night.endsWith('m') ? ['magnet', 'boost', 'heart', 'shield'] : undefined, s = create(seed, n0, false, set), twin = create(seed, n0, false, set), passed = new Set(); song.start(seed); let k = 0, pumped = 0;
+      const melody = tune(seed);
+      while (!s.over) {
+        const p = Math.max(0, Math.min(1, progress(s))); song.set({ on: true, progress: p, danger: 0, light: s.light });
+        const x = policies.greedy(s); step(s, x); step(twin, x); clock += DT; if (clock - pumped >= 0.1) { song.pump(); pumped = clock; }
+        for (const e of s.events) {
+          if (e === 'hurt' || e === 'break' || e === 'wisp') { song.hit(); hits++; if (!song.bare) fail.push(`seed ${seed}: a blow did not thin the music`); }
+          if (e !== 'ember') continue;
+          const n = song.ember(); if (!n) { waits++; continue; } notes++;
+          const late = n.at - clock, grid = (n.at - song.next) / song.HALF;
+          worst = Math.max(worst, late); if (late > 0.03 + song.HALF + 1e-9) slow++;
+          if (late > 0.03 + 5 * song.HALF) fail.push(`seed ${seed}: note ${(late * 1000).toFixed(0)} ms after the pickup`);
+          if (Math.abs(grid - Math.round(grid)) > 1e-6) fail.push(`seed ${seed}: note off the sixteenth grid (${grid.toFixed(3)})`);
+          if (late < 0.03 - 1e-9) fail.push(`seed ${seed}: note ${(late * 1000).toFixed(0)} ms after the pickup, sooner than 30 ms`);
+          const pad = song.log.findLast(l => l.kind === 'pad' && l.step === (n.step & ~15)), c = ((pad ? pad.major : p > 0.86) ? DAWN : NIGHT)[(n.step >> 4) & 3]; // the key of the pad sounding
+          if (!c.some(m => (n.midi - m) % 12 === 0)) fail.push(`seed ${seed}: ${n.midi} is not in the chord at step ${n.step}`);
+          if (n.midi !== ladder(c, melody[k++ % melody.length])) fail.push(`seed ${seed}: note ${k} is not the tune's`);
+        }
+        for (const e of s.embers) if (e.kind === 'ember' && !e.got && e.y < s.y - 0.35 && !passed.has(e)) { passed.add(e); song.miss(); }
+        for (const l of song.log) if (l.kind === 'back' && !l.seen) { l.seen = true; const bare = l.at - song.log.findLast(b => b.kind === 'bare' && b.at <= l.at).at; if (bare < 16 * song.STEP - 1e-6 || bare > 18 * song.STEP + 1e-6) fail.push(`seed ${seed}: thinned for ${(bare / song.STEP).toFixed(1)} eighths, not two bars`); }
+      }
+      // A harmony note scheduled after a blow never falls inside the thinned stretch (ones scheduled ahead before it are muted by its gain).
+      song.log.forEach((h, i) => { if (h.kind !== 'harm' && h.kind !== 'arp') return; harm++; const j = song.log.findLastIndex((l, q) => q < i && l.kind === 'bare'); if (j >= 0 && h.at < song.log[j + 1].at - 1e-9) fail.push(`seed ${seed}: harmony inside a thinned stretch`); });
+      played += song.melody.played; missed += song.melody.missed;
+      if (JSON.stringify([s.over, s.y, s.x, s.taken, s.hearts]) !== JSON.stringify([twin.over, twin.y, twin.x, twin.taken, twin.hearts])) fail.push(`seed ${seed}: the music changed the rules`);
+    }
+    console.log(`music${mutate ? ` (mutate ${mutate})` : ''}: nights ${nights}, ${runs} seeds each: ${notes} melody notes, ${waits} pickups with no note (queue full), ${hits} blows, ${harm} harmony notes; latest note ${(worst * 1000).toFixed(0)} ms after its pickup, ${slow} later than one sixteenth (waiting behind another); melody played ${(100 * played / (played + missed)).toFixed(0)}% by the greedy bot; ${fail.length} failures${fail.length ? ': ' + [...new Set(fail)].slice(0, 4).join('; ') : ''}`);
+    return fail.length;
+  }
+  if (flags.includes('--mutate')) { const caught = ['grid', 'chord'].map(m => trial(m) > 0); console.log(caught.every(Boolean) ? 'mutation caught: the claims fail on a broken score' : 'MUTATION NOT CAUGHT'); process.exit(caught.every(Boolean) ? 1 : 2); }
+  process.exit(trial(null) ? 1 : 0);
 }

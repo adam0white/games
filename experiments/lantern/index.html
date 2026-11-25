@@ -542,9 +542,10 @@ function playScene() {
 function say(text, ms = 2200) { const el = $('say'); el.textContent = text; el.style.opacity = 1; clearTimeout(sayTimer); sayTimer = setTimeout(() => { el.style.opacity = 0; }, ms); }
 
 // Sound: all synthesized, started by the first touch.
-// Music (from the lab's Lantern Song, music.js): a score made as the run goes, a new tune for each river from its seed. It fills out
-// towards dawn, a low pulse comes in with danger, and embers chime inside the chord. lantern-music is '0' when the player turned it off.
-let water, waterGain, drone, droneGain, streak = 0, song = null, musicOn = localStorage.getItem('lantern-music') !== '0';
+// Music (kit/music.js through music.js, from the lab's Lantern Song): a score made as the run goes, a new tune for each river from its seed.
+// It fills out towards dawn and a low pulse comes in with danger. Each ember plays the next note of the night's melody (from the lab's
+// Lantern Rhythm): a streak adds harmony, a blow thins the music for two bars. lantern-music is '0' when the player turned it off.
+let water, waterGain, drone, droneGain, streak = 0, song = null, passed = new WeakSet(), musicOn = localStorage.getItem('lantern-music') !== '0';
 const snd = sound({ setup: ac => { // the river and the low drone, built once
   const len = ac.sampleRate * 2, buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0);
   for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
@@ -556,6 +557,7 @@ const snd = sound({ setup: ac => { // the river and the low drone, built once
   song = music(ac); song.volume(0.8);
 } });
 const audio = () => snd.unlock();
+window.lanternMusic = () => song && { ...song.melody, bare: song.bare, step: song.step, next: song.next, STEP: song.STEP, HALF: song.HALF, now: snd.ctx?.currentTime, ctx: snd.ctx?.state, log: song.log.slice(-80) }; // read by the browser checks
 const tone = (freq, dur, vol, type = 'sine', slide = 0) => { if (snd.ctx) snd.tone(freq, dur, vol, type, slide); }; // slide was dropped here before, so the crash sounds never slid
 const scale = [392, 440, 523.25, 587.33, 659.25, 783.99, 880, 1046.5];
 
@@ -657,7 +659,8 @@ function finish() {
     else if (won) { $('line').textContent = t('wonNight', { n: stage, next: stage + 1, ahead: ahead(stage + 1) }); stage++; opened = Math.max(opened, stage); store.set('lantern-night', opened); $('go').textContent = t('playNight', { n: stage }); }
     else { $('line').textContent = t('nightLost', { why, pct, best }); $('go').textContent = t('playAgain'); }
   }
-  $('sub').textContent = gained;
+  const tune = song && song.melody, laid = tune ? tune.played + tune.missed : 0; // the share of tonight's melody the embers played
+  $('sub').textContent = gained + (musicOn && laid >= 4 ? ' ' + t('melodyPlayed', { pct: Math.round(tune.share * 100) }) : '');
   setTimeout(() => { if (!playing && screen === 'play') show('card'); }, won ? 2600 : crash ? 1300 : 700); // a crash plays out before the card
 }
 // The leaderboard on this phone: a run's score goes in if it beats the tenth. Returns its place, 1 to 10, or 0.
@@ -934,7 +937,8 @@ addEventListener('keyup', e => keys.delete(e.key));
 
 // What each event of a run sounds and looks like; the shop's showings of an ability use it too.
 function react(e) {
-  if (e === 'ember') { tone(song && musicOn ? song.chime(Math.min(streak++, 7)) : scale[Math.min(streak++, scale.length - 1)], 0.5, 0.12, 'triangle'); glow = 1; for (let i = 0; i < 8; i++) sparks.push({ x: s.x, y: s.y, vx: (Math.random() - 0.5) * 0.4, vy: Math.random() * 0.5, life: 0.6 }); }
+  // With the music on in a run, an ember plays the next note of tonight's melody (kit/music.js); elsewhere (the shop's showings) a chime as before.
+  if (e === 'ember') { const n = streak++; if (!(song && musicOn && song.ember())) tone(song && musicOn ? song.chime(Math.min(n, 7)) : scale[Math.min(n, scale.length - 1)], 0.5, 0.12, 'triangle'); glow = 1; for (let i = 0; i < 8; i++) sparks.push({ x: s.x, y: s.y, vx: (Math.random() - 0.5) * 0.4, vy: Math.random() * 0.5, life: 0.6 }); }
   if (e === 'graze') { tone(1320, 0.12, 0.05); glow = Math.max(glow, 0.5); }
   if (e === 'shield') { tone(880, 0.5, 0.1); setTimeout(() => tone(1320, 0.7, 0.08), 110); glow = 1; say(t('sayField'), 1700); }
   if (e === 'push') { tone(300, 0.15, 0.08, 'triangle', 220); snd.ctx && snd.noise(0.08, 0.1, 900); }
@@ -944,6 +948,7 @@ function react(e) {
     tone(240, 0.35, 0.25, 'square'); tone(1760, 0.25, 0.06); shake = 0.6; target = s.x; steer.rebase();
     for (let i = 0; i < 14; i++) sparks.push({ x: s.x, y: s.y, vx: (Math.random() - 0.5) * 0.9, vy: (Math.random() - 0.3) * 0.9, life: 0.7, blue: true });
   }
+  if ((e === 'wisp' || e === 'hurt' || e === 'break') && playing) song?.hit(); // a blow: the melody's streak ends and the music thins for two bars
   if (e === 'wisp') { tone(150, 0.5, 0.2, 'sawtooth'); say(t('sayWisp'), 1400); streak = 0; }
   if (e === 'heart') { tone(523.25, 0.4, 0.1, 'triangle'); setTimeout(() => tone(783.99, 0.6, 0.1, 'triangle'), 120); glow = 1; say(t('sayHeart'), 1500); }
   if (e === 'hurt') {
@@ -970,6 +975,7 @@ function tick() {
   const was = s.x; if (tutor) { s.light = Math.max(s.light, tutor.at === 2 ? 0.2 : 0.45); s.hearts = Math.max(2, s.hearts); }
   step(s, target);
   for (const e of s.events) react(e);
+  for (const e of s.embers) if (e.kind === 'ember' && !e.got && e.y < s.y - 0.35 && !passed.has(e)) { passed.add(e); song?.miss(); } // past the magnet's reach: a note of the melody not played
   if (tutor) { tutorTick(was); hud(); return; }
   // Things worth saying aloud: the waterfall coming up, and each step harder on the endless river.
   const soon = fall(s, s.y + 1.3) > 0 || fall(s, s.y + 0.6) > 0;
