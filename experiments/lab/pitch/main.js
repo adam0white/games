@@ -10,6 +10,7 @@ import { hint } from '../../kit/hint.js';
 import { lab } from '../../kit/lab.js';
 import { home, backLink } from '../../kit/home.js';
 import { table, newCode, cleanCode, linkFor, codeFromLink, share } from '../../kit/room.js';
+import { shareImage } from '../../kit/share.js';
 
 noZoom();
 const KEY = 'pitch:v1';
@@ -35,7 +36,7 @@ let screen = 'menu', mode = 'demo', paused = false, clock = 0, last = performanc
 // One match or daily round. s: sim state; seats: which players the bot plays; anim: the segment being drawn.
 let s = null, seats = [false, true], level = 0, score = [0, 0], game = 0, queue = [], anim = null, botAt = -1, after = [], ended = false;
 let picShown = '', picAsk = 0;
-let first = false, pop = null, drag = null, today = null, dailyRec = null, attemptStart = 0, reveal = false, pictureBlob = null, pictureUrl = '';
+let first = false, pop = null, drag = null, today = null, dailyRec = null, attemptStart = 0, reveal = false, pictureBlob = null;
 let room = null, roomSeat = null, roomSeats = [], roomGame = 0, roomSeed = 0, roomMoves = 0, roomVotes = [];
 let roomNext = null, roomInviting = false, roomLag = false, roomLagTimer = 0;
 // Puzzle book: the puzzle in play (index), its misses this visit; effects: the goal burst, the go-again word, a missed tap.
@@ -813,9 +814,8 @@ function picture(scoreText) {
 function showEnd(scoreText) {
   if (mode === 'table' && paused) { paused = false; snd.release(); }
   pictureBlob = null; $('toast').classList.remove('on');
-  if (pictureUrl) URL.revokeObjectURL(pictureUrl);
   if (picShown) URL.revokeObjectURL(picShown);
-  pictureUrl = ''; picShown = '';
+  picShown = '';
   $('pic').alt = t('pictureAlt');
   $('pic').removeAttribute('src');
   // The picture is drawn and encoded after the card has slid in, each in its own task and never inside a frame:
@@ -833,18 +833,8 @@ function savePicture() {
   if (!pictureBlob) return;
   rec.event('share', { mode });
   const name = mode === 'daily' ? t('fileDaily', { date: today.date }) : t('file');
-  const file = new File([pictureBlob], name, { type: 'image/png' });
-  const download = () => {
-    const a = document.createElement('a'); pictureUrl = URL.createObjectURL(pictureBlob);
-    a.href = pictureUrl; a.download = name; document.body.append(a); a.click(); a.remove();
-  };
-  try {
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      navigator.share({ files: [file], title: t('title'), text: `${shareLine()}\n${location.origin}${location.pathname}` }).catch(e => { if (e && e.name !== 'AbortError') download(); });
-      return;
-    }
-  } catch {}
-  download();
+  // kit/share.js: the share sheet with the file where the browser can, else a download.
+  shareImage(pictureBlob, { name, text: `${shareLine()}\n${location.origin}${location.pathname}` });
 }
 
 // ---------- input

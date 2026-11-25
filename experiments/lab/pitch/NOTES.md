@@ -121,6 +121,7 @@ The owner played the page and said "Good but improve". There was no specific com
 - The puzzles are made by `puzzles-make.mjs` (seeded self-play; `node puzzles-make.mjs > puzzles.js`) and checked by `puzzles-rules.mjs`. Solo content before: 3 bot levels and today's pitch (4). After: 8 levels, today's pitch and 18 puzzles (27), almost seven times as many. Two on one phone and a friend by link are unchanged.
 - **Result lines worth sharing.** The picture has a footer line, and Save picture shares the same line as text with the link: "Paper Pitch: I beat the level 3 bot 2–1.", "Paper Pitch puzzle 7: solved on try 2. Book 7/18.", the daily with tries used.
 - **The small games home.** `kit/home.js` is wired with the menu and end cards. Opened with `?from=small`, both cards get "‹ Small games", and every run that ends (a solved puzzle is `won`) is written to `hub:results`. The end picture is a row shorter when the link is there, so nothing scrolls at 320 x 568. The page's line in `small/catalog.js` was already right and is unchanged.
+- **Save picture through the kit.** `kit/share.js` reached main while this was built; Save picture now calls its `shareImage` with the picture and the share line, so the share sheet and the download fallback are the kit's.
 - **Recording.** Puzzle runs are recorded like the other modes: `start` with `{ mode: 'puzzle', puzzle, n }`, the event `puzzle-solved`, and `won` on a solve (`quit` when left). A bot match now also records `rung`.
 
 ### Old saves
@@ -140,4 +141,3 @@ The owner played the page and said "Good but improve". There was no specific com
 - A real phone and the real table Worker: `link-check.mjs` runs the real class off the platform.
 - WebKit encodes the end picture on the main thread: one task of 10 to 15 ms after the card has slid in, while nothing animates. Chromium encodes it off the main thread (0 to 2 ms).
 - The Turkish was written by an AI and has not been read by a native speaker.
-- A shared share-picture helper: `small/` and this page each make their own picture. If a third page needs one, it belongs in the kit as `kit/share.js`.
