@@ -95,3 +95,90 @@ Fourteen accepted captures were inspected. They show the opening, growing bed, f
 The page sends play records to the lab under the name `night-channels` through `kit/lab.js` (the name is in human-framework `LAB_PROTOTYPES` once its pull request lands; until then every send is refused). This page has no start card, so the recording notice sits in the footer under the garden from the first moment, and the off switch is on the pause card. A run is one garden, from the first cut to bloom (`won`), a replant or leaving for the list (`lost` if the cuts ran out, else `quit`). Opening the page and not cutting records nothing. Events: `garden-complete` and, for the daily, `daily-finished`. The check no longer blocks `/kit/lab.js`; it answers the lab address itself and asserts nothing else is written.
 
 `check.mjs` answers the lab address itself (no check reaches the real one), loads the page with `?labRunSource=agent`, and asserts: the notice is on the page before play, a played run sends one run record under `night-channels` with its events record, and after the switch is turned off a further run sends nothing and the player id is removed. Not verified: delivery to the real lab (the Worker does not accept this name yet), a real phone.
+
+## 2026-11-24 — improve (the owner: "Good but improve")
+
+The owner played the page on a phone and said "Good but improve". This round played it cold first (main bd56a760, cleared save, WebKit iPhone 13 and Chromium Pixel 7 at 390x844), wrote down the five weakest things, fixed them, tripled the gardens from the same rule, added par and a shareable daily line, sound and motion for every action, and Turkish.
+
+### Five weak things, before and after
+
+| # | Weak thing (before) | Change | Before | After |
+| --- | --- | --- | --- | --- |
+| 1 | Dead wait after the last cut | When the beds are joined to the spring, no finger is down and the last cut was 0.8 s ago, the water runs four ticks per frame. The result line says "Water running »". | Wall s from last drag to win, gardens 3/5/7/9/10: WebKit 6.7/8.7/16.2/17.1/12.6, Chromium 6.1/8.0/15.2/16.1/11.7 | WebKit 2.3/2.8/4.7/4.9/3.8, Chromium 2.1/2.6/4.4/4.6/3.5. Longest new garden (22): 8.5 / 8.2 |
+| 2 | A drag through a stone kept digging below it (wasted cuts) | A stroke that crosses a stone stops cutting until the finger lifts (`stroke.js`). Refused cells show a red X, a low tone and the line "A stone stops the cut". "No cuts left" shows when the budget is spent. | Garden 7, a straight drag down column 1: 4 of 14 cuts spent on a dry trench. Clumsy bot, gardens 1–10: 100 85 88 100 56 100 38 80 96 99 | Same drag: 0 cuts spent. Clumsy bot: 100 97 96 100 99 99 94 79 97 97 |
+| 3 | A win said little ("In full bloom", 10 px) | Every garden has a par. A win reads "12 cuts · par 12" or "N under par". The list marks gardens cleared at or under par. A per-garden best is kept. | No par, no per-garden best | Par shown before and after play; best per garden saved |
+| 4 | Thin feedback | Sound and motion for every action, all through `kit/audio.js` (list below). | One noise burst per cut; touches on stone, spring or with no cuts were silent; buttons silent | Every action has a sound and a motion |
+| 5 | A bed's thirst was invisible | A ring round each bed fills with its growth: light while wet, amber while drying, faint while dry. If the beds are joined and a bed has had no growth for 25 s of game time since the last cut, the line says "Too little water reaches a bed". | No sign until the leaves changed | Ring on every bed |
+
+Screenshots: `/tmp/claude-improve-night-channels/before/` and `after/` (and `after-tr/` for Turkish), not in the repo.
+
+### Thirty gardens: one idea each (11–30 are new)
+
+Gardens 1–10 are unchanged. Gardens 11–30 use the same rule (water follows the free surface, sand soaks, stone blocks, a bed blooms while wet). Each adds one idea:
+
+- 11 Old furrows: a dug furrow already leads away from the spring, the wrong way. Use it or ignore it.
+- 12 Sand or stone: two rows of sand stand between the spring and the bed. Cutting through sand is cheap but it soaks; the bypass is longer.
+- 13 Through the bed: one bed sits on the line to the next; water passes through a bed to reach the one below.
+- 14 Spring at the foot: the spring is at the bottom and the bed is uphill. Water must climb.
+- 15 The dry ditch: an old dry furrow (`=`, dug but empty) lies across the slope. Joining it is cheaper than digging a new one.
+- 16 Up the slope: the spring is mid-hill with one bed above and one below.
+- 17 Spring on the side: the spring is at the left edge, not the top.
+- 18 The walled bed: stone walls the bed on three sides; there is one way in, from below.
+- 19 The narrow gate: a stone wall across the hill with one gap.
+- 20 Sand sink: two beds sit inside a field of sand that drinks water.
+- 21 The fan: four beds in a row at the bottom; one trunk channel must branch.
+- 22 Switchback: two walls force the channel to zig and zag down the hill.
+- 23 Far corners: two beds in the bottom corners, with sand between them.
+- 24 Two springs: two springs at the top corners and three beds; choose which spring feeds which bed.
+- 25 Four ways: the spring is in the middle and four beds sit north, south, east and west of it.
+- 26 Five beds: five beds, the most in any garden.
+- 27 Mirror: a symmetric garden; a stone row with gaps lies across it and two beds sit below it.
+- 28 The far spring: two springs, and the near one is walled off; the far one is the only way.
+- 29 The long way down: a stone maze; the only route is long.
+- 30 The whole hillside: everything at once: two springs, five beds, sand, stone and an old dry ditch.
+
+Gardens 21–30 were reordered once so the clumsy bot's clear rate falls without a step of more than 15 points (before reordering, 25→26 fell 17 points).
+
+### Par
+
+`plan.js` plans routes by Dijkstra over new cuts from every spring's wet network to each bed, with a penalty for each step uphill (`climb`). Par is the fewest cuts of a planned route that the rules confirm flowers every bed within 90 s of game time. It tries climb 2, 0, 1, 4, 8, then a terrace route (a cross channel on rows 1–5). Campaign pars are in `PARS` (checked by `bots.mjs` against the planner): 3 6 8 7 10 9 12 12 13 11 4 4 3 5 6 6 7 7 11 5 9 16 13 11 11 13 9 9 13 11. A daily par is computed once on the device and cached. Daily par over 365 dates ranges 7–18. On 30 of those dates the cheapest route does not flower in time (the water starves), so par is the cheapest route that does.
+
+### Daily and share
+
+The daily garden is unchanged (same seed from the local date, same layout for everyone on that date). After a daily win a Share button appears. It shares three lines: the title with the date, the flowers with cuts and par, and the page address. It uses `navigator.share` and falls back to the clipboard ("Copied"). The address is the page's origin and path only, without `from`, `lang` or other query words. There is no picture on purpose: a picture of the board would give the route away. There is no `experiments/kit/share.js` on main and no open pull request adds one. `night-sand/main.js` and the small-games home (`experiments/small/main.js`, merged during this round) each share a drawn picture file through `navigator.share({ files })`; their code makes the picture, which this page does not want, so nothing was moved to the kit and the share stays in this page.
+
+The daily's par is found once per date in a module worker (`par-worker.js`), so the tap that opens the daily does not wait for it; the par reads "–" until it answers (without workers the page finds it itself). Measured at 390x844 on three dates, including the slowest of 365 in Node (2027-10-21) and one where the cheapest route starves (2029-05-27): the tap takes 3–4 ms on WebKit and Chromium, and the par arrives 10–49 ms later. Done on the page's thread before the worker, the same tap took 55 ms (WebKit) and 156 ms (Chromium) on 2027-10-21. The first tap in a freshly launched headless Chromium costs about 130 ms whatever the date; main bd56a760 shows the same 134 ms, so it is not from this change. `check.mjs` asserts the page's daily par equals the Node planner's on both browsers.
+
+### Sound and motion for every action
+
+All sounds go through `kit/audio.js`. The motion is the page's own (`render.js` and `garden.css`): the kit has no motion or feedback helper to use. Reduced motion keeps the sounds and colour changes and drops the movement.
+
+- Cut: noise burst, clods fly, the cuts number pops.
+- Refused cut (stone, spring, already cut after a stone, no cuts): low triangle tone, red X ring on the cell, the cuts number shakes when spent, a short line says why.
+- Water reaches a new bed: plink and a ripple ring.
+- A bed blooms: two rising tones and petals.
+- The garden blooms: four-note arpeggio and rings at every bed.
+- Every button: a soft tone and a press scale. A new garden fades in.
+
+### Saves
+
+`night-channels:save` keeps its format. `unlocked` is clamped to 30. A save with `completed: true` (all ten old gardens done) opens garden 11. Per-garden bests are under a new key, `night-channels:gardens` (`{garden: cuts}`). Daily bests stay at `night-channels:save:best:<date>`. Language uses the kit's `kit:lang`.
+
+### Language
+
+All page strings are in `words.js` in English and Turkish (`kit/i18n.js`). `?lang=tr` or the language button on the pause card switches. No native reader has checked the Turkish. The play-recording notice in the footer comes from `kit/lab.js` and stays in English.
+
+### Checks
+
+- `bots.mjs` exits 0 in about 7 s. Parity: gardens 1–10 and 30 dailies give digest `89119636`, the same as main's rules. All 30 gardens and 365 dailies flower at par. The clumsy bot (200 trials per garden, a planned route with random detours and slips) clears: 100 97 96 100 99 99 94 79 97 97 97 97 96 93 95 91 89 95 93 97 91 89 89 83 81 78 74 68 62 58. Minimum 58. The largest drop between neighbouring gardens is 15, at garden 7 to 8 (94 to 79). Garden 8 is one of the unchanged original ten (80 on main), so the 15-point limit in the claim is that observed drop, not a target chosen in advance. Clumsy-bot numbers before this round exist only for gardens 1–10, because 11–30 are new.
+- `--mutate` (mass leak) exits 1 at residual 0.0466. `--mutate=stroke` (stones do not stop a stroke) exits 1. `--mutate=par` (par without checking it flowers) exits 1 on daily 2027-02-16.
+- `check.mjs` exits 0 on WebKit and Chromium. It plays all 30 gardens with real drags (11–30 at par), checks par in the win line, the list's par marks, the daily share line, the garden-12 run record, the old-save migration, page work per frame on garden 30 (p95 1 ms, max 2 ms; target under 8 ms), and that nothing scrolls at 320x568 in English and Turkish (footer bottom 563 of 568).
+- `phone.mjs lab/night-channels` exits 0 on both browsers. `npm test` passes (73).
+
+Checks changed on purpose: the list and campaign counts went from 10 to 30, the last garden is 30 not 10, unlocked after reload is 30 not 10, and gardens 11–30 are played on the par route. Nothing was removed or loosened.
+
+Not verified: Turkish wording by a native reader; play on a real phone; the sounds by ear; whether the faster water after the last cut feels right; the share sheet on a device; the daily across time zones (it uses the local date, as before); delivery of play records to the real lab.
+
+### The small-games home (after merging main)
+
+Main gained the small-games home (`/small/`, `kit/home.js`, `experiments/small/catalog.js`) while this round was under way. The page now calls `home(lab('night-channels'), { back: ['#paused .card', '#selection .card'] })`, so a player who came from the home gets "‹ Small games" ("‹ Küçük oyunlar") on the pause and garden-list cards, and a won garden counts as a win on the home. The catalog entry for this page now has `tr: true` and the Turkish name "Kanallar". The home's progress reader for this page (`experiments/small/marks.js`, this page's line only) counted 10 gardens and called `completed` finished; it now counts up to 30 (the larger of `completed` as 10, unlocked − 1 and the gardens with a best) and calls the page finished when garden 30 has a best. A player who finished the old ten now shows 10 of 30 on the home, not finished. This line is in the home's file, outside this page's catalog entry; without it the home would show 10 of 10 finished after garden 10. It is a decision for whoever looks after the home. `check.mjs` opens the page with and without `?from=small` at 320x568: with it, the pause and list cards carry the link to `/small/` and fit (card bottoms 414 and 512 of 568); without it, they carry nothing. `phone.mjs small` passes on both browsers.

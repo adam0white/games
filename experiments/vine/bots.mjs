@@ -3,7 +3,9 @@ import { readFile } from 'node:fs/promises';
 
 const source = new URL('./sim.js', import.meta.url);
 let sim = await import(source);
-if (process.argv.includes('--mutate')) {
+// node bots.mjs music [--mutate]: only the music claims (below), and --mutate then breaks the music, not the rules.
+const musicOnly = process.argv.includes('music');
+if (process.argv.includes('--mutate') && !musicOnly) {
   const normal = 'const dx = s.lamp.x - tip.x;';
   const reversed = 'const dx = tip.x - s.lamp.x;';
   const code = await readFile(source, 'utf8');
@@ -13,6 +15,79 @@ if (process.argv.includes('--mutate')) {
 const { aim, createBed, prune, shadeAt, tick, cue, CUE } = sim;
 const seeds = Array.from({ length: 24 }, (_, i) => Math.imul(i + 1, 2654435761) >>> 0);
 const round = n => Number(n.toFixed(2));
+
+// ---------- Music (kit/music.js through song.js, 2026-11-24): node bots.mjs music [--mutate]
+// Gardeners play beds on a stand-in audio clock that runs with the sim: one follows the bed's finger (cue), two others put a
+// quarter, then three fifths, of their inputs somewhere random (a tap or a cut across a random spot), and one leaves the lamp
+// on the window and never cuts (beds that open in shade then wilt). Claims: each tendril caught, bunch ripened, window reached
+// and cut plays exactly one note of the bed's tune (or waits when four notes already wait) and nothing else plays one; a cut
+// that drops a held tendril plays no note and is a missed note; a wilted flower is a blow that thins the music; every note is
+// on the score's grid, in its chord and in the tune's order (kit/check/music-claims.mjs); the heartbeat sounds only while a
+// flower is under stress and the high note only when one is about to wilt; the chords turn major only past four fifths of
+// the bed's steps; and the music never changes the bed (a twin bed without it ends the same).
+// --mutate runs twice with song.js broken on purpose (a cut that drops a tendril still plays; notes on a clock) and must fail.
+async function musicClaims(mutate) {
+  const { bench } = await import('../kit/check/music-claims.mjs');
+  let code = await readFile(new URL('./song.js', import.meta.url), 'utf8');
+  const right = '(lost ? 0 : cut)';
+  assert.ok(code.includes(right), 'music mutation target exists');
+  if (mutate === 'cut') code = code.replace(right, 'cut');
+  if (mutate === 'clock') code = code.replace(right, '(Math.floor(s.time * 2) > Math.floor(s.time * 2 - 1 / 15) ? 1 : 0)');
+  const { SONG, mood, look, heard } = await import('data:text/javascript;base64,' + Buffer.from(code).toString('base64'));
+  const fail = [], sum = { beds: 0, minutes: 0, notes: 0, waits: 0, misses: 0, blows: 0, pulses: 0, highs: 0, worst: 0 };
+  const count = g => ({ grips: g.arms.filter(a => a.grip >= 0).length, ripe: g.arms.filter(a => a.ripe).length, window: g.window.reached ? 1 : 0 });
+  for (let level = 1; level <= 10; level++) for (let k = 0; k < 6; k++) for (const who of ['follow', 'quarter', 'most', 'neglect']) {
+    const seed = 8731 + level * 271 + k, bed = createBed(level, seed), twin = createBed(level, seed), b = bench({ preset: SONG.preset }, seed);
+    let r = (seed * 2654435761) >>> 0; const rnd = () => (r = (Math.imul(1664525, r) + 1013904223) >>> 0) / 4294967296;
+    const wrong = { follow: 0, quarter: .25, most: .6, neglect: 0 }[who];
+    let cuts = 0;
+    for (let f = 0; f < 90 * 30 && bed.status === 'growing'; f++) {
+      const before = look(bed, cuts), was = count(bed);
+      let cutNow = false;
+      if (f % 15 === 0) {
+        if (who === 'neglect') { aim(bed, bed.window.x, bed.window.y); aim(twin, twin.window.x, twin.window.y); }
+        else if (wrong && rnd() < wrong) {
+          const x = 30 + rnd() * 300, y = 60 + rnd() * 380;
+          if (rnd() < .5) { aim(bed, x, y); aim(twin, x, y); } else { cutNow = prune(bed, x - 25, y, x + 25, y) > 0; prune(twin, x - 25, y, x + 25, y); }
+        } else {
+          const c = cue(bed);
+          if (c?.kind === 'tap') { aim(bed, c.at.x, c.at.y); aim(twin, c.at.x, c.at.y); }
+          else if (c) { cutNow = prune(bed, c.from.x, c.from.y, c.to.x, c.to.y) > 0; prune(twin, c.from.x, c.from.y, c.to.x, c.to.y); }
+        }
+      }
+      if (cutNow) cuts++;
+      tick(bed); tick(twin);
+      const m = mood(bed); b.mood({ on: bed.status === 'growing', ...m });
+      const h = heard(before, bed, cuts), got = b.heard(h), now = count(bed), dropped = Math.max(0, was.grips - now.grips);
+      const earned = Math.max(0, now.grips - was.grips) + Math.max(0, now.ripe - was.ripe) + Math.max(0, now.window - was.window) + (cutNow && !dropped ? 1 : 0);
+      if (h.notes !== earned) fail.push(`bed ${level} seed ${seed} (${who}): ${h.notes} notes for ${earned} steps and cuts`);
+      if (h.misses !== dropped) fail.push(`bed ${level} seed ${seed} (${who}): a dropped tendril is not a missed note`);
+      if (dropped && got.length > Math.max(0, now.grips - was.grips) + Math.max(0, now.ripe - was.ripe) + Math.max(0, now.window - was.window)) fail.push(`bed ${level} seed ${seed} (${who}): a cut that dropped a tendril played a note`);
+      if (h.blows !== (bed.status === 'wilted' ? 1 : 0)) fail.push(`bed ${level} seed ${seed} (${who}): a wilt is not a blow`);
+      const n = b.song.log.length; b.advance(1 / 30);
+      for (const l of b.song.log.slice(n)) {
+        if (l.kind === 'pad' && l.major && m.progress <= b.P.turn) fail.push(`bed ${level} seed ${seed} (${who}): the chords turned major before four fifths of the bed`);
+        if (l.kind === 'pulse' && m.danger <= .15) fail.push(`bed ${level} seed ${seed} (${who}): a heartbeat with no flower under stress`);
+        if (l.kind === 'high' && m.light >= .28) fail.push(`bed ${level} seed ${seed} (${who}): the high note with no flower about to wilt`);
+      }
+    }
+    const log = b.close();
+    if (JSON.stringify(bed) !== JSON.stringify(twin)) fail.push(`bed ${level} seed ${seed} (${who}): the music changed the bed`);
+    fail.push(...b.fail.map(f => `bed ${level} ${f}`));
+    sum.beds++; sum.minutes += bed.time / 60; sum.pulses += log.filter(l => l.kind === 'pulse').length; sum.highs += log.filter(l => l.kind === 'high').length;
+    for (const key of ['notes', 'waits', 'misses', 'blows']) sum[key] += b.n[key]; sum.worst = Math.max(sum.worst, b.n.worst);
+  }
+  console.log(`music${mutate ? ` (mutate ${mutate})` : ''}: ${sum.beds} beds, ${sum.minutes.toFixed(1)} minutes: ${sum.notes} tune notes (${(sum.notes / sum.minutes).toFixed(1)} a minute), ${sum.waits} with no note (four waiting), ${sum.misses} dropped tendrils (missed notes), ${sum.blows} wilts (blows), ${sum.pulses} heartbeat pulses, ${sum.highs} high notes; latest note ${(sum.worst * 1000).toFixed(0)} ms after its moment; ${fail.length} failures${fail.length ? ': ' + [...new Set(fail)].slice(0, 4).join('; ') : ''}`);
+  return fail.length;
+}
+if (musicOnly) {
+  if (process.argv.includes('--mutate')) {
+    const caught = [await musicClaims('cut'), await musicClaims('clock')];
+    console.log(caught.every(Boolean) ? 'mutation caught: both broken versions of the music fail' : 'MUTATION MISSED');
+    process.exit(caught.every(Boolean) ? 1 : 2);
+  }
+  process.exit(await musicClaims() ? 1 : 0);
+}
 
 function advance(s, seconds, stop = () => false) {
   for (let i = 0; i < Math.round(seconds * 30) && s.status === 'growing' && !stop(s); i++) tick(s);
@@ -269,3 +344,5 @@ for (let level = 1; level <= 10; level++) {
   });
   console.log('Time to wilt with no cut, beds', deadline.join(', '));
 }
+// The music claims (above) run with the rest; `node bots.mjs music` runs them alone.
+assert.equal(await musicClaims(), 0, 'the music claims hold');

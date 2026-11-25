@@ -12,38 +12,66 @@
   <main id="work">
     <header>
       <div class="mast">
-        <div class="eyebrow"><span class="fork" aria-hidden="true"></span> Resonance studies</div>
-        <button id="pause" aria-label="Pause" title="Pause"><span aria-hidden="true">Ⅱ</span></button>
+        <h1><span id="title-a">Salt</span><i id="title-b">plate</i></h1>
+        <div class="eyebrow"><span class="fork" aria-hidden="true"></span> <span data-i18n="eyebrow">Resonance studies</span></div>
+        <button id="pause" aria-label="Pause" title="Pause" data-i18n-aria="pause" data-i18n-title="pause"><span aria-hidden="true">Ⅱ</span></button>
       </div>
-      <h1>Salt<i>plate</i></h1>
       <p class="instruction">Tune the plate until the salt fills the engraving.</p>
     </header>
     <figure>
-      <figcaption><span class="mono" id="number"></span><strong id="level-name"></strong></figcaption>
-      <canvas id="plate" width="400" height="400" aria-label="Salt grains on a vibrating plate with an engraved target pattern"></canvas>
+      <figcaption>
+        <span class="cap"><button id="number" class="mono plain"></button><strong id="level-name"></strong></span>
+        <span class="tools">
+          <button id="home" class="small" data-i18n="plates" hidden>Plates</button>
+          <button id="daily" class="small" data-i18n="daily" hidden>Daily</button>
+          <button id="free" class="small" data-i18n="free" hidden>Instrument</button>
+          <button id="resalt" class="small" data-i18n="saltAgain" hidden>Salt again</button>
+        </span>
+      </figcaption>
+      <div class="stage">
+        <canvas id="plate" width="400" height="400" aria-label="Salt grains on a vibrating plate with an engraved target pattern"></canvas>
+        <p id="shared-note" class="toast" role="status"></p>
+      </div>
     </figure>
-    <div class="controls" id="controls">
-      <div class="readouts">
-        <div><label for="tuner" class="mono">Frequency</label><span class="reading"><output id="frequency" for="tuner">110</output><small> Hz</small></span></div>
-        <div class="match"><span class="mono">Impression</span><div class="meter"><span id="match-bar"></span></div></div>
+    <div class="deck">
+      <div class="controls" id="controls">
+        <div class="readouts">
+          <div><label for="tuner" class="mono" data-i18n="frequency">Frequency</label><span class="reading"><output id="frequency" for="tuner">110</output><small> Hz</small></span></div>
+          <div class="gauges">
+            <div class="match"><span class="mono" data-i18n="impression">Impression</span><div class="meter"><span id="match-bar"></span></div></div>
+            <div class="match" id="salt-gauge" hidden><span class="mono" data-i18n="salt">Salt</span><div class="meter salt"><span id="salt-bar"></span></div></div>
+            <div class="match" id="clock" hidden><span class="mono" data-i18n="time">Time</span><span class="clock"><span id="clock-value">0.0</span> s</span></div>
+            <div class="free-tools">
+              <button id="shape" class="small">Shape</button>
+              <button id="picture" class="small" data-i18n="picture">Save picture</button>
+            </div>
+          </div>
+        </div>
+        <div class="instrument">
+          <div class="scale" aria-hidden="true"><div class="graduations"></div><span id="notch"></span><span id="drone-mark" hidden></span></div>
+          <input id="tuner" type="range" min="0" max="1000" step="1" value="0" aria-label="Tune the vibrating plate">
+          <div class="legends"><span>110</span><span>220</span><span>330</span><span>440 Hz</span></div>
+        </div>
       </div>
-      <div class="instrument">
-        <div class="scale" aria-hidden="true"><div class="graduations"></div><span id="notch"></span></div>
-        <input id="tuner" type="range" min="0" max="1000" step="1" value="0" aria-label="Tune the vibrating plate">
-        <div class="legends"><span>110</span><span>220</span><span>330</span><span>440 Hz</span></div>
-      </div>
+      <section id="result" class="result" aria-labelledby="result-title">
+        <div class="mono"><span class="seal" aria-hidden="true">✓</span><span id="result-label"></span></div>
+        <h2 id="result-title"></h2>
+        <div class="actions"><button id="next" class="primary">Next plate →</button><button id="replay">Reprint</button><button id="share" data-i18n="share">Share picture</button></div>
+      </section>
     </div>
-    <section id="result" class="result" aria-labelledby="result-title">
-      <div class="mono"><span class="seal" aria-hidden="true">✓</span><span id="result-label"></span></div>
-      <h2 id="result-title"></h2>
-      <div class="actions"><button id="next" class="primary">Next plate →</button><button id="replay">Reprint</button></div>
-    </section>
   </main>
   <section id="paused" class="overlay" role="dialog" aria-modal="true" aria-labelledby="pause-title">
-    <div class="card"><span class="mono" id="pause-plate"></span><h2 id="pause-title">Plate at rest</h2>
-      <button id="resume" class="primary">Resume</button>
+    <div class="card"><span class="mono" id="pause-plate"></span><h2 id="pause-title" data-i18n="restAt">Plate at rest</h2>
+      <button id="resume" class="primary" data-i18n="resume">Resume</button>
       <div class="actions"><button id="look">Finish · Blue</button><button id="sound">Sound on</button></div>
-      <button id="restart">Reset plate</button>
+      <div class="actions"><button id="to-plates" data-i18n="plates">Plates</button><button id="lang">Türkçe</button></div>
+      <button id="restart" data-i18n="reset">Reset plate</button>
+    </div>
+  </section>
+  <section id="chooser" class="overlay" role="dialog" aria-modal="true" aria-labelledby="chooser-title">
+    <div class="card wide"><h2 id="chooser-title" data-i18n="plates">Plates</h2>
+      <div id="plate-list" class="plate-list"></div>
+      <button id="chooser-close" data-i18n="close">Close</button>
     </div>
   </section>
   <script type="module" src="./main.js"></script>

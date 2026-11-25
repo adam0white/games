@@ -124,10 +124,24 @@ function drawDeck() {
   $('dots').innerHTML = order.map(game => `<i class="${game === pick ? 'pk' : ''}"></i>`).join('');
   show(at, false);
 }
+// A card the page is scrolling to (arrows, Surprise me, a side card's tap). While it is set, the deck's position does
+// not change `at`: the cards the glide passes are not the current one. When the deck comes to rest it must be on that
+// card; if it is not (WebKit can drop a smooth scroll asked for while another is still running), it jumps there.
+let target = null, rest = 0;
+const leftOf = card => card.offsetLeft - (deck.clientWidth - card.offsetWidth) / 2;
+function settle() {
+  clearTimeout(rest);
+  rest = setTimeout(() => {
+    const card = target === null ? null : cards()[target];
+    target = null;
+    if (card && Math.abs(deck.scrollLeft - leftOf(card)) > 2) deck.scrollTo({ left: leftOf(card), behavior: 'auto' });
+  }, 160);
+}
 function show(i, smooth = true) {
   at = Math.max(0, Math.min(order.length - 1, i));
   const card = cards()[at];
-  if (card) deck.scrollTo({ left: card.offsetLeft - (deck.clientWidth - card.offsetWidth) / 2, behavior: smooth && !reduced() ? 'smooth' : 'auto' });
+  if (card) deck.scrollTo({ left: leftOf(card), behavior: smooth && !reduced() ? 'smooth' : 'auto' });
+  target = card && smooth ? at : null; if (target !== null) settle();
   sync();
 }
 const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -140,9 +154,10 @@ function sync() {
 // Follow the thumb: the card nearest the middle is the current one, checked once a frame while the deck moves.
 let frame = 0;
 deck.addEventListener('scroll', () => {
+  if (target !== null) { settle(); return; }
   if (frame) return;
   frame = requestAnimationFrame(() => {
-    frame = 0;
+    frame = 0; if (target !== null) return;
     const mid = deck.scrollLeft + deck.clientWidth / 2;
     let best = at, gap = Infinity;
     cards().forEach((c, i) => { const d = Math.abs(c.offsetLeft + c.offsetWidth / 2 - mid); if (d < gap) { gap = d; best = i; } });
@@ -168,6 +183,7 @@ $('shareAll').onclick = async () => { rec.event('share', { what: 'all' }); if (a
 // the deck mid-glide fires no click in phone browsers.
 let down = null;
 addEventListener('pointerdown', e => { down = { x: e.clientX, y: e.clientY, left: deck.scrollLeft }; }, { passive: true, capture: true });
+deck.addEventListener('touchstart', () => { target = null; }, { passive: true }); // a finger on the deck takes over from the page's glide
 // A side card is brought in on the finger's release, not on click: WebKit sent no click for a tap on the sliver of
 // the next card in the phone check. The click that may follow is then swallowed, so it cannot open the game.
 let broughtIn = 0;

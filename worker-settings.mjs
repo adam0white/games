@@ -76,6 +76,7 @@ export const labMoved = {
   'ant-quests': '/ant-promotion/',
   'ant-nest': '/ant-promotion/',
   'ant-creatures': '/ant-promotion/?look=4',
+  'ant-hide': '/ant-promotion/',
   'night-flock': '/flock/',
   'night-flock-2': '/flock/',
   'night-vine': '/vine/',

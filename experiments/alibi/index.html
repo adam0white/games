@@ -58,6 +58,12 @@
   #calendarDates { display: block; margin: 4px 0; font: 700 13px Georgia, serif; color: #eed6bc; }
   #calendarHeading { margin-top: 4px; font: 700 17px Georgia, serif; color: #f9d6a1; }
   #hardDaily { line-height: 1.15; }
+  #learn { width: 100%; margin-bottom: 8px; }
+  #coach { position: absolute; left: 16px; right: 16px; top: 113px; min-height: 52px; display: flex; align-items: center; gap: 8px; padding: 2px 8px 2px 12px; border: 2px solid #f6c17b; border-radius: 13px; background: #2c2337f2; font-size: 14.5px; line-height: 1.17; pointer-events: none; }
+  #learn.fresh { border: 2px solid #f6c17b; color: #ffdda1; }
+  #coachText { flex: 1; margin: 0; }
+  #coachCount { color: #f6c17b; font-size: 11px; }
+  #coachOk { pointer-events: auto; padding: 6px 12px; }
   #hardDaily small { display: block; margin-top: 2px; font-size: 12px; }
   #shareStatus { margin: 0; color: #f5d9b5; }
   #shareStatus svg { display: block; margin: 0 auto 12px; }
@@ -85,11 +91,13 @@
   <div id="layout">
     <p id="playGuide" class="sr-only" role="status"></p>
     <button id="pause" data-i18n-aria="pause" hidden><svg width="19" height="20" viewBox="0 0 19 20" aria-hidden="true"><path d="M6 4v12m7-12v12" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/></svg></button>
+    <div id="coach" hidden><p id="coachText" role="status"></p><button id="coachOk" class="primary" data-i18n="learnOk"></button><span id="coachCount"></span></div>
     <section id="menu" class="screen">
       <h1 data-i18n="title"></h1>
       <button id="menuLanguage" class="language" data-i18n-aria="switchLanguage"><svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="10" cy="10" r="8"/><ellipse cx="10" cy="10" rx="3.5" ry="8"/><path d="M2 10h16"/></svg><span data-i18n="languageCode"></span></button>
       <div class="panel">
         <button id="play" class="primary"><span data-i18n="play"></span> <span id="progress"></span></button>
+        <button id="learn" data-i18n="howTo"></button>
         <div class="row tight">
           <button id="daily"><span data-i18n="daily"></span> <span id="streak"></span></button>
           <button id="pickCase" data-i18n="cases"></button>

@@ -148,7 +148,7 @@ async function scrub(page, frame) {
 const tap = (page, point) => touch(page, [['pointerdown', point], ['pointerup', point]]);
 async function hold(page, point) {
   await touch(page, [['pointerdown', point]]);
-  await delay(620);
+  await delay(1600); // a held portrait pins by game time, which lags when frames are slow
   await touch(page, [['pointerup', point]]);
 }
 
@@ -751,6 +751,72 @@ async function draws(page, key) {
 // Training marks retire after their lesson: the circle on the chosen suspect
 // after chapter I, the sound bracket after the blackout lesson. Picture tags
 // name the animal under each mask in the mask lesson only.
+// The practice case (note #245): reached from the menu, one move a step, nothing
+// saved or lost, and the time of every mark painted under the line.
+async function checkPractice(page, url) {
+  await page.goto(url);
+  await see(page, 'menu');
+  const saved = () => page.evaluate(() => localStorage.getItem('alibi-save'));
+  const before = await saved();
+  const at = async step => {
+    await page.waitForFunction(wanted => window.alibiState().step === wanted, step, { timeout: 5000 });
+    return state(page);
+  };
+  await press(page, '#learn');
+  let st = await at(0);
+  await accuse(page, 1);
+  assert.equal((await state(page)).screen, 'play', 'nobody can be accused before the last step');
+  const painted = await page.evaluate(() => new Promise(done => {
+    const proto = CanvasRenderingContext2D.prototype;
+    const original = proto.fillText;
+    const drawn = [];
+    proto.fillText = function (value, ...args) { drawn.push(value); return original.call(this, value, ...args); };
+    requestAnimationFrame(() => requestAnimationFrame(() => { proto.fillText = original; done(drawn); }));
+  }));
+  for (const time of ['7:00', '7:05', '7:10', '7:15', '7:20']) assert.ok(painted.includes(time), `${time} stands under the line`);
+  await press(page, '#coachOk');
+  st = await at(1);
+  await scrub(page, 4);
+  st = await at(2);
+  await tap(page, st.points.suspects[0]);
+  st = await at(3);
+  await tap(page, st.points.claim[0]);
+  assert.equal((await at(4)).frame, 2, 'the alibi jumps to its time');
+  await press(page, '#coachOk');
+  st = await at(5);
+  await tap(page, st.points.suspects[1]);
+  await at(6);
+  await press(page, '#coachOk');
+  st = await at(7);
+  for (const id of [0, 2, 0, 2]) await accuse(page, id);
+  st = await state(page);
+  assert.deepEqual([st.screen, st.stars], ['play', 3], 'wrong accusations cost nothing in practice');
+  await page.reload();
+  assert.equal((await state(page)).screen, 'menu', 'a reload does not resume practice as a case');
+  await press(page, '#learn');
+  await press(page, '#coachOk');
+  await scrub(page, 4);
+  st = await at(2);
+  await tap(page, st.points.suspects[0]);
+  st = await at(3);
+  await tap(page, st.points.claim[0]);
+  await at(4);
+  await press(page, '#coachOk');
+  st = await at(5);
+  await tap(page, st.points.suspects[1]);
+  await at(6);
+  await press(page, '#coachOk');
+  await at(7);
+  await accuse(page, 1);
+  await see(page, 'reveal');
+  await press(page, '#skipReveal');
+  await see(page, 'done');
+  assert.equal(await saved(), before, 'practice saves nothing');
+  await press(page, '#next');
+  st = await state(page);
+  assert.deepEqual([st.screen, st.step, st.level], ['play', null, 1], 'Play after practice starts the campaign');
+}
+
 async function checkGuides(page, url) {
   await page.addInitScript(countDraws);
   const open = async level => {
@@ -1383,6 +1449,7 @@ async function runProfile(profile, engine, device, origin) {
         await stubLab(guideContext, origin, [], errors);
         const page = await guideContext.newPage();
         page.on('pageerror', error => errors.push(error.message));
+        await checkPractice(page, url);
         await checkGuides(page, url);
         await checkOpenItems(page, url);
         assert.deepEqual(errors, [], 'guide browser errors');
