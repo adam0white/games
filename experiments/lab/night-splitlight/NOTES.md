@@ -89,3 +89,103 @@ Unaided discovery by a new person, app switching on a physical phone, physical-d
 ## Play recording (2026-11-24)
 
 Records under `night-splitlight` (`kit/lab.js`). One run for each plate: it starts at the first turn of the dial, ends `won` when every receiver is lit (event `plate-exposed` with seconds), and ends `quit` on Restart plate, Replay or any other new plate. Summary: level, receivers lit, receiver count, seconds, highest unlocked plate. The notice is under the instrument, on screen from the first look; the height formulas reserve 60 px more, and in landscape the notice sits above the title. The page sends nothing typed, no names and no room codes. The recording notice and off switch are the kit's own (`kit/lab.js`); the switch is on the pause card. `check.mjs` answers the lab endpoint itself, loads the page with `?labRunSource=agent`, and asserts that a played run sends a run record under the slug with recording on and nothing with the switch off. Not verified: the live endpoint (it refuses these names until the human-framework change lands and deploys). Changed on purpose: the check's lab-storage assertions allow the player id and this page's session id only, and the block on `/kit/lab.js` is gone. Bots: unchanged outcome. `check.mjs`: exit 0 on both profiles.
+
+## 2026-11-24 — bench v2: 18 plates, chord rule, daily bench
+
+The owner's note on this page was "Good but improve". This section records what changed, the numbers before and after, and what was not checked.
+
+### Five weak things, before and after
+
+| # | Weak thing | Before (main) | After |
+| --- | --- | --- | --- |
+| 1 | Every plate played the same: receivers latched one at a time, so a blind sweep cleared everything | A blind slow sweep (+0.01 every 40 ms, 500 ms pause while a receiver charges) cleared 6 of 6 plates in the browser | Chord rule: every receiver must be fed at the same setting before any charge builds. The same sweep, now part of `bots.mjs` and run in node against `bench.js` (the before run drove the browser slider), clears 13 of 18 plates. It fails on the four two-control plates 8, 11, 12, 18 and on the moving receiver, 16. A one-control dial still passes through its one answer, so this weakness is only partly fixed. |
+| 2 | Difficulty cliff on the last plate | Clumsy bot clear rate 100.0, 99.3, 99.8, 99.0, 99.8, then 34.8% | Lowest plate 85.0%; the largest drop between neighbouring plates is 13.0 points (plate 16 to 17); the planned limit was 15. Full table below. |
+| 3 | Thin light | Plate 6 at dial 0.3: saturated canvas pixels 0.49% WebKit, 0.41% Chromium; bright 2.17% / 2.64%; 1.25 px lines; no bloom; one 784 Hz finish tone | Saturated 1.36% and bright 2.75% on both engines. Glow pass, a continuous dispersion fan of 25 wavelengths between the six bands, receivers that bloom while fed, and a finish chord built from the receivers' own colour pitches through `kit/audio.js`. |
+| 4 | Layout at small phones | 320x568: canvas 286x318 and the page scrolled 3 px | 320x568: canvas 294x327, no scroll on the bench, daily bench, result card, Turkish result or pause card (checked in `check.mjs`). 390x844: canvas 364x404 before and after; the bench is limited by width there. |
+| 5 | Nothing to come back for | 6 plates, no daily, no share, English only | 18 plates, a daily bench with par and a share line, best turns per plate, English and Turkish. |
+
+Frame work in the animation callback during a drag at 390x844: WebKit median 0, p95 1, max 1 ms (the WebKit timer has 1 ms steps); Chromium median 0.3, p95 0.4, max 0.6 ms. Before: WebKit 0 / 1 / 1, Chromium 0.1 / 0.3 / 0.4. The budget is 8 ms.
+
+### Plates and their optics
+
+`bench.js` is a new tracer. It calls `sim.js`'s `transmit` unchanged for every glass face and adds a mirror, a colour filter, a thin lens (slope minus h/f), a transmission grating (sin θm = sin θi + mλ/d, orders −1, 0, 1 unless a plate says otherwise), more than one lamp, and parts that slide. Receivers are placed by tracing a hidden answer, so every plate is solvable by construction.
+
+| Plate | Name | Idea | Controls |
+| ---: | --- | --- | ---: |
+| 1 | First light | dispersion: white light fans into colours | 1 |
+| 2 | Chromatic pair | two colours must land at once (the chord) | 1 |
+| 3 | Return path | total internal reflection sends violet out another face | 1 |
+| 4 | Violet edge | three colours at one setting | 1 |
+| 5 | Twin facets | a four-sided glass picks the exit face | 1 |
+| 6 | Critical angle | work at the edge of total internal reflection | 1 |
+| 7 | Folded beam | a plane mirror: angle in equals angle out | 1 |
+| 8 | Mirror and glass | aim the beam with a mirror, then split it | 2 |
+| 9 | Two lamps | two beams through one prism | 1 |
+| 10 | Green glass | an absorbing filter passes one band | 1 |
+| 11 | Sliding prism | where the beam enters changes the path; slide and turn | 2 |
+| 12 | Glass mirror | a right-angle prism used as a mirror by total internal reflection | 2 |
+| 13 | Focus | a thin lens bends each ray by its height | 1 |
+| 14 | Back to white | a second prism recombines the colours into white | 1 |
+| 15 | Ruled glass | a diffraction grating: red bends more than violet, the opposite of a prism | 1 |
+| 16 | Wandering eye | a receiver that swings; hold the light where it will be | 1 |
+| 17 | Mirror and grating | steer onto a grating, then read its orders | 2 |
+| 18 | Full spectrum | three diffraction orders at once | 2 |
+
+Plates 1–6 keep the first version's glass, cut and lamp. Their receivers moved so that one setting feeds all of them (the chord rule). This is a deliberate change to those plates.
+
+### Bots
+
+`bots.mjs` part 1 is the first version's checks, unchanged, run against `sim.js`. Part 2 is new:
+
+- Parity: `bench.js` against `sim.js` on the six original plates, 36,036 rays at 1,001 dial positions; worst point difference 3.93e-12.
+- Solver: clears every plate; par equals the control count on every plate.
+- Clumsy bot: aims at the answer with a normal error of 0.035 of travel on each control, holds 0.8 s (or one swing period), 12 gestures, 400 trials per plate.
+
+| Plate | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Before % | 100.0 | 99.3 | 99.8 | 99.0 | 99.8 | 34.8 | | | | | | | | | | | | |
+| After % | 100.0 | 99.5 | 99.3 | 91.5 | 99.0 | 99.5 | 100.0 | 90.0 | 100.0 | 98.5 | 90.8 | 93.5 | 100.0 | 100.0 | 100.0 | 100.0 | 87.0 | 85.0 |
+
+- Daily bench: 365 days from 2026-11-24, each valid and cleared at par 2. Families mirror 77, slide 87, lamps 100, grating 101. Mean 10.91 generation attempts.
+- Mutations: `--mutate` (equal refractive index) and `--mutate=mirror|grating|lens|filter|chord|moving` each exit 1 with an assertion tied to that part.
+
+### Daily bench
+
+`?daily` opens today's bench; `?day=YYYY-MM-DD` opens a given day. The seed is FNV-1a of `splitlight <day>` into mulberry32, so everyone gets the same bench. One of four families (mirror, slide, lamps, grating) is generated and checked: receivers well apart, the answer feeds them all, no knife edge (±0.01 still solves), the start is unsolved, and no single control can solve it. Par is 2. The result card shows turns, par and seconds, and a Share button. Share draws a picture of the bench and offers it with a text line through the Web Share API when the phone can share files; otherwise it hands the text and link to `shareLink` from `kit/room.js` (there is no `kit/share.js`). The link is `?daily&day=<day>`, so whoever opens it gets the same bench. A bench for a day other than the real (UTC) date is labelled "Shared" and does not replace today's saved result. A turn is one gesture, or a run of key presses with gaps of 700 ms or less.
+
+### Storage
+
+Existing keys keep their formats: `night-splitlight:plate` (highest unlocked plate), `:sound`, `:hint`. A saved plate from 1 to 6 loads as before. New keys: `:best` (best turns per plate, JSON), `:daily` (today's result, JSON), `:parts` (the part chips have been used), `:done` (plate 18 finished; read by `experiments/small/marks.js`).
+
+### Small games and words
+
+`catalog.js` marks this page `tr: true`; `marks.js` counts 18 plates and reads `:done`. The page uses `kit/home.js`, so `?from=small` shows the way back on the pause card and the result card. Every new string is in `words.js` in English and Turkish.
+
+### Checks changed on purpose
+
+- `check.mjs` second plate: it now aims at the chord answer. A tap at 0.55 used to win plate 2 and must not under the chord rule.
+- `check.mjs` gained `extras` at 320x568: daily bench, par, chips at least 44 px, the chord frequencies, share line, `?from=small` back link, Turkish plate label, no scroll in each state.
+- `check.mjs` daily checks use the real UTC date, and a second case opens the day before and proves today's saved result is kept. With that guard removed the check fails ("a past bench does not replace today's result").
+- `experiments/kit/check/lab-pages.mjs`: the expected plate label is now "Plate 02 / 18" (was "Plate 02 / 06"), and the seeds add `:best`, `:parts` and `:daily` to prove old and new saves load.
+
+### Correction
+
+The first section says "There is no lab recording." That stopped being true with the play recording section above.
+
+### Checks run (2026-11-24)
+
+- `npm test`: 73 of 73 pass.
+- `bots.mjs`: exit 0. `--mutate`: exit 1. The six named mutations exited 1 at commit c3105b18; `bench.js` has not changed since.
+- `check.mjs`: exit 0 on WebKit iPhone 13 and Chromium Pixel 7, with 0 browser errors, outside requests, lab requests or lab writes.
+- `experiments/kit/check/phone.mjs small,lab/night-splitlight`: ok on both browsers, including the hint.
+- Screenshots at 390x844 (first plate, mid-turn, result, plate 12 with chips, pause card, plate 18, end card, daily bench, daily result) and the landscape hint were inspected on both engines. They are kept outside the repository.
+
+### Not verified
+
+- Turkish was not read by a native speaker.
+- The finish chord and receiver tones were not judged by ear; only the frequencies were checked.
+- First-time play by a person, and frame timing on a physical phone.
+- The share sheet on a physical phone; the check only sees the line and the link call.
+- The kit's back link and the lab notice keep the language the page loaded in after the in-page language switch. That is the kit's behaviour and was not changed here.
+- On screens shorter than 700 px in portrait, the result card covers the foot of the bench instead of growing the page.
+- On taller screens the result card replaces the dial and the page grows, so the centred bench moves up when a plate is won: at 390x844 the canvas top moves from 186 to 168 px, and to 142 px on the end card with the way back. This was chosen over covering the receivers that just lit.

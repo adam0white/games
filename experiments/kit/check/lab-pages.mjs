@@ -270,16 +270,22 @@ export const labPages = {
   }),
   'lab/night-splitlight': {
     startsOnBoard: true, sound: '#sound', soundKey: 'night-splitlight:sound', soundOff: 'off',
-    seeds: { ...splitlightLegacy, 'night-splitlight:hint': '1' },
+    // :best, :daily, :done and :parts were added on 2026-11-24 with the 18-plate bench; they are seeded so a save that
+    // has them must survive too.
+    seeds: { ...splitlightLegacy, 'night-splitlight:hint': '1', 'night-splitlight:best': '{"1":1}', 'night-splitlight:parts': '1',
+      'night-splitlight:daily': '{"day":"2026-11-23","turns":3,"par":2,"seconds":9.5}' },
     state: () => {
       const s = window.splitlightState?.();
       return s && { screen: s.screen, t: s.elapsed };
     },
     verify: () => {
       const { level, sound } = window.splitlightState();
-      return { level, sound, plate: document.querySelector('#plate').textContent };
+      const today = document.querySelector('#daily').getBoundingClientRect();
+      return { level, sound, plate: document.querySelector('#plate').textContent, best: localStorage.getItem('night-splitlight:best'),
+        todayButton: today.width >= 44 && today.height >= 44 && today.right <= innerWidth };
     },
-    expect: { level: 2, sound: true, plate: 'Plate 02 / 06' },
+    // 'Plate 02 / 06' until 2026-11-24, when the page grew to 18 plates (deliberate; see the page's NOTES).
+    expect: { level: 2, sound: true, plate: 'Plate 02 / 18', best: '{"1":1}', todayButton: true },
     touch: turnPrism,
     hint: { key: 'night-splitlight:hint', delay: 2200, play: '#angle', timing: { board: true },
       input: turnPrism, legacy: splitlightLegacy },

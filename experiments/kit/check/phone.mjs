@@ -864,6 +864,7 @@ const GAMES = {
     await page.click('#resume'); assert.equal(await page.evaluate(() => window.__ant.beam), 0, 'no beam before a promotion');
     await page.evaluate(() => { window.__ant.s.player.xp = 999; });
     await until(page, () => window.__ant.mode === 'evolve', 'promotion card');
+    assert.deepEqual(await page.$$eval('#opts .opt', cards => cards.map(c => { const e = c.querySelector('.does'); return !!e && e.textContent.length > 8 && e.scrollWidth <= c.clientWidth && c.getBoundingClientRect().right <= innerWidth; })), [true, true, true], 'each card says what its skill does (note #238)');
     await page.click('#opts .opt'); assert.equal(await mode(), 'play');
     assert.ok(await page.evaluate(() => window.__ant.beam) > 0.5, 'a promotion starts the light beam');
     await page.evaluate(() => { window.__ant.s.player.safe = 99; }); // nothing may eat the player while the beam plays out
