@@ -26,7 +26,7 @@ await mkdir(shots, { recursive: true });
 
 function allowed(url) {
   return url === path || url === away || url === notes || url === '/favicon.ico'
-    || /^\/lab\/night-rubbing\/[\w.-]+$/.test(url)
+    || /^\/small\/night-rubbing\/[\w.-]+$/.test(url)
     || /^\/kit\/(?:audio|drag|hint|home|lab|pause|save|screens|stick|zoom)\.js$/.test(url);
 }
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml' };
@@ -359,7 +359,7 @@ async function run({ name, engine, device }) {
     await capture('after-reload');
     await page.waitForFunction(() => {
       const button = document.getElementById('notes-button');
-      return button?.pathname === '/notes/' && /^\?game=lab&build=[a-f0-9]{10}$/.test(button.search);
+      return button?.pathname === '/notes/' && /^\?game=small&build=[a-f0-9]{10}$/.test(button.search);
     }, null, { polling: 50 });
     assert.ok(await page.locator('#notes-button').isVisible(), 'a tester can reach feedback');
 

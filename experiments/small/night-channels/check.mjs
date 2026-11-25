@@ -31,7 +31,7 @@ const server = createServer(async (req, res) => {
   let file;
   if (pathname === '/notes/button.js') file = resolve(experiments, '../workers/feedback/public/notes/button.js');
   else if (pathname === pagePath) file = join(import.meta.dirname, 'index.html');
-  else if (/^\/(lab\/night-channels|kit)\/[\w-]+\.(js|css)$/.test(pathname)) file = join(experiments, pathname);
+  else if (/^\/(small\/night-channels|kit)\/[\w-]+\.(js|css)$/.test(pathname)) file = join(experiments, pathname);
   try {
     if (!file) throw new Error('unserved path');
     const body = await readFile(file);
