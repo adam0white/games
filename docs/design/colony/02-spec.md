@@ -13,7 +13,7 @@ The game is done for release when outside players finish the first season withou
 | New players who finish Day 1 without opening help | 80% |
 | New players who start Day 2 | 60% |
 | Players who finish season one (Spring, 6 days) | 30% of those who start Day 2 |
-| Lost progress after a crash, reload or closed tab | at most 60 seconds of play, every time |
+| Lost progress after a crash, reload or closed tab | at most 30 seconds of play, every time |
 | A full day on a mid-range phone (iPhone 13 class, Pixel 7 class) | 30 frames a second or better at 2,000 ants |
 | Friends' hill by link | a second phone joins in under 10 seconds with no account |
 | "Would you recommend it?" on the end card | a majority of yes from outside players |
@@ -22,7 +22,7 @@ The owner accepts each milestone by playing it (section 12 of the roadmap).
 
 ## 1. Clean-room line
 
-The project rule (owner, 2026-11-24): for a specific published game, take the genre, not the game. This table lists what we keep from the genre, what we leave with the reference game, and which common complaint each design choice answers.
+The project rule (owner, 2026-11-24): for a specific published game, take the genre, not the game. These tables list what we keep from the genre and what we leave with the reference game.
 
 ### Taken: genre conventions shared by many games
 
@@ -45,27 +45,21 @@ SimAnt (1991) already had most of these: pheromone trails, a nest cutaway and a 
 | A fictional gene-stealing ant and a jelly meta-currency | Fictional native species of our own (section 5). Progress comes from the colony's age and the hill's regrowth ("bloom") |
 | A hex-tile nest where tiles upgrade from same-type neighbours | Free digging in a soil grid. A room's purpose is painted on, and its worth comes from depth, size, dryness and distance (section 6.2) |
 | Five numbered pheromone groups fed by assigned nurseries | Trails you draw with a finger, an alarm call, a recall, and job sliders (section 6.4) |
-| A named class of giant bosses | Season beasts, each with its own rules and no shared class name |
+| A named class of giant bosses | One large animal per season, each its own set piece with its own rules; the game gives them no shared class name |
 | Biome tiers with real species per tier | Five regions of one hill across four seasons |
 | Its look, UI, music, names and levels | All ours: procedural ink-and-wash art, our own UI and levels |
 
-### Answered: the reference game's common complaints
+### Design goals drawn from the genre's common complaints
 
-Counts are from the reference research.
+The research (01, section 10) maps each common complaint in this genre to the system below that answers it. In short:
 
-| Complaint | Cinderhill's answer |
-| --- | --- |
-| No save inside a mission; no pause for giving orders (the top complaint) | The sim is deterministic and saves a snapshot plus the command log every 30 seconds and at each dusk. Solo play has a tactical pause that still takes orders. Gentle difficulty adds a one-minute rewind |
-| Missions of 40 minutes to hours | One day of play is 8 to 12 minutes and ends at dusk with a summary and a save |
-| Crashes lose progress | Same as the save answer. A reload resumes within 30 seconds of play |
-| Slow with large armies | The sim uses typed arrays and integer math; ants draw in one instanced call. Gate: 2,000 ants at 30 frames a second on a mid-range phone |
-| Thin content; the same colony setup every mission | One colony persists all campaign. The hill changes as it blooms. Each day starts from the last |
-| Difficulty spikes and starvation spirals | A hunger warning comes before brood starves. The queen has a fasting reserve. Each new threat first appears in a safe day. Three difficulties with stated differences |
-| No retreat; slow orders; tedious group management late in the game | A one-tap Recall. Ants pick up an alarm within a second near the call. Groups form by job, with up to three bands you name |
-| Pathfinding bugs that soft-lock "kill all" goals | No "kill all" goals. Flow fields cover every reachable cell, and an enemy stuck for 20 seconds wanders free (section 6.6) |
-| "Bigger swarm wins" | Threats that punish crowds (section 6.5), tournaments where display beats numbers, and economy goals |
-| No multiplayer | Friends' hill: 2 to 4 players by link, co-op or versus, no account |
-| Long early access | Small, playable milestones go out every few weeks (roadmap) |
+- **Never lose more than 30 seconds of play**, and pause to give orders at any time.
+- **Short days** (8 to 12 minutes) that end in a save, inside one colony that persists.
+- **A retreat in one tap**, and orders that show their effect within half a second.
+- **Large swarms that stay smooth on a phone.**
+- **Threats and contests where the bigger swarm does not simply win.**
+- **No goal that a stuck enemy can block.**
+- **Play with friends by link.**
 
 ## 2. Name and setting: owner's pick
 
@@ -82,7 +76,7 @@ The rest of this spec is written for A. Most systems carry over to B to D unchan
 
 ## 3. Pitch
 
-A summer fire has burned Cinderhill black. One young queen landed in the ash after her wedding flight and dug in. You are her colony. Forage, dig and raise brood. Plant the seeds your ants carry, and the hill turns green behind you. Rain floods the low tunnels, a spider hunts the ash, and from the valley road a pale invading supercolony climbs toward you, absorbing every colony it meets. A day of play lasts ten minutes. A season lasts six days. Win by bringing the hill back to life and turning the native colonies from rivals into allies before the pale tide reaches the top.
+A summer fire has burned Cinderhill black. One young queen landed in the ash after her wedding flight and dug in. You are her colony. Forage, dig and raise brood. Plant the seeds your ants carry, and the hill turns green behind you. Rain floods the low tunnels, a spider that smells like an ant walks your trails, and from the valley road a pale invading supercolony climbs toward you, driving out every colony it meets. A day of play lasts ten minutes. Spring, Summer and Autumn last six days each. Win by bringing the hill back to life and turning the native colonies from rivals into allies before the pale tide reaches the top.
 
 ## 4. Story and characters
 
@@ -94,15 +88,15 @@ The story is told without a narrator. Scenes last 5 to 15 seconds and are drawn 
 - **Tally.** The first worker to hatch. She is the player's guide and is never forced on the player. The first trail of the game is hers. If she dies, her trail fades and a younger ant takes her name ("Tally the Second"), so the colony's memory survives.
 - **Burr.** An old ground beetle who lived through the fire under a stone. He trades seeds for protection and knows where things are. Ant guests like him are real: myrmecophiles.
 - **The Changeling.** A caterpillar the colony adopts in Summer. It smells like brood, so the nurses carry it in and feed it, and it eats brood in secret. Caterpillars of the large blue butterfly (*Phengaris*) do this. When the colony finds out, the player chooses: drive it out, or keep it and let it eat. Kept until Autumn, it emerges as a butterfly that pollinates the high meadow, and the bloom jumps. This is a mercy choice with a cost and a payoff. Neither path is "wrong".
-- **The Pale Tide.** An invasive supercolony coming from the road. It has no queen you can reach, only many nests that share one scent and never fight each other. It is a slow, unbeatable flood that must be held back with allies, scent and terrain. Argentine ants behave this way. The Tide is drawn without faces. It is a force, not a villain.
+- **The Pale Tide.** An invasive supercolony coming from the road. It has no queen you can reach, only many nests that share one scent and never fight each other. It displaces the native colonies it reaches. It is a slow, unbeatable flood that must be held back with allies, scent and terrain. Argentine ants behave this way. The Tide is drawn without faces. It is a force, not a villain.
 - **Neighbour colonies.** Three native colonies: the **Thornbacks** (big, slow, proud), the **Jar-keepers** (honeypot ants who store food in living workers) and the **Leafstitchers** (who sew nests from leaves with silk from their larvae). Each starts as a rival and can become an ally through a tournament (section 6.7).
 
 ### Arc by season
 
 | Season | Days | What happens | New verb or system |
 | --- | --- | --- | --- |
-| Spring | 6 | Founding. The first workers, the first trail, the first rain. Burr appears. A wolf spider hunts the ash slope | Trail, dig, rooms, Recall, Alarm, rain |
-| Summer | 6 | The hill starts to bloom. The Changeling is adopted. Thornback tournament. Heat closes the midday | Seeds and bloom, tournaments, heat, castes |
+| Spring | 6 | Founding. The first workers, the first trail, the first rain. Burr appears. An ant-eating spider that wears ant scent hunts the trails | Trail, dig, rooms, Recall, Alarm, rain |
+| Summer | 6 | The hill starts to bloom. The Changeling is adopted. Thornback tournament. Heat closes the midday. Antlion pits on the dry slope. A horned lizard waits beside the trails | Seeds and bloom, tournaments, heat, castes |
 | Autumn | 6 | The Pale Tide reaches the creek. Jar-keeper and Leafstitcher alliances. The Changeling choice pays off. Night raids | Scent disguise, allies, repletes, plugs |
 | Winter | 4 | Diapause. Short defensive days in a cold, slow nest. The Tide tests the hill's edge. The colony survives on stores | Stores, brood pause, defence |
 | Spring again | 2 | The wedding flight. Winged daughters leave to found new colonies, which seed New Hill+ and friends' games | Wedding flight, legacy |
@@ -111,17 +105,17 @@ End: the hill's bloom level and the allies won decide one of three closing scene
 
 ### Tone
 
-Warm, small and alive. Death is shown (ants carry their dead to the midden, which real ants do) but never gory. There is no human cruelty. Themes of stewardship, mercy and renewal fit the owner's faith-adjacent aim without preaching. Nothing in the game names a religion.
+Warm, small and alive. Death is shown (ants carry their dead to the midden, which real ants do) but never gory. There is no human cruelty. Themes of stewardship, mercy and renewal, without preaching. Nothing in the game names a religion.
 
 ## 5. Species (all fictional, built on real behaviour)
 
 | Species | Plays as | Real basis | Special |
 | --- | --- | --- | --- |
 | Cinder harvesters (player) | Campaign colony | Seed-harvester ants (*Messor*, *Pogonomyrmex*) | Store seeds in granaries. Majors crack seeds. Plant seeds by dropping them in the midden |
-| Thornbacks | Rival, later ally; playable in Friends' hill | Big-headed ants (*Pheidole*), turtle ants | Majors plug entrances with their heads |
-| Jar-keepers | Rival, later ally; playable | Honeypot ants (*Myrmecocystus*) | Repletes: living food stores. Tournament displays |
-| Leafstitchers | Rival, later ally; playable | Weaver ants (*Oecophylla*) | Build above-ground leaf nests. Chain-bridges |
-| Pale Tide | Enemy only | Argentine ant supercolonies | Never fight each other. Absorb colonies whose scent they steal |
+| Thornbacks | Rival, later ally; playable later (P3) | Turtle ants (*Cephalotes*) | Majors plug entrances with their flat heads |
+| Jar-keepers | Rival, later ally; playable later (P3) | Honeypot ants (*Myrmecocystus*) | Repletes: living food stores. Tournament displays |
+| Leafstitchers | Rival, later ally; playable later (P3) | Weaver ants (*Oecophylla*) | Build above-ground leaf nests. Chain-bridges |
+| Pale Tide | Enemy only | Argentine ant supercolonies | Never fight each other. Drive out and kill native colonies, as real Argentine ants do |
 
 Each playable species has 3 or 4 castes from one shared list of body parts (rig.js, section 9). One species is enough for the vertical slice.
 
@@ -131,7 +125,8 @@ Each playable species has 3 or 4 castes from one shared list of body parts (rig.
 
 - **Surface:** a top-down map of a region of the hill (ash, stones, burned stumps, plants regrowing, water). Foraging, threats, tournaments and the Tide happen here.
 - **Nest:** a side cutaway of the soil under the colony's entrance or entrances. Digging, rooms, brood, the queen and stores live here.
-- One gesture switches between them (swipe down at an entrance, or the layer button). Each layer is one grid, so pathfinding and scent work the same way in both. Ants pass between layers through entrances.
+- The layer button switches between them. Each layer is one grid, so pathfinding and scent work the same way in both. Ants pass between layers through entrances.
+- A small inset always shows the other layer, with alert pips for fights, floods and hungry brood. The first emergency of each kind pauses the game in solo play and points to it.
 
 ### 6.2 Digging and rooms
 
@@ -159,14 +154,14 @@ Each playable species has 3 or 4 castes from one shared list of body parts (rig.
 
 ### 6.4 Control: scent, not cursors
 
-All four verbs work with one finger. A mouse uses the same gestures.
+A tool strip at the bottom picks the mode: Trail, Dig or Alarm. One finger acts in the chosen mode. Two fingers always pan and zoom, in every mode, so a drawn trail is never a camera move by mistake. A mouse uses the left button to act and the right button or wheel to move the camera. The M0 trail painter tests this scheme before anything else is built.
 
 | Verb | Gesture | What ants do |
 | --- | --- | --- |
-| **Trail** | Draw a line from the nest or an existing trail | Ants of the chosen job follow it and lay scent as they use it. Unused trails fade in about one day. A trail with food at its end grows stronger by itself, as in nature. Trails can be erased |
-| **Alarm** | Press and hold on a spot | Guards and nearby ants rush there. The call grows while held, and ants arrive in waves. Release to let it fade |
-| **Recall** | One button | Every ant outside heads home on the shortest path at a run. Carriers drop nothing. This is the retreat the reference game lacked |
-| **Dig** | Paint soil (nest layer) | Workers dig the painted cells in order |
+| **Trail** | Trail mode: draw a line from the nest or an existing trail | Ants of the chosen job follow it and lay scent as they use it. Unused trails fade in about one day. A trail with food at its end grows stronger by itself, as in nature. Trails can be erased |
+| **Alarm** | Alarm mode: press and hold on a spot | Guards and nearby ants rush there. The call grows while held, and ants arrive in waves. Release to let it fade |
+| **Recall** | One button | Every ant outside heads home on the shortest path at a run. Carriers drop nothing. This is the retreat |
+| **Dig** | Dig mode: paint soil (nest layer) | Workers dig the painted cells in order |
 
 - **Bands.** Up to three named bands (a banner each) for players who want more control. Tap a band, then draw a trail or call an alarm for that band alone. Bands are optional. The game is winnable without them.
 - **Tactical pause** (solo, and co-op when all players agree): time stops; trails, alarms, digs and sliders can still be set; they take effect when time resumes.
@@ -177,11 +172,11 @@ All four verbs work with one finger. A mouse uses the same gestures.
 - Fights are automatic when ants meet enemies. Ants bite, sting or spray by caste. Several ants can **pin** a big enemy: each ant on a leg slows it, and enough ants stop it. This is real ant behaviour, and it makes small ants matter against big foes.
 - Terrain decides how numbers count. On open ground every ant can touch an enemy, so a swarm wins by the square of its size (Lanchester's square law, which fits some real ant fights). In a tunnel one ant faces one enemy, so quality wins (the linear law). This gives majors, choke points and plugs their worth with one rule: how many enemies each ant can touch. Attacks from the side or behind do more.
 - **Threats that punish "bigger swarm wins":**
-  - **Antlion pits** on the ash. Ants that stream down a straight trail into one are lost one by one. Answer: route the trail around it, or fill it with spoil.
-  - **Fly parasites** that hover over dense crowds and pick off ants. Answer: thin trails and keep crowds underground. Real phorid flies do this.
+  - **Antlion pits** on the dry slope (from Summer). Ants that stream down a straight trail into one are lost one by one. Answer: route the trail around it, or fill it with spoil.
+  - **Fly parasites** that hover over dense crowds and pick off ants. They are an ambient hazard that grows with crowding, never a scripted wave. Answer: thin trails and keep crowds underground. Real phorid flies do this.
   - **Spider webs** across gaps. Answer: route around them, or send majors to cut them.
   - **Birds**, shown as a shadow first. Ants on open ash are taken. Answer: Recall, or trails under cover.
-- **Season beasts** (one per season, each a set piece with a readable pattern): wolf spider (Spring), centipede in the creek (Summer), a mole digging through the nest from below (Autumn; a nest-layer fight), a hungry shrew at the frozen entrance (Winter). Each beast teaches the next season's skill.
+- **One large animal per season**, each a set piece with a readable pattern and no shared class name in the game: an ant-eating spider that wears ant scent and walks the trails (Spring; it teaches scent and is the first hint of disguise), a horned lizard that sits beside trails eating ants one by one (Summer; horned lizards specialise in harvester ants, from memory; answer: move the trail, or plug and wait for the heat), a mole digging through the nest from below (Autumn; a nest-layer fight), a hungry shrew at the frozen entrance (Winter). Each one teaches the next season's skill.
 - **The Pale Tide** is not a beast. It advances one front per day on a visible map. It can be slowed by allies, by scent tricks, by plugging and by burning bridges (dropping the leaf-bridges it uses). It is never beaten outright. Winning is holding the top of the hill.
 
 ### 6.6 Movement and pathing
@@ -194,7 +189,7 @@ All four verbs work with one finger. A mouse uses the same gestures.
 
 Real honeypot ants settle borders with displays: workers face off, stand tall and stilt-walk, and the colony that shows more and bigger ants takes the ground, often with no deaths. In Cinderhill:
 
-- A tournament is called on a border with a neighbour. Each side sends ants to a ring. Ants display for 60 seconds.
+- A tournament is called on a border with a neighbour. Each side sends ants to a ring. Ants display for 60 seconds. The ring holds at most 30 ants a side, so a bigger colony cannot simply flood it: freshness, size and timing decide.
 - Score is display, not kills: the number of ants in the ring, their size, their freshness (well-fed ants display longer) and timing. The player paces the ants in waves: fresh ants replace tired ones.
 - Winning makes the neighbour yield the border. Winning by a wide margin, or winning twice, opens an alliance. An ally sends guards when the Tide comes and trades goods (Jar-keepers trade sugar; Leafstitchers build bridges).
 - Losing costs ground, not ants. A player can always fight instead, at a cost in dead ants and a lasting grudge.
@@ -207,7 +202,13 @@ Real honeypot ants settle borders with displays: workers face off, stand tall an
 - **Bloom:** seeds carried home are eaten for the fatty tip, and the seed is thrown in the midden. Middens near the surface sprout. Real ants spread seeds this way (myrmecochory). Plants grow over days: shade, nectar, aphids, cover from birds, roots that stop cave-ins. The **bloom map** turns black ash green where the colony has been. Bloom is the campaign's score, and the map is the reward a player shows a friend.
 - **Aphid herding:** aphids on regrown plants give honeydew if guarded. Ladybirds eat them. A guarded herd is a farm.
 
-### 6.9 Progress between days
+### 6.9 A day's goal, losing a day, and catching up
+
+- **One goal per day**, shown on the dawn card (for example "Bring home 20 seeds before dusk" or "Keep the nursery dry through the storm"), plus up to two optional goals. A day is won at dusk when the main goal is met.
+- **Losing a day** means the goal was missed or the queen was in danger at dusk. The colony keeps what it has, and the player chooses: go on to the next day, or **restart the day from dawn** (the dawn save is always kept). No day can be lost in a way that makes a later day impossible: the next day's dawn checks the colony against a floor (ants, stores, a dry queen's chamber) and, below it, Burr brings seeds and the day's goal is eased. The dusk card says so plainly.
+- **A decision floor:** Day 1 asks for at least one meaningful order every 20 seconds; the bots measure orders per minute on every day, and a day where the careful bot needs fewer than two orders a minute gets more to do.
+
+### 6.10 Progress between days
 
 - The colony carries everything from day to day: the nest, stores, brood, ants, trails (faded overnight) and bloom.
 - **Colony traits:** at each season's end the colony picks one of three traits (for example: "Deep sleepers: Winter costs half the stores"; "Long legs: foragers run 15% faster on ash"; "Sweet tooth: aphid herds yield double"). Traits are earned by playing, not by replaying for currency. A trait choice can be changed once per season.
@@ -218,7 +219,7 @@ Real honeypot ants settle borders with displays: workers face off, stand tall an
 | Mode | Players | Length | Notes |
 | --- | --- | --- | --- |
 | Campaign | 1, or 2 in co-op | 24 days, about 4 to 5 hours | Co-op: the friend plays a sister nest (real colonies with several nests do this) on the same hill, with shared bloom |
-| Friends' hill | 2 to 4 by link | one 20 to 30 minute match | Co-op against the Tide, versus by tournaments only (family), or versus with fights |
+| Friends' hill | 2 to 4 by link | one 20 to 30 minute match | Co-op against the year's hunters and weather, versus by tournaments only (family), or versus with fights. Co-op against the Tide comes with the full campaign (M5) |
 | Daily hill | 1 | one day, about 10 minutes | Same seed for everyone, shared leaderboard (the lab's board Worker) |
 | Skirmish | 1 against bots | one match | Bot colonies use the same rules |
 | Sandbox | 1 | open | Every system unlocked, sliders for weather and threats |

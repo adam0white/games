@@ -245,3 +245,21 @@ Also: good mid-range performance (17), plenty of post-campaign content (22).
 - PC Gamer, Empire of the Ants review (page opened; body did not load): https://pcgamer.com/games/rts/empire-of-the-ants-review
 
 **Search-snippet-only (not opened, lower confidence):** Hooded Horse wiki Basic Mechanics and Formicarium Adaptation pages (403), Fandom wiki (402), Prima Games royal jelly / upgrade guides (403), TV Tropes (403), GameStar review (403), guide aggregator pages on beginner tips, Empire of the Ants critic snippets (Niche Gamer, Windows Central, GOG), Pocket Ants App Store and Google Play snippets. Reddit could not be fetched; no Reddit claims are included.
+
+## 10. How the Cinderhill spec answers these complaints
+
+Section numbers point to `02-spec.md`.
+
+| Complaint | Cinderhill's answer |
+| --- | --- |
+| No save inside a mission; no pause for giving orders (the top complaint) | The sim is deterministic and saves a snapshot plus the command log every 30 seconds and at each dusk. Solo play has a tactical pause that still takes orders. Gentle difficulty adds a one-minute rewind |
+| Missions of 40 minutes to hours | One day of play is 8 to 12 minutes and ends at dusk with a summary and a save |
+| Crashes lose progress | Same as the save answer. A reload loses at most 30 seconds of play |
+| Slow with large armies | The sim uses typed arrays and integer math; ants draw in one instanced call. Gate: 2,000 ants at 30 frames a second on a mid-range phone |
+| Thin content; the same colony setup every mission | One colony persists all campaign. The hill changes as it blooms. Each day starts from the last |
+| Difficulty spikes and starvation spirals | A hunger warning comes before brood starves. The queen has a fasting reserve. Each new threat first appears in a safe day. Three difficulties with stated differences |
+| No retreat; slow orders; tedious group management late in the game | A one-tap Recall. Ants pick up an alarm within a second near the call. Groups form by job, with up to three bands you name |
+| Pathfinding bugs that soft-lock "kill all" goals | No "kill all" goals. Flow fields cover every reachable cell, and an enemy stuck for 20 seconds wanders free (section 6.6) |
+| "Bigger swarm wins" | Threats that punish crowds (section 6.5), tournaments where display beats numbers, and economy goals |
+| No multiplayer | Friends' hill: 2 to 4 players by link, co-op or versus, no account |
+| Long early access | Small, playable milestones go out every few weeks (roadmap) |

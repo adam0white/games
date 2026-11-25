@@ -8,10 +8,10 @@ Decisions for building the game, with reasons. The research behind them, with so
 | --- | --- | --- | --- |
 | Engine | Plain web: ES modules, no build step, served like the other experiments | Unity 6 Web, Godot 4 Web, Bevy | Below |
 | Rendering | Own WebGL2: instanced ants, terrain as textures, scent as an overlay texture. Canvas 2D for `rig.js` close-ups and UI | PixiJS v8 (kept as the fallback), Three.js, WebGPU as a base | WebGL2 runs on every target phone. WebGPU is on by default in iOS 26 but not on all Android GPUs, and Firefox Android has it behind a flag. Use it later for looks only |
-| Simulation | One pure, deterministic module in `shared/`: integer positions (1/256 cell), typed arrays per field (structure of arrays), seeded mulberry32, lookup-table trig, stable order, a state hash per subsystem | An ECS library (bitECS is MPL-2.0; miniplex uses one object per entity), a physics engine | Determinism, saves and replays come free. The same file runs in the page, the Durable Object, Node bots and tests |
+| Simulation | One pure, deterministic module in `experiments/cinderhill/sim/`: integer positions (1/256 cell), typed arrays per field (structure of arrays), seeded mulberry32, lookup-table trig, stable order, a state hash per subsystem | An ECS library (bitECS is MPL-2.0; miniplex uses one object per entity), a physics engine | Determinism, saves and replays come free. The same file runs in the page, the Durable Object, Node bots and tests |
 | Movement | Flow field per goal (breadth-first fill over the grid, rebuilt only in changed regions), separation from a spatial hash, scent fields that blur and decay each tick, three-sensor steering | A* per ant, navmesh | Cost grows with goals, not ants. Red Blob Games' flow-field notes and the Age of Empires IV GDC talk use this for large crowds |
 | Terrain | Cell grid (material per cell, Terraria-style), drawn smooth with marching squares; only water and loose ash move, in dirty chunks (Noita-style, limited) | 3D voxels | Small to save and send; the same grid drives digging, flow fields and scent |
-| Saves | Snapshot of typed arrays plus the command log, in IndexedDB every 30 s and at dusk; reload replays the log from the snapshot | Saving only between days | Answers the reference game's top complaint |
+| Saves | Snapshot of typed arrays plus the command log, in IndexedDB every 30 s and at dusk; reload replays the log from the snapshot | Saving only between days | Never lose more than 30 seconds of play, the genre's most common complaint |
 | Friends' play | Server-ordered lockstep: a Durable Object collects commands, stamps the tick, broadcasts, runs its own copy and checks hashes; a snapshot on join or mismatch | Per-ant snapshots (Crumbwar model), peer-to-peer | Bandwidth grows with commands, not ants (below) |
 | Fallback if S2 fails | Coarse server state: per-cell ant counts, scent and terrain changes; phones animate ants locally | | Simpler server, but players do not see the same individual ants |
 | Art | Procedural, in code. Optional CC0 textures (ambientCG) and CC0 sound (Freesound CC0 filter, Kenney) | Paid packs; CC-BY models unless credited | The art budget is $1 a month. Procedural ants recolour per caste and species for free |
@@ -31,8 +31,8 @@ Godot has the same problems: GDScript and C# cannot run in a Worker, and C# cann
 
 ### Why lockstep, in numbers
 
-- **Measured (Crumbwar, `workers/crumbwar/DECISIONS.md`):** 240 ants in one Durable Object tick in 0.56 to 0.76 ms locally. Each client receives 1.6 to 3.6 KB a second of per-ant snapshots.
-- **Extrapolated:** 5,000 visible ants in per-ant snapshots would be about 150 KB a second per client. That is too much for phones on mobile data.
+- **Measured (Crumbwar, `workers/crumbwar/DECISIONS.md`):** 240 ants tick in 0.56 to 0.76 ms locally (the room's full tick, sockets aside). At 240 ants each client receives about 2.5 to 3.6 KB a second of per-ant snapshots in the local bench.
+- **Extrapolated:** 5,000 visible ants in per-ant snapshots would be about 75 KB a second per client if Crumbwar's 240-ant rate scales linearly, and about 150 KB a second at 3 bytes per ant ten times a second (06-tech-research.md). Either is too much for phones on mobile data.
 - **Lockstep:** players send commands (a trail is a few points; Age of Empires players issued a command every 1.5 to 2 seconds, from "1500 Archers"). Bandwidth stays at a few hundred bytes a second whatever the ant count.
 - **Costs:** the slowest phone sets the pace; a tab put in the background must catch up or take a snapshot; every phone holds the full state, so hidden information is not secret from a modified client. That is acceptable among friends.
 - **What we already have:** `kit/lockstep.js` runs two phones in lockstep (Thumb Duel), and `kit/samemath.js` gives the same `exp`, `sin`, `cos` and `hypot` on every engine. On 2026-11-24 the lab measured WebKit and Chromium differing from Node on 5 to 37% of 20,000 arguments to `Math` functions. That is why the Cinderhill sim uses integers and tables, not floating-point `Math`.
@@ -43,12 +43,12 @@ Godot has the same problems: GDScript and C# cannot run in a Worker, and C# cann
 | --- | --- | --- |
 | `experiments/kit/` | `hint.js`, `save.js`, `audio.js`, `music.js`, `pause.js`, `zoom.js`, `i18n.js`, `screens.js`, `lab.js`, `share.js`, `fx.js` | Teaching, saves, sound, music (new "hill" preset), pause, words, recording, sharing the bloom map |
 | `experiments/kit/` | `room.js` (codes and links, no account), `lockstep.js`, `samemath.js` | Friends' hill links. `lockstep.js` is for two phones; Cinderhill needs a server-ordered version for 2 to 4, added to the kit as a new module (kit rule 4: exports only grow) |
-| `workers/crumbwar/` | Durable Object room and directory, binary `Writer` in `shared/proto.js`, join rate limit, health and alert workflow, `PROTO` fingerprint test, load bench, bot harness | The Friends' hill Worker, whether in `workers/lab-ai` (room routes exist) or its own Worker |
+| `workers/crumbwar/` | Durable Object room and directory, binary `Writer` in `public/crumbwar/shared/proto.js`, join rate limit, health and alert workflow, `PROTO` fingerprint test, load bench, bot harness | The Friends' hill Worker, whether in `workers/lab-ai` (room routes exist) or its own Worker |
 | `workers/lab-ai/` | `/lab-api/board/` shared leaderboard with run tickets | Daily hill board |
 | `experiments/ant-promotion/` | `rig.js` (legged creatures with a real tripod gait, pure math), `creature.js` (species as parameter records), `look3d.js` (2D draw calls turned into lit 3D shapes), `bots.mjs` style | Close-up ants and every insect; the optional 3D look; test bots |
 | `experiments/kit/check/phone.mjs` | WebKit iPhone 13 and Chromium Pixel 7 runs | Cinderhill section from M1 |
 
-Kit rule 1 applies: when Cinderhill needs something a second game could use (scent fields, flow fields, a turn server), it goes in the kit.
+Kit rule 1 applies: the scent field, the flow field and the turn client start in `experiments/cinderhill/sim/` and move to the kit as soon as a second game imports them.
 
 ## Prior art (outside this repo)
 

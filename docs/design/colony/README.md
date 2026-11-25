@@ -12,4 +12,4 @@ An original ant colony real-time strategy and base-building game for phone and d
 | [06-tech-research.md](06-tech-research.md) | Research behind 05: swarm sims, flow fields, netcode, terrain, engines, free assets, WebGPU status |
 | [07-biology-ideas.md](07-biology-ideas.md) | Real ant biology as mechanics, ranked, with sources |
 
-Open owner decisions are in the todo list (`bd list --label cinderhill --label needs-adam`).
+Roadmap items are in the todo list under epic `lab-5w7` (`bd list --label cinderhill`). The open owner decision is `lab-5w7.1` (name and setting).

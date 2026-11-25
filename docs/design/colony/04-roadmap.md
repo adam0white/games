@@ -1,15 +1,15 @@
 # Cinderhill: roadmap
 
-From spikes to release. Each milestone ends in something a person can play at `/cinderhill/` (unlisted until M4), and in a gate that only the owner closes by playing. Feature numbers are from [03-features.md](03-features.md). Dates are targets at the lab's current pace (several agent threads a day), not promises. Each milestone and spike is filed in the todo list (`docs/todo.md`, label `cinderhill`).
+From spikes to release. Each milestone ends in something a person can play at `/cinderhill/` (unlisted until M3), and in a gate that only the owner closes by playing. Feature numbers are from [03-features.md](03-features.md). Dates are targets at the lab's current pace (several agent threads a day), not promises. Each milestone and spike is filed in the todo list (`docs/todo.md`, epic `lab-5w7`, label `cinderhill`).
 
 | Milestone | Target | What a player gets | Gate (who closes it) |
 | --- | --- | --- | --- |
-| M0 Spikes | 2026-11-30 | Three lab pages: trail painter, determinism check, phone frame test | Numbers below pass (agent) |
-| M1 Vertical slice | 2026-12-10 | Days 1 to 3 solo: trail, dig, rooms, brood, spider, saves (features 1 to 14) | Owner plays Day 1 to 3 and says go on, change or stop |
-| M2 Spring | 2026-12-24 | Six days of Spring with rain, threats, jobs, difficulty, help, daily hill (15 to 26) | 5 lab testers: 4 of 5 finish Day 1 unaided (agent reads records); owner plays |
-| M3 Friends | 2027-01-10 | Friends' hill by link, co-op Spring with a sister nest (27, 28) | Owner and one friend play a match on two phones |
-| M4 Summer and outside players | 2027-01-31 | Bloom, tournaments, Summer days, Changeling (29, 30, 34, 35) | Listed on the site. Release gates in 02-spec section 0 measured on outside players |
-| M5 Full campaign | 2027-03 | Autumn, Winter, the Tide, allies, traits, wedding flight (31 to 42) | Owner finishes the campaign |
+| M0 Spikes | 2026-12-02 | Lab pages: trail painter (also tests the tool strip and two-finger camera), tournament toy, determinism check, phone frame test | Numbers below pass (agent); owner tries the trail painter and tournament toy |
+| M1 Vertical slice | 2026-12-17 | Days 1 to 3 solo: trail, dig, rooms, brood, spider, saves (features 1 to 14) | Owner plays Day 1 to 3 and says go on, change or stop |
+| M2 Spring | 2027-01-07 | Six days of Spring with rain, threats, jobs, difficulty, help, daily hill (15 to 26) | 5 lab testers: 4 of 5 finish Day 1 unaided (agent reads records); owner plays |
+| M3 Summer and outside players | 2027-01-31 | Bloom, tournaments, Summer days, the Changeling's adoption, aphids (29, 30, 31, 34, 35) | Listed on the site. Release gates in 02-spec section 0 measured on outside players |
+| M4 Friends | 2027-02-21 | Friends' hill by link: co-op against hunters and weather, tournament versus, fight versus; co-op campaign with a sister nest (27, 28) | Owner and one friend play a match on two phones |
+| M5 Full campaign | 2027-04 | Autumn and Winter, the Tide (also in co-op), allies, scent disguise, the Changeling's payoff, traits, wedding flight (32, 33, 36 to 42) | Owner finishes the campaign |
 | M6 Release | after M5 | Polish, name check, store-ready page | Owner decides to publish |
 
 ## M0: spikes (each has a pass line and a fail plan)
@@ -25,7 +25,7 @@ The trail painter (S3's page) is also the first thing the owner can touch: a pho
 
 ## M1: vertical slice, in build order
 
-1. `shared/` sim core: grids, ants as typed arrays, tick, hash, seeded random numbers, command log (feature 1).
+1. `experiments/cinderhill/sim/` core: grids, ants as typed arrays, tick, hash, seeded random numbers, command log (feature 1).
 2. Layers, flow fields, scent field (2 to 4). Bot harness from the first day (14).
 3. Verbs and the pause (5, 9). Brood and economy (6). Rooms (7).
 4. Renderer: instanced far ants, `rig.js` near ants, ink-and-wash terrain (10).
@@ -47,8 +47,11 @@ Each step is a pull request with bots and a phone check, as in Ant Promotion.
 
 | Risk | Where it bites | Plan |
 | --- | --- | --- |
-| Lockstep desyncs | M3 | S2 first; hash per subsystem; replay harness; snapshot on mismatch |
+| Lockstep desyncs | M4 | S2 first; hash per subsystem; replay harness; snapshot on mismatch |
 | Indirect control feels vague on a phone | M1 | Order feedback in under 0.5 s; owner gate at M1 before building more |
 | Two layers confuse new players | M1 to M2 | One gesture to switch; the first two days stay mostly on one layer |
 | Scope: four seasons, five species | M5 | Seasons ship one at a time; species beyond the player's are P3 |
+| Indirect control feels like watching | M1 | One goal per day; bots measure orders per minute; floor of one meaningful order every 20 s on Day 1 |
+| A bad day ruins later days | M2 | Dawn restart of any day; a catch-up floor at each dawn (02-spec 6.9) |
+| Tournaments reward the bigger swarm anyway | M0 | Ring cap of 30 a side; tested in the tournament toy before M3 |
 | Name collision | M6 | A trademark and store search before anything public |

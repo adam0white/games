@@ -32,7 +32,7 @@ Set `BEADS_ACTOR=lab-agent` (or the thread's name) so the audit trail does not c
 
 - `needs-adam`: a decision only the owner can make. Keep this list short.
 - `needs-person`: someone has to play, listen or read. An agent cannot close it alone.
-- Area: `lantern`, `ant-promotion`, `crumbwar`, `exile`, `small-games`, `new-games`, `tester`, `infra`, `hf`, `agents`, `ideas`.
+- Area: `lantern`, `ant-promotion`, `cinderhill`, `crumbwar`, `exile`, `small-games`, `new-games`, `tester`, `infra`, `hf`, `agents`, `ideas`.
 - `agent-idea`: proposed by an agent, not asked for.
 
 Priority 1 is next, 4 is someday. Status `in_progress` means a thread owns it now.
