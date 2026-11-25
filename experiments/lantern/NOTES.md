@@ -692,6 +692,53 @@ Checked: the phone check's line for the modes card; the card and Echo opened at 
 ### Left as a proposal (2026-11-24, note #234)
 - Echo in Turkish, and tuned past night 1. The wish to have the modes inside Lantern proper (one boat, skins and bank) is recorded above and still stands.
 
+## 2026-11-24: the melody made of embers; the score moves to the kit
+
+Two owner decisions from the lab cleanup. The score moved to `experiments/kit/music.js` so other games can use it;
+`music.js` here is now three lines that build the kit's score with its `lantern` preset. With no embers taken the
+notes are the same as before: a Node check drove the old file and the new one with the same seeds and inputs (40
+seeds, two minutes each, a pause, the switch off and on) and the 16,599 notes matched in pitch, time, length, loudness
+and wave; changing one number in the walk made 27 of the 40 seeds differ.
+
+From the lab's Lantern Rhythm, the melody made of embers. With the music on, in a run:
+
+- Each ember plays the next note of the night's tune (16 notes, two phrases, from the river's seed; Today's river has
+  the same tune for every player). The note waits for the next sixteenth of the score's clock (30 to 238 ms after
+  the pickup) and is a chord tone of the chord sounding then, so irregular embers still land in time and in key.
+- Four in a row add a second voice under each ember note; eight in a row add chord tones climbing on the beats. While
+  the streak runs, the score's own walk steps back.
+- An ember that passes more than 0.35 behind the boat (out of the magnet's reach) ends the streak. A blow (a heart or
+  the shield taken, or a wisp) ends it too and drops pad, bass, walk and harmony for two bars (16 eighths, about 6.7 s);
+  the ember notes, the heartbeat and the high note stay.
+- The end card adds "Melody played: N%." (Turkish "Çalınan ezgi: %N.") when the music is on and at least four embers
+  came by. Pickups count only while the music is on, so turning it on or off mid-run from the pause card makes that
+  share wrong for that run.
+
+With the music off, or in the shop's showings, an ember chimes exactly as before. Nothing is in `sim.js`.
+
+Checked by machine:
+- An ember note takes the key of its chord's pad: past 86% the pad of the chord already sounding may still be minor,
+  and the note waits for the next major chord. Without this, 150 of the bot's notes clashed with the pad at the turn.
+- `node bots.mjs 30 music`: the greedy bot on nights 1, 3, 8, 12 and with magnet on 3 and 8, 30 seeds each, on a
+  stand-in audio clock: 3,296 ember notes, every one on the sixteenth grid, 30 to 233 ms after its pickup, in the
+  chord at its step and in the tune's order; 138 blows, each thinned for 16 to 18 eighths with no harmony scheduled
+  inside; the same seed ends the same way with the music driven. `--mutate` breaks it twice (no quantising: 2,113
+  failures; the chord of the clock instead of the note's own: 249) and fails.
+- Bot parity: `node bots.mjs 100` prints the same as on main (the sim is untouched).
+- Chromium (Pixel 7) and WebKit (iPhone 13), real audio clock: over 12 s of play with a 1.5 s pause, every score note
+  sat on one eighth-note clock (0 ms spread), every ember note on its sixteenth grid (0 ms off), and the clock did not
+  move while paused. Peak of the whole mix through an analyser, light low, heartbeat on and an ember every 0.45 s:
+  0.20 to 0.23 with music, 0.16 without (WebKit 0.22); during a rock crash with music on 0.38 (WebKit 0.43). The kit
+  self-test renders each preset at its loudest offline: lantern 0.31 at volume 1 (Lantern plays it at 0.8).
+- The phone check takes four embers with the music on, checks their notes on the grid where the audio clock runs,
+  and reads "Melody played: 100%." on the end card.
+
+Not checked: any of it by ear. Nobody has listened. What to listen for: the ember notes should sound like one tune
+that comes back each 16 embers, never out of key or off the beat, and not later than the pickup feels; the harmony
+at four and eight in a row should sound like a reward, not clutter; after a blow the music should drop to the
+heartbeat and the ember notes and come back on a beat; and on a phone speaker the ember notes should sit above the
+river's hiss without being shrill (the tune reaches A6, 1,760 Hz).
+
 ## 2026-11-24: groups on the menu, a tutorial, slide steering (tester t1, notes #239 and #236)
 
 The note #239: the menu is messy; put it in groups called Game mode, Shop and Perspective; leave Play night alone; endless, tower, spark, echo and the rest go in Game mode; Shop opens the whole shop with its stats; Perspective holds 2D, 3D and first person, says what each does, and offers tilt or slide. The note #236 answers #230: the first-time tutorial, which may be skipped, was meant for Lantern.

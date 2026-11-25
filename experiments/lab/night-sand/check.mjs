@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 const experiments = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const pagePath = '/lab/night-sand/';
 const saveKey = 'night-sand:save';
-const shots = process.env.SHOTS || '/private/tmp/night-r6-new6';
+const shots = process.env.SHOTS || '/tmp/claude-improve-night-sand/check';
 import { answerLab, withAgent, assertNotice, assertRun, assertOffSendsNothing, assertNoLeak, waitForRuns } from '../../kit/check/lab-record.mjs';
 const notes = '/notes/button.js';
 const require = createRequire(join(resolve(process.env.PLAYWRIGHT ||
@@ -119,6 +119,14 @@ async function instrument(context, origin, errors, requests) {
     if (location.protocol !== 'http:') return;
     localStorage.setItem('hf-lab-send-localhost', '1');
     window.sandCheckPointers = [];
+    // Stand in for the phone's share sheet: keep what the page hands over.
+    window.sandShared = [];
+    Object.defineProperty(navigator, 'canShare', { configurable: true, value: data => Boolean(data?.files?.length) });
+    Object.defineProperty(navigator, 'share', { configurable: true, value: async data => {
+      const file = data.files[0];
+      const head = Array.from(new Uint8Array(await file.slice(0, 8).arrayBuffer()));
+      window.sandShared.push({ name: file.name, type: file.type, size: file.size, text: data.text, head });
+    } });
     document.addEventListener('pointerdown', event => {
       if (event.target.id === 'field') window.sandCheckPointers.push({ type: event.pointerType, trusted: event.isTrusted });
     }, true);
@@ -179,6 +187,41 @@ async function measureFrames(page, whilePlaying) {
   return sample;
 }
 
+// The informed player: each stroke follows the live hint, which starts on sand that is there now.
+async function follow(page, stroke, { strokes = 16, settle = 420 } = {}) {
+  for (let n = 0; n < strokes; n++) {
+    const now = await state(page);
+    if (now.status !== 'play' || now.screen !== 'play') break;
+    const { x, y, toX, toY } = now.hint;
+    await stroke(x, y, toX, toY);
+    // Let the sand come to rest and the goal hold before the next stroke, as a player watching would.
+    await delay(settle);
+    await page.waitForFunction(() => { const s = window.sandState(); return s.status !== 'play' || (s.flow === 0 && s.load === 0); },
+      null, { polling: 40, timeout: 8000 }).catch(() => {});
+    await delay(700);
+  }
+  await screen(page, 'result');
+}
+
+// Bed 3: open the board, wait for the lower bulb, then slide it back before the upper mark.
+async function stopGlass(page, stroke) {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const now = await state(page);
+    if (now.status !== 'play' || now.screen !== 'play') break;
+    const { x, y, toX, toY } = now.hint;
+    await stroke(x, y, toX, toY, { steps: 8, dwell: 30 });
+    await delay(300);
+    // The hint starts at the board; far from the throat means the board is open.
+    if (Math.abs((await state(page)).hint.x - 60) > 10) {
+      await page.waitForFunction(() => window.sandState().status !== 'play' || window.sandState().progress >= 0.95,
+        null, { polling: 20, timeout: 14000 });
+    } else {
+      await page.waitForFunction(() => window.sandState().screen === 'result', null, { polling: 50, timeout: 2500 }).catch(() => {});
+    }
+  }
+  await screen(page, 'result');
+}
+
 // A played bed sends one run record under the page's name; with the switch off nothing is sent.
 async function recording(profile, origin, browser, errors, requests) {
   const { name, device } = profile;
@@ -190,17 +233,8 @@ async function recording(profile, origin, browser, errors, requests) {
   await waitForFrames(page, name);
   await assertNotice(page);
   const stroke = await controls(page, name);
-  const play = async () => {
-    const { x, y, toX, toY } = (await state(page)).hint;
-    for (const offset of [0, -4, 4, 0, -6, 6, 0, -3, 3]) {
-      if ((await state(page)).status !== 'play') break;
-      await stroke(x + offset, y, toX, toY);
-      await delay(260);
-    }
-    await screen(page, 'result');
-  };
   assert.equal(lab.sent.length, 0, 'nothing is sent before the bed is touched');
-  await play();
+  await follow(page, stroke);
   await waitForRuns(lab, 'night-sand', 1);
   const won = assertRun(lab, 'night-sand', { outcomes: ['won'], summaryKeys: ['level', 'kind', 'progress', 'completed'] });
   assert.equal(won.data.summary.level, 1);
@@ -213,8 +247,29 @@ async function recording(profile, origin, browser, errors, requests) {
   await assertOffSendsNothing(page, lab, 'night-sand', { play: async () => {
     await page.tap('#resume');
     await screen(page, 'play');
-    await play();
+    await follow(page, stroke);
   } });
+  await context.close();
+}
+
+// A save written before this change loads unchanged, and the garden button shows on the bed.
+async function oldSave(profile, origin, browser, errors, requests) {
+  const context = await browser.newContext({ ...devices[profile.device], serviceWorkers: 'block' });
+  await context.addInitScript(key => {
+    if (!sessionStorage.getItem('seeded')) {
+      localStorage.setItem(key, JSON.stringify({ v: 1, unlocked: 6, level: 6, completed: 5, best: 81, sound: false, look: 'plum' }));
+      sessionStorage.setItem('seeded', '1');
+    }
+  }, saveKey);
+  const page = await instrument(context, origin, errors, requests);
+  await page.goto(withAgent(origin + pagePath));
+  await screen(page, 'play');
+  const loaded = await state(page);
+  assert.deepEqual([loaded.level, loaded.unlocked, loaded.completed, loaded.best, loaded.sound, loaded.look],
+    [6, 6, 5, 81, false, 'plum'], 'an old save loads with every field');
+  assert.ok(await page.locator('#to-garden').isVisible(), 'a player past bed 1 sees the garden button');
+  const stored = await saved(page);
+  assert.deepEqual(Object.keys(stored).sort(), ['best', 'completed', 'level', 'look', 'sound', 'unlocked', 'v']);
   await context.close();
 }
 
@@ -235,19 +290,32 @@ async function run(profile, origin) {
     const opening = await state(page);
     assert.equal(opening.level, 1);
     assert.equal(opening.unlocked, 1);
+    assert.equal(await page.locator('#to-garden').isVisible(), false, 'the garden button waits for bed 1');
     await capture(page, name, '01-lamp');
     const stroke = await controls(page, name);
     const start = performance.now();
     const openingBox = await page.locator('#field').boundingBox();
-    await page.touchscreen.tap(openingBox.x + openingBox.width * .25, openingBox.y + openingBox.height * .16);
+    await page.touchscreen.tap(openingBox.x + openingBox.width * .25, openingBox.y + openingBox.height * .12);
     assert.equal((await state(page)).status, 'play', 'an exploratory tap on sky leaves the lamp buried');
-    const { x, y, toX, toY } = opening.hint;
-    for (const offset of [0, -4, 4, 0, -6, 6, 0, -3, 3]) {
-      if ((await state(page)).status !== 'play') break;
-      await stroke(x + offset, y, toX, toY);
-      await delay(260);
-    }
-    await screen(page, 'result');
+    assert.equal((await state(page)).lifted, 0, 'a tap high in the sky takes no sand');
+    // Touch to grains in the hand, timed by the page's own clock.
+    const touchToGrainsMs = await page.evaluate(h => new Promise(done => {
+      const field = document.getElementById('field'), box = field.getBoundingClientRect();
+      const at = { clientX: box.left + h.x * box.width / 120, clientY: box.top + h.y * box.height / 160,
+        pointerId: 9, button: 0, bubbles: true, pointerType: 'touch', isPrimary: true };
+      const t0 = performance.now();
+      field.dispatchEvent(new PointerEvent('pointerdown', at));
+      (function frame() {
+        if (window.sandState().load > 0) {
+          field.dispatchEvent(new PointerEvent('pointerup', at));
+          return done(performance.now() - t0);
+        }
+        if (performance.now() - t0 > 3000) return done(Infinity);
+        requestAnimationFrame(frame);
+      })();
+    }), opening.hint);
+    assert.ok(touchToGrainsMs < 300, 'grains are in the hand within 300 ms of the touch');
+    await follow(page, stroke);
     const firstSeconds = (performance.now() - start) / 1000;
     assert.ok(firstSeconds < 60, 'the first lamp is uncovered in under one minute');
     assert.equal((await state(page)).unlocked, 2, 'the level result unlocks the second level');
@@ -261,7 +329,9 @@ async function run(profile, origin) {
     await tap(page, 'next');
     await screen(page, 'play');
     assert.equal((await state(page)).level, 2);
-    await capture(page, name, '03-hourglass');
+    assert.ok(await page.locator('#to-garden').isVisible(), 'the garden is one tap away once bed 1 is cleared');
+    await fits(page, 'to-garden');
+    await capture(page, name, '03-seed');
     await tap(page, 'pause');
     await screen(page, 'paused');
     const paused = await state(page);
@@ -273,6 +343,13 @@ async function run(profile, origin) {
     const after = await saved(page);
     assert.equal(after.sound, !before.sound);
     assert.notEqual(before.look, after.look);
+    // Turkish, then back to English.
+    await page.locator('#langs button[value="tr"]').tap();
+    assert.equal((await state(page)).lang, 'tr');
+    assert.equal(await page.locator('#resume').innerText().then(t => t.includes('Devam et')), true, 'the pause card reads in Turkish');
+    await capture(page, name, '04-pause-tr');
+    await page.locator('#langs button[value="en"]').tap();
+    assert.equal((await state(page)).lang, 'en');
     await tap(page, 'book');
     await screen(page, 'book');
     assert.equal(await page.locator('[id^="level-"]').count(), 10);
@@ -291,56 +368,44 @@ async function run(profile, origin) {
     assert.equal(reload.look, after.look);
     assert.equal(reload.sound, after.sound);
     const box = await page.locator('#field').boundingBox();
-    await page.touchscreen.tap(box.x + box.width * .5, box.y + box.height * .6);
+    await page.touchscreen.tap(box.x + box.width * .5, box.y + box.height * .2);
     await page.waitForFunction(() => window.sandState().tick > 0, null, { polling: 50, timeout: 4000 });
     assert.equal(await page.evaluate(() => Boolean(window.sandCheckGain)), false, 'fresh muted play leaves audio off');
-    await page.mouse.move(box.x + box.width * .5, box.y + box.height * .6);
+    await page.mouse.move(box.x + box.width * .5, box.y + box.height * .2);
     await page.mouse.down();
     assert.equal((await state(page)).pressed, true);
     await page.keyboard.press('Escape');
     await screen(page, 'paused');
-    assert.equal((await state(page)).pressed, false, 'pausing clears the captured board pointer');
+    assert.equal((await state(page)).pressed, false, 'pausing clears the captured pointer');
     await page.mouse.up();
     assert.equal((await state(page)).screen, 'paused', 'a delayed finger lift leaves pause in place');
     await tap(page, 'sound');
     await tap(page, 'resume');
     assert.equal((await state(page)).sound, true);
-    // Continue from the genuine saved unlock. Every later goal is reached through play.
-    const openingStroke = async () => {
-      const { x, y, toX, toY } = (await state(page)).hint;
-      await stroke(x, y, toX, toY);
-    };
-    const pourSample = await measureFrames(page, openingStroke);
-    assert.ok(pourSample.maxFlow > 0, 'opening the board releases moving grains');
+    // Every later goal is reached through play.
+    const pourSample = await measureFrames(page, () => follow(page, stroke));
+    assert.ok(pourSample.maxFlow > 0, 'poured grains move');
     assert.ok(pourSample.maxMovingGain > 0, 'moving grains raise their native Web Audio gain');
-    await screen(page, 'result');
-    assert.equal((await state(page)).unlocked, 3, 'the lower bulb reached its line');
-    for (const [level, kind] of [[3, 'sieve'], [4, 'seed']]) {
-      await tap(page, 'next');
-      await screen(page, 'play');
-      assert.equal((await state(page)).level, level);
-      assert.equal((await state(page)).kind, kind);
-      await capture(page, name, `0${level + 1}-${kind}`);
-      for (let attempt = 0; attempt < 3; attempt++) {
-        const beforeStroke = await state(page);
-        if (beforeStroke.status !== 'play' || beforeStroke.screen === 'result') break;
-        await openingStroke();
-        // Wait for the poured grains to reach the receiver before adding another scoop.
-        await page.waitForFunction(start => {
-          const s = window.sandState();
-          return s.status !== 'play' || s.tick >= start + 280;
-        }, beforeStroke.tick, { polling: 60, timeout: 14000 });
-      }
-      await screen(page, 'result');
-      assert.equal((await state(page)).unlocked, level + 1, kind + ' goal unlocks the next level');
-    }
+    assert.equal((await state(page)).unlocked, 3, 'the seed is covered between the marks');
     await tap(page, 'next');
     await screen(page, 'play');
-    await tap(page, 'pause');
-    await tap(page, 'garden');
+    assert.equal((await state(page)).kind, 'glass');
+    await capture(page, name, '05-glass');
+    await stopGlass(page, stroke);
+    assert.equal((await state(page)).status, 'won', 'the board shut in time fills the bulb between the marks');
+    assert.equal((await state(page)).unlocked, 4);
+    await tap(page, 'next');
+    await screen(page, 'play');
+    assert.equal((await state(page)).kind, 'sieve');
+    await follow(page, stroke, { settle: 900 });
+    assert.equal((await state(page)).unlocked, 5, 'the sieve sorts the sand');
+    await tap(page, 'next');
+    await screen(page, 'play');
+    await tap(page, 'to-garden');
     await screen(page, 'play');
     assert.equal((await state(page)).level, 0);
     assert.equal((await state(page)).score, 0);
+    assert.ok(await page.locator('#share').isVisible(), 'the garden offers its picture');
     await stroke(24, 80, 40, 139, { steps: 28, curve: 8 });
     const unpaired = (await state(page)).score;
     const sample = await measureFrames(page, () => stroke(95, 80, 79, 139, { steps: 28, curve: -8 }));
@@ -350,7 +415,22 @@ async function run(profile, origin) {
     assert.ok(paired.score >= 75, 'at least three quarters of a mirrored touch drawing matches');
     assert.equal(paired.best, (await saved(page)).best, 'the garden record is written locally');
     assert.ok(paired.best >= paired.score);
+    // The bed is full here (about twelve thousand grains): page work per frame stays under 8 ms.
+    assert.ok(sample.workP95Ms < 8 && pourSample.workP95Ms < 8, 'page work per frame under 8 ms');
+    await tap(page, 'share');
+    await page.waitForFunction(() => window.sandShared.length > 0, null, { polling: 50, timeout: 5000 });
+    const shared = (await page.evaluate(() => window.sandShared))[0];
+    assert.equal(shared.type, 'image/png');
+    assert.deepEqual(shared.head.slice(0, 4), [0x89, 0x50, 0x4e, 0x47], 'the shared file is a PNG');
+    assert.ok(shared.size > 4000, 'the picture holds the raked bed');
+    assert.ok(shared.text.includes(String(paired.score)), 'the caption carries the score');
     await capture(page, name, '06-garden');
+    // Smoothing the bed ends the garden run, which carries the share event.
+    await tap(page, 'pause');
+    await tap(page, 'restart');
+    await screen(page, 'play');
+    for (let wait = 0; wait < 30 && !page.lab.sent.some(r => r.data?.events?.some(e => e.type === 'garden-shared')); wait++) await delay(100);
+    assert.ok(page.lab.sent.some(r => r.data?.events?.some(e => e.type === 'garden-shared')), 'the share is a recorded event');
     await page.reload();
     await screen(page, 'play');
     assert.equal((await state(page)).best, paired.best, 'reload preserves the garden record');
@@ -361,13 +441,14 @@ async function run(profile, origin) {
     assert.ok(page.lab.sent.length > 0 && page.lab.sent.every(r => r.game === 'night-sand' && r.runSource === 'agent'), 'every record is named and marked as an agent run');
     await context.close();
     await recording(profile, origin, browser, errors, requests);
+    await oldSave(profile, origin, browser, errors, requests);
 
-    for (const asset of [notes, ...['save', 'audio', 'pause', 'screens', 'zoom', 'hint'].map(n => `/kit/${n}.js`)]) {
+    for (const asset of [notes, ...['save', 'audio', 'pause', 'screens', 'zoom', 'hint', 'i18n'].map(n => `/kit/${n}.js`)]) {
       assert.ok(requests.has(asset), `loaded ${asset}`);
     }
     assert.deepEqual(errors, [], 'browser or network errors');
-    console.log(JSON.stringify({ profile: device, firstSeconds: +firstSeconds.toFixed(2),
-      oneStroke: unpaired, mirrored: paired.score, best: paired.best, pourFrames: pourSample, gardenFrames: sample, errors: errors.length }));
+    console.log(JSON.stringify({ profile: device, touchToGrainsMs: +touchToGrainsMs.toFixed(1), firstSeconds: +firstSeconds.toFixed(2),
+      oneStroke: unpaired, mirrored: paired.score, best: paired.best, shareBytes: shared.size, pourFrames: pourSample, gardenFrames: sample, errors: errors.length }));
   } finally {
     await browser.close();
   }
