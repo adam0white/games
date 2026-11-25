@@ -129,9 +129,21 @@ async function savedPhone(page, g) {
   if (!g.startsOnBoard) assert.equal(await page.evaluate(() => window.audioLog.made), 1, 'Play starts one audio context');
   await g.touch(page, { finger, until, sleep });
   if (g.startsOnBoard) assert.equal(await page.evaluate(() => window.audioLog.made), 1, 'first input starts one audio context');
+  // Music (kit/music.js): on at first, playing the run's score while the run is in play.
+  const tune = () => page.evaluate(g.music.hook);
+  if (g.music) {
+    assert.equal(await page.textContent(g.music.button), g.music.on, 'music: on at first');
+    await until(page, hook => { const m = (0, eval)(hook)(); return m && m.on && m.kinds.includes('pad'); }, 'music: the score plays during a run', 8000, g.music.hook.toString());
+  }
   await shot(page, 'play');
   await pause();
   const t = (await state()).t;
+  // Turned off on the pause card: its own key is '0', and after resuming the score is silent and schedules nothing.
+  if (g.music) {
+    await page.click(g.music.button);
+    assert.equal(await page.textContent(g.music.button), g.music.off, 'music: the switch says off');
+    assert.equal(await page.evaluate(k => localStorage.getItem(k), g.music.key), '0', 'music: off saved under its own key');
+  }
   await g.verifyPaused?.(page, { finger });
   if (hasTimedHint(g)) await observeFrames(page, 300); else await sleep(300);
   assert.equal((await state()).t, t, 'play state stands still while paused'); await shot(page, 'paused');
@@ -144,6 +156,10 @@ async function savedPhone(page, g) {
   await page.click(g.resume ?? '#resume'); await wait(s => s.screen === 'play' && !s.paused, 'resume');
   if (g.resumeTouch) await g.touch(page, { finger, until, sleep });
   await wait(s => s.screen === 'play' && !s.paused && s.t > t, 'play state advances after resume');
+  if (g.music) {
+    await sleep(500); const a = await tune(); await sleep(800); const b = await tune();
+    assert.ok(!a.on && !b.on && a.notes === b.notes, `music: off schedules nothing (${a.notes} then ${b.notes} notes)`);
+  }
   await page.evaluate(() => dispatchEvent(new Event('blur'))); await wait(s => s.paused || s.screen === 'paused', 'losing focus pauses');
   await page.keyboard.press('P'); await wait(s => s.screen === 'play' && !s.paused, 'capital P resumes');
   await page.evaluate(() => dispatchEvent(new Event('pagehide'))); await wait(s => s.paused || s.screen === 'paused', 'putting the page away pauses');
@@ -167,6 +183,7 @@ async function savedPhone(page, g) {
   await play();
   if (g.startsOnBoard) await g.touch(page, { finger, until, sleep });
   assert.equal(await page.evaluate(() => window.audioLog.made), g.sound ? 0 : 1, 'sound choice survives reload');
+  if (g.music) assert.equal(await page.textContent(g.music.button), g.music.off, 'music: off survives reload');
   await pause();
   if (g.menu) await page.click(g.menu);
 }

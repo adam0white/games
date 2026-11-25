@@ -109,3 +109,43 @@ Full-sample clumsy difficulty (200 seeds per street):
 All 9 strict adjacent comparisons pass. Group means: streets 1–3 93.17%, 4–7 80.50%, 8–10 32.00%. These are reproducible measurements of the defined bot and seed set, not a claim about people or every possible seed sample.
 
 Final `bots.mjs` exits 0: all checks pass, including all 9 adjacent difficulty comparisons, 30/30 careful finishes, and 27/30 three-star finishes. Daily streams 20261124 / 20261125 / 20261126 score 397 / 784 / 968, carry 6 / 12 / 16 passengers, and end by soak at 69 / 128 / 150 s (times rounded by the runner). Mean careful score 716 versus clumsy 116 (runner-rounded), above both unchanged performance thresholds. Generated pieces 1–59 pass the paired-drain gap check. `git diff --check -- experiments/boat/` also passes. No commits or deployment.
+
+## 2026-11-24 — Music
+
+The shared score (`../kit/music.js`) now plays under Paper Boat, behind a **Music: on/off** button beside Sound (key `boat-music`, `'0'` = off). Music off, or Sound off, leaves the game as it was: the original sounds only. Sound off does not suspend the audio context in this game, so the score also checks `save.sound` before it plays.
+
+**Preset: `river`.** Water in a gutter: a thin pad and plucked notes in a wide echo. Minor chords down the street, turning major near the pond. Override (`song.js`): the river's pickup note at 0.2 instead of the kit's 0.1, for the level reason below.
+
+**Mapping (`song.js`, used by the page and by `bots.mjs`).**
+- progress: way down the street, `(y − 0.3) / (length − 0.3)`; the daily stream has no end, so it fills over 150 s and stops at 0.8 (before the turn to major).
+- danger: a drain ahead within 0.8 street units that the boat is heading for (within 0.4 sideways, or any closed grate across the gutter), or a warning paw within 0.4 ahead/behind and 0.3 sideways. It drives the heartbeat.
+- light: dry paper left, `1 − soak`. Low light brings the high note.
+- A note (ember): each passenger taken, and each drain or paw the boat gets past (crossing y + 0.15) without sinking.
+- A miss: a passenger gone past untaken (the streak ends).
+- A blow: a paw swat (the music thins for two bars).
+- Not mapped: kerb bumps, pebble knocks, leaves. They keep their own sounds.
+- A pickup that earns a note plays the chord tone instead of its two tones; with music off it plays the original two tones.
+
+**Volume 0.35.** Rendered offline at volume 1 (headless Chromium): bed peak 0.158, RMS 0.0239; late bed RMS 0.0244; one melody note alone peak 0.15; heartbeat peak 0.223; worst case (full danger, ending, light 0.1, a note every 0.2 s, a blow) peak 0.384. At 0.35:
+- Bed RMS 0.0084 ≤ ripple tone 0.035 / 4 = 0.00875 (the quietest regular effect; the 0.006 ambient drips are ignored). Pass, narrowly.
+- Melody note 0.0525 = 0.75 × the pickup tone 0.07 it replaces (window 0.5–2×). Pass. With the kit's 0.1 lead it would be 0.375×, so the lead is doubled.
+- Worst 0.134 + loudest effect (swat: square 0.1 + noise 0.32) = 0.554 < 0.9. Pass.
+
+**Checks (all 2026-11-24).**
+- `node bots.mjs music`: 74 runs (each street careful seed 1 + clumsy seeds 1–6, daily 20261124/5 careful and clumsy), 38.5 min of play, 295 notes (7.7 per minute), 0 waits, 70 left-behind misses, 1 swat, 243 heartbeat pulses, a heartbeat within 2.5 s before 19 of 19 drains, 24 high notes, latest note 319 ms after its step, 0 failures.
+- `node bots.mjs music --mutate`: a left-behind passenger playing a note gives 140 failures; a note every second gives 4810 failures. Both caught (exit 1).
+- `node bots.mjs`: all checks pass, including the music claims (exit 0). `--mutate` (old) still fails 9 checks as intended.
+- `kit/check/phone.mjs boat` (with the new `music:` entry in `pages.mjs`) and `check.mjs`: pass on WebKit and Chromium, 0 errors.
+- A scripted Chromium play of street 1 by the page's own advice: won with 2 passengers; the score played 2 notes, 0 misses, pads, bass and walk.
+
+**Words.** `words.js` holds only the music button's strings (English and Turkish: "Müzik: açık/kapalı"). The rest of the game stays English; the page's `lang` stays `en` and the button carries its own `lang`.
+
+**Not verified.** Nobody has listened to it. The levels are measured, not heard. Not played on a real phone.
+
+**What to listen for.**
+- A plucked note on each passenger taken, and on each drain or paw got past; silence where a passenger is left behind.
+- The music thinning for two bars after a swat.
+- A heartbeat when heading at a drain or under a warning paw, and none on open water.
+- A high note when the paper is soaked past about 72%.
+- Chords brightening to major near the pond (not in the daily stream).
+- The ripple's splash still clearly above the bed; the bed should sit under it, not mask it.

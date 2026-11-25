@@ -87,6 +87,10 @@ A score made in code (Web Audio only, no samples) that follows play. It came fro
 5. On a pickup: `if (!(musicOn && song?.ember())) snd.tone(...)` (the game's own sound when the music is off or not in play). On a blow: `song?.hit()`. When a pickup passes by: `song?.miss()`.
 6. Optional: `song.melody.share` on the end card (Lantern: "Melody played: 92%.", `melodyPlayed`).
 7. Music must never touch the rules: call it from the page, never from `sim.js`, and show it with the game's `bots.mjs` (Lantern's `node experiments/lantern/bots.mjs 30 music` is a model).
+8. Put what the music hears in the game's own `song.js` (`SONG`: preset, overrides and volume; `mood(game)` for `set`; `heard(...)`: notes, misses and blows for a step), so the page and `bots.mjs` use the same mapping. `check/music-claims.mjs` gives a bot a stand-in clock and the note claims (`bench(opts, seed)`); a game's `node bots.mjs music [--mutate]` runs them. In `check/pages.mjs` a `music: { button, key, on, off, hook }` entry makes the phone check test the switch, its key and that off schedules nothing.
+9. Set the volume by measuring: the game's effects are usually far quieter than Lantern's. The four games below render the score offline and keep the bed's RMS under a quarter of the quietest regular effect's peak, and the tune's note within half to twice the tone it replaces.
+
+Used by (2026-11-24): `lantern` (`lantern`, 0.8), `flock` (`bell`, 0.22), `vine` (`flute`, 0.3), `boat` (`river` with a louder pickup note, 0.35), `harvest` (`flute` at 88 a minute in morning chords, 0.4). Each game's `NOTES.md` says why and what to listen for.
 
 ## Friends' tables (`room.js`)
 

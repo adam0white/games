@@ -176,3 +176,38 @@ Very clumsy (500 ms late, 50% wrong), 20 seeds, evenings 3, 12, 20: 95%, 20%, 0%
 - The bank ring was never seen in a screenshot (it shows only while a sheep is within 12 units of a bank). Its position is covered by the bots, which steer by it. The dotted line to a bridge or a lane was never looked at in a screenshot; the line to the cross-gate (evening 2) and to the fold (endless) were.
 - A loss by a lost sheep (`lost` outcome, "Lost in the woods / to the stream" titles) was not produced in a browser; the `dark` loss was.
 - The redirect was checked on the local server only, not on the deployed host.
+
+## 2026-11-24 — Music (kit/music.js)
+
+The owner moved Lantern's music to the kit for this game and three others. Night Flock now has a score that the flock plays.
+
+What the player gets:
+- A Music switch on the pause card, under Valley map and Sound ("Music on / Music off", "Müzik açık / Müzik kapalı"). It is on at first and remembered under its own key, `night-flock-2:music` (`'0'` when off). The save (`night-flock-2:save`) is untouched. With Sound off nothing plays, as before.
+- Preset `bell` (a soft bell: sine notes with a quiet bell partial), at the kit's 66 a minute. Why: the kit wrote `bell` for a pasture, and a slow sparse bell suits a dusk field better than the river's plucks or the flute. Lantern's sound is unchanged (no edit to `kit/music.js`; `lantern/bots.mjs 30 music` prints the same line before and after).
+- What the music hears is in `song.js`, which the page and `bots.mjs` both import. It only reads the evening; `sim.js` is unchanged.
+  - Each sheep into the fold plays the next note of the evening's tune (each evening's tune comes from its seed). The fold's old note plays only when four tune notes already wait (then as a pitch from the chord sounding), or with the music off (exactly as before).
+  - A sheep that breaks away (becomes a stray) is a note not played: the streak and its harmony end.
+  - A sheep lost to the woods or the stream is a blow: the music thins for two bars (the evening ends there anyway).
+  - progress: the share of the flock in the fold. The chords turn major once four fifths are in.
+  - danger: the wolf (its eyes 0.45, its run 1) or a flock whose calm is under 80% (full at 40%): a low heartbeat.
+  - light: the light left before dark. In the last 28% of the time a thin high note is held each bar.
+
+Volume 0.22, from rendering the score offline in headless Chromium (`OfflineAudioContext`, the score alone at volume 1, then scaled; the graph is linear):
+- `bell` at volume 1: the bed (mid-run, calm) peaks at 0.160 with RMS 0.024; one tune note alone peaks at 0.091; the worst case (full danger, the ending, light nearly out, a pickup every 0.2 s, a blow) peaks at 0.315.
+- Criterion, set before choosing: the bed's RMS at most a quarter of the quietest regular effect (the whistle, a sine at 0.025, so 0.00625); a tune note between half and twice the fold's own note it replaces (0.035, so 0.0175 to 0.07); the worst case plus the loudest effect under 0.9.
+- At 0.22: bed RMS 0.0054 (pass), tune note 0.020 (pass, about 5 dB under the old fold note), worst case 0.069 plus 0.04 (pass). The bed's peaks (pad attacks, 0.035) are as loud as the whistle's peak; a person should judge whether the whistle still cuts through.
+
+Checks:
+- `node bots.mjs music`: 192 evenings (evenings 1, 3, 4, 8, 12, 16, 20 and endless wave 3; 8 seeds; the careful shepherd and two clumsy ones with a quarter and three fifths of their targets random), 149.5 minutes of play: 3326 tune notes (22 a minute), 2937 sheep with no tune note (they come through the gate in bunches; a fifth note in under a beat waits for none and the fold's chord pitch plays), 229 strays, 3 lost sheep, 430 wolf runs with 2053 heartbeat pulses, 181 high notes; latest note 938 ms after its sheep (waiting behind others); 0 failures. Claims: one note per sheep into the fold and none otherwise; strays are misses; losses are blows that thin for two bars with no harmony inside; every note on the score's sixteenth grid, 30 ms or more after its sheep, a tone of the chord sounding and the tune's next note (`kit/check/music-claims.mjs`); a heartbeat while every wolf run lasting over 1.2 s; no major chord before four fifths are home; no high note before the last of the light; and a twin evening stepped with the same inputs and no music ends with an identical state (JSON).
+- `node bots.mjs music --mutate`: song.js broken two ways (a stray plays a note: 436 failures; notes every second instead of on the fold: 22641 failures); exits 1.
+- `node bots.mjs` runs the music claims at its end and exits 0; `node bots.mjs --mutate` still breaks the rules and exits 1 as before.
+- `node experiments/kit/check/phone.mjs flock`: 8 of 8 pass on WebKit iPhone 13 and Chromium Pixel 7. New in the shared check: the switch says on at first, the score schedules notes during a run, turning it off on the pause card writes `'0'` under the new key, after resuming nothing more is scheduled, and off survives a reload.
+- `node check.mjs`: see the pull request.
+- Looked at the pause card screenshot (WebKit, 390 wide): the Music button is a full-width row under Valley map and Sound.
+
+Not verified: any of it by ear. Nobody has listened. What a person should listen for:
+- Does a sheep into the fold sound like a note the player played, and does a run of sheep through the gate make a phrase rather than a clatter (only four notes can wait; the rest fall back to a chord pitch)?
+- Does a stray's missing note register at all? It is silent by design; the only audible sign is the harmony stopping after a streak.
+- Is the heartbeat while the wolf runs, or while the flock is unsettled, helpful or nagging? It starts when calm falls under 74%.
+- The turn to major when four fifths are in, and the high held note as the light runs out.
+- Whether the whistle (0.025, the quietest sound) and the end-of-evening chimes still stand out over the bed at 0.22.

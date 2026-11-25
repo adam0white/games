@@ -1,8 +1,10 @@
 import { command, createGame, LIMIT_LEVEL, RESCUE_POINTS, step } from './sim.js';
 import { farm, valley } from './valley.js';
 import { draw } from './art.js';
-import { readJson, writeJson } from '../kit/save.js';
+import { read, write, readJson, writeJson } from '../kit/save.js';
 import { sound } from '../kit/audio.js';
+import { music } from '../kit/music.js';
+import { SONG, mood, look as counts, heard } from './song.js';
 import { onLeave, isPauseKey } from '../kit/pause.js';
 import { noZoom } from '../kit/zoom.js';
 import { screens } from '../kit/screens.js';
@@ -48,7 +50,10 @@ function store(soundChanged = false) {
   storageOK = writeJson(key, saved);
 }
 
-const audio = sound({ on: () => saved.sound });
+// Music (kit/music.js, 2026-11-24): the bell preset, played by the flock (song.js). Its own key, '0' when turned off.
+const musicKey = 'night-flock-2:music';
+let musicOn = read(musicKey) !== '0', song = null, songFor = null;
+const audio = sound({ on: () => saved.sound, setup: ac => { song = music(ac, { preset: SONG.preset }); song.volume(SONG.volume); } });
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 let mode = 'campaign', level = saved.unlocked, wave = 1, carried = 0, endlessSeed = 0;
 let game, screen, lastFrame = null, owner = null, target = null, fromFields = 'paused';
@@ -202,6 +207,8 @@ function updateLedger() {
 function syncSound() {
   el('sound').textContent = t(saved.sound ? 'soundOn' : 'soundOff');
   el('sound').setAttribute('aria-pressed', String(saved.sound));
+  el('music').textContent = t(musicOn ? 'musicOn' : 'musicOff');
+  el('music').setAttribute('aria-pressed', String(musicOn));
 }
 function starRow(holder, names, earned) {
   holder.replaceChildren(...names.map((name, index) => {
@@ -332,6 +339,11 @@ el('sound').onclick = () => {
     audio.unlock();
     audio.tone(523, .16, .03);
   } else audio.hold();
+};
+el('music').onclick = () => {
+  musicOn = !musicOn;
+  write(musicKey, musicOn ? '1' : '0');
+  syncSound();
 };
 onLeave(pause);
 matchMedia('(orientation: portrait)').addEventListener('change', () => {
@@ -475,6 +487,8 @@ function paint() {
 function frame(now) {
   const dt = lastFrame === null ? 0 : Math.min(.12, (now - lastFrame) / 1000);
   lastFrame = now;
+  if (song && songFor !== game) { songFor = game; song.start(game.seed); } // each evening its own tune, from its seed
+  song?.set({ on: musicOn && saved.sound && screen === 'play' && game.status === 'play' && game.started, ...mood(game) });
   if (screen === 'play') {
     clock += reducedMotion.matches && !game.started ? 0 : dt;
     if (game.status === 'play') {
@@ -483,7 +497,9 @@ function frame(now) {
       const gathering = flank && !flank.gathered;
       const closed = game.terrain.gate && !game.terrain.gate.open;
       holdIfStill(dt);
+      const before = counts(game);
       step(game, dt, steerable(game) ? target : null);
+      const heardNow = heard(before, game);
       began();
       picture = cue(game);
       if (gathering && flank.gathered) {
@@ -494,9 +510,15 @@ function frame(now) {
         tally.gateAt = Math.round(game.time * 10) / 10;
         rec.event('gate', { t: tally.gateAt });
       }
+      // With the music on, each sheep into the fold plays the next note of the evening's tune; a stray is a note not
+      // played; a lost sheep thins the music. With it off (or the tune's queue full), the fold's own note as before.
+      let sung = false;
+      if (musicOn && song) for (let i = 0; i < heardNow.notes; i++) sung = !!song.ember() || sung;
+      for (let i = 0; i < heardNow.misses; i++) song?.miss();
+      for (let i = 0; i < heardNow.blows; i++) song?.hit();
       if (game.home > home) {
         recordCount();
-        audio.tone([392, 494, 587, 659][(game.home - 1) % 4], .24, .035, 'sine');
+        if (!sung) audio.tone(musicOn && song ? song.chime(game.home - 1) : [392, 494, 587, 659][(game.home - 1) % 4], .24, .035, 'sine');
       }
       if (game.rescued > rescued) say('rescued', { n: num(RESCUE_POINTS) });
       else if (game.lost > lost) say('lostOne');
@@ -568,4 +590,5 @@ requestAnimationFrame(frame);
 
 // Read-only snapshot for phone checks. It cannot steer the dog or advance time.
 window.flockState = () => structuredClone({game, screen, mode, wave, saved, stars, dailyDate, pressed: owner !== null,
-  lang: lang(), picture: picture?.kind ?? null, recording: rec.on, sent: rec.sent});
+  lang: lang(), picture: picture?.kind ?? null, recording: rec.on, sent: rec.sent, music: musicOn});
+window.flockMusic = () => song && { ...song.melody, on: song.state.on, step: song.step, notes: song.log.length, kinds: song.log.map(l => l.kind) }; // read by the phone check

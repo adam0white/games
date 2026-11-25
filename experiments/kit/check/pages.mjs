@@ -150,6 +150,7 @@ export const pages = {
       await finger(page, '#c', [['pointerup', p.x + 45, p.y]]);
     },
     hint: { key: 'harvest:hint', delay: 3000, moved: () => window.harvestState().finger, legacy: { 'harvest-save': '{"v":1,"runs":4}' } },
+    music: { button: '#music2', key: 'harvest-music', on: 'Music: on', off: 'Music: off', hook: () => window.harvestMusic?.() },
   },
   boat: {
     seeds: saved('boat-save', { v: 1, stars: { 1: 2 }, opened: 2, sound: true, daily: { '2026-11-20': 430 }, best: 430, runs: 4 }, 'boat:hint'),
@@ -164,6 +165,7 @@ export const pages = {
       await page.waitForFunction(() => window.boatState().ripples > 0, null, { timeout: 3000 }).catch(() => assert.fail('a swipe makes a ripple'));
     },
     hint: { key: 'boat:hint', delay: 2500, releaseInput: true, before: () => window.boatState().ripples, moved: n => window.boatState().ripples > n, legacy: { 'boat-save': '{"v":1,"opened":2,"best":430}' } },
+    music: { button: '#music', key: 'boat-music', on: 'Music: on', off: 'Music: off', hook: () => window.boatMusic?.() },
   },
   flock: {
     sound: '#sound', saveKey: 'night-flock-2:save', pausePosition: { x: 8, y: 23 },
@@ -186,6 +188,7 @@ export const pages = {
     },
     touch: driveFlock,
     hints: flockHints,
+    music: { button: '#music', key: 'night-flock-2:music', on: 'Music on', off: 'Music off', hook: () => window.flockMusic?.() },
   },
   // Night Vine (was /lab/night-vine/): the bed waits for the first touch, which places the lamp and starts growth.
   vine: {
@@ -195,6 +198,7 @@ export const pages = {
     verify: () => { const { level, unlocked, best } = window.vineState(); return { level, unlocked, best, look: document.body.dataset.look }; },
     expect: { level: 2, unlocked: 3, best: 7, look: 'cobalt' },
     touch: moveVineLamp,
+    music: { button: '#music', key: 'night-vine:music', on: 'Music on', off: 'Music off', hook: () => window.vineMusic?.() },
     hint: { key: 'night-vine:hint', delay: 3100, play: '#field', timing: { board: true }, input: moveVineLamp, legacy: { 'night-vine:save': '{"v":1,"unlocked":3,"level":2,"best":7,"sound":true,"look":"cobalt"}' } },
   },
 };
