@@ -329,9 +329,10 @@ All player-facing strings are in `words.js` (English and Turkish, through `kit/i
 
 ### Checked
 
-- `node bots.mjs`: 0 failed (planner 6/6 on every level). `node bots.mjs --mutate` (glass without a floor): 4 checks fail, exit 1, as it must. `node bots.mjs --sweep` (planner 64 seeds, thumb 500 seeds, held out): SWEEPRESULT.
-- `node grid-check.mjs`, `node daily.test.mjs`: pass. `npm test`: 73 pass.
-- `check.mjs` on WebKit (iPhone 13) and Chromium (Pixel 7): ok. Same digest in Node, WebKit and Chromium. Frame work p95 1 ms (WebKit timer step) and 0.3 ms (Chromium), whole loop: rules and canvas calls, not the browser's own painting. Failed pour: card 360 and 366 ms after the loss, restart 3 and 16 ms after one tap off the card (after merging main). Before the merge, with the Again button: 28 and 48 ms.
+- `node bots.mjs`: 0 failed (planner 6/6 on every level). `node bots.mjs --mutate` (glass without a floor): 4 checks fail, exit 1, as it must. `node bots.mjs --sweep` (planner 64 seeds, thumb 500 seeds, held out): exit 0. Planner 64/64 on every level (seeds 4201 to 4264). Thumb on seeds 4201 to 4700 as in the table; lowest 41.8%, largest step down 13.4 points, no level easier than the one after it within 3 points. Levels 4 and 6 lose almost only by spill (126 and 185 spills, 1 and 2 overfills). The sweep ran on this `sim.js` and `thumb.mjs`; neither changed after it started.
+- `node grid-check.mjs`, `node daily.test.mjs`: pass. After merging main: `npm test` 73 pass, `npm run check:lane` 73 pass.
+- Saves: the save key and its shape (`v: 1`, stars per level, sound, tries) are unchanged, and there are still eight levels, so an old save loads and keeps its stars and unlocks. Stars earned on an old level now unlock the new level in the same slot.
+- `check.mjs` on WebKit (iPhone 13) and Chromium (Pixel 7): ok. Same digest in Node, WebKit and Chromium. Viewports 390 x 844 (WebKit) and 412 x 915 (Chromium, the Pixel 7 profile). Frame work p95 1 ms (WebKit timer step) and 0.3 ms (Chromium), whole loop: rules and canvas calls, not the browser's own painting. Failed pour: card 360 and 366 ms after the loss, restart 3 and 16 ms after one tap off the card (after merging main). Before the merge, with the Again button: 28 and 48 ms.
 - `kit/check/phone.mjs lab/wild-pour` and its hint run: ok on both.
 - Played in headless Playwright at 390 x 844 and looked at the screenshots (outside the repo, `/tmp/claude-improve-wild-pour/after/`): WebKit start, mid-pour, end card and pause card; Chromium mid-pour; levels 2, 4, 5, 6 and 7 mid-pour (`after/levels/`); a lost pour's card. Levels 3 and 8 were played by the scripts but not looked at.
 
