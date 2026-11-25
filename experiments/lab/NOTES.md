@@ -125,6 +125,8 @@ The owner went through the lab and decided each page that came from a live game.
 | Lantern's `music.js` | Accepted: move to the kit for Night Flock, Night Vine, Paper Boat, Harvest Morning | |
 | Friend play by link (`kit/room.js`, from `pitch` and `pisti`) | Accepted for Thumb Duel | `pitch` stays; `pisti` was rejected later |
 
+`ant-hide` landed (2026-11-24): a few rocks and patches of tall grass in Ant Promotion's meadow from level 4 (`ant-promotion/cover.js`, checks in `ant-promotion/cover-bots.mjs`), about 11 rocks and 13 patches in a world where the lab page had 53 of each. Rocks block sight and movement in every look; creeping in grass hides you; the first rock is taught by a hunter whose drawn sight stops at it. The page is in `archive/lab/ant-hide/`.
+
 `ant-creatures` landed (2026-11-24): its rig and drawing are Ant Promotion's fifth look, Living (`/ant-promotion/?look=4`, on the Look button), with the rig checks in `ant-promotion/rig-bots.mjs`. The page is in `archive/lab/ant-creatures/`; the zoo was not carried over.
 
 Owner's decision on the small pages (2026-11-24, after playing them): "Good but improve: Thankful Garden, Paper pitch, channels, ring, sand needs a lot of improvements, bells, podwire good but improve/extend, pour but improve sim and it's too difficult right now, face shift but improve as it needs more variety and gameplay, saltplate but improve and extend, splitlight. Reject: pisti, keeper, kite, loaves. We should collect small games into 1-2 URLs, maybe split by single/multi player, or open to other ideas."

@@ -161,7 +161,9 @@
 
 <script type="module">
 import { FORMS, ANT, WORLD, TOP, sightOf, sightWords, create, step, choose, revive, me, level, needFor, article, SPAWN_WEIGHTS, hideReady, fastBoost, SAME_SNEAK,
-  crown, powerOf, nemesisMob, nemesisSave, cleanKnobs, TEMPERAMENTS, TEMPERAMENT_NAMES, powerFor, paceAgainst, placeOld, OLD_DIM, oldAims } from './sim.js';
+  crown, powerOf, nemesisMob, nemesisSave, cleanKnobs, TEMPERAMENTS, TEMPERAMENT_NAMES, powerFor, paceAgainst, placeOld, OLD_DIM, oldAims, coverOn } from './sim.js';
+import { sightCut } from './cover.js';
+import { rocks2d, grassUnder, grassOver, eyes2d, hiddenFromPlayer, playerHidden, rocks3d, grass3d, eyes3d } from './cover-draw.js'; // rocks and tall grass, from level 4
 import { drawForm, setLook, LOOKS } from './art.js';
 import { create3D } from './look3d.js';
 import { living, portraitLiving } from './living.js'; // look 4: animals on rigs
@@ -176,7 +178,7 @@ import { noZoom } from '../kit/zoom.js'; noZoom(); // no double-tap or pinch zoo
 import { t, lang, setLang, apply, animal, skill, trait, line, title as titleOf, sight as sightText, tx, rivalName, tables, EPITHETS, TITLES, LINES, FEAR, KIN } from './words.js'; // English and Turkish
 
 const $ = id => document.getElementById(id), cv = $('c'), g = cv.getContext('2d');
-const KEY = 'ant-promotion:v1', query = new URLSearchParams(location.search);
+const KEY = 'ant-promotion:v1', COVER_KEY = 'ant-promotion:cover', query = new URLSearchParams(location.search);
 const COLOURS = ['#3a2a22', '#c0271f', '#e08a1c', '#d6b21c', '#3f9a3c', '#2a7fd9', '#7a44c0', '#e05a9a', '#e8e2d6'];
 const PATTERNS = [['plain', 'Plain'], ['stripes', 'Stripes'], ['spots', 'Spots'], ['crown', 'Crown']];
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -298,7 +300,8 @@ function retire(stack) { if (stack.length < TOP) return false; save.old = topThr
 function start(fresh) {
   const retired = fresh && retire(save.stack);
   if (fresh) { save.stack = [ANT]; save.xp = 0; store(); } // the rival stays: it remembers you
-  s = create(Number(query.get('seed')) || (Math.random() * 1e9 | 0), save.stack, save.xp, SPAWN_WEIGHTS, !!save.wild, save.nem?.sim, save.old);
+  // cover (cover.js): rocks and tall grass from level 4. The first rock is taught once per device (its own key, so the save is untouched); ?cover=0 turns it off.
+  s = create(Number(query.get('seed')) || (Math.random() * 1e9 | 0), save.stack, save.xp, SPAWN_WEIGHTS, !!save.wild, save.nem?.sim, save.old, { cover: query.get('cover') !== '0', teach: !readJson(COVER_KEY, null)?.taught });
   if (save.nem && !s.nemesis) { save.nem = null; store(); }
   L4.clear(); floats.length = 0; bits.length = 0; flash = 0; glow = 0; beam = 0; bubble = null; noticeAt = -99; riseNow = false; pendingOffer = false; offerAt = 0; hud(); show('play');
   say(retired ? t('oldStart') : level(s) === 1 ? t('firstSay') : t('youAre', nameVars(me(s).name)));
@@ -558,12 +561,16 @@ let dimAt = 0;
 function dimSight(p, F, at, rect) {
   if (s.dead) return;
   const [far, half] = sightOf(F); let turn = p.a - dimAt; turn = Math.atan2(Math.sin(turn), Math.cos(turn)); dimAt += turn * 0.15;
-  const R = Math.max(170, 240 * far) + F.r * 2, near = 90 + F.r * 2, a0 = dimAt - Math.min(Math.PI, half), a1 = dimAt + Math.min(Math.PI, half);
+  const R = Math.max(170, 240 * far) + F.r * 2, near = 90 + F.r * 2, a0 = dimAt - Math.min(Math.PI, half), a1 = dimAt + Math.min(Math.PI, half), C = coverOn(s);
   for (const k of [1, 1.12]) { // two steps make a soft edge
     g.fillStyle = 'rgba(8,18,40,.08)'; g.beginPath(); g.rect(...rect);
     const all = half >= Math.PI, n = 40, pts = [];
+    const cut = C && sightCut(C.rocks, p.x, p.y, a0, a1, R * k, all ? 0 : near * k); // rocks cast shadows in your own sight too
+    if (cut) for (let i = 0; i < cut.length; i += 2) pts.push([cut[i] - p.x, cut[i + 1] - p.y]);
+    else {
     for (let i = 0; i <= n; i++) { const a = a0 + (a1 - a0) * i / n; pts.push([Math.cos(a) * R * k, Math.sin(a) * R * k]); }
     if (!all) for (let i = 0; i <= 20; i++) { const a = a1 + (2 * Math.PI - (a1 - a0)) * i / 20; pts.push([Math.cos(a) * near * k, Math.sin(a) * near * k]); }
+    }
     let first = true;
     for (const [x, y] of pts) { const q = at(p.x + x, p.y + y); if (q[2] <= 0) continue; if (first) g.moveTo(q[0], q[1]); else g.lineTo(q[0], q[1]); first = false; }
     g.closePath(); g.fill('evenodd');
@@ -580,19 +587,22 @@ function draw(now) {
   const sx = shake > 0 ? (Math.random() - 0.5) * shake * 14 : 0;
   ground(p.x, p.y);
   g.translate(sx, 0); // still inside the world transform that ground() set; restored below
-  const vw = W / zoom / 2 + 260, vh = H / zoom / 2 + 260, edge = [];
+  const vw = W / zoom / 2 + 260, vh = H / zoom / 2 + 260, edge = [], C = coverOn(s), vbox = [p.x - vw, p.y - vh, p.x + vw, p.y + vh];
+  if (C) grassUnder(g, C.grass, vbox);
   // sight wedges first, so bodies sit on top
   for (const m of s.mobs) {
     const pw = powerOf(m); if (Math.abs(m.x - p.x) > vw || Math.abs(m.y - p.y) > vh || pw === F.power) continue;
-    const strong = pw > F.power, [range, cone] = sight(m), R = range * F.stealth + F.r;
-    g.beginPath(); g.moveTo(m.x, m.y); g.arc(m.x, m.y, R, m.a - cone, m.a + cone); g.closePath();
+    const strong = pw > F.power, [range, cone] = sight(m), R = range * F.stealth + F.r, cut = C && sightCut(C.rocks, m.x, m.y, m.a - cone, m.a + cone, R);
+    g.beginPath(); g.moveTo(m.x, m.y); if (cut) for (let i = 0; i < cut.length; i += 2) g.lineTo(cut[i], cut[i + 1]); else g.arc(m.x, m.y, R, m.a - cone, m.a + cone); g.closePath(); // a rock casts a shadow in it
     g.fillStyle = m.alert ? (strong ? '#ff3a2a40' : '#ffe23a38') : (strong ? '#ffffff2c' : '#ffffff12'); g.fill();
   }
+  if (C) rocks2d(g, C.rocks, save.look, vbox);
   const alive = isLiving(); if (alive) L4.begin();
   for (const m of alive ? [...s.mobs].sort((a, b) => a.y - b.y) : s.mobs) { // living bodies overlap, so the nearer (lower) one is drawn last
     const M = FORMS[m.f], strong = powerOf(m) > F.power;
     if (Math.abs(m.x - p.x) > vw || Math.abs(m.y - p.y) > vh) continue;
     if (!m.nem && strong && m.alert && (Math.abs(m.x - p.x) > W / zoom / 2 || Math.abs(m.y - p.y) > H / zoom / 2)) edge.push(m); // the rival has its own arrow
+    if (C && hiddenFromPlayer(C, m, M, p, F)) { eyes2d(g, m.x, m.y, m.a, M.r, now); continue; } // creeping in tall grass: only its eyes
     g.save(); g.translate(m.x, m.y);
     if (m.nem && persona) { // the rival's ring, under it
       g.strokeStyle = persona.colour; g.lineWidth = Math.max(3, 3.5 / zoom); g.setLineDash([9, 6]); g.beginPath(); g.arc(0, 0, M.r * 1.6, -now / 700, -now / 700 + 6.283); g.stroke(); g.setLineDash([]);
@@ -633,12 +643,15 @@ function draw(now) {
   g.save(); g.translate(p.x, p.y);
   if (p.safe > 0) { g.strokeStyle = `rgba(160,220,255,${0.4 + 0.3 * Math.sin(now / 90)})`; g.lineWidth = 3; g.beginPath(); g.arc(0, 0, F.r * 1.9, 0, 7); g.stroke(); }
   g.strokeStyle = save.skin.c === '#3a2a22' ? '#fff8e6' : save.skin.c; g.lineWidth = 2.5; g.setLineDash([5, 5]); g.beginPath(); g.arc(0, 0, F.r * 1.55, now / 900, now / 900 + 6.283); g.stroke(); g.setLineDash([]);
+  const faint = C && playerHidden(C, p); if (faint) g.globalAlpha = 0.5; // hidden in the grass
   if (alive && L4.rig()) { g.restore(); L4.player(g, s, save.skin, 1 / zoom); } else { g.rotate(p.a); drawForm(g, F, F.r, p.ph, save.skin, p.a); g.restore(); }
+  g.globalAlpha = 1; if (faint) eyes2d(g, p.x, p.y, p.a, F.r, now);
   }
+  if (C) grassOver(g, C.grass, save.look, now, [...(s.dead ? [] : [{ x: p.x, y: p.y, r: F.r }]), ...s.mobs.filter(m => Math.abs(m.x - p.x) < vw && Math.abs(m.y - p.y) < vh).map(m => ({ x: m.x, y: m.y, r: FORMS[m.f].r }))], vbox);
   // numbers
   const size = Math.max(11, 15 / zoom);
   for (const m of s.mobs) {
-    const M = FORMS[m.f]; if (Math.abs(m.x - p.x) > vw || Math.abs(m.y - p.y) > vh) continue;
+    const M = FORMS[m.f]; if (Math.abs(m.x - p.x) > vw || Math.abs(m.y - p.y) > vh || C && hiddenFromPlayer(C, m, M, p, F)) continue;
     mobLabel(m, m.x, m.y - M.r * (M.kind === 'bird' ? 1.5 : 1.25) - 4 - (alive ? L4.lift(m) * 0.55 : 0), size, F); // over a hop, a flight or a pounce
   }
   if (!s.dead) label(p.x, p.y - F.r * (F.kind === 'bird' ? 1.5 : 1.25) - 6 - (alive ? L4.lift(null) * 0.55 : 0), String(F.power), '#ffffff', size * 1.1);
@@ -729,9 +742,15 @@ function draw3d(now) {
     else if (a < 0.6) R.ball(x, 2.5 + b * 2, y, 7 + b * 6, 0, 0, 5 + b * 4, 4 + b * 3, [0.56, 0.56, 0.5]);
     else if (a < 0.72) { R.rod(x, 0, y, x + sway * 0.6, 9, y, 0.8, GREEN[0]); for (let k = 0; k < 5; k++) R.ball(x + sway * 0.6 + Math.cos(k * 1.257) * 3.4, 9.5, y + Math.sin(k * 1.257) * 3.4, 2.6, 0, 0, 2.6, 1.6, b < 0.5 ? [0.9, 0.78, 0.1] : [0.9, 0.45, 0.62]); R.ball(x + sway * 0.6, 10.5, y, 2, 0, 0, 2, 1.6, [1, 0.96, 0.8]); }
   }
+  const C = coverOn(s), vbox = [p.x - vw, p.y - vh, p.x + vw, p.y + vh];
+  if (C) { rocks3d(R, C.rocks, vbox); grass3d(R, C.grass, now, [...(s.dead ? [] : [{ x: p.x, y: p.y, r: F.r }]), ...s.mobs.filter(m => Math.abs(m.x - p.x) < vw && Math.abs(m.y - p.y) < vh).map(m => ({ x: m.x, y: m.y, r: FORMS[m.f].r }))], vbox); }
   for (const m of s.mobs) {
     const M = FORMS[m.f], pw = powerOf(m), strong = pw > F.power, [range, cone] = sight(m); if (Math.abs(m.x - p.x) > vw || Math.abs(m.y - p.y) > vh) continue;
-    if (pw !== F.power) R.wedge(m.x, m.y, range * F.stealth + F.r, m.a - cone, m.a + cone, m.alert ? (strong ? [1, 0.2, 0.15] : [1, 0.9, 0.2]) : [1, 1, 1], m.alert ? 0.26 : strong ? 0.17 : 0.07);
+    if (pw !== F.power) {
+      const c = m.alert ? (strong ? [1, 0.2, 0.15] : [1, 0.9, 0.2]) : [1, 1, 1], al = m.alert ? 0.26 : strong ? 0.17 : 0.07, cut = C && sightCut(C.rocks, m.x, m.y, m.a - cone, m.a + cone, range * F.stealth + F.r);
+      if (cut) for (let i = 2; i < cut.length; i += 2) R.tri(1, m.x, 0.6, m.y, cut[i - 2], 0.6, cut[i - 1], cut[i], 0.6, cut[i + 1], c, al); // cut by rocks: a fan
+      else R.wedge(m.x, m.y, range * F.stealth + F.r, m.a - cone, m.a + cone, c, al);
+    }
     if (m.nem && P()) { const c = R.rgb(P().colour); R.ring(m.x, m.y, 0, M.r * 1.6, c, 0.22); R.ring(m.x, m.y, M.r * 1.6 - 1.6, M.r * 1.6 + 1.6, c, 0.95, 10, -now / 700); } // the rival's ring on the ground
     if (m.old) R.ring(m.x, m.y, M.r * 1.5, M.r * 1.5 + 2.4, R.rgb(OLD_COLOUR), 0.95, 14, now / 900);
     const aim = m.old && oldAims(m); if (aim) {
@@ -740,6 +759,7 @@ function draw3d(now) {
       else if (aim.kind === 'leap' || aim.kind === 'dive') { for (let i = 0; i < 12; i++) { const k = M.r + 8 + i * 14; R.ball(m.x + Math.cos(aim.a) * k, 1.5, m.y + Math.sin(aim.a) * k, 5, 0, 0, i / 12 < aim.k ? 5 : 2.6, 1.6, [1, 0.35, 0.23]); } }
       else R.ring(m.x, m.y, M.r * 2 - 2, M.r * 2 + 2, c, 0.35 + 0.6 * aim.k);
     }
+    if (C && hiddenFromPlayer(C, m, M, p, F)) { eyes3d(R, m.x, m.y, m.a, M.r); continue; } // creeping in tall grass: only its eyes
     rec.start(m.x, m.y, m.a, M.r, pose(M, m.ph)); drawForm(rec, M, M.r, m.ph, null, 0);
   }
   for (const m of s.mobs) if (m.chase && !m.chase.gone && Math.abs(m.x - p.x) < vw && Math.abs(m.y - p.y) < vh) { // who is chasing whom: a dotted red line on the ground
@@ -754,6 +774,7 @@ function draw3d(now) {
   if (!s.dead) {
     if (p.safe > 0) R.ring(p.x, p.y, F.r * 1.8, F.r * 1.8 + 3, [0.6, 0.85, 1], 0.5 + 0.3 * Math.sin(now / 90));
     R.ring(p.x, p.y, F.r * 1.5, F.r * 1.5 + 2.6, save.skin.c === '#3a2a22' ? [1, 0.97, 0.9] : R.rgb(save.skin.c), 0.95, 12, now / 900);
+    if (C && playerHidden(C, p)) eyes3d(R, p.x, p.y, p.a, F.r); // hidden in the grass: the blades cover you, your eyes show
     rec.start(p.x, p.y, p.a, F.r, pose(F, p.ph)); drawForm(rec, F, F.r, p.ph, save.skin, 0);
   }
   R.end();
@@ -763,6 +784,7 @@ function draw3d(now) {
   for (const m of s.mobs) {
     const M = FORMS[m.f]; if (Math.abs(m.x - p.x) > vw || Math.abs(m.y - p.y) > vh) continue;
     const [x, y] = R.project(m.x, high(M), m.y), strong = powerOf(m) > F.power;
+    if (C && hiddenFromPlayer(C, m, M, p, F)) continue; // no number over a hidden animal
     if (!m.nem && strong && m.alert && (x < 0 || x > W || y < 0 || y > H)) edge.push(m); // the rival has its own arrow
     if (x < -40 || x > W + 40 || y < -20 || y > H + 40) continue;
     mobLabel(m, x, y - 4, size, F);
@@ -786,6 +808,7 @@ function frame(now) {
       acc -= 1 / 60; step(s, inp); inp.power = wantPower = false; // a tap between two steps waits for the next one
       if (isLiving()) { for (const e of s.events) L4.event(e, s); L4.step(s, W / zoom / 2 + 300, H / zoom / 2 + 300); } // the rigs walk at the sim's own step
       for (const e of s.events) {
+        if (e.t === 'coverTeach') writeJson(COVER_KEY, { taught: true }); // shown once: later climbs meet rocks without the staged hunter
         if (e.t === 'eat') {
           const M = FORMS.find(f => f.name === e.name);
           streak = now - streakAt < 4000 ? streak + 1 : 1; streakAt = now; buzz(12);
