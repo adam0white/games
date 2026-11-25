@@ -1072,13 +1072,15 @@ const GAMES = {
       let kept = 0, noise = 0, ring = 0; for (let i = 0; i < p.length; i += 4) { const n = d(q, i); if (n > 6) continue; kept++; noise += n; ring += d(r, i); }
       return { kept: kept / (p.length / 4), noise: noise / kept, ring: ring / kept };
     }, [a, b, c]);
-    await page.evaluate(() => window.lanternRipples.run(240)); await sleep(500); // the wake dies away
+    // run(n) steps the water n ticks on the next frame; wait for that step and two frames more, not for a time.
+    const ran = async n => { const at = await page.evaluate(n => { window.lanternRipples.run(n); return window.lanternRipples().steps; }, n); await until(page, at => window.lanternRipples().steps >= at, 'the water steps', 8000, at + n); await page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)))); };
+    await ran(240); // the wake dies away
     await sleep(300);
     const plain = await look(); await sleep(500); const plain2 = await look(); // the water's slow drift over as long as the ringed shot below takes
-    await page.evaluate(() => { const s = window.lanternSim(); window.lanternRipples.drop(s.x, s.y + 0.3, 0.04, 0.6); window.lanternRipples.run(14); }); await sleep(300);
+    await page.evaluate(() => { const s = window.lanternSim(); window.lanternRipples.drop(s.x, s.y + 0.3, 0.04, 0.6); }); await ran(14);
     const ringed = await look(), { kept, noise, ring } = await differ(plain2, plain, ringed);
     assert.ok(kept > 0.6, `most of the water holds still between two shots (${(100 * kept).toFixed(0)}%)`);
-    assert.ok(ring > 0.6, `a ring shows on the water: ${ring.toFixed(2)} per pixel changed (wanted over 0.6; drawn rings gave 0.87 to 2.2, a field that is not drawn 0 to 0.28); the water drifted ${noise.toFixed(2)} in as long with nothing dropped`);
+    assert.ok(ring > 0.6, `a ring shows on the water: ${ring.toFixed(2)} per pixel changed (wanted over 0.6; drawn rings gave 1.5 to 1.8 in 10 runs, a field that is not drawn 0 to 0.3); the water drifted ${noise.toFixed(2)} in as long with nothing dropped`);
     console.log(`     ripples on ${page.context().checkName}: ${r.path}, GPU against CPU ${agree.diff.toFixed(4)} of ${agree.top.toFixed(3)}, ring ${ring.toFixed(2)} against ${noise.toFixed(2)} per pixel`);
     const e = await page.evaluate(() => window.lanternRipples.sample()); assert.ok(e.h.some(v => Math.abs(v) > 0.01), 'the ring is in the field');
     // Less motion: off while the setting is on, back when it is not.

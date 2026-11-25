@@ -685,7 +685,7 @@ export function createRenderer(canvas) {
   const calm = typeof matchMedia === 'undefined' ? null : matchMedia('(prefers-reduced-motion: reduce)');
   const RIP = { level: 2, pinned: /[0-2]/.test(ask) ? Number(ask.match(/[0-2]/)[0]) : null, cpu: ask.includes('cpu'), water: null, mem: {}, t: 0, y: 0, at: 0, still: false, hide: false,
     gaps: [], since: 0, steps: 0, drops: 0, queued: [], extra: 0, broken: false, fell: [] };
-  const HEIGHT = 0.04; // how high a unit of the field stands, river units
+  const HEIGHT = 0.07; // how high a unit of the field stands, river units
   // The rippled ground and water marks: the same shaders with RIPPLES defined, attributes where the plain programs have them.
   // A failure here turns ripples off and never stops the 3D view.
   function variant(vs, fs, base, names) {
