@@ -12,3 +12,4 @@ dist/
 .beads-credential-key
 .beads/proxieddb/
 *.gate.lock*
+.exile-records/

@@ -1,19 +1,45 @@
 #!/usr/bin/env node
 // Reads Exile play records from the lab inbox and prints what happened in each run.
 //
-//   1. In the human-framework checkout:  npm run lab:inbox        (downloads records into .lab-inbox/)
-//   2. Here:  node experiments/exile/telemetry.mjs ~/code/lab/human-framework/.lab-inbox
+//   node experiments/exile/telemetry.mjs .exile-records --fetch=7
 //
+// --fetch=DAYS downloads only Exile's records for the last DAYS days from the lab's private bucket (hf-lab) into the
+// folder, with Wrangler and your own Cloudflare login, and keeps them, so a later run downloads only what is new.
+// Without --fetch the folder is read as it is; a human-framework `.lab-inbox` (from `npm run lab:inbox`) works too.
 // Options: --agents includes bot and agent runs (left out otherwise); --csv=FILE writes one row per run;
 // --html=FILE writes a page with the same tables and a map of where players walked and fell.
 // What the build sends is listed in NOTES.md under "Play records".
-import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { gunzipSync } from 'node:zlib';
 import { join } from 'node:path';
 
 const args = process.argv.slice(2), dir = args.find(a => !a.startsWith('--'));
 const opt = n => args.find(a => a.startsWith(`--${n}=`))?.slice(n.length + 3);
-if (!dir) { console.error('usage: node telemetry.mjs <path to .lab-inbox> [--agents] [--csv=FILE] [--html=FILE]'); process.exit(1); }
+if (!dir) { console.error('usage: node telemetry.mjs <path to .lab-inbox> [--fetch=DAYS] [--agents] [--csv=FILE] [--html=FILE]'); process.exit(1); }
 const agents = args.includes('--agents');
+
+const days = Number(opt('fetch'));
+if (days > 0) {
+  mkdirSync(join(dir, 'linked'), { recursive: true }); mkdirSync(join(dir, 'raw'), { recursive: true });
+  const get = (key, file) => execFileSync('wrangler', ['r2', 'object', 'get', `hf-lab/${key}`, '--remote', '--file', file], { stdio: 'ignore', timeout: 30000 });
+  const groups = new Map(); let fresh = 0, failed = 0;
+  for (let i = 0; i < days; i++) {
+    const day = new Date(Date.now() - i * 864e5).toISOString().slice(0, 10), index = join(dir, 'raw', `index-${day}.json`);
+    try { get(`private/linked-index/${day}.json`, index); } catch { continue; }   // no records that day
+    for (const e of JSON.parse(readFileSync(index, 'utf8')).records ?? []) {
+      if (e.game !== 'exile' || !/^[a-f0-9]{32}$/.test(e.id) || !/^[a-f0-9]{32}$/.test(e.player)) continue;
+      const file = join(dir, 'raw', `${e.id}.json`);
+      if (!existsSync(file)) { try { get(`linked/${e.player}/${e.id}.json.gz`, `${file}.gz`); writeFileSync(file, gunzipSync(readFileSync(`${file}.gz`))); fresh++; } catch { failed++; continue; } }
+    }
+  }
+  for (const f of readdirSync(join(dir, 'raw')).filter(f => /^[a-f0-9]{32}\.json$/.test(f))) {
+    const r = JSON.parse(readFileSync(join(dir, 'raw', f), 'utf8')), key = `${r.player}-exile-${r.session}-${r.runId}-${r.runSource ?? 'unattributed'}`;
+    groups.set(key, [...(groups.get(key) ?? []), r]);
+  }
+  for (const [key, records] of groups) writeFileSync(join(dir, 'linked', `${key}.json`), JSON.stringify(records));
+  console.error(`Fetched ${fresh} new records${failed ? `, ${failed} failed` : ''}.`);
+}
 
 // One run can arrive more than once (sent when the page is put away, again when it ends): keep the latest copy.
 const runs = new Map(), between = [];
@@ -57,7 +83,7 @@ const median = xs => { const s = [...xs].sort((a, b) => a - b); return s.length 
 
 const n = rows.length, out = [];
 out.push(`Exile play records: ${n} runs from ${new Set(rows.map(r => r.player)).size} players${agents ? ' (agent runs included)' : ''}, ${between.length} events outside a run.`);
-if (!n) out.push('No runs yet. Run `npm run lab:inbox` in the human-framework checkout first; agent runs need --agents.');
+if (!n) out.push('No runs yet. Use --fetch=7 to download records; agent runs need --agents.');
 else {
   out.push('\nHow far runs got');
   const steps = [['started', () => true], ['placed a building', r => r.buildings > 0], ['founded the kingdom', r => r.founded], ['raid began', r => r.raid], ['raid won', r => r.raidWon],

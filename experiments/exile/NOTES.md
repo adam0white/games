@@ -29,7 +29,7 @@ its switch sit in the bottom left corner while the build loads, on the title scr
   exile-unity README under "Play records". No GPU name, screen size or other device detail.
 - A run the player walks away from is still sent when the tab is hidden; it has no outcome and reads as `left`.
 - `autoplay=1` records nothing unless the address also has `labRunSource=agent`, which marks the run as an agent's.
-- To read them: `npm run lab:inbox` in the human-framework checkout, then
-  `node experiments/exile/telemetry.mjs <that checkout>/.lab-inbox --html=report.html`. It prints how far runs got,
+- To read them: `node experiments/exile/telemetry.mjs .exile-records --fetch=7 --html=report.html` (Wrangler, logged in to
+  the lab's Cloudflare account; `.exile-records/` is git-ignored and holds private play records). It prints how far runs got,
   where unfinished runs stopped, falls by place, stranger and stat choices, camera time, combat counts and frame rate,
   and one row per run. `--agents` includes agent runs; `--csv=FILE` writes the rows.
