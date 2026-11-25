@@ -231,23 +231,132 @@ async function clearOpening(page) {
   return { position: first.position, simulatedSeconds: first.elapsed, wallSeconds };
 }
 
+// Plate 2 follows the chord rule (changed deliberately on 2026-11-24): both receivers must be fed at one setting, so
+// one tap at the hidden answer clears it, and a tap that feeds only one colour does not.
 async function clearSecond(page) {
   const start = performance.now();
-  const angles = [];
-  // A native range thumb travels from its radius to one radius short of the far edge.
   const slider = await page.locator('#angle').boundingBox();
   const thumb = 27;
-  for (const [receiver, fraction] of [[0, .55], [1, .15]]) {
-    await turnByTouch(page, (thumb / 2 + fraction * (slider.width - thumb)) / slider.width);
-    await waitUntil(() => state(page), value => value.targets[receiver].lit, `waiting for receiver ${receiver + 1}`);
-    angles.push((await state(page)).position);
-    assert.equal(await page.locator('#captured').textContent(), `${receiver + 1} / 2`);
-  }
+  const at = fraction => (thumb / 2 + fraction * (slider.width - thumb)) / slider.width;
+  await turnByTouch(page, at(.55));
+  await sleep(900);
+  const partial = await state(page);
+  assert.ok(!partial.won && partial.charge === 0, 'one colour alone does not expose a chord plate');
+  const [answer] = await page.evaluate(() => window.splitlightAnswer());
+  await turnByTouch(page, at(answer));
   await waitForScreen(page, 'result');
   const second = await state(page);
   assert.ok(second.won && second.targets.every(target => target.lit));
+  assert.equal(await page.locator('#captured').textContent(), '2 / 2');
   assert.equal(Number(await stored(page)), 3, 'exposing both colors earns plate 3');
-  return { angles, simulatedSeconds: second.elapsed, wallSeconds: (performance.now() - start) / 1000 };
+  return { position: second.position, turns: second.turns, par: second.par, simulatedSeconds: second.elapsed, wallSeconds: (performance.now() - start) / 1000 };
+}
+
+// The 2026-11-24 additions: the daily bench and its share line, part chips, the chord, Turkish, the way back to the
+// small games, and no scrolling at 320 × 568 in any of those states.
+async function noScroll(page, where) {
+  const extra = await page.evaluate(() => [document.documentElement.scrollWidth - innerWidth, document.documentElement.scrollHeight - innerHeight]);
+  if (extra.some(n => n > 0)) await page.screenshot({ path: join(shots, `night-splitlight-scroll-${where.replaceAll(/\W+/g, '-')}.png`), fullPage: true });
+  assert.deepEqual(extra.map(n => Math.max(0, n)), [0, 0], `nothing scrolls at 320 × 568: ${where}`);
+}
+async function solveByAnswer(page) {
+  const answer = await page.evaluate(() => window.splitlightAnswer());
+  for (let i = 0; i < answer.length; i++) {
+    if (answer.length > 1) await page.tap(`#parts .chip[data-control="${i}"]`);
+    const box = await page.locator('#angle').boundingBox();
+    const thumb = 27;
+    await page.touchscreen.tap(box.x + thumb / 2 + answer[i] * (box.width - thumb), box.y + box.height / 2);
+    await sleep(120);
+  }
+  await waitForScreen(page, 'result');
+  return state(page);
+}
+async function extras({ name, engine, device }) {
+  const browser = await engine.launch({ headless: true, timeout: 45000 });
+  try {
+    const context = await browser.newContext({ ...devices[device], viewport: { width: 320, height: 568 } });
+    const page = await context.newPage();
+    page.setDefaultTimeout(20000);
+    const { errors, outside, lab } = await watchRequests(context, page);
+    await context.addInitScript(() => {
+      window.splitlightCheckTones = [];
+      const Context = window.AudioContext || window.webkitAudioContext;
+      if (!Context) return;
+      const make = Context.prototype.createOscillator;
+      Context.prototype.createOscillator = function () {
+        const o = make.call(this), set = o.frequency.setValueAtTime.bind(o.frequency);
+        o.frequency.setValueAtTime = (f, t) => { window.splitlightCheckTones.push(f); return set(f, t); };
+        return o;
+      };
+      if (location.protocol === 'http:') localStorage.setItem('night-splitlight:hint', '1');
+    });
+    if (name === 'webkit') { await page.goto('about:blank'); await wakeDisplay(page); }
+    await page.goto(withAgent(`${url}?from=small&daily&day=2026-11-24`));
+    await waitForScreen(page, 'play');
+    const daily = await state(page);
+    assert.equal(daily.mode, 'daily'); assert.equal(daily.day, '2026-11-24'); assert.equal(daily.par, 2, 'the daily bench has par 2');
+    assert.equal(await page.locator('#parts .chip').count(), 2, 'two parts, two chips');
+    await controls(page, ['pause', 'angle', 'daily']);
+    for (const chip of await page.locator('#parts .chip').all()) {
+      const box = await chip.boundingBox();
+      assert.ok(box.width >= 44 && box.height >= 44, 'each part chip has a 44 × 44 target');
+    }
+    const canvasBefore = await page.locator('#field').boundingBox();
+    await noScroll(page, 'daily bench');
+    await screenshot(page, name, '07-daily');
+    // Same day, same bench: a second load gives the same receivers.
+    const again = await context.newPage();
+    await again.goto(withAgent(`${url}?daily&day=2026-11-24`));
+    await waitForScreen(again, 'play');
+    assert.deepEqual((await state(again)).targets.map(t => t.angle), daily.targets.map(t => t.angle), 'the daily bench is the same for everyone on a day');
+    await again.close();
+    // Unlock audio with a tap, then solve; the chord sounds every receiver's pitch.
+    await page.evaluate(() => { window.splitlightCheckTones.length = 0; });
+    const won = await solveByAnswer(page);
+    assert.ok(won.won && won.turns === 2, 'the daily bench is solved in two turns: ' + won.turns);
+    await waitUntil(() => page.evaluate(() => window.splitlightChord), chord => chord?.length >= 2, 'waiting for the chord');
+    const chord = await page.evaluate(() => window.splitlightChord);
+    const tones = await page.evaluate(() => window.splitlightCheckTones);
+    for (const f of chord) assert.ok(tones.some(t => Math.abs(t - f) < .01), `the chord plays ${f} Hz`);
+    assert.ok(await page.locator('#share').isVisible(), 'the daily result offers sharing');
+    assert.ok(await page.locator('#result .kit-home').isVisible(), 'a visit from the small games gets the way back');
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('night-splitlight:daily')));
+    assert.equal(saved.day, '2026-11-24'); assert.equal(saved.turns, 2);
+    const home = await page.evaluate(() => JSON.parse(localStorage.getItem('hub:results') || '{}')['night-splitlight']);
+    assert.ok(home?.wins >= 1, 'the small games home hears about the win');
+    const line = await page.evaluate(() => window.splitlightShareLine());
+    assert.match(line, /^Splitlight 2026-11-24: 2 turns, par 2, [\d.]+ s \S+$/u, 'the share line: ' + line);
+    await noScroll(page, 'daily result with the way back');
+    await screenshot(page, name, '08-daily-result');
+    // Back to the plates; plate 8 has two parts. Turkish throughout, then back to English.
+    await page.tap('#next');
+    await waitForScreen(page, 'play');
+    await page.evaluate(() => { localStorage.setItem('night-splitlight:plate', '8'); });
+    await page.goto(withAgent(url)); // the tab remembers it came from the small games
+    await waitForScreen(page, 'play');
+    assert.equal((await state(page)).level, 8);
+    assert.equal(await page.locator('#parts .chip').count(), 2);
+    await page.tap('#pause');
+    await page.tap('#lang');
+    assert.match(await page.locator('#plate').textContent(), /^Levha 08 \/ 18$/, 'Turkish plate line');
+    assert.equal(await page.locator('#paused .kit-home').count(), 1, 'the pause card keeps the way back');
+    await noScroll(page, 'Turkish pause card');
+    await page.tap('#resume');
+    await waitForScreen(page, 'play');
+    await noScroll(page, 'Turkish plate with two parts');
+    const canvasAfter = await page.locator('#field').boundingBox();
+    assert.ok(canvasAfter.height >= canvasBefore.height - 1, 'chips and labels do not shrink the bench');
+    await screenshot(page, name, '09-turkish-parts');
+    const tr = await solveByAnswer(page);
+    assert.ok(tr.won);
+    await noScroll(page, 'Turkish result');
+    await page.tap('#pause').catch(() => {});
+    await page.evaluate(() => localStorage.setItem('kit:lang', 'en'));
+    assert.deepEqual([errors, outside, lab], [[], [], []], 'no errors, external requests or stray lab requests');
+    console.log(JSON.stringify({ browser: name, extras: 'ok', daily: { par: daily.par, turns: won.turns }, chord, line }));
+  } finally {
+    await browser.close();
+  }
 }
 
 async function watchRequests(context, page) {
@@ -468,6 +577,7 @@ try {
     try {
       await run(profile);
       await recording(profile);
+      await extras(profile);
     } catch (error) {
       process.exitCode = 1;
       console.error(profile.name, error);

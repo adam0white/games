@@ -32,9 +32,9 @@ export const LEVELS = [
   { id: 11, key: 'p11', idea: 'slide', sources: [lamp()], parts: [prism(EQ, { at: [180, 150], slide: [180, 242], turn: [-57, 71] })],
     receivers: [[0], [5]], width: .08, answer: [.724, .434], start: [.23, .13] },
   { id: 12, key: 'p12', idea: 'porro', sources: [lamp(-136)], parts: [
-    prism([0, 90, 180], { at: [180, 60], r: 30, turn: [30, 60] }),
+    prism([0, 90, 180], { at: [180, 60], r: 30, turn: [38, 52] }),
     prism(EQ, { turn: [-57, 71] }),
-  ], receivers: [[0], [3], [5]], width: .08, answer: [.788, .639], start: [.24, .07] },
+  ], receivers: [[0], [5]], width: .08, answer: [.78, .538], start: [.4, .22] },
   { id: 13, key: 'p13', idea: 'lens', sources: [lamp()], parts: [
     { kind: 'lens', at: [86, 150], slide: [86, 242], len: 60, f: 60, angle: 90 },
     prism(EQ, { angle: 30 }),

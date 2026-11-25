@@ -31,7 +31,8 @@ let level, state, rules, dense, screen, reveal = 0, previous = performance.now()
 let parInfo = { par: 1 }, gesture = null, lastKeyTurn = -1e9, nextTickSound = 0;
 // Each colour is a pitch of a pentatonic scale on C, red lowest, so any set of receivers sounds as a chord.
 const PITCH = [261.63, 293.66, 329.63, 392, 440, 523.25];
-const WHITE = [130.81, 196, 261.63];
+// White sounds as an open C major triad on the same pitches as the colours, so it never beats against red.
+const WHITE = [261.63, 392, 523.25];
 const litCount = () => state.targets.filter(target => target.lit || target.fed).length;
 const best = () => { const b = readJson(key + 'best', {}); return b && typeof b === 'object' ? b : {}; };
 
@@ -125,6 +126,7 @@ function markChips() {
 function select(i) {
   if (!state || screen !== 'play' || i === state.selected) return;
   state.selected = i;
+  lastKeyTurn = -1e9; // moving another part is another turn
   if (controlsOf(level).length > 1) write(key + 'parts', '1');
   slider.value = Math.round(state.values[i] * 1000);
   el('dial-label').textContent = controlWord(controlsOf(level)[i]);
@@ -189,14 +191,14 @@ function setControl(i, position) {
 }
 const fedNow = (target, field) => fed(target, field.rays, state.elapsed);
 function tone(band, dur, vol) {
-  if (band < 0) { for (const f of WHITE) audio.tone(f * 2, dur, vol * .6, 'sine'); return; }
+  if (band < 0) { for (const f of WHITE) audio.tone(f, dur, vol * .6, 'sine'); return; }
   audio.tone(PITCH[band], dur, vol, 'sine');
 }
 // The chord of a solved bench: every receiver's pitch at once, a low root under it, and an octave shimmer above.
 function chord() {
   const notes = new Set();
   for (const target of state.targets) {
-    if (target.band < 0) WHITE.forEach(f => notes.add(f * 2)); else notes.add(PITCH[target.band]);
+    if (target.band < 0) WHITE.forEach(f => notes.add(f)); else notes.add(PITCH[target.band]);
   }
   const list = [...notes].sort((a, b) => a - b);
   audio.tone(65.41 * 2, 2.2, .05, 'sine');
@@ -323,8 +325,9 @@ function finishPlate() {
   if (mode === 'daily') {
     const was = dailySave();
     const mine = { day: today, turns: state.turns, par: parInfo.par, seconds: Math.round(state.elapsed * 10) / 10 };
-    const keep = was?.day === today && was.turns <= mine.turns ? { ...was } : mine;
-    keep.first = was?.day === today ? was.first || was : mine;
+    const same = was?.day === today;
+    const keep = same && was.turns <= mine.turns ? { ...was } : { ...mine };
+    keep.first = same && was.first ? was.first : same ? { turns: was.turns, seconds: was.seconds } : { turns: mine.turns, seconds: mine.seconds };
     saved = writeJson(key + 'daily', keep);
   } else {
     high = Math.max(high, lastPlate(), Math.min(COUNT, state.id + 1));
@@ -335,9 +338,11 @@ function finishPlate() {
   }
   runEnd('won');
   const secs = (Math.round(state.elapsed * 10) / 10).toFixed(1);
-  const parts = [t('resultLine', { turns: turnWords(state.turns), par: parInfo.par, secs })];
-  if (state.turns <= parInfo.par) parts.push(t('atPar'));
-  if (mode === 'daily') parts.push(t('dailyBest', { turns: turnWords(dailySave()?.turns ?? state.turns) }));
+  let line = t('resultLine', { turns: turnWords(state.turns), par: parInfo.par, secs });
+  if (state.turns <= parInfo.par) line += ' · ' + t('atPar');
+  const parts = [line + '.'];
+  const bestToday = dailySave()?.turns;
+  if (mode === 'daily' && bestToday < state.turns) parts.push(t('dailyBest', { turns: turnWords(bestToday) }));
   if (!saved) parts.push(t('savedSession'));
   el('result-line').textContent = parts.join(' ');
   chord();
@@ -345,6 +350,7 @@ function finishPlate() {
   el('result-title').textContent = mode === 'daily' ? t('dailyExposed') : finale ? t('complete') : t('exposed');
   el('next').textContent = mode === 'daily' ? t('plates') : finale ? t('fromStart') : t('next');
   el('share').hidden = mode !== 'daily';
+  el('again').hidden = mode === 'daily';
   slider.disabled = true;
   document.body.classList.remove('guide');
 }
@@ -366,7 +372,7 @@ function picture() {
     g.fillStyle = '#f5ebd9'; g.font = '64px Georgia, serif'; g.fillText('Splitlight', 70, 1250);
     g.font = '36px ui-monospace, monospace'; g.fillStyle = '#e8c493';
     const d = dailySave();
-    g.fillText(`${today} · ${turnWords(d?.day === today ? d.turns : state.turns)} · par ${parInfo.par}`, 70, 1310);
+    g.fillText(`${today} · ${t('resultLine', { turns: turnWords(d?.day === today ? d.turns : state.turns), par: parInfo.par, secs: (Math.round(state.elapsed * 10) / 10).toFixed(1) })}`, 70, 1310);
     state.targets.forEach((target, i) => { g.fillStyle = bandColour(target.band); g.beginPath(); g.arc(760 + i * 44, 1236, 16, 0, Math.PI * 2); g.fill(); });
     return new Promise(ok => c.toBlob(blob => ok(blob), 'image/png'));
   } catch { return Promise.resolve(null); }
@@ -416,4 +422,5 @@ window.splitlightState = () => ({
 });
 // For checks and the bots' page runs: the answer the receivers were placed from.
 window.splitlightAnswer = () => level.answer.slice();
+window.splitlightShareLine = () => shareLine();
 requestAnimationFrame(frame);
