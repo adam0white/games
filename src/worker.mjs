@@ -1,6 +1,7 @@
 import registry from '../games.json' with { type: 'json' };
 import { validateRegistry } from '../scripts/lib.mjs';
 import { archivedHosts, labMoved } from '../worker-settings.mjs';
+import { isProbe } from './probe.mjs';
 
 const PLAY = 'https://play.adamwhite.work';
 const SHELF = 'https://human.adamwhite.work/games/';
@@ -21,7 +22,8 @@ export function labPath(pathname, moved = labMoved) {
   return match && Object.hasOwn(moved, match[1]) ? moved[match[1]] : null;
 }
 
-export function createHandler(games, archived = archivedHosts) {
+// topLevel is the list of top-level names in dist/, from vite.config.ts. Null (Wrangler, tests) skips that check.
+export function createHandler(games, archived = archivedHosts, topLevel = null) {
   validateRegistry({ hfVersion: '0.0.0', games }, archived);
   // Archived games' old hosts (worker-settings.mjs). A 302, not a 301, so removing a host from the list rolls back.
   const retired = new Set(archived);
@@ -37,6 +39,7 @@ export function createHandler(games, archived = archivedHosts) {
         if (moved) return Response.redirect(`${PLAY}${moved}${url.search}`, 301);
         const left = labPath(url.pathname);
         if (left) return Response.redirect(`${PLAY}${left}${left.includes('?') ? url.search.replace(/^\?/, '&') : url.search}`, 302);
+        if (isProbe(url.pathname, topLevel)) return new Response('Not found', { status: 404, headers: { 'X-Content-Type-Options': 'nosniff' } });
         if (/^\/lefthand\/engine\/game-[a-f0-9]+\.wasm$/.test(url.pathname)) {
           if (request.method !== 'GET' && request.method !== 'HEAD') return new Response('Method not allowed', { status: 405, headers: { Allow: 'GET, HEAD' } });
           url.pathname += '.gz';
@@ -79,4 +82,4 @@ self.addEventListener('activate', event => event.waitUntil((async () => {
   };
 }
 // Build and deploy preflight verify every enabled alias before upload.
-export default createHandler(registry.games);
+export default createHandler(registry.games, archivedHosts, typeof __TOP_LEVEL__ === 'undefined' ? null : __TOP_LEVEL__);
