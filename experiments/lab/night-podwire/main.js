@@ -169,8 +169,12 @@ $('lang').onclick = () => {
 $('share').onclick = async () => {
   const entry = days.days[today], n = entry?.plucks ?? state.plucks, par = entry?.par ?? dayPar ?? '…';
   const marks = '◆'.repeat(Math.min(n, Number(par) || n)) + '◇'.repeat(Math.max(0, n - (Number(par) || n)));
-  const text = t('shareLine', { date: today, plate: plantName(state.level), n, par, marks });
-  const how = await shareLink(location.origin + location.pathname + '?daily', text);
+  const text = t(n === 1 ? 'shareLineOne' : 'shareLine', { date: today, plate: plantName(state.level), n, par, marks });
+  const url = location.origin + location.pathname + '?daily';
+  // Without a share sheet the kit copies only the link; copy the result line with it.
+  let how;
+  if (navigator.share) how = await shareLink(url, text);
+  else try { await navigator.clipboard.writeText(text + ' ' + url); how = 'copied'; } catch { how = 'shown'; }
   $('status').textContent = how === 'shared' ? t('shared') : how === 'copied' ? t('copied') : text;
 };
 onLeave(pause);

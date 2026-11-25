@@ -170,13 +170,15 @@ After. 16 seeds per plate, clears at three noise levels (`node bots.mjs --report
 | ±16, 20, 0.2 s | 16 | 16 | 16 | 12 | 4 | 2 | 15 | 15 | 16 | 14 | 13 | 11 | 11 | 10 | 10 | 10 | 8 | 5 |
 | ±24, 30, 0.3 s | 16 | 16 | 14 | 7 | 4 | 4 | 11 | 12 | 14 | 12 | 10 | 11 | 10 | 9 | 7 | 1 | 6 | 4 |
 
-Across VII–XVIII, the middle row falls from 15 to 5 in steps of at most 3 (one step up, at IX). The heights of the new pods were tuned by bisection to hit a straight-line target at the middle noise level. Not fixed: the cliff from IV to VI (12 → 4 → 2). Those plates' rules are frozen by the parity rule. After VI the rate rises again to 15, so a player who struggles on V–VI meets easier plates next. This needs the owner's call: change V–VI on main, or leave them.
+Across VII–XVIII, the middle row falls from 15 to 5 in steps of at most 3 (one step up, at IX). The heights of the new pods were tuned by bisection to hit a straight-line target at the middle noise level. Not fixed: the cliff from IV to VI (12 → 4 → 2). Those plates' rules are frozen by the parity rule. After VI the rate rises again to 15, so a player who struggles on V–VI meets easier plates next. This needs the owner's call: change V–VI on main, or leave them. At the highest noise there is a second cliff: XVI (Squirting cucumber, four timed pulls) drops to 1 of 16 between XV at 7 and XVII at 6. Its rhythm, not its aim, is what fails under ±0.3 s timing noise. The middle row does not show it. Not fixed.
+
+The two tables use different players. "Before" is main's mirror bot, which aims at the mirror point and has no timing. "After" is the look-ahead player with aim, pull and timing noise. Compare plates within a table, not one table's numbers against the other's.
 
 The aiming player clears every plate on seeds 1–8 (`bots.mjs`, every run). With `--report` it clears every plate on seeds 1–16.
 
 ### Today's plate
 
-A UTC date hash picks a plate from II–XVIII and a seed. Pods get 2.2× the usual position jitter. The pick is the same for everyone and needs no network. The page works out the par with the look-ahead player in slices of up to 4 ms inside the frame (worst case in Node: 310 ms of work over 1,500 days). Over 1,500 days from 2026-11-24, every daily plate can be cleared (`/tmp` script; `bots.mjs` checks 30 days on every run). The first result of the day is kept. The result line reads, for example, `Podwire 2026-12-04 · Sweet pea: 1 plucks, par 1 ◆`. `kit/room.js shareLink` shares it, or copies it, with a `?daily` link. The daily score goes to no leaderboard. `?date=YYYY-MM-DD` opens another day's plate (for checks).
+A UTC date hash picks a plate from II–XVIII and a seed. Pods get 2.2× the usual position jitter. The pick is the same for everyone and needs no network. The page works out the par with the look-ahead player in slices of up to 4 ms inside the frame (worst case in Node: 310 ms of work over 1,500 days). Over 1,500 days from 2026-11-24, every daily plate can be cleared (`/tmp` script; `bots.mjs` checks 30 days on every run). The first result of the day is kept. The result line reads, for example, `Podwire 2026-12-04 · Sweet pea: 1 pluck, par 1 ◆ …/lab/night-podwire/?daily`. With a share sheet, `kit/room.js shareLink` sends the line and a `?daily` link. Without one, the page copies the line and the link together, because `shareLink` copies only the link. The daily score goes to no leaderboard. `?date=YYYY-MM-DD` opens another day's plate (for checks).
 
 ### The first ten seconds: does the drawn finger teach the pluck?
 

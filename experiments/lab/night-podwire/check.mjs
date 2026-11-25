@@ -410,8 +410,23 @@ async function run(name, base) {
     assert.match(await page.locator('#count').innerText(), /1 pluck · par 1/);
     assert.equal(await page.locator('#share').isVisible(), true);
     await shot(page, name + '-10-daily-end');
+    // The share sheet gets the result line and the link; without one, both go to the clipboard.
+    await page.evaluate(() => {
+      window.checkShared = [];
+      Object.defineProperty(navigator, 'share', { configurable: true, value: async data => { window.checkShared.push(data.text + ' ' + data.url); } });
+    });
     await page.tap('#share');
-    await page.waitForFunction(() => document.querySelector('#status').textContent !== '');
+    await page.waitForFunction(() => window.checkShared.length === 1);
+    await page.evaluate(() => {
+      Object.defineProperty(navigator, 'share', { configurable: true, value: undefined });
+      Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async text => { window.checkShared.push(text); } } });
+    });
+    await page.tap('#share');
+    await page.waitForFunction(() => window.checkShared.length === 2);
+    for (const line of await page.evaluate(() => window.checkShared)) {
+      assert.match(line, /^Podwire 2026-12-04 · Sweet pea: 1 pluck, par 1 ◆ http:\/\/[^ ]+\/lab\/night-podwire\/\?daily$/, 'shared result line: ' + line);
+    }
+    assert.equal(await page.locator('#status').innerText(), 'Copied');
     const daySaved = await page.evaluate(key => JSON.parse(localStorage.getItem(key)), dayKey);
     assert.deepEqual(daySaved.days['2026-12-04'], { plucks: 1, par: 1 });
     assert.match(await page.locator('#today').innerText(), /✓/);
