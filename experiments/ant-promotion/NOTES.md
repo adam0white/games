@@ -865,3 +865,60 @@ The owner on the lab page: evolution "can make things interesting for long time 
 - Frame cost was not measured. A real phone and thumb feel were not checked.
 - **Rules left on plain forms.** `paceAgainst` and `catchable` use `FORMS` speed, which is a few percent off for slowed prey. `skills.js` `within` uses the plain radius.
 - "{n} more in the field guide" counts changes, not species.
+
+## 2026-11-25: hiding skills restored; meadow marks, card cap, plain-form checks (follow-up to PR 276)
+
+### Six skills that hide you did nothing on main
+- `node bots.mjs 6 12` failed six skill stage tests in section 4c on main: Bat, Owl, Fox, Lynx, Ostrich and Zebra.
+- **Cause.** The test was right; the game was wrong. In 29528436 ("Merge origin/main into ant-skills: skills with rocks and grass", part of PR 242), the conflict on the `sees` line kept cover's `&& !hid` and dropped two things from skills:
+  - `!unseen(s, m, d, ...)` and `seenK(s)`;
+  - the line `if (m.alert && unseen(...)) m.alert = false`.
+  `sim.js` still imported `unseen` and `seenK` but never used them. So on main, every skill that hides you, blinds an animal or shrinks how far you are seen had no effect.
+- **Bisect.** A harness with sections 4b and 4c alone, built from each commit's `bots.mjs`:
+  - passes at 29528436^1, at 4daf2feb and at 2213e407;
+  - fails the six at 29528436, at PR 242's tip and at its merge 09ac6741.
+- **Fix.** Both lines are back, beside `&& !hid`.
+- **Parity.** The `--ref` for `evolve-bots.mjs` is now main's `sim.js` with these two lines restored, because main itself has the bug.
+
+### The meadow: do species differ? (measured from bot play, not hand-seeded)
+- The look the owner saw (every species the same green, "102 more") came from the checks' hand-seeded meadow, in which every species was given grass 0.8.
+- **Measurement.** `/tmp` scratch, rules as in PR 276. 30 runs per habit bot. For each species, its look = its strongest trait and its band (in quarters of the range).
+
+| habit | species changed | trait sd across species (lead / grass / wary / bold) | distinct looks | most common look |
+| --- | --- | --- | --- | --- |
+| flees left | 27 | 0.23 / 0.00 / 0.18 / 0.12 | 9 | 7 of 27 |
+| creeps | 26 | 0.05 / 0.12 / 0.22 / 0.10 | 7 | 7 of 26 |
+| uses its skill | 25 | 0.03 / 0.00 / 0.20 / 0.11 | 7 | 9 of 25 |
+| zigzags | 23 | 0.04 / 0.00 / 0.18 / 0.11 | 6 | 5 of 23 |
+| plain | 24 | 0.05 / 0.00 / 0.19 / 0.08 | 6 | 11 of 24 |
+
+- Species do not all move together. Prey traits follow each species' own share eaten. Hunter traits move only for species that chased you, and by how often each did.
+- **Tried and dropped.** Each species learns only from its own encounters, with a step weighted by its own chases (4 for a full step) and no run-wide pooling. It made species *less* distinct (lead sd 0.23 to 0.07, grass 0.12 to 0.11, wary 0.18 to 0.16) and weakened every habit, because one species chases you only once or twice a run. The rule is unchanged.
+- **Card cap.** A run tells at most `SHOW` = 4 changes, strongest first. The card shows 2 lines and at most "2 more in the field guide". When more than 4 changed, it says "More in the field guide." with no number. All changes are marked as told, so none pile up for later cards. The field guide lists everything.
+
+### Marks, not paint
+- The tint is now at most 15 % (`TINT`, was 55 %), so a red Fire Ant stays red and a white Rabbit stays white.
+- An evolved animal carries a row of spots down its back, one in each strong trait's colour (a quarter of its range or more), with a dark rim. This is in Flat, Cartoon, Soft and Living (2D, in the body's frame) and in 3D (small balls on the back). The same spots are on the card and field-guide portraits. The dots beside the number are unchanged.
+- Screenshots before and after, from a meadow made by 30 runs of mixed-habit bot play, are at `/tmp/claude-fold-ant-evolve/shots/{before,after}-*.png` (outside the repo).
+
+### Plain forms in the » mark, `catchable` and skill reach
+- These are not bugs a player can feel. Evolution only ever slows an animal, by at most x0.912, and the speed claim shows no pair changes who is faster or who can eat whom.
+- A new claim checks the actual readers on real worlds: in evolved worlds at levels 2 to 18 with every trait at its slowest, the » mark (`paceAgainst`) and `catchable` read from plain forms agree with the evolved forms for all 1152 animals, 0 differ. A planted bad case (wary slowing by 30 %) makes it fail on 284 animals.
+- Skill reach (`within` in `skills.js`) uses the plain radius. A wary animal is at most 12 % bigger, so reach is off by about 1 to 4 units in reaches of 150 to 320. Left as is.
+
+### Checks (2026-11-25)
+- `node bots.mjs 6 12` (1800 s limit): exits 0, every section.
+- `evolve-bots.mjs --ref=<main's sim.js with the two lines restored>`:
+  - 86,400 ticks identical;
+  - habits as before (every pair apart from run 7);
+  - in the habit runs, 18 to 23 of 30 runs end with a card and 13 to 19 species carry spots;
+  - clear rate within the band: own 1.07, every trait at its bound 0.99, hunters at their bounds 1.06 (plain 8.00 levels in 8 min, 10 seeds);
+  - the card cap holds over 300 runs: at most 4 told, up to 245 left to the field guide in the extreme bursts.
+- **Mutations.** `bots.mjs --mutate=meadow` exits 1 (4 checks). Bare `--mutate` exits 1 through the rig (3 checks).
+- **Phone check** `ant-promotion`: ok on WebKit iPhone 13 and Chromium Pixel 7. The death card now has exactly two lines and "More in the field guide."
+- **`npm test`:** 73 pass.
+- **Looked at, headless at 390x844.** All five looks with a bot-made meadow, before and after. The field guide, the death card, and the earlier play script's screens. No page errors.
+
+### Not verified
+- No person has judged whether the spots read as "this animal changed" without the field guide. A real phone was not used.
+- In the Living look, the spots follow the heading `m.a`, not the rig's own body bend.

@@ -12,7 +12,7 @@
 //    bar points a minute of single lives rewarded dying early; levels climbed a minute from mid levels sat near 0, so ratios meant nothing.)
 // 5. 300 runs of the update, fed with the tallies the habits produced and with extreme ones: every trait stays in its bounds, no step
 //    is larger than STEP, nothing is NaN. --mutate=meadow removes the step cap and the clamp; this check must then fail.
-import { FORMS, ANT, COVER, needFor, create, step, choose, revive, me, level, powerOf, sightOf, optionsFor, SPAWN_WEIGHTS, TIRE, powerReady, catchable, formOf, encounter, chasePace } from './sim.js';
+import { FORMS, ANT, COVER, needFor, create, step, choose, revive, me, level, powerOf, sightOf, optionsFor, SPAWN_WEIGHTS, TIRE, powerReady, catchable, formOf, encounter, chasePace, paceAgainst } from './sim.js';
 import { patchAt } from './cover.js';
 import * as MW from './meadow.js';
 
@@ -97,6 +97,18 @@ const put = (s, f, x, y, a = Math.PI) => { const m = { id: s.nextId++, f: f.id, 
   }
   claim(bad === 0, `the slowest an evolved animal gets (x${MW.SPEED_FLOOR.toFixed(3)}) never changes who is faster or who can eat whom: ${bad} pairs differ`);
   claim(FORMS.every(F => MW.shape(F, Object.values(WORST), 'hunt').power === F.power), 'no trait changes power');
+  // so the plain numbers the page and the bots read (the » mark from paceAgainst, catchable) say the same as the evolved forms would:
+  // in worlds at every level with every trait at its slowest, none of them differs for any animal
+  let off = 0, seen = 0;
+  for (let L = 2; L <= 18; L += 2) for (const wild of [false, true]) {
+    const s = create(L, stackAt(L), 0, SPAWN_WEIGHTS, wild, null, [], { meadow: MW.makeMeadow(fill({ ...WORST, shake: 1, wary: 1 })) }), F = me(s), eat = new Set(catchable(s));
+    for (const m of s.mobs) {
+      const E = formOf(s, m), strong = powerOf(m) > F.power, fast = (strong ? chasePace(E, F) : E.speed) > F.speed; seen++;
+      if (fast !== paceAgainst(m, F) > F.speed) off++;
+      if (eat.has(m) !== (encounter(F, { power: powerOf(m), speed: E.speed, alert: m.alert }) === 'eat' && (E.speed <= F.speed || !m.alert))) off++;
+    }
+  }
+  claim(off === 0 && seen > 500, `the » mark and catchable, read from the plain forms, agree with the evolved forms for all ${seen} animals in evolved worlds at levels 2 to 18: ${off} differ`);
 }
 { // the rival, the old animals and the teaching hunter keep their own form
   const { s, F } = scene(7, WORST), f = hunterFor(F), a = put(s, f, 1500, 1500), b = put(s, f, 1600, 1500), c = put(s, f, 1700, 1500); b.old = true; c.teach = true;
@@ -201,14 +213,15 @@ const BAND = [0.75, 1.15]; // stated before any evolved run was measured
 
 // ---- 5. 300 runs
 {
-  let M = MW.newMeadow(), worstStep = 0, out = 0, nan = 0, rnd = 12345; const rand = () => (rnd = (rnd * 1103515245 + 12345) % 2147483648) / 2147483648;
+  let M = MW.newMeadow(), worstStep = 0, out = 0, nan = 0, told = 0, hid = 0, rnd = 12345; const rand = () => (rnd = (rnd * 1103515245 + 12345) % 2147483648) / 2147483648;
   const extreme = (k) => { const t = MW.newTally(); t.time = 99; for (const f of FORMS.filter(f => f.level >= 2)) { t.hunt[f.name] = { chase: 5, grass: k ? 5 : 0, rock: k ? 0 : 5, tired: k ? 5 : 0, dash: k ? 5 : 0 }; t.prey[f.name] = { met: 9, eaten: k ? 9 : 0 }; t.stun[f.name] = k ? 9 : 0; } t.hx = k ? 99 : 0; t.hy = 0; t.runs = 99; return t; };
   for (let r = 0; r < 300; r++) {
-    const t = r % 50 < 10 ? extreme(r % 2) : tallies[Math.floor(rand() * tallies.length)], next = MW.advance(M, t).meadow;
+    const t = r % 50 < 10 ? extreme(r % 2) : tallies[Math.floor(rand() * tallies.length)], o = MW.advance(M, t), next = o.meadow; told = Math.max(told, o.changes.length); hid = Math.max(hid, o.more);
     for (const n in next.sp) next.sp[n].forEach((v, i) => { if (!Number.isFinite(v)) nan++; if (v < MW.TRAITS[i].lo || v > MW.TRAITS[i].hi) out++; worstStep = Math.max(worstStep, Math.abs(v - (M.sp[n]?.[i] ?? 0))); });
     M = next;
   }
   claim(nan === 0 && out === 0 && worstStep <= MW.STEP + 1e-9, `300 runs (real tallies, with bursts of the most extreme possible): no NaN, ${out} values outside bounds, largest step ${worstStep.toFixed(3)} (cap ${MW.STEP})`);
+  claim(told <= MW.SHOW && hid > 0, `a run tells at most ${MW.SHOW} changes, strongest first (the card shows 2 and at most ${MW.SHOW - 2} more; largest told ${told}, largest left to the field guide ${hid})`);
   const again = MW.cleanMeadow(JSON.parse(JSON.stringify(M)));
   claim(JSON.stringify(again.sp) === JSON.stringify(M.sp) && again.runs === 300, 'the meadow survives being stored and read back');
   const junk = MW.cleanMeadow({ v: 1, runs: -3, sp: { Wolf: [9, -9, NaN, 1, 1, 1], Nope: [0, 0, 0, 0, 0, 0], Fox: 'x' }, shown: { Wolf: [99] } });

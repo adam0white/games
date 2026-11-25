@@ -22,7 +22,7 @@ const roleOf = v => (HUNT.some(i => Math.abs(v[i]) >= 0.05) ? 'hunt' : 'prey'); 
 const lineOf = c => t(`meadow.${c.up ? 'up' : 'down'}.${traitKey(c.trait, c.sign)}`, { name: animal(c.name) });
 
 export function meadowPage({ show, say, portrait, rec, mode }) {
-  let M = MW.cleanMeadow(readJson(MW.MEADOW_KEY, null)), T = MW.newTally(), live = null, fresh = [], startsNow = false, revive = false, sure = 0;
+  let M = MW.cleanMeadow(readJson(MW.MEADOW_KEY, null)), T = MW.newTally(), live = null, fresh = [], hidden = 0, startsNow = false, revive = false, sure = 0;
   const store = () => writeJson(MW.MEADOW_KEY, M);
   // a run ends: count it, keep the meadow, record the numbers, and keep what changed for the card
   function end(why) {
@@ -30,7 +30,7 @@ export function meadowPage({ show, say, portrait, rec, mode }) {
     const was = M.runs; M = r.meadow; store();
     rec.event('meadow', { why, ...MW.summary(M) }); // numbers only: generation, species changed, mean and largest of each trait
     if (was < MW.GRACE && M.runs >= MW.GRACE && MW.changed(M).length) startsNow = true;
-    if (r.changes.length) fresh = r.changes;
+    if (r.changes.length) { fresh = r.changes; hidden = r.more; } // at most MW.SHOW, strongest first; hidden: how many more changed
     return true;
   }
   function card(box) { // "What the meadow learned": at most two lines, each with the animal as it is now and its trait's colour
@@ -47,9 +47,9 @@ export function meadowPage({ show, say, portrait, rec, mode }) {
       row.append(pic, dot, Object.assign(document.createElement('span'), { textContent: lineOf(c) }));
       box.append(row);
     }
-    if (fresh.length > 2) box.append(Object.assign(document.createElement('div'), { className: 'small', textContent: t('meadow.more', { n: fresh.length - 2 }) }));
+    if (fresh.length > 2 || hidden) box.append(Object.assign(document.createElement('div'), { className: 'small', textContent: hidden ? t('meadow.moreAll') : t('meadow.more', { n: fresh.length - 2 }) }));
   }
-  function seen() { fresh = []; startsNow = false; } // the player has read it: a new life or the field guide
+  function seen() { fresh = []; hidden = 0; startsNow = false; } // the player has read it: a new life or the field guide
   // ---- the field guide: each changed species, then and now, and a bar for each trait from the line where it began
   function guide() {
     $('meadowSay').textContent = M.runs < MW.GRACE ? t('meadow.wait', { g: MW.GRACE, n: MW.GRACE - M.runs }) : t('meadow.say', { n: M.runs });
@@ -108,11 +108,23 @@ export function meadowPage({ show, say, portrait, rec, mode }) {
     // the marks beside an evolved animal's number: a dot in each strong trait's colour (a quarter of its range or more), to the left of
     // the number, which label() has just drawn centred on x with its baseline on y (g.font is still its font)
     pips(g, F, x, y, size, text) {
-      if (!F.ev) return; const on = MW.TRAITS.map((T, i) => i).filter(i => (MW.TRAITS[i].role === F.ev.role || MW.TRAITS[i].role === 'any') && Math.abs(F.ev.v[i]) >= 0.25); if (!on.length) return;
+      const on = MW.marked(F); if (!on.length) return;
       const r = Math.max(3, size * 0.24), w = r * 2.3, right = x - g.measureText(text).width / 2 - r - 3, cy = y - size * 0.36;
       g.save(); g.lineWidth = Math.max(1.2, r * 0.5); g.strokeStyle = '#0b1408';
       on.forEach((i, k) => { g.fillStyle = MW.TRAITS[i].colour; g.beginPath(); g.arc(right - k * w, cy, r, 0, 7); g.fill(); g.stroke(); });
       g.restore();
+    },
+    // the marks on an evolved animal's body: a row of spots down its back, one in each strong trait's colour, with a dark rim, so the
+    // species keeps its own colours and the spots read as marks. 2D: g is in the body's frame (+x forward), r its radius.
+    marks(g, F, r) {
+      const on = MW.marked(F); if (!on.length) return; const d = Math.max(1.5, r * 0.19);
+      g.save(); g.lineWidth = Math.max(0.8, d * 0.4); g.strokeStyle = '#0b1408';
+      on.forEach((i, k) => { g.fillStyle = MW.TRAITS[i].colour; g.beginPath(); g.arc(-r * 0.12 - k * d * 2.4, 0, d, 0, 7); g.fill(); g.stroke(); });
+      g.restore();
+    },
+    marks3d(R, m, F) { // the same spots in the 3D look, as small balls on its back
+      const on = MW.marked(F); if (!on.length) return; const d = Math.max(1.5, F.r * 0.2), c = Math.cos(m.a), s = Math.sin(m.a);
+      on.forEach((i, k) => { const off = -F.r * 0.12 - k * d * 2.4; R.ball(m.x + c * off, F.r * 1.05, m.y + s * off, d, 0, 0, d, d, R.rgb(MW.TRAITS[i].colour)); });
     },
     translate() { button(); if (mode() === 'meadow') guide(); card($('menuLearned')); card($('learned')); },
   };
