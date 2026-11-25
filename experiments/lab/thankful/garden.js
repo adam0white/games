@@ -101,7 +101,7 @@ export function cluster(g, ps, time, o) {
   const drawn = [...ps].sort((a, b) => a.y - b.y);
   for (const p of drawn) {
     const key = p.day + ':' + p.index; if (!born.has(key)) born.set(key, o.today && frames > 20 && time ? time : -1e9); // only a flower given just now grows in
-    const poked = pokes.get(key), nod = poked && time - poked < 900 ? Math.sin((time - poked) / 70) * 0.35 * (1 - (time - poked) / 900) : 0;
+    const poked = pokes.get(key), dt = poked ? time - poked : -1, nod = dt >= 0 && dt < 900 ? Math.sin(dt / 70) * 0.35 * (1 - dt / 900) : 0;
     const since = time - born.get(key), age = since < 0 ? 1 : Math.min(1, since / 1400), grow = 1 - (1 - age) ** 3;
     const [shape, hue, sat, li, rel] = SPECIES[p.species || speciesOf(p.day, p.k)] || SPECIES.starflower, zoom = o.zoom || 1;
     const s = zoom * p.size * 3.9 * rel * depth * (o.today ? 1.12 : 1) * (0.25 + 0.75 * grow), wind = Math.sin(time / 1900 + p.x / 90) * 0.11 + Math.sin(time / 700 + p.phase) * 0.03;

@@ -52,6 +52,9 @@ const COL=66,days=()=>[...new Set([...Object.keys(state.days),today])].sort();
 const lastCol=()=>Math.floor((days().length-1)/ROWS);
 // A young garden is drawn larger and in the middle; from about four columns on it is the full field, anchored right.
 const zoomFor=w=>Math.max(1,Math.min(2.1,(w-92)/((lastCol()+1)*COL)));
+// With more than one day, a column holds several days one above another: grow them only as far as the rows allow,
+// so a day's flowers (two radii plus a head, 20 px at zoom 1) never reach into the next day's.
+const rowCap=(z,bandH)=>days().length<2?z:Math.max(1,Math.min(z,bandH*.9/(ROWS+.5)*.95/(2*Math.min(17,bandH/ROWS*.3)+20)));
 function band(h,bottom){const top=(state.look==='sky'?84:128);return {top,bottom:Math.max(top+150,bottom)};}
 let zoom=zoomFor(innerWidth),bottomNow=0;
 const maxPan=()=>Math.max(0,lastCol()*COL*zoom-W+92);
@@ -60,9 +63,9 @@ function scene(ctx,w,h,offset,time,bottom,z,animate=false){const r=renderers[sta
 for(let i=0;i<all.length;i++){const day=all[i],ps=points(day,i,t,bd,w,offset,z);if(!ps.length||ps[0].cx< -60||ps[0].cx>w+60)continue;const shown=animate&&flight&&day===today?ps.filter(p=>p.index!==flight.index):ps;if(day===today)mine=ps;if(shown.length)r.cluster(ctx,shown,t,{today:day===today,band:bd,radius:ps[0].radius,zoom:z});found.push(...shown);}
 return {found,mine};}
 function draw(time){requestAnimationFrame(draw);if(paused)return;g.setTransform(dpr,0,0,dpr,0,0);measure();
-const foot=state.look==='garden'?44:26,room=(lineTop-8-band(H,0).top-150)/foot,zt=Math.max(1,Math.min(zoomFor(W),room));zoom+=(zt-zoom)*(reduced?1:.05);const target=lineTop-foot*zoom-8;bottomNow=bottomNow?bottomNow+(target-bottomNow)*(reduced?1:.05):target;
+const foot=state.look==='garden'?44:26,room=(lineTop-8-band(H,0).top-150)/foot,zt0=Math.max(1,Math.min(zoomFor(W),room)),zt=rowCap(zt0,lineTop-foot*zt0-8-band(H,0).top);zoom+=(zt-zoom)*(reduced?1:.05);const target=lineTop-foot*zoom-8;bottomNow=bottomNow?bottomNow+(target-bottomNow)*(reduced?1:.05):target;
 const result=scene(g,W,H,pan,time,bottomNow,zoom,true),mine=result.mine;hits=result.found;
-if(lookFade&&!reduced){const u=(time-lookFade)/600;if(u>1||u<0)lookFade=0;else{g.fillStyle=`rgba(7,21,40,${1-u})`;g.fillRect(0,0,W,H);}}
+if(lookFade&&!reduced){const u=Math.max(0,(time-lookFade)/600);if(u>1)lookFade=0;else{g.fillStyle=`rgba(7,21,40,${1-u})`;g.fillRect(0,0,W,H);}}
 if(flight){const u=(time-flight.start)/1100;const p=mine&&mine[flight.index];if(u>1||!p)flight=null;else{const e=1-(1-u)**3,x=flight.x+(p.x-flight.x)*e,y=flight.y+(p.y-flight.y)*e-Math.sin(u*Math.PI)*40;g.globalCompositeOperation='lighter';for(let k=0;k<9;k++){const v=Math.max(0,u-k*.025),ev=1-(1-v)**3;g.fillStyle=`rgba(255,238,190,${.5-k*.05})`;g.beginPath();g.arc(flight.x+(p.x-flight.x)*ev,flight.y+(p.y-flight.y)*ev-Math.sin(v*Math.PI)*40,4-k*.35,0,7);g.fill();}g.globalCompositeOperation='source-over';}}
 if(bloom&&mine&&mine[0]){const u=(time-bloom)/2400;if(u>1)bloom=0;else{const c=mine[0];g.globalCompositeOperation='lighter';const R=reduced?90:40+u*Math.max(W,H)*.7,gr=g.createRadialGradient(c.cx,c.cy,R*.55,c.cx,c.cy,R);gr.addColorStop(0,'rgba(255,232,180,0)');gr.addColorStop(.8,`rgba(255,232,180,${(1-u)*.22})`);gr.addColorStop(1,'rgba(255,232,180,0)');g.fillStyle=gr;g.beginPath();g.arc(c.cx,c.cy,R,0,7);g.fill();g.globalCompositeOperation='source-over';}}
 if(shoot&&!reduced){const u=(time-shoot-900)/1300;if(u>1)shoot=0;else if(u>0){const x=W*(.05+u*.9),y=H*(.08+u*.14),gr=g.createLinearGradient(x-90,y-22,x,y);gr.addColorStop(0,'rgba(255,240,200,0)');gr.addColorStop(1,'rgba(255,240,200,.9)');g.strokeStyle=gr;g.lineWidth=2;g.beginPath();g.moveTo(x-90,y-22);g.lineTo(x,y);g.stroke();}}
@@ -73,7 +76,7 @@ function countLine(n){return n.lights===1?t('countOne'):n.days===1?t('count1',{n
 // The picture to keep or share: the garden as it is, and below it today's three flowers by name, which are
 // the same flowers everyone could grow today.
 function pictureBlob(){return new Promise((resolve,reject)=>{try{const canvas=document.createElement('canvas');canvas.width=1080;canvas.height=1350;const ctx=canvas.getContext('2d');ctx.scale(2.5,2.5);
-const z=Math.max(1,Math.min(2.1,(432-92)/((lastCol()+1)*COL)));scene(ctx,432,540,0,0,330-30*z,z);
+const z0=Math.max(1,Math.min(2.1,(432-92)/((lastCol()+1)*COL))),top=band(540,0).top,pb=z=>Math.min(350,410-65*z),z=rowCap(z0,pb(z0)-top);scene(ctx,432,540,0,0,pb(z),z);
 const fade=ctx.createLinearGradient(0,350,0,420);fade.addColorStop(0,'rgba(8,20,26,0)');fade.addColorStop(1,'rgba(8,20,26,.92)');ctx.fillStyle=fade;ctx.fillRect(0,350,432,190);
 const n=counts(state),items=state.days[today]||[];ctx.textAlign='center';ctx.fillStyle='rgba(255,248,230,.95)';ctx.font='500 13px system-ui, sans-serif';ctx.fillText(t('name'+NAME[state.look]).toLocaleUpperCase(lang()),216,402);
 ctx.font='11px system-ui, sans-serif';ctx.fillStyle='rgba(255,248,230,.7)';ctx.fillText(`${fmt(today)} · ${t('dayN',{n:n.days})}`,216,420);

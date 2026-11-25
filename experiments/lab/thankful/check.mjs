@@ -123,6 +123,10 @@ async function extras(name,engine,device,base){
  assert.ok(work.mean<8,`mean page work per frame ${work.mean.toFixed(2)} ms`);
  const under=await page.evaluate(()=>{const L=document.getElementById('line').getBoundingClientRect(),P=document.getElementById('picture').getBoundingClientRect();return window.__thankful.lights.filter(l=>l.y>L.top-20&&l.y<P.bottom).length;});
  assert.equal(under,0,'no flower behind the words');
+ // Zoom never pushes days in a column into each other: where the rows are already tight (a short screen), the garden stays at zoom 1, as on main.
+ for(const n of [2,4,14]){await page.goto(`${base}/lab/thankful/?day=2026-11-28&lang=en&demo=${n}`);await page.waitForFunction(()=>!!window.__thankful);await page.waitForTimeout(2500);
+  const gap=await page.evaluate(()=>{const z=window.__thankful.zoom,c=new Map();for(const l of window.__thankful.lights)c.set(l.day,l);const a=[...c.values()];let worst=Infinity;for(const p of a)for(const q of a)if(p!==q&&Math.abs(p.cx-q.cx)<1)worst=Math.min(worst,Math.abs(p.cy-q.cy)-(2*p.radius+20*z)*.85);return {worst,z};});
+  assert.ok(gap.worst>=0||gap.z<1.01,`demo ${n}: zoom ${gap.z.toFixed(2)} pushes days in a column together (${gap.worst.toFixed(1)} px)`);}
  await context.close();
  // The smallest phone, in both languages: every control inside the screen, the title clear of the look button, no scroll.
  for(const lang of ['en','tr']){({context,page}=await fresh({viewport:{width:320,height:568}}));
