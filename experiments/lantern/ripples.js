@@ -128,7 +128,7 @@ export function disturb(s, mem, ticks, now) {
   if (ticks > 0 && rain(s, s.y)) for (let i = 0; i < ticks * 1.6; i++) { // rain: small rings anywhere on the river in view, more than the eye can count
     if (rand() > 0.62 && i >= ticks) continue;
     const y = s.y - 0.3 + rand() * (AHEAD + 0.2), c = centre(s, y), h = half(s, y);
-    out.push({ x: c + (rand() * 2 - 1) * (h - 0.01), y, r: 0.012 + 0.01 * rand(), a: 0.18 + 0.2 * rand() });
+    out.push({ x: c + (rand() * 2 - 1) * (h - 0.01), y, r: 0.012 + 0.01 * rand(), a: 0.06 + 0.07 * rand() });
   }
   if (ticks > 0) for (let i = 0; i < s.rocks.length; i++) { // things in the water that move it themselves
     const k = s.rocks[i], dy = k.y - s.y; if (dy < -BACK || dy > AHEAD) continue;

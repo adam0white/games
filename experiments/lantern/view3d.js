@@ -213,8 +213,8 @@ void main() {
     col += uLampCol * lampW(vW) * pow(max(dot(n, hv), 0.), sh) * (sh + 2.) / 8. * 0.035;
     // The lantern's light under the surface, seen through it: shifted where the surface tilts, and gathered under
     // crests and spread under troughs (the curvature), as the bright lines on a pool's floor are.
-    float caus = clamp(1. - rp.z * 0.012, 0.2, 2.6);
-    col += uLampCol * uWet * 1.6 * (lampW(vW + vec3(rp.x, 0., -rp.y) * 0.05) * caus - lampW(vW));
+    float caus = clamp(1. - rp.z * 0.006, 0.6, 1.8);
+    col += uLampCol * uWet * 1.0 * (lampW(vW + vec3(rp.x, 0., -rp.y) * 0.05) * caus - lampW(vW));
 #endif
     if (foam > 0.) {
       vec3 fc = shade(vW, vec3(0, 1, 0), v, vec3(0.75, 0.82, 0.85), 8., 0.05, 1.);
