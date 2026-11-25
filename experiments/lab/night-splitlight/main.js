@@ -10,7 +10,8 @@ import { screens } from '../../kit/screens.js';
 import { noZoom } from '../../kit/zoom.js';
 import { bandColour, draw } from './art.js';
 import { controlsOf, denseLights, expose, fed, makeBench, setValue, trace } from './bench.js';
-import { dailyLevel, today } from './daily.js';
+import { current, dailyLevel, today } from './daily.js';
+const pastDay = today !== current;
 import { LEVELS } from './levels.js';
 import { par as parOf } from './solver.js';
 import { lang } from './words.js';
@@ -77,11 +78,11 @@ function texts() {
   canvas.setAttribute('aria-label', t('canvasAria'));
   el('pause').setAttribute('aria-label', t('pause'));
   if (!state) return;
-  el('plate').textContent = mode === 'daily' ? t('dailyPlate', { day: dayLabel() }) : t('plate', { n: String(state.id).padStart(2, '0'), of: String(COUNT).padStart(2, '0') });
-  el('plate-name').textContent = mode === 'daily' ? t('dailyName') : t(level.key);
+  el('plate').textContent = mode === 'daily' ? t(pastDay ? 'sharedPlate' : 'dailyPlate', { day: dayLabel() }) : t('plate', { n: String(state.id).padStart(2, '0'), of: String(COUNT).padStart(2, '0') });
+  el('plate-name').textContent = mode === 'daily' ? t(pastDay ? 'sharedName' : 'dailyName') : t(level.key);
   el('daily').textContent = mode === 'daily' ? t('plates') : t('today');
   el('daily').setAttribute('aria-label', el('daily').textContent);
-  el('daily').classList.toggle('done', mode !== 'daily' && dailySave()?.day === today);
+  el('daily').classList.toggle('done', mode !== 'daily' && dailySave()?.day === current);
   el('dial-label').textContent = controlWord(controlsOf(level)[state.selected]);
   el('sound').textContent = audible ? t('soundOn') : t('soundOff');
   el('sound').setAttribute('aria-pressed', String(audible));
@@ -330,14 +331,14 @@ const turnWords = n => t(n === 1 ? 'turn1' : 'turnN', { n });
 function finishPlate() {
   rec.event('plate-exposed', { level: state.id, mode, seconds: Math.round(state.elapsed * 10) / 10, turns: state.turns, par: parInfo.par });
   let saved = true;
-  if (mode === 'daily') {
+  if (mode === 'daily' && !pastDay) {
     const was = dailySave();
     const mine = { day: today, turns: state.turns, par: parInfo.par, seconds: Math.round(state.elapsed * 10) / 10 };
     const same = was?.day === today;
     const keep = same && was.turns <= mine.turns ? { ...was } : { ...mine };
     keep.first = same && was.first ? was.first : same ? { turns: was.turns, seconds: was.seconds } : { turns: mine.turns, seconds: mine.seconds };
     saved = writeJson(key + 'daily', keep);
-  } else {
+  } else if (mode !== 'daily') {
     high = Math.max(high, lastPlate(), Math.min(COUNT, state.id + 1));
     saved = write(key + 'plate', high);
     const b = best();
@@ -349,7 +350,7 @@ function finishPlate() {
   let line = t('resultLine', { turns: turnWords(state.turns), par: parInfo.par, secs });
   if (state.turns <= parInfo.par) line += ' · ' + t('atPar');
   const parts = [line + '.'];
-  const bestToday = dailySave()?.turns;
+  const ds = dailySave(), bestToday = ds?.day === today ? ds.turns : undefined;
   if (mode === 'daily' && bestToday < state.turns) parts.push(t('dailyBest', { turns: turnWords(bestToday) }));
   if (!saved) parts.push(t('savedSession'));
   el('result-line').textContent = parts.join(' ');

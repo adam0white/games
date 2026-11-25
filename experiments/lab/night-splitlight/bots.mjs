@@ -310,4 +310,28 @@ for (let d = 0; d < days; d++) {
   dailyAttempts += level.attempts; families[level.family] = (families[level.family] || 0) + 1;
 }
 console.log('Daily benches:', days, 'days valid and cleared at par 2; families', families, '; mean attempts', (dailyAttempts / days).toFixed(2));
+// Blind sweep, the before-measure of "every plate plays the same": each control in turn runs from its start to 1,
+// then from 0 back to its start, 0.01 every 40 ms, holding 0.5 s whenever the shared charge rises. On main it cleared
+// all six plates. A one-control dial still passes its answer, so it still clears those; the chord rule makes the
+// two-control plates and the moving receiver resist it.
+const swept = [];
+for (const level of LEVELS) {
+  const s = bench.makeBench(level);
+  const step = dt => bench.expose(s, bench.trace(level, s.values), dt);
+  for (let c = 0; c < s.values.length && !s.won; c++) {
+    const from = s.values[c], path = [];
+    for (let v = from; v <= 1.0001; v += .01) path.push(Math.min(1, v));
+    for (let v = 0; v < from; v += .01) path.push(v);
+    for (const v of path) {
+      if (s.won) break;
+      bench.setValue(s, c, v);
+      const before = s.charge;
+      for (let i = 0; i < 2 && !s.won; i++) step(.02);
+      if (s.charge > before) for (let i = 0; i < 25 && !s.won; i++) step(.02);
+    }
+  }
+  if (s.won) swept.push(level.id);
+}
+assert.deepEqual(LEVELS.filter(l => !swept.includes(l.id)).map(l => l.id), [8, 11, 12, 16, 18], 'plates that resist a blind sweep');
+console.log('Blind sweep clears', swept.length, 'of', LEVELS.length, 'plates; resisted by 8, 11, 12, 16, 18');
 console.log('Part 2 passed', fault ? '(fault ' + fault + ' did not break it)' : '');

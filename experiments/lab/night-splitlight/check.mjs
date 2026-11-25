@@ -12,6 +12,9 @@ import { answerLab, withAgent, assertNotice, assertRun, assertOffSendsNothing, a
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const notesButton = resolve(root, '../workers/feedback/public/notes/button.js');
 const mount = '/lab/night-splitlight/';
+// The daily checks use the real date, so today's save rules apply; PAST is the day before.
+const DAY = new Date().toISOString().slice(0, 10);
+const PAST = new Date(Date.parse(DAY) - 864e5).toISOString().slice(0, 10);
 const shots = process.env.SHOTS || '/private/tmp/night-r5-review';
 const saveKey = 'night-splitlight:plate';
 const types = {
@@ -291,10 +294,10 @@ async function extras({ name, engine, device }) {
       if (location.protocol === 'http:') localStorage.setItem('night-splitlight:hint', '1');
     });
     if (name === 'webkit') { await page.goto('about:blank'); await wakeDisplay(page); }
-    await page.goto(withAgent(`${url}?from=small&daily&day=2026-11-24`));
+    await page.goto(withAgent(`${url}?from=small&daily&day=${DAY}`));
     await waitForScreen(page, 'play');
     const daily = await state(page);
-    assert.equal(daily.mode, 'daily'); assert.equal(daily.day, '2026-11-24'); assert.equal(daily.par, 2, 'the daily bench has par 2');
+    assert.equal(daily.mode, 'daily'); assert.equal(daily.day, DAY); assert.equal(daily.par, 2, 'the daily bench has par 2');
     assert.equal(await page.locator('#parts .chip').count(), 2, 'two parts, two chips');
     await controls(page, ['pause', 'angle', 'daily']);
     for (const chip of await page.locator('#parts .chip').all()) {
@@ -306,7 +309,7 @@ async function extras({ name, engine, device }) {
     await screenshot(page, name, '07-daily');
     // Same day, same bench: a second load gives the same receivers.
     const again = await context.newPage();
-    await again.goto(withAgent(`${url}?daily&day=2026-11-24`));
+    await again.goto(withAgent(`${url}?daily&day=${DAY}`));
     await waitForScreen(again, 'play');
     assert.deepEqual((await state(again)).targets.map(t => t.angle), daily.targets.map(t => t.angle), 'the daily bench is the same for everyone on a day');
     await again.close();
@@ -321,15 +324,25 @@ async function extras({ name, engine, device }) {
     assert.ok(await page.locator('#share').isVisible(), 'the daily result offers sharing');
     assert.ok(await page.locator('#result .kit-home').isVisible(), 'a visit from the small games gets the way back');
     const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('night-splitlight:daily')));
-    assert.equal(saved.day, '2026-11-24'); assert.equal(saved.turns, 2);
+    assert.equal(saved.day, DAY); assert.equal(saved.turns, 2);
     const home = await page.evaluate(() => JSON.parse(localStorage.getItem('hub:results') || '{}')['night-splitlight']);
     assert.ok(home?.wins >= 1, 'the small games home hears about the win');
     const line = await page.evaluate(() => window.splitlightShareLine());
-    assert.match(line, /^Splitlight 2026-11-24: 2 turns, par 2, [\d.]+ s \S+$/u, 'the share line: ' + line);
+    assert.match(line, new RegExp(`^Splitlight ${DAY}: 2 turns, par 2, [\\d.]+ s \\S+$`, 'u'), 'the share line: ' + line);
     const link = await page.evaluate(() => window.splitlightShareUrl());
-    assert.match(link, /\/lab\/night-splitlight\/\?daily&day=2026-11-24$/, 'the shared link opens the same bench: ' + link);
+    assert.ok(link.endsWith(`/lab/night-splitlight/?daily&day=${DAY}`), 'the shared link opens the same bench: ' + link);
     await noScroll(page, 'daily result with the way back');
     await screenshot(page, name, '08-daily-result');
+    // A shared link to another day plays that day's bench but leaves today's saved result alone.
+    const past = await context.newPage();
+    await past.goto(withAgent(`${url}?daily&day=${PAST}`));
+    await waitForScreen(past, 'play');
+    assert.equal((await state(past)).day, PAST);
+    assert.match(await past.locator('#plate').textContent(), /^Shared/, 'a past day is not called today');
+    assert.ok((await solveByAnswer(past)).won, 'the shared past bench can be solved');
+    const kept = await past.evaluate(() => JSON.parse(localStorage.getItem('night-splitlight:daily')));
+    assert.equal(kept.day, DAY, 'a past bench does not replace today\'s result'); assert.equal(kept.turns, 2);
+    await past.close();
     // Back to the plates; plate 8 has two parts. Turkish throughout, then back to English.
     await page.tap('#next');
     await waitForScreen(page, 'play');

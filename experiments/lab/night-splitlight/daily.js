@@ -7,7 +7,9 @@ import { miss, search } from './solver.js';
 
 let asked = null;
 try { asked = new URLSearchParams(location.search).get('day'); } catch { /* not a page */ }
-export const today = /^\d{4}-\d{2}-\d{2}$/.test(asked || '') ? asked : new Date().toISOString().slice(0, 10);
+export const current = new Date().toISOString().slice(0, 10);
+// A shared link names its day; that bench plays the same for everyone, but only the real day's result is saved.
+export const today = /^\d{4}-\d{2}-\d{2}$/.test(asked || '') ? asked : current;
 
 export function random(text) { // FNV-1a into mulberry32, as the small games' home does
   let h = 2166136261; for (const c of text) h = Math.imul(h ^ c.charCodeAt(0), 16777619);

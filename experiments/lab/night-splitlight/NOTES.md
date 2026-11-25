@@ -98,7 +98,7 @@ The owner's note on this page was "Good but improve". This section records what 
 
 | # | Weak thing | Before (main) | After |
 | --- | --- | --- | --- |
-| 1 | Every plate played the same: receivers latched one at a time, so a blind sweep cleared everything | A blind slow sweep (+0.01 every 40 ms, 500 ms pause while a receiver charges) cleared 6 of 6 plates in the browser | Chord rule: every receiver must be fed at the same setting before any charge builds. The same sweep, run in node against `bench.js`, clears 13 of 18 plates. It fails on the four two-control plates 8, 11, 12, 18 and on the moving receiver, 16. A one-control dial still passes through its one answer, so this weakness is only partly fixed. |
+| 1 | Every plate played the same: receivers latched one at a time, so a blind sweep cleared everything | A blind slow sweep (+0.01 every 40 ms, 500 ms pause while a receiver charges) cleared 6 of 6 plates in the browser | Chord rule: every receiver must be fed at the same setting before any charge builds. The same sweep, now part of `bots.mjs` and run in node against `bench.js` (the before run drove the browser slider), clears 13 of 18 plates. It fails on the four two-control plates 8, 11, 12, 18 and on the moving receiver, 16. A one-control dial still passes through its one answer, so this weakness is only partly fixed. |
 | 2 | Difficulty cliff on the last plate | Clumsy bot clear rate 100.0, 99.3, 99.8, 99.0, 99.8, then 34.8% | Lowest plate 85.0%; the largest drop between neighbouring plates is 13.0 points (plate 16 to 17); the planned limit was 15. Full table below. |
 | 3 | Thin light | Plate 6 at dial 0.3: saturated canvas pixels 0.49% WebKit, 0.41% Chromium; bright 2.17% / 2.64%; 1.25 px lines; no bloom; one 784 Hz finish tone | Saturated 1.36% and bright 2.75% on both engines. Glow pass, a continuous dispersion fan of 25 wavelengths between the six bands, receivers that bloom while fed, and a finish chord built from the receivers' own colour pitches through `kit/audio.js`. |
 | 4 | Layout at small phones | 320x568: canvas 286x318 and the page scrolled 3 px | 320x568: canvas 294x327, no scroll on the bench, daily bench, result card, Turkish result or pause card (checked in `check.mjs`). 390x844: canvas 364x404 before and after; the bench is limited by width there. |
@@ -151,7 +151,7 @@ Plates 1–6 keep the first version's glass, cut and lamp. Their receivers moved
 
 ### Daily bench
 
-`?daily` opens today's bench; `?day=YYYY-MM-DD` opens a given day. The seed is FNV-1a of `splitlight <day>` into mulberry32, so everyone gets the same bench. One of four families (mirror, slide, lamps, grating) is generated and checked: receivers well apart, the answer feeds them all, no knife edge (±0.01 still solves), the start is unsolved, and no single control can solve it. Par is 2. The result card shows turns, par and seconds, and a Share button. Share draws a picture of the bench and offers it with a text line through the Web Share API when the phone can share files; otherwise it hands the text and link to `shareLink` from `kit/room.js` (there is no `kit/share.js`). The link is `?daily&day=<day>`, so whoever opens it gets the same bench. A turn is one gesture, or a run of key presses with gaps of 700 ms or less.
+`?daily` opens today's bench; `?day=YYYY-MM-DD` opens a given day. The seed is FNV-1a of `splitlight <day>` into mulberry32, so everyone gets the same bench. One of four families (mirror, slide, lamps, grating) is generated and checked: receivers well apart, the answer feeds them all, no knife edge (±0.01 still solves), the start is unsolved, and no single control can solve it. Par is 2. The result card shows turns, par and seconds, and a Share button. Share draws a picture of the bench and offers it with a text line through the Web Share API when the phone can share files; otherwise it hands the text and link to `shareLink` from `kit/room.js` (there is no `kit/share.js`). The link is `?daily&day=<day>`, so whoever opens it gets the same bench. A bench for a day other than the real (UTC) date is labelled "Shared" and does not replace today's saved result. A turn is one gesture, or a run of key presses with gaps of 700 ms or less.
 
 ### Storage
 
@@ -165,6 +165,7 @@ Existing keys keep their formats: `night-splitlight:plate` (highest unlocked pla
 
 - `check.mjs` second plate: it now aims at the chord answer. A tap at 0.55 used to win plate 2 and must not under the chord rule.
 - `check.mjs` gained `extras` at 320x568: daily bench, par, chips at least 44 px, the chord frequencies, share line, `?from=small` back link, Turkish plate label, no scroll in each state.
+- `check.mjs` daily checks use the real UTC date, and a second case opens the day before and proves today's saved result is kept. With that guard removed the check fails ("a past bench does not replace today's result").
 - `experiments/kit/check/lab-pages.mjs`: the expected plate label is now "Plate 02 / 18" (was "Plate 02 / 06"), and the seeds add `:best`, `:parts` and `:daily` to prove old and new saves load.
 
 ### Correction
@@ -174,7 +175,7 @@ The first section says "There is no lab recording." That stopped being true with
 ### Checks run (2026-11-24)
 
 - `npm test`: 73 of 73 pass.
-- `bots.mjs`: exit 0. `--mutate` and the six named mutations: exit 1.
+- `bots.mjs`: exit 0. `--mutate`: exit 1. The six named mutations exited 1 at commit c3105b18; `bench.js` has not changed since.
 - `check.mjs`: exit 0 on WebKit iPhone 13 and Chromium Pixel 7, with 0 browser errors, outside requests, lab requests or lab writes.
 - `experiments/kit/check/phone.mjs small,lab/night-splitlight`: ok on both browsers, including the hint.
 - Screenshots at 390x844 (first plate, mid-turn, result, plate 12 with chips, pause card, plate 18, end card, daily bench, daily result) and the landscape hint were inspected on both engines. They are kept outside the repository.
@@ -187,3 +188,4 @@ The first section says "There is no lab recording." That stopped being true with
 - The share sheet on a physical phone; the check only sees the line and the link call.
 - The kit's back link and the lab notice keep the language the page loaded in after the in-page language switch. That is the kit's behaviour and was not changed here.
 - On screens shorter than 700 px in portrait, the result card covers the foot of the bench instead of growing the page.
+- On taller screens the result card replaces the dial and the page grows, so the centred bench moves up when a plate is won: at 390x844 the canvas top moves from 186 to 168 px, and to 142 px on the end card with the way back. This was chosen over covering the receivers that just lit.
