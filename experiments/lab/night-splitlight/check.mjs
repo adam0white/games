@@ -326,6 +326,8 @@ async function extras({ name, engine, device }) {
     assert.ok(home?.wins >= 1, 'the small games home hears about the win');
     const line = await page.evaluate(() => window.splitlightShareLine());
     assert.match(line, /^Splitlight 2026-11-24: 2 turns, par 2, [\d.]+ s \S+$/u, 'the share line: ' + line);
+    const link = await page.evaluate(() => window.splitlightShareUrl());
+    assert.match(link, /\/lab\/night-splitlight\/\?daily&day=2026-11-24$/, 'the shared link opens the same bench: ' + link);
     await noScroll(page, 'daily result with the way back');
     await screenshot(page, name, '08-daily-result');
     // Back to the plates; plate 8 has two parts. Turkish throughout, then back to English.

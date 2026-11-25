@@ -385,8 +385,11 @@ function picture() {
     return new Promise(ok => c.toBlob(blob => ok(blob), 'image/png'));
   } catch { return Promise.resolve(null); }
 }
+// The link opens the same day's bench for whoever receives it.
+const shareUrl = () => location.origin + location.pathname + '?daily&day=' + today;
+window.splitlightShareUrl = () => shareUrl();
 async function shareResult() {
-  const text = shareLine(), url = location.origin + location.pathname;
+  const text = shareLine(), url = shareUrl();
   rec.event('share', { mode, day: today });
   try {
     const blob = await picture();
