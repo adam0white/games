@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Exile</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0e1418; color: #e8e4d8; font: 16px/1.4 system-ui, sans-serif; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; outline: none; background: #0e1418; }
+  #card { position: fixed; inset: 0; display: grid; place-content: center; text-align: center; padding: 24px; }
+  #card h1 { margin: 0 0 6px; font-size: 40px; letter-spacing: 0.04em; }
+  #card p { margin: 6px 0; max-width: 34em; opacity: 0.85; }
+  #bar { width: 260px; height: 8px; margin: 18px auto 0; background: #26323a; border-radius: 4px; overflow: hidden; }
+  #fill { width: 0; height: 100%; background: #d9b24a; }
+  #phone { display: none; color: #f0c674; }
+  @media (pointer: coarse) { #phone { display: block; } }
+</style>
+</head>
+<body>
+<canvas id="game" tabindex="-1"></canvas>
+<div id="card">
+  <h1>Exile</h1>
+  <p>Framed for your father's death. Found your own kingdom in the forest, then go back for your brother.</p>
+  <p id="phone">This prototype needs a keyboard and a mouse. Open it on a computer.</p>
+  <p id="status">Loading</p>
+  <div id="bar"><div id="fill"></div></div>
+</div>
+<script src="Build/webgl.loader.js"></script>
+<script>
+  // A Unity WebGL build (source outside this repo; see NOTES.md). The files are gzip with Unity's own
+  // unpacking, so they need no content-encoding header from the server.
+  const canvas = document.getElementById('game'), card = document.getElementById('card'), status = document.getElementById('status');
+  createUnityInstance(canvas, {
+    dataUrl: 'Build/webgl.data.unityweb',
+    frameworkUrl: 'Build/webgl.framework.js.unityweb',
+    codeUrl: 'Build/webgl.wasm.unityweb',
+    companyName: 'Lab', productName: 'Exile', productVersion: '0.1',
+    devicePixelRatio: Math.min(window.devicePixelRatio || 1, 1.5),
+    showBanner: (msg, type) => { if (type === 'error') { card.style.display = 'grid'; status.textContent = msg; } }
+  }, p => { document.getElementById('fill').style.width = Math.round(p * 100) + '%'; })
+    .then(() => { card.style.display = 'none'; canvas.focus(); })
+    .catch(err => { status.textContent = 'Could not start: ' + err; });
+  addEventListener('pointerdown', () => canvas.focus());
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+</script>
+</body>
+</html>
