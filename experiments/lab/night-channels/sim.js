@@ -1,5 +1,6 @@
 // Coordinates are cell centres, x across the hill and y downhill. One tick is 1/30 s.
-// A digit is a seedbed, ~ is an existing furrow, : is sand and # is bedrock.
+// A digit is a seedbed, ~ is an existing furrow, = is an old dry furrow, : is sand and # is bedrock.
+// Gardens 11 onwards are appended; gardens 1-10 and the daily are unchanged.
 const gardens = [
   [5, ['...S...', '.#.~...', '...~..#', '.......', '#.....:', '.......', '...1...', '.:...#.', '.......']],
   [8, ['.S.....', '.~...#.', '...#...', '.##....', '.......', '.:..1..', '..:....', '.....#.', '.......']],
@@ -10,7 +11,28 @@ const gardens = [
   [14,['.S.....', '.~..#..', '.###...', '....:..', '....#1.', '..#....', '..:##..', '.2...3.', '......:']],
   [14,['.....S.', '...#.~.', '.1...:.', '..##.:.', '......2', '..:##..', '..:....', '..3....', '.....#.']],
   [16,['...S...', '...~..#', '.:###..', '.....1.', '..#..#.', '.2:....', '.####..', '....3..', '...:...']],
-  [17,['...S...', '.#.~.#.', '.1...2.', '..:.:..', '..###..', '.:...:.', '...#...', '.3...4.', '#.....#']]
+  [17,['...S...', '.#.~.#.', '.1...2.', '..:.:..', '..###..', '.:...:.', '...#...', '.3...4.', '#.....#']],
+  // 11 onwards: one new idea each (NOTES lists them). Budgets set the clumsy bot's clear rate (bots.mjs).
+  [7,['..S....', '..~....', '..~~~..', '.....#.', '.#.....', '....:..', '.....1.', '.#.....', '.......']], // 11 Old furrows
+  [5,['...S...', '...~...', '.......', '::::::.', '::::::.', '.......', '...1...', '.......', '.#...#.']], // 12 Sand or stone
+  [4,['...S...', '...~...', '.#...#.', '...1...', '.......', '.#...#.', '...2...', '.......', '..#.#..']], // 13 Through the bed
+  [6,['.......', '.......', '...1...', '.#...#.', '.......', '..:....', '.......', '.......', '...S...']], // 14 Spring at the foot
+  [8,['..S....', '..~..#.', '.......', '.#...#.', '..===..', '.#.....', '....1..', '.1#..:.', '.......']], // 15 The dry ditch
+  [7,['.......', '.1...#.', '.......', '....S..', '....~..', '.#.....', '.....2.', '..:....', '.......']], // 16 Up the slope
+  [10,['.......', '..1..#.', '.......', 'S~.....', '.....#.', '.#.....', '.....2.', '.......', '..:....']], // 17 Spring on the side
+  [8,['.S.....', '.~.....', '.......', '...###.', '...#1#.', '.......', '.......', '.:...:.', '.......']], // 18 The walled bed
+  [13,['.S.....', '.~.....', '.......', '####.##', '.......', '.:.....', '.1...2.', '.......', '...#...']], // 19 The narrow gate
+  [7,['...S...', '...~...', '.......', '.:::::.', '.:1::2:', '.:::::.', '.......', '...#...', '.......']], // 20 Sand sink
+  [11,['...S...', '...~...', '.#...#.', '.......', '..#.#..', '.......', '.......', '1.2.3.4', '.......']], // 21 The fan
+  [17,['S......', '~......', '#####..', '.......', '.......', '..#####', '.......', '.......', '1......']], // 22 Switchback
+  [16,['...S...', '...~...', '.......', '.......', '.......', '.......', '.:::::.', '1.....2', '.......']], // 23 Far corners
+  [15,['S.....S', '~.....~', '..#.#..', '.......', '.1...2.', '.......', '..###..', '.......', '...3...']], // 24 Two springs
+  [12,['...1...', '.#...#.', '.......', '...#...', '1.S~..1', '...#...', '.......', '.#...#.', '...1...']], // 25 Four ways
+  [15,['...S...', '.#.~.#.', '.1.....', '...#.2.', '.:.....', '.3.:.#.', '.....4.', '.#.....', '...5...']], // 26 Five beds
+  [11,['...S...', '...~...', '.#...#.', '.......', '#.#.#.#', '.......', '.1...2.', '.......', '.......']], // 27 Mirror
+  [9,['S#.....', '~#....S', '##....~', '.......', '.#...#.', '1......', '..#.#..', '.....2.', '.......']], // 28 The far spring
+  [14,['......S', '.####~.', '.#.....', '.#.####', '.#.....', '.####..', '......#', '.###...', '1......']], // 29 The long way down
+  [14,['S.....S', '~..#..~', '.1.....', '..:.:..', '.#.==2.', '...#...', '.3:.:..', '....#..', '.4...5.']] // 30 The whole hillside
 ];
 
 function hash(text) {
@@ -53,34 +75,34 @@ function dailyGarden(random) {
   return [open.size + 1, rows.map(row => row.join(''))];
 }
 
+export const GARDENS = gardens.length;
 const LOWER = 1.55;
 const DT = 1/30;
 
 export function create(level, day=null) {
-  if (!Number.isInteger(level) || level<1 || level>10) throw new RangeError('Garden must be 1 to 10');
+  if (!Number.isInteger(level) || level<1 || level>GARDENS) throw new RangeError('Garden must be 1 to ' + GARDENS);
   const seed = hash(day === null ? 'garden/' + level : 'day/' + day);
   const random = generator(seed);
   const [budget, map] = day === null ? gardens[level-1] : dailyGarden(random);
   const rows=map.length, cols=map[0].length;
-  const cells=[], beds=[], edges=[];
-  let source;
+  const cells=[], beds=[], edges=[], sources=[];
   for (const [y,row] of map.entries()) {
     for (const [x,mark] of [...row].entries()) {
       const i = y*cols+x;
       const kind = ({'#':'rock', ':':'sand', S:'spring'})[mark] || (/\d/.test(mark) ? 'bed' : 'soil');
-      const dug = mark==='~';
+      const dug = mark==='~' || mark==='=';
       const low = dug || kind==='bed' || kind==='spring';
       const height = (rows-1-y)*.052 + random()*.022 + (low ? 0 : LOWER);
-      const water = kind==='spring' ? .57 : dug ? .33 : 0;
-      cells.push({kind, height, dug, water, moisture:dug ? .26 : 0, growth:0, flowX:0, flowY:0});
+      const water = kind==='spring' ? .57 : mark==='~' ? .33 : 0;
+      cells.push({kind, height, dug, water, moisture:mark==='~' ? .26 : 0, growth:0, flowX:0, flowY:0});
       if (kind==='bed') beds.push(i);
-      if (kind==='spring') source=i;
+      if (kind==='spring') sources.push(i);
       if (x) edges.push([i-1,i,1,0]);
       if (y) edges.push([i-cols,i,0,1]);
     }
   }
   const initialWater = cells.reduce((sum,c) => sum+c.water+c.moisture,0);
-  return {cols, rows, seed, level, source, cells, beds, budget, remaining:budget, ticks:0, won:false,
+  return {cols, rows, seed, level, source:sources[0], sources, cells, beds, budget, remaining:budget, ticks:0, won:false,
     initialWater, supplied:0, drained:0, edges};
 }
 
@@ -100,10 +122,12 @@ export function tick(s) {
   if (s.won) return;
   s.ticks++;
   const cells = s.cells;
-  const source = cells[s.source];
-  const feed = Math.min(.078,Math.max(0,.66-source.water));
-  source.water+=feed;
-  s.supplied+=feed;
+  for (const i of s.sources) {
+    const source = cells[i];
+    const feed = Math.min(.078,Math.max(0,.66-source.water));
+    source.water+=feed;
+    s.supplied+=feed;
+  }
 
   const outgoing = new Float64Array(cells.length);
   const flux = new Float64Array(s.edges.length);

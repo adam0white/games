@@ -1,5 +1,8 @@
-import { create, dig, tick } from './sim.js';
+import { create, dig, tick, GARDENS } from './sim.js';
 import { render, geometry } from './render.js';
+import { stroke } from './stroke.js';
+import { par as findPar, wetNetwork, PARS } from './plan.js';
+import { t, lang, apply, setLang } from './words.js';
 import { readJson, writeJson } from '../../kit/save.js';
 import { sound } from '../../kit/audio.js';
 import { isPauseKey, onLeave } from '../../kit/pause.js';
@@ -7,14 +10,15 @@ import { noZoom } from '../../kit/zoom.js';
 import { screens } from '../../kit/screens.js';
 import { hint } from '../../kit/hint.js';
 import { lab } from '../../kit/lab.js';
+import { home } from '../../kit/home.js';
 
 noZoom();
 const get = id => document.getElementById(id);
 const canvas = get('garden');
 const terrain = get('terrain');
 const key = 'night-channels:save';
-const titles = ['First furrow', 'The bend', 'Between stones', 'Sandy banks', 'A fork in the hill',
-  'Side by side', 'The long terrace', 'Three seedbeds', 'Across the slope', 'The lower garden'];
+// Per-garden fewest cuts, added with gardens 11-30. The old save key keeps its format.
+const bestKey = 'night-channels:gardens';
 const query = new URLSearchParams(location.search);
 const look = query.get('look') === 'clay' ? 'clay' : 'moon';
 document.documentElement.dataset.look = look;
@@ -24,17 +28,23 @@ function today() {
   const d = new Date();
   return [d.getFullYear(), number(d.getMonth()+1), number(d.getDate())].join('-');
 }
+// `completed` meant "garden 10 flowered" before gardens 11-30 existed, so it opens garden 11.
 function load() {
   const raw = readJson(key, null);
-  return {
-    unlocked: Number.isInteger(raw?.unlocked) ? Math.max(1, Math.min(10, raw.unlocked)) : 1,
-    completed: raw?.completed === true,
-    sound: raw?.sound !== false,
-  };
+  const completed = raw?.completed === true;
+  const unlocked = Number.isInteger(raw?.unlocked) ? Math.max(1, Math.min(GARDENS, raw.unlocked)) : 1;
+  return { unlocked: completed ? Math.max(unlocked, 11) : unlocked, completed, sound: raw?.sound !== false };
 }
 let saved = load();
 const dailyBests = new Map();
+let gardenBests = readBests();
 let saveFailed = false;
+function readBests() {
+  const raw = readJson(bestKey, {});
+  const out = {};
+  for (const [k, v] of Object.entries(raw && typeof raw === 'object' ? raw : {})) if (Number.isInteger(v) && v >= 0) out[k] = v;
+  return out;
+}
 function bestOn(date) {
   if (!date) return null;
   const disk = readJson(key + ':best:' + date);
@@ -44,7 +54,7 @@ function bestOn(date) {
 }
 function reportSave(ok) {
   saveFailed = !ok;
-  get('saveStatus').textContent = ok ? '' : 'Progress stays in this session. Storage is unavailable.';
+  get('saveStatus').textContent = ok ? '' : t('saveFailed');
 }
 function store(soundChanged = false) {
   const disk = load();
@@ -54,10 +64,30 @@ function store(soundChanged = false) {
   reportSave(writeJson(key, saved));
 }
 const audio = sound({ on:() => saved.sound });
+// Par for each garden and date is worked out once: the fewest cuts of a planned route the rules confirm flowers.
+// A daily's par is found once per date, in a worker so the tap that opens the daily does not stall.
+// Until it answers the par reads "–". Without workers it is found here.
+const pars = new Map();
+let planner = null;
+try {
+  planner = new Worker(new URL('./par-worker.js', import.meta.url), { type: 'module' });
+  planner.onmessage = ({ data }) => { pars.set(data.id, data.cuts); update(); };
+  planner.onerror = () => { planner = null; for (const [id, v] of pars) if (v === undefined) pars.delete(id); update(); };
+} catch { planner = null; }
+function parOf(n, date) {
+  if (!date) return PARS[n - 1] ?? null;
+  const id = 'd' + n + ':' + date;
+  if (!pars.has(id)) {
+    if (planner) { pars.set(id, undefined); planner.postMessage({ id, level: n, date }); }
+    else pars.set(id, findPar({ create, dig, tick }, n, date)?.cuts ?? null);
+  }
+  return pars.get(id) ?? null;
+}
 let level = saved.unlocked, day = null, state = create(level), screen = 'play';
-let pointer = null, previous = null, lastSound = -Infinity;
-let elapsed = 0, carry = 0, lastFrame = null, blooms = 0;
-let touched = false;
+let pointer = null, previous = null, lastSound = -Infinity, line = null;
+let elapsed = 0, carry = 0, lastFrame = null, blooms = 0, clock = 0;
+let touched = false, connected = false, lastCutTick = 0, lastCutAt = -Infinity, hurry = false;
+let wet = new Set(), effects = [], shared = '', status = '';
 const show = screens(['paused','selection'], name => {
   screen = name;
   const modal = name === 'paused' || name === 'selection';
@@ -65,73 +95,140 @@ const show = screens(['paused','selection'], name => {
   get('pause').hidden = name === 'won';
   if (modal) get(name === 'paused' ? 'resume' : 'return').focus({preventScroll:true});
 });
+
+// Sound and motion for every player action. Motion is drawn on the canvas (render.js) or by CSS on buttons.
+let lastRefuse = -Infinity;
+const feel = {
+  cut(i, y) {
+    effects.push({ kind:'cut', i, at:clock });
+    const now = performance.now();
+    if (now - lastSound > 65) { audio.noise(.065,.085,760 + y * 45); lastSound = now; }
+    pulse('cuts');
+  },
+  refuse(i, why) {
+    effects.push({ kind:'refuse', i, at:clock });
+    const now = performance.now();
+    if (now - lastRefuse > 140) { audio.tone(why === 'spent' ? 196 : 130, .11, .05, 'triangle', -40); lastRefuse = now; }
+    if (why === 'spent') pulse('cuts', 'shake');
+  },
+  wet(i) { effects.push({ kind:'wet', i, at:clock }); audio.tone(988,.14,.03,'sine',180); },
+  bloom(i) { effects.push({ kind:'bloom', i, at:clock }); audio.tone(523,.5,.050,'sine'); audio.tone(784,.62,.034,'sine'); pulse('bloom'); },
+  win() {
+    effects.push({ kind:'win', i:state.source, at:clock });
+    [523, 659, 784, 1046].forEach((f, k) => setTimeout(() => audio.tone(f, .7, .04, 'sine'), 110 * k));
+    pulse('result');
+  },
+  button() { audio.tone(660,.05,.025,'sine',120); },
+};
+function pulse(id, kind = 'pop') {
+  const el = get(id);
+  if (!el || reduced.matches) return;
+  el.classList.remove('pop', 'shake');
+  void el.offsetWidth;
+  el.classList.add(kind);
+}
+
 // Once all cuts are spent, a bed behind an intact bank cannot receive water.
 // A connected bed can still take time to soak, especially downstream of sand.
 function isolatedBed() {
-  const open = new Set([state.source]);
-  for (const i of open) {
-    const x = i % state.cols;
-    for (const n of [x ? i-1 : -1, x+1 < state.cols ? i+1 : -1, i-state.cols, i+state.cols]) {
-      const c = state.cells[n];
-      if (c && (c.dug || c.kind === 'spring' || c.kind === 'bed')) open.add(n);
-    }
-  }
+  const open = wetNetwork(state);
   return state.beds.some(i => !open.has(i));
 }
+const parNow = () => parOf(level, day);
+function folio() {
+  return day ? t('folioDaily', { date: day }) : t('folio', { n: number(level), total: GARDENS });
+}
 function update() {
-  get('folio').textContent = day ? 'Daily garden · ' + day : 'Garden ' + number(level) + ' / 10';
-  get('gardenName').textContent = day ? 'The daily garden' : titles[level - 1];
+  get('folio').textContent = folio();
+  get('gardenName').textContent = day ? t('dailyName') : t('t' + level);
   get('cuts').textContent = state.remaining;
   get('bloom').textContent = blooms + ' / ' + state.beds.length;
-  get('sound').textContent = saved.sound ? 'Sound on' : 'Sound off';
+  get('sound').textContent = saved.sound ? t('soundOn') : t('soundOff');
   get('sound').setAttribute('aria-pressed', String(saved.sound));
   get('next').hidden = !state.won;
   get('openList').hidden = state.won;
-  get('next').textContent = !day && level < 10 ? 'Next garden →' : 'Gardens →';
+  get('nextText').textContent = !day && level < GARDENS ? t('nextGarden') : t('gardens');
   get('daily').hidden = Boolean(day);
+  get('share').hidden = !(day && state.won);
+  get('shareText').textContent = shared || t('share');
   const result = get('result');
-  if (state.won) result.textContent = day ? (state.budget - state.remaining) + ' cuts · Best ' + bestOn(day) : 'In full bloom';
-  else if (state.remaining === 0) result.textContent = isolatedBed() ? 'Isolated bed · Replant ↺' : 'Wait or replant ↺';
-  else if (day && bestOn(day) !== null) result.textContent = 'Best · ' + bestOn(day) + ' cuts';
+  const spent = state.budget - state.remaining, p = parNow();
+  result.classList.toggle('won', state.won);
+  if (state.won) result.textContent = p === null ? t('wonPar', { n: spent, par: '–' })
+    : spent < p ? t('underPar', { n: spent, d: p - spent }) : t('wonPar', { n: spent, par: p });
+  else if (state.remaining === 0 && isolatedBed()) result.textContent = t('isolated');
+  else if (said && performance.now() < saidUntil) result.textContent = t(said);
+  else if (thirsty()) result.textContent = t('thirsty');
+  else if (state.remaining === 0 && !hurry) result.textContent = t('waitOrReplant');
+  else if (hurry) result.textContent = t('running');
+  else if (!touched && day && bestOn(day) !== null) result.textContent = t('bestCuts', { n: bestOn(day), par: p ?? '–' });
+  else if (!touched && p !== null) result.textContent = t('parOnly', { par: p });
   else result.textContent = '';
+}
+// A short word after a refused cut, for 1.6 seconds.
+let said = null, saidUntil = 0;
+function say(word) {
+  if (said === word && performance.now() < saidUntil) return;
+  said = word; saidUntil = performance.now() + 1600;
+  update();
+  setTimeout(() => { if (performance.now() >= saidUntil) update(); }, 1650);
+}
+// Every bed is joined to a spring and 25 seconds of game time passed after the last cut, yet a bed never started.
+function thirsty() {
+  return connected && !state.won && state.ticks - lastCutTick > 30 * 25 && state.beds.some(i => state.cells[i].growth === 0);
+}
+function words() {
+  apply();
+  document.title = t('title');
+  get('title').innerHTML = t('titleHtml');
+  update();
 }
 function lift() {
   const id = pointer;
   pointer = null;
   previous = null;
+  line = null;
   if (id !== null && canvas.hasPointerCapture(id)) canvas.releasePointerCapture(id);
 }
 // Play recording for the game lab: one run is one garden, from the first cut to bloom, replant or leaving it.
-const rec = lab('night-channels');
+const rec = home(lab('night-channels'), { back: ['#paused .card', '#selection .card'] });
 let running = false;
 function recEnd(outcome) {
   if (!running) return;
   running = false;
-  rec.end(outcome, { garden: level, daily: Boolean(day), cuts: state.budget - state.remaining, budget: state.budget, bloomed: blooms, beds: state.beds.length, secs: Math.round(elapsed * 10) / 10 });
+  rec.end(outcome, { garden: level, daily: Boolean(day), cuts: state.budget - state.remaining, budget: state.budget, par: parNow(), bloomed: blooms, beds: state.beds.length, secs: Math.round(elapsed * 10) / 10 });
 }
 function start(n, date = null) {
   recEnd(state.won ? 'won' : state.remaining === 0 ? 'lost' : 'quit');
   lift();
   level = n; day = date; state = create(n,date); touched = false; blooms = 0;
-  elapsed = carry = 0; lastFrame = null;
+  elapsed = carry = 0; lastFrame = null; connected = false; lastCutTick = 0; lastCutAt = -Infinity; hurry = false;
+  wet = new Set(); effects = []; shared = '';
+  connected = state.beds.every(i => wetNetwork(state).has(i));
   show('play'); audio.release(); audio.unlock();
+  if (!reduced.matches) { canvas.classList.remove('fresh'); void canvas.offsetWidth; canvas.classList.add('fresh'); }
   update();
   paint();
 }
 function win() {
   lift();
+  const spent = state.budget - state.remaining;
   if (day) {
-    const cuts = Math.min(state.budget - state.remaining, bestOn(day) ?? Infinity);
+    const cuts = Math.min(spent, bestOn(day) ?? Infinity);
     dailyBests.set(day, cuts);
     reportSave(writeJson(key + ':best:' + day, cuts));
   } else {
-    saved.unlocked = Math.max(saved.unlocked, Math.min(10, level + 1));
+    saved.unlocked = Math.max(saved.unlocked, Math.min(GARDENS, level + 1));
     if (level === 10) saved.completed = true;
     store();
+    gardenBests = { ...readBests(), ...gardenBests };
+    gardenBests[level] = Math.min(spent, gardenBests[level] ?? Infinity);
+    reportSave(writeJson(bestKey, gardenBests));
   }
-  rec.event('garden-complete', { garden: level, daily: Boolean(day), cuts: state.budget - state.remaining, budget: state.budget });
-  if (day) rec.event('daily-finished', { cuts: state.budget - state.remaining });
+  rec.event('garden-complete', { garden: level, daily: Boolean(day), cuts: spent, budget: state.budget, par: parNow() });
+  if (day) rec.event('daily-finished', { cuts: spent, par: parNow() });
   recEnd('won');
+  feel.win();
   show('won');
   update();
 }
@@ -148,33 +245,62 @@ function back() {
 function choose() {
   recEnd(state.won ? 'won' : state.remaining === 0 ? 'lost' : 'quit');
   lift(); audio.hold();
+  gardenBests = { ...readBests(), ...gardenBests };
   const list = get('levels');
   list.replaceChildren();
-  for (let i=1; i<=10; i++) {
+  for (let i=1; i<=GARDENS; i++) {
     const button = document.createElement('button');
     button.textContent = number(i); button.disabled = i > saved.unlocked;
-    const finished = i < saved.unlocked || saved.completed;
+    const finished = i < saved.unlocked || (saved.completed && i <= 10) || gardenBests[i] !== undefined;
+    const atPar = gardenBests[i] !== undefined && parOf(i) !== null && gardenBests[i] <= parOf(i);
     button.classList.toggle('completed', finished);
-    button.setAttribute('aria-label', 'Garden ' + i + ', ' + titles[i-1] + (finished ? ', in bloom' : ''));
+    button.classList.toggle('par', atPar);
+    button.setAttribute('aria-label', t('gardenLabel', { n: i, name: t('t' + i) }) + (finished ? t('gardenDone') : '') + (atPar ? t('gardenPar') : ''));
     button.setAttribute('aria-current', String(!day && i === level));
-    button.onclick = () => start(i);
+    button.onclick = () => { feel.button(); start(i); };
     list.append(button);
   }
   const record = bestOn(today());
-  get('dailyBest').textContent = record !== null
-    ? 'Today’s best on this device · ' + record + ' cuts' : 'Best kept on this device';
+  get('dailyBest').textContent = record !== null ? t('bestToday', { n: record }) : t('bestDevice');
   show('selection');
+  list.querySelector('[aria-current=true]')?.scrollIntoView?.({ block:'nearest' });
 }
-get('daily').onclick = get('pickDaily').onclick = () => start(10,today());
-get('pause').onclick = pause;
-get('retry').onclick = () => start(level,day);
-get('resume').onclick = get('return').onclick = back;
-get('gardens').onclick = get('openList').onclick = choose;
-get('next').onclick = () => !day && level < 10 ? start(level+1) : choose();
+// The daily result as one line of text: no picture, so the route stays the reader's own puzzle.
+function shareText() {
+  const spent = state.budget - state.remaining, p = parNow();
+  const flowers = '✿'.repeat(state.beds.length);
+  const body = p !== null && spent < p ? t('shareUnder', { blooms: flowers, n: spent, d: p - spent })
+    : t('shareCuts', { blooms: flowers, n: spent, par: p ?? '–' });
+  return t('shareLine', { date: day }) + '\n' + body + '\n' + location.origin + location.pathname;
+}
+async function share() {
+  const text = shareText();
+  window.lastShare = text;
+  try {
+    if (navigator.share) {
+      await navigator.share({ text });
+      rec.event('daily-shared', { cuts: state.budget - state.remaining });
+      return;
+    }
+  } catch (e) { if (e?.name === 'AbortError') return; }
+  try { await navigator.clipboard.writeText(text); } catch { /* The line is still in window.lastShare for the check. */ }
+  shared = t('copied');
+  update();
+  rec.event('daily-shared', { cuts: state.budget - state.remaining, copied: true });
+}
+const tap = fn => () => { feel.button(); fn(); };
+get('daily').onclick = get('pickDaily').onclick = tap(() => start(10,today()));
+get('pause').onclick = tap(pause);
+get('retry').onclick = tap(() => start(level,day));
+get('resume').onclick = get('return').onclick = tap(back);
+get('gardens').onclick = get('openList').onclick = tap(choose);
+get('next').onclick = tap(() => !day && level < GARDENS ? start(level+1) : choose());
+get('share').onclick = tap(share);
 get('sound').onclick = () => {
   saved.sound = !saved.sound;
-  store(true); update();
+  store(true); update(); feel.button();
 };
+get('lang').onclick = () => { setLang(lang() === 'tr' ? 'en' : 'tr'); words(); feel.button(); };
 onLeave(pause);
 addEventListener('keydown', e => {
   if (!isPauseKey(e) || e.repeat) return;
@@ -216,15 +342,24 @@ function clippedStroke(a,b) {
   });
   return [point(enter),point(exit)];
 }
+let lastCell = -1;
 function cut(x,y) {
-  if (!dig(state,y * state.cols + x)) return;
-  if (!touched && !running) { running = true; rec.start({ garden: level, daily: Boolean(day), budget: state.budget }); }
-  touched = true; hintControl.done();
-  const now = performance.now();
-  if (now - lastSound > 65) {
-    audio.noise(.065,.085,760 + y * 45);
-    lastSound = now;
+  const i = y * state.cols + x;
+  if (i === lastCell) return;
+  lastCell = i;
+  const what = line.enter(i);
+  const c = state.cells[i];
+  if (what === 'rock' || what === 'spent' || (what === 'broken' && (c.kind === 'soil' || c.kind === 'sand') && !c.dug)) {
+    feel.refuse(i, what);
+    say(what === 'spent' ? 'noCuts' : 'stoneStops');
+    return;
   }
+  if (what !== 'cut') return;
+  if (!touched && !running) { running = true; rec.start({ garden: level, daily: Boolean(day), budget: state.budget, par: parNow() }); }
+  touched = true; hintControl.done();
+  lastCutTick = state.ticks; lastCutAt = performance.now(); hurry = false;
+  connected = state.beds.every(b => wetNetwork(state).has(b));
+  feel.cut(i, y);
   update();
 }
 function trace(event) {
@@ -249,6 +384,7 @@ function trace(event) {
 canvas.addEventListener('pointerdown', e => {
   if (screen !== 'play' || pointer !== null || e.button !== 0 || !inside(position(e))) return;
   e.preventDefault(); pointer = e.pointerId; audio.unlock();
+  line = stroke(state, dig); lastCell = -1;
   try { canvas.setPointerCapture(pointer); } catch { /* An emulated pointer has no native capture. */ }
   trace(e);
 });
@@ -268,11 +404,12 @@ for (const type of ['pointercancel','lostpointercapture']) {
 const hintControl = hint(canvas, {
   key:'night-channels:hint', kind:'path', look:'hand', reach:22,
   when:() => screen === 'play' && !touched && (level !== 1 || Boolean(day)),
-  played:saved.unlocked > 1, delay:4000, label:'Drag from the spring to a seedbed',
+  played:saved.unlocked > 1, delay:4000, label:t('hint'),
 });
 function paint() {
   render(canvas,terrain,state,{
-    time:elapsed, hint:screen === 'play' && !day && level === 1 && pointer === null && state.remaining > 0 &&
+    time:elapsed, clock, effects, hurry,
+    hint:screen === 'play' && !day && level === 1 && pointer === null && state.remaining > 0 &&
       query.get('hint') !== '0' && !hintControl.shown,
     look, reduced:reduced.matches,
   });
@@ -283,32 +420,45 @@ new ResizeObserver(() => {
   lift();
   paint();
 }).observe(canvas);
+// Once every bed is joined to a spring and the finger has been off the soil for a moment, the water runs four times
+// faster: the outcome is settled and only the waiting is left. The rules and their tick are unchanged.
+const HURRY = 4;
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = lastFrame === null ? 0 : Math.min(.2, (now - lastFrame)/1000);
   lastFrame = now;
   if (screen !== 'play' && screen !== 'won') return;
-  elapsed += dt;
+  elapsed += dt; clock += dt;
+  if (effects.length && clock - effects[0].at > 1.6) effects = effects.filter(f => clock - f.at <= 1.6);
   if (screen === 'play') {
+    hurry = connected && touched && pointer === null && !state.won && now - lastCutAt > 800;
     carry += dt;
     while (carry >= 1/30 && !state.won) {
-      tick(state); carry -= 1/30;
+      for (let k = 0; k < (hurry ? HURRY : 1) && !state.won; k++) tick(state);
+      carry -= 1/30;
     }
-    const count = state.beds.filter(i => state.cells[i].growth >= 1).length;
-    if (count > blooms) {
-      blooms = count;
-      // Ring two consonant notes together when a flower opens.
-      if (touched) { audio.tone(523,.5,.050,'sine'); audio.tone(784,.62,.034,'sine'); }
+    for (const i of state.beds) {
+      if (!wet.has(i) && state.cells[i].moisture >= .065) { wet.add(i); if (touched) feel.wet(i); }
+    }
+    const open = state.beds.filter(i => state.cells[i].growth >= 1);
+    if (open.length > blooms) {
+      blooms = open.length;
+      if (touched) feel.bloom(open.at(-1));
       update();
+    } else {
+      const next = hurry + '|' + thirsty();
+      if (next !== status) update();
     }
-    if (state.won) win();
+    status = hurry + '|' + thirsty();
+    if (state.won) { hurry = false; win(); }
   }
   paint();
 }
 // A read-only snapshot lets browser checks inspect running water after a real drag.
 window.channelView = () => ({screen, state:structuredClone(state), geometry:geometry(canvas,state),
-  level, day, best:bestOn(day), unlocked:saved.unlocked, look});
-update();
+  level, day, best:bestOn(day), unlocked:saved.unlocked, look, gardens:GARDENS, par:parNow(), hurry,
+  gardenBest:gardenBests[level] ?? null, lang:lang()});
+words();
 requestAnimationFrame(frame);
 
 // The notice is under the garden from the first moment (this page has no start card); the switch is on the pause card.
