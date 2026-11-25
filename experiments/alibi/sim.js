@@ -315,6 +315,24 @@ export function observe(c, beat) {
   };
 }
 
+// The guided practice case: three suspects, one mark to compare, nothing hidden.
+// It is fixed and is not a campaign level, so no save refers to it. The cake is
+// in room 0. Suspect 1 lies: it says room 2 and the replay shows room 0.
+export function practiceCase() {
+  const at = [[1, 2, 1], [1, 2, 1], [1, 0, 2], [1, 2, 2], [2, 1, 2]];
+  const incident = 2;
+  return {
+    spec: { chapter: 1, site: 0, count: 3, beats: 5, crime: 0, rooms: 3, tutorial: 'practice' },
+    practice: true, level: 1, seed: 0, culprit: 1, crime: 0, crimeRoom: 0, incident,
+    cast: [['fox', 1], ['rabbit', 2], ['bear', 2]].map(([species, room], id) => ({
+      id, species, sound: id, claim: { beat: incident, room },
+    })),
+    shutterBeat: null, blackoutBeat: null, carryBeat: null, carrier: null, trail: null, exchangeBeat: null, maskKinds: [],
+    frames: at.map(row => row.map((room, id) => ({ room, mask: null, slot: id }))),
+    beatCount: 5,
+  };
+}
+
 export const EVIDENCE = ['crumbs', 'splash', 'feather', 'crumbs', 'feather', 'petals', 'honey', 'prints', 'leaves'];
 
 export const freshRun = () => ({ stars: 3, rejected: [], outcome: null });

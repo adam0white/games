@@ -10,7 +10,7 @@ export function cluster(g, ps, time, o) {
   if (ps.length === 3) { g.strokeStyle = o.today ? 'rgba(255,236,190,.5)' : 'rgba(210,225,255,.22)'; g.lineWidth = 1; g.beginPath(); ps.forEach((p, i) => i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y)); g.closePath(); g.stroke(); }
   g.globalCompositeOperation = 'lighter';
   for (const p of ps) {
-    const tw = 0.78 + 0.22 * Math.sin(time / 900 + p.phase), r = p.size * 2.6 * (o.today ? 1.25 : 1), warm = p.hue < 0.62, c = warm ? '255,226,170' : '185,214,255';
+    const tw = 0.78 + 0.22 * Math.sin(time / 900 + p.phase), r = p.size * 2.6 * (o.today ? 1.25 : 1) * (o.zoom || 1), warm = p.hue < 0.62, c = warm ? '255,226,170' : '185,214,255';
     const halo = g.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 4.2); halo.addColorStop(0, `rgba(${c},${0.55 * tw})`); halo.addColorStop(0.25, `rgba(${c},${0.16 * tw})`); halo.addColorStop(1, `rgba(${c},0)`);
     g.fillStyle = halo; g.beginPath(); g.arc(p.x, p.y, r * 4.2, 0, 7); g.fill();
     g.strokeStyle = `rgba(${c},${0.5 * tw})`; g.lineWidth = 0.8; g.beginPath(); g.moveTo(p.x - r * 2.6, p.y); g.lineTo(p.x + r * 2.6, p.y); g.moveTo(p.x, p.y - r * 2.6); g.lineTo(p.x, p.y + r * 2.6); g.stroke();

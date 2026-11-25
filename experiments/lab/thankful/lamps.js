@@ -9,7 +9,7 @@ export function background(g, w, h, time, band, pan) {
 }
 export function cluster(g, ps, time, o) {
   for (const p of [...ps].sort((a, b) => a.y - b.y)) {
-    const depth = 0.7 + 0.5 * (p.y - o.band.top) / Math.max(1, o.band.bottom - o.band.top), s = p.size * 4.4 * depth * (o.today ? 1.15 : 1), fl = 0.85 + 0.15 * Math.sin(time / 420 + p.phase * 3);
+    const depth = 0.7 + 0.5 * (p.y - o.band.top) / Math.max(1, o.band.bottom - o.band.top), s = p.size * 4.4 * depth * (o.today ? 1.15 : 1) * (o.zoom || 1), fl = 0.85 + 0.15 * Math.sin(time / 420 + p.phase * 3);
     g.globalCompositeOperation = 'lighter';
     const halo = g.createRadialGradient(p.x, p.y, 0, p.x, p.y, s * 4); halo.addColorStop(0, `rgba(255,165,70,${0.34 * fl})`); halo.addColorStop(1, 'rgba(255,165,70,0)'); g.fillStyle = halo; g.beginPath(); g.arc(p.x, p.y, s * 4, 0, 7); g.fill();
     for (let k = 0; k < 5; k++) { g.fillStyle = `rgba(255,180,95,${0.2 * fl * (1 - k / 5)})`; const wob = Math.sin(time / 700 + p.phase + k) * 1.5; g.beginPath(); g.ellipse(p.x + wob, p.y + s * 1.5 + k * s * 0.75, s * (0.9 - k * 0.12), s * 0.22, 0, 0, 7); g.fill(); }

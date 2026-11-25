@@ -8,7 +8,14 @@ if (process.argv.includes('--mutate')) {
   assert.notEqual(original,broken,'target face transfer exists');
   rules = 'data:text/javascript;base64,' + Buffer.from(broken).toString('base64');
 }
-const {create,dig,tick} = await import(rules);
+const {create,dig,tick,GARDENS} = await import(rules);
+// Mutations of the new parts: --mutate=stroke lets a stroke dig on past a stone; --mutate=par takes the cheapest
+// route as par without playing it out. Each must make a claim below fail.
+const mutation = process.argv.find(a => a.startsWith('--mutate='))?.slice(9);
+const {stroke} = await import('./stroke.js');
+const plan = await import('./plan.js');
+const parOf = (level, day=null) => plan.par({create,dig,tick}, level, day, {verify: mutation !== 'par'});
+const strokeOn = s => stroke(s, dig, {breakOnRock: mutation !== 'stroke'});
 
 function near(actual,expected,tolerance,message) {
   assert.ok(Math.abs(actual-expected)<=tolerance, message + ': ' + actual + ' vs ' + expected);
@@ -40,8 +47,8 @@ function build(s) {
   const served=new Set();
   while (served.size<s.beds.length) {
     const n=s.cells.length, cost=Array(n).fill(Infinity), prev=Array(n).fill(-1);
-    const open=new Set([s.source]);
-    cost[s.source]=0;
+    const open=new Set(s.sources);
+    for (const i of s.sources) cost[i]=0;
     while (open.size) {
       let best;
       for (const i of open) if (best===undefined || cost[i]<cost[best]) best=i;
@@ -60,7 +67,7 @@ function build(s) {
     const target=s.beds.filter(i=>!served.has(i)).sort((a,b)=>cost[a]-cost[b])[0];
     if (target===undefined || !Number.isFinite(cost[target])) break;
     const path=[];
-    for (let i=target; i!==s.source; i=prev[i]) path.unshift(i);
+    for (let i=target; prev[i]!==-1; i=prev[i]) path.unshift(i);
     served.add(target);
     for (const i of path) {
       if (dig(s,i)) advance(s,3);
@@ -133,7 +140,8 @@ function solve(level,day=null) {
   return s;
 }
 const results=[];
-for (let level=1; level<=10; level++) {
+assert.equal(GARDENS,30,'thirty gardens');
+for (let level=1; level<=GARDENS; level++) {
   const idle=create(level);
   advance(idle,30*90);
   assert.ok(idle.beds.every(i=>idle.cells[i].growth===0),'without a cut every bed stays dry');
@@ -183,6 +191,103 @@ advance(terrace,30*90);
 assert.ok(terrace.won,'high cross-channel feeds all three beds');
 console.log('terrace comparison',starved.budget-starved.remaining,terrace.budget-terrace.remaining,terrace.ticks);
 console.log('maximum mass residual',maxMassError);
+
+// Gardens 1-10 and the daily are unchanged from before gardens 11-30: the solved states of gardens 1-10 and 30 dates
+// hash to the value main's rules gave (computed on main bd56a760 with this planner; `sources` is new and left out).
+function digest(text) { let h=2166136261; for (let i=0;i<text.length;i++) h=Math.imul(h^text.charCodeAt(i),16777619); return (h>>>0).toString(16); }
+{
+  const parts=[];
+  const strip=({sources, ...rest})=>rest;
+  for (let level=1; level<=10; level++) parts.push(JSON.stringify(strip(solve(level))));
+  for (let d=0; d<30; d++) parts.push(JSON.stringify(strip(solve(1,new Date(Date.UTC(2026,10,24+d*7)).toISOString().slice(0,10)))));
+  assert.equal(digest(parts.join('|')),'89119636','gardens 1-10 and the daily match main');
+}
+
+// A stroke stops digging at a stone. Garden 7: a straight drag from the spring down column 1 crosses the stone at
+// row 2; nothing below it is cut. On main the same drag spent four cuts on a dry trench.
+{
+  const s=create(7), line=strokeOn(s);
+  for (let y=0; y<s.rows; y++) line.enter(y*s.cols+1);
+  assert.equal(s.budget-s.remaining,0,'a drag through a stone cuts nothing past it');
+  const tap=strokeOn(s);
+  assert.equal(tap.enter(22),'cut','a new stroke can start below the stone');
+}
+
+// Par: the fewest cuts of a planned route that the rules confirm flowers every bed.
+const pars=[];
+for (let level=1; level<=GARDENS; level++) {
+  const p=parOf(level);
+  assert.ok(p,'garden '+level+' has a par');
+  assert.equal(p.cuts,plan.PARS[level-1],'PARS matches par() for garden '+level);
+  assert.ok(p.cuts<=create(level).budget,'par fits the budget');
+  const s=create(level);
+  for (const d of p.drags) for (const i of d) if (dig(s,i)) advance(s,3);
+  advance(s,30*90);
+  assert.ok(s.won && s.budget-s.remaining===p.cuts,'par route flowers garden '+level+' with par cuts');
+  pars.push(p.cuts);
+}
+let parDiffers=0;
+const dailyPars=[];
+for (let d=0; d<365; d++) {
+  const day=new Date(Date.UTC(2026,10,24+d)).toISOString().slice(0,10);
+  const p=parOf(1,day);
+  assert.ok(p,'daily '+day+' has a par');
+  const s=create(1,day);
+  for (const r of p.drags) for (const i of r) if (dig(s,i)) advance(s,3);
+  advance(s,30*90);
+  assert.ok(s.won && s.budget-s.remaining===p.cuts,'par route flowers daily '+day+' with par cuts');
+  if (p.cuts!==plan.routes(create(1,day)).cuts.length) parDiffers++;
+  dailyPars.push(p.cuts);
+}
+assert.equal(parOf(1,'2029-05-27').cuts,15,'the starving 13-cut route is not par');
+console.log('par gardens',pars.join(' '),'daily par',Math.min(...dailyPars)+'-'+Math.max(...dailyPars),
+  'dates where the cheapest route starves',parDiffers);
+
+// A clumsy player: 30% of drags run straight down from the spring and across to a bed, ignoring stones; one cell in
+// eight the finger wobbles into a neighbour and back; otherwise it drags the planned route. Clear means every bed
+// flowers within 90 s of the last cut. The rate must fall gently: no garden under 50%, no drop of more than 15 points
+// from one garden to the next, and the last five gardens harder than the first five.
+function rng(seed) { return () => (seed=(Math.imul(1664525,seed)+1013904223)>>>0)/4294967296; }
+function clumsy(level, seed) {
+  const s=create(level), r=rng(seed*7919+level);
+  const step=()=>{ for (let k=0;k<3 && !s.won;k++) tick(s); };
+  for (let drag=0; drag<8 && s.remaining>0; drag++) {
+    const net=plan.wetNetwork(s);
+    const left=s.beds.filter(i=>!net.has(i));
+    if (!left.length) break;
+    let cells;
+    if (r()<.3) {
+      const bed=left[Math.floor(r()*left.length)];
+      const sx=s.source%s.cols, sy=Math.floor(s.source/s.cols), bx=bed%s.cols, by=Math.floor(bed/s.cols);
+      cells=[];
+      for (let y=sy; y!==by+Math.sign(by-sy || 1); y+=Math.sign(by-sy || 1)) cells.push(y*s.cols+sx);
+      for (let x=sx; x!==bx; x+=Math.sign(bx-sx)) cells.push(by*s.cols+x+Math.sign(bx-sx));
+    } else cells=plan.routes(s).drags[0];
+    if (!cells) break;
+    const line=strokeOn(s);
+    const enter=i=>{ if (s.cells[i] && line.enter(i)==='cut') step(); };
+    for (const i of cells) {
+      enter(i);
+      if (r()<.12) { const ns=plan.neighbours(s,i); enter(ns[Math.floor(r()*ns.length)]); enter(i); }
+    }
+    step();
+  }
+  advance(s,2700);
+  return s.won;
+}
+const trials=Number(process.argv.find(a=>a.startsWith('--trials='))?.slice(9) || 200);
+const rates=[];
+for (let level=1; level<=GARDENS; level++) {
+  let won=0;
+  for (let t=1; t<=trials; t++) won+=clumsy(level,t);
+  rates.push(Math.round(100*won/trials));
+}
+console.log('clumsy clear % by garden',rates.join(' '));
+const drops=rates.slice(1).map((v,i)=>rates[i]-v);
+assert.ok(Math.min(...rates)>=50,'every garden is cleared by the clumsy player at least half the time');
+assert.ok(Math.max(...drops)<=15,'no cliff: largest drop '+Math.max(...drops));
+const mean=a=>a.reduce((x,y)=>x+y,0)/a.length;
+assert.ok(mean(rates.slice(-5))<mean(rates.slice(0,5)),'later gardens are harder');
 
 // Long generator audit. The eighth layout draw selects which terrace was reserved.
 // Replay that choice independently of the generator's protected-cell set.

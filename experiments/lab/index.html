@@ -18,34 +18,19 @@
 <body>
 <main>
   <h1>Lab experiments</h1>
-  <p>Wild takes on Lantern and Ant Promotion. Each one tests one idea. The main games are not changed by anything here.</p>
+  <p>New ideas are tried here first. The ones that worked have moved out: the small games have their own home, and the Lantern and Ant Promotion ideas are in those games.</p>
+  <a class="card" href="/small/"><b>Small games</b><span>Twelve short games, three picked for tonight.</span></a>
   <div id="list"></div>
   <p><a href="/lantern/" style="color:#ffd9a0">Lantern</a> · <a href="/ant-promotion/" style="color:#ffd9a0">Ant Promotion</a></p>
 </main>
 <script type="module">
 // One entry per experiment: [directory, title, what it tests, which game it comes from]
-const LIST = [
-  ['ant-hide', 'Ant Hide', 'Rocks block what hunters can see and tall grass hides you. Their sight is drawn with real shadows, so you can see where it is safe. Break their line of sight to lose them.', 'Ant Promotion'],
-  ['ant-evolve', 'Ant Promotion: The Meadow Evolves', 'Every animal carries traits. The ones that chase you well, or escape you, have the children. The meadow slowly learns how you play, and tells you what it learned.', 'Ant Promotion'],
-  ['lantern-ripples', 'Lantern Ripples', 'The water is simulated: the wake, every pickup, the rain and every hit send ripples across the river.', 'Lantern'],
-  ['lantern-race', 'Lantern: Race', 'Race up to eight boats on the same river, in an open room or with a code for friends.', 'Lantern'],
-  ['wild2-face-shift', 'Face Shift', 'Grab a rubber face by its brow, nose, ears or mouth and stretch it to copy each sitter, then take the photo.', 'New'],
-  ['wild-pour', 'Pour', 'A jug of real drops: juice, then honey, soda and two glasses. Slide to tip it, or tip the phone itself, and fill the glass to the line.', 'New'],
-  ['night-bells', 'Night Bells', 'Three bells swing at their own pace. Tap each one at the top of its swing to keep it ringing and light the village.', 'New'],
-  ['night-channels', 'Channels', 'Water is the game. Dig channels with your thumb so the spring runs downhill and the seedbeds flower.', 'New'],
-  ['night-podwire', 'Podwire', 'Pull a string and let go. The wave runs along it and splits the seed pods: eighteen plates of real string physics, and a plate of the day.', 'New'],
-  ['lantern-duet', 'Lantern Duet', 'Two boats, one thumb each, joined by a rope of light. Spread the rope to sweep up embers; bring both boats to one side of a rock before it snags. Three nights.', 'Lantern'],
-  ['night-splitlight', 'Splitlight', 'Tap to send white light through glass. It splits into colours; turn the glass so each colour finds its receiver.', 'New'],
-  ['lantern-tide', 'Lantern Tide', 'The river has currents you can read. Fast water saves the flame but hides the rocks; eddies behind rocks relight the wick.', 'Lantern'],
-  ['night-rubbing', 'Carbon Cabinet', 'Rub graphite across a fossil plate. The direction of each stroke decides which edges show.', 'New'],
-  ['night-sand', 'Night Sand', 'Thousands of sand grains pile, slide and pour. Take sand in your fingers and let it run: dig out lamps, fill hourglasses, sift, pile and layer it, then rake a garden worth sharing.', 'New'],
-  ['night-saltplate', 'Saltplate', 'Slide a brass tuner until the salt on a ringing plate settles into the engraved pattern.', 'New'],
-  ['pitch', 'Paper Pitch', 'Paper soccer, the old pencil game. Draw the ball\'s path one line at a time; bounce off old ink to go again. A bot, a daily one-turn puzzle, or two on one phone.', 'New'],
-  ['ring', 'Firefly Ring', 'Drag a glowing thread around fireflies and close the ring. One colour scores the square of the catch; a mixed ring scatters them. Eight levels to dawn, and a daily meadow.', 'New'],
-  ['thankful', 'Thankful Garden', 'Three thanks a day. Each one grows as a flower in a garden that fills.', 'the lab'],
-];
+// The lab was cleaned up on 2026-11-24 (NOTES.md, "Lab cleanup"). The small games are listed at /small/. Pages the
+// owner accepted into Lantern and Ant Promotion are not listed here while they are being folded in; their addresses
+// keep working until each fold lands and then redirect to the game.
+const LIST = [];
 const box = document.getElementById('list');
-if (!LIST.length) box.innerHTML = '<p>The first experiments are being built.</p>';
+if (!LIST.length) box.innerHTML = '<p>Nothing is on trial right now. The next experiments will appear here.</p>';
 for (const [dir, title, what, from] of LIST) {
   const a = document.createElement('a'); a.className = 'card'; a.href = `./${dir}/`;
   const b = document.createElement('b'); b.textContent = title;
