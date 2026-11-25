@@ -628,5 +628,22 @@ Not verified: a new player, a real phone, a native Turkish reader; the 9-unit fi
 
 ### Left as a proposal (2026-11-24)
 
-- Offer practice by itself on a first visit, as Lantern does.
+- ~~Offer practice by itself on a first visit, as Lantern does.~~ Done 2026-11-25 (note #260), below.
 - Show the step sentences in words in cases 1–7 too; they exist in both languages but only screen readers get them.
+
+## 2026-11-25: practice opens by itself for a new player (tester t1, note #260, answering #252)
+
+The tester chose "Open the tutorial by itself for new players" from the lab's question.
+
+- A player with no `alibi-save` who has never opened practice gets the practice case when they tap Play, instead of case 1. Opening practice (by Play or by How to play) writes the new key `alibi-practice` = `'1'`, so the next Play goes to case 1. Practice still writes nothing to `alibi-save`.
+- A player who already has a save is never sent to practice. A `?level=` link skips the offer, so the browser checks that open `?level=1` are unchanged.
+- To skip practice: pause, Menu, Play. There is no Skip button on the first step; Lantern asks first and offers Skip. Recorded below.
+
+Checks: new lines in `kit/check/phone.mjs` (`alibi`): the first Play opened practice and wrote the key and no save; with the key removed, Play opens practice at step 0; after it, a reload and Play opens case 1; a player with a save is not sent to practice and is not marked. With the old `game.js` the check fails at "the first Play opened practice" on WebKit and Chromium. `check.mjs` passed on all three profiles.
+
+Not verified: a real phone; whether a new player finds the way out of practice without a Skip button.
+
+### Left as a proposal (2026-11-25)
+
+- A Skip button on the first practice step, if new players want to go straight to case 1.
+
