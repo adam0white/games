@@ -47,11 +47,7 @@ Archiving a registered game (done for Commonstead, Island, Hearsay, Good Hands, 
 
 ## Old hostnames
 
-Without a route to this Worker, an archived game's old host falls through to the game's original deployment, which still serves its old build. So the eight hosts in `archivedHosts` (`worker-settings.mjs`) keep a `<host>/*` route, and `src/worker.mjs` answers any path on them with a 302 to `https://human.adamwhite.work/games/`. A 302, not a 301, so browsers do not cache it and rollback takes effect at once. `scripts/deploy-preflight.test.mjs` keeps `wrangler.jsonc` in step with the list, `scripts/check-redirects.mjs` refuses any route that is neither an enabled games.json alias nor an archived host, and `validateRegistry` refuses a games.json legacy origin that is still archived.
-
-On 2026-11-23, before this, six of the first seven hosts returned the old builds with HTTP 200; `island.adamwhite.work` has a proxied DNS record but returned 522 (its origin is gone). `smoke.adamwhite.work` was already a route to this Worker as a legacy host (a redirect to `/smoke/`); it moved to `archivedHosts` when Smoke was archived and its old redirect target stops serving.
-
-Rollback for one host: remove it from `archivedHosts` and its route from `wrangler.jsonc`, and deploy. The original deployment then answers it again.
+Deleted on 2026-11-25 at the owner's request; see "Old game subdomains" in `docs/infrastructure.md`. The eight archived hosts no longer resolve and `archivedHosts` in `worker-settings.mjs` is empty. The mechanism stays: a host added to `archivedHosts` (with its `<host>/*` route in `wrangler.jsonc`) is answered with a 302 to the games shelf, and `scripts/deploy-preflight.test.mjs`, `scripts/check-redirects.mjs` and `validateRegistry` keep the lists in step.
 
 
 ## Ideas worth reusing

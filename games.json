@@ -9,7 +9,7 @@
       },
       "saveSchema": "rope-hf4/1",
       "legacyOrigin": "https://rope.adamwhite.work",
-      "redirectEnabled": true,
+      "redirectEnabled": false,
       "verifiedRelease": "fd4e4ad80580939e3903213950bd5b3a3b2e63cc"
     },
     {
@@ -23,7 +23,7 @@
         "chromium"
       ],
       "legacyOrigin": "https://glance.adamwhite.work",
-      "redirectEnabled": true,
+      "redirectEnabled": false,
       "verifiedRelease": "fd4e4ad80580939e3903213950bd5b3a3b2e63cc"
     },
     {
@@ -50,7 +50,7 @@
         "webkit"
       ],
       "legacyOrigin": "https://murmur.adamwhite.work",
-      "redirectEnabled": true,
+      "redirectEnabled": false,
       "verifiedRelease": "fd4e4ad80580939e3903213950bd5b3a3b2e63cc"
     },
     {
@@ -61,7 +61,7 @@
       },
       "saveSchema": "stairwell@14/15/16",
       "legacyOrigin": "https://stairwell.adamwhite.work",
-      "redirectEnabled": true,
+      "redirectEnabled": false,
       "verifiedRelease": "fd4e4ad80580939e3903213950bd5b3a3b2e63cc"
     },
     {
@@ -72,7 +72,7 @@
       },
       "saveSchema": "pass-hf4/2",
       "legacyOrigin": "https://pass.adamwhite.work",
-      "redirectEnabled": true,
+      "redirectEnabled": false,
       "verifiedRelease": "fd4e4ad80580939e3903213950bd5b3a3b2e63cc"
     },
     {
@@ -87,7 +87,7 @@
         "webkit"
       ],
       "legacyOrigin": "https://warren.adamwhite.work",
-      "redirectEnabled": true,
+      "redirectEnabled": false,
       "verifiedRelease": "fd4e4ad80580939e3903213950bd5b3a3b2e63cc"
     },
     {
@@ -106,7 +106,7 @@
         "chromium"
       ],
       "legacyOrigin": "https://neighbours.adamwhite.work",
-      "redirectEnabled": true,
+      "redirectEnabled": false,
       "verifiedRelease": "fd4e4ad80580939e3903213950bd5b3a3b2e63cc"
     },
     {
@@ -121,7 +121,7 @@
         "webkit"
       ],
       "legacyOrigin": "https://lefthand.adamwhite.work",
-      "redirectEnabled": true,
+      "redirectEnabled": false,
       "verifiedRelease": "fd4e4ad80580939e3903213950bd5b3a3b2e63cc"
     },
     {
@@ -136,7 +136,7 @@
         "webkit"
       ],
       "legacyOrigin": "https://word.adamwhite.work",
-      "redirectEnabled": true,
+      "redirectEnabled": false,
       "verifiedRelease": "fd4e4ad80580939e3903213950bd5b3a3b2e63cc"
     }
   ]
