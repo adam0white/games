@@ -1,4 +1,4 @@
-import { field, LEVELS } from './sim.js';
+import { toneField, marks, violinHalfWidth } from './sim.js';
 
 const SIZE = 400;
 const EDGE = 29;
@@ -14,13 +14,13 @@ const PALETTES = {
   steel: {
     body: ['#19383d', '#102c32', '#081c22'],
     plate: ['#345160', '#223d50', '#152b3d'],
-    bevel: '#789792', dark: '#091923', etch: '#9bcacb', ink: '#adcecb',
+    bevel: '#789792', dark: '#091923', etch: '#9bcacb', ink: '#adcecb', powder: '#f0995a',
     salt: ['#d2be98', '#f1dfae', '#fff5d2'],
   },
   oxide: {
     body: ['#462d2b', '#302125', '#1c171e'],
     plate: ['#694e43', '#493539', '#342731'],
-    bevel: '#ac8771', dark: '#20151c', etch: '#d5ae8f', ink: '#dac0a1',
+    bevel: '#ac8771', dark: '#20151c', etch: '#d5ae8f', ink: '#dac0a1', powder: '#f6b06e',
     salt: ['#d9bd8f', '#f6dcaa', '#fff1cd'],
   },
 };
@@ -68,12 +68,10 @@ function mount(ctx, x, y, angle, palette) {
   ctx.restore();
 }
 
-function texture(ctx, palette) {
+function texture(ctx, palette, outline) {
   const random = rng(22479);
   ctx.save();
-  ctx.beginPath();
-  ctx.rect(EDGE, EDGE, SPAN, SPAN);
-  ctx.clip();
+  ctx.clip(outline);
 
   for (let i = 0; i < 5800; i++) {
     const x = EDGE + random() * SPAN;
@@ -95,20 +93,22 @@ function texture(ctx, palette) {
   ctx.restore();
 }
 
-function contour(ctx, level, drive, palette) {
+// The zero line of a field, as a path in plate units.
+function nodalPath(sample, inside) {
   const side = DIVISIONS + 1;
   const values = new Float64Array(side * side);
   for (let y = 0; y < side; y++) {
     for (let x = 0; x < side; x++) {
-      values[y * side + x] = field(level, drive, x / DIVISIONS, y / DIVISIONS);
+      values[y * side + x] = sample(x / DIVISIONS, y / DIVISIONS);
     }
   }
+  const ctx = new Path2D();
 
   const step = SPAN / DIVISIONS;
   const corners = [[0, 0], [1, 0], [1, 1], [0, 1]];
-  ctx.beginPath();
   for (let y = 0; y < DIVISIONS; y++) {
     for (let x = 0; x < DIVISIONS; x++) {
+      if (inside && !inside((x + 0.5) / DIVISIONS, (y + 0.5) / DIVISIONS)) continue;
       const index = y * side + x;
       const samples = [
         values[index], values[index + 1], values[index + side + 1], values[index + side],
@@ -127,7 +127,7 @@ function contour(ctx, level, drive, palette) {
       }
       if (points.length === 2) line(ctx, ...points[0], ...points[1]);
       if (points.length === 4) {
-        const center = field(level, drive, (x + 0.5) / DIVISIONS, (y + 0.5) / DIVISIONS);
+        const center = sample((x + 0.5) / DIVISIONS, (y + 0.5) / DIVISIONS);
         if ((center >= 0) === (samples[0] >= 0)) {
           line(ctx, ...points[0], ...points[1]);
           line(ctx, ...points[2], ...points[3]);
@@ -138,17 +138,23 @@ function contour(ctx, level, drive, palette) {
       }
     }
   }
+  return ctx;
+}
+
+function engrave(ctx, path, palette, faint = false) {
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
+  ctx.setLineDash(faint ? [3, 4] : []);
   ctx.lineWidth = 2.3;
-  ctx.globalAlpha = 0.46;
+  ctx.globalAlpha = faint ? 0.3 : 0.46;
   ctx.strokeStyle = palette.dark;
-  ctx.stroke();
+  ctx.stroke(path);
   ctx.lineWidth = 0.8;
-  ctx.globalAlpha = 0.52;
+  ctx.globalAlpha = faint ? 0.34 : 0.52;
   ctx.strokeStyle = palette.etch;
-  ctx.stroke();
+  ctx.stroke(path);
   ctx.globalAlpha = 1;
+  ctx.setLineDash([]);
 }
 
 function graduations(ctx, palette) {
@@ -178,7 +184,53 @@ function graduations(ctx, palette) {
   ctx.globalAlpha = 1;
 }
 
-function paintBacking(ctx, level, palette) {
+
+// The plate's outline in plate units (the square is the old plate exactly).
+const outlines = new Map();
+export function outline(shape) {
+  if (outlines.has(shape)) return outlines.get(shape);
+  const path = new Path2D();
+  const X = u => EDGE + u * SPAN;
+  if (shape === 'disk') path.arc(200, 200, SPAN / 2 - 0.5, 0, Math.PI * 2);
+  else if (shape === 'triangle') {
+    path.moveTo(X(0), X(0.933));
+    path.lineTo(X(1), X(0.933));
+    path.lineTo(X(0.5), X(0.067));
+    path.closePath();
+  } else if (shape === 'violin') {
+    const points = [];
+    for (let i = 0; i <= 120; i++) {
+      const y = 0.03 + 0.94 * i / 120;
+      points.push([0.5 + violinHalfWidth(y), y]);
+    }
+    path.moveTo(X(0.5), X(0.03));
+    for (const [x, y] of points) path.lineTo(X(x), X(y));
+    for (const [x, y] of points.reverse()) path.lineTo(X(1 - x), X(y));
+    path.closePath();
+  } else path.rect(EDGE, EDGE, SPAN, SPAN);
+  outlines.set(shape, path);
+  return path;
+}
+
+const engravings = new Map();
+// The engraved target (and its lit copy for the moment it prints), per plate.
+function engraving(spec) {
+  if (engravings.has(spec.id)) return engravings.get(spec.id);
+  const result = { lines: null, drone: null, spots: [], crests: [] };
+  if (!spec.free) {
+    result.lines = nodalPath((x, y) => toneField(spec, 0, x, y), null);
+    if (spec.drone !== undefined) result.drone = nodalPath((x, y) => toneField(spec, 1, x, y), null);
+    const found = marks(spec);
+    result.spots = found.spots;
+    result.crests = found.crests;
+  }
+  engravings.set(spec.id, result);
+  return result;
+}
+
+function paintBacking(ctx, spec, palette) {
+  const shape = spec.shape ?? 'square';
+  const plate = outline(shape);
   ctx.fillStyle = linear(ctx, 0, 0, SIZE, SIZE, palette.body);
   ctx.fillRect(0, 0, SIZE, SIZE);
   ctx.strokeStyle = palette.bevel;
@@ -186,19 +238,40 @@ function paintBacking(ctx, level, palette) {
   ctx.lineWidth = 0.75;
   ctx.strokeRect(4, 4, 392, 392);
   ctx.globalAlpha = 1;
-  ctx.fillStyle = palette.dark;
-  ctx.fillRect(25, 25, 350, 351);
-  ctx.fillStyle = palette.bevel;
-  ctx.fillRect(27, 27, 346, 346);
+  if (shape === 'square') {
+    ctx.fillStyle = palette.dark;
+    ctx.fillRect(25, 25, 350, 351);
+    ctx.fillStyle = palette.bevel;
+    ctx.fillRect(27, 27, 346, 346);
+  } else {
+    // A cut plate: a shadow and a bevelled rim instead of the square's frame.
+    ctx.save();
+    ctx.translate(0, 2.5);
+    ctx.fillStyle = palette.dark;
+    ctx.fill(plate);
+    ctx.restore();
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = palette.bevel;
+    ctx.stroke(plate);
+  }
   ctx.fillStyle = linear(ctx, 60, 32, 373, 350, palette.plate);
-  ctx.fillRect(EDGE, EDGE, SPAN, SPAN);
-  texture(ctx, palette);
+  ctx.fill(plate);
+  texture(ctx, palette, plate);
   ctx.strokeStyle = palette.dark;
   ctx.globalAlpha = 0.65;
   ctx.lineWidth = 0.8;
-  ctx.strokeRect(EDGE + 0.5, EDGE + 0.5, SPAN - 1, SPAN - 1);
+  if (shape === 'square') ctx.strokeRect(EDGE + 0.5, EDGE + 0.5, SPAN - 1, SPAN - 1);
+  else ctx.stroke(plate);
   ctx.globalAlpha = 1;
-  contour(ctx, level, LEVELS[level - 1].target, palette);
+  const marked = engraving(spec);
+  ctx.save();
+  ctx.clip(plate);
+  if (marked.drone) engrave(ctx, marked.drone, palette, true);
+  if (marked.lines) engrave(ctx, marked.lines, palette, !!marked.drone);
+  ctx.restore();
+  // Two tones: the salt can rest only where both figures cross. Powder: rings where it heaps.
+  for (const [x, y] of marked.spots) ring(ctx, EDGE + x * SPAN, EDGE + y * SPAN, 6.5, palette, 0.75);
+  for (const [x, y] of marked.crests) ring(ctx, EDGE + x * SPAN, EDGE + y * SPAN, 5, palette, 0.55, true);
 
   graduations(ctx, palette);
   mount(ctx, 14, 14, -0.67, palette);
@@ -207,10 +280,26 @@ function paintBacking(ctx, level, palette) {
   mount(ctx, 386, 386, -0.31, palette);
 }
 
-function backing(canvas, level, look, palette) {
+function ring(ctx, x, y, radius, palette, alpha, dashed = false) {
+  ctx.save();
+  ctx.setLineDash(dashed ? [2, 2.5] : []);
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.lineWidth = 2.2;
+  ctx.globalAlpha = alpha * 0.8;
+  ctx.strokeStyle = palette.dark;
+  ctx.stroke();
+  ctx.lineWidth = 0.9;
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = dashed ? palette.powder : palette.etch;
+  ctx.stroke();
+  ctx.restore();
+}
+
+function backing(canvas, spec, look, palette) {
   const { width, height } = canvas;
   const cached = backings.get(canvas);
-  if (cached?.level === level && cached.look === look && cached.width === width &&
+  if (cached?.id === spec.id && cached.look === look && cached.width === width &&
       cached.height === height) {
     return cached.surface;
   }
@@ -220,8 +309,8 @@ function backing(canvas, level, look, palette) {
   surface.height = height;
   const ctx = surface.getContext('2d');
   ctx.scale(width / SIZE, height / SIZE);
-  paintBacking(ctx, level, palette);
-  backings.set(canvas, { surface, width, height, level, look });
+  paintBacking(ctx, spec, palette);
+  backings.set(canvas, { surface, width, height, id: spec.id, look });
   return surface;
 }
 
@@ -301,35 +390,164 @@ function crystalAtlas(palette) {
   return atlas;
 }
 
-function salt(ctx, grains, palette) {
-  const atlas = crystalAtlas(palette);
+
+const POWDER = { steel: ['#f07a32', '#ffa65c', '#ffe1ad'], oxide: ['#c8692c', '#f0a05a', '#ffe0b0'] };
+function atlasFor(palette, powder) {
+  if (!powder) return crystalAtlas(palette);
+  const key = palette.powderKey ??= { ...palette, salt: palette === PALETTES.oxide ? POWDER.oxide : POWDER.steel };
+  return crystalAtlas(key);
+}
+
+// Grains: salt crystals, and the fine orange powder on plates that carry it. Before the first touch
+// the salt is still falling onto the plate (intro below 1); after a print every grain hops (hop 0..1).
+function salt(ctx, grains, palette, shape, { intro = 1, hop = -1, time = 0 } = {}) {
   const pixels = CRYSTAL_CELL * CRYSTAL_SCALE;
+  const saltAtlas = atlasFor(palette, false);
+  const powderAtlas = atlasFor(palette, true);
   ctx.save();
-  ctx.beginPath();
-  ctx.rect(EDGE + 1, EDGE + 1, SPAN - 2, SPAN - 2);
-  ctx.clip();
-
+  ctx.clip(outline(shape));
   for (let i = 0; i < grains.length; i++) {
-    const { x, y } = grains[i];
+    const grain = grains[i];
+    let { x, y } = grain;
+    let lift = 0;
+    let size = grain.powder ? CRYSTAL_CELL * 0.95 : CRYSTAL_CELL;
+    if (grain.powder && shape === 'disk') {
+      // Powder heaps against the rim; draw it just inside, so the rim's clip does not cut the heap in half.
+      const r = Math.hypot(x - 0.5, y - 0.5);
+      if (r > 0.47) { x = 0.5 + (x - 0.5) * 0.47 / r; y = 0.5 + (y - 0.5) * 0.47 / r; }
+    }
+    if (grain.gone) {
+      // Shaken off: the grain jumps away and fades over half a second.
+      const age = time - grain.goneAt;
+      if (!(age >= 0 && age < 0.5)) continue;
+      ctx.globalAlpha = 1 - age * 2;
+      lift = age * 60;
+      x += (x - 0.5) * age * 0.6;
+    }
+    if (intro < 1) {
+      const delay = ((i * 0.618034) % 1) * 0.55;
+      const fall = Math.min(1, Math.max(0, (intro - delay) / 0.45));
+      if (fall <= 0) continue;
+      lift += (1 - fall) ** 2 * 120;
+      ctx.globalAlpha = Math.min(1, fall * 2);
+    }
+    if (hop >= 0 && hop < 1) {
+      const phase = ((i * 0.381966) % 1) * 0.35;
+      const local = Math.min(1, Math.max(0, (hop - phase) / 0.6));
+      lift += Math.sin(local * Math.PI) * 7;
+    }
     const variant = (Math.imul(i ^ (i >>> 4), 13) ^ (i >>> 2)) & (CRYSTAL_VARIANTS - 1);
-    ctx.drawImage(atlas, variant * pixels, 0, pixels, pixels,
-      EDGE + x * SPAN - CRYSTAL_CELL / 2, EDGE + y * SPAN - CRYSTAL_CELL / 2,
-      CRYSTAL_CELL, CRYSTAL_CELL);
+    ctx.drawImage(grain.powder ? powderAtlas : saltAtlas, variant * pixels, 0, pixels, pixels,
+      EDGE + x * SPAN - size / 2, EDGE + y * SPAN - size / 2 - lift, size, size);
+    if (grain.gone || intro < 1) ctx.globalAlpha = 1;
   }
-
   ctx.restore();
 }
 
-export function drawPlate(ctx, state, { look = 'steel', active = false, time = 0 } = {}) {
+// The bow (a strip of rosined hair against the plate) or the damping finger.
+function handle(ctx, state, palette, time, active) {
+  const spec = state.spec;
+  const kind = spec?.handle ?? (spec?.free && state.handle ? 'bow' : null);
+  if (!kind) return;
+  if (!state.handle) {
+    if (kind === 'damp') {
+      // No finger yet: a fingerprint waits at the rim.
+      ctx.globalAlpha = 0.5 + 0.2 * Math.sin(time * 3);
+      fingertip(ctx, 372, 372, palette);
+      ctx.globalAlpha = 1;
+    }
+    return;
+  }
+  const x = EDGE + state.handle[0] * SPAN;
+  const y = EDGE + state.handle[1] * SPAN;
+  if (kind === 'damp') return fingertip(ctx, x, y, palette);
+  const pulse = active ? 0.5 + 0.5 * Math.sin(time * 18) : 0;
+  ctx.save();
+  ctx.globalAlpha = 0.25 + 0.25 * pulse;
+  circle(ctx, x, y, 14 + 3 * pulse, '#ffcf8a');
+  ctx.globalAlpha = 1;
+  ctx.translate(x, y);
+  ctx.rotate(-0.6);
+  ctx.fillStyle = '#3b2417';
+  ctx.fillRect(-20, -4.5, 40, 9);
+  ctx.fillStyle = '#f3e6c4';
+  ctx.fillRect(-19, -1.6, 38, 3.2);
+  ctx.fillStyle = '#c99a5b';
+  ctx.fillRect(-21, -5, 5, 10);
+  ctx.restore();
+  circle(ctx, x, y, 3, RED);
+}
+
+function fingertip(ctx, x, y, palette) {
+  ctx.save();
+  ctx.globalAlpha *= 0.85;
+  circle(ctx, x, y + 1.5, 13, '#00000055');
+  circle(ctx, x, y, 12, '#e9b99a');
+  ctx.strokeStyle = '#a3705a';
+  ctx.lineWidth = 0.7;
+  for (let r = 3; r <= 10; r += 2.3) {
+    ctx.beginPath();
+    ctx.ellipse(x, y + 1, r, r * 0.8, 0, Math.PI * 1.1, Math.PI * 1.9 + r * 0.05);
+    ctx.stroke();
+  }
+  ctx.restore();
+  void palette;
+}
+
+// options: look, active, time, progress (0..1, the print taking hold), lit (seconds since the print,
+// or -1), intro (0..1 while the salt first falls)
+export function drawPlate(ctx, state, { look = 'steel', active = false, time = 0, progress = 0, lit = -1, intro = 1 } = {}) {
   const { width, height } = ctx.canvas;
   const palette = look === 'oxide' ? PALETTES.oxide : PALETTES.steel;
-  const surface = backing(ctx.canvas, state.level, look, palette);
+  const spec = state.spec;
+  const surface = backing(ctx.canvas, spec, look, palette);
 
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.drawImage(surface, 0, 0);
   ctx.scale(width / SIZE, height / SIZE);
-  salt(ctx, state.grains, palette);
+
+  // The engraving lights as the print takes hold and stays lit once it is taken.
+  const glow = lit >= 0 ? 1 : progress;
+  const marked = !spec.free && engraving(spec);
+  if (marked && glow > 0.02) {
+    ctx.save();
+    ctx.clip(outline(spec.shape));
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#ffd99a';
+    ctx.globalAlpha = 0.18 * glow;
+    ctx.lineWidth = 9;
+    if (!marked.drone) ctx.stroke(marked.lines);
+    ctx.globalAlpha = 0.5 * glow;
+    ctx.lineWidth = 2.2;
+    if (!marked.drone) ctx.stroke(marked.lines);
+    ctx.restore();
+    ctx.fillStyle = '#ffd99a';
+    for (const [x, y] of marked.spots) {
+      ctx.globalAlpha = 0.35 * glow;
+      ctx.beginPath();
+      ctx.arc(EDGE + x * SPAN, EDGE + y * SPAN, 11, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+  salt(ctx, state.grains, palette, spec.shape, { intro, hop: lit >= 0 ? lit / 0.9 : -1, time });
+  handle(ctx, state, palette, time, active);
+
+  // A sweep of light across the plate when the print is taken.
+  if (lit >= 0 && lit < 1.2) {
+    const along = lit / 1.2;
+    const x = -80 + along * 560;
+    const sweep = ctx.createLinearGradient(x - 70, x - 140, x + 70, x + 0);
+    sweep.addColorStop(0, '#fff3d000');
+    sweep.addColorStop(0.5, '#fff3d055');
+    sweep.addColorStop(1, '#fff3d000');
+    ctx.save();
+    ctx.clip(outline(spec.shape));
+    ctx.fillStyle = sweep;
+    ctx.fillRect(0, 0, SIZE, SIZE);
+    ctx.restore();
+  }
 
   // The rim lamp marks vibration and remains lit when the print has settled.
   const lamp = state.won ? '#ffc783' : RED;
@@ -339,4 +557,23 @@ export function drawPlate(ctx, state, { look = 'steel', active = false, time = 0
   ctx.globalAlpha = intensity;
   circle(ctx, 200, 10, 1.5, lamp);
   ctx.restore();
+}
+
+// A picture of the plate for sharing: the plate as drawn, with a caption strip under it.
+export function picture(canvas, caption, sub, look) {
+  const out = document.createElement('canvas');
+  const side = 1080;
+  out.width = side;
+  out.height = side + 150;
+  const c = out.getContext('2d');
+  c.fillStyle = look === 'oxide' ? '#efe3cf' : '#f1ead8';
+  c.fillRect(0, 0, out.width, out.height);
+  c.drawImage(canvas, 0, 0, side, side);
+  c.fillStyle = look === 'oxide' ? '#392821' : '#172f32';
+  c.font = '400 64px Georgia, serif';
+  c.fillText(caption, 40, side + 88);
+  c.font = '600 30px ui-monospace, Menlo, monospace';
+  c.textAlign = 'right';
+  c.fillText(sub, side - 40, side + 86);
+  return out;
 }

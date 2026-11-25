@@ -1,6 +1,8 @@
 // Ant Promotion: rules and world, no drawing. Deterministic for a given seed, input sequence and rival. It never calls the network.
 import { skillFor, skillTick, clearSkill, unseen, seenK, drive, touch, wideBites } from './skills.js';
 export { skillFor };
+import { COVER, layout, hidden, pushOut } from './cover.js';
+export { COVER };
 export const WORLD = 2000, TOP = 18, MOBS = 64;
 const SPEED = { slow: 104, medium: 124, fast: 150 };
 const ROLE = {
@@ -166,12 +168,15 @@ function oldSkill(s, m, M, F, d, to, speed, dt) { // one tick of it, while it hu
 }
 
 // nemesis: what nemesisSave() returned on an earlier visit, or null for a world with no rival.
-export function create(seed = 1, stack = [ANT], xp = 0, weights = SPAWN_WEIGHTS, wild = false, nemesis = null, old = []) {
+// opts.cover: false makes a world with no rocks or grass at any level (the rules as before cover). opts.teach: stage the first rock
+// with a hunter behind it when cover first comes on (the page passes it until the device has seen it once).
+export function create(seed = 1, stack = [ANT], xp = 0, weights = SPAWN_WEIGHTS, wild = false, nemesis = null, old = [], opts = {}) {
   const s = { wild, huntAt: HUNT_EVERY, hides: 0, hunts: 0, mobEats: 0, tired: 0, zones: [], items: [], powers: 0, rand: rng(seed), nrand: rng((seed ^ 0x5bd1e995) >>> 0), t: 0, tick: 0, weights, mobs: [], events: [], choosing: null, dead: null, won: false, eaten: 0, deaths: 0, nextId: 1,
     nemesis: null, player: { x: WORLD / 2, y: WORLD / 2, a: 0, ph: 0, stack: stack.slice(), xp, safe: 2.5, hideAt: 0, busy: 0 } };
   while (s.mobs.length < MOBS) spawn(s, 260);
   if (nemesis && FORMS[nemesis.f]) placeNemesis(s, nemesis);
   if (old.length) placeOld(s, old);
+  if (opts.cover !== false) { s.cover = layout(seed, WORLD); s.cover.teach = !!opts.teach; s.coverLost = 0; }
   return s;
 }
 // What the player is now. Picking the same kind again builds on it: each earlier fast pick makes a fast animal faster (fastBoost),
@@ -253,6 +258,31 @@ function spawn(s, minDist) {
   return m;
 }
 
+// ---------- cover (cover.js): rocks and tall grass, from level COVER.from up. Below it, or in a world made with { cover: false },
+// none of this runs and the rules are exactly as before cover.
+export const coverOn = s => (s.cover && s.player.stack.length >= COVER.from ? s.cover : null);
+function coverPlayer(s, C, F, v) {
+  const p = s.player; pushOut(C, p, F.r); p.v = v; p.speed = F.speed;
+  if (!C.taught) { C.taught = true; if (C.teach) teachCover(s, C, F); }
+}
+// The first rock is taught without words: it appears ahead of the player with a hunter behind it, facing the player, whose drawn sight
+// stops at the rock. The hunter is the one of the next two levels that sees farthest; it waits a few seconds, then lives as usual.
+function teachCover(s, C, F) {
+  const p = s.player, L = F.level;
+  const M = FORMS.filter(f => f.level > L && f.level <= L + 2).map(f => ({ f, reach: f.range * sightOf(f)[0] * F.stealth + F.r })).sort((a, b) => b.reach - a.reach)[0];
+  if (!M) return;
+  // inside its reach, and on a phone screen (the page shows about 0.34 x (480 + 14 x level) world units either side of the player)
+  const D = Math.min(M.reach * 0.8, 0.25 * (480 + 14 * L)), r = Math.max(26, Math.min(44, D * 0.17)), at = D * 0.42;
+  for (let i = 0; i < 13; i++) {
+    const a = p.a + (i % 2 ? 1 : -1) * Math.ceil(i / 2) * 0.5, hx = p.x + Math.cos(a) * D, hy = p.y + Math.sin(a) * D;
+    if (hx < 90 || hy < 90 || hx > WORLD - 90 || hy > WORLD - 90) continue;
+    C.rocks.push({ x: p.x + Math.cos(a) * at, y: p.y + Math.sin(a) * at, r, k: 0.5, teach: true });
+    s.mobs.push({ id: s.nextId++, f: M.f.id, x: hx, y: hy, a: a + Math.PI, alert: false, lost: 0, timer: 6, want: a + Math.PI, walk: false, ph: 0, teach: true });
+    s.events.push({ t: 'coverTeach', x: hx, y: hy });
+    return;
+  }
+}
+
 // input: { x, y } with length up to 1. One call advances 1/60 s.
 export function step(s, input) {
   s.events.length = 0;
@@ -269,6 +299,7 @@ export function step(s, input) {
   if (input?.power && !s.choosing) usePower(s); // after the heading: a leap goes the way the stick points now
   const pv = F.speed * (p.fx?.up || 1) * (p.boost > 0 ? p.boostK : 1) * (p.slow > 0 ? p.slowK : 1);
   p.x = clamp(p.x + ix * pv * dt, F.r, WORLD - F.r); p.y = clamp(p.y + iy * pv * dt, F.r, WORLD - F.r);
+  const C = coverOn(s); if (C) coverPlayer(s, C, F, Math.hypot(ix, iy) * pv);
 
   if (p.fx || s.zones.length || s.items.length || s.skilled) { skillTick(s, F, il > 0.01, dt); wideBites(s, F); F = me(s); }
   if (s.oldAt && s.t >= s.oldAt) callOld(s);
@@ -296,13 +327,14 @@ export function step(s, input) {
     if (m.winded > 0) m.winded -= dt;
     if (m.spring > 0) m.spring -= dt; if (m.pounce > 0) m.pounce -= dt;
     if (m.stun > 0) m.stun -= dt;
-    const sees = p.safe <= 0 && !(p.veil > 0) && !unseen(s, m, d, power > F.power) && !(m.winded > 0) && !(m.stun > 0) && (m.hunt > 0 || d < range * F.stealth * seenK(s) + F.r && Math.abs(wrap(to - m.a)) < cone);
-    if (m.alert && unseen(s, m, d, power > F.power)) m.alert = false;
+    const hid = C && (m.alert || m.hunt > 0 || d < range * F.stealth + F.r) && hidden(C, m, p, M.r + F.r); // cover: a rock between, or creeping in grass
+    const sees = p.safe <= 0 && !(p.veil > 0) && !(m.winded > 0) && !(m.stun > 0) && (m.hunt > 0 || d < range * F.stealth + F.r && Math.abs(wrap(to - m.a)) < cone) && !hid;
     const wasAlert = m.alert;
-    if (sees) { if (!m.alert && power !== F.power) s.events.push({ t: 'notice', strong: power > F.power, id: m.id, nem: !!m.nem }); m.alert = true; m.lost = 0; }
+    if (sees) { if (!m.alert && power !== F.power) s.events.push({ t: 'notice', strong: power > F.power, id: m.id, nem: !!m.nem }); m.alert = true; m.lost = 0; if (C) m.seen = { x: p.x, y: p.y }; }
     else if (m.alert) {
       const forget = T ? FORGET[N.knobs.persistence] * T.reach : 1.8, hold = T ? HOLD[N.knobs.persistence] * T.hold : 1.5;
-      m.lost = d > range * forget ? m.lost + dt : 0; if (m.lost > hold || p.safe > 0) m.alert = false;
+      m.lost = d > range * forget || hid ? m.lost + dt : 0; if (m.lost > (hid ? Math.min(hold, COVER.lose) : hold) || p.safe > 0) m.alert = false;
+      if (hid && !m.alert) { m.winded = Math.max(m.winded || 0, COVER.rest); s.coverLost++; s.events.push({ t: 'coverLost', id: m.id, strong: power > F.power, x: m.x, y: m.y }); } // lost to cover
     }
     // animals hunt each other: a stronger animal that sees a weaker one (at most 2 levels below, never the little food bugs) chases it.
     // The rival takes no part: it hunts only the player, and no animal hunts it.
@@ -313,7 +345,7 @@ export function step(s, input) {
         if (o === m || o.gone || o.nem || o.old) continue; const O = FORMS[o.f], op = powerOf(o); if (op === power || O.level < 1) continue;
         const ex = o.x - m.x, ey = o.y - m.y; if (ex > 220 || ex < -220 || ey > 220 || ey < -220) continue; const e = Math.hypot(ex, ey);
         if (op > power) { if (o.chase === m && e < bf) { bf = e; m.fear = o; } }
-        else if (!(m.fed > 0) && M.level - O.level <= 2 && e < M.range * PREY.sight && e < bc && (o === was || Math.abs(wrap(Math.atan2(ey, ex) - m.a)) < CONE)) { bc = e; m.chase = o; }
+        else if (!(m.fed > 0) && M.level - O.level <= 2 && e < M.range * PREY.sight && e < bc && (o === was || Math.abs(wrap(Math.atan2(ey, ex) - m.a)) < CONE) && !(C && hidden(C, m, { x: o.x, y: o.y, v: o.v, speed: O.speed }, M.r + O.r))) { bc = e; m.chase = o; }
       }
       m.chaseFor = m.chase && m.chase === was ? (m.chaseFor || 0) + 0.2 : 0;
       if (m.chaseFor > PREY.give) { m.chase = null; m.fed = 5; } // gives up on prey it cannot catch
@@ -325,7 +357,7 @@ export function step(s, input) {
     if (m.alert && power !== F.power) {
       turn = 7; speed = M.speed;
       if (!flees) {
-        m.want = to; const pace = m.old ? Math.min(chasePace(M, F), F.speed * OLD_PACE) : chasePace(M, F); speed = pace; hunting = true;
+        m.want = hid && m.seen ? Math.atan2(m.seen.y - m.y, m.seen.x - m.x) : to; const pace = m.old ? Math.min(chasePace(M, F), F.speed * OLD_PACE) : chasePace(M, F); speed = pace; hunting = true;
         if (!T) {
           speed = pace * tirePace(m);
           if (m.pounce > 0) speed = Math.max(speed, F.speed * POUNCE.up);
@@ -342,6 +374,7 @@ export function step(s, input) {
             else speed = d > range * 0.7 ? Math.min(pace, F.speed) * 0.95 : 0;
           }
         }
+        if (hid && m.seen) { m.pounce = 0; speed = Math.min(speed, M.speed * COVER.search); if (Math.hypot(m.seen.x - m.x, m.seen.y - m.y) < 12) speed = 0; } // lost to cover: it looks for you where it saw you last
       } else { // run away; near a wall, slide along it
         let fx = -dx / (d || 1), fy = -dy / (d || 1); const pad = 90;
         if (m.x < pad) fx += (pad - m.x) / 40; if (m.x > WORLD - pad) fx -= (m.x - WORLD + pad) / 40;
@@ -381,6 +414,7 @@ export function step(s, input) {
     if (!hunting && m.tire > 0) m.tire = Math.max(0, m.tire - dt * 1.5);
     m.a += clamp(wrap(m.want - m.a), -turn * dt, turn * dt);
     m.x = clamp(m.x + Math.cos(m.a) * speed * dt, M.r, WORLD - M.r); m.y = clamp(m.y + Math.sin(m.a) * speed * dt, M.r, WORLD - M.r);
+    if (C) { pushOut(C, m, M.r); m.v = speed; }
     m.ph += speed * dt * 0.09;
 
     if (!m.gone && d < (M.r + F.r) * 0.85) {

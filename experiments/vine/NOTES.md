@@ -116,3 +116,32 @@ The lab page moved from `experiments/lab/night-vine/` to `experiments/vine/` and
 - Bed 6 leaves about 8 s before the first wilt. A first-time player may need a retry there; the bots cannot show that.
 - The naive bot assumes a person copies a shown flick within 1 s.
 - Production recording: the server accepts only listed games. `vine` must be added to `LAB_PROTOTYPES` in human-framework `apps/site/src/lab/games.ts` and deployed; until then every send is refused.
+
+## 2026-11-24 — Music (kit/music.js)
+
+The owner moved Lantern's music into the kit for this game. Night Vine now has a score made in code that the gardener plays.
+
+**Preset: `flute`.** The kit describes it as "a garden": slow attack, a small vibrato, 80 a minute, key of G. Night Vine is a night glasshouse, so the score starts in minor chords and turns major once four fifths of the bed's steps are done (`turn` 0.8), as the window comes into reach. No kit change; the preset is used as it is (`song.js`, `SONG`).
+
+**Mapping (`song.js`; the page and `bots.mjs` both import it; `sim.js` is unchanged and never calls it):**
+- progress: the bed's own steps (tendrils caught, bunches ripe, the window) out of all of them (2 × arms + 1).
+- danger: the most stressed flower (0 to 1); the heartbeat starts above 0.15.
+- light: 1 − that stress; the thin high note sounds when a flower is about to wilt (stress above 0.72).
+- Notes: a tendril catching an eye, a bunch ripening, the window reached, and a cut that takes wood each play the next note of the bed's tune. These steps had no sound before, so with Music off they stay silent; the cut keeps its own snip sound either way.
+- A miss: a cut that drops a held tendril (and its bunch) plays no note, and the streak ends (`miss()`).
+- A blow: a wilted flower (`hit()`); the bed ends there.
+- `on`: Music on, Sound on, the bed in play, started and growing, not paused. Each bed starts its own tune from its seed when the song first hears it.
+- Measured rates (scratch script, the finger-following gardener, 100 beds, 19.2 minutes): tendrils 8.3, bunches 8.3, windows 5.2, cuts 2.3 a minute; a bed takes about 11 s, so about four or five notes a bed. This is a sparse melody, by design: a note is something the gardener did.
+
+**Switch.** "Music on / Music off" (Turkish "Müzik açık / Müzik kapalı") on the pause card's settings row, between Sound and the language button. Its own key `night-vine:music`, `'0'` when off; on when the key is missing. The save `night-vine:save` is unchanged. On the 390 px card the four settings buttons wrap to two lines each (screenshot looked at); Turkish passes `check.mjs`'s overflow check.
+
+**Levels** (rendered offline in headless Chromium, peaks of the score alone at volume 1, after a 6 s fade-in): bed peak 0.154, RMS 0.024; one melody note 0.083; heartbeat at full danger 0.165; the kit's worst case 0.292. The game's own sounds (the kit's tone peak is its volume): first touch 0.035, cut noise about 0.040 peak (rendered), wilt 0.06, win 0.085 + 0.045. Criterion written before choosing: (1) bed RMS at most a quarter of the quietest regular sound (0.035); (2) a melody note within half to twice the first-touch tone, the nearest in-play tone (the steps had none); (3) worst case plus the loudest sound under 0.9. Volume 0.3: bed RMS 0.0073 (≤ 0.0088), bed peak 0.046, a melody note 0.025 (in 0.018 to 0.07), worst case 0.088 + 0.13 = 0.22. When the tune's queue is full (four notes waiting) a chord pitch plays at 0.03 instead.
+
+**Checks.**
+- `node bots.mjs music`: 240 beds (10 beds × 6 seeds × 4 gardeners: finger-following, a quarter of inputs random, three fifths random, lamp left on the window with no cuts), 130 minutes: 1139 tune notes (8.8 a minute; the random gardeners make long beds), 176 with no note (four waiting), 173 dropped tendrils (missed notes), 18 wilts (blows), 827 heartbeat pulses, 18 high notes; latest note 275 ms after its moment; 0 failures. Claims: one note for each step and cut and none otherwise; a dropped tendril plays no note and is a miss; a wilt is a blow; every note on the grid, in its chord and in the tune's order (`kit/check/music-claims.mjs`); heartbeat only above 0.15 stress, high note only with a flower about to wilt; major chords only past four fifths; a twin bed with no music ends identical (JSON equal).
+- `node bots.mjs music --mutate` exits 1: a cut that drops a tendril still playing (270 failures) and notes on a clock (15277 failures) are both caught.
+- `node bots.mjs` exits 0 (the music claims now run at its end too); `node bots.mjs --mutate` still fails as before (exit 1, "tips bend toward opposing lamps").
+- `phone.mjs vine` passes on WebKit iPhone 13 and Chromium Pixel 7 (both sections): Music on at first, the score scheduling during a bed, the switch off on the pause card saved as `'0'`, nothing scheduled after resuming with it off, off kept after a reload; old saves kept.
+- `check.mjs` passes on both phones (English and Turkish).
+
+**Not verified.** Nobody has listened; all of this was measured, not heard. Things to listen for: whether a note on each tendril, bunch and window feels like the gardener playing (or like random chimes); whether a cut's note sits well on top of the snip; whether the heartbeat under a shaded flower helps or nags (it starts early, at 0.15 stress); whether the high note before a wilt is noticed; whether the flute's vibrato is pleasant on a phone speaker; whether the music at 0.3 hides the first-touch tone. The music is quiet on purpose; a phone speaker may lose the bass.

@@ -21,3 +21,19 @@ const ORDER = [[2,0,4,1,3],[1,3,0,4,2],[3,1,4,0,2],[0,2,4,1,3],[4,1,3,0,2],[2,4,
 export function place(i) { const col=Math.floor(i/ROWS), row=ORDER[col%ORDER.length][i%ROWS]; return {col,row,x:col+0.5+(hash('px'+i)-0.5)*0.45,y:0.05+(row+0.5+(col%2?0.5:0))/(ROWS+0.5)*0.9+(hash('py'+i)-0.5)*0.03}; }
 // The three lights of a day sit round the day's place. Offsets are in units of the cluster radius.
 export function member(day,index) { const a=hash(day+'a')*Math.PI*2+index*Math.PI*2/3+(hash(day+'j'+index)-0.5)*0.7, r=0.62+hash(day+'r'+index)*0.38; return {dx:Math.cos(a)*r,dy:Math.sin(a)*r*0.8,size:0.75+hash(day+'s'+index)*0.5,hue:hash(day+'h'+index),phase:hash(day+'p'+index)*6.283}; }
+
+// Daily flowers (2026-11-25). Each kind of thanks has three flowers. Which one a day grows depends only on the
+// date, so it is the same for everyone that day, and the twelve buttons show a different mix each day.
+// Days before CUTOFF always grow the first flower, so a garden saved before this change draws as it did.
+export const TRAY = ['bread','water','home','family','friend','health','rain','rest','work','tree','light','spark'];
+export const ALIAS = { heart: 'health', moon: 'rest', hands: 'work', sun: 'light' }; // older names for the same pictures
+export const VARIETIES = {
+  bread: ['wheat','barley','oats'], water: ['bluebell','muscari','forgetmenot'], home: ['tulip','crocus','hollyhock'],
+  family: ['daisy','aster','gerbera'], friend: ['cosmos','zinnia','sweetpea'], health: ['rose','peony','camellia'],
+  rain: ['snowdrop','lily','iris'], rest: ['moonflower','primrose','lotus'], work: ['lavender','foxglove','lupin'],
+  tree: ['sprig','blossom','fern'], light: ['sunflower','marigold','dandelion'], spark: ['starflower','passionflower','allium'],
+};
+export const CUTOFF = '2026-11-25';
+export const dayNumber = day => Math.round(Date.UTC(+day.slice(0,4), +day.slice(5,7)-1, +day.slice(8,10)) / 864e5);
+export function variety(day, k) { const kind = ALIAS[k] || k, i = TRAY.indexOf(kind); if (i < 0 || !validDay(day) || day < CUTOFF) return 0; return (dayNumber(day) + i) % 3; }
+export const species = (day, k) => (VARIETIES[ALIAS[k] || k] || VARIETIES.spark)[variety(day, k)];

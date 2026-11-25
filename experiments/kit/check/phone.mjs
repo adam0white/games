@@ -129,9 +129,21 @@ async function savedPhone(page, g) {
   if (!g.startsOnBoard) assert.equal(await page.evaluate(() => window.audioLog.made), 1, 'Play starts one audio context');
   await g.touch(page, { finger, until, sleep });
   if (g.startsOnBoard) assert.equal(await page.evaluate(() => window.audioLog.made), 1, 'first input starts one audio context');
+  // Music (kit/music.js): on at first, playing the run's score while the run is in play.
+  const tune = () => page.evaluate(g.music.hook);
+  if (g.music) {
+    assert.equal(await page.textContent(g.music.button), g.music.on, 'music: on at first');
+    await until(page, hook => { const m = (0, eval)(hook)(); return m && m.on && m.kinds.includes('pad'); }, 'music: the score plays during a run', 8000, g.music.hook.toString());
+  }
   await shot(page, 'play');
   await pause();
   const t = (await state()).t;
+  // Turned off on the pause card: its own key is '0', and after resuming the score is silent and schedules nothing.
+  if (g.music) {
+    await page.click(g.music.button);
+    assert.equal(await page.textContent(g.music.button), g.music.off, 'music: the switch says off');
+    assert.equal(await page.evaluate(k => localStorage.getItem(k), g.music.key), '0', 'music: off saved under its own key');
+  }
   await g.verifyPaused?.(page, { finger });
   if (hasTimedHint(g)) await observeFrames(page, 300); else await sleep(300);
   assert.equal((await state()).t, t, 'play state stands still while paused'); await shot(page, 'paused');
@@ -144,6 +156,10 @@ async function savedPhone(page, g) {
   await page.click(g.resume ?? '#resume'); await wait(s => s.screen === 'play' && !s.paused, 'resume');
   if (g.resumeTouch) await g.touch(page, { finger, until, sleep });
   await wait(s => s.screen === 'play' && !s.paused && s.t > t, 'play state advances after resume');
+  if (g.music) {
+    await sleep(500); const a = await tune(); await sleep(800); const b = await tune();
+    assert.ok(!a.on && !b.on && a.notes === b.notes, `music: off schedules nothing (${a.notes} then ${b.notes} notes)`);
+  }
   await page.evaluate(() => dispatchEvent(new Event('blur'))); await wait(s => s.paused || s.screen === 'paused', 'losing focus pauses');
   await page.keyboard.press('P'); await wait(s => s.screen === 'play' && !s.paused, 'capital P resumes');
   await page.evaluate(() => dispatchEvent(new Event('pagehide'))); await wait(s => s.paused || s.screen === 'paused', 'putting the page away pauses');
@@ -167,6 +183,7 @@ async function savedPhone(page, g) {
   await play();
   if (g.startsOnBoard) await g.touch(page, { finger, until, sleep });
   assert.equal(await page.evaluate(() => window.audioLog.made), g.sound ? 0 : 1, 'sound choice survives reload');
+  if (g.music) assert.equal(await page.textContent(g.music.button), g.music.off, 'music: off survives reload');
   await pause();
   if (g.menu) await page.click(g.menu);
 }
@@ -877,6 +894,21 @@ const GAMES = {
     await until(page, () => window.__ant.living && window.__ant.living.stat.drawn > 3 && window.__ant.living.rig(null), 'living bodies after a death');
     await toMenu(); await lookTo(['Flat', 'Cartoon', 'Soft', '3D', 'Living'][lookWas]); assert.equal((await saved()).look, lookWas, 'the look goes back round');
     await page.click('#continue'); assert.equal(await page.evaluate(() => window.__ant.living), null, 'no rigs in the other looks');
+    // Cover (ant-promotion/cover.js, from the lab page ant-hide): none below level 4. At level 4 or above, a device that has not seen it
+    // is taught once: a rock ahead and a hunter behind it that does not see the player. Every look draws rocks and grass; the save keeps its format.
+    await toMenu(); await page.evaluate(([k, st]) => { localStorage.setItem(k, JSON.stringify({ skin: { c: '#3a2a22', p: 'plain' }, stack: st, xp: 0, sound: true, look: 1, wild: true })); localStorage.removeItem('ant-promotion:cover'); }, [KEY, ladder.slice(0, 3)]);
+    await page.reload(); await page.click('#continue'); await sleep(200);
+    assert.equal(await page.evaluate(() => window.__ant.s.cover.rocks.some(r => r.teach) || localStorage.getItem('ant-promotion:cover')), null, 'no cover and no teaching below level 4');
+    await page.click('#pause'); await page.click('#paused .toMenu');
+    await page.evaluate(([k, st]) => localStorage.setItem(k, JSON.stringify({ skin: { c: '#3a2a22', p: 'plain' }, stack: st, xp: 0, sound: true, look: 1, wild: true })), [KEY, ladder.slice(0, 6)]);
+    await page.reload(); await page.click('#continue');
+    await until(page, () => JSON.parse(localStorage.getItem('ant-promotion:cover') || '{}').taught && window.__ant.s.cover.rocks.some(r => r.teach), 'the first rock is taught');
+    await sleep(500); assert.equal(await page.evaluate(() => window.__ant.s.mobs.find(m => m.teach)?.alert), false, 'the hunter behind the teaching rock has not seen the player');
+    for (const look of [0, 1, 2, 3, 4]) { await page.evaluate(n => window.__ant.look(n), look); await sleep(250); assert.equal(await mode(), 'play', `look ${look} draws cover`); }
+    await page.evaluate(() => { const { s, FORMS, me } = window.__ant, p = s.player, m = s.mobs.find(m => FORMS[m.f].power > me(s).power); p.safe = 0; p.hideAt = 1e9; p.x = m.x; p.y = m.y; });
+    await until(page, () => window.__ant.mode === 'dead', 'death card with cover');
+    const after = await saved(); assert.ok(!('cover' in after) && !('taught' in after), 'cover is not in the save');
+    await page.click('#goOn'); await page.click('#pause'); await page.click('#paused .toMenu'); await page.evaluate(([k, v]) => localStorage.setItem(k, v), [KEY, kept]);
   },
   // The three games of 2026-11-23. Each has its own full check (experiments/<slug>/check.mjs); this is the shared part:
   // the page loads through the kit with no error, a run starts from Play, pause holds it, and leaving for the menu
@@ -906,7 +938,15 @@ const GAMES = {
     await until(page, () => window.fixitSim().rival.hurry, 'the rival speeds up'); await page.evaluate(() => { const s = window.fixitSim(); s.rival.next = s.clock; }); await until(page, () => window.fixitSim().rival.gag, 'it makes a mistake');
   },
   borrowed: page => started(page, 'borrowed', 'borrowedState', '#toMenu'),
-  alibi: page => started(page, 'alibi', 'alibiState', '#toMenu'),
+  async alibi(page) {
+    await started(page, 'alibi', 'alibiState', '#toMenu');
+    // The practice case (note #245): from the menu, one step at a time, and nothing of it is saved.
+    const kept = await page.evaluate(() => localStorage.getItem('alibi-save'));
+    await page.click('#learn'); await until(page, () => window.alibiState().step === 0 && !document.querySelector('#coach').hidden, 'practice starts');
+    await page.click('#coachOk'); assert.equal(await page.evaluate(() => window.alibiState().step), 1);
+    await page.click('#pause'); await page.click('#toMenu'); assert.equal(await page.evaluate(() => window.alibiState().step), null, 'leaving ends practice');
+    assert.equal(await page.evaluate(() => localStorage.getItem('alibi-save')), kept, 'practice saves nothing');
+  },
   nightshift: page => started(page, 'nightshift', 'nightshiftState', '#toMenu'),
   // Lab pages (/lab/<name>/): an old save survives, a finger steers, pause stops time, one audio context after the first tap.
   async 'lab/thankful'(page) {
@@ -925,6 +965,12 @@ const GAMES = {
     assert.equal(await page.evaluate(() => window.__thankful.state.days['2026-11-23'].length), 3, 'the fourth thanks did not change today');
     const picture = await page.evaluate(() => window.__thankful.picture());
     assert.equal(picture.width, 1080); assert.equal(picture.height, 1350); assert.ok(picture.bytes > 20000, 'picture has PNG image data');
+    // Daily flowers (2026-11-25): the buttons show the flower each kind grows that day, the same for everyone, in Turkish too.
+    await page.goto(`${base}/lab/thankful/?day=2026-11-25&lang=tr`); await until(page, () => window.__thankful, 'game script');
+    assert.equal(await page.getAttribute('[data-kind="bread"]', 'aria-label'), 'ekmek: arpa', 'bread grows barley on 25 Nov, named in Turkish');
+    assert.equal(await page.textContent('#line'), 'Bugün için üç teşekkür.', 'Turkish line');
+    await page.goto(`${base}/lab/thankful/?day=2026-11-24&lang=en`); await until(page, () => window.__thankful, 'game script');
+    assert.equal(await page.getAttribute('[data-kind="bread"]', 'aria-label'), 'bread: wheat', 'before the change bread grows wheat');
   },
   async 'lab/pitch'(page) {
     // Paper Pitch: an old save survives, a tap on a pulsing point draws a line, leaving the page pauses.

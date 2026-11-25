@@ -4,7 +4,9 @@ import { sound } from '../kit/audio.js';
 import { hint } from '../kit/hint.js';
 import { lab } from '../kit/lab.js';
 import { isPauseKey, onLeave } from '../kit/pause.js';
-import { readJson, writeJson } from '../kit/save.js';
+import { read, write, readJson, writeJson } from '../kit/save.js';
+import { music } from '../kit/music.js';
+import { SONG, mood, look as counts, heard } from './song.js';
 import { screens } from '../kit/screens.js';
 import { stick } from '../kit/stick.js';
 import { noZoom } from '../kit/zoom.js';
@@ -31,7 +33,10 @@ function save() {
   saved.best = Math.max(saved.best, integer(latest.best, 0, Number.MAX_SAFE_INTEGER, 0));
   storageAvailable = writeJson(saveKey, saved);
 }
-const audio = sound({ on: () => saved.sound });
+// Music (kit/music.js, 2026-11-24): the flute preset, played by the gardener (song.js). Its own key, '0' when turned off.
+const musicKey = 'night-vine:music';
+let musicOn = read(musicKey) !== '0', song = null, songFor = null, heardFrom = null;
+const audio = sound({ on: () => saved.sound, setup: ac => { song = music(ac, { preset: SONG.preset }); song.volume(SONG.volume); } });
 let s, screen, started, score = 0, cuts = 0, arbourSeed = 0, gesture = null;
 let elapsed = 0, previous = null, debt = 0, lastDraw = -1, reveal = 0, snip = null;
 // The finger the bed shows (sim.js cue): what it points at, how long the player has been idle, how long a flower
@@ -92,6 +97,7 @@ function begin(level, endless = false) {
   started = false; cuts = 0; snip = null; reveal = 0; debt = 0; lastDraw = -1;
   shown = null; idle = 0; shaded = 0; planned = null; plannedAt = -1; wonAt = 0; stepsKey = '';
   tally = { grips: 0, ripe: 0 };
+  heardFrom = counts(s, 0);
   rec.start({ level, endless, seed, lang: lang() });
   if (!endless && saved.level !== level) { saved.level = level; save(); }
   const target = s.arms[0] ?? s.window;
@@ -157,6 +163,8 @@ function buttons() {
   setText('ink', t(saved.look));
   setText('sound', t(saved.sound ? 'soundOn' : 'soundOff'));
   el('sound').setAttribute('aria-pressed', String(saved.sound));
+  setText('music', t(musicOn ? 'musicOn' : 'musicOff'));
+  el('music').setAttribute('aria-pressed', String(musicOn));
 }
 for (const sheet of document.querySelectorAll('.sheet, #result')) {
   // A release over a newly opened card still belongs to the gardening gesture.
@@ -192,6 +200,11 @@ el('ink').onclick = () => {
 el('sound').onclick = () => {
   saved.sound = !saved.sound;
   save(); buttons();
+};
+el('music').onclick = () => {
+  musicOn = !musicOn;
+  write(musicKey, musicOn ? '1' : '0');
+  buttons();
 };
 el('next').onclick = () => {
   if (s.status !== 'won') { if (s.endless) endless(); else begin(s.level); }
@@ -388,6 +401,8 @@ function steer(dt) {
 function frame(now) {
   const dt = previous === null ? 0 : Math.min(.2,(now-previous)/1000);
   previous = now;
+  if (song && songFor !== s) { songFor = s; song.start(s.seed); } // each bed its own tune, from its seed
+  song?.set({ on: musicOn && saved.sound && screen === 'play' && started && s.status === 'growing', ...mood(s) });
   if (screen === 'play') {
     elapsed += dt;
     if (started && s.status === 'growing') {
@@ -398,6 +413,7 @@ function frame(now) {
         if (s.status !== 'growing') markOutcome();
       }
     }
+    listen();
     steer(dt);
     if (elapsed-lastDraw >= 1/30 || lastDraw < 0) {
       paint(); objective(); lastDraw = elapsed;
@@ -408,6 +424,17 @@ function frame(now) {
     if (elapsed-lastDraw >= 1/18) { paint(); lastDraw = elapsed; }
   }
   requestAnimationFrame(frame);
+}
+// With the music on, each step of the bed (a tendril caught, a bunch ripe, the window) and each cut since the last frame
+// plays the next note of the bed's tune; a cut that drops a tendril is a note not played; a wilt thins the music. The bed
+// had no sound for these steps before, so with the music off (or the tune's queue full) they stay silent, as before;
+// with it on and the queue full, a pitch from the chord.
+function listen() {
+  const h = heard(heardFrom, s, cuts);
+  heardFrom = counts(s, cuts);
+  if (musicOn && song) for (let i = 0; i < h.notes; i++) if (!song.ember() && song.state.on) audio.tone(song.chime(i), .3, .03, 'sine');
+  for (let i = 0; i < h.misses; i++) song?.miss();
+  for (let i = 0; i < h.blows; i++) song?.hit();
 }
 // A few choices that matter, for the lab: a tendril catching, a bunch ripening, the window reached.
 function noteProgress() {
@@ -459,8 +486,9 @@ window.vineState = () => structuredClone({
   screen,started,time:s.time,level:s.level,endless:s.endless,score,cuts,status:s.status,
   lamp:s.lamp,window:s.window,arms:s.arms,flowers:s.flowers,nodes:s.nodes,tips:s.tips,
   best:saved.best,unlocked:saved.unlocked,lang:lang(),cue:shown,
-  recording:rec.on
+  recording:rec.on, music: musicOn
 });
+window.vineMusic = () => song && { ...song.melody, on: song.state.on, step: song.step, notes: song.log.length, kinds: song.log.map(l => l.kind) }; // read by the phone check
 buttons();
 begin(saved.level);
 translatePage();
