@@ -63,6 +63,7 @@ export const labMoved = {
   'lantern-song': '/lantern/',
   'lantern-echo': '/lantern/',
   'lantern-voice': '/lantern/',
+  'ant-creatures': '/ant-promotion/?look=4',
   'ant-nemesis': '/ant-promotion/',
   'ant-wilds': '/ant-promotion/',
   'ant-swarm': '/ant-promotion/',
