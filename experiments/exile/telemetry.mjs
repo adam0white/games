@@ -82,9 +82,11 @@ const pct = (n, of) => of ? `${n} (${Math.round(100 * n / of)}%)` : '0';
 const median = xs => { const s = [...xs].sort((a, b) => a - b); return s.length ? s[Math.floor(s.length / 2)] : 0; };
 
 const n = rows.length, out = [];
+const loads = between.flatMap(b => b.data.events ?? []), loaded = loads.filter(e => e.type === 'loaded').length, loadFailed = loads.filter(e => e.type === 'loadFailed').length;
 out.push(`Exile play records: ${n} runs from ${new Set(rows.map(r => r.player)).size} players${agents ? ' (agent runs included)' : ''}, ${between.length} events outside a run.`);
 if (!n) out.push('No runs yet. Use --fetch=7 to download records; agent runs need --agents.');
 else {
+  out.push(`\nPage loads that finished: ${loaded}; that failed: ${loadFailed}; runs started: ${n}`);
   out.push('\nHow far runs got');
   const steps = [['started', () => true], ['placed a building', r => r.buildings > 0], ['founded the kingdom', r => r.founded], ['raid began', r => r.raid], ['raid won', r => r.raidWon],
     ['freed the witness', r => r.witness], ['brother beaten', r => r.brotherDown], ['reached an ending', r => r.outcome.startsWith('won')]];
