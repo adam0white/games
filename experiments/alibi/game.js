@@ -8,7 +8,7 @@ import { noZoom } from '../kit/zoom.js';
 import { t, lang, setLang, apply } from './words.js';
 import {
   CASES, CHAPTER_TWO_END, CLOCK_START, CLOCK_STEP, aids, caseVariant, claims, createCase, dailyCase, dailyWin, dayKey, offsetDay, dossiers,
-  floorOf, freshRun, accuse, observe,
+  floorOf, freshRun, accuse, observe, practiceCase,
 } from './sim.js';
 import {
   W, H, INK, CREAM, GOLD, rect, text, star, clock, place, animal, costume, signature,
@@ -76,7 +76,7 @@ const rec = lab('alibi');
 const snd = sound({ on: () => profile.sound });
 const showCards = screens(['menu', 'cases', 'paused', 'done', 'sharing', 'calendar']);
 const calm = matchMedia('(prefers-reduced-motion: reduce)');
-const replay = { x: 42, endX: 318, y: 561 };
+const replay = { x: 42, endX: 318, y: 553 };
 const homeStamp = { x: 180, y: 605 };
 const notebookButton = { x: 48, y: 605 };
 const HOLD = .46;
@@ -101,6 +101,8 @@ let rooms = [];
 let screen = 'menu';
 let daily = false;
 let hard = false;
+// The guided practice case (note #245): the step the player is on, or null.
+let step = null;
 let day = '';
 let run = freshRun();
 let variant = 0;
@@ -220,6 +222,7 @@ const starTotal = () => t('starTotal', {
 function updateMenu() {
   const current = validLevel(forceLevel) ? forceLevel : profile.level;
   $('progress').textContent = `${number(current)}/${number(CASES.length)}`;
+  $('learn').classList.toggle('fresh', save.readJson(KEY) === null);
   $('caseStars').textContent = starTotal();
   if (screen === 'done') updateGoal();
   const today = dayKey();
@@ -356,8 +359,51 @@ function start(isDaily, level = profile.level, isHard = false, dailyDate = dayKe
   run = freshRun();
   hintReady = phase;
   setScreen('play');
-  rec.start({ level: daily ? `${hard ? 'hard-daily' : 'daily'}-${day}` : c.level });
+  step = null;
+  rec.start({ level: c.practice ? 'practice' : daily ? `${hard ? 'hard-daily' : 'daily'}-${day}` : c.level });
   if (!restoredCase) snd.tone(494, .15, .09, 'triangle', 160);
+}
+
+// The practice case teaches one move per step, in words. A step ends when the
+// player has done it. Nothing here is saved or scored, and nobody can lose.
+const STEPS = [
+  { say: 'learnStory', tap: true },
+  { say: 'learnDrag', done: () => time >= c.beatCount - 1.02 && !pointer },
+  { say: 'learnAsk', who: 0, done: () => selected === 0 },
+  { say: 'learnJump', who: 0, done: () => beatNow() === c.incident && !pointer },
+  { say: 'learnTrue', who: 0, tap: true },
+  { say: 'learnOther', who: 1, done: () => selected === 1 && beatNow() === c.incident },
+  { say: 'learnLie', who: 1, tap: true },
+  { say: 'learnStamp' },
+];
+const canAccuse = () => step === null || step === STEPS.length - 1;
+let stepAt = 0;
+function learn() {
+  start(false, 1, false, '', { case: practiceCase(), variant: 0 });
+  snd.release();
+  snd.unlock();
+  step = 0;
+  stepAt = phase;
+  snd.tone(494, .15, .09, 'triangle', 160);
+}
+function nextStep() {
+  step++;
+  stepAt = phase;
+  stampArmed = false;
+  snd.tone(660, .16, .07, 'triangle', 180);
+}
+function updateCoach() {
+  const show = playing() && step !== null;
+  $('coach').hidden = !show;
+  if (!show) return;
+  const now = STEPS[step];
+  if (now.done?.()) { nextStep(); updateCoach(); return; }
+  // A step names its suspect: choosing another one keeps the step waiting.
+  const vars = { time: formatTime(c.incident), end: formatTime(c.beatCount - 1) };
+  const message = wrongNotice ? t('learnWrong', vars) : t(now.say, vars);
+  if ($('coachText').textContent !== message) $('coachText').textContent = message;
+  $('coachOk').hidden = !now.tap;
+  $('coachCount').textContent = `${number(step + 1)}/${number(STEPS.length)}`;
 }
 
 function pause() {
@@ -377,7 +423,7 @@ function resume() {
 }
 
 function endSummary() {
-  return { level: daily ? `${hard ? 'hard-daily' : 'daily'}-${day}` : c.level, stars: run.stars, marks: scrolled.size,
+  return { level: c.practice ? 'practice' : daily ? `${hard ? 'hard-daily' : 'daily'}-${day}` : c.level, stars: run.stars, marks: scrolled.size,
     statements: seen.size, guesses: run.rejected.length + Number(run.outcome === 'solved') };
 }
 
@@ -386,6 +432,7 @@ function menu() {
   pointer = null;
   selected = null;
   notebook = false;
+  step = null;
   daily = false;
   hard = false;
   day = '';
@@ -406,6 +453,8 @@ function toggleSound() {
 }
 
 $('play').onclick = () => start(false, validLevel(forceLevel) ? forceLevel : profile.level);
+$('learn').onclick = learn;
+$('coachOk').onclick = () => { if (playing() && STEPS[step]?.tap) nextStep(); };
 $('daily').onclick = () => start(true);
 $('hardDaily').onclick = () => start(true, profile.level, true);
 $('openCalendar').onclick = openCalendar;
@@ -417,8 +466,8 @@ $('pause').onclick = pause;
 $('resume').onclick = resume;
 $('toMenu').onclick = menu;
 $('endMenu').onclick = menu;
-$('again').onclick = () => start(daily, c.level, hard, day);
-$('next').onclick = () => start(false, Math.min(CASES.length, c.level + 1));
+$('again').onclick = () => c.practice ? learn() : start(daily, c.level, hard, day);
+$('next').onclick = () => start(false, c.practice ? profile.level : Math.min(CASES.length, c.level + 1));
 $('menuSound').onclick = toggleSound;
 $('pauseSound').onclick = toggleSound;
 $('menuLanguage').onclick = switchLanguage;
@@ -458,7 +507,7 @@ addEventListener('resize', layout);
 layout();
 
 const help = hint(canvas, {
-  kind: 'drag', key: 'kit-hint:alibi', played: Boolean(loaded), when: playing,
+  kind: 'drag', key: 'kit-hint:alibi', played: Boolean(loaded), when: () => playing() && step === null,
   delay: 1700, reach: 64, label: t('dragHint'),
   bottom: () => {
     const box = canvas.getBoundingClientRect();
@@ -468,7 +517,7 @@ const help = hint(canvas, {
 
 function portraitPoints() {
   return cast.map((_, id) => ({
-    x: 88.5 + (id % 4) * 61 + (id >= 4 && cast.length < 8 ? (8 - cast.length) * 30.5 : 0),
+    x: 88.5 + (id % 4) * 61 + (cast.length < 4 ? (4 - cast.length) * 30.5 : id >= 4 && cast.length < 8 ? (8 - cast.length) * 30.5 : 0),
     y: id < 4 ? 448 : 493,
   }));
 }
@@ -571,6 +620,13 @@ function finishReveal() {
 // A solved campaign case names what it completed and the star total.
 function updateGoal() {
   const goal = $('goal');
+  if (c.practice && run.outcome === 'solved') {
+    goal.hidden = false;
+    const head = document.createElement('span');
+    head.textContent = t('learnDone');
+    goal.replaceChildren(head, t('learnRule'));
+    return;
+  }
   goal.hidden = daily || run.outcome !== 'solved';
   if (goal.hidden) return;
   const last = c.level === CASES.length;
@@ -586,7 +642,8 @@ function updateGoal() {
 function showResult(solved) {
   $('result').textContent = t(solved ? 'caught' : 'retry');
   updateGoal();
-  $('next').hidden = daily || !solved || c.level >= CASES.length;
+  $('next').hidden = daily || !solved || (!c.practice && c.level >= CASES.length);
+  $('next').textContent = t(c.practice ? 'play' : 'next');
   $('share').hidden = !daily || !solved;
   $('next').classList.toggle('primary', !$('next').hidden);
   $('again').classList.toggle('primary', !solved);
@@ -600,6 +657,7 @@ function showResult(solved) {
 }
 
 function saveWin() {
+  if (c.practice) return;
   if (save.readJson(KEY) !== null) syncProfile();
   if (daily) {
     const summary = dailyProfile();
@@ -618,8 +676,17 @@ function saveWin() {
 }
 
 function accuseId(id) {
+  if (!canAccuse()) return;
   const next = accuse(c, run, id);
   if (next === run) return;
+  if (c.practice && next.outcome !== 'solved') {
+    // Practice costs nothing: say that this alibi was true and keep going.
+    wrongNotice = true;
+    lastShot = { at: phase, id, solved: false };
+    snd.noise(.105, .16, 465);
+    rec.event('accuse', { suspect: id, correct: false, stars: run.stars });
+    return;
+  }
   run = next;
   wrongNotice = !run.outcome;
   lastShot = { at: phase, id, solved: run.outcome === 'solved' };
@@ -672,6 +739,7 @@ function markNote(id, actorRoom = null) {
 
 const noteRowY = i => 157 + 45 * i;
 function notebookInput(p) {
+  if (c.practice) return false;
   if (Math.abs(p.x - notebookButton.x) < 29 && Math.abs(p.y - notebookButton.y) < 24) {
     notebook = !notebook;
     stampArmed = false;
@@ -712,6 +780,7 @@ function begin(e) {
   if (notebookInput(p)) { e.preventDefault(); return; }
   if (Math.abs(p.y - homeStamp.y) <= 25 && Math.abs(p.x - homeStamp.x) < 61) {
     pointer = { ...p, id: e.pointerId, type: 'stamp', start: p, moved: false };
+    if (!canAccuse()) { pointer = null; return; }
     snd.tone(375, .06, .065, 'triangle', 60);
   } else if (Math.abs(p.y - replay.y) <= 24 && p.x > 13 && p.x < 347) {
     stampArmed = false;
@@ -790,6 +859,7 @@ addEventListener('keydown', e => {
   if (!playing()) return;
   stampArmed = false;
   if (e.key.toLowerCase() === 'n') {
+    if (c.practice) return;
     if (selected !== null && e.shiftKey) markNote(selected);
     else notebook = !notebook;
   } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
@@ -825,12 +895,13 @@ function line(points, color, width = 1.5) {
 function heading(frame) {
   rect(g, 67, 13, 125, 44, 14, '#412f46', '#b4808180');
   eventIcon(g, 88, 34, 33, c.crime, false);
-  if (daily) text(g, hard ? '◆' : '✦', 119, 35, 22, GOLD);
+  if (c.practice) text(g, '?', 117, 35, 22, GOLD);
+  else if (daily) text(g, hard ? '◆' : '✦', 119, 35, 22, GOLD);
   else {
     text(g, chapters[c.spec.chapter - 1], 105, 28, 8, GOLD, 'system-ui', 'left');
     text(g, twoDigits(c.level), 105, 44, 15, CREAM, 'Georgia', 'left');
   }
-  for (let i = 0; i < 3; i++) star(g, 146 + i * 16, 37, 6.3, i < run.stars ? GOLD : '#594054', '#cf936d', 1);
+  if (!c.practice) for (let i = 0; i < 3; i++) star(g, 146 + i * 16, 37, 6.3, i < run.stars ? GOLD : '#594054', '#cf936d', 1);
   rect(g, 208, 13, 140, 44, 14, '#412f46', '#b4808180');
   clock(g, 232, 35, 13, minute(frame.beat));
   text(g, formatTime(frame.beat), 278, 35, 22, CREAM, 'Georgia');
@@ -895,6 +966,9 @@ function drawReplay(frame) {
     const x = tickX(i);
     line([[x, replay.y - 11], [x, replay.y + 11]], '#896678', 1);
     dot(x, replay.y, seen.size && scrolled.has(i) ? 3.3 : 2.7, i <= time ? '#f6cf97' : '#987384');
+    // The time of each mark, under the line (note #245).
+    const here = i === frame.beat;
+    text(g, formatTime(i), x, replay.y + 24.5, c.beatCount > 10 ? 9 : here ? 12 : 11, here ? '#ffdf9f' : '#d9b6ab', 'Georgia');
     if (i === c.shutterBeat) {
       rect(g, x - 3.8, replay.y + 10, 7.6, 5.6, 1.2, null, '#dcb58d', 1.1);
       dot(x, replay.y + 12.8, 1.2, '#dcb58d');
@@ -913,11 +987,13 @@ function drawReplay(frame) {
   dot(tickX(time), replay.y + 2.2, 16, '#251c32');
   clock(g, tickX(time), replay.y, 15, minute(frame.beat));
 
+  if (!canAccuse()) return;
   rect(g, 119, 583, 122, 44, 10, stampArmed ? '#885153' : '#403047', stampArmed ? GOLD : '#987184');
   const held = pointer?.type === 'stamp';
   if (stampArmed) text(g, '×', 146, 604, 23, CREAM);
   else if (!held) stamp(g, 146, homeStamp.y - 1, .76);
   text(g, t(stampArmed ? 'cancel' : 'accuse'), 201, 605, 15, CREAM);
+  if (c.practice) return;
   const { x, y } = notebookButton;
   rect(g, x - 25, y - 22, 50, 44, 10, notebook ? '#70505c' : '#403047', '#987184');
   bookIcon(x - 3, y, '#ffe1aa');
@@ -969,7 +1045,7 @@ function drawNotebook(cue) {
 
 function drawPortraits() {
   const pts = portraitPoints();
-  rect(g, 47, 423, 266, 95, 19, '#412f45', '#a774817d');
+  rect(g, 47, 423, 266, cast.length <= 4 ? 50 : 95, 19, '#412f45', '#a774817d');
   for (const [id, { x, y }] of pts.entries()) {
     const person = cast[id];
     const target = pointer?.type === 'stamp' && pointer.target === id;
@@ -1177,7 +1253,7 @@ function corners(x, y, w, h, color = CREAM) {
 
 function markTick(beat) {
   const x = tickX(beat);
-  line([[x - 5, 537], [x, 542], [x + 5, 537]], CREAM, 2.1);
+  line([[x - 5, replay.y - 24], [x, replay.y - 19], [x + 5, replay.y - 24]], CREAM, 2.1);
 }
 
 function drawNotebookHint(cue, pulse) {
@@ -1243,8 +1319,37 @@ function drawWrongCue() {
   }
 }
 
+// The practice case points at exactly one thing: what the step asks for.
+function drawCoaching() {
+  if (wrongNotice) return;
+  const pulse = calm.matches ? .55 : .5 - .5 * Math.cos(phase * 5);
+  const now = STEPS[step];
+  if (now.say === 'learnDrag') {
+    const wave = calm.matches ? .62 : .5 - .5 * Math.cos((phase - stepAt) * 2.2);
+    hand(g, tickX(Math.max(time, wave * (c.beatCount - 1))), replay.y + 4, -.19);
+  } else if (now.say === 'learnStamp') {
+    if (!stampArmed) ghostTap(homeStamp.x, homeStamp.y, pulse);
+  } else if (now.who !== undefined && selected !== now.who) {
+    const p = portraitPoints()[now.who];
+    ghostTap(p.x, p.y, pulse);
+  } else if (selected !== null && beatNow() !== c.incident) {
+    const p = claimPoint(cast[selected], cast[selected].claim);
+    ghostTap(p.x, p.y, pulse);
+    markTick(c.incident);
+  } else if (now.say === 'learnTrue' || now.say === 'learnLie') {
+    // The alibi's picture, the same picture in the house, and where they are.
+    const actor = board[beatNow()].actors.find(entry => entry.portrait === selected);
+    const room = rooms[cast[selected].claim.room];
+    corners(150, 85, 20, 20, '#8e5562');
+    corners(room.x + SIGN.x, room.y + SIGN.y, SIGN.size / 2 + 2 + pulse * 2, SIGN.size / 2 + 2 + pulse * 2);
+    const at = roomPoint(rooms[actor.room], actor.slot);
+    corners(at.x, at.y - 4, 21 + pulse * 2, 23 + pulse * 2, GOLD);
+  }
+}
+
 function drawTeaching(frame, cue) {
   if (!cue || pointer) return;
+  if (step !== null) { drawCoaching(); return; }
   const pulse = calm.matches ? .55 : .5 - .5 * Math.cos(phase * 5);
   if (notebook) { drawNotebookHint(cue, pulse); return; }
   if (cue === 'wrong') {
@@ -1518,7 +1623,7 @@ function draw() {
   if (screen === 'menu' || screen === 'cases' || screen === 'calendar') { drawMenu(); return; }
   drawScene(frame);
   heading(frame);
-  if (cue) updateGuide(cue);
+  if (cue && step === null) updateGuide(cue);
   drawClaim(frame);
   drawPortraits();
   drawReplay(frame);
@@ -1688,7 +1793,7 @@ window.alibiState = () => ({
     claim: selected === null ? [] : claims(cast[selected]).map(mark => ({ beat: mark.beat, room: mark.room, ...cssPoint(claimPoint(cast[selected], mark)) })),
     signs: rooms.map(room => ({ ...cssPoint({ x: room.x + SIGN.x, y: room.y + SIGN.y }), size: SIGN.size * scale })),
   },
-  loupeOpen: Boolean(loupe), trailBack,
+  loupeOpen: Boolean(loupe), trailBack, step,
 });
 
 let last = performance.now();
@@ -1696,7 +1801,7 @@ function animate(now) {
   const dt = Math.min(.1, Math.max(0, (now - last) / 1000));
   last = now;
   if (!document.hidden && screen !== 'paused' && screen !== 'done' && screen !== 'sharing') phase += dt;
-  if (playing() && pointer?.type === 'suspect' && phase - pointer.at >= HOLD) {
+  if (playing() && pointer?.type === 'suspect' && !c.practice && phase - pointer.at >= HOLD) {
     markNote(pointer.suspect);
     pointer.type = 'pinned';
   }
@@ -1707,6 +1812,7 @@ function animate(now) {
     }
     if (phase - revealStart >= REVEAL_DURATION) finishReveal();
   }
+  updateCoach();
   draw();
   requestAnimationFrame(animate);
 }
@@ -1714,7 +1820,7 @@ function animate(now) {
 // A reload can resume this tab. Durable progress stays in the original local save.
 addEventListener('pagehide', () => {
   try {
-    if (!playing() && screen !== 'paused') {
+    if (c.practice || !playing() && screen !== 'paused') {
       sessionStorage.removeItem(KEY);
       return;
     }
