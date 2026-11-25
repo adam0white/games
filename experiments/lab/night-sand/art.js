@@ -250,6 +250,7 @@ function glassRims(c,s,p) {
   const foot=[[x-9,bottom+1],[x+9,bottom+1]];
   polyline(c,foot,p.dark,1.5);polyline(c,foot,p.brass,.7);
   // The etched rail indicates the allowed horizontal motion of the shutter.
+  if(!s.gate)return;
   const sy=s.gate.y+.5;
   polyline(c,[[4,sy],[W-4,sy]],p.brass+'70',.22);
   for(let j=8;j<=W-8;j+=4)polyline(c,[[j,sy+.4],[j,sy+(j%12===0?1.6:1)]],p.rim+'70',.24);
@@ -394,7 +395,21 @@ function goalMarks(c,s,p,time) {
   const g=s.goal;
   if(s.kind==='glass'){
     depthMark(c,g.x,g.y,g.half,p);
-    slide(c,s.gate,p);
+    if(g.topLine){
+      // The upper mark is a limit: drawn in the warning ink.
+      depthMark(c,g.x,g.topLine,g.topHalf,{...p,rim:'#f0a08a'});
+    }
+    if(s.gate)slide(c,s.gate,p);
+  }else if(s.kind==='pile'){
+    c.save();c.lineWidth=.35;c.strokeStyle=p.rim+'90';c.setLineDash([.8,1.8]);
+    c.beginPath();c.moveTo(g.x,g.y+2.5);c.lineTo(g.x,g.base);c.stroke();c.restore();
+    const pulse=s.progress>=1?1.25:.9+.12*Math.cos(time*3);
+    star(c,g.x,g.y,3.4*pulse,p.dark);star(c,g.x,g.y,2.6*pulse,p.moon);
+  }else if(s.kind==='layers'){
+    const {jar}=g, half=(jar.x2-jar.x1)/2-.5, mid=(jar.x1+jar.x2)/2+.5;
+    c.fillStyle=p.teal+'14';c.fillRect(jar.x1+1,jar.top,jar.x2-jar.x1-1,jar.bottom-jar.top);
+    depthMark(c,mid,jar.lower,half,{...p,rim:p.sand[3]});
+    depthMark(c,mid,jar.upper,half,{...p,rim:p.fine[3]});
   }else if(s.kind==='sieve'){
     catchSymbol(c,g.x,g.y,true,p);
     catchSymbol(c,g.coarseX,g.y,false,p);
@@ -412,12 +427,18 @@ function goalMarks(c,s,p,time) {
     c.save();c.lineWidth=.3;c.strokeStyle=p.rim+'96';
     c.setLineDash([.9,2.4]);c.beginPath();c.moveTo(W/2,4);c.lineTo(W/2,H-3);c.stroke();
     c.restore();
-  }else if(s.kind==='lamp'&&s.progress<.8){
-    // An exposed glint at the bail shows where to start at rest.
-    const pulse=.65+.35*Math.cos(time*2.8);
-    c.save();c.globalAlpha=pulse;
-    star(c,g.x-1.55,g.y-13.45,1.6,p.rim);
-    c.restore();
+  }else if(s.kind==='lamp'){
+    if(s.gate)slide(c,s.gate,p);
+    if(s.progress<.8){
+      // A buried lamp still shows through the sand as a warm glow, so the player knows where to dig.
+      const pulse=.65+.35*Math.cos(time*2.8);
+      const glow=c.createRadialGradient(g.x,g.y,0,g.x,g.y,13);
+      glow.addColorStop(0,'#ffd27a'+Math.round(70+60*pulse).toString(16));glow.addColorStop(1,'#ffd27a00');
+      c.fillStyle=glow;c.fillRect(g.x-13,g.y-13,26,26);
+      c.save();c.globalAlpha=pulse;
+      star(c,g.x-1.55,g.y-13.45,1.6,p.rim);
+      c.restore();
+    }
   }
 }
 function ghost(c,s,p,time) {
@@ -460,12 +481,18 @@ function tool(c,s,p,focused){
   c.setLineDash([2.2,1.3]);c.beginPath();c.arc(0,0,5.9,0,tau);c.stroke();c.setLineDash([]);
   if(s.kind==='garden'){
     for(let i=-1;i<=1;i++)polyline(c,[[i*2,-2.4],[i*2,2.3]],p.rim,.55);
-  }else if(load>0){
-    // A hanging scoopful travels with the thumb until release.
-    const radius=Math.min(4.8,1.3+Math.sqrt(load)*.18);
-    ellipse(c,0,0,radius,radius*.77,p.dark);
-    ellipse(c,0,-.3,radius-.35,Math.max(.3,radius*.77-.35),p.brass);
-    for(let i=0;i<7;i++)ellipse(c,Math.sin(i*5.6)*radius*.64,Math.cos(i*3.8)*radius*.39,.25,.2,p.rim);
+  }else if(load>0&&!s.hand.board){
+    // The handful is real sand: a little heap of the very grains held, sitting on the fingertip.
+    const shown=Math.min(load,150);
+    let k=0;
+    for(let row=0;k<shown;row++){
+      const width=Math.min(2*row+1,13);
+      for(let j=0;j<width&&k<shown;j++,k++){
+        const grain=s.scoop[s.scoop.length-1-k]%16;
+        c.fillStyle=grain>=5?p.fine[grain-5]:p.sand[Math.max(0,grain-1)];
+        c.fillRect(j-(width>>1)-.5,row-Math.ceil(Math.sqrt(shown))+.2,1,1);
+      }
+    }
   }
   c.restore();
 }
@@ -486,7 +513,7 @@ export function renderer(canvas) {
   }
   size();
   new ResizeObserver(size).observe(canvas);
-  return (s,{look='basalt',time=s.ticks/60,intro=false,focused=false}={})=>{
+  return (s,{look='basalt',time=s.ticks/60,intro=false,focused=false,glow=0}={})=>{
     const p=inks[look]||inks.basalt;
     if(previousState!==s||previousPalette!==p){
       cached=plate(s,p);
@@ -508,5 +535,9 @@ export function renderer(canvas) {
     goalMarks(ctx,s,p,time);
     if(intro&&s.status==='play'&&!s.hand.down)ghost(ctx,s,p,time);
     tool(ctx,s,p,focused);
+    if(glow>0){
+      // A bed that is done lights up for a moment.
+      ctx.fillStyle=`rgba(255,226,160,${(.28*glow).toFixed(3)})`;ctx.fillRect(0,0,W,H);
+    }
   };
 }

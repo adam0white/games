@@ -72,3 +72,90 @@ The shared kit self-test passed on both engines. The post-change shared phone su
 ## Play recording (2026-11-24)
 
 Records under `night-sand` (`kit/lab.js`). One run for each bed: it starts at the first press on the sand, ends `won` or `lost` when the bed ends (event `bed-cleared` with level and kind), and ends `quit` on Start over, Choose a bed or any new bed. The endless garden records its score in the summary. Summary: level, kind, progress percent, score, beds completed. The notice is under the sand table, on screen from the first look. The table width formula now reserves 232 px instead of 172 px for it; in landscape the notice sits above the title. The page sends nothing typed, no names and no room codes. The recording notice and off switch are the kit's own (`kit/lab.js`); the switch is on the pause card. `check.mjs` answers the lab endpoint itself, loads the page with `?labRunSource=agent`, and asserts that a played run sends a run record under the slug with recording on and nothing with the switch off. Not verified: the live endpoint (it refuses these names until the human-framework change lands and deploys). Changed on purpose: the check's "no hf-lab keys" assertion now allows `hf-lab-player`; the block on `/kit/lab.js` is gone. Bots: unchanged outcome (same-seed replay matches). `check.mjs`: exit 0 on both profiles.
+
+## Improve pass (2026-11-24): what a cold play found first
+
+The owner's words: "sand needs a lot of improvements". Before any change, a cold play at 390 × 844 (Chromium Pixel 7 and WebKit iPhone 13, cleared save) and measurements on the unchanged page:
+
+| Measure (before) | WebKit | Chromium |
+| --- | ---: | ---: |
+| Touch to first moved grain, hint stroke on bed 1 | 5 ms | 132 ms |
+| Touch to the result card, one hint stroke | 1.85 s | 2.00 s |
+| Page work per frame, mean over the stroke (≈120 frames) | 0.14 ms | 0.16 ms |
+
+The 8–10 s in the earlier NOTES counted the check's own sky tap and its repeated strokes; one good stroke reaches the card in about 2 s. Latency was not the problem. A random first touch on bed 1 moves sand only 43% of the time (1,944 of 4,524 grid points), because two thirds of the field is sky.
+
+A clumsy bot (random plausible drags, no knowledge of the answer, 15 runs per bed, three simulated minutes at most) on the unchanged rules:
+
+| Bed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Won / median | 15/15, 10.6 s | 15/15, 2.0 s | 15/15, 87 s | 12/15, 63 s | 15/15, 6.0 s | 0/15 | 13/15, 71 s | 2/15 | 0/15 | 15/15, 22 s |
+
+The five weakest things, in order:
+
+1. **The sand does not pour.** A press lifts a disc of up to 680 grains at once into a hidden scoop, drawn as a small brass coin; on release they reappear as a heap at the release point. Nothing streams from the finger. It is a cut-and-paste of pixels, not a handful of sand.
+2. **Most first touches do nothing**, and the moving hint points into the sky (a toss gesture), so a player who copies it near the top of the dune lifts a few grains and sees no change.
+3. **Four ideas spread over ten beds.** Beds 1, 5, 10 are the same lamp; 2, 6, 9 the same hourglass; 3, 8 the same sieve; 4, 7 the same seed. Bed 2 is won by any nudge of the board (2 s). On beds 5 and 10 the lamp is fully buried and nothing shows where it is.
+4. **The endless garden is hidden** behind Pause or after bed 10, and gives nothing to keep or show.
+5. **Thin feel.** One noise loop follows the flow; there is no sound for picking up or pouring, no light response, and the page is English only.
+
+## Improve pass (2026-11-24): what changed
+
+**The verb.** The finger now takes sand in hand and lets it run. A press gathers the grains under a finger-sized disc (radius 5 cells); a press just above the surface reaches down to it. Dragging gathers more along the path, up to a handful (600 grains on lamp beds, 420 elsewhere). The held grains are drawn under the finger as real grains. Over open air the hand trickles: slowly while it moves fast, freely while it hovers still. On lift the rest streams out of a narrow spout. Sand the hand has just poured is not taken back for 40 ticks. Mass is conserved (field + hand + pouring batches + waste) on every bot run. The falling-sand rules themselves (`fall`, the mesh, runout) are unchanged.
+
+**Ten beds, one idea each.** Level numbers stay 1–10, so `unlocked`, `completed` and `level` in old saves keep their meaning (the hub reads `completed`).
+
+| Bed | Idea | Goal |
+| --- | --- | --- |
+| 1 | Dig and throw aside | Uncover the lamp at the top of a dune |
+| 2 | Pour a measured amount | Cover the seed between two marks; too much is not a win |
+| 3 | Open, then shut in time | Slide the board open, then back before the sand passes the upper (pink) mark |
+| 4 | The mesh sorts | Pour mixed sand on the sieve; blue falls through, ochre slides off |
+| 5 | A deep hole must be wide | The lamp is deep (a faint glow marks it); a narrow hole fills itself |
+| 6 | Bend the stream | Set the board under the stream so it lands in an offset bulb |
+| 7 | Pile it high | Heap sand under a star; a tall pile needs a wide foot |
+| 8 | Order matters | Ochre in the jar to the lower mark, then blue on top |
+| 9 | Fill by hand | No charge in the glass; carry sand up from the dunes and pour it in |
+| 10 | Shut the source first | A hopper keeps burying the lamp until its board is slid shut |
+
+Replaced: the old bed 2 (an hourglass any nudge won), beds 5 and 10 (the same lamp, hidden), bed 8 (a second sieve) and the old bed 7 (a second seed). A "skim the blue off the top" bed was built and dropped: strokes always took ochre with it.
+
+**Garden and share.** Once bed 1 is cleared a garden button sits in the mast on every bed. In the garden that slot is a share button: it draws the raked bed at 4× with the score under it and hands a PNG to the phone's share sheet (`navigator.share` with files). Where that is missing it saves the picture instead. The kit has no image share helper (`room.js` `shareLink` takes a URL only), so this lives in `main.js`; if a second game needs it, it belongs in the kit. Shares are recorded as `garden-shared` / `garden-saved` events in the garden run.
+
+**Feel.** A short crunch through `kit/audio.js` when grains are taken, scaled by how many; the existing hiss still follows grains in motion; a second chime and a warm light wash on a win; a buried glow and glint over a covered lamp.
+
+**Words.** Every string is in `words.js` (`kit/i18n.js`), English and Turkish, with a language switch on the pause card. The Turkish has not been read by a native speaker. The kit's recording notice and switch stay English (kit text, not this page's).
+
+### After, measured
+
+| Measure | Before | After |
+| --- | --- | --- |
+| Clumsy bot, bed 1 (15 runs, frozen seeds) | 15/15, median 10.6 s | 15/15, median 8.5 s |
+| Touch to grains in the hand (check, page clock) | first grain moved 5 ms WebKit / 132 ms Chromium | same event, 0–0.2 ms; drawn on the next frame |
+| Random first touch that takes sand (bed 1 grid) | 43% | 45% |
+| Page work per frame, p95, bed full (garden, about 12,000 grains) | — | 1 ms WebKit, 0.3 ms Chromium |
+| `check.mjs` first bed, start to result card | 6.4 s / 9.9 s | 10.6 s / 11.7 s (four strokes now, each waits for the sand to settle) |
+
+Clumsy bot after, all beds: 1: 15/15 8.5 s · 2: 1/15 · 3: 5/15 · 4: 0/15 · 5: 15/15 38.1 s · 6: 0/15 · 7: 0/15 · 8: 2/15 · 9: 9/15 102.5 s · 10: 0/15. Beds 2–10 are meant to need intent, so random drags failing them is expected. The before numbers show bed 1 already met the 45 s target; the owner's complaint was the feel, not the time.
+
+Informed bot (follows the live hint), six seeds per bed: all ten beds won; ticks after the first touch: 446, 80–95, 177, 249–267, 1652, 649–655, 984, 986, 1197, 1786. The beds are nearly seed-independent (the seed only varies grain colour), so six seeds is closer to one run than six.
+
+### Checks changed on purpose
+
+The old rules cannot hold "exactly as on main": the verb changed. Kept unchanged: the mesh fixture, the coarse and fine pile shapes, the mound avalanche, the garden mirror scores, the curved mirrored strokes, the shifted-stroke scores and same-seed replay. Changed in `bots.mjs`:
+
+- The empty tray is built from bed 4 (no board), not bed 3: a bed with a board now waits for the first touch.
+- The per-bed informed play follows the live hint (`aim()`), not a fixed stroke plus offsets.
+- Removed: the bail-grip claims (bed 1 no longer has a grab handle), the old bed 2 closed-gate and late-gate losses (that bed is gone), bed 9 straight-miss (bed 9 has no board), the bed 7 overburied seed (seed is bed 2 now).
+- Added: first press holds a handful and a still hand pours it; a press above the surface reaches down; a sky stroke takes nothing; the clumsy bot clears bed 1 in a median under 45 s; bed 3 waits for a touch and a board left open is lost (`overfill`); bed 6 straight stream misses; bed 2 overburied is not a win.
+- `--mutate` still breaks the mesh; `--mutate=hand` loses poured grains (fails the mass claim); `--mutate=trickle` stops the hand pouring before lift (fails the trickle claim). All three exit 1.
+
+In `check.mjs`: beds 1–4 are lamp, seed, stop-glass and sieve, played by following the live hint and waiting for the sand to settle; bed 3 is opened then shut. Added: touch-to-grains under 300 ms; the garden button hidden before bed 1 and shown after; the Turkish switch; the garden reached from the mast; the share hands over a PNG with the score in its caption and is recorded; page work p95 under 8 ms with the bed full; an old-format save loads with every field.
+
+### Not verified
+
+- A real phone: thumb feel of the reach (5 cells), the trickle rates, and whether the held handful reads under a finger.
+- Sound by ear: the crunch and win chime were checked only as gain on a node.
+- Colours in daylight: not measured; the dark sky behind ochre sand is high contrast, the plum look less so.
+- The real share sheet: checked with a stand-in `navigator.share`; the download fallback was not exercised.
+- Turkish wording.

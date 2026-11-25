@@ -1,5 +1,6 @@
-import { W, H, create, step, press, move, release } from './sim.js';
+import { W, H, create, step, press, move, release, grips } from './sim.js';
 import { renderer } from './art.js';
+import { t, lang, apply, setLang, langs } from './words.js';
 import { drag } from '../../kit/drag.js';
 import { sound } from '../../kit/audio.js';
 import { hint } from '../../kit/hint.js';
@@ -30,13 +31,10 @@ function store() {
   writeJson(key, save);
 }
 const reduce = matchMedia('(prefers-reduced-motion: reduce)');
-const titles = { lamp: 'Uncover the lamp', glass: 'Fill to the line', sieve: 'Sift the blue sand', seed: 'Cover the seed', garden: 'Rake a mirror image' };
-const finishes = { lamp: 'Lamp uncovered', glass: 'Bulb filled', sieve: 'Sand sorted', seed: 'Seed planted' };
-const actions = { lamp:'Lift sand off the lamp. Drop it to the side.', glass:'Slide the board to pour sand into the lower bulb.', sieve:'Scoop the mixed sand onto the mesh.', seed:'Carry sand to the seed and cover it to the mark.', garden:'Drag the rake through the sand. Match your marks on the other side.' };
 
 let bed, screen, fromBook, pointer = null, keyboard = false, keyboardFocus = false, started, previousTime, debt = 0;
-let elapsed, endAt, releasedAt, lastPaint, lastMeter, mouseStart, mouseGate, frameCost = 0;
-let inkFlow = 0, soundAt = 0, noiseGain, noiseFilter;
+let elapsed, endAt, releasedAt, lastPaint, lastMeter, mouseStart, mouseGate, frameCost = 0, wonAt = null;
+let inkFlow = 0, soundAt = 0, crunchAt = 0, lastLifted = 0, noiseGain, noiseFilter;
 const audio = sound({ on: () => save.sound, setup(ctx) {
   const noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
   const samples = noise.getChannelData(0);
@@ -60,21 +58,49 @@ function hush() {
     noiseGain.gain.setValueAtTime(0, now);
   }
 }
+// The hiss follows the grains in motion; a handful taken from the bed crunches.
 function updateSound(now) {
-  if (!audio.ctx || !save.sound || now < soundAt) return;
+  if (!audio.ctx || !save.sound) return;
+  const taken = bed.lifted - lastLifted;
+  lastLifted = bed.lifted;
+  if (taken > 0 && now >= crunchAt) {
+    crunchAt = now + 70;
+    audio.noise(.07, Math.min(.16, .03 + taken / 500), 2600 + Math.random() * 900);
+  }
+  if (now < soundAt) return;
   soundAt = now + 55;
   const level = Math.min(1, Math.sqrt(inkFlow / 1200));
-  const t = audio.ctx.currentTime;
-  noiseGain.gain.setTargetAtTime(.19 * level, t, .04);
-  noiseFilter.frequency.setTargetAtTime(720 + 2750 * level, t, .06);
+  const t0 = audio.ctx.currentTime;
+  noiseGain.gain.setTargetAtTime(.19 * level, t0, .04);
+  noiseFilter.frequency.setTargetAtTime(720 + 2750 * level, t0, .06);
 }
-const label = () => bed.level ? 'Bed ' + String(bed.level).padStart(2,'0') + ' / 10' : 'Endless garden';
+const label = () => bed.level ? t('bed', { n: String(bed.level).padStart(2,'0') }) : t('garden');
 const setText = (id, text) => { const node = el(id); if (node.textContent !== text) node.textContent = text; };
+function words() {
+  apply();
+  setText('look', t('ink', { name: t(save.look) }));
+  setText('sound', t(save.sound ? 'soundOn' : 'soundOff'));
+  el('to-garden').setAttribute('aria-label', t('openGarden'));
+  el('share').setAttribute('aria-label', t('share'));
+  el('title').innerHTML = lang() === 'tr' ? 'Gece <i>Kumu</i>' : 'Night <i>Sand</i>';
+  document.title = t('title');
+  for (const button of el('langs').children) button.setAttribute('aria-pressed', String(button.value === lang()));
+  for (const button of el('levels').children) button.setAttribute('aria-label', t('levelLabel', { n: button.value }));
+  if (bed) describe();
+}
 function settings() {
   document.body.dataset.look = save.look;
-  setText('look', 'Ink · ' + (save.look === 'plum' ? 'Plum' : 'Basalt'));
-  setText('sound', save.sound ? 'Sound on' : 'Sound off');
   el('sound').setAttribute('aria-pressed', String(save.sound));
+  words();
+}
+function describe() {
+  setText('edition', label());
+  setText('pause-level', label());
+  setText('restart', t(bed.level ? 'restart' : 'smooth'));
+  setText('objective', t('goal' + bed.level));
+  field.setAttribute('aria-label', t('act' + bed.level) + ' ' + t('keys'));
+  document.querySelector('.meter').setAttribute('aria-label', t(bed.level ? 'progress' : 'symmetry'));
+  if (!bed.level) setText('garden-best', t('gardenBest', { n: save.best }));
 }
 function readout() {
   const percent = bed.level ? Math.round(100 * bed.progress) : bed.score;
@@ -83,8 +109,8 @@ function readout() {
   const meter = document.querySelector('.meter');
   meter.setAttribute('aria-valuenow', percent);
   meter.firstElementChild.style.width = percent + '%';
-  setText('reading', percent + '%');
-  if (!bed.level) setText('garden-best','Best ' + save.best + '%');
+  setText('reading', t('percent', { n: percent }));
+  if (!bed.level) setText('garden-best', t('gardenBest', { n: save.best }));
 }
 const sheets = screens(['paused','catalog','result']);
 function show(name) {
@@ -97,9 +123,11 @@ function show(name) {
   if (name !== 'play') document.querySelector('.sheet.on button:not([hidden]):not(:disabled)')?.focus({preventScroll:true});
 }
 function draw() {
-  const retryCue = bed.level === 1 && !bed.hand.down && bed.progress < .1 && elapsed - releasedAt > 1;
-  paint(bed, { look:save.look, intro:(!started || retryCue) && !keyboardFocus,
-    focused:keyboardFocus && document.activeElement === field, time:reduce.matches ? 0 : elapsed });
+  // The moving hint shows before the first touch, and again after a long idle spell without progress.
+  const idle = !bed.hand.down && bed.progress < .1 && elapsed - releasedAt > (bed.level === 1 ? 1 : 8);
+  paint(bed, { look:save.look, intro:(!started || idle) && !keyboardFocus && bed.level > 0,
+    focused:keyboardFocus && document.activeElement === field, time:reduce.matches ? 0 : elapsed,
+    glow: wonAt === null || reduce.matches ? 0 : Math.max(0, 1 - (elapsed - wonAt) / 1.1) });
   readout();
 }
 // Play recording for the game lab (kit/lab.js): one run for each bed the player starts to work.
@@ -111,6 +139,11 @@ function runEnd(outcome) {
   runOpen = false;
   rec.end(outcome, { level: bed.level, kind: bed.kind, progress: Math.round(bed.progress * 100), score: bed.score, completed: save.completed });
 }
+function masthead() {
+  // The garden is one tap from the first screen once the first bed is done; in the garden that button shares.
+  el('to-garden').hidden = !(bed.level && save.completed >= 1);
+  el('share').hidden = !!bed.level;
+}
 function start(level) {
   runEnd('quit');
   drop();
@@ -120,25 +153,26 @@ function start(level) {
   keyboardFocus = false;
   elapsed = 0;
   endAt = null;
+  wonAt = null;
   releasedAt = 0;
+  lastLifted = 0;
   lastPaint = -Infinity;
   lastMeter = null;
   el('garden-best').hidden = !!level;
-  setText('edition', label());
-  setText('objective', titles[bed.kind]);
-  el('goal-icon').setAttribute('href', '#i-' + bed.kind);
-  field.setAttribute('aria-label', actions[bed.kind] + ' Arrow keys position the tool. Space picks up or releases.');
+  el('goal-icon').setAttribute('href', '#i-' + icon(bed));
+  describe();
+  masthead();
   Object.assign(bed.hand,{x:bed.hint.x,y:bed.hint.y});
-  document.querySelector('.meter').setAttribute('aria-label', level ? 'Goal progress' : 'Rake symmetry');
   if (level && save.level !== level) { save.level = level; store(); }
   show('play');
   audio.release();
   draw();
 }
+const icon = s => ({ pile: 'pile', layers: 'layers' })[s.kind] || s.kind;
 function rememberGarden() {
   if (bed?.kind === 'garden' && bed.score > save.best) {
     save.best = bed.score; store();
-    setText('garden-best','Best ' + save.best + '%');
+    setText('garden-best', t('gardenBest', { n: save.best }));
   }
 }
 function drop() {
@@ -169,10 +203,11 @@ function finish() {
   runEnd(won ? 'won' : 'lost');
   audio.hold();
   el('next').hidden = !won;
-  setText('advance', bed.level === 10 ? 'Enter the garden' : 'Next bed');
+  setText('advance', t(bed.level === 10 ? 'enterGarden' : 'next'));
   positionResult();
-  setText('result-title', won ? finishes[bed.kind] : 'Upper bulb empty');
-  el('result-icon').setAttribute('href', '#i-' + bed.kind);
+  setText('result-title', won ? t('done' + bed.level) : t(bed.ending === 'overfill' ? 'lostOverfill' : 'lostEmpty'));
+  el('result-icon').setAttribute('href', '#i-' + icon(bed));
+  masthead();
   show('result');
 }
 function pause() {
@@ -183,14 +218,14 @@ function pause() {
   audio.hold();
   setText('pause-level', label());
   el('garden').hidden = !bed.level;
-  setText('restart',bed.level ? 'Start over' : 'Smooth the bed');
+  setText('restart', t(bed.level ? 'restart' : 'smooth'));
   show('paused');
 }
 function resume() { audio.release(); show('play'); field.focus({preventScroll:true}); }
 function openBook() {
   fromBook = screen;
   for (const button of el('levels').children) button.disabled = Number(button.value) > save.unlocked;
-  setText('record', 'Garden best · ' + save.best + '%');
+  setText('record', t('gardenRecord', { n: save.best }));
   show('book');
 }
 for (let n=1; n<=10; n++) {
@@ -198,17 +233,24 @@ for (let n=1; n<=10; n++) {
   button.id = 'level-' + n;
   button.value = String(n);
   button.textContent = String(n).padStart(2,'0');
-  button.setAttribute('aria-label', 'Bed ' + n);
   button.onclick = () => start(n);
   el('levels').append(button);
+}
+for (const code of langs) {
+  const button = document.createElement('button');
+  button.value = code;
+  button.textContent = code.toUpperCase();
+  button.onclick = () => { setLang(code); words(); };
+  el('langs').append(button);
 }
 el('pause').onclick = pause;
 el('resume').onclick = resume;
 el('restart').onclick = el('retry').onclick = () => start(bed.level);
 el('next').onclick = () => start(bed.level === 10 ? 0 : bed.level+1);
-el('garden').onclick = el('book-garden').onclick = () => start(0);
+el('garden').onclick = el('book-garden').onclick = el('to-garden').onclick = () => start(0);
 el('book').onclick = el('result-book').onclick = openBook;
 el('back').onclick = () => show(fromBook);
+el('share').onclick = () => shareGarden();
 el('sound').onclick = () => {
   save.sound = !save.sound;
   hush();
@@ -220,6 +262,45 @@ el('look').onclick = () => {
   settings(); draw(); store();
 };
 onLeave(pause);
+
+// The raked garden as a picture: the bed itself, with its score and the game's name under it.
+// The kit has a share helper for links only (room.js shareLink), so the image share lives here.
+async function gardenImage() {
+  const scale = 4, foot = 64;
+  const out = document.createElement('canvas');
+  out.width = W * scale; out.height = H * scale + foot;
+  const c = out.getContext('2d');
+  c.fillStyle = getComputedStyle(document.body).getPropertyValue('--paper') || '#ede5cf';
+  c.fillRect(0, 0, out.width, out.height);
+  c.drawImage(field, 0, 0, W * scale, H * scale);
+  c.fillStyle = getComputedStyle(document.body).getPropertyValue('--ink') || '#162e2b';
+  c.font = '500 30px ui-serif, Baskerville, serif';
+  c.fillText(t('title'), 18, H * scale + 42);
+  c.font = '600 20px ui-monospace, monospace';
+  c.textAlign = 'right';
+  c.fillText(t('percent', { n: bed.score }), W * scale - 18, H * scale + 40);
+  return new Promise(resolve => out.toBlob(resolve, 'image/png'));
+}
+async function shareGarden() {
+  const blob = await gardenImage();
+  if (!blob) return;
+  const file = new File([blob], 'night-sand-garden.png', { type: 'image/png' });
+  const text = t('shareCaption', { n: bed.score });
+  try {
+    if (navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ files: [file], text });
+      rec.event('garden-shared', { score: bed.score });
+      return;
+    }
+  } catch (e) { if (e?.name === 'AbortError') return; }
+  // No file sharing here (most desktop browsers): save the picture instead.
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = file.name;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(link.href), 4000);
+  rec.event('garden-saved', { score: bed.score });
+}
 
 function locationInBed(e) {
   const r = field.getBoundingClientRect();
@@ -236,17 +317,17 @@ field.addEventListener('pointerdown', e => {
   started = true;
   runBegin();
   audio.unlock();
-  if (bed.kind === 'glass') {
+  if (grips(bed, x, y)) {
     mouseStart = x; mouseGate = bed.gate.x;
     press(bed, mouseGate, bed.gate.y);
   } else press(bed,x,y);
 });
 field.addEventListener('pointermove', e => {
   if (pointer !== e.pointerId || !canTouch()) { e.stopImmediatePropagation(); return; }
-  if (bed.kind !== 'glass') { const {x,y} = locationInBed(e); move(bed,x,y); }
+  if (!bed.hand.board) { const {x,y} = locationInBed(e); move(bed,x,y); }
 });
 const gateDrag = drag(field, {
-  playing: () => canTouch() && bed.kind === 'glass' && pointer !== null,
+  playing: () => canTouch() && bed.hand.board && pointer !== null,
   paused: () => false, resume, from: () => bed.gate.x,
   travel: dx => dx * W / field.getBoundingClientRect().width,
   aim: x => move(bed,x,bed.gate.y),
@@ -255,7 +336,7 @@ const gateDrag = drag(field, {
 for (const type of ['pointerup','pointercancel','lostpointercapture']) {
   field.addEventListener(type, e => {
     if (pointer !== e.pointerId) return;
-    if (type === 'pointerup' && canTouch() && bed.kind !== 'glass') {
+    if (type === 'pointerup' && canTouch() && !bed.hand.board) {
       const {x,y} = locationInBed(e);
       move(bed,x,y);
     }
@@ -309,7 +390,10 @@ function frame(now) {
     if (bed.status !== 'play' && endAt === null) {
       endAt = elapsed + (reduce.matches ? .4 : 1.15);
       hush();
-      if (save.sound && bed.status === 'won') audio.tone(523,.38,.055,'sine',140);
+      if (bed.status === 'won') {
+        wonAt = elapsed;
+        if (save.sound) { audio.tone(523,.38,.055,'sine',140); setTimeout(() => audio.tone(784,.5,.045,'sine',60), 140); }
+      }
     }
     if (started || now-lastPaint >= 1000/24-1) { draw(); lastPaint = now; }
     frameCost = performance.now() - frameStart;
@@ -325,12 +409,13 @@ window.sandState = () => ({
   best:save.best, score:bed.score, progress:bed.progress, flow:bed.flow,
   unlocked:save.unlocked, completed:save.completed, sound:save.sound, look:save.look,
   hint:{...bed.hint}, pressed:bed.hand.down, load:bed.hand.load, total:bed.total,
+  lifted:bed.lifted, board:bed.hand.board, ending:bed.ending || null, lang:lang(),
   frameCost
 });
 settings();
 start(save.level);
 hint(field, { kind:'hold-and-move', key:'night-sand:hint', played:save.completed>0,
-  when:() => canTouch() && !started && bed.level === 1, label:'Lift the sand away',
+  when:() => canTouch() && !started && bed.level === 1, label:t('hintLabel'),
   delay:3800, reach:26, bottom:() => {
     const r = field.getBoundingClientRect();
     return window.innerHeight - r.top - r.height * bed.hint.y/H;
