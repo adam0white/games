@@ -24,7 +24,7 @@ Bindings: `AI` (Workers AI), `BROWSER` (Browser Rendering), `LAB` (R2 bucket `hf
 - **Stages not yet ported (target 2026-11-20):** the reading sweep, narration variants, inbox suggestions, the reading refill and the Clef label on a report. They need game source and inbox access from the Worker. Until then a day spends roughly the two play sessions only.
 - **No live catalogue check.** The Worker has no account API credential. A missing model fails the first request; that reservation is kept and the day halts.
 - **No account-analytics gate.** The 8,000-neuron fallback applies every day. Unrelated account callers remain unbounded, as before.
-- **Vision models are refused.** The plan uses Qwen3 30B only.
+- **Vision models are refused.** The plan uses Gemma 4 26B only (`@cf/google/gemma-4-26b-a4b-it`, 9,091 and 27,273 neurons per million input and output tokens, about twice Qwen's input rate). It replaced Qwen3 30B on 2026-11-25 by owner decision: Cloudflare retired Qwen3 30B on 2026-11-20 and every run from then to 2026-11-24 halted on its first request. The request turns Gemma's reasoning off with `chat_template_kwargs.enable_thinking: false`; with reasoning on, the same test request used 201 output tokens instead of 14. A failed request now records the error's class name and code, never its message.
 - **No first-minute screenshot** and no screenshots at all; the receipts are text.
 - **Shorter sessions.** 7 and 3 minutes instead of 25 and 5.
 

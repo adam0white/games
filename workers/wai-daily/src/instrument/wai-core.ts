@@ -8,9 +8,10 @@ export const GAMES = (registry.games as { slug: string; kind?: string }[])
   .map((game) => ({ id: game.slug, href: `https://play.adamwhite.work/${game.slug}/` }));
 
 export const PERSONAS = ['Maya Chen', 'Emre Kaya', 'Nia Okafor'];
+// Qwen3 30B and Llama 3.2 3B stopped answering on 2026-11-20 (Cloudflare's deprecation notice of
+// 2026-11-05). Gemma 4 26B replaced them on 2026-11-25 (owner decision).
 export const MODELS = [
-  '@cf/qwen/qwen3-30b-a3b-fp8',
-  '@cf/meta/llama-3.2-3b-instruct',
+  '@cf/google/gemma-4-26b-a4b-it',
   '@cf/meta/llama-3.2-11b-vision-instruct',
 ];
 export function responseText(result: Record<string, unknown>): string {
