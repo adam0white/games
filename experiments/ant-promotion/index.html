@@ -164,6 +164,7 @@ import { FORMS, ANT, WORLD, TOP, sightOf, sightWords, create, step, choose, revi
   crown, powerOf, nemesisMob, nemesisSave, cleanKnobs, TEMPERAMENTS, TEMPERAMENT_NAMES, powerFor, paceAgainst, placeOld, OLD_DIM, oldAims } from './sim.js';
 import { drawForm, setLook, LOOKS } from './art.js';
 import { create3D } from './look3d.js';
+import { living, portraitLiving } from './living.js'; // look 4: animals on rigs
 import { readJson, writeJson } from '../kit/save.js';
 import { sound } from '../kit/audio.js';
 import { onLeave, isPauseKey } from '../kit/pause.js';
@@ -184,7 +185,7 @@ const pick = list => list[Math.floor(Math.random() * list.length)];
 // nem: the living rival (null when there is none). trophies: rivals eaten. gens: how many rivals there have been. Saves from before the rival have none of the three.
 let save = { skin: { c: COLOURS[0], p: 'plain' }, stack: [ANT], xp: 0, sound: true, look: 1, seen: [], wild: true, nem: null, trophies: [], gens: 0, old: [] }; // old: the top animals of the last climb, still to be eaten (note #201); absent in older saves
 Object.assign(save, readJson(KEY, {}));
-if (query.has('look')) save.look = Number(query.get('look')); // ?look=0 flat, 1 cartoon, 2 soft
+if (query.has('look')) save.look = Number(query.get('look')); // ?look=0 flat, 1 cartoon, 2 soft, 3 3D, 4 living
 if (!LOOKS[save.look]) save.look = 1;
 if (query.has('wild')) save.wild = query.get('wild') === '1'; // ?wild=1 wild rules, ?wild=0 classic
 setLook(save.look);
@@ -198,6 +199,8 @@ const buzz = ms => { try { if (save.sound) navigator.vibrate?.(ms); } catch {} }
 const store = () => writeJson(KEY, save);
 
 let arrowTo = null; // the id the green food arrow points at, for the checks
+const L4 = living(), isLiving = () => save.look === 4; // the Living look's rigs; stepped with the sim (frame) and drawn in draw()
+let work = []; // milliseconds of page work in each of the last 120 frames, for the checks
 let s = null, mode = 'menu', W = 0, H = 0, dpr = 1, zoom = 1, last = 0, acc = 0, shake = 0, sayTimer = 0;
 const floats = [], bits = [], keys = new Set(); let flash = 0, dying = 0, streak = 0, streakAt = 0, hideWas = false;
 
@@ -276,6 +279,7 @@ function portrait(canvas, F, r, t = 0, skin = save.skin) {
   const x = canvas.getContext('2d'); x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, canvas.width, canvas.height);
   const wide = F.kind === 'bird' ? 2.3 : F.kind === 'snake' ? (F.f.long ? 3.2 : 2.2) : 2.2, fit = Math.min(r, canvas.height / 2 / wide * 1.9, canvas.width / 2 / wide);
   x.translate(canvas.width / 2 + (F.kind === 'snake' ? fit * 1.6 : F.kind === 'quad' ? fit * 0.4 : 0), canvas.height / 2); x.rotate(-0.25);
+  if (save.look === 4) { x.setTransform(1, 0, 0, 1, 0, 0); portraitLiving(x, F, canvas.width, canvas.height, skin); return; } // the living animal, standing
   if (save.look === 3) setLook(1); // portraits are 2D
   drawForm(x, F, fit, t, skin, -0.25); setLook(save.look);
 }
@@ -296,7 +300,7 @@ function start(fresh) {
   if (fresh) { save.stack = [ANT]; save.xp = 0; store(); } // the rival stays: it remembers you
   s = create(Number(query.get('seed')) || (Math.random() * 1e9 | 0), save.stack, save.xp, SPAWN_WEIGHTS, !!save.wild, save.nem?.sim, save.old);
   if (save.nem && !s.nemesis) { save.nem = null; store(); }
-  floats.length = 0; bits.length = 0; flash = 0; glow = 0; beam = 0; bubble = null; noticeAt = -99; riseNow = false; pendingOffer = false; offerAt = 0; hud(); show('play');
+  L4.clear(); floats.length = 0; bits.length = 0; flash = 0; glow = 0; beam = 0; bubble = null; noticeAt = -99; riseNow = false; pendingOffer = false; offerAt = 0; hud(); show('play');
   say(retired ? t('oldStart') : level(s) === 1 ? t('firstSay') : t('youAre', nameVars(me(s).name)));
   if (save.nem) speakLine(save.nem.persona.lines.notice, 'notice', 3000); // it remembers you
 }
@@ -366,7 +370,7 @@ function back(restart) {
 $('continue').onclick = () => { unlock(); start(false); }; $('fresh').onclick = () => { unlock(); start(true); };
 $('toSkins').onclick = () => { skins(); show('skins'); }; $('toHow').onclick = () => show('how'); $('toBook').onclick = () => { book(); show('book'); };
 $('rules').onclick = () => { save.wild = !save.wild; store(); menu(); say(t(save.wild ? 'rulesSayWild' : 'rulesSayClassic')); };
-$('look').onclick = () => { save.look = (save.look + 1) % LOOKS.length; setLook(save.look); store(); menu(); };
+$('look').onclick = () => { save.look = (save.look + 1) % LOOKS.length; setLook(save.look); L4.clear(); store(); menu(); };
 $('sound').onclick = () => { save.sound = !save.sound; store(); menu(); blip(660); };
 for (const b of document.querySelectorAll('.back')) b.onclick = () => show('menu');
 for (const b of document.querySelectorAll('.toMenu')) b.onclick = () => { if (s?.dead) revive(s, false); riseNow = false; if (s) { save.stack = s.player.stack.slice(); save.xp = s.player.xp; keepNem(); store(); } s = null; show('menu'); };
@@ -584,7 +588,8 @@ function draw(now) {
     g.beginPath(); g.moveTo(m.x, m.y); g.arc(m.x, m.y, R, m.a - cone, m.a + cone); g.closePath();
     g.fillStyle = m.alert ? (strong ? '#ff3a2a40' : '#ffe23a38') : (strong ? '#ffffff2c' : '#ffffff12'); g.fill();
   }
-  for (const m of s.mobs) {
+  const alive = isLiving(); if (alive) L4.begin();
+  for (const m of alive ? [...s.mobs].sort((a, b) => a.y - b.y) : s.mobs) { // living bodies overlap, so the nearer (lower) one is drawn last
     const M = FORMS[m.f], strong = powerOf(m) > F.power;
     if (Math.abs(m.x - p.x) > vw || Math.abs(m.y - p.y) > vh) continue;
     if (!m.nem && strong && m.alert && (Math.abs(m.x - p.x) > W / zoom / 2 || Math.abs(m.y - p.y) > H / zoom / 2)) edge.push(m); // the rival has its own arrow
@@ -600,6 +605,7 @@ function draw(now) {
       else if (aim.kind === 'leap' || aim.kind === 'dive') { g.save(); g.rotate(aim.a); g.fillRect(M.r, -M.r * 0.8, 170, M.r * 1.6); g.beginPath(); g.moveTo(M.r, 0); g.lineTo(M.r + 170 * aim.k, 0); g.stroke(); g.restore(); }
       else { g.beginPath(); g.arc(0, 0, M.r * 2, -1.571, -1.571 + 6.283 * aim.k); g.stroke(); }
     }
+    if (alive) { g.restore(); if (L4.mob(g, m, 1 / zoom, m.nem && N ? N.kills - 1 : 0)) continue; g.save(); g.translate(m.x, m.y); } // the rig draws in world units, scars included
     g.rotate(m.a); g.fillStyle = '#00000026'; g.beginPath(); g.ellipse(0, 3, M.r * 1.1, M.r * 0.8, 0, 0, 7); g.fill(); drawForm(g, M, M.r, m.ph, null, m.a);
     if (m.nem && N) { // one scar for each repeat win
       g.lineCap = 'round';
@@ -627,15 +633,15 @@ function draw(now) {
   g.save(); g.translate(p.x, p.y);
   if (p.safe > 0) { g.strokeStyle = `rgba(160,220,255,${0.4 + 0.3 * Math.sin(now / 90)})`; g.lineWidth = 3; g.beginPath(); g.arc(0, 0, F.r * 1.9, 0, 7); g.stroke(); }
   g.strokeStyle = save.skin.c === '#3a2a22' ? '#fff8e6' : save.skin.c; g.lineWidth = 2.5; g.setLineDash([5, 5]); g.beginPath(); g.arc(0, 0, F.r * 1.55, now / 900, now / 900 + 6.283); g.stroke(); g.setLineDash([]);
-  g.rotate(p.a); drawForm(g, F, F.r, p.ph, save.skin, p.a); g.restore();
+  if (alive && L4.rig()) { g.restore(); L4.player(g, s, save.skin, 1 / zoom); } else { g.rotate(p.a); drawForm(g, F, F.r, p.ph, save.skin, p.a); g.restore(); }
   }
   // numbers
   const size = Math.max(11, 15 / zoom);
   for (const m of s.mobs) {
     const M = FORMS[m.f]; if (Math.abs(m.x - p.x) > vw || Math.abs(m.y - p.y) > vh) continue;
-    mobLabel(m, m.x, m.y - M.r * (M.kind === 'bird' ? 1.5 : 1.25) - 4, size, F);
+    mobLabel(m, m.x, m.y - M.r * (M.kind === 'bird' ? 1.5 : 1.25) - 4 - (alive ? L4.lift(m) * 0.55 : 0), size, F); // over a hop, a flight or a pounce
   }
-  if (!s.dead) label(p.x, p.y - F.r * (F.kind === 'bird' ? 1.5 : 1.25) - 6, String(F.power), '#ffffff', size * 1.1);
+  if (!s.dead) label(p.x, p.y - F.r * (F.kind === 'bird' ? 1.5 : 1.25) - 6 - (alive ? L4.lift(null) * 0.55 : 0), String(F.power), '#ffffff', size * 1.1);
   for (let i = floats.length - 1; i >= 0; i--) { const f = floats[i]; g.globalAlpha = Math.max(0, 1 - f.age); label(f.x, f.y - f.age * 30, f.text, f.c || '#ffe23a', size * (f.big || 1)); g.globalAlpha = 1; }
   g.restore();
   // where things are on the screen, for the rival's tag and bubble
@@ -772,12 +778,13 @@ function draw3d(now) {
 }
 
 function frame(now) {
-  requestAnimationFrame(frame);
+  requestAnimationFrame(frame); const w0 = performance.now(); // page work in this frame: the sim's steps, the rigs, the drawing
   const dt = last ? Math.min(0.1, (now - last) / 1000) : 0; last = now;
   if (mode === 'play' && s) {
     acc += dt; const inp = input(); inp.power = wantPower; powerButton();
     while (acc >= 1 / 60 && mode === 'play') {
       acc -= 1 / 60; step(s, inp); inp.power = wantPower = false; // a tap between two steps waits for the next one
+      if (isLiving()) { for (const e of s.events) L4.event(e, s); L4.step(s, W / zoom / 2 + 300, H / zoom / 2 + 300); } // the rigs walk at the sim's own step
       for (const e of s.events) {
         if (e.t === 'eat') {
           const M = FORMS.find(f => f.name === e.name);
@@ -863,7 +870,7 @@ function frame(now) {
   if (shake > 0) shake -= dt;
   if (sayTimer > 0 && (sayTimer -= dt) <= 0) $('say').classList.remove('on');
   if (bubble && now > bubble.until) bubble = null;
-  draw(now);
+  draw(now); work.push(performance.now() - w0); if (work.length > 120) work.shift();
 }
 // ---------- language: English, or Turkish by ?lang=tr, the globe button or the browser (experiments/kit/i18n.js, words.js)
 // The How to play list, the recording notice and its switch keep the English the page and the kit wrote; only other languages replace them.
@@ -903,7 +910,7 @@ for (const id of ['langMenu', 'langPause']) {
 translatePage();
 
 addEventListener('pagehide', () => { if (s && !s.dead) { save.stack = s.player.stack.slice(); save.xp = s.player.xp; keepNem(); store(); } });
-window.__ant = { get s() { return s; }, get mode() { return mode; }, get input() { return input(); }, get arrowTo() { return arrowTo; }, get save() { return save; }, get bubble() { return bubble; }, get beam() { return beam; }, FORMS, me, level, step, powerOf, nemesisMob };
+window.__ant = { get s() { return s; }, get mode() { return mode; }, get input() { return input(); }, get arrowTo() { return arrowTo; }, get save() { return save; }, get bubble() { return bubble; }, get beam() { return beam; }, get living() { return isLiving() ? L4 : null; }, get work() { return work.slice(); }, look(n) { save.look = n; setLook(n); }, FORMS, me, level, step, powerOf, nemesisMob };
 show('menu'); requestAnimationFrame(frame);
 </script>
 <script src="/notes/button.js" defer></script>
