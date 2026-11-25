@@ -86,3 +86,8 @@ body[data-screen="result"] footer, body[data-screen="result"] #pause { visibilit
   #result { justify-content:flex-start; }
   #result .card { margin:0 0 0 auto; }
 }
+.mast-buttons { display:flex; gap:8px; align-items:center; }
+.round.icon { border-color:var(--muted); padding:0; }
+.round.icon .glyph { width:24px; height:24px; }
+.langs { grid-template-columns:repeat(2,1fr); }
+.langs button[aria-pressed="true"] { color:var(--ink); text-decoration:underline; }
