@@ -11,3 +11,9 @@ A third-person prototype made in Unity, to decide whether the idea is worth more
 - Test switches in the address: `?autoplay=1` (a bot plays), `speed=3`, `raid=60` (seconds until the raid), `god=1`, `debug=1`, `wood=40` (start with stores), `touch=1`, `cam=follow|mouse|fixed`.
 
 Not checked by `kit/check/phone.mjs`. Touch play was checked by hand-written Playwright runs with a phone profile, not on a real phone.
+
+## The Banished layer (2026-11-25)
+
+Built from the second owner's two design sheets: title menu (Play, Shop, Customize, Credits, Sounds and options), XP and five stats (P), stamina, strangers with six choices (V), three rulers, a horse (G), wolves and hogs, coins and a coins-only shop, items, equip and travel menu (M). The hero wakes by the fire after falling; the game is lost only when the fire dies. Nothing takes payment. Not built: bow, PvP, Mountains region, orbs, real animal models (the horse and animals are boxes made in code).
+
+Extra test flags: `coins=N`, `at=x,z`, `test=strangers`, `test=fall`.
