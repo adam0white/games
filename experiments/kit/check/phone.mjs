@@ -1131,7 +1131,7 @@ const GAMES = {
     await page.evaluate(() => { const T = window.__ant.meadow.tally; T.time = 40; window.__ant.meadow.meadow.shown = {}; });
     await page.evaluate(() => { const { s, FORMS, me } = window.__ant, p = s.player, m = s.mobs.find(m => FORMS[m.f].power > me(s).power && !m.nem && !m.old); p.safe = 0; p.hideAt = 1e9; p.x = m.x; p.y = m.y; });
     await until(page, () => window.__ant.mode === 'dead', 'death card with the meadow');
-    assert.match(await page.textContent('#learned'), /^What the meadow learned/, 'the death card says what the meadow learned'); assert.equal((await meadowOf()).runs, 10, 'the run counted');
+    assert.match(await page.textContent('#learned'), /^What the meadow learned/, 'the death card says what the meadow learned'); assert.equal(await page.$$eval('#learned .mrow', l => l.length), 2, 'two lines'); assert.match(await page.textContent('#learned'), /More in the field guide\.$/, 'and no long count when many changed'); assert.equal((await meadowOf()).runs, 10, 'the run counted');
     const told = labRuns(page, 'ant-promotion').filter(r => r.data.outcome === 'died').at(-1)?.data.events.find(e => e.type === 'meadow')?.data;
     assert.ok(told && told.gen === 10 && told.why === 'died' && told.mean.length === 6, 'the life\'s lab record has the generation and the trait summary');
     await page.click('#goOn'); assert.ok(await page.evaluate(() => !!window.__ant.s.meadow), 'the next life plays the meadow');

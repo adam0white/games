@@ -48,6 +48,11 @@ export const EFFECT = {
 // 150 x 0.912 = 137 > 124, 1.06 x 0.97 > 1), so the » mark, and who can eat whom, never change (evolve-bots.mjs checks every pair).
 export const SPEED_FLOOR = (1 - EFFECT.wary.slow) * (1 - EFFECT.shake.slow);
 export const STEP = 0.15, RATE = 0.25, POOL = 3, WAY = 0.2; // POOL: chases this species needs before its own record outweighs the run's
+// At most SHOW changes are told a run, strongest first (the card shows 2 and "n more", so n is at most 2); the rest show in the field guide.
+export const SHOW = 4;
+export const TINT = 0.15; // the most an evolved animal's colour moves toward its traits' colours
+// The traits strong enough to mark on an evolved form (a quarter of their range or more), for its role now.
+export const marked = F => (F.ev ? TRAITS.map((_, i) => i).filter(i => (TRAITS[i].role === F.ev.role || TRAITS[i].role === 'any') && Math.abs(F.ev.v[i]) >= 0.25) : []);
 
 let MUT = null; // a deliberately broken rule for `node evolve-bots.mjs --mutate=meadow`; never set by the page
 export const mutate = name => { MUT = name || null; };
@@ -89,9 +94,10 @@ export function shape(F, v, role) {
   if (sh) { M.shake = 1 + EFFECT.shake.faster * sh; M.speed *= 1 - EFFECT.shake.slow * sh; }
   if (wa) { M.range *= 1 + EFFECT.wary.sight * wa; M.speed *= 1 - EFFECT.wary.slow * wa; M.r *= 1 + EFFECT.wary.big * wa; }
   if (bo) M.range *= 1 - EFFECT.bold.sight * bo;
-  // what the player sees: the body takes on the colour of its strongest traits (at most 55%), and a fat one is bigger (above)
+  // what the player sees: a slight tint toward its strongest traits (at most TINT, so a red ant stays red), spots on its back (the page,
+  // marks()), and a fat one is bigger (above)
   for (const [i, k] of [[I.grass, g], [I.stay, Math.abs(st)], [I.lead, ld], [I.shake, sh], [I.wary, wa], [I.bold, bo]]) if (k > 0) { tint = w ? mix(tint, TRAITS[i].colour, k / (w + k)) : TRAITS[i].colour; w += k; }
-  if (w) { const k = 0.55 * Math.min(1, w); M.c = mix(F.c, tint, k); M.d = mix(F.d, tint, k * 0.6); }
+  if (w) { const k = TINT * Math.min(1, w); M.c = mix(F.c, tint, k); M.d = mix(F.d, tint, k * 0.6); }
   return M;
 }
 // The object sim.js uses (opts.meadow on create, or s.meadow): form() for each animal, aim() for a hunter that leads.
@@ -190,8 +196,8 @@ export function advance(M0, T) {
     const b = band(v), was = M.shown[n][i]; if (b === was) return;
     changes.push({ name: n, trait: TRAITS[i].k, i, v, up: Math.abs(b) > Math.abs(was), sign: Math.sign(b || was) }); M.shown[n][i] = b;
   });
-  changes.sort((a, b) => Math.abs(b.v) - Math.abs(a.v));
-  return { meadow: M, counted: true, changes };
+  changes.sort((a, b) => Math.abs(b.v) - Math.abs(a.v)); // all are marked shown above, so what is not told does not pile up for later cards
+  return { meadow: M, counted: true, changes: changes.slice(0, SHOW), more: Math.max(0, changes.length - SHOW) };
 }
 // For the lab record: numbers only. gen, species changed, and for each trait the mean and the largest size over the changed species.
 export function summary(M) {

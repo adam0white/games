@@ -332,7 +332,8 @@ export function step(s, input) {
     if (m.spring > 0) m.spring -= dt; if (m.pounce > 0) m.pounce -= dt;
     if (m.stun > 0) m.stun -= dt * (M.shake || 1); // meadow: an evolved animal shakes off a stun sooner
     const hid = C && (m.alert || m.hunt > 0 || d < range * F.stealth + F.r) && hidden(C, m, p, (M.r + F.r) * (M.look || 1)); // meadow: M.look, it looks into grass. cover: a rock between, or creeping in grass
-    const sees = p.safe <= 0 && !(p.veil > 0) && !(m.winded > 0) && !(m.stun > 0) && (m.hunt > 0 || d < range * F.stealth + F.r && Math.abs(wrap(to - m.a)) < cone) && !hid;
+    const sees = p.safe <= 0 && !(p.veil > 0) && !unseen(s, m, d, power > F.power) && !(m.winded > 0) && !(m.stun > 0) && (m.hunt > 0 || d < range * F.stealth * seenK(s) + F.r && Math.abs(wrap(to - m.a)) < cone) && !hid;
+    if (m.alert && unseen(s, m, d, power > F.power)) m.alert = false; // skills.js: a skill that hides you (both lost in the cover merge, restored)
     const wasAlert = m.alert;
     if (sees) { if (!m.alert && power !== F.power) s.events.push({ t: 'notice', strong: power > F.power, id: m.id, nem: !!m.nem }); m.alert = true; m.lost = 0; if (C) m.seen = { x: p.x, y: p.y }; }
     else if (m.alert) {

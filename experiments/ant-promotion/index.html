@@ -313,9 +313,9 @@ function portrait(canvas, F, r, t = 0, skin = save.skin) {
   const x = canvas.getContext('2d'); x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, canvas.width, canvas.height);
   const wide = F.kind === 'bird' ? 2.3 : F.kind === 'snake' ? (F.f.long ? 3.2 : 2.2) : 2.2, fit = Math.min(r, canvas.height / 2 / wide * 1.9, canvas.width / 2 / wide);
   x.translate(canvas.width / 2 + (F.kind === 'snake' ? fit * 1.6 : F.kind === 'quad' ? fit * 0.4 : 0), canvas.height / 2); x.rotate(-0.25);
-  if (save.look === 4) { x.setTransform(1, 0, 0, 1, 0, 0); portraitLiving(x, F, canvas.width, canvas.height, skin); return; } // the living animal, standing
+  if (save.look === 4) { x.setTransform(1, 0, 0, 1, 0, 0); portraitLiving(x, F, canvas.width, canvas.height, skin); if (F.ev) { x.translate(canvas.width / 2, canvas.height / 2); x.rotate(-0.25); mp.marks(x, F, fit); } return; } // the living animal, standing
   if (save.look === 3) setLook(1); // portraits are 2D
-  drawForm(x, F, fit, t, skin, -0.25); setLook(save.look);
+  drawForm(x, F, fit, t, skin, -0.25); setLook(save.look); if (F.ev) mp.marks(x, F, fit); // meadow: its spots
 }
 function book() {
   $('bookSay').textContent = save.seen.length < PLAYABLE.length ? t('bookSay', { n: save.seen.length, m: PLAYABLE.length }) : t('bookAll');
@@ -671,8 +671,8 @@ function draw(now) {
       else if (aim.kind === 'leap' || aim.kind === 'dive') { g.save(); g.rotate(aim.a); g.fillRect(M.r, -M.r * 0.8, 170, M.r * 1.6); g.beginPath(); g.moveTo(M.r, 0); g.lineTo(M.r + 170 * aim.k, 0); g.stroke(); g.restore(); }
       else { g.beginPath(); g.arc(0, 0, M.r * 2, -1.571, -1.571 + 6.283 * aim.k); g.stroke(); }
     }
-    if (alive) { g.restore(); if (L4.mob(g, m, 1 / zoom, m.nem && N ? N.kills - 1 : 0)) continue; g.save(); g.translate(m.x, m.y); } // the rig draws in world units, scars included
-    g.rotate(m.a); g.fillStyle = '#00000026'; g.beginPath(); g.ellipse(0, 3, M.r * 1.1, M.r * 0.8, 0, 0, 7); g.fill(); drawForm(g, M, M.r, m.ph, null, m.a);
+    if (alive) { g.restore(); if (L4.mob(g, m, 1 / zoom, m.nem && N ? N.kills - 1 : 0)) { if (M.ev) { g.save(); g.translate(m.x, m.y); g.rotate(m.a); mp.marks(g, M, M.r); g.restore(); } continue; } g.save(); g.translate(m.x, m.y); } // the rig draws in world units, scars included
+    g.rotate(m.a); g.fillStyle = '#00000026'; g.beginPath(); g.ellipse(0, 3, M.r * 1.1, M.r * 0.8, 0, 0, 7); g.fill(); drawForm(g, M, M.r, m.ph, null, m.a); mp.marks(g, M, M.r); // meadow: its spots
     if (m.nem && N) { // one scar for each repeat win
       g.lineCap = 'round';
       for (let k = 0; k < Math.min(4, N.kills - 1); k++) {
@@ -817,7 +817,7 @@ function draw3d(now) {
       else R.ring(m.x, m.y, M.r * 2 - 2, M.r * 2 + 2, c, 0.35 + 0.6 * aim.k);
     }
     if (C && hiddenFromPlayer(C, m, M, p, F)) { eyes3d(R, m.x, m.y, m.a, M.r); continue; } // creeping in tall grass: only its eyes
-    rec.start(m.x, m.y, m.a, M.r, pose(M, m.ph)); drawForm(rec, M, M.r, m.ph, null, 0);
+    rec.start(m.x, m.y, m.a, M.r, pose(M, m.ph)); drawForm(rec, M, M.r, m.ph, null, 0); mp.marks3d(R, m, M);
   }
   for (const m of s.mobs) if (m.chase && !m.chase.gone && Math.abs(m.x - p.x) < vw && Math.abs(m.y - p.y) < vh) { // who is chasing whom: a dotted red line on the ground
     const dx = m.chase.x - m.x, dy = m.chase.y - m.y, n = Math.floor(Math.hypot(dx, dy) / 14);
