@@ -7,13 +7,15 @@
 //   hello [2, VERSION, role, nonce]      both, every 300 ms until a match starts; a new nonce means the friend reloaded
 //   ping  [6, n] / pong [7, n]           the host measures the round trip (4 pings, at most 1.5 s)
 //   go    [3, id, seed, delay, only, first, introMs]   the host starts match `id`; repeated until the friend's inputs for it arrive
+//                                        (the host steps its first tick half its measured round trip later, when the go
+//                                        has reached the guest, so neither phone starts ahead of the other)
 //   input [1, ...lockstep frame]         kit/lockstep.js
 //   again [4, id]                        this player wants a rematch of match `id`; when both do, the host sends go id+1
 //   bye   [5]                            this player left
 import { relay as kitRelay } from '../kit/room.js';
 import { lockstep } from '../kit/lockstep.js';
 import { KINDS } from './sim.js';
-import { VERSION, MSG, delayFor } from './net.js';
+import { VERSION, MSG, delayFor, adaptFor, hold } from './net.js';
 
 export const LINK = { helloMs: 300, pingMs: 120, pings: 4, pingWaitMs: 1500, goMs: 400, againMs: 400, sendMs: 50, goneMs: 20000 };
 const randomInt = () => { try { return crypto.getRandomValues(new Uint32Array(1))[0] >>> 1 || 1; } catch { return 1 + Math.floor(Math.random() * 2147483646); } };
@@ -23,7 +25,7 @@ const randomInt = () => { try { return crypto.getRandomValues(new Uint32Array(1)
 // state: 'off' | 'connecting' | 'alone' (in the room, no friend yet) | 'meeting' | 'match' | 'lost' (reconnecting) |
 //        'failed' | 'full' | 'closed' | 'version' | 'left'
 export function friendLink({ role, onGo = () => {}, onAgain = () => {}, onLeft = () => {}, onState = () => {}, relay = kitRelay, Socket,
-  now = () => performance.now(), newSeed = randomInt, only = null, intro = 0, firstKind = 'tug' }) {
+  now = () => performance.now(), newSeed = randomInt, only = null, intro = 0 }) {
   const host = role === 'host', nonce = randomInt();
   let state = 'off', status = 'off', peer = false, version = false, left = false, mixed = false;
   let peerNonce = null, helloAt = -1e9, pingAt = -1e9, pingFirst = null, pingN = 0;
@@ -40,13 +42,14 @@ export function friendLink({ role, onGo = () => {}, onAgain = () => {}, onLeft =
   function gone(why) { if (left) return; left = true; update(); onLeft(why); }
   function start(g) {
     go = g; goConfirmed = !host; sentAt = -1e9;
-    ls = lockstep({ id: g.id, delay: g.delay });
+    ls = lockstep({ id: g.id, delay: g.delay, adapt: adaptFor(g.delay), fill: hold });
     update(); onGo(g, ls);
   }
   function hostGo(t) {
     const rtt = rtts.length ? [...rtts].sort((a, b) => a - b)[rtts.length >> 1] : NaN;
     const id = (go?.id ?? 0) + 1;
-    start({ id, seed: newSeed() >>> 0, delay: go?.delay ?? delayFor(rtt), only: KINDS.includes(only) ? only : null, first: id === 1 ? firstKind : null, intro, rtt });
+    start({ id, seed: newSeed() >>> 0, delay: go?.delay ?? delayFor(rtt), only: KINDS.includes(only) ? only : null, first: null, intro, rtt,
+      hold: Number.isFinite(rtt) ? rtt / 2 : 0 }); // the first duel's kind comes from the seed, on both phones
     goAt = -1e9; pump(t);
   }
   const goFrame = g => [MSG.go, g.id, g.seed, g.delay, KINDS.indexOf(g.only), KINDS.indexOf(g.first), Math.round((g.intro || 0) * 1000)];

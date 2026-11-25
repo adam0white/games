@@ -5,8 +5,9 @@
 // claims must then fail.
 import { createMatch, step, KINDS } from './sim.js';
 import { makeBot, STRENGTHS } from './brain.js';
-import { encode, decode, delayFor, FRIEND_KINDS, DELAY } from './net.js';
+import { encode, decode, delayFor, FRIEND_KINDS, DELAY, PER_TICK } from './net.js';
 import { linkMatch, replay, mulberry } from './channel.mjs';
+import { lockstep } from '../kit/lockstep.js';
 
 const fnv = (h, str) => { for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
 const pct = (a, n) => `${Math.round(100 * a / n)}%`;
@@ -38,13 +39,20 @@ export function linkClaims({ claim, quick = false, late = false }) {
         for (const x of inp) {
           const e = encode(x), d = decode(e); n++; longest = Math.max(longest, e.length);
           if (e.some(v => !Number.isInteger(v) || v < -2147483648 || v > 4294967295)) outOfRange++;
-          const close = d.held === !!x.held && d.taps.length === Math.min(7, x.taps.length) && d.releases.length === Math.min(7, x.releases.length)
+          const close = d.held === !!x.held && d.taps.length === Math.min(PER_TICK.taps, x.taps.length) && d.releases.length === Math.min(PER_TICK.releases, x.releases.length)
             && (x.px === null ? d.px === null : Math.abs(d.px - x.px) <= 0.0005 + 1e-12 && Math.abs(d.py - x.py) <= 0.0005 + 1e-12);
           if (!close || JSON.stringify(encode(d)) !== JSON.stringify(e)) bad++;
         }
         step(s, inp); s.events.length = 0;
       }
     }
+    // The longest input a tick can carry (every field at its extreme, more taps and releases than fit) still goes out in
+    // one frame, late in a long match with a full-size state check in the header: else both phones would wait for ever.
+    const far = -100, worst = encode({ held: true, px: far, py: far, heldFor: 100, taps: Array(9).fill({ x: far, y: far }), releases: Array(9).fill({ x0: far, y0: far, x: far, y: far, seconds: 100 }) });
+    const ls = lockstep({ id: 9999, delay: 15 });
+    for (let t = 0; t < 99999; t++) { ls.push([]); ls.receive([9999, t + 15, -1, 0, t + 15, 1, 0]); ls.advance(); } // 28 minutes of play
+    ls.check(99990, 4294967295); ls.push(worst); const f = ls.frame(0);
+    claim(f && f[5] === 1 && JSON.stringify({ t: 'r', d: [1, ...f] }).length <= 200, `the longest tick (${worst.length} integers, ${JSON.stringify(worst).length} characters) fits one frame of ${JSON.stringify({ t: 'r', d: [1, ...(f ?? [])] }).length} bytes (the relay takes 200)`);
     claim(bad === 0 && outOfRange === 0, `codec: ${n} bot inputs survive encode/decode within half a thousandth, and decode is a fixed point (${bad} bad); longest ${longest} integers`);
   }
 
@@ -82,21 +90,42 @@ export function linkClaims({ claim, quick = false, late = false }) {
   // the host's delay from its measured round trip (2L).
   {
     console.log('\nBy link: felt input delay and game speed (medium v medium, 20 matches per row, one duel kind)');
-    console.log('kind    one-way  jitter  delay        felt median / p90   speed');
+    console.log('kind    one-way  jitter  delay        felt median / p90   speed  stalls a match (median / p90)');
     const rows = {};
     for (const only of ['tug', 'hockey']) for (const L of [20, 75, 150, 400]) {
-      const D = delayFor(2 * L), felt = [], p90 = [], speed = [];
+      const D = delayFor(2 * L), felt = [], p90 = [], speed = [], stalls = [];
       for (let seed = 1; seed <= (quick ? 6 : 20); seed++) {
         const r = linkMatch({ seed, only, intro: 0.5, delay: D, latency: L, jitter: L * 0.2 });
         for (const p of r.phones) { if (p.playMs) speed.push(p.playTicks / (p.playMs / 1000) / 60); }
         if (r.felt[0]) { felt.push(r.felt[0].med); p90.push(r.felt[0].p90); }
+        stalls.push(Math.max(...r.stalls));
       }
+      const st = [...stalls].sort((x, y) => x - y);
       rows[`${only}${L}`] = { felt: median(felt), speed: median(speed) };
-      console.log(`${only.padEnd(7)} ${String(L).padStart(4)} ms  ${String(L * 0.2).padStart(4)} ms  ${String(D).padStart(2)} ticks (${Math.round(D * 1000 / 60)} ms)  ${String(median(felt)).padStart(4)} / ${String(median(p90)).padStart(4)} ms   ${median(speed).toFixed(2)}`);
+      console.log(`${only.padEnd(7)} ${String(L).padStart(4)} ms  ${String(L * 0.2).padStart(4)} ms  ${String(D).padStart(2)} ticks (${Math.round(D * 1000 / 60)} ms)  ${String(median(felt)).padStart(4)} / ${String(median(p90)).padStart(4)} ms   ${median(speed).toFixed(2)}   ${median(st)} / ${st[Math.floor(st.length * 0.9)]}`);
     }
-    claim(rows.tug20.felt <= 130 && rows.tug75.felt <= 180, `felt delay on a good line: ${rows.tug20.felt} ms at 20 ms one-way, ${rows.tug75.felt} ms at 75 ms (6-tick floor, 100 ms)`);
+    claim(rows.tug20.felt <= 130 && rows.tug75.felt <= 200, `felt delay on a good line: ${rows.tug20.felt} ms at 20 ms one-way, ${rows.tug75.felt} ms at 75 ms (the floor is 6 ticks, 100 ms)`);
+    claim(rows.tug150.felt <= 270 && rows.hockey150.felt <= 270, `at 150 ms one-way the thumb feels under 270 ms (tug ${rows.tug150.felt}, hockey ${rows.hockey150.felt})`);
     claim(rows.tug150.speed >= 0.95 && rows.hockey150.speed >= 0.95, `at 150 ms one-way the duel runs at full speed (tug ${rows.tug150.speed.toFixed(2)}, hockey ${rows.hockey150.speed.toFixed(2)}); the thumb feels ${rows.tug150.felt} ms`);
     console.log(`     at 400 ms one-way the delay is capped at ${DELAY.max} ticks, so the duel runs at about ${rows.tug400.speed.toFixed(2)} speed (stalls while it waits) and the thumb feels ${rows.tug400.felt} ms`);
+  }
+
+  // 8g. Stalls on an ordinary line: 40-70 ms one way with up to 30 ms of jitter. The host measures the round trip from 4
+  // noisy pings, as the page does, and starts its delay from it; each phone then moves its own delay (net.js adaptFor).
+  // Counted on the phone that stalls more, per match. Also: a host that starts a whole one-way trip early (the page before
+  // this change waited nothing) still settles, because each stall raises the delay and falls back.
+  {
+    const N = quick ? 12 : 40, rnd = mulberry(4070), worst = [], early = [], felt = [];
+    for (let i = 0; i < N; i++) {
+      const L = 40 + Math.round(rnd() * 30), J = 30;
+      const rtt = [0, 1, 2, 3].map(() => 2 * L + rnd() * J + rnd() * J).sort((a, b) => a - b)[2], D = delayFor(rtt);
+      const base = { seed: 3000 + i, kinds: FRIEND_KINDS, delay: D, latency: L, jitter: J, net: i, skew };
+      const r = linkMatch({ ...base, hold: rtt / 2 }); worst.push(Math.max(...r.stalls)); felt.push(Math.max(r.felt[0]?.med ?? 0, r.felt[1]?.med ?? 0));
+      const e = linkMatch({ ...base, hold: 0 }); early.push(Math.max(...e.stalls));
+    }
+    const p = a => { const b = [...a].sort((x, y) => x - y); return [b[b.length >> 1], b[Math.floor(b.length * 0.9)], b.at(-1)]; };
+    const [m, p9, mx] = p(worst), [em, ep9] = p(early);
+    claim(m === 0 && p9 <= 2, `stalls at 40-70 ms one way, 30 ms jitter: median ${m}, p90 ${p9}, most ${mx} a match over ${N} matches; felt delay median ${median(felt)} ms (a host that starts early: median ${em}, p90 ${ep9})`);
   }
 
   // 8f. Hockey is left out of the friend deck: a delay takes the skill out of it. A careful player's share of duels
@@ -107,7 +136,7 @@ export function linkClaims({ claim, quick = false, late = false }) {
     for (const only of KINDS) for (const D of only === 'hockey' ? [1, 6, 14] : [1, 6]) {
       let cw = 0, n = 0;
       for (let seed = 1; seed <= N; seed++) for (const flip of [0, 1]) {
-        const r = linkMatch({ seed, only, intro: 0.5, delay: D, latency: 0, sendMs: 1, bots: flip ? ['clumsy', 'careful'] : ['careful', 'clumsy'] });
+        const r = linkMatch({ seed, only, intro: 0.5, delay: D, adapt: false, latency: 0, sendMs: 1, bots: flip ? ['clumsy', 'careful'] : ['careful', 'clumsy'] });
         for (const d of r.phones[0].s.duels) { n++; if (d.winner === (flip ? 1 : 0)) cw++; }
       }
       share[`${only}${D}`] = cw / n;

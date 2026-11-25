@@ -11,7 +11,7 @@ import { hint } from '../kit/hint.js';
 import { noZoom } from '../kit/zoom.js'; noZoom(); // no double-tap or pinch zoom (note #74)
 import { newCode, cleanCode, codeFromLink, linkFor, share } from '../kit/room.js';
 import { sameMath } from '../kit/samemath.js';
-import { FRIEND_KINDS, drive, stateHash } from './net.js';
+import { FRIEND_KINDS, PER_TICK, drive, stateHash } from './net.js';
 import { friendLink } from './friend.js';
 import { t as tr, apply as applyWords } from './words.js';
 
@@ -103,7 +103,11 @@ const pending = [[], []];   // taps waiting for the next tick
 const releases = [[], []];  // completed gestures waiting for the next tick
 const kb = { held: false, chargeAt: null, tap: 0, px: 0.5, py: 0.75, keys: new Set(), pads: [] }; // the keyboard is side 0's thumb
 let fx = [], texts = [], shake = 0, flash = [0, 0], confetti = 0, seedNo = 0;
-const show = screens(['menu', 'solo', 'friend', 'gone', 'paused', 'end'], name => { $('pause').style.display = name === 'play' ? 'grid' : 'none'; });
+const show = screens(['menu', 'solo', 'friend', 'gone', 'paused', 'end'], name => {
+  $('pause').style.display = name === 'play' ? 'grid' : 'none';
+  // By link the duel does not stop: the button is a menu, not a pause, and says so.
+  $('pause').classList.toggle('link', !!link); $('pause').setAttribute('aria-label', link ? tr('linkPauseButton') : 'Pause');
+});
 
 // ---------------------------------------------------------------- lab recording
 const rec = lab('duel');
@@ -155,8 +159,9 @@ function inputFor(i) {
     if (p.duel && p.duel === s.d) inp.heldFor = (performance.now() - p.at) / 1000;
   }
   if (latest) { inp.px = latest.x; inp.py = latest.y; }
-  inp.taps = pending[i].splice(0);
-  inp.releases = releases[i].splice(0);
+  // By link one tick carries at most PER_TICK taps and releases (net.js); the rest wait for the next tick.
+  inp.taps = link ? pending[i].splice(0, PER_TICK.taps) : pending[i].splice(0);
+  inp.releases = link ? releases[i].splice(0, PER_TICK.releases) : releases[i].splice(0);
   if (i === keySide()) { // the keyboard, in this side's own frame
     if (kb.held) inp.held = true;
     if (kb.chargeAt !== null && inp.heldFor === 0) inp.heldFor = (performance.now() - kb.chargeAt) / 1000;
@@ -276,6 +281,7 @@ function pause() {
   if (screen !== 'play' || paused) return;
   // By link the duel cannot stop for one phone: the card opens, this thumb lets go, and the match goes on.
   $('linkPauseLine').hidden = !link;
+  $('pausedTitle').textContent = link ? tr('linkPauseTitle') : 'Paused';
   paused = true; clearInput(); show('paused'); snd.hold();
 }
 function resume() { if (!paused) return; paused = false; screen = 'play'; show('play'); snd.release(); }
@@ -316,7 +322,7 @@ function startLink(go, ls) {
   s = createMatch({ seed: go.seed, only: go.only, first: go.first, intro: go.intro || undefined, kinds: FRIEND_KINDS });
   solo = null; bot = null;
   link.m = { ls, s, me: link.me, onTick };
-  link.acc = 0; link.stalledAt = null; link.wait = false;
+  link.acc = 0; link.stalledAt = null; link.wait = false; link.startAt = performance.now() + (go.hold || 0); // host: when the go reaches the guest
   clearInput();
   ready = [false, false]; fx = []; texts = []; confetti = 0; acc = 0; paused = false; lastBeep = -1;
   $('wait').hidden = true;
@@ -357,7 +363,7 @@ function linkFrame(now, dt) {
   const L = link;
   L.f.pump(now);
   if (link !== L) return;
-  if (L.m && s && !s.over && screen === 'play') {
+  if (L.m && s && !s.over && screen === 'play' && now >= L.startAt) {
     const r = drive(L.m, Math.min(0.1, L.acc + dt), () => { moveKeys(); return inputFor(L.me); });
     if (link !== L) return;
     L.acc = r.acc;
@@ -545,6 +551,8 @@ function draw(t) {
   }
 }
 function text(str, x, y, size, color, stroke = C.ink) {
+  // By link each player holds their own phone, so words drawn for the friend's half turn round to face this reader.
+  if (link) { const m = g.getTransform(); if (m.a < 0 && m.d < 0) { g.save(); g.translate(x, y); g.rotate(Math.PI); text(str, 0, 0, size, color, stroke); g.restore(); return; } }
   g.font = `bold ${Math.max(14, size)}px ui-rounded, 'Arial Rounded MT Bold', 'Trebuchet MS', system-ui, sans-serif`;
   g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
   g.lineWidth = Math.max(3, size / 7); g.strokeStyle = stroke; g.strokeText(str, x, y);
@@ -883,7 +891,7 @@ window.duelState = () => {
     held: [0, 1].map(i => [...pointers.values()].some(p => p.side === i)), pointers: [...pointers.entries()].map(([id, p]) => ({ id, side: p.side })),
     board: { bx, cy, k, W, H }, d: d ? JSON.parse(JSON.stringify({ ...d, box: undefined })) : null,
     save: JSON.parse(JSON.stringify(save)), hint: help[0].shown, sound: save.sound, fx: fx.length,
-    flip, link: link ? { state: link.f.state, role: link.f.role, me: link.me, code: link.f.code, id: link.f.go?.id ?? 0, delay: link.f.go?.delay ?? null, rtt: link.f.rtt,
+    flip, link: link ? { state: link.f.state, role: link.f.role, me: link.me, code: link.f.code, id: link.f.go?.id ?? 0, delay: link.f.go?.delay ?? null, delayNow: link.m?.ls.delay ?? null, rtt: link.f.rtt,
       tick: link.m?.ls.tick ?? 0, mismatch: link.m?.ls.mismatch ?? null, wait: link.wait, stalls: link.stalls, peer: link.f.peer, peerReady: link.f.peerReady,
       hash: s && link.m ? stateHash(s) : null } : null,
     minTouchPx: Math.min(...sizes, s?.kind === 'memory' ? k * MEMORY.r * 2 : Infinity, s?.kind === 'hockey' ? k * HOCKEY.pad * 2 : Infinity),

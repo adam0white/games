@@ -15,14 +15,28 @@
 //   on a frame from the friend: ls.receive(ints, now)
 //   after a reconnect: ls.resend()  (the next frame starts from the friend's last confirmation)
 //
+// Adaptive delay (optional, `adapt: { up, downAfter, min, max }`): each phone may change its OWN delay during a match,
+// because the friend's phone only needs one input per tick, whatever tick it was stamped at. A stall raises the delay
+// by `up` ticks at once (the next input is stamped further ahead; the ticks in between get `fill(last input)`, so the
+// thumb's hold carries over but no tap is repeated); `downAfter` ticks without a stall lower it by one (that tick takes
+// no new sample, so the caller's taps wait for the next one). Never below `min` or above `max`. Both phones stay
+// identical: what changes is only when each thumb's input lands, never which tick an input is applied at.
+// A phone stalls because it runs ahead of its friend's inputs, and its own delay cannot help with that: so with each
+// raise it also falls back by the same ticks (`takeOwed()`: the caller waits that long before the next step). Falling back
+// gives this phone that much slack on the friend's inputs and takes the same from the friend's on its own, which the
+// raise gives straight back; the friend's phone is not asked to do anything.
+//
+// One tick's integers must fit in a frame (frame's maxChars, less about 35 for the header): a tick that cannot is never
+// sent, and both phones wait for it for ever. The game bounds its inputs (Thumb Duel: net.js PER_TICK).
 // Frame (integers): [id, ack, checkTick, checkHash, first, count, ...ticks], each tick [n, ...n ints], or [-1] for
 // "the same as the tick before it in this frame". ack: the last tick of the friend's inputs this phone holds without a gap.
 
 const same = (a, b) => !!a && !!b && a.length === b.length && a.every((v, i) => v === b[i]);
 const digits = v => String(v).length + 1; // the JSON text of one integer and its comma
 
-export function lockstep({ id = 0, delay = 6, resendMs = 400, keepChecks = 32 } = {}) {
-  let tick = 0, nextLocal = delay;
+export function lockstep({ id = 0, delay = 6, resendMs = 400, keepChecks = 32, adapt = null, fill = ints => ints } = {}) {
+  const start = delay; // ticks before this have no inputs on either phone
+  let tick = 0, nextLocal = delay, stallTick = -1, calm = 0, stalls = 0, owed = 0, last = [];
   const mine = new Map(), theirs = new Map();
   let have = delay - 1, peerAck = delay - 1, sentTo = delay - 1, ackSent = -2, checkSent = -2;
   let lastHeard = 0, waitingSince = null, mismatch = null, received = 0, frames = 0;
@@ -33,20 +47,32 @@ export function lockstep({ id = 0, delay = 6, resendMs = 400, keepChecks = 32 } 
 
   return {
     get id() { return id; }, get delay() { return delay; }, get tick() { return tick; },
-    get mismatch() { return mismatch; }, get have() { return have; }, get peerAck() { return peerAck; },
+    get mismatch() { return mismatch; }, get have() { return have; }, get peerAck() { return peerAck; }, get stalls() { return stalls; },
     get stats() { return { tick, nextLocal, have, peerAck, mine: mine.size, theirs: theirs.size, received, frames }; },
     canSample: () => nextLocal <= tick + delay,
-    push(ints) { const t = nextLocal++; mine.set(t, Array.isArray(ints) ? ints.slice() : []); return t; },
+    push(ints) {
+      while (nextLocal < tick + delay) mine.set(nextLocal++, fill(last)); // the delay went up: bridge the gap
+      last = Array.isArray(ints) ? ints.slice() : [];
+      const t = nextLocal++; mine.set(t, last); return t;
+    },
     // Both inputs for the current tick, or null while the friend's has not arrived.
     ready() {
-      if (tick < delay) return { mine: EMPTY, theirs: EMPTY };
-      return mine.has(tick) && theirs.has(tick) ? { mine: mine.get(tick), theirs: theirs.get(tick) } : null;
+      if (tick < start) return { mine: EMPTY, theirs: EMPTY };
+      if (mine.has(tick) && theirs.has(tick)) return { mine: mine.get(tick), theirs: theirs.get(tick) };
+      if (stallTick !== tick) {
+        stallTick = tick; stalls++; calm = 0;
+        if (adapt) { const up = Math.min(adapt.max, delay + adapt.up) - delay; delay += up; owed += up; }
+      }
+      return null;
     },
     advance() {
       theirs.delete(tick);
       if (tick <= peerAck) mine.delete(tick);
       tick++;
+      if (adapt && ++calm >= adapt.downAfter && delay > adapt.min) { delay--; calm = 0; }
     },
+    // Ticks of time this phone should wait on top of a stall (adapt): the caller takes them once and steps that much later.
+    takeOwed() { const n = owed; owed = 0; return n; },
     check(t, hash) { myChecks.set(t, hash >>> 0); trim(myChecks); compare(t); },
     resend() { sentTo = peerAck; ackSent = -2; checkSent = -2; },
     // The next frame to send, or null when there is nothing new. maxChars bounds the JSON text of the integers.
@@ -79,7 +105,7 @@ export function lockstep({ id = 0, delay = 6, resendMs = 400, keepChecks = 32 } 
         if (q[at] === -1) { if (!prev) return false; ints = prev; at += 1; }
         else { const len = q[at]; if (!Number.isInteger(len) || len < 0 || at + 1 + len > q.length) return false; ints = q.slice(at + 1, at + 1 + len); at += 1 + len; }
         const t = first + n;
-        if (t >= tick && t >= delay && !theirs.has(t)) theirs.set(t, ints);
+        if (t >= tick && t >= start && !theirs.has(t)) theirs.set(t, ints);
         prev = ints;
       }
       while (theirs.has(have + 1)) have++;

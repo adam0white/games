@@ -30,7 +30,9 @@ export const tables = {
     friendLeft: 'Your friend left.',
     outOfStep: 'Your phones fell out of step. This match does not count.',
     friendReady: 'Your friend is ready',
-    linkPause: 'The duel goes on while this card is open.',
+    linkPause: 'Your friend keeps playing while this card is open.',
+    linkPauseTitle: 'The duel goes on',
+    linkPauseButton: 'Menu (the duel goes on)',
   },
   tr: {
     friend: 'Arkadaşınla oyna',
@@ -59,7 +61,9 @@ export const tables = {
     friendLeft: 'Arkadaşın ayrıldı.',
     outOfStep: 'Telefonlarınızın adımı kaydı. Bu maç sayılmaz.',
     friendReady: 'Arkadaşın hazır',
-    linkPause: 'Bu kart açıkken düello sürüyor.',
+    linkPause: 'Bu kart açıkken arkadaşın oynamaya devam ediyor.',
+    linkPauseTitle: 'Düello sürüyor',
+    linkPauseButton: 'Menü (düello sürüyor)',
   },
 };
 

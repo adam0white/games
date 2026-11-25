@@ -2,7 +2,7 @@
 // Two pages in one run, one iPhone 13 (WebKit) and one Pixel 7 (Chromium), so the pair is also two different JavaScript
 // engines; each run swaps which one makes the code. Their sockets go to the real relay room (workers/lab-ai Room class
 // and handleRoom, with stand-ins for the platform) through Playwright's WebSocket routing, with a delay each way.
-// Covers: the code and the link, the match on both phones to the same result tick for tick, a cut and reconnect mid-duel
+// Covers: the code and the link, the match on both phones (dealt from the seed: at least three duel kinds across the matches) to the same result tick for tick, a cut and reconnect mid-duel
 // (the waiting banner), a rematch, one side leaving mid-duel (the other is offered the bot), a phone that just vanishes,
 // and the relay not deployed (a 404: "could not reach your friend", then the bot). Screenshots go to $SHOTS.
 import { createServer } from 'node:http';
@@ -116,7 +116,7 @@ async function run(hostEngine, guestEngine) {
   const A = await phone(hb, 'host', PHONES[hostEngine][1], netA), B = await phone(gb, 'guest', PHONES[guestEngine][1], netB);
   try {
     // The host makes a code and sends the link.
-    await A.page.goto(`${base}/duel/?fast=1&only=tug&seed=11&lang=en`);
+    await A.page.goto(`${base}/duel/?fast=1&seed=${hostEngine === 'webkit' ? 11 : 12}&lang=en`);
     await until(A.page, () => window.duelState?.().screen === 'menu', 'host menu');
     await B.page.addInitScript(() => localStorage.setItem('duel-save', JSON.stringify({ v: 1, sound: true, matches: 4, friend: { side: 1, run: 2, best: 3 }, solo: { easy: { won: 2, run: 1, best: 2 }, medium: { won: 0, run: 0, best: 0 }, hard: { won: 0, run: 0, best: 0 } } })));
     assert.equal(await A.page.locator('#toFriend').textContent(), 'Play a friend');
@@ -142,7 +142,8 @@ async function run(hostEngine, guestEngine) {
     // Thumbs on both phones: a tap on the guest's own bottom half is the TOP side of the shared board.
     await until(A.page, () => window.duelState().phase === 'play', 'the duel is on', 15000);
     await Promise.all([thumb(A.page, 110), thumb(B.page, 170)]);
-    await until(A.page, () => window.duelState().d?.p !== undefined && window.duelState().d.p !== 0, 'the rope moves', 8000);
+    const t0 = (await state(A.page)).link.tick;
+    await until(A.page, t => window.duelState().link.tick > t + 90, 'the duel steps on', 8000, t0);
     await shot(B.page, `${tag}-guest-play`);
 
     // The guest's line goes down for 2.5 s mid-duel: the host stalls and says so, then both carry on.
@@ -157,7 +158,7 @@ async function run(hostEngine, guestEngine) {
     await until(A.page, (t) => window.duelState().link.tick > t + 60 && !window.duelState().link.wait, 'the duel goes on after the reconnect', 15000, stalled.link.tick);
 
     // To the end of the match: both phones agree on every duel, the score, the winner and the last tick's state.
-    await Promise.all([A, B].map(p => until(p.page, () => window.duelState().screen === 'end', `${p.name} end card`, 90000)));
+    await Promise.all([A, B].map(p => until(p.page, () => window.duelState().screen === 'end', `${p.name} end card`, 240000)));
     await Promise.all([stopThumb(A.page), stopThumb(B.page)]);
     await sleep(600);
     const [a1, b1] = await Promise.all([state(A.page), state(B.page)]);
@@ -166,7 +167,8 @@ async function run(hostEngine, guestEngine) {
     assert.ok(a1.winner === 0 || a1.winner === 1 || a1.winner === -1);
     const word = (p, w) => w < 0 ? 'Draw!' : w === p ? 'You win!' : 'So close!';
     assert.equal(await A.page.locator('#endT0').textContent(), word(0, a1.winner)); assert.equal(await B.page.locator('#endT0').textContent(), word(1, a1.winner));
-    console.log(`     ${tag}: match 1 ${a1.score.join('-')} after ${a1.link.tick} ticks, identical on both; host stalls ${a1.link.stalls}`);
+    const kinds = new Set(a1.duels.map(d => d.kind));
+    console.log(`     ${tag}: match 1 ${a1.score.join('-')} after ${a1.link.tick} ticks, identical on both; duels ${a1.duels.map(d => d.kind).join(', ')}; stalls host ${a1.link.stalls}, guest ${b1.link.stalls}; delay now ${a1.link.delayNow}/${b1.link.delayNow}`);
     await shot(B.page, `${tag}-guest-end`);
     assert.deepEqual(b1.save.friend, { side: 1, run: 2, best: 3 }, 'the one-phone streak is not touched by a link match');
     assert.equal(b1.save.matches, 5, 'the match is counted');
@@ -178,9 +180,17 @@ async function run(hostEngine, guestEngine) {
     await Promise.all([A, B].map(p => until(p.page, () => window.duelState().link?.id === 2 && window.duelState().screen === 'play', `${p.name} in match 2`)));
     await Promise.all([thumb(A.page, 140), thumb(B.page, 140)]);
     await until(A.page, () => window.duelState().phase === 'play', 'match 2 duel is on', 15000); await sleep(800);
+    const [a2, b2m] = await Promise.all([state(A.page), state(B.page)]);
+    assert.equal(a2.kind, b2m.kind, 'match 2 deals the same first duel on both phones');
+    kinds.add(a2.kind);
+    assert.ok(kinds.size >= 3, `at least three duel kinds across the matches: ${[...kinds].join(', ')}`);
+    assert.notEqual(a1.duels[0].kind === 'tug' && a2.kind === 'tug', true, 'the first duel is not always tug');
+    console.log(`     ${tag}: kinds played ${[...kinds].join(', ')}; match 2 opens with ${a2.kind}`);
 
     // The host leaves mid-duel through the pause card: the guest is told and offered the bot.
+    assert.equal(await A.page.locator('#pause').getAttribute('aria-label'), 'Menu (the duel goes on)', 'by link the button is a menu');
     await A.page.click('#pause');
+    assert.equal(await A.page.locator('#pausedTitle').textContent(), 'The duel goes on');
     assert.equal(await A.page.locator('#linkPauseLine').isVisible(), true);
     await shot(A.page, `${tag}-host-pause`);
     await A.page.click('#quit');

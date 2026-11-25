@@ -164,9 +164,9 @@ Still unverified: first-time human comprehension, two contacts and safe-area ins
 
 ## 2026-11-24 — Play a friend by link
 
-**What the player sees.** "Play a friend" on the menu makes a four-letter code and a "Send the link" button (the phone's share sheet, else the clipboard). The friend opens the link, or types the code, on their own phone, and the duel starts on both. Each player sees their own side at the bottom, the right way up (the guest's whole canvas is turned half round). If the friend's inputs are late the duel holds still and says "Waiting for your friend…"; after 10 s it also offers the bot and the menu. If the friend leaves (Menu, or gone for 20 s), or the room cannot be reached, a card says so and offers the bot. The pause button opens the pause card, but the duel goes on: it cannot stop for one phone. New words are in English and Turkish (`words.js`); the older words of the game are unchanged.
+**What the player sees.** "Play a friend" on the menu makes a four-letter code and a "Send the link" button (the phone's share sheet, else the clipboard). The friend opens the link, or types the code, on their own phone, and the duel starts on both. Each player sees their own side at the bottom, the right way up (the guest's whole canvas is turned half round), and every word on the screen faces them, the friend's half included (only one-phone play keeps the top half's words turned for the far player). The first duel of each linked match is dealt from the match seed, the same on both phones, not always tug. If the friend's inputs are late the duel holds still and says "Waiting for your friend…"; after 10 s it also offers the bot and the menu. If the friend leaves (Menu, or gone for 20 s), or the room cannot be reached, a card says so and offers the bot. By link the pause button is a menu button (three bars, labelled "Menu (the duel goes on)"); its card is titled "The duel goes on": a duel cannot stop for one phone. New words are in English and Turkish (`words.js`); the older words of the game are unchanged.
 
-**How.** Lockstep: each phone samples its thumb once a tick and stamps it 6-15 ticks ahead (`kit/lockstep.js`); a tick is stepped only when both inputs are there. The host (who made the code) is side 0, picks the seed and sets the delay from four pings (`net.js delayFor`: half the round trip plus 75 ms, 6 to 15 ticks); the guest is side 1. Both apply the decoded (quantized) input, their own included. Every 30 ticks and at the end both compare a state hash; if they ever differ the match ends for both with "Your phones fell out of step. This match does not count." While linked, the sim uses `kit/samemath.js` for exp, sin and hypot (`useMath` in sim.js), because those differ between WebKit, Chromium and Node; one-phone and bot play keep `Math`. The relay is the lab-ai `Room` class with a `duel` entry in `RELAY` (see that README). Messages: `friend.js`.
+**How.** Lockstep: each phone samples its thumb once a tick and stamps it 6-15 ticks ahead (`kit/lockstep.js`); a tick is stepped only when both inputs are there. The host (who made the code) is side 0, picks the seed and sets the delay from four pings (`net.js delayFor`: half the round trip plus 95 ms, 6 to 15 ticks, then adapting); the guest is side 1. Both apply the decoded (quantized) input, their own included. Every 30 ticks and at the end both compare a state hash; if they ever differ the match ends for both with "Your phones fell out of step. This match does not count." While linked, the sim uses `kit/samemath.js` for exp, sin and hypot (`useMath` in sim.js), because those differ between WebKit, Chromium and Node; one-phone and bot play keep `Math`. The relay is the lab-ai `Room` class with a `duel` entry in `RELAY` (see that README). Messages: `friend.js`.
 
 **Friend deck: no hockey.** A careful bot beats a clumsy one at hockey in 98% of duels with 1 tick of delay and about 53% with 6 (the smallest delay a link uses), and 45% at 14 ticks, the delay for 150 ms one way. The skill is gone, so hockey is unplayable by link even at good latency. The other eight duels keep their order within a few points (bots.mjs section 8). `FRIEND_KINDS` in net.js is the one place to change this.
 
@@ -176,10 +176,12 @@ Still unverified: first-time human comprehension, two contacts and safe-area ins
 
 | One way | Delay | Felt input delay (median) | Speed |
 | --- | --- | --- | --- |
-| 20 ms | 6 ticks (100 ms) | 102 ms | 1.00 |
-| 75 ms | 9 ticks (150 ms) | 153 ms | 1.00 |
-| 150 ms | 14 ticks (233 ms) | 238 ms | 1.00 |
-| 400 ms | 15 ticks (250 ms, the cap) | 476 ms (p90 578) | 0.55 |
+| 20 ms | 7 ticks (117 ms) | 119 ms | 1.00 |
+| 75 ms | 11 ticks (183 ms) | 187 ms | 1.00 |
+| 150 ms | 15 ticks (250 ms) | 255 ms | 1.00 |
+| 400 ms | 15 ticks (250 ms, the cap) | 476 ms (p90 561) | 0.55 |
+
+(Updated after the later section below; the first version had 6, 9 and 14 ticks.)
 
 Tug and hockey give the same numbers; the table is the wire, not the duel. At 400 ms one way the duel runs at about half speed with stalls. The delay cap of 15 ticks keeps the thumb's lag at 250 ms where the line allows it; raising the cap would trade lag for smoothness.
 
@@ -191,3 +193,13 @@ Tug and hockey give the same numbers; the table is the wire, not the duel. At 40
 
 **Not verified.** Two real phones on a real network; the deployed relay (not deployed yet); how 100-250 ms of input lag feels to a thumb in each duel; whether players find the code card; the browser match plays tug only (a full deck by tapping bots would take minutes), so the cross-engine evidence for the other duels is the maths probe and the bot runs, not a browser match. A phone on a flaky line can trip the per-address limit of 6 upgrades a minute while reconnecting; it then sees "could not reach".
 Also not exercised: a network freeze of 2 s or more that then delivers its whole queue at once can put more than 30 frames into the relay's rolling second; the socket is closed (1008) and the page reconnects, using one of the 6 upgrades a minute. Two friends behind one public address (the same Wi-Fi) share that budget. The pretend network drops frames during a cut rather than queueing them.
+
+### 2026-11-24 (later) — fewer stalls, words facing the reader, seeded first duel
+
+- **Why the host stalled.** The host started stepping the moment it sent "go", a whole one-way trip before the guest, so it ran ahead and waited on every late frame: in bots.mjs a 40-70 ms one-way line with 30 ms of jitter gave a median of 17 stalls a match (p90 31), all on the host; the browser check saw 8-38. Now the host waits half its measured round trip before its first tick (`go.hold` in friend.js), and the margin in `delayFor` is 45 ms instead of 25.
+- **Adaptive delay** (`kit/lockstep.js` `adapt`, net.js `adaptFor`): a stall raises that phone's delay by 2 ticks at once and it falls back 2 ticks; 20 s without a stall lowers it by 1, never below the starting delay or above 15 ticks. Raising alone did not help (a phone stalls on its friend's delay, not its own); the fall-back gives it slack and the raise gives the friend's slack back.
+- **Numbers (bots.mjs section 8g and 8e).** 40-70 ms one way, 30 ms jitter, delay from 4 noisy pings, 40 matches: median 0 stalls, p90 0, most 0; felt delay median 170 ms. A host that starts early (the old behaviour) settles to median 1, p90 2. Heavier lines (my runs, not claims): 80 ms jitter, median 1, p90 2; 3% of frames lost, median 2, p90 4. Delays and felt input delay by one-way time: 20 ms, 7 ticks, 119 ms; 75 ms, 11 ticks, 187 ms; 150 ms, 15 ticks, 255 ms (under 270), 0 stalls; 400 ms, 15 ticks (the cap), 476 ms, 0.55 speed.
+- **A deadlock found on the way.** During a stall the page queued every tap; the next tick then carried them all (up to 7 taps and 7 releases), too long for any frame, so it was never sent and both phones waited for ever (the browser check caught it after a cut). One tick now carries at most 2 taps and 1 release (`PER_TICK`); the rest wait for the next tick. bots.mjs checks the longest possible tick fits a frame (98 characters, a 155-byte frame).
+- **Words face the reader by link.** Canvas text whose drawing is turned upside down on this phone is turned back round its own centre (`text()` in main.js), only while linked.
+- **First duel from the seed.** friend.js no longer forces tug; the sim deals the first duel from the match seed on both phones. link-check now plays the full deck (no `only=tug`) and asserts at least three kinds across the matches.
+

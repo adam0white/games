@@ -34,6 +34,7 @@
   #pause { position: fixed; right: calc(6px + env(safe-area-inset-right)); top: 50%; transform: translateY(-50%); width: 48px; height: 48px; min-width: 0; min-height: 0; margin: 0; padding: 0; border-radius: 50%; display: none; place-items: center; box-shadow: 0 3px 0 #1b1328; background: #fff4dc; z-index: 2; }
   #pause:active { transform: translateY(calc(-50% + 2px)); }
   #pause::before { content: ''; width: 4px; height: 16px; border: solid #1b1328; border-width: 0 5px; }
+  #pause.link::before { width: 20px; height: 4px; border: 0; border-radius: 2px; background: #1b1328; box-shadow: 0 -7px #1b1328, 0 7px #1b1328; } /* by link: a menu, the duel goes on */
   /* The match end: one half for each player, the top one turned to face the far side. */
   #end { background: #160f2477; display: none; grid-template-rows: 1fr 1fr; place-items: stretch; padding: 0; }
   #end.on { display: grid; }
@@ -126,7 +127,7 @@
 <div id="wait" role="status" hidden><p id="waitLine" style="margin:0"></p><p id="waitButtons" hidden><button id="waitBot" class="small" data-i18n="playBot"></button><button id="waitMenu" class="small" data-i18n="menu"></button></p></div>
 
 <div id="paused" class="screen"><div class="card">
-  <h2>Paused</h2>
+  <h2 id="pausedTitle">Paused</h2>
   <p id="linkPauseLine" class="sub" data-i18n="linkPause" hidden></p>
   <p class="desk sub">Mouse works. Space is your thumb.</p>
   <p><button id="resume" class="main">Keep going</button></p>
