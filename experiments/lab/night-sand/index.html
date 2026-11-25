@@ -17,12 +17,15 @@
       <symbol id="i-seed" viewBox="0 0 32 32"><path d="M4 20h24M16 23V13m0 3c-6 0-8-3-8-7 6 0 8 3 8 7Zm0-2c0-6 3-9 9-9 0 6-3 9-9 9Z"/><ellipse cx="16" cy="25" rx="2.6" ry="3" transform="rotate(28 16 25)"/></symbol>
       <symbol id="i-garden" viewBox="0 0 32 32"><path d="m7 25 13-13m-5-4 9 9m-11-6 4-4m0 8 4-4m0 8 4-4M3 25l3 3m-2-6 5 5"/></symbol>
       <symbol id="i-arrow" viewBox="0 0 32 32"><path d="M6 16h19m-8-8 8 8-8 8"/></symbol>
+      <symbol id="i-pile" viewBox="0 0 32 32"><path d="M3 27h26M5 27c4-2 7-9 11-14 4 5 7 12 11 14"/><path class="filled" d="m16 3 1.4 3.2 3.4.3-2.6 2.2.8 3.3-3-1.8-3 1.8.8-3.3-2.6-2.2 3.4-.3Z"/></symbol>
+      <symbol id="i-layers" viewBox="0 0 32 32"><path d="M9 5v22h14V5M9 21h14M9 14h14"/><path class="filled" d="M10 15h12v5H10z"/></symbol>
+      <symbol id="i-share" viewBox="0 0 32 32"><path d="M16 4v16m-6-10 6-6 6 6M7 15v12h18V15"/></symbol>
     </defs>
   </svg>
   <main id="table">
     <header class="mast">
-      <div class="mast-copy"><div id="edition" class="small">Bed 01 / 10</div><h1>Night <i>Sand</i></h1></div>
-      <button class="round" id="pause" aria-label="Pause"><span></span><span></span></button>
+      <div class="mast-copy"><div id="edition" class="small">Bed 01 / 10</div><h1 id="title">Night <i>Sand</i></h1></div>
+      <div class="mast-buttons"><button class="round icon" id="to-garden" hidden><svg class="glyph" aria-hidden="true"><use href="#i-garden"/></svg></button><button class="round icon" id="share" hidden><svg class="glyph" aria-hidden="true"><use href="#i-share"/></svg></button><button class="round" id="pause" data-i18n-aria="pause" aria-label="Pause"><span></span><span></span></button></div>
     </header>
     <div class="frame"><canvas id="field" width="360" height="480" tabindex="0" aria-label="Sand bed"></canvas></div>
     <footer>
@@ -32,21 +35,22 @@
     </footer>
   </main>
   <section class="sheet" id="paused" role="dialog" aria-modal="true" aria-labelledby="pause-title"><div class="card">
-    <div class="small" id="pause-level"></div><h2 id="pause-title">Paused</h2>
-    <button id="resume" class="primary">Resume <span aria-hidden="true">▷</span></button>
-    <div class="pair"><button id="restart">Start over</button><button id="book">Choose a bed</button></div>
-    <button id="garden"><svg class="glyph" aria-hidden="true"><use href="#i-garden"/></svg>Endless garden</button>
+    <div class="small" id="pause-level"></div><h2 id="pause-title" data-i18n="paused">Paused</h2>
+    <button id="resume" class="primary"><span data-i18n="resume">Resume</span> <span aria-hidden="true">▷</span></button>
+    <div class="pair"><button id="restart">Start over</button><button id="book" data-i18n="choose">Choose a bed</button></div>
+    <button id="garden"><svg class="glyph" aria-hidden="true"><use href="#i-garden"/></svg><span data-i18n="garden">Endless garden</span></button>
     <div class="settings"><button id="sound" aria-pressed="true">Sound on</button><button id="look">Ink · Basalt</button></div>
+    <div class="settings langs" id="langs"></div>
   </div></section>
   <section class="sheet" id="catalog" role="dialog" aria-modal="true" aria-labelledby="book-title"><div class="card">
-    <h2 id="book-title">Sand beds</h2><div id="levels"></div>
-    <button id="book-garden"><svg class="glyph" aria-hidden="true"><use href="#i-garden"/></svg>Endless garden</button><p id="record"></p><button id="back">Back</button>
+    <h2 id="book-title" data-i18n="beds">Sand beds</h2><div id="levels"></div>
+    <button id="book-garden"><svg class="glyph" aria-hidden="true"><use href="#i-garden"/></svg><span data-i18n="garden">Endless garden</span></button><p id="record"></p><button id="back" data-i18n="back">Back</button>
   </div></section>
   <section class="sheet" id="result" role="dialog" aria-modal="true" aria-labelledby="result-title"><div class="card">
     <svg class="result-seal glyph" aria-hidden="true"><use id="result-icon" href="#i-lamp"/></svg>
     <h2 id="result-title"></h2>
     <button id="next" class="primary"><span id="advance">Next bed</span><svg class="glyph" aria-hidden="true"><use href="#i-arrow"/></svg></button>
-    <div class="pair"><button id="retry">Try again</button><button id="result-book">Choose a bed</button></div>
+    <div class="pair"><button id="retry" data-i18n="retry">Try again</button><button id="result-book" data-i18n="choose">Choose a bed</button></div>
   </div></section>
   <script type="module" src="./main.js"></script>
   <script defer src="/notes/button.js"></script>

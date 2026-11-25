@@ -353,6 +353,16 @@ async function boardFeedback(page) {
   expect(await boardInk(page, 'bubble', red), 'wrong delivery marks the rejected message');
   await tap(page, st.nodes[st.from]); await sleep(100);
   expect(!await boardInk(page, 'bubble', red), 'editing clears the rejected message');
+  // Second cold play: the reset symbol looked like a button and did nothing. A tap on it, away from the teller, restarts.
+  await tap(page, st.nodes[wrong]); await tap(page, st.nodes[lv.to]);
+  await until(page, () => window.grapevineState().result === 'wrong', 'second wrong delivery');
+  const teller = st.nodes[st.from], side = teller.x > page.viewportSize().width * 0.66 ? -1 : 1;
+  const resetAt = { x: teller.x - side * (st.R + 23), y: teller.y + st.R * 0.45 };
+  expect(Math.hypot(resetAt.x - teller.x, resetAt.y - teller.y) > st.R * 1.6, 'the reset symbol is outside the teller\'s own touch circle');
+  expect(resetAt.x - 22 >= 0 && resetAt.x + 22 <= page.viewportSize().width, 'the reset symbol\'s 44 px target is on screen');
+  await tap(page, resetAt); await sleep(100);
+  const afterReset = await state(page);
+  expect(afterReset.result === null && afterReset.route.length === 1, `a tap on the reset symbol starts again (${afterReset.result}, ${afterReset.route})`);
   await page.goto(`${base}/grapevine/?level=10`);
   await page.click('#play');
   st = await state(page);
@@ -664,6 +674,28 @@ async function openItems(page) {
     expect(await boardInk(page, at(B, -st.R * 1.4), lane), `level 31: lane ${a}→${b} has its arrowhead next to ${b}`);
     expect(!await boardInk(page, at(A, st.R * 1.4), lane), `level 31: lane ${a}→${b} has no arrow next to ${a}`);
   }
+  // Second cold play: on 35 the arrowheads sat under raised arms and hats. Every lane in every village shows its head.
+  const hidden = [], shortLanes = [];
+  for (let n = 31; n <= 60; n++) {
+    await open(`level=${n}`);
+    st = await state(page); lv = await levelNow(page);
+    if (!lv.edges.some(e => e[2] === ONEWAY)) continue;
+    await painted();
+    for (const [a, b] of lv.edges.filter(e => e[2] === ONEWAY)) {
+      const A = st.nodes[a], B = st.nodes[b], len = Math.hypot(B.x - A.x, B.y - A.y), ux = (B.x - A.x) / len, uy = (B.y - A.y) / len;
+      // the tip sits just outside B, or further back when a lane from below would put it on B's badge (laneBack);
+      // the teller and the listener have no badge
+      const R = st.R, near = R * 1.12, plain = ['teller', 'listener'].includes(lv.nodes[b].kind);
+      const onBadge = d => !plain && Math.abs(ux * d) <= R * 1.05 + 6 && Math.abs(-uy * d - R * 1.42) <= R * 0.43 + 6;
+      let back = near;
+      while (back < len - near - 17 && onBadge(back)) back += 2;
+      if (onBadge(back)) { shortLanes.push(`${n}:${a}→${b}`); back = near; } // too short to clear the badge
+      const d = -back - 8; // the middle of the arrowhead
+      if (!await boardInk(page, [B.x + ux * d - 3, B.y + uy * d - 3, 6, 6], lane)) hidden.push(`${n}:${a}→${b}`);
+    }
+  }
+  expect(!hidden.length, `every lane's arrowhead shows (${hidden.join(' ')})`);
+  expect(!shortLanes.length, `no lane is too short for its head to clear the badge (${shortLanes.join(' ')})`);
   await page.emulateMedia({ reducedMotion: 'no-preference' });
 
   // 2. The top bar: right news the listener cannot get from here shows no green tick; right and deliverable does.
@@ -751,6 +783,15 @@ async function openItems(page) {
     expect((await state(page)).streak === 1, 'a late solve does not join the streak');
     expect(await page.locator(`#week button[data-day="${day(1)}"] small.late`).count() === 1, 'the week shows the late stars apart');
   }
+  // Second cold play: the menu had no way into the week once today was solved. Its daily button now goes on to the
+  // newest unsolved day (today and yesterday are solved here, day 3 had stars already), and names it.
+  await page.goto(`${base}/grapevine/?visit=${++visit}`);
+  await until(page, () => window.grapevineState, 'menu after the week');
+  const dayName = await page.evaluate(k => new Intl.DateTimeFormat(document.documentElement.lang, { weekday: 'short' }).format(new Date(`${k}T12:00:00`)), day(2));
+  expect(new RegExp(`→\\s${dayName}`).test(await page.textContent('#daily small')), `the daily button names the day it opens (${await page.textContent('#daily small')})`);
+  await page.click('#daily');
+  expect((await state(page)).day === day(2), `with today solved, the menu's daily button opens the newest unsolved day (${(await state(page)).day})`);
+  await solveHere('daily from the menu');
   const cell = page.locator(`#week button[data-day="${day(3)}"]`);
   if (await cell.count()) await cell.click();
   expect((await state(page)).day === day(3), 'a day in the week opens its village');
@@ -1037,6 +1078,20 @@ async function localizedScreens(browser, device, phone) {
       await page.locator('#sendCard').tap();
       await until(page, () => !document.querySelector('#manualShare').hidden, 'manual copy from a long card');
       await take('campaign-postcard-copy');
+      // Second cold play: "26. köye git" broke onto two lines beside a solved daily button on an iPhone 13.
+      await page.evaluate(() => {
+        const save = JSON.parse(localStorage.getItem('grapevine-save'));
+        save.opened = 26; save.best = Object.fromEntries(Array.from({ length: 25 }, (_, i) => [i + 1, 3]));
+        localStorage.setItem('grapevine-save', JSON.stringify(save));
+      });
+      await go({ hint: '0' });
+      const start = await page.evaluate(() => {
+        const box = document.querySelector('#play'), range = document.createRange(); range.selectNodeContents(box);
+        return { text: box.textContent, daily: document.querySelector('#daily').textContent, lines: new Set([...range.getClientRects()].map(r => Math.round(r.top))).size, fits: box.scrollWidth <= box.clientWidth + 1 };
+      });
+      assert.ok(/26/.test(start.text) && /★/.test(start.daily), `${lang}: the menu shows village 26 beside a solved daily (${JSON.stringify(start)})`);
+      assert.ok(start.lines === 1 && start.fits, `${phone} ${lang}: the start button is one line (${JSON.stringify(start)})`);
+      await take('menu-26-daily-solved');
       assert.deepEqual(errors, [], `${lang}: page errors`);
     } finally {
       await context.close();

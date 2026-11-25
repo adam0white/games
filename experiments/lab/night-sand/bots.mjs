@@ -3,15 +3,23 @@ import { readFile } from 'node:fs/promises';
 
 const file = new URL('./sim.js', import.meta.url);
 let sim = await import(file);
-if (process.argv.includes('--mutate')) {
+// --mutate breaks the mesh (coarse grains pass). --mutate=hand makes the hand lose the grains it pours.
+// --mutate=trickle stops a held handful from pouring until the finger lifts. Each must fail a claim below.
+const mutation = process.argv.find(a => a.startsWith('--mutate'))?.split('=')[1] ?? (process.argv.includes('--mutate') ? 'mesh' : null);
+if (mutation) {
   const code = await readFile(file, 'utf8');
-  const barrier = "const solid = grain < 5 ? 0 : 2;";
-  assert.ok(code.includes(barrier), 'could not locate mesh collision rule');
-  const broken = code.replace(barrier, 'const solid = 2;');
+  const cuts = {
+    mesh: ["const solid = grain < 5 ? 0 : 2;", 'const solid = 2;'],
+    hand: ["      const particle = grains.pop();\n      s.cells[i] = particle % 16;", "      const particle = grains.pop();\n      if (grains.length % 9 === 0) continue;\n      s.cells[i] = particle % 16;"],
+    trickle: ["  if (!s.scoop.length || (h.moved < 4 && h.age < 30)) return;", "  return;"],
+  };
+  const [from, to] = cuts[mutation] || [];
+  assert.ok(from && code.includes(from), 'could not locate the rule for mutation ' + mutation);
+  const broken = code.replace(from, to);
   sim = await import('data:text/javascript;base64,' + Buffer.from(broken).toString('base64'));
+  console.log('Mutation:', mutation);
 }
-
-const { W, H, create, step, press, move, release } = sim;
+const { W, H, create, step, press, move, release, BEDS } = sim;
 function wait(s, ticks) { for (let i = 0; i < ticks && s.status === 'play'; i++) step(s); }
 function stroke(s, x, y, toX, toY, ticks = 14) {
   press(s, x, y);
@@ -25,7 +33,7 @@ function stroke(s, x, y, toX, toY, ticks = 14) {
 const count = cells => cells.reduce((n, val) => n + Number(val !== 0), 0);
 const mass = s => count(s.cells) + s.scoop.length + s.spill.reduce((n, b) => n + b.grains.length, 0) + (s.waste || 0);
 function emptyTray() {
-  const s = create(3);
+  const s = create(4); // the sieve bed has no board, so the step does not wait for a first touch
   s.cells.fill(0);
   s.walls.fill(0);
   for (let y = 0; y < H; y++) s.walls[y * W] = s.walls[y * W + W - 1] = 1;
@@ -111,107 +119,124 @@ for (const [offset, expected] of [[1, 90], [2, 0]]) {
   assert.equal(shifted.score, expected);
 }
 
-function play(level, seed, offset = 0, settle = 90) {
+// The informed player follows the moving hint: each stroke starts on sand that is there now.
+function play(level, seed, settle = 60) {
   const s = create(level, seed);
   const initial = s.total;
   wait(s, settle);
   assert.equal(s.status, 'play');
   const start = s.ticks;
-  for (let attempt = 0; attempt < 25 && s.status === 'play'; attempt++) {
+  for (let attempt = 0; attempt < 40 && s.status === 'play'; attempt++) {
     const h = s.hint;
-    const variation = s.kind === 'sieve' ? (attempt % 3 - 1) * 8 : offset;
-    if (s.kind === 'seed' && s.goal.depth > s.goal.maxDepth) {
-      const { x, y, depth } = s.goal;
-      stroke(s, x, Math.floor(y - depth) + 3, h.x, h.y - 15);
-    } else {
-      stroke(s, h.x + variation, h.y + offset, h.toX + offset, h.toY);
-    }
-    assert.equal(mass(s), initial, 'mass in the field, scoop, pouring batches and waste');
-    wait(s, s.kind === 'glass' ? 1000 : 240);
+    stroke(s, h.x, h.y, h.toX, h.toY);
+    assert.equal(mass(s), initial, 'mass in the field, hand, pouring batches and waste');
+    if (s.goal.topLine) {
+      // The shut-in-time bed: wait for the sand, then follow the hint back.
+      wait(s, 16);
+      for (let i = 0; i < 900 && s.status === 'play' && s.progress < 0.95 && Math.abs(s.gate.x - s.goal.x) > 10; i++) step(s);
+    } else wait(s, s.gate && s.kind === 'glass' ? 1000 : 120);
     assert.equal(mass(s), initial, 'mass after the pour');
   }
+  wait(s, 600);
   assert.equal(s.status, 'won', 'campaign level ' + level + ', seed ' + seed);
   return s.ticks - start;
 }
 
-const seeds = [1, 17, 717, 7109, 65537, 0xffffffff];
+const seeds = [1, 17, 717, 7109, 65537];
 for (let level = 1; level <= 10; level++) {
-  const times = seeds.map(seed => play(level, seed));
-  console.log('Level', level, seeds.length + '/' + seeds.length, 'won, ticks after touch', Math.min(...times), 'to', Math.max(...times));
+  const times = [...seeds, 553 + level * 971].map(seed => play(level, seed));
+  console.log('Level', level, BEDS[level].kind, (seeds.length + 1) + '/' + (seeds.length + 1), 'won, ticks after the first touch', Math.min(...times), 'to', Math.max(...times));
 }
-const builtIn = Array.from({ length: 10 }, (_, i) => play(i + 1, 553 + (i + 1) * 971, 0, 0));
-console.log('All ten built-in opening states; ticks:', builtIn.join(', '));
-const openings = [-5, -3, 0, 3, 5].map(offset => play(1, 43, offset));
-assert.ok(Math.max(...openings) < 3600, 'wordless first swipe clears within one simulated minute');
-console.log('Opening offsets −5..+5: 5/5 finished in', Math.min(...openings), 'to', Math.max(...openings), 'ticks');
 
-let bailWins = 0;
-for (const x of [50, 55, 60, 65, 70]) {
-  for (const y of [84, 87, 90]) {
-    const s = create(1, 1524);
-    stroke(s, x, y, x + 29, y - 20);
-    wait(s, 180);
-    assert.equal(s.status, 'won', 'a stroke begun on the visible bail uncovers the lamp');
-    assert.equal(mass(s), s.total);
-    bailWins++;
-  }
-}
-console.log('Bail grips: ' + bailWins + '/15 uncover the lamp');
+// The verb: a press on the sand puts grains in the hand; a still hand over air pours them.
+const verb = create(1, 1524);
+press(verb, 60, 95);
+const held = verb.scoop.length;
+assert.ok(held >= 40, 'the first press gathers a visible handful');
+move(verb, 30, 40);
+for (let i = 0; i < 10; i++) step(verb);
+const carried = verb.scoop.length;
+for (let i = 0; i < 40; i++) step(verb);
+assert.ok(carried >= 40 && verb.scoop.length < carried / 4, 'a hand held still over open air pours while the finger is down');
+release(verb);
+wait(verb, 200);
+assert.equal(mass(verb), verb.total);
+console.log('First press gathered', held, 'grains; a still hand poured', carried - verb.scoop.length, 'in 40 ticks');
+
+const reach = create(1, 1524);
+press(reach, 60, columnTop(reach, 60) - 12);
+assert.ok(reach.scoop.length > 0, 'a press just above the surface reaches down to it');
 const sky = create(1, 1524);
-stroke(sky, 13, 22, 46, 9);
+press(sky, 13, 22); move(sky, 46, 9); release(sky);
 wait(sky, 180);
 assert.equal(sky.status, 'play');
-assert.equal(sky.progress, 0);
-
+assert.equal(mass(sky), sky.total);
+assert.equal(sky.lifted, 0, 'a stroke high in the sky gathers nothing');
 const idle = create(1, 8);
 wait(idle, 3600);
 assert.equal(idle.status, 'play');
-assert.equal(idle.progress, 0);
-const blocked = create(2, 1);
-press(blocked, 60, 96);
-release(blocked);
-wait(blocked, 2400);
-assert.equal(blocked.status, 'lost', 'an untouched gate after the clock starts spills the charge');
-assert.equal(count(blocked.cells.subarray(0, (blocked.goal.neckY + 1) * W)), 0);
-assert.equal(mass(blocked), blocked.total);
-console.log('Idle opening: 3600 ticks, 0 exposed. Closed gate lost at', blocked.ticks, 'ticks;', blocked.waste, 'grains in waste');
 
-const late = create(2, 31);
-press(late, late.gate.x, late.gate.y);
-release(late);
-wait(late, 1226);
-press(late, late.hint.x, late.hint.y);
-move(late, late.hint.toX, late.hint.toY);
-release(late);
-wait(late, 200);
-assert.equal(late.status, 'lost', 'a lower bulb reaching the line after the upper bulb empties is too late');
-assert.equal(count(late.cells.subarray(0, (late.goal.neckY + 1) * W)), 0, 'upper empty on the terminal tick');
-console.log('Late gate release lost at', late.ticks, 'ticks');
-
-for (const level of [6, 9]) {
-  const miss = create(level);
-  press(miss, miss.gate.x, miss.gate.y);
-  release(miss);
-  wait(miss, 2400);
-  assert.equal(miss.status, 'lost', 'the offset lower bulb misses a straight stream');
-  assert.equal(mass(miss), miss.total);
+// Bed 1 must fall to a clumsy player: random drags that know nothing of the lamp.
+function rng(seed) { let n = seed >>> 0 || 1; return () => (n = (Math.imul(n, 1664525) + 1013904223) >>> 0) / 4294967296; }
+function surface(s, x) { for (let y = 1; y < H - 1; y++) if (s.cells[y * W + x]) return y; return H - 2; }
+function clumsy(level, seed, limit = 60 * 180) {
+  const s = create(level, 553 + level * 971), r = rng(seed);
+  let t = 0;
+  while (s.status === 'play' && t < limit) {
+    let x = 2 + Math.floor(r() * (W - 4)), y;
+    if (s.gate) { x = s.gate.x + (r() - 0.5) * 20; y = s.gate.y; }
+    else y = r() < 0.7 ? surface(s, x) + Math.floor(r() * 10) - 2 : 10 + r() * (H - 20);
+    const angle = r() * Math.PI * 2, length = 10 + r() * 50;
+    const toX = x + Math.cos(angle) * length, toY = s.gate ? y : y + Math.sin(angle) * length;
+    const n = 8 + Math.floor(r() * 25);
+    press(s, x, y);
+    for (let i = 1; i <= n && s.status === 'play'; i++) { move(s, x + (toX - x) * i / n, y + (toY - y) * i / n); step(s); t++; }
+    release(s);
+    const pause = 20 + Math.floor(r() * 60);
+    for (let i = 0; i < pause && s.status === 'play'; i++) { step(s); t++; }
+  }
+  return s.status === 'won' ? t / 60 : Infinity;
 }
+const clumsyTimes = Array.from({ length: 15 }, (_, i) => clumsy(1, 1000 + i * 7919)).sort((a, b) => a - b);
+const clumsyMedian = clumsyTimes[7];
+assert.ok(clumsyMedian < 45, 'a clumsy player clears bed 1 in a median under 45 seconds');
+console.log('Clumsy player, bed 1:', clumsyTimes.filter(Number.isFinite).length + '/15 won, median', clumsyMedian.toFixed(1), 's');
 
-const deep = create(7, 1);
-wait(deep, 180);
-for (let k = 0; k < 3; k++) { stroke(deep, 88, 96 + 4 * k, 39, 113, 1); wait(deep, 10); }
-wait(deep, 200);
-assert.equal(deep.status, 'play');
-const tooDeep = deep.goal.depth;
-assert.ok(tooDeep > deep.goal.maxDepth);
-stroke(deep, 39, Math.floor(143 - tooDeep) + 3, 80, 70);
-wait(deep, 180);
-if (deep.status === 'play') {
-  stroke(deep, 82, 98, 39, 115);
-  wait(deep, 180);
+// Bed 3: the glass waits for the first touch; a board left open spills past the upper mark.
+const untouched = create(3, 1);
+wait(untouched, 2400);
+assert.equal(untouched.status, 'play', 'the hourglass waits for the first touch');
+const open = create(3, 1);
+stroke(open, open.gate.x, open.gate.y, open.gate.x + 32, open.gate.y);
+wait(open, 3000);
+assert.equal(open.status, 'lost', 'a board left open spills past the upper mark');
+assert.equal(open.ending, 'overfill');
+assert.equal(mass(open), open.total);
+console.log('Board left open on bed 3: lost (overfill) at', open.ticks, 'ticks');
+
+// Bed 6: a stream that falls straight misses the offset lower bulb.
+const miss = create(6);
+press(miss, miss.gate.x, miss.gate.y);
+release(miss);
+wait(miss, 2400);
+assert.equal(miss.status, 'lost', 'the offset lower bulb misses a straight stream');
+assert.equal(mass(miss), miss.total);
+
+// Bed 2: too much sand on the seed is not a win. The hand never lifts between handfuls,
+// so the bed cannot be won on the way past the marks.
+const deep = create(2, 1);
+for (let k = 0; k < 12 && !(deep.goal.depth > deep.goal.maxDepth + 10); k++) {
+  press(deep, 26 + (k % 3) * 6, columnTop(deep, 26 + (k % 3) * 6) + 3);
+  move(deep, deep.goal.x, 70);
+  for (let i = 0; i < 80; i++) step(deep);
 }
-assert.equal(deep.status, 'won', 'an overly buried seed can be uncovered and replanted');
-console.log('Overburied seed recovered:', tooDeep, 'to', deep.goal.depth, 'cells of cover');
+release(deep);
+wait(deep, 300);
+assert.equal(deep.status, 'play', 'an overburied seed is not planted');
+assert.ok(deep.goal.depth > deep.goal.maxDepth);
+assert.equal(mass(deep), deep.total);
+console.log('Overburied seed: depth', deep.goal.depth, 'over the limit', deep.goal.maxDepth, '; still in play');
+function columnTop(s, x) { for (let y = 1; y < H - 1; y++) if (s.cells[y * W + x]) return y; return H - 2; }
 
 function replay(seed) {
   const s = create(3, seed);

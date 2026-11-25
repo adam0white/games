@@ -71,6 +71,16 @@ function parse(raw: unknown): Ledger {
   return value;
 }
 
+/** The error's class name and numeric code, with nothing a model or a page wrote. */
+export function failureLabel(error: unknown): string {
+  if (!error || typeof error !== 'object') return 'unknown';
+  const { name, code, status } = error as { name?: unknown; code?: unknown; status?: unknown };
+  const label = typeof name === 'string' && /^[A-Za-z]{1,40}$/u.test(name) ? name : 'Error';
+  const number = [code, status].find((value) => typeof value === 'number' && Number.isInteger(value));
+  if (number !== undefined) return `${label} ${number}`;
+  const inText = /\b(\d{3,5})\b/u.exec(String((error as { message?: unknown }).message ?? ''));
+  return inText ? `${label} ${inText[1]}` : label;
+}
 export function createBudget(
   env: { LAB: Bucket; AI: Ai },
   now: () => number = Date.now,
@@ -131,10 +141,13 @@ export function createBudget(
         model.includes('/qwen/') && last?.role === 'user'
           ? [...messages.slice(0, -1), { ...last, content: `${last.content} /no_think` }]
           : messages;
+      // Gemma 4 reasons by default and bills the reasoning as output. Measured 2026-11-25 with the
+      // same request twice: 201 output tokens with reasoning, 14 with enable_thinking false.
       const body = {
         messages: sent,
         max_tokens: maxTokens,
         response_format: { type: 'json_object' },
+        ...(model.includes('/gemma-4') ? { chat_template_kwargs: { enable_thinking: false } } : {}),
       };
       const reserve = textReservation(model, body);
       const reserved = await mutate(day, (ledger, today) => {
@@ -170,8 +183,9 @@ export function createBudget(
             timer = setTimeout(() => reject(new Error('timeout')), patience);
           }),
         ]).finally(() => clearTimeout(timer));
-      } catch {
-        throw new Error('Inference unavailable; reservation retained');
+      } catch (error) {
+        // Name and numeric code only: an error message can quote the prompt, which holds page text.
+        throw new Error(`Inference unavailable (${failureLabel(error)}); reservation retained`);
       }
       if (!result || typeof result !== 'object') throw new Error('Inference failed; reservation retained');
       const neurons = usageNeurons(model, result as Record<string, unknown>);
