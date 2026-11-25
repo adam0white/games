@@ -54,7 +54,7 @@ Reproduction commands (prefix each with `PLAYWRIGHT=/Users/abdul/code/human-fram
 
 ```sh
 fnm exec --using=26.12.0 node experiments/kit/check/phone.mjs breath,matchmaker,sling,duel,harvest,boat
-fnm exec --using=26.12.0 node experiments/kit/check/phone.mjs lab/lantern-race,lab/ant-swarm,lab/ant-quests,lab/lantern-spark,lab/ant-creatures,lab/ant-draft,lab/ant-draft-b,lab/boat-b,lab/wild2-face-shift,lab/wild-pour
+fnm exec --using=26.12.0 node experiments/kit/check/phone.mjs lab/ant-swarm,lab/ant-quests,lab/lantern-spark,lab/ant-creatures,lab/ant-draft,lab/ant-draft-b,lab/boat-b,lab/wild2-face-shift,lab/wild-pour
 fnm exec --using=26.12.0 node experiments/kit/check/phone.mjs 'matchmaker,hint breath,hint boat,lab/lantern-fp'
 fnm exec --using=26.12.0 node experiments/kit/check/phone.mjs lab/ant-quests,kit
 ```

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFile } from 'node:fs/promises';
 import { ROOM, roomName, roomMessage, rateWindow, needsRound, freshRound, freeId } from '../src/room.mjs';
-import { decode } from '../../../experiments/lab/lantern-race/sim.js';
+import { decode } from '../../../experiments/lantern/modes/race-sim.js';
 
 // Run the class itself with socket/context stand-ins. Only the platform base class and 101 response are replaced;
 // a wrangler dev smoke test exercises the real runtime separately. Import paths still point to the real modules.

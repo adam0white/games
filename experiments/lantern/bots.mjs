@@ -3,15 +3,18 @@
 //   node experiments/lantern/bots.mjs parity [seeds] [--mutate]   with no mode chosen, sim.js plays exactly as on main (see parity below)
 //   node experiments/lantern/bots.mjs spark [runs] [--mutate[=flies-anywhere]]   Spark's claims (modes/spark-bots.mjs)
 //   node experiments/lantern/bots.mjs ripples [--mutate]   the 3D view's water (ripple-bots.mjs)
+//   node experiments/lantern/bots.mjs tide [seeds] [--mutate]   Tide's claims (modes/tide-bots.mjs)
+//   node experiments/lantern/bots.mjs duet [--mutate]   Duet's claims (modes/duet-bots.mjs)
+//   node experiments/lantern/bots.mjs race [--mutate]   Race's claims (modes/race-bots.mjs)
 import { create, step, centre, half, sight, score, progress, towerStage, GOAL, BOAT, DT } from './sim.js';
 if (process.argv[2] === 'ripples') { // the 3D view's water: its own claims (ripple-bots.mjs), in its own process
   const { spawnSync } = await import('node:child_process');
   process.exit(spawnSync(process.execPath, [new URL('./ripple-bots.mjs', import.meta.url).pathname, ...process.argv.slice(3)], { stdio: 'inherit' }).status ?? 1);
 }
-const SUB = ['parity', 'spark'].includes(process.argv[2]) ? process.argv[2] : '';
-if (SUB === 'spark') { // its own process: spark-bots.mjs reads its arguments and runs worker threads
+const SUB = ['parity', 'spark', 'tide', 'duet', 'race'].includes(process.argv[2]) ? process.argv[2] : '';
+if (SUB === 'spark' || SUB === 'tide' || SUB === 'duet' || SUB === 'race') { // its own process: the mode's bots read their own arguments (spark-bots.mjs runs worker threads)
   const { spawnSync } = await import('node:child_process');
-  const out = spawnSync(process.execPath, [new URL('./modes/spark-bots.mjs', import.meta.url).pathname, ...process.argv.slice(3)], { stdio: 'inherit' });
+  const out = spawnSync(process.execPath, [new URL(`./modes/${SUB}-bots.mjs`, import.meta.url).pathname, ...process.argv.slice(3)], { stdio: 'inherit' });
   process.exit(out.status ?? 1);
 }
 // A stage of -100 - L is tower level L (with that level's things); -n above -100 is the old tower holding night n's things at level 1.
@@ -91,7 +94,7 @@ if (SUB === 'parity') {
   const file = join(mkdtempSync(join(tmpdir(), 'lantern-parity-')), 'sim-main.mjs');
   writeFileSync(file, execFileSync('git', ['show', 'origin/main:experiments/lantern/sim.js'], { cwd: here }));
   const main = await import(file), now = await import('./sim.js?v=15');
-  const seeds = Number(process.argv.find((a, i) => i > 2 && /^\d+$/.test(a)) ?? 40), mutated = process.argv.includes('--mutate');
+  const seeds = Number(process.argv.find((a, i) => i > 2 && /^\d+$/.test(a)) ?? 40), mutated = flags.includes('--mutate'); // flags were taken out of argv above
   const cases = [[1], [2], [3], [4], [5], [6], [12], [20], [30], [50], [0], [-101], [-151], [3, ['boost', 'slow', 'heart']], [8, ['size', 'magnet', 'flare', 'shield']], [5, undefined, { hearts: 2, calm: 3, pull: 2 }]];
   const build = (sim, seed, [stage, set, stats]) => stage <= -100 ? sim.create(seed, sim.towerStage(-stage - 100), 'tower', set, stats, -stage - 100) : sim.create(seed, stage || 1, !stage, set, stats);
   let ticks = 0, bad = 0;
