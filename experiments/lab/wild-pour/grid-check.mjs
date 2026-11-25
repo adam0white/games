@@ -1,58 +1,69 @@
-// Independent exact-state comparison against the original simulation's immutable Git blob.
+// The neighbour grid against every pair. sim.js finds touching drops through a grid; this check takes states from
+// real runs (every level, two seeds, four thumbs, the mutation too, and some odd states) and runs one relaxation pass
+// both ways on copies. Corrections are summed then applied, so the two must agree to rounding (1e-9 units).
+// 2026-11-24: the rules changed (NOTES.md), so the old comparison with the original sim's Git blob no longer applies.
 // Run: fnm exec --using=26.12.0 node experiments/lab/wild-pour/grid-check.mjs
-import { execFileSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
 import { performance } from 'node:perf_hooks';
-import * as current from './sim.js';
-const REFERENCE_BLOB = '5d5ab9cf68b7d4e0bf2364bf59a940c01a7944a8';
-const original = execFileSync('git', ['show', REFERENCE_BLOB], {
-  cwd: fileURLToPath(new URL('./', import.meta.url)), encoding: 'utf8',
-});
-const oldLevel = /^export function level\(n\) \{[\s\S]*?^\}/gm;
-if ([...original.matchAll(oldLevel)].length !== 1) throw Error('reference level table was not found exactly once');
-// Compare both grids under the current level settings with the original physics.
-const source = original.replace(oldLevel, () => `export ${current.level.toString()}`);
-const reference = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
-console.log(`Reference simulation blob: ${REFERENCE_BLOB}, using current level settings.`);
-let steps = 0, episodes = 0;
-const eq = (a, b, path = '') => {
-  if (a === null || typeof a !== 'object') { if (!Object.is(a, b)) throw Error(`state mismatch ${path}: ${a} !== ${b}`); return; }
-  if (Object.keys(a).length !== Object.keys(b).length) throw Error(`key mismatch ${path}`);
-  for (const k of Object.keys(a)) eq(a[k], b[k], path ? `${path}.${k}` : k);
-};
-const policies = [() => 0, () => 2.4, (s, i) => i % 180 < 90 ? 1.8 : 0, (s, i) => Math.max(0, Math.sin(i / 47) * 2.4)];
-for (let n = 1; n <= 8; n++) for (const seed of [7, 113]) for (const mutate of [false, true]) for (let policy = 0; policy < policies.length; policy++) {
-  const a = current.create(n, seed, { mutate }), b = reference.create(n, seed, { mutate });
-  for (let i = 0; i < 650 && !a.over; i++) {
-    const tilt = policies[policy](a, i); current.step(a, tilt); reference.step(b, tilt);
-    eq(a, b); steps++;
+import * as sim from './sim.js';
+
+const TOL = 1e-9;
+let compared = 0, pairsSeen = 0, worst = 0;
+function same(a, b, where) {
+  if (a.p.length !== b.p.length) throw Error(`${where}: particle count ${a.p.length} !== ${b.p.length}`);
+  for (let i = 0; i < a.p.length; i++) {
+    const p = a.p[i], q = b.p[i];
+    for (const k of ['x', 'y', 'px', 'py']) {
+      const d = Math.abs(p[k] - q[k]);
+      if (Number.isNaN(p[k]) !== Number.isNaN(q[k]) || d > TOL) throw Error(`${where}: drop ${i} ${k} ${p[k]} !== ${q[k]}`);
+      if (d > worst) worst = d;
+    }
+    if (p.air !== q.air || p.st !== q.st) throw Error(`${where}: drop ${i} air/st ${p.air}/${p.st} !== ${q.air}/${q.st}`);
   }
-  episodes++;
 }
-// Force the fallback and oversized-state path; these must preserve even unusual states.
-for (const oversized of [false, true]) {
-  const a = current.create(1, 3), b = reference.create(1, 3);
-  if (oversized) { for (let i = 0; i < 60; i++) { a.p.push({ ...a.p[i] }); b.p.push({ ...b.p[i] }); } }
-  else { a.p[0].x = b.p[0].x = -100; a.p[0].px = b.p[0].px = -100; }
-  for (let i = 0; i < 120; i++) { current.step(a, 1.9); reference.step(b, 1.9); eq(a, b); steps++; }
-  episodes++;
+function compare(s, where) {
+  const a = sim.clone(s), b = sim.clone(s);
+  sim.relaxOnce(a, false); sim.relaxOnce(b, true);
+  same(a, b, where); compared++;
+  let touching = 0; for (let i = 0; i < s.p.length; i++) if (s.p[i].x !== a.p[i].x || s.p[i].y !== a.p[i].y) touching++;
+  pairsSeen += touching;
 }
-// Nonfinite external state must use the same unbounded fallback, including NaN behavior.
+
+// A known bad case must fail: the comparison catches a one-micro-unit difference.
 {
-  const a = current.create(1, 7), b = reference.create(1, 7);
-  a.p[0].x = b.p[0].x = NaN;
-  for (let i = 0; i < 10; i++) { current.step(a, 1.9); reference.step(b, 1.9); eq(a, b); steps++; }
+  const s = sim.create(1, 1); for (let i = 0; i < 200; i++) sim.step(s, 1.9);
+  const a = sim.clone(s), b = sim.clone(s); b.p[3].x += 1e-6;
+  let caught = false; try { same(a, b, 'self-test'); } catch { caught = true; }
+  if (!caught) throw Error('self-test: the comparison missed a 1e-6 difference');
+}
+
+const policies = [() => 0, () => 2.4, (s, i) => i % 180 < 90 ? 1.8 : 0, (s, i) => Math.max(0, Math.sin(i / 47) * 2.4)];
+let episodes = 0;
+for (let n = 1; n <= sim.LEVELS; n++) for (const seed of [7, 113]) for (const mutate of [false, true]) for (let k = 0; k < policies.length; k++) {
+  const s = sim.create(n, seed, { mutate });
+  for (let i = 0; i < 900 && !s.over; i++) {
+    sim.step(s, policies[k](s, i));
+    if (i % 15 === 7) compare(s, `level ${n} seed ${seed} mutate ${mutate} thumb ${k} step ${i}`);
+  }
   episodes++;
 }
-console.log(`Exact reference comparison passed: ${episodes} episodes, ${steps} steps; every state field, particle coordinate, previous coordinate, count, RNG and event.`);
-const bench = engine => {
-  const start = performance.now(), cpu = process.cpuUsage();
-  for (let run = 0; run < 12; run++) {
-    const s = engine.create(4, run + 1);
-    for (let i = 0; i < 900; i++) engine.step(s, i % 180 < 90 ? 1.8 : 0);
-  }
-  const used = process.cpuUsage(cpu);
-  return { wallMs: +(performance.now() - start).toFixed(3), cpuMs: +((used.user + used.system) / 1000).toFixed(3) };
+// Odd states: a drop far outside the grid, more drops than the buffers hold, a drop that is not a number, a heap.
+{
+  const s = sim.create(1, 3); for (let i = 0; i < 300; i++) sim.step(s, 1.9);
+  const far = sim.clone(s); far.p[0].x = far.p[0].px = -100; compare(far, 'drop far left');
+  const big = sim.clone(s); for (let i = 0; i < 200; i++) big.p.push({ ...big.p[i % big.p.length], x: big.p[i % big.p.length].x + 0.3 }); compare(big, 'oversized');
+  const nan = sim.clone(s); nan.p[0].x = NaN; compare(nan, 'NaN drop');
+  const heap = sim.create(1, 5); heap.p = Array.from({ length: 90 }, (_, i) => ({ x: 50 + (i % 9) * 1.7, y: 140 - Math.floor(i / 9) * 1.7, px: 50 + (i % 9) * 1.7, py: 140 - Math.floor(i / 9) * 1.7, st: 1, air: i % 4 === 0 ? 1 : 0, e: 0 }));
+  compare(heap, 'tight heap with stream drops');
+  episodes++;
+}
+if (pairsSeen === 0) throw Error('no drop moved in any compared pass: the check compared nothing');
+console.log(`grid against every pair: ${compared} passes from ${episodes} runs agree (largest difference ${worst.toExponential(2)}, tolerance ${TOL}); ${pairsSeen} drop moves compared`);
+
+const bench = brute => {
+  const s = sim.create(1, 2); for (let i = 0; i < 400; i++) sim.step(s, i < 200 ? 2.0 : 0);
+  const start = performance.now();
+  for (let r = 0; r < 4000; r++) sim.relaxOnce(s, brute); // the same heap again and again
+  return +(performance.now() - start).toFixed(1);
 };
-const first = bench(reference), second = bench(current), third = bench(reference), fourth = bench(current);
-console.log(JSON.stringify({ reference: [first, third], dense: [second, fourth], cpuSpeedup: ((first.cpuMs + third.cpuMs) / (second.cpuMs + fourth.cpuMs)).toFixed(3) }));
+const g1 = bench(false), b1 = bench(true), g2 = bench(false), b2 = bench(true);
+console.log(JSON.stringify({ gridMs: [g1, g2], everyPairMs: [b1, b2], speedup: ((b1 + b2) / (g1 + g2)).toFixed(2) }));

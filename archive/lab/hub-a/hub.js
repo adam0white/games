@@ -72,7 +72,7 @@ const P = {
   'night-sand'() { const n = num(J('night-sand:save')?.completed, 10); return { score: n, of: 10, finished: n >= 10 }; },
   'night-bells'() { const n = count(J('night-bells:save')?.stars); return { score: n, of: 8, finished: n >= 8 }; },
   'night-podwire'() { const s = J('night-podwire:progress') || {}; const n = s.complete === true ? 6 : Math.max(0, num(s.next, 6) - 1); return { score: n, of: 6, finished: n >= 6 }; },
-  'night-saltplate'() { const n = num(J('night-saltplate:save')?.cleared, 18); return { score: n, of: 18, finished: n >= 18 }; },
+  'night-saltplate'() { const n = num(J('night-saltplate:save')?.cleared, 6); return { score: n, of: 6, finished: n >= 6 }; },
   // Splitlight keeps the highest plate reached (a plain number), so the last plate's clear is not visible here.
   'night-splitlight'() { const n = Math.max(0, num(readNumber('night-splitlight:plate', 1), 6) - 1); return { score: n, of: 6 }; },
   'wild-pour'() { const n = count(J('wild-pour:save')?.stars); return { score: n, of: 8, finished: n >= 8 }; },
@@ -111,7 +111,7 @@ export const SMALL = [
   g('night-splitlight', '/lab/night-splitlight/', { en: 'Splitlight' }, { en: 'Turn the glass so each colour finds its receiver.', tr: 'Camı çevir, her renk kendi alıcısını bulsun.' }, ['minLevel', 1], 'think'),
   g('ring', '/lab/ring/', { en: 'Firefly Ring', tr: 'Ateş Böceği Halkası' }, { en: 'Draw a ring around fireflies of one colour.', tr: 'Aynı renkteki ateş böceklerinin çevresine halka çiz.' }, ['minLevel', 1], 'think', { tr: true }),
   g('pitch', '/lab/pitch/', { en: 'Paper Pitch', tr: 'Kâğıt Futbolu' }, { en: 'The old pencil game: draw the ball into the goal.', tr: 'Eski kalem oyunu: topu kaleye çiz.' }, ['minMatch', 3], 'think', { tr: true, friend: 'byLink' }),
-  g('night-saltplate', '/lab/night-saltplate/', { en: 'Saltplate', tr: 'Tuz Levha' }, { en: 'Tune a ringing plate until the salt draws the engraving.', tr: 'Çınlayan levhayı akort et, tuz oymadaki deseni çizsin.' }, ['minLevel', 1], 'calm', { tr: true }),
+  g('night-saltplate', '/lab/night-saltplate/', { en: 'Saltplate' }, { en: 'Tune a ringing plate until the salt draws the engraving.', tr: 'Çınlayan levhayı akort et, tuz oymadaki deseni çizsin.' }, ['minLevel', 1], 'calm'),
   g('night-rubbing', '/lab/night-rubbing/', { en: 'Carbon Cabinet' }, { en: 'Rub graphite over a fossil and bring out its ridges.', tr: 'Fosilin üstüne grafit sür, kabartmalarını ortaya çıkar.' }, ['minLevel', 1], 'calm'),
   g('thankful', '/lab/thankful/', { en: 'Thankful Garden' }, { en: 'Three thanks a day. Each one becomes a light in your sky.', tr: 'Günde üç teşekkür. Her biri gökyüzünde bir ışık olur.' }, ['minDay', 1], 'calm'),
 ];

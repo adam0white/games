@@ -10,6 +10,8 @@ Why this and not the listed directions: every other game tonight is about steeri
 
 ## Rules (`sim.js`)
 
+This section, Controls and Bot results describe the page before the 2026-11-24 retune. The current rules are in "2026-11-24 — easier, and a liquid that reads as liquid" at the end.
+
 - World 100 x 160 units, y down, fixed step 1/60 s, two substeps. Drop radius 1.45. Seeded; the jiggle that keeps the pile liquid uses a number stored in the state, so a state can be copied with `structuredClone`.
 - The jug turns around its spout. The player asks for a tilt from 0 to 2.4 rad; the jug tips at 1.5 rad/s (a faster tip flung juice everywhere) and stands up at 3.5 rad/s.
 - Juice starts to run at about 1.25 rad with a full jug and needs more tilt as it empties (measured: 76 of 80 still in at 1.38 rad, 26 at 1.88, empty at 2.13).
@@ -235,3 +237,105 @@ Inspected both profiles' menu, pouring, full-tilt and daily-result screenshots i
 ## Play recording (2026-11-24)
 
 Records under `wild-pour` (`kit/lab.js`). One run for each pour, started by Play, Daily pour, Next or Again; it ends `won` or `lost` when the pour ends (event `level-finished`, or `daily-finished` for the daily pour, with level and stars), and `quit` on Menu from the pause card. Summary: level, daily or not, why it ended, stars, drops in the glass, target, spilled, seconds. The daily date is not sent. The notice is on the menu card; on a phone held sideways the card scrolls and the notice is below the fold. The page sends nothing typed, no names and no room codes. The recording notice and off switch are the kit's own (`kit/lab.js`); the switch is on the pause card. `check.mjs` answers the lab endpoint itself, loads the page with `?labRunSource=agent`, and asserts that a played run sends a run record under the slug with recording on and nothing with the switch off. Not verified: the live endpoint (it refuses these names until the human-framework change lands and deploys). Bots: unchanged outcome (0 failed). `check.mjs`: exit 0 on both profiles.
+
+## 2026-11-24 — easier, and a liquid that reads as liquid
+
+The owner's words: "pour but improve sim and it's too difficult right now". Page stays at `/lab/wild-pour/`; nothing moved.
+
+### What the old sim was
+
+`liquid.js` is only a renderer: each drop adds a round kernel to a scalar field (3 samples a unit, radius 12 px) on an offscreen canvas, and the field is drawn where it passes 0.34 (a metaball). The physics was in `sim.js`: 80 position-based Verlet drops in the jug and the glass, with gravity, pairwise push-apart, walls, damping 0.996, air drag 0.975 on free drops and a tiny jiggle. No cohesion and no viscosity. The juice ran when the drops in the jug spilled over the lip, so the flow came from the heap in the jug.
+
+### Five weakest things before the change, and what became of each
+
+Screenshots: `/tmp/claude-improve-wild-pour/before/` (not in the repo).
+
+1. A natural slide floods the glass: a steady thumb overfilled level 1 every time (61 to 66 for a line at 34, 4 of 4 tries in each browser). Now: the flow follows the thumb (below), the same thumb wins 4 of 4 at 34 of 34 with 3 stars.
+2. Flow against tilt could not be learned: steep, and it moved with the fill (table below). Now: one curve at every fill, no noise.
+3. The juice read as beads: separate dots in the air and a lumpy heap in the glass. Now: one stream from spout to surface, a level surface with a wave, a meniscus and a highlight; loose drops (splashes) keep the metaball.
+4. A loss waited 1.1 s for its card and restarted only from the button. Now: the card shows 0.35 s after a loss; Again, a tap on the card's backdrop, or a tap on the scene restarts. Measured 28 to 48 ms from tap to pouring.
+5. A loss gave nothing and a near miss felt like a miss. Now: the band is wider and every pour in it wins; stars say how close (3 within a quarter of the band, 2 within 60%, 1 anywhere in it); a small second pour tops up; the spill allowance forgives the first slosh. A 30 s clock became 30 to 45 s per level.
+
+### The new model (`sim.js`)
+
+- The jug is a reservoir. The thumb asks for a control tilt (0 to 2.4 rad, finger travel as before). Flow starts at 0.95 rad and is full at 2.25: share = x(0.35 + 0.65x) for x the fraction between them. Target rate = liquid flow x level pace x share x (0.85 + 0.15 x fill). The actual rate follows the target with the liquid's lag (juice 0.08 s, honey 0.5 s). Whole drops leave the spout when the rate has added up to one. The jug's drawn angle is computed from the fill so the drawn surface meets the spout as the flow starts; it is drawing only.
+- Drops in the stream do not push each other; they join the liquid when they touch it, a wall or the floor. Drops in the glass have push-apart, cohesion (a pull towards neighbours out to 1.5 diameters, `stick`) and XSPH viscosity (velocity smoothing, `visc`). All pair corrections are summed, then applied (Jacobi), so pair order changes nothing but rounding. Sines in the rules use a pure arithmetic sine (`psin`), so WebKit, Chromium and Node agree.
+- Liquids: juice (flow 9, visc 0.1, stick 0.03), honey (flow 4.7, lag 0.5, visc 0.45, stick 0.1: slow, and it keeps coming after you lift), soda (as juice, plus froth: every drop that lands adds 1.3 units of foam that settles away with a 1.5 s half-life; the pour is judged only when the foam is down, so the level that counts is under the froth).
+- Settled area per drop: `AREA` 7.2 units, measured from settled pours (juice and soda 7.2 to 7.5, honey 5.4 to 6.1 because honey heaps). The drawn surface uses it; the count of drops decides the result.
+- Judge: `calm` adds up while nothing flies, the jug is not pouring, the foam is down and the belt is still. Spills over the allowance lose at once; any glass over the band with calm over 0.4 s loses; the last glass in the band with calm over 1 s wins; the clock ends the level with the same verdict.
+
+### Levels: one new idea each
+
+| Level | Idea | Liquid | Target ± band | Glass half-width | Spill allowed | Seconds | Pace |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | Juice (daily pour too) | juice | 34 ± 9 | 13 | 30 | 30 | 1 |
+| 2 | Honey: slow, keeps coming | honey | 34 ± 6 | 11 | 26 | 40 | 0.98 |
+| 3 | A tall glass | juice | 40 ± 7 | 10 | 26 | 30 | 0.88 |
+| 4 | The glass moves (12 units at 1.3 rad/s) | juice | 36 ± 7 | 10 | 22 | 30 | 1 |
+| 5 | Soda: the foam settles lower | soda | 34 ± 7 | 12 | 26 | 40 | 0.98 |
+| 6 | Honey in a moving glass (12 units at 1.4 rad/s) | honey | 30 ± 5 | 10 | 15 | 45 | 1 |
+| 7 | Two glasses, one jug (a belt brings the second) | juice | 24 ± 7 each | 10 | 30 | 45 | 1.04 |
+| 8 | A small glass | juice | 22 ± 6 | 8 | 24 | 30 | 0.97 |
+
+The save keeps 8 stars, so there are still 8 levels; old saves load unchanged (stars for level n stay on level n). Level 6, the old cliff (2/6 planner, NOTES above), is now honey in a moving glass, tuned to sit on the slope.
+
+### Difficulty: the clumsy thumb (`thumb.mjs`)
+
+Written and committed (commit "a frozen clumsy-thumb bot and a flow-against-tilt probe, before any rule change") before any rule changed, and not edited after. It reacts 250 to 400 ms late, slides 0.6 to 1.2 rad/s until it sees juice run, wobbles, backs off a fast stream, stops at a random point around the line (often a little early) plus 0 to 250 ms late, slides back slowly on 30% of seeds, and tops up when the glass settles under the band. Tuning used seeds 1 to 500 (levels' pace, and honey's flow); the sweep below is held out.
+
+| Level | Before, seeds 1–500 | After, seeds 1–500 | After, held-out seeds 4201–4700 |
+| --- | --- | --- | --- |
+| 1 | 7.4% (456 over) | 92.8% | 92.4% |
+| 2 | 17.4% | 86.2% | 83.8% |
+| 3 | 14.6% | 79.4% | 81.2% |
+| 4 | 19.4% | 74.4% | 74.6% |
+| 5 | 12.8% | 67.4% | 71.6% |
+| 6 | 22.0% | 59.8% | 62.6% |
+| 7 | 14.6% | 52.4% | 55.2% |
+| 8 | 22.2% | 41.0% | 41.8% |
+
+Before, losses were mostly overfills. After, juice losses are overfills and sway losses are spills. Average stars on a win run from 1.2 (two glasses) to 2.6 (sway levels, where the slow careful pour lands close).
+
+### Flow against tilt (`flow.mjs --steady`, 8 seeds, level 1)
+
+Drops a second over one second, starting half a second after the jug reaches the tilt; mean ± spread over seeds. Plot: `/tmp/claude-improve-wild-pour/flow-vs-tilt.svg` (not in the repo).
+
+| Tilt (rad) | 1.0 | 1.2 | 1.4 | 1.6 | 1.8 | 2.0 | 2.2 | 2.4 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Before, full jug | 3.6 ± 0.9 | 10.9 ± 1.3 | 24.0 ± 1.8 | 36.9 ± 2.1 | 45.8 ± 2.0 | 40.8 ± 1.9 | 24.0 ± 2.2 | 10.9 ± 1.8 |
+| Before, jug 39% | 0 | 0.8 ± 0.4 | 3.4 ± 1.5 | 13.9 ± 1.1 | 24.6 ± 1.4 | 25.3 ± 2.4 | 14.9 ± 2.3 | 6.6 ± 0.9 |
+| After, full jug | 0 | 1 | 2 | 3 | 5 | 7 | 8 | 9 |
+| After, jug 49% | 0 | 1 | 2 | 3 | 4 | 6 | 7 | 9 |
+
+Before: onset moved from 1.0 to 1.3 rad as the jug emptied; the rate climbed about 6 drops a second per 0.1 rad; spread/mean 0.10 to 0.18; it was monotone in only 12 or 13 of 18 steps, because at steep tilts the jug empties within the window. After: the same curve at every fill to within one drop, spread 0 (the flow law has no randomness; the jiggle only scatters where drops go), monotone in 17 or 18 of 18 steps (the one miss is a whole-drop rounding), and 9 drops a second at most, so a thumb has time to react.
+
+### Rendering (`main.js`)
+
+The glass liquid is drawn from the count: a level body with a 16-column wave that takes kicks from landing drops and from the glass's acceleration (slosh), a meniscus where it meets the walls, a highlight, bubbles and a foam band for soda. The stream is one ribbon through the drops in the air, joined when they left the spout close together in time (a slow honey pour stays a thin thread). The jug's liquid is a polygon level at any tilt. Splashes and loose drops still use `liquid.js`. On two-glass levels the arrows mark only the glass being filled.
+
+### Sound
+
+A looping noise through a band-pass filter, louder with the flow, while drops are in the air. Its pitch climbs with the glass's fill: 380 Hz empty, 1.6 octaves up at the line, and on up past it. The real rise from empty to this line would be about four semitones (air column 44 to 35 units), so it is exaggerated on purpose. Built with the kit's `sound({ setup })`. Not heard by a person.
+
+### Words
+
+All player-facing strings are in `words.js` (English and Turkish, through `kit/i18n.js`). The Turkish has not been read by a native speaker.
+
+### Checks changed on purpose
+
+- `bots.mjs`: `careful()` and the planner aim a pour rate instead of the old "tilt where juice runs" formula. The old clumsy bot and its checks ("late levels at least 0.25 below early levels"; `--sweep`: "careless bots under 50% on levels 5 to 8") were replaced by the frozen thumb and the owner's targets: level 1 at least 88%, levels 2 and 3 above 75%, no level under 35%, no level easier than the one after it (within 4 points on 200 seeds, 3 points on the 500-seed sweep), no step down over 20 points. The planner minimum (5 of 6) is unchanged. The sloppy-aim bot and its `--sweep` line were removed with the old careless checks; the frozen thumb covers careless play. New: conservation on a two-glass level; the stars check uses the page's own `starsFor` and needs 3 stars on the line, 1 at the band's edges and never fewer stars nearer the line.
+- `grid-check.mjs`: the old check compared the grid with the original sim's Git blob, which no longer applies. It now runs one relaxation pass through the grid and over every pair on 6,876 states from 129 runs (every level, two seeds, four thumbs, the mutation, odd states) and needs them equal to 1e-9; largest difference 2.8e-14. It first shows that it catches a 1e-6 difference. At 80 drops the grid is about as fast as every pair (14 against 12 ms for 4,000 passes); it is kept for bigger pours.
+- `check.mjs`: the scripted thumb slides to a steady pour; p95 frame work must be under 8 ms (was 16.67); a failed pour must show its card within 0.6 s and one tap off the card (on the dimmed scene) must restart it within 1 s; the Again button is used by the attempt loop; the page must reach the same end state as Node for a scripted pour on three levels.
+
+### Checked
+
+- `node bots.mjs`: 0 failed (planner 6/6 on every level). `node bots.mjs --mutate` (glass without a floor): 4 checks fail, exit 1, as it must. `node bots.mjs --sweep` (planner 64 seeds, thumb 500 seeds, held out): exit 0. Planner 64/64 on every level (seeds 4201 to 4264). Thumb on seeds 4201 to 4700 as in the table; lowest 41.8%, largest step down 13.4 points, no level easier than the one after it within 3 points. Levels 4 and 6 lose almost only by spill (126 and 185 spills, 1 and 2 overfills). The sweep ran on this `sim.js` and `thumb.mjs`; neither changed after it started.
+- `node grid-check.mjs`, `node daily.test.mjs`: pass. After merging main: `npm test` 73 pass, `npm run check:lane` 73 pass.
+- Saves: the save key and its shape (`v: 1`, stars per level, sound, tries) are unchanged, and there are still eight levels, so an old save loads and keeps its stars and unlocks. Stars earned on an old level now unlock the new level in the same slot.
+- `check.mjs` on WebKit (iPhone 13) and Chromium (Pixel 7): ok. Same digest in Node, WebKit and Chromium. Viewports 390 x 844 (WebKit) and 412 x 915 (Chromium, the Pixel 7 profile). Frame work p95 1 ms (WebKit timer step) and 0.3 ms (Chromium), whole loop: rules and canvas calls, not the browser's own painting. Failed pour: card 360 and 366 ms after the loss, restart 3 and 16 ms after one tap off the card (after merging main). Before the merge, with the Again button: 28 and 48 ms.
+- `kit/check/phone.mjs lab/wild-pour` and its hint run: ok on both.
+- Played in headless Playwright at 390 x 844 and looked at the screenshots (outside the repo, `/tmp/claude-improve-wild-pour/after/`): WebKit start, mid-pour, end card and pause card; Chromium mid-pour; levels 2, 4, 5, 6 and 7 mid-pour (`after/levels/`); a lost pour's card. Levels 3 and 8 were played by the scripts but not looked at.
+
+### Not verified
+
+A real phone (frame time, the tilt sensor, touch feel), the sound by ear, the Turkish wording, and difficulty for real people: the thumb bot is a model, not a person. Paint and compositing time are not in the frame numbers.
