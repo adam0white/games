@@ -6,6 +6,7 @@ Add one line per purchase, before or with the change that uses it. Cloudflare us
 
 | Date | What | Amount (USD) | Approved by | Change |
 |------|------|--------------|-------------|--------|
+| 2026-11-25 | Exile art: KayKit Adventurers and Medieval Hexagon packs (CC0, free download) | 0.00 | not needed (free) | experiments/exile build |
 
 ## Monthly totals
 
