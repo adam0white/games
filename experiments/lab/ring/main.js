@@ -1,5 +1,8 @@
-import { create, step, dropThread, dailySeed, stars, mulberry, DT, W as FW, H as FH, LX, LY, JAR, NIGHT, MAXC, FLY, MOTH, GOLD, LEVELS, REKINDLE } from './sim.js';
+import { create, step, dropThread, dailySeed, stars, mulberry, asleep, DT, W as FW, H as FH, LX, LY, JAR, NIGHT, NIGHTS, MAXC, FLY, MOTH, GOLD, THORN, NOTICE } from './sim.js';
 import { readJson, writeJson } from '../../kit/save.js';
+import { home } from '../../kit/home.js';
+import { shareImage } from '../../kit/share.js';
+import { feedback } from '../../kit/fx.js';
 import { sound } from '../../kit/audio.js';
 import { onLeave, isPauseKey } from '../../kit/pause.js';
 import { noZoom } from '../../kit/zoom.js';
@@ -19,7 +22,19 @@ const save = { v: 1, sound: true, nights: 0, dawns: 0, best: 0, bestRing: 0, end
 const persist = () => writeJson(KEY, save);
 const today = /^\d{4}-\d{2}-\d{2}$/.test(query.get('date') || '') ? query.get('date') : new Date().toISOString().slice(0, 10);
 const practiceLevel = Math.max(0, Math.min(NIGHT, Number(query.get('level')) | 0));
+// Nights 2 and 3 have their own key; ring:v1 keeps its shape. A player who already saw dawn on night 1 finds night 2 open.
+// save.best stays the best of night 1; best[1] and best[2] are the later nights.
+const NKEY = 'ring:nights', NIGHTN = NIGHTS.length, OPEN = 4;
+const nsaved = readJson(NKEY, null);
+const nights = { v: 1, open: save.dawns > 0 ? 2 : 1, pick: 0, best: [0, 0, 0], ...(nsaved && typeof nsaved === 'object' ? nsaved : {}) };
+nights.open = Math.max(1, Math.min(NIGHTN, nights.open | 0)); nights.pick = Math.max(0, Math.min(nights.open - 1, nights.pick | 0));
+if (!Array.isArray(nights.best)) nights.best = [0, 0, 0];
+const persistNights = () => writeJson(NKEY, nights);
+const practiceNight = Math.max(0, Math.min(NIGHTN, Number(query.get('night')) | 0)) - 1;
+// The page plays with fair moths (a moth hovers a moment before it chases) and relight (a full jar relights one wick).
+const RULES = { fair: true, relight: true };
 const snd = sound({ on: () => save.sound });
+const { fx, bump, log: fxLog } = feedback({ canSound: () => save.sound, size: 1000 });
 
 const COLOR = ['#ffa443', '#5fe3b0', '#ff7fc0', '#fff07a'];
 const CORE = ['#fff1d6', '#eafff6', '#ffeaf6', '#ffffff'];
@@ -83,21 +98,26 @@ function paintBack() {
 addEventListener('resize', layout); layout();
 
 // Runs
-let s = create(1, { start: 0 }), mode = 'menu', kind = 'night', scored = false, acc = 0, last = performance.now(), endAt = 0;
+let s = create(1, { start: 0 }), mode = 'menu', kind = 'night', night = 0, scored = false, acc = 0, last = performance.now(), endAt = 0, jarsSeen = 0;
 const finger = { id: -1, down: false, lift: false, x: 0, y: 0 };
 const show = screens(['menu', 'paused', 'end'], name => {
   $('pause').classList.toggle('on', name === 'play');
 });
 // Play recording for the game lab: one run is one night, today's meadow, an endless meadow or a practice jar.
-const rec = lab('ring');
+// Opened from the small games' home, the menu and end cards get the way back, and a finished run is reported there.
+const rec = home(lab('ring'), { back: ['#menu > div', '#end > div'] });
 let running = false;
-function recEnd(outcome, extra) { if (!running) return; running = false; rec.end(outcome, { kind, score: s.score, level: s.level + 1, cleared: s.cleared, bestRing: s.bestRing, ...extra }); }
+function recEnd(outcome, extra) { if (!running) return; running = false; rec.end(outcome, { kind, night: night + 1, score: s.score, level: s.level + 1, cleared: s.cleared, bestRing: s.bestRing, ...extra }); }
 function begin(k) {
   recEnd('quit');
   kind = k; snd.unlock();
+  night = k === 'night' ? nights.pick : k === 'practice' ? Math.max(0, practiceNight) : 0;
   const seed = k === 'daily' ? dailySeed(today) : (Math.random() * 4294967296) >>> 0;
-  if (k === 'practice') s = create(seed, { start: practiceLevel - 1, single: true });
-  else s = create(seed, { mode: k === 'endless' ? 'endless' : 'night' });
+  // Practice: ?level= plays one level, ?night= alone plays that whole night, open or not, without saving a score.
+  if (k === 'practice' && practiceLevel) s = create(seed, { ...RULES, night, start: practiceLevel - 1, single: true });
+  else if (k === 'practice') s = create(seed, { ...RULES, night });
+  else s = create(seed, { ...RULES, night, mode: k === 'endless' ? 'endless' : 'night' });
+  jarsSeen = 0;
   scored = k === 'daily' && !save.daily[today];
   if (scored) { save.daily[today] = { score: 0, fills: [], stars: 0, ring: 0 }; trimDaily(); persist(); }
   acc = 0; last = performance.now(); finger.down = false; finger.lift = false; finger.id = -1;
@@ -105,7 +125,7 @@ function begin(k) {
   for (let i = 0; i < NP; i++) pl[i] = 0;
   handle();
   mode = 'play'; show('play');
-  running = true; rec.start({ kind, level: s.level + 1, lang: lang() });
+  running = true; rec.start({ kind, night: night + 1, level: s.level + 1, lang: lang() });
 }
 function trimDaily() { const keys = Object.keys(save.daily).sort(); while (keys.length > 40) delete save.daily[keys.shift()]; }
 function pauseGame() {
@@ -115,7 +135,7 @@ function pauseGame() {
   show('paused');
 }
 function pauseText() {
-  $('pauseLine').textContent = kind === 'endless' ? t('pauseEndless', { score: num(s.score) }) : kind === 'practice' ? t('pausePractice', { n: num(s.level + 1) }) : t('pauseNight', { n: num(s.level + 1), total: num(NIGHT), score: num(s.score) });
+  $('pauseLine').textContent = kind === 'endless' ? t('pauseEndless', { score: num(s.score) }) : kind === 'practice' ? t('pausePractice', { n: num(s.level + 1) }) : night ? t('pauseNightN', { night: num(night + 1), n: num(s.level + 1), total: num(NIGHT), score: num(s.score) }) : t('pauseNight', { n: num(s.level + 1), total: num(NIGHT), score: num(s.score) });
 }
 function resume() { if (mode !== 'paused') return; snd.release(); mode = 'play'; last = performance.now(); acc = 0; show('play'); }
 function toMenu() { recEnd('quit'); snd.release(); mode = 'menu'; menuText(); show('menu'); }
@@ -127,7 +147,16 @@ $('restart').addEventListener('click', () => { snd.release(); begin(kind === 'da
 $('toMenu').addEventListener('click', toMenu);
 $('endMenu').addEventListener('click', toMenu);
 $('again').addEventListener('click', () => begin(kind === 'daily' ? 'night' : kind));
-$('play').addEventListener('click', () => begin(practiceLevel ? 'practice' : 'night'));
+const practising = practiceLevel > 0 || practiceNight >= 0;
+$('play').addEventListener('click', () => begin(practising ? 'practice' : 'night'));
+function pickNight(d) {
+  const to = Math.max(0, Math.min(nights.open - 1, nights.pick + d));
+  if (to === nights.pick) { fx('nightEdge', () => snd.tone(180, 0.08, 0.04, 'sine'), () => bump('#nightName')); return; }
+  nights.pick = to; persistNights(); menuText();
+  fx('night', () => snd.tone(523.25 + 130 * to, 0.12, 0.04, 'triangle'), () => bump('#nightName'));
+}
+$('nightPrev').addEventListener('click', () => pickNight(-1));
+$('nightNext').addEventListener('click', () => pickNight(1));
 $('daily').addEventListener('click', () => begin('daily'));
 $('endless').addEventListener('click', () => { if (save.endless) begin('endless'); });
 for (const id of ['sound', 'sound2']) $(id).addEventListener('click', () => { save.sound = !save.sound; persist(); soundText(); if (save.sound) snd.unlock(); });
@@ -149,8 +178,15 @@ function menuText() {
   $('dailyNote').textContent = d ? t('dailyDone', { n: num(d.score) }) : t('dailyNew');
   $('endless').disabled = !save.endless;
   $('endlessNote').textContent = save.endless ? (save.endlessBest ? t('endlessBest', { n: num(save.endlessBest) }) : t('endlessOpen')) : t('endlessLocked');
-  $('best').textContent = save.best ? t('best', { n: num(save.best), ring: num(save.bestRing) }) : '';
-  $('play').textContent = practiceLevel ? t('practise', { n: num(practiceLevel) }) : t('play');
+  const pick = nights.pick, best = pick ? nights.best[pick] : save.best;
+  $('best').textContent = best ? t(pick ? 'bestN' : 'best', { night: num(pick + 1), n: num(best), ring: num(save.bestRing) }) : '';
+  $('play').textContent = practiceLevel ? t('practise', { n: num(practiceLevel) }) : practiceNight >= 0 ? t('practiseNight', { n: num(practiceNight + 1) }) : pick ? t('playNight', { n: num(pick + 1) }) : t('play');
+  // The chooser shows once a second night is open; before that, one quiet line says how to open it.
+  const many = nights.open > 1 && !practising;
+  $('nights').hidden = !many;
+  $('nightName').textContent = t('nightOf', { n: num(pick + 1), open: num(nights.open) });
+  $('nightPrev').disabled = pick === 0; $('nightNext').disabled = pick >= nights.open - 1;
+  $('nightNote').textContent = practising || nights.open >= NIGHTN ? '' : t('nightLocked', { n: num(nights.open + 1), k: num(OPEN) });
 }
 allText();
 
@@ -162,12 +198,17 @@ canvas.addEventListener('pointerdown', e => {
   try { canvas.setPointerCapture(e.pointerId); } catch {}
   finger.id = e.pointerId; finger.down = true; finger.lift = false; finger.x = e.clientX; finger.y = e.clientY;
   snd.unlock();
+  // Pen down: a soft spark. While the lamp rekindles after a ring the thread cannot start, and a dull tick says so.
+  if (s.rekindle > 0) fx('rekindleWait', () => snd.tone(150, 0.08, 0.04, 'sine'), () => burst(e.clientX, e.clientY, 3, 5, 25, 0.3));
+  else fx('penDown', () => snd.tone(880, 0.05, 0.015, 'sine'), () => burst(e.clientX, e.clientY, 4, 4, 35, 0.35));
 });
 canvas.addEventListener('pointermove', e => { if (e.pointerId === finger.id && finger.down && !finger.lift) { finger.x = e.clientX; finger.y = e.clientY; } });
 const up = e => { if (e.pointerId === finger.id && finger.down) { finger.x = e.clientX; finger.y = e.clientY; finger.lift = true; } };
 canvas.addEventListener('pointerup', up);
 canvas.addEventListener('pointercancel', e => { if (e.pointerId === finger.id) { finger.down = false; finger.lift = false; finger.id = -1; dropThread(s); } });
 
+// Every button answers with a click and a small bump.
+document.addEventListener('click', e => { const b = e.target.closest?.('button'); if (b) fx('button', () => snd.tone(1250, 0.025, 0.025, 'square'), () => bump(b)); }, true);
 hint(canvas, { kind: 'hold-and-move', key: 'ring:hint', when: () => mode === 'play' && s.phase === 'play', played, label: t('hintLabel') });
 allText();
 
@@ -193,51 +234,74 @@ let threadCopyN = 0;
 function handle() {
   for (const e of s.ev) {
     if (e.type === 'level') {
-      banner = calm ? 1.6 : 2.2;
-      bannerTitle = kind === 'endless' ? (e.round ? ['round', { n: e.round + 1 }] : ['endless']) : ['level', { n: e.level + 1 }];
-      bannerTip = kind === 'endless' && e.round ? ['freshJars'] : ['tip' + e.level];
+      banner = calm ? 1.6 : 2.2; jarsSeen = 0;
+      bannerTitle = kind === 'endless' ? (e.round ? ['round', { n: e.round + 1 }] : ['endless']) : night ? ['levelNight', { night: num(night + 1), n: num(e.level + 1) }] : ['level', { n: e.level + 1 }];
+      bannerTip = kind === 'endless' && e.round ? ['freshJars'] : night ? ['idea_' + s.def.idea] : ['tip' + e.level];
+      fx('level', () => { snd.tone(392, 0.3, 0.03, 'sine'); setTimeout(() => snd.tone(587.33, 0.4, 0.03, 'sine'), 140); }, () => { flare = Math.max(flare, 0.6); });
     } else if (e.type === 'ring') {
-      effects.push({ type: 'ring', poly: e.poly, caught: e.caught, n: e.n, col: e.color, x: e.x, y: e.y, t: 0, dur: calm ? 0.55 : 0.95 });
-      pops.push({ x: e.x, y: e.y, t: 0, text: `+${num(e.points)}` });
-      chime(e.n);
+      fx(e.called ? 'ringCalled' : 'ring', () => { chime(e.n); if (e.gold) setTimeout(() => chime(9), 200); if (e.called) setTimeout(() => snd.tone(1760, 0.25, 0.03, 'triangle'), 260); }, () => {
+        effects.push({ type: 'ring', poly: e.poly, caught: e.caught, n: e.n, col: e.color, x: e.x, y: e.y, t: 0, dur: calm ? 0.55 : 0.95 });
+        pops.push({ x: e.x, y: e.y, t: 0, text: `+${num(e.points)}${e.called ? ' ×2' : ''}` });
+      });
       if (e.n > save.bestRing) { save.bestRing = e.n; persist(); }
-      if (e.gold) { setTimeout(() => chime(9), 200); }
     } else if (e.type === 'mixed') {
-      effects.push({ type: 'mixed', poly: e.poly, x: e.x, y: e.y, t: 0, dur: 0.75 });
-      snd.tone(110, 0.28, 0.16, 'triangle', -50); snd.noise(0.18, 0.22, 260);
-      if (!calm) shake = Math.max(shake, 5);
+      fx('mixed', () => { snd.tone(110, 0.28, 0.16, 'triangle', -50); snd.noise(0.18, 0.22, 260); }, () => {
+        effects.push({ type: 'mixed', poly: e.poly, x: e.x, y: e.y, t: 0, dur: 0.75 });
+        if (!calm) shake = Math.max(shake, 5);
+      });
     } else if (e.type === 'moths') {
-      effects.push({ type: 'moths', poly: e.poly, x: e.x, y: e.y, t: 0, dur: 0.6 });
-      pops.push({ x: e.x, y: e.y, t: 0, text: `+${num(e.points)}` });
-      snd.tone(330, 0.25, 0.05, 'sine', 80);
+      fx('moths', () => snd.tone(330, 0.25, 0.05, 'sine', 80), () => {
+        effects.push({ type: 'moths', poly: e.poly, x: e.x, y: e.y, t: 0, dur: 0.6 });
+        pops.push({ x: e.x, y: e.y, t: 0, text: `+${num(e.points)}` });
+      });
     } else if (e.type === 'empty') {
-      effects.push({ type: 'empty', poly: e.poly, x: e.x, y: e.y, t: 0, dur: 0.4 });
-      snd.tone(260, 0.12, 0.03, 'sine');
+      fx('empty', () => snd.tone(260, 0.12, 0.03, 'sine'), () => effects.push({ type: 'empty', poly: e.poly, x: e.x, y: e.y, t: 0, dur: 0.4 }));
     } else if (e.type === 'snap') {
-      for (let k = 0; k < threadCopyN; k += 6) burst(threadCopy[k], threadCopy[k + 1], 2, 4, 40, 0.6);
-      burst(ox + e.x * sc, oy + e.y * sc, 14, 5, 90, 0.7);
-      snd.noise(0.1, 0.25, 2600); snd.tone(420, 0.22, 0.08, 'sawtooth', -300);
-      if (!calm) shake = 9;
-      navigator.vibrate?.(60);
+      fx('snap', () => { snd.noise(0.1, 0.25, 2600); snd.tone(420, 0.22, 0.08, 'sawtooth', -300); }, () => {
+        for (let k = 0; k < threadCopyN; k += 6) burst(threadCopy[k], threadCopy[k + 1], 2, 4, 40, 0.6);
+        burst(ox + e.x * sc, oy + e.y * sc, 14, 5, 90, 0.7);
+        if (!calm) shake = 9;
+        navigator.vibrate?.(60);
+      });
+    } else if (e.type === 'thorn') {
+      // A thorn cuts the thread like a moth would, but costs no wick: a dry snap, no shake.
+      fx('thorn', () => { snd.noise(0.06, 0.12, 4200); snd.tone(300, 0.12, 0.05, 'triangle', -120); }, () => {
+        for (let k = 0; k < threadCopyN; k += 8) burst(threadCopy[k], threadCopy[k + 1], 1, 4, 30, 0.4);
+        effects.push({ type: 'thorn', x: e.x, y: e.y, t: 0, dur: 0.5 });
+      });
     } else if (e.type === 'eat') {
-      burst(ox + e.x * sc, oy + e.y * sc, 10, e.color, 70, 0.5);
-      snd.tone(180, 0.1, 0.06, 'square', -80);
-    } else if (e.type === 'bat') { snd.tone(1900, 0.05, 0.025, 'sine'); setTimeout(() => snd.tone(2100, 0.05, 0.025, 'sine'), 120); }
-    else if (e.type === 'gust') snd.noise(0.8, 0.05, 500);
-    else if (e.type === 'golden') { snd.tone(1568, 0.4, 0.03, 'sine'); setTimeout(() => snd.tone(2093, 0.5, 0.03, 'sine'), 110); }
+      fx('eat', () => snd.tone(180, 0.1, 0.06, 'square', -80), () => burst(ox + e.x * sc, oy + e.y * sc, 10, e.color, 70, 0.5));
+    } else if (e.type === 'fade') {
+      fx('fade', () => snd.tone(PENTA[2 + e.color], 0.3, 0.012, 'sine', -60), () => burst(ox + e.x * sc, oy + e.y * sc, 5, e.color, 25, 0.8));
+    } else if (e.type === 'bat') fx('bat', () => { snd.tone(1900, 0.05, 0.025, 'sine'); setTimeout(() => snd.tone(2100, 0.05, 0.025, 'sine'), 120); });
+    else if (e.type === 'gust') fx('gust', () => snd.noise(0.8, 0.05, 500));
+    else if (e.type === 'moth') fx('moth', () => snd.tone(140, 0.35, 0.03, 'sine', 30));
+    else if (e.type === 'golden') fx('golden', () => { snd.tone(1568, 0.4, 0.03, 'sine'); setTimeout(() => snd.tone(2093, 0.5, 0.03, 'sine'), 110); });
+    else if (e.type === 'call') fx('call', () => snd.tone(PENTA[4 + e.color], 0.35, 0.04, 'triangle'), () => { callPulse = 1; });
+    else if (e.type === 'relight') fx('relight', () => { snd.tone(784, 0.3, 0.04, 'triangle'); setTimeout(() => snd.tone(1175, 0.35, 0.04, 'triangle'), 120); }, () => { relightPulse = 1; pops.push({ x: 60, y: 30, t: -0.2, text: t('relight') }); });
     else if (e.type === 'end' || e.type === 'full') {
-      if (e.full !== false) { for (let k = 0; k < 3; k++) setTimeout(() => snd.tone(1318.5 + k * 260, 0.35, 0.04, 'triangle'), k * 90); }
-      else snd.tone(196, 0.5, 0.06, 'sine', -40);
-      if (e.bonus) pops.push({ x: LX, y: 70, t: -0.3, text: t('dawnBonus', { n: num(e.bonus) }) });
-    } else if (e.type === 'over') { mode = 'ending'; endAt = performance.now() + 1400; show('ending'); }
+      fx(e.full !== false ? 'levelFull' : 'levelShort', () => {
+        if (e.full !== false) { for (let k = 0; k < 3; k++) setTimeout(() => snd.tone(1318.5 + k * 260, 0.35, 0.04, 'triangle'), k * 90); }
+        else snd.tone(196, 0.5, 0.06, 'sine', -40);
+      }, () => { if (e.bonus) pops.push({ x: LX, y: 70, t: -0.3, text: t('dawnBonus', { n: num(e.bonus) }) }); });
+    } else if (e.type === 'over') fx('over', null, () => { mode = 'ending'; endAt = performance.now() + 1400; show('ending'); });
   }
 }
+let callPulse = 0, relightPulse = 0;
 function tick() {
   const hx = finger.down ? toFieldX(finger.x) : NaN, hy = finger.down ? toFieldY(finger.y) : NaN;
   step(s, hx, hy);
   if (finger.lift) { finger.down = false; finger.lift = false; finger.id = -1; }
   handle();
+  // A jar that fills, and a moth that has just noticed the thread, have no sim event: they are read off the state.
+  const jars = Math.floor(s.light / JAR);
+  if (s.phase === 'play' && jars > jarsSeen) fx('jar', () => snd.tone(PENTA[Math.min(PENTA.length - 1, 3 + jars)], 0.22, 0.035, 'triangle'), () => { jarPulse = 1; });
+  jarsSeen = s.phase === 'play' ? Math.max(jarsSeen, jars) : 0;
+  if (s.opts.fair) for (let i = 0; i < MAXC; i++) if (s.kind[i] === MOTH && s.notice[i] === 1) {
+    fx('mothNotice', () => { snd.tone(660, 0.07, 0.03, 'square'); setTimeout(() => snd.tone(520, 0.1, 0.03, 'square'), 80); }, () => effects.push({ type: 'notice', i, t: 0, dur: NOTICE / 60 }));
+  }
 }
+let jarPulse = 0;
 
 // The end card and its picture.
 let picture = null;
@@ -274,10 +338,14 @@ function finish() {
     top = t('endless'); title = s.round ? t(s.round === 1 ? 'rounds1' : 'roundsN', { n: num(s.round) }) : t('dawnCame');
     const better = s.score > save.endlessBest; if (better) save.endlessBest = s.score;
     lines.push(better ? t('newBestDevice') : t('bestDevice', { n: num(save.endlessBest) }));
-  } else if (kind === 'practice') {
+  } else if (kind === 'practice' && practiceLevel) {
     top = t('pausePractice', { n: num(s.level + 1) }); title = t(s.cleared ? 'jarsFull' : 'dawnFirst');
     lines.push(t('practiceNote'));
+  } else if (kind === 'practice') {
+    top = t('nightName', { n: num(night + 1) });
+    lines.push(t('levelsFull', { n: num(s.cleared), total: num(NIGHT) }), t('practiceNote'));
   } else {
+    if (night) top = `${t('nightName', { n: num(night + 1) })} · ${top}`;
     lines.push(t('levelsFull', { n: num(s.cleared), total: num(NIGHT) }));
     save.nights++;
     if (!wicks) { save.dawns++; if (!save.endless) { save.endless = true; lines.push(t('endlessOpened')); } }
@@ -285,15 +353,26 @@ function finish() {
       top = t('dailyTop', { date: dateLabel(today) });
       if (scored) { save.daily[today] = { score: s.score, fills: fills.map(f => Math.round(f * 100) / 100), stars: st, ring: s.bestRing }; lines.push(t('scoredRun')); }
       else lines.push(t('practiceDaily', { n: num(save.daily[today]?.score ?? 0) }));
-    } else if (s.score > save.best) { save.best = s.score; lines.push(t('newBestNight')); }
+    } else if (night === 0 && s.score > save.best) { save.best = s.score; lines.push(t('newBestNight')); }
+    else if (night > 0 && s.score > (nights.best[night] || 0)) { nights.best[night] = s.score; lines.push(t('newBestNight')); }
+    // The next night opens when this one ends, by dawn or by wicks, with OPEN levels or more full.
+    if (kind === 'night' && s.cleared >= OPEN && night + 1 === nights.open && nights.open < NIGHTN) {
+      nights.open++; nights.pick = night + 1; lines.push(t('nightOpened', { n: num(nights.open) }));
+      if (running) rec.event('night-opened', { night: nights.open });
+      fx('nightOpened', () => [523.25, 659.25, 783.99, 1046.5].forEach((f, k) => setTimeout(() => snd.tone(f, 0.4, 0.035, 'triangle'), 500 + k * 110)), () => bump('#endLine'));
+    }
+    persistNights();
   }
   if (s.bestRing > save.bestRing) save.bestRing = s.bestRing;
   persist();
   if (running) {
-    rec.event('dawn', { kind, stars: st, cleared: s.cleared, wicks });
+    rec.event('dawn', { kind, night: night + 1, stars: st, cleared: s.cleared, wicks });
     if (kind === 'daily') rec.event('daily-finished', { scored, stars: st });
-    recEnd(wicks ? 'lost' : 'won', { stars: st, round: s.round || 0 });
+    // A night is won by reaching dawn with a wick lit; one practice level only by filling its jars (the home counts 'won' as a win).
+    const won = kind === 'practice' && practiceLevel ? s.cleared > 0 : !wicks;
+    recEnd(won ? 'won' : 'lost', { stars: st, round: s.round || 0 });
   }
+  shareText = t('shareLine', { title: t('title'), top, score: num(s.score), ring: num(s.bestRing) }) + (kind === 'night' || kind === 'daily' ? ' ' + '★'.repeat(st) + '☆'.repeat(3 - st) : '');
   $('endTop').textContent = top; $('endTitle').textContent = title; $('endLine').textContent = lines.join(' ');
   $('total').textContent = num(s.score); $('bestRing').textContent = num(s.bestRing);
   const showJars = kind !== 'endless';
@@ -304,11 +383,17 @@ function finish() {
   if (kind === 'practice') jarRow(jc, jr.width / 2 - 40, 14, 80, [fills[s.level]], 1);
   else jarRow(jc, 0, 14, jr.width, fills, NIGHT);
   $('saveNote').textContent = '';
-  makePicture(top, title, fills, st);
+  // The picture is drawn and encoded after the card is up, each in its own task, never in the frame that ended the night:
+  // in that frame it cost 31 ms on WebKit and 23 ms on Chromium.
+  picture = null; picCanvas = null;
+  const ask = ++picAsk;
+  picLater = () => makePicture(top, title, fills, st, ask);
+  setTimeout(() => { if (ask === picAsk && mode === 'end' && !picCanvas) picLater(); }, 300);
   show('end');
 }
-function makePicture(top, title, fills, st) {
-  picture = null;
+let picAsk = 0, shareText = '', picLater = null, picCanvas = null;
+function makePicture(top, title, fills, st, ask) {
+  if (ask !== picAsk) return null;
   const c = document.createElement('canvas'); c.width = 720; c.height = 420;
   const x = c.getContext('2d'), bg = x.createLinearGradient(0, 0, 0, 420);
   bg.addColorStop(0, '#05070f'); bg.addColorStop(1, '#0d2219'); x.fillStyle = bg; x.fillRect(0, 0, 720, 420);
@@ -320,19 +405,20 @@ function makePicture(top, title, fills, st) {
   x.fillStyle = '#ffd27a'; x.font = '40px Georgia, serif';
   if (kind === 'night' || kind === 'daily') x.fillText('★'.repeat(st) + '☆'.repeat(3 - st), 360, 300);
   x.fillStyle = '#f3e6cf'; x.font = '26px Georgia, serif'; x.fillText(t('picScore', { score: num(s.score), ring: num(s.bestRing) }), 360, 360);
-  try { c.toBlob(b => { picture = b; }, 'image/png'); } catch {}
+  picCanvas = c;
+  setTimeout(() => { try { c.toBlob(b => { if (ask === picAsk) picture = b; }, 'image/png'); } catch {} }, 0);
+  return c;
 }
+// kit/share.js: the share sheet with the picture and a line of words where the phone can, else a download.
 $('savePic').addEventListener('click', async () => {
-  if (!picture) { $('saveNote').textContent = t('picNotReady'); return; }
-  const name = t('imageName', { name: kind === 'daily' ? today : 'night' });
-  try {
-    const file = new File([picture], name, { type: 'image/png' });
-    if (navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file], title: t('title') }); $('saveNote').textContent = t('shared'); return; }
-  } catch (err) { if (err?.name === 'AbortError') return; }
-  const url = URL.createObjectURL(picture), a = document.createElement('a');
-  a.href = url; a.download = name; document.body.append(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 4000);
-  $('saveNote').textContent = t('saved');
+  // A tap before the picture is ready draws it now and shares the canvas (kit/share.js encodes it).
+  const source = picture || picCanvas || picLater?.();
+  if (!source) { $('saveNote').textContent = t('picNotReady'); return; }
+  const name = t('imageName', { name: kind === 'daily' ? today : night ? `night-${night + 1}` : 'night' });
+  const how = await shareImage(source, { name, text: `${shareText}\n${location.origin}${location.pathname}` });
+  if (how === 'shared') $('saveNote').textContent = t('shared');
+  else if (how === 'saved') $('saveNote').textContent = t('saved');
+  else if (how === 'failed') $('saveNote').textContent = t('picNotReady');
 });
 
 // Drawing.
@@ -386,7 +472,7 @@ function drawThread(t) {
   }
   g.globalAlpha = 1;
   if (finger.down && s.phase === 'play') {
-    const dim = s.rekindle > 0 ? 0.35 + 0.3 * (1 - s.rekindle / REKINDLE) : 1, R = 15 + 2 * Math.sin(t * 12);
+    const dim = s.rekindle > 0 ? 0.35 + 0.3 * (1 - s.rekindle / s.def.rekindle) : 1, R = 15 + 2 * Math.sin(t * 12);
     g.globalCompositeOperation = 'lighter'; g.globalAlpha = dim;
     g.drawImage(headSprite, finger.x - R, finger.y - R, 2 * R, 2 * R);
     g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
@@ -396,17 +482,43 @@ function drawThread(t) {
     }
   }
 }
+const life = { span: 0, big: 0, sleep: false };
+function drawThorns() {
+  const th = s.def.thorn;
+  if (!th || !th.length) return;
+  const r = THORN * sc;
+  for (let m = 0; m < th.length; m += 2) {
+    const x = X(th[m]), y = Y(th[m + 1]);
+    g.fillStyle = '#1b130e'; g.beginPath(); g.arc(x, y, r * 0.7, 0, 6.283); g.fill();
+    g.strokeStyle = '#8a5a44'; g.lineWidth = 1.6; g.beginPath();
+    for (let q = 0; q < 8; q++) { const a = q * 0.785 + m; g.moveTo(x + Math.cos(a) * r * 0.5, y + Math.sin(a) * r * 0.5); g.lineTo(x + Math.cos(a) * r * 1.15, y + Math.sin(a) * r * 1.15); }
+    g.stroke();
+  }
+}
 function drawCreatures(t) {
   const near = finger.down && s.phase === 'play';
+  life.span = s.def.life ? s.def.life * 60 : 0; life.big = s.def.big; life.sleep = s.def.sleep;
   g.globalCompositeOperation = 'lighter';
   for (let i = 0; i < MAXC; i++) {
     const k = s.kind[i];
     if (k !== FLY && k !== GOLD) continue;
-    const x = X(s.x[i]), y = Y(s.y[i]), b = brightness(k, s.col[i], s.blink[i]), fade = Math.min(1, s.age[i] / 40);
-    const R = (k === GOLD ? 20 : 12) * (0.75 + 0.35 * b) * Math.max(0.8, sc);
-    g.globalAlpha = (0.35 + 0.65 * b) * fade;
+    const x = X(s.x[i]), y = Y(s.y[i]), sleeping = life.sleep && asleep(s, i), b = sleeping ? 0 : brightness(k, s.col[i], s.blink[i]);
+    // Fading in over 40 steps; with a life span, fading out over the last second of it.
+    let fade = Math.min(1, s.age[i] / 40);
+    if (life.span && k === FLY) fade = Math.min(fade, Math.max(0.15, (life.span - s.age[i]) / 60));
+    const R = (k === GOLD ? 20 : s.heavy[i] ? 19 : 12) * (0.75 + 0.35 * b) * Math.max(0.8, sc);
+    g.globalAlpha = (sleeping ? 0.16 : 0.35 + 0.65 * b) * fade;
     g.drawImage(sprites[k === GOLD ? 3 : s.col[i]], x - R, y - R, 2 * R, 2 * R);
   }
+  g.globalCompositeOperation = 'source-over';
+  // Big fireflies wear a second, thin ring; sleepers a small closed eye.
+  if (life.big || life.sleep) for (let i = 0; i < MAXC; i++) {
+    if (s.kind[i] !== FLY) continue;
+    const x = X(s.x[i]), y = Y(s.y[i]);
+    if (s.heavy[i]) { g.strokeStyle = COLOR[s.col[i]]; g.globalAlpha = 0.55; g.lineWidth = 1.3; g.beginPath(); g.arc(x, y, 15 * Math.max(0.8, sc), 0, 6.283); g.stroke(); }
+    if (life.sleep && asleep(s, i)) { g.strokeStyle = '#cfc6b8'; g.globalAlpha = 0.5; g.lineWidth = 1.2; g.beginPath(); g.arc(x, y - 2, 3.5, 0.3, 2.84); g.stroke(); }
+  }
+  g.globalAlpha = 1;
   g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
   for (let i = 0; i < MAXC; i++) {
     const k = s.kind[i];
@@ -471,6 +583,18 @@ function drawEffects(dt) {
     const a = e.t / e.dur;
     if (a >= 1) { if (e.type === 'ring') { flare = 1; burst(X(LX), Y(LY), 8, e.col, 60, 0.6); } effects.splice(i, 1); continue; }
     g.lineJoin = 'round';
+    if (e.type === 'notice') {
+      // A moth has seen the thread: a red ring closes on it while it hovers, before it chases.
+      if (s.kind[e.i] !== MOTH) { effects.splice(i, 1); continue; }
+      const x = X(s.x[e.i]), y = Y(s.y[e.i]), r = (calm ? 16 : 30 - 16 * a) * Math.max(0.8, sc);
+      g.strokeStyle = '#ff6a5a'; g.globalAlpha = 0.85 - 0.4 * a; g.lineWidth = 2; g.beginPath(); g.arc(x, y, r, 0, 6.283); g.stroke();
+      g.globalAlpha = 1; continue;
+    }
+    if (e.type === 'thorn') {
+      const r = THORN * sc * (1 + (calm ? 0.3 : a * 1.2));
+      g.strokeStyle = '#ffb09a'; g.globalAlpha = 1 - a; g.lineWidth = 2; g.beginPath(); g.arc(X(e.x), Y(e.y), r, 0, 6.283); g.stroke();
+      g.globalAlpha = 1; continue;
+    }
     if (e.type === 'ring') {
       const flash = calm ? 1 - a : Math.max(0, 1 - a / 0.2), k = calm ? 0 : ease((a - 0.18) / 0.82);
       polyPath(e.poly, k, lx, ly);
@@ -530,13 +654,22 @@ function drawHud(t) {
       g.fillStyle = '#fff3c4'; g.beginPath(); g.ellipse(x, y + 5, 1.4, 2.8, 0, 0, 6.283); g.fill();
     }
   }
+  if (relightPulse > 0) { g.globalCompositeOperation = 'lighter'; g.globalAlpha = relightPulse; g.drawImage(glowSprite, 32 - 40, cy - 30, 80, 80); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; }
   g.fillStyle = '#f3e6cfcc'; g.font = '14px Georgia, serif'; g.textAlign = 'left';
   g.fillText(scoreText, 9, cy + 44);
+  // The called colour, worth double, under the score.
+  if (s.def.call && s.phase === 'play') {
+    const r = 6 + 3 * callPulse, x = 14, y = cy + 60;
+    g.globalCompositeOperation = 'lighter'; g.globalAlpha = 0.9; g.drawImage(sprites[s.call], x - r * 2, y - r * 2, r * 4, r * 4); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
+    g.fillStyle = '#ffe6bd'; g.fillText('×2', x + 12, y + 5);
+  }
   const jars = Math.round(s.target / JAR), left = 64, right = VW - 60, span = right - left;
   const gap = Math.min(40, span / jars), w = Math.min(26, gap * 0.7), h = w * 1.3, x0 = (VW - gap * jars) / 2;
   for (let k = 0; k < jars; k++) {
     const f = Math.max(0, Math.min(1, (s.light - k * JAR) / JAR));
-    drawJar(g, x0 + gap * k + (gap - w) / 2, cy, w, h, f, f >= 1 ? 1 : 0.4 + 0.2 * Math.sin(t * 3));
+    const jx = x0 + gap * k + (gap - w) / 2;
+    drawJar(g, jx, cy, w, h, f, f >= 1 ? 1 : 0.4 + 0.2 * Math.sin(t * 3));
+    if (jarPulse > 0 && k === jarsSeen - 1) { g.globalCompositeOperation = 'lighter'; g.globalAlpha = jarPulse * 0.8; g.drawImage(glowSprite, jx + w / 2 - 30, cy + h / 2 - 30, 60, 60); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; }
   }
   const by = cy + h + 7, bw = Math.max(gap * jars, 150), bx = (VW - bw) / 2, frac = Math.max(0, s.dawn / s.dawnMax);
   g.fillStyle = '#ffffff16'; g.fillRect(bx, by, bw, 4);
@@ -548,8 +681,10 @@ function drawBanner(dt) {
   banner -= dt;
   const a = Math.min(1, banner / 0.5, (2.2 - banner) / 0.3 + (calm ? 1 : 0));
   g.globalAlpha = Math.max(0, a); g.textAlign = 'center';
-  g.fillStyle = '#ffd9a0'; g.font = '34px Georgia, serif'; g.fillText(t(...bannerTitle), VW / 2, Y(150));
-  g.fillStyle = '#f3e6cf'; g.font = '18px Georgia, serif'; g.fillText(t(...bannerTip), VW / 2, Y(150) + 32);
+  // Each line shrinks to fit the screen: the longest Turkish tips are wider than a 320 px phone at full size.
+  const fit = (text, px, y) => { g.font = `${px}px Georgia, serif`; const w = g.measureText(text).width, room = VW - 24; if (w > room) g.font = `${Math.floor(px * room / w)}px Georgia, serif`; g.fillText(text, VW / 2, y); };
+  g.fillStyle = '#ffd9a0'; fit(t(...bannerTitle), 34, Y(150));
+  g.fillStyle = '#f3e6cf'; fit(t(...bannerTip), 18, Y(150) + 32);
   g.globalAlpha = 1;
 }
 function render(t, dt) {
@@ -561,8 +696,9 @@ function render(t, dt) {
   let sx = 0, sy = 0;
   if (shake > 0) { sx = (Math.random() - 0.5) * shake; sy = (Math.random() - 0.5) * shake; shake = Math.max(0, shake - dt * 40); }
   g.setTransform(dpr, 0, 0, dpr, sx * dpr, sy * dpr);
-  flare = Math.max(0, flare - dt * 2);
+  flare = Math.max(0, flare - dt * 2); callPulse = Math.max(0, callPulse - dt * 1.5); relightPulse = Math.max(0, relightPulse - dt * 0.8); jarPulse = Math.max(0, jarPulse - dt * 2);
   drawLantern(t);
+  drawThorns();
   drawWind(dt);
   drawCreatures(t);
   drawEffects(dt);
@@ -617,13 +753,21 @@ window.__ring = Object.freeze({
   get effects() { return effects.length; },
   get bestRing() { return s.bestRing; },
   get counts() { return { ...s.counts }; },
+  get night() { return night; },
+  get idea() { return s.def?.idea || ''; },
+  get rules() { return { fair: !!s.opts.fair, relight: !!s.opts.relight }; },
+  get fx() { return fxLog(); },
+  get picture() { return !!picture; },
+  get shareText() { return shareText; },
   map() { return { ox, oy, sc, width: FW, height: FH }; },
+  thorns() { return Array.from(s.def?.thorn || [], (v, k) => k % 2 ? Y(v) : X(v)); },
   creatures() {
     const out = [];
-    for (let i = 0; i < MAXC; i++) if (s.kind[i]) out.push({ i, kind: KINDS[s.kind[i]], col: s.col[i], x: X(s.x[i]), y: Y(s.y[i]), scared: s.scare[i] > 0 });
+    for (let i = 0; i < MAXC; i++) if (s.kind[i]) out.push({ i, kind: KINDS[s.kind[i]], col: s.col[i], x: X(s.x[i]), y: Y(s.y[i]), scared: s.scare[i] > 0, noticing: s.kind[i] === MOTH && s.notice[i] > 0 && s.notice[i] <= NOTICE, big: !!s.heavy[i], asleep: asleep(s, i) });
     return out;
   },
   save() { return readJson(KEY, null); },
+  nights() { return readJson(NKEY, null); },
 });
 
 // The notice is on the menu card, seen before Play; the switch is on the pause card.

@@ -1,5 +1,6 @@
-import { create, clone, legal, apply, xy, target, bounces, botTurn, daily, mulberry32, hashString, snapshot, DX, DY } from './sim.js';
-import { t, lang, apply as applyWords, setLang, levelName, dateLabel } from './words.js';
+import { create, clone, legal, apply, xy, target, bounces, botTurn, daily, mulberry32, hashString, snapshot, DX, DY, rungTurn, RUNGS, rungOfLevel, levelOfRung, fromMoves, solve } from './sim.js';
+import { t, lang, apply as applyWords, setLang, dateLabel, rungName } from './words.js';
+import { PUZZLES } from './puzzles.js';
 import { readJson, writeJson } from '../../kit/save.js';
 import { sound } from '../../kit/audio.js';
 import { onLeave, isPauseKey } from '../../kit/pause.js';
@@ -7,7 +8,9 @@ import { noZoom } from '../../kit/zoom.js';
 import { screens } from '../../kit/screens.js';
 import { hint } from '../../kit/hint.js';
 import { lab } from '../../kit/lab.js';
+import { home, backLink } from '../../kit/home.js';
 import { table, newCode, cleanCode, linkFor, codeFromLink, share } from '../../kit/room.js';
+import { shareImage } from '../../kit/share.js';
 
 noZoom();
 const KEY = 'pitch:v1';
@@ -18,8 +21,13 @@ const canvas = $('c'), ctx = canvas.getContext('2d');
 const loaded = readJson(KEY, null);
 const save = Object.assign({ played: 0, level: 0, lossStreak: 0, wins: 0, sound: true, daily: {}, name: '' }, loaded || {});
 const store = () => writeJson(KEY, save);
+// New state since 2026-11-24, under its own key so the old save keeps its format: the ladder rung (0 to 7) and the
+// puzzle book ({ <id>: { tries, solved } }). A player with an old save starts on the rung of their old level.
+const MORE = 'pitch:more';
+const more = Object.assign({ rung: rungOfLevel(save.level), book: {} }, readJson(MORE, null) || {});
+const storeMore = () => writeJson(MORE, more);
 const snd = sound({ on: () => save.sound });
-const show = screens(['menu', 'friendCard', 'paused', 'between', 'end'], name => {
+const show = screens(['menu', 'friendCard', 'book', 'paused', 'between', 'end'], name => {
   screen = name === 'friendCard' ? 'friend' : name || 'play';
   updateRoomNotice();
 });
@@ -27,17 +35,20 @@ const show = screens(['menu', 'friendCard', 'paused', 'between', 'end'], name =>
 let screen = 'menu', mode = 'demo', paused = false, clock = 0, last = performance.now();
 // One match or daily round. s: sim state; seats: which players the bot plays; anim: the segment being drawn.
 let s = null, seats = [false, true], level = 0, score = [0, 0], game = 0, queue = [], anim = null, botAt = -1, after = [], ended = false;
-let first = false, pop = null, drag = null, today = null, dailyRec = null, attemptStart = 0, reveal = false, pictureBlob = null, pictureUrl = '';
+let picShown = '', picAsk = 0;
+let first = false, pop = null, drag = null, today = null, dailyRec = null, attemptStart = 0, reveal = false, pictureBlob = null;
 let room = null, roomSeat = null, roomSeats = [], roomGame = 0, roomSeed = 0, roomMoves = 0, roomVotes = [];
 let roomNext = null, roomInviting = false, roomLag = false, roomLagTimer = 0;
+// Puzzle book: the puzzle in play (index), its misses this visit; effects: the goal burst, the go-again word, a missed tap.
+let puzzle = -1, misses = 0, burst = null, againPop = null, missRing = null, shakeUntil = 0;
 let L = { cell: 40, ox: 0, oy: 0 }, W = innerWidth, H = innerHeight, dpr = 1, safe = { top: 0, bottom: 0 };
 // Play recording for the game lab. One run is a match against the bot, a two-player match, a friend's table match
 // or today's pitch. The data holds modes, levels and results only: never a name, a typed word or a table code.
-const rec = lab('pitch');
+const rec = home(lab('pitch'), { back: ['#menu .card', '#end .card'] });
 let running = false;
 function recStart(info) { recEnd('quit'); running = true; rec.start(info); }
 function recEnd(outcome) { if (!running) return; running = false; rec.end(outcome, recSummary()); }
-function recSummary() { return { mode, level, goals: score.slice(), games: game + 1, ...(mode === 'daily' && dailyRec ? { tries: dailyRec.used, solved: dailyRec.solved } : {}) }; }
+function recSummary() { return { mode, level: mode === 'bot' ? levelOfRung(level) : level, ...(mode === 'bot' ? { rung: level } : {}), goals: score.slice(), games: game + 1, ...(mode === 'daily' && dailyRec ? { tries: dailyRec.used, solved: dailyRec.solved } : {}), ...(mode === 'puzzle' ? { puzzle: PUZZLES[puzzle]?.id, n: puzzle + 1, tries: bookRec()?.tries ?? 0, solved: !!bookRec()?.solved } : {}) }; }
 const paperLayer = document.createElement('canvas'), inkLayer = document.createElement('canvas');
 
 // ---------- drawing
@@ -57,12 +68,13 @@ function wobbly(c, a, b, cell, color, t = 1, width = 2.4, key = 0) {
   }
   const scale = Math.max(0.8, cell / 42);
   c.lineCap = 'round'; c.lineJoin = 'round'; c.strokeStyle = color;
+  const base = c.globalAlpha;
   for (const [alpha, w, off] of [[0.92, width * scale * (0.9 + rng() * 0.25), 0], [0.35, width * scale * 0.55, 0.6 * scale]]) {
-    c.globalAlpha = alpha; c.lineWidth = w; c.beginPath();
+    c.globalAlpha = alpha * base; c.lineWidth = w; c.beginPath();
     pts.forEach((p, i) => (i ? c.lineTo(p.x + off, p.y - off) : c.moveTo(p.x + off, p.y - off)));
     c.stroke();
   }
-  c.globalAlpha = 1;
+  c.globalAlpha = base;
   return pts[pts.length - 1];
 }
 const at = (lay, x, y) => ({ x: lay.ox + x * lay.cell, y: lay.oy + y * lay.cell });
@@ -94,7 +106,7 @@ function drawPaper(c, w, h, lay, seed = 7) {
   c.stroke();
 }
 // The pitch in pencil: boundary, goal nets, a faint halfway line and centre circle, then every settled segment in ink.
-function drawPitch(c, lay, st, upto = st.log.length, extra = []) {
+function drawPitch(c, lay, st, upto = st.log.length, extra = [], from = 0) {
   const { w, h } = st, m = w / 2, cell = lay.cell, P = (x, y) => at(lay, x, y);
   c.save();
   c.globalAlpha = 0.28; c.strokeStyle = GRAPHITE; c.lineWidth = 1.2;
@@ -118,16 +130,21 @@ function drawPitch(c, lay, st, upto = st.log.length, extra = []) {
       wobbly(c, { x: a.x + (b.x - a.x) * f0, y: a.y + (b.y - a.y) * f0 }, { x: a.x + (b.x - a.x) * f1, y: a.y + (b.y - a.y) * f1 }, cell * 0.5, GRAPHITE, 1, 2.6, hashString(`w${i},${k},${poly[i]}`));
     }
   }
-  for (let i = 0; i < upto; i++) {
-    const [from, to, player] = st.log[i];
-    wobbly(c, pxy(lay, st, from), pxy(lay, st, to), cell, INK[player]);
-  }
+  for (let i = from; i < upto; i++) drawSeg(c, lay, st, i);
   for (const [from, to] of extra) {
     c.setLineDash([cell * 0.12, cell * 0.1]);
     wobbly(c, pxy(lay, st, from), pxy(lay, st, to), cell, GRAPHITE, 1, 2);
     c.setLineDash([]);
   }
 }
+// One settled segment. The setup of a daily or a puzzle (before attemptStart) is paler, so the player's own chain stands out.
+function drawSeg(c, lay, st, i) {
+  const [a, b, player] = st.log[i];
+  if (setupInk() && i < attemptStart) c.globalAlpha = 0.42;
+  wobbly(c, pxy(lay, st, a), pxy(lay, st, b), lay.cell, INK[player], 1, setupInk() && i < attemptStart ? 2 : 2.4);
+  c.globalAlpha = 1;
+}
+const setupInk = () => mode === 'daily' || mode === 'puzzle';
 function drawRoomGoals(c, lay, st) {
   for (const [seat, y] of [[0, st.h + 1], [1, -1]]) {
     wobbly(c, at(lay, st.w / 2 - 1, y), at(lay, st.w / 2 + 1, y), lay.cell, INK[seat]);
@@ -162,13 +179,21 @@ function layout() {
   const pc = paperLayer.getContext('2d'); pc.setTransform(dpr, 0, 0, dpr, 0, 0); drawPaper(pc, W, H, L);
   redrawInk();
 }
+// Draw one just-settled segment onto the ink layer, instead of redrawing every line (a full redraw took up to 19 ms).
+function inkOne(i) {
+  const c = inkLayer.getContext('2d');
+  c.setTransform(dpr, 0, 0, dpr, 0, 0); c.save(); orient(c); drawSeg(c, L, s, i); c.restore();
+  inked = i + 1;
+}
+let inked = 0;
 function redrawInk() {
   const c = inkLayer.getContext('2d');
   c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, inkLayer.width, inkLayer.height); c.setTransform(dpr, 0, 0, dpr, 0, 0);
   if (!s) return;
   c.save();
   orient(c);
-  drawPitch(c, L, s, s.log.length - (anim ? 1 : 0), reveal ? revealSegs() : []);
+  inked = s.log.length - (anim ? 1 : 0);
+  drawPitch(c, L, s, inked, reveal ? revealSegs() : []);
   if (mode === 'table') drawRoomGoals(c, L, s);
   c.restore();
 }
@@ -213,8 +238,46 @@ function render() {
     const k = (clock - pop.t) / 420;
     ctx.globalAlpha = 1 - k; drawSpring(ctx, pop.p, L.cell * (1 + k * 0.6), pop.color, 0.2 * Math.sin(k * Math.PI)); ctx.globalAlpha = 1;
   }
+  drawEffects(ball);
   drawBall(ctx, ball, L.cell);
 }
+// Motion that answers every action: a goal bursts pencil strokes from the ball and shakes the paper, a bounce says
+// "again!", and a tap that hits no point leaves a ring where the finger was.
+function drawEffects(ball) {
+  if (againPop && clock - againPop.t < 700) {
+    const k = (clock - againPop.t) / 700;
+    ctx.globalAlpha = 1 - k * k; ctx.fillStyle = againPop.color; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = `700 ${Math.round(L.cell * 0.5)}px ${handFont()}`;
+    ctx.fillText(t('again'), againPop.p.x, againPop.p.y - L.cell * (0.45 + 0.6 * k));
+    ctx.globalAlpha = 1;
+  }
+  if (missRing && clock - missRing.t < 380) {
+    const k = (clock - missRing.t) / 380;
+    ctx.globalAlpha = 0.5 * (1 - k); ctx.strokeStyle = GRAPHITE; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(missRing.x, missRing.y, 10 + 18 * k, 0, Math.PI * 2); ctx.stroke(); ctx.globalAlpha = 1;
+  }
+  if (burst && clock - burst.t < 900) {
+    const k = (clock - burst.t) / 900, ease = 1 - (1 - k) ** 3;
+    ctx.strokeStyle = burst.color; ctx.lineCap = 'round'; ctx.lineWidth = Math.max(2, L.cell / 18);
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * Math.PI * 2 + burst.spin, r0 = L.cell * (0.3 + 1.6 * ease), r1 = r0 + L.cell * 0.35 * (1 - k);
+      ctx.globalAlpha = 1 - k;
+      ctx.beginPath(); ctx.moveTo(burst.p.x + Math.cos(a) * r0, burst.p.y + Math.sin(a) * r0); ctx.lineTo(burst.p.x + Math.cos(a) * r1, burst.p.y + Math.sin(a) * r1); ctx.stroke();
+    }
+    ctx.globalAlpha = 0.35 * (1 - k); ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(burst.p.x, burst.p.y, L.cell * (0.4 + 2.2 * ease), 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+}
+const handFont = () => getComputedStyle(document.documentElement).getPropertyValue('--hand');
+// Every sound and every motion goes through here, so the check can see that each action answered.
+const fxLog = [];
+function fx(name, sound, motion) {
+  fxLog.push(name); if (fxLog.length > 200) fxLog.shift();
+  if (sound && canSound()) sound();
+  if (motion) motion();
+}
+function bump(sel) { const el = document.querySelector(sel); if (!el) return; el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
 
 // ---------- game flow
 
@@ -224,7 +287,7 @@ function busy() { return !!anim || queue.length > 0 || paused || screen !== 'pla
 // A player may tap again while their own bounce is still being drawn; that line is finished at once.
 function canTap() {
   return !!s && mode !== 'demo' && !paused && screen === 'play' && !ended && !queue.length && s.winner < 0 && !isBot(s.turn)
-    && (mode !== 'daily' || s.turn === 0) && (!anim || anim.player === s.turn)
+    && ((mode !== 'daily' && mode !== 'puzzle') || s.turn === 0) && (!anim || anim.player === s.turn)
     && (mode !== 'table' || (roomSeat === s.turn && room.status === 'live' && !room.waiting && roomSeats[1 - roomSeat]));
 }
 function later(ms, fn) { after.push({ at: clock + ms, fn }); }
@@ -238,7 +301,7 @@ function step() {
     if (botAt < 0) botAt = clock + (mode === 'demo' ? DEMO_MS : BOT_WAIT);
     else if (clock >= botAt) {
       const rng = mulberry32(hashString(`${game}:${s.log.length}:${clock | 0}`));
-      queue = botTurn(s, mode === 'demo' ? 1 : level, rng) || [];
+      queue = (mode === 'demo' ? botTurn(s, 1, rng) : rungTurn(s, level, rng)) || [];
     }
   }
 }
@@ -247,24 +310,28 @@ function startSegment(d, dur) {
   const from = s.ball, player = s.turn, to = target(s, d), wasBounce = bounces(s, to);
   apply(s, d);
   anim = { from, to, player, start: clock, dur, bounce: wasBounce && s.winner < 0 };
-  redrawInk();
-  scratch(dur);
+  if (inked !== s.log.length - 1) redrawInk();
+  fx(isBot(player) ? 'botDraw' : 'draw', () => scratch(dur));
   if (mode === 'daily' && s.log.length === attemptStart + 1) { dailyRec.used++; store(); }
+  if (mode === 'puzzle' && s.log.length === attemptStart + 1) { bookRec().tries++; storeMore(); }
   if (mode !== 'demo' && s.winner < 0) updateHud();
 }
 function settle() {
-  const a = anim; anim = null; redrawInk();
+  const a = anim; anim = null;
+  if (inked === s.log.length - 1) inkOne(inked); else redrawInk();
   botAt = queue.length ? clock + 40 : -1;
   if (a.bounce) {
     pop = { p: viewBall(a.to), t: clock, color: INK[a.player] };
-    if (canSound()) snd.tone(480, 0.14, 0.05, 'triangle', 420);
+    // Go again: the word rises from the ball with two rising notes, so a bounce is never missed.
+    againPop = { p: viewBall(a.to), t: clock, color: INK[a.player] };
+    fx('again', () => { snd.tone(480, 0.14, 0.05, 'triangle', 420); setTimeout(() => snd.tone(720, 0.12, 0.04, 'triangle', 300), 90); });
   }
-  if (s.winner >= 0) return gameOver();
-  if (mode === 'daily' && s.turn !== 0) return dailyMiss();
+  if (s.winner >= 0) { againPop = null; return gameOver(); }
+  if ((mode === 'daily' || mode === 'puzzle') && s.turn !== 0) return mode === 'daily' ? dailyMiss() : puzzleMiss();
+  if (!a.bounce && canTap()) fx('yourTurn', () => snd.tone(880, 0.06, 0.035, 'sine'), () => bump('#turn'));
   updateHud();
 }
 function scratch(dur) {
-  if (!canSound()) return;
   snd.noise(Math.min(0.09, dur / 1000), 0.05, 3400);
   setTimeout(() => snd.noise(dur / 1400, 0.035, 2600), dur * 0.4);
 }
@@ -280,23 +347,25 @@ function startMatch(m) {
   snd.unlock();
   mode = m; score = [0, 0]; game = 0; after = []; paused = false;
   first = m === 'bot' && save.played === 0;
-  level = m === 'bot' ? (first ? 0 : save.level) : 0;
+  // In a bot match `level` is the ladder rung (0 to 7).
+  level = m === 'bot' ? (first ? 0 : more.rung) : 0;
   seats = [false, m === 'bot'];
   show(null); $('hud').classList.add('on'); $('turn').classList.add('on');
-  recStart({ mode: m, level, first });
+  recStart({ mode: m, level: m === 'bot' ? levelOfRung(level) : level, rung: m === 'bot' ? level : undefined, first });
   kickOff();
 }
 function gameOver() {
   ended = true;
   const scorer = s.winner, how = s.how;
   if (mode === 'demo') { later(2200, () => { game++; kickOff(); }); return; }
+  if (how !== 'stuck') goalBurst(scorer);
   if (mode === 'daily') return dailyEnd();
+  if (mode === 'puzzle') return puzzleEnd();
   if (mode !== 'table') score[scorer]++;
   rec.event('goal', { by: mode === 'table' ? (scorer === roomSeat ? 'you' : 'friend') : scorer, how });
-  if (canSound()) {
-    if (how === 'stuck') snd.tone(196, 0.4, 0.08, 'sine', -60);
-    else { [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => snd.tone(f, 0.22, 0.09, 'triangle'), i * 110)); }
-  }
+  if (how === 'stuck') fx('stuck', () => snd.tone(196, 0.4, 0.08, 'sine', -60), () => bump('#c'));
+  else if (how === 'own') fx('ownGoal', () => { snd.tone(392, 0.3, 0.08, 'sawtooth', -120); snd.noise(0.25, 0.05, 900); });
+  else fx('goal', cheer);
   toast(t(how === 'stuck' ? 'stuck' : how === 'own' ? 'ownGoal' : 'goal'), INK[scorer]);
   updateHud();
   later(1200, () => {
@@ -311,17 +380,27 @@ function gameOver() {
     show('between');
   });
 }
+function cheer() { [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => snd.tone(f, 0.22, 0.09, 'triangle'), i * 110)); snd.noise(0.5, 0.03, 5200); }
+// The ball hits the net: strokes burst from it and the paper shakes for a moment.
+function goalBurst(scorer) {
+  burst = { p: viewBall(s.ball), t: clock, color: INK[scorer], spin: (s.log.length % 7) * 0.4 };
+  bump('#c');
+}
 function matchOver() {
   const winner = score[0] > score[1] ? 0 : 1, names = playerNames();
   let line = '';
   if (mode === 'bot') {
+    matchRung = level;
     save.played++;
     const was = level;
-    if (winner === 0) { save.wins++; save.level = Math.min(2, (first ? 0 : save.level) + 1); save.lossStreak = 0; }
-    else { save.lossStreak++; if (save.lossStreak >= 2) { save.level = Math.max(0, save.level - 1); save.lossStreak = 0; } }
-    store();
-    line = save.level !== was ? t('nextUp', { level: levelName(save.level) }) : t('nextUpAgain', { level: levelName(save.level) });
-    if (first) line = t(winner === 0 ? 'nowFullPitchMedium' : 'nextFullPitch');
+    // A win climbs one rung of the ladder; two losses in a row step down one. The old `level` follows the rung.
+    if (winner === 0) { save.wins++; more.rung = Math.min(RUNGS - 1, level + 1); save.lossStreak = 0; }
+    else { more.rung = level; save.lossStreak++; if (save.lossStreak >= 2) { more.rung = Math.max(0, level - 1); save.lossStreak = 0; } }
+    save.level = levelOfRung(more.rung);
+    store(); storeMore();
+    line = more.rung !== was ? t('nextUp', { level: rungName(more.rung) }) : t('nextUpAgain', { level: rungName(more.rung) });
+    if (first) line = t(winner === 0 ? 'nowFullPitchRung' : 'nextFullPitch');
+    fx(more.rung > was ? 'levelUp' : more.rung < was ? 'levelDown' : 'matchEnd', () => (winner === 0 ? [659, 880] : [330, 262]).forEach((f, i) => setTimeout(() => snd.tone(f, 0.18, 0.06, 'triangle'), 700 + i * 140)));
     $('endTitle').textContent = t(winner === 0 ? 'youWin' : 'botWins');
   } else if (mode === 'table') {
     $('endTitle').textContent = winner === roomSeat ? t('youWin') : t('nameWins', { name: names[winner] });
@@ -526,24 +605,25 @@ function resetAttempt() {
   layout(); updateHud();
 }
 function dailyMiss() {
-  ended = true; snd.tone(196, 0.3, 0.06, 'sine', -40);
+  ended = true; fx('miss', () => snd.tone(196, 0.3, 0.06, 'sine', -40), () => bump('#c'));
   toast(t(dailyRec.used >= 3 ? 'noMoreTries' : 'notThisTime'), INK[1]);
   updateHud();
-  later(1300, () => (dailyRec.used >= 3 ? dailyResult() : resetAttempt()));
+  later(1300, () => (dailyRec.used >= 3 ? dailyResult() : (fx('reset', () => snd.noise(0.12, 0.04, 2200)), resetAttempt())));
 }
 function dailyEnd() {
   if (s.winner === 0 && s.how === 'goal') {
     dailyRec.solved = true; dailyRec.path = s.log.slice(attemptStart).map(e => [e[0], e[1]]); store();
-    [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => snd.tone(f, 0.22, 0.09, 'triangle'), i * 110));
+    fx('goal', cheer);
     toast(t('goal'), INK[0]); updateHud();
     later(1200, dailyResult);
   } else dailyMiss();
 }
 function revealSegs() {
-  const t = clone(today.state), out = [];
-  for (const d of today.solution) { const from = t.ball; apply(t, d); out.push([from, t.ball]); }
+  const src = revealSource(), t = clone(src.state), out = [];
+  for (const d of src.solution) { const from = t.ball; apply(t, d); out.push([from, t.ball]); }
   return out;
 }
+const revealSource = () => (mode === 'puzzle' ? { state: puzzleState(), solution: solve(puzzleState(), 7) } : today);
 function dailyResult() {
   // The picture: the winning chain in blue ink, or the answer in dashed pencil after three misses.
   s = clone(today.state); attemptStart = s.log.length; ended = true; anim = null; queue = [];
@@ -567,6 +647,82 @@ function dotsHtml(rec = dailyRec) {
 }
 function renderDailyHud() { if (mode === 'daily') $('tag').innerHTML = dotsHtml(); }
 
+// ---------- puzzle book
+
+const bookRec = (i = puzzle) => more.book[PUZZLES[i]?.id];
+const solvedCount = () => PUZZLES.filter(p => more.book[p.id]?.solved).length;
+// Open: every solved puzzle and the first two unsolved ones, so one hard page never blocks the book.
+function openPuzzles() {
+  const open = new Set(); let free = 2;
+  PUZZLES.forEach((p, i) => { if (more.book[p.id]?.solved) open.add(i); else if (free > 0) { open.add(i); free--; } });
+  return open;
+}
+function bookCard() {
+  const open = openPuzzles(), grid = $('bookGrid');
+  grid.textContent = '';
+  PUZZLES.forEach((p, i) => {
+    const b = document.createElement('button'), r = more.book[p.id];
+    b.className = 'tile' + (r?.solved ? ' done' : '');
+    b.disabled = !open.has(i);
+    b.innerHTML = `<b>${i + 1}</b><small>${r?.solved ? '✓' : ''}</small>`;
+    b.setAttribute('aria-label', `${t('puzzleN', { n: i + 1 })}: ${t('idea_' + p.id)}`);
+    b.onclick = () => startPuzzle(i);
+    grid.append(b);
+  });
+  $('bookCount').textContent = `${solvedCount()}/${PUZZLES.length}`;
+  show('book');
+}
+function startPuzzle(i) {
+  recEnd('quit');
+  snd.unlock();
+  puzzle = i; misses = 0; mode = 'puzzle'; after = []; paused = false; game = 0; score = [0, 0];
+  more.book[PUZZLES[i].id] ??= { tries: 0, solved: false };
+  storeMore();
+  show(null); $('hud').classList.add('on'); $('turn').classList.add('on');
+  recStart({ mode: 'puzzle', puzzle: PUZZLES[i].id, n: i + 1 });
+  puzzleAttempt();
+}
+function puzzleState() { const p = PUZZLES[puzzle]; return fromMoves(p.w, p.h, p.first, p.moves); }
+function puzzleAttempt() {
+  s = puzzleState(); attemptStart = s.log.length;
+  anim = null; queue = []; botAt = -1; ended = false; reveal = false; pop = null;
+  layout(); updateHud();
+}
+// A miss resets the sheet. Every third miss first shows the way in dashed pencil for a moment.
+function puzzleMiss() {
+  ended = true; misses++;
+  fx('miss', () => snd.tone(196, 0.3, 0.06, 'sine', -40), () => bump('#c'));
+  toast(t('notThisTime'), INK[1]); updateHud();
+  const again = () => { fx('reset', () => snd.noise(0.12, 0.04, 2200)); puzzleAttempt(); };
+  later(1300, () => {
+    if (misses % 3) return again();
+    puzzleAttempt(); ended = true; reveal = true; redrawInk(); toast(t('showWay'), GRAPHITE);
+    later(2600, again);
+  });
+}
+function puzzleEnd() {
+  if (s.winner === 0 && s.how === 'goal') {
+    const r = bookRec();
+    if (!r.solved) { r.solved = true; r.at = r.tries; }
+    storeMore();
+    fx('goal', cheer);
+    toast(t('goal'), INK[0]); updateHud();
+    rec.event('puzzle-solved', { id: PUZZLES[puzzle].id, n: puzzle + 1, tries: r.tries });
+    later(1200, puzzleResult);
+  } else puzzleMiss();
+}
+function puzzleResult() {
+  const r = bookRec(), last = puzzle === PUZZLES.length - 1, all = solvedCount() === PUZZLES.length;
+  recEnd('won');
+  $('endTitle').textContent = t('idea_' + PUZZLES[puzzle].id);
+  $('endTitle').style.color = INK[0];
+  $('endLine').textContent = `${t('bookTitle')}: ${solvedCount()}/${PUZZLES.length}${all ? ' · ' + t('bookDone') : ''}`;
+  $('again').textContent = last ? t('bookTitle') : t('nextPuzzle');
+  $('again').disabled = false;
+  $('again').parentElement.hidden = false;
+  showEnd(t('solvedTry', { n: r.at || r.tries }));
+}
+
 // ---------- HUD, cards, picture
 
 function updateHud() {
@@ -574,6 +730,9 @@ function updateHud() {
   if (mode === 'daily') {
     $('score').innerHTML = `<div><span class="b">${t('today')}</span><small>${dateLabel(today.date)}</small></div>`;
     renderDailyHud();
+  } else if (mode === 'puzzle') {
+    $('score').innerHTML = `<div><span class="b">${t('puzzleN', { n: puzzle + 1 })}</span><small>${t('idea_' + PUZZLES[puzzle].id)}</small></div>`;
+    $('tag').textContent = `${solvedCount()}/${PUZZLES.length}`;
   } else if (mode === 'table') {
     const board = $('score');
     if (!board.querySelector('[data-seat]')) {
@@ -591,10 +750,10 @@ function updateHud() {
     $('tag').textContent = '';
   } else {
     const names = playerNames();
-    $('score').innerHTML = `<div><span class="b">${score[0]}</span><small>${names[0]}</small></div><span>–</span><div><span class="r">${score[1]}</span><small>${mode === 'bot' ? t('botLevel', { level: levelName(level) }) : names[1]}</small></div>`;
+    $('score').innerHTML = `<div><span class="b">${score[0]}</span><small>${names[0]}</small></div><span>–</span><div><span class="r">${score[1]}</span><small>${mode === 'bot' ? t('botLevel', { level: rungName(level) }) : names[1]}</small></div>`;
     $('tag').textContent = mode === 'bot' && first ? t('smallPitch') : '';
   }
-  const p = s.turn, names = (mode === 'bot' ? ['turnYou', 'turnBot'] : mode === 'daily' ? ['turnDaily', 'turnDailyOver'] : ['turnBlue', 'turnRed']).map(k => t(k));
+  const p = s.turn, names = (mode === 'bot' ? ['turnYou', 'turnBot'] : setupInk() ? ['turnDaily', 'turnDailyOver'] : ['turnBlue', 'turnRed']).map(k => t(k));
   document.documentElement.style.setProperty('--turn', INK[mode === 'table' && s.winner >= 0 ? s.winner : p]);
   $('turnText').textContent = s.winner >= 0 ? t(s.winner === 0 ? 'blueScores' : 'redScores') : names[p];
   if (mode === 'bot' && s.winner >= 0) $('turnText').textContent = t(s.winner === 0 ? 'yourPoint' : 'botPoint');
@@ -609,8 +768,20 @@ function toast(text, color) {
   const t = $('toast'); t.textContent = text; t.style.color = color || ''; t.classList.add('on');
   clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('on'), 1300);
 }
+// The line under the picture and in the share: what happened, in one sentence.
+function shareLine() {
+  if (mode === 'daily') {
+    const marks = [0, 1, 2].map(i => (i < dailyRec.used ? (dailyRec.solved && i === dailyRec.used - 1 ? '⚽' : '✗') : '·')).join('');
+    return t(dailyRec.solved ? 'shareDaily' : 'shareDailyMiss', { date: dateLabel(today.date, false), n: dailyRec.used, marks });
+  }
+  if (mode === 'puzzle') { const r = bookRec(); return t('shareBook', { n: puzzle + 1, k: r.at || r.tries, done: solvedCount(), all: PUZZLES.length }); }
+  const win = score[0] > score[1] ? 0 : 1, a = Math.max(...score), b = Math.min(...score);
+  if (mode === 'bot') return t(win === 0 ? 'shareWon' : 'shareLost', { n: matchRung + 1, a: score[0], b: score[1] });
+  return t('shareTwo', { name: playerNames()[win], a, b });
+}
+let matchRung = 0;
 function picture(scoreText) {
-  const cell = 64, pad = 36, head = 64, w = s.w * cell + pad * 2, h = (s.h + 2) * cell + pad * 2 + head;
+  const cell = 64, pad = 36, head = 64, foot = 56, w = s.w * cell + pad * 2, h = (s.h + 2) * cell + pad * 2 + head + foot;
   const pc = document.createElement('canvas'); pc.width = w; pc.height = h;
   const c = pc.getContext('2d'), lay = { cell, ox: pad, oy: pad + head + cell };
   drawPaper(c, w, h, lay, 11);
@@ -622,9 +793,9 @@ function picture(scoreText) {
   drawBall(c, viewPoint(pxy(lay, s, s.ball), lay, s), cell);
   c.fillStyle = '#26262a'; c.textBaseline = 'middle';
   c.font = `700 30px ${getComputedStyle(document.documentElement).getPropertyValue('--hand')}`;
-  c.fillText(mode === 'daily' ? t('pictureTitleDaily', { date: dateLabel(today.date, false) }) : t('title'), pad, pad + 18);
+  c.fillText(mode === 'daily' ? t('pictureTitleDaily', { date: dateLabel(today.date, false) }) : mode === 'puzzle' ? `${t('puzzleN', { n: puzzle + 1 })}` : t('title'), pad, pad + 18);
   c.textAlign = 'right';
-  if (mode === 'daily') { c.fillStyle = dailyRec.solved ? INK[0] : GRAPHITE; c.fillText(scoreText, w - pad, pad + 18); }
+  if (mode === 'daily' || mode === 'puzzle') { c.fillStyle = mode === 'puzzle' || dailyRec.solved ? INK[0] : GRAPHITE; c.fillText(scoreText, w - pad, pad + 18); }
   else {
     c.fillStyle = INK[1]; c.fillText(String(score[1]), w - pad, pad + 18);
     const rw = c.measureText(String(score[1])).width;
@@ -632,34 +803,38 @@ function picture(scoreText) {
     const dw = c.measureText(' – ').width;
     c.fillStyle = INK[0]; c.fillText(String(score[0]), w - pad - rw - dw, pad + 18);
   }
+  // The result line along the bottom, shrunk to fit the width.
+  const line = shareLine();
+  c.textAlign = 'center'; c.fillStyle = '#26262a';
+  let size = 26; c.font = `700 ${size}px ${handFont()}`;
+  while (size > 14 && c.measureText(line).width > w - pad * 2) { size -= 2; c.font = `700 ${size}px ${handFont()}`; }
+  c.fillText(line, w / 2, h - pad - foot / 2 + 8);
   return pc;
 }
 function showEnd(scoreText) {
   if (mode === 'table' && paused) { paused = false; snd.release(); }
   pictureBlob = null; $('toast').classList.remove('on');
-  const pc = picture(scoreText);
-  if (pictureUrl) URL.revokeObjectURL(pictureUrl);
+  if (picShown) URL.revokeObjectURL(picShown);
+  picShown = '';
   $('pic').alt = t('pictureAlt');
-  $('pic').src = pc.toDataURL('image/png');
-  pc.toBlob(b => { pictureBlob = b; });
+  $('pic').removeAttribute('src');
+  // The picture is drawn and encoded after the card has slid in, each in its own task and never inside a frame:
+  // drawing it and toDataURL in the frame that ended the match cost 15 to 40 ms on WebKit.
+  const ask = ++picAsk;
+  setTimeout(() => {
+    if (ask !== picAsk || screen !== 'end') return;
+    const pc = picture(scoreText);
+    setTimeout(() => ask === picAsk && pc.toBlob(b => { if (!b || ask !== picAsk) return; pictureBlob = b; picShown = URL.createObjectURL(b); $('pic').src = picShown; }), 0);
+  }, 260);
   $('hud').classList.remove('on'); $('turn').classList.remove('on');
   show('end');
 }
 function savePicture() {
   if (!pictureBlob) return;
+  rec.event('share', { mode });
   const name = mode === 'daily' ? t('fileDaily', { date: today.date }) : t('file');
-  const file = new File([pictureBlob], name, { type: 'image/png' });
-  const download = () => {
-    const a = document.createElement('a'); pictureUrl = URL.createObjectURL(pictureBlob);
-    a.href = pictureUrl; a.download = name; document.body.append(a); a.click(); a.remove();
-  };
-  try {
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      navigator.share({ files: [file], title: t('title') }).catch(e => { if (e && e.name !== 'AbortError') download(); });
-      return;
-    }
-  } catch {}
-  download();
+  // kit/share.js: the share sheet with the file where the browser can, else a download.
+  shareImage(pictureBlob, { name, text: `${shareLine()}\n${location.origin}${location.pathname}` });
 }
 
 // ---------- input
@@ -698,7 +873,12 @@ canvas.addEventListener('pointerup', e => {
   if (!canTap()) return;
   const b = viewBall(s.ball);
   const d = g.moved ? aimFrom(e.clientX - b.x, e.clientY - b.y) : nearest(e.clientX, e.clientY);
-  if (d < 0) return;
+  if (d < 0) {
+    // A tap that reaches no point: a ring where the finger was and a dull tick, so the tap is not lost in silence.
+    missRing = { x: e.clientX, y: e.clientY, t: clock };
+    fx('missTap', () => snd.tone(150, 0.06, 0.05, 'sine', -40));
+    return;
+  }
   if (mode === 'table') {
     snd.unlock();
     if (room.move([d])) watchRoomLag();
@@ -724,8 +904,9 @@ function toMenu() {
   show('menu'); refreshMenu(); kickOff();
 }
 function refreshMenu() {
-  $('playSub').textContent = save.played === 0 ? t('firstMatch') : t('bestOf', { level: levelName(save.level) });
+  $('playSub').textContent = save.played === 0 ? t('firstMatch') : t('bestOf', { level: rungName(more.rung) });
   const rec = save.daily[utcDate()];
+  $('bookDone').textContent = `${solvedCount()}/${PUZZLES.length}`;
   $('dailyDots').innerHTML = dotsHtml(rec || { used: 0 }).replace(/^<span class="dots"[^>]*>|<\/span>$/g, '');
   for (const id of ['soundMenu', 'soundPause']) $(id).textContent = t(save.sound ? 'soundOn' : 'soundOff');
 }
@@ -734,6 +915,10 @@ function toggleSound() { save.sound = !save.sound; store(); refreshMenu(); if (s
 $('play').onclick = () => startMatch('bot');
 $('two').onclick = () => startMatch('two');
 $('daily').onclick = startDaily;
+$('puzzles').onclick = bookCard;
+$('bookMenu').onclick = () => { show('menu'); refreshMenu(); };
+// Every button answers with a click of sound (once audio is open) and its own press motion (CSS).
+document.addEventListener('click', e => { if (e.target.closest?.('button')) fx('button', () => snd.tone(1250, 0.025, 0.025, 'square')); }, true);
 $('friend').onclick = friendCard;
 $('friendName').oninput = e => { save.name = e.target.value.slice(0, 24); store(); };
 $('newTable').onclick = () => { snd.unlock(); openRoom(newCode(), true); };
@@ -755,12 +940,15 @@ $('shareLink').onclick = async () => {
 $('roomLeave').onclick = toMenu;
 $('pauseBtn').onclick = pause;
 $('resume').onclick = resume;
-$('restart').onclick = () => startMatch(mode);
+$('restart').onclick = () => (mode === 'puzzle' ? startPuzzle(puzzle) : startMatch(mode));
 $('quit').onclick = toMenu;
 $('endMenu').onclick = toMenu;
 $('again').onclick = () => {
   if (mode === 'table') {
     if (room.again()) recordRoomVote(roomSeat);
+  } else if (mode === 'puzzle') {
+    if (puzzle < PUZZLES.length - 1 && openPuzzles().has(puzzle + 1)) startPuzzle(puzzle + 1);
+    else { toMenu(); bookCard(); }
   } else startMatch(mode);
 };
 $('next').onclick = () => { show(null); game++; kickOff(); };
@@ -799,6 +987,9 @@ function retext() {
   updateHud();
   updateRoomNotice();
   if (mode === 'table' && roomSeat !== null && screen === 'end') updateRoomEnd();
+  if (screen === 'book') bookCard();
+  for (const a of document.querySelectorAll('.kit-home')) a.remove();
+  backLink('#menu .card'); backLink('#end .card');
 }
 for (const id of ['langMenu', 'langPause']) {
   $(id).addEventListener('click', () => {
@@ -822,6 +1013,11 @@ window.__pitch = Object.freeze({
   get size() { return s ? { w: s.w, h: s.h } : null; },
   get score() { return score.slice(); },
   get level() { return level; },
+  get rung() { return more.rung; },
+  get fx() { return fxLog.slice(); },
+  get puzzle() { return mode === 'puzzle' ? { n: puzzle + 1, id: PUZZLES[puzzle].id, misses, attemptStart, ...bookRec() } : null; },
+  get shareLine() { return s ? shareLine() : ''; },
+  more() { return JSON.parse(JSON.stringify(more)); },
   get segments() { return s ? s.log.length : 0; },
   get legal() { return s ? legal(s).map(d => { const t = target(s, d), q = xy(s, t), p = viewBall(t); return { d, x: q.x, y: q.y, sx: p.x, sy: p.y, bounce: bounces(s, t) }; }) : []; },
   get room() { return mode === 'table' && room ? { code: room.code, seat: roomSeat, game: roomGame, seed: roomSeed, moves: roomMoves, status: room.status, waiting: room.waiting } : null; },

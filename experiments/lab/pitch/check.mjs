@@ -6,15 +6,16 @@ import { createRequire } from 'node:module';
 import { dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
-import { create, restore, snapshot, botTurn, mulberry32, daily, legal, apply, clone } from './sim.js';
+import { create, restore, snapshot, botTurn, mulberry32, daily, legal, apply, clone, solve, fromMoves } from './sim.js';
+import { PUZZLES } from './puzzles.js';
 import { tables } from './words.js';
 import { answerLab, allowLocalSend, withAgent, assertNotice, assertRun, assertNoLeak, assertOffSendsNothing, waitForRuns, runRecords } from '../../kit/check/lab-record.mjs';
 import { TABLE, tableName, tableMessage, freshTable, sit, move, again, shown } from '../../../workers/lab-ai/src/table.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const SHOTS = process.env.SHOTS || '/private/tmp/claude-504/-Users-abdul-code/e727a231-6be3-4081-a695-31f6b5ca1a96/scratchpad/pitch-shots';
+const SHOTS = process.env.SHOTS || '/tmp/claude-improve-pitch/pitch-shots';
 const TABLE_SHOTS = join(dirname(SHOTS), 'pitch-table-shots');
-const WORD_SHOTS = process.env.WORD_SHOTS || '/private/tmp/claude-504/-Users-abdul-code/e727a231-6be3-4081-a695-31f6b5ca1a96/scratchpad/i18n-shots/pitch';
+const WORD_SHOTS = process.env.WORD_SHOTS || '/tmp/claude-improve-pitch/i18n-shots';
 await Promise.all([mkdir(SHOTS, { recursive: true }), mkdir(TABLE_SHOTS, { recursive: true }), mkdir(WORD_SHOTS, { recursive: true })]);
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
 const server = createServer(async (req, res) => {
@@ -550,7 +551,8 @@ async function run(test, phone) {
   const saved = await P(page, () => __pitch.save());
   assert.equal(saved.played, 1, 'played count survives reload');
   assert.equal(saved.level, result.save.level, 'level survives reload');
-  assert.match(await page.textContent('#playSub'), /vs (Easy|Medium|Hard) bot/, 'menu shows the next bot');
+  // Changed on purpose (2026-11-24): the bot is now one of eight levels, named by number.
+  assert.match(await page.textContent('#playSub'), /vs Level [1-8] bot/, 'menu shows the next bot');
 
   // Today's pitch: one missed attempt, then the solver's chain.
   await page.click('#daily');
@@ -580,12 +582,51 @@ async function run(test, phone) {
   assert.ok(await visibleIn(page, '#endMenu'), 'daily card fits');
   assert.equal(await page.isVisible('#again'), false, 'no Rematch on the daily card');
   await shot(page, phone, '5-daily-end');
+  // Feedback (2026-11-24): every action since the reload (daily: a miss, then the chain) went through fx(), so it had a sound and a motion.
+  const fxSeen = new Set(await P(page, () => __pitch.fx));
+  for (const name of ['button', 'draw', 'miss', 'goal']) assert.ok(fxSeen.has(name), `fx ${name} fired (seen: ${[...fxSeen].join(',')})`);
   await page.reload();
   await until(page, () => window.__pitch?.ready && __pitch.screen === 'menu', 'menu after daily');
   assert.equal(await page.locator('#dailyDots i.won').count(), 1, 'menu shows today solved');
   await page.click('#daily');
   await until(page, () => __pitch.screen === 'end', 'a finished daily reopens to its result');
   await page.click('#endMenu');
+
+  // Puzzle book (2026-11-24): 18 pages, two open at the start, a miss counts a try, the solver's chain clears it.
+  await page.click('#puzzles');
+  await until(page, () => __pitch.screen === 'book', 'puzzle book');
+  assert.equal(await page.locator('#bookGrid button').count(), PUZZLES.length, 'one tile per puzzle');
+  assert.equal(await page.locator('#bookGrid button:not([disabled])').count(), 2, 'two puzzles open before any is solved');
+  assert.ok(await visibleIn(page, '#bookMenu'), 'the book fits');
+  await shot(page, phone, '5b-book');
+  await page.locator('#bookGrid button').nth(1).click();
+  await until(page, () => __pitch.mode === 'puzzle' && __pitch.canTap, 'puzzle 2 starts');
+  const p2 = PUZZLES[1], ps = await P(page, () => __pitch.state());
+  assert.deepEqual(ps.log, fromMoves(p2.w, p2.h, p2.first, p2.moves).log.map(e => e.slice()), 'page and Node build the same puzzle');
+  for (let i = 0; i < 40; i++) {
+    await until(page, () => __pitch.canTap, 'puzzle input opens');
+    const st = await P(page, () => __pitch.puzzle);
+    if (st.misses === 1) break;
+    const t = restore(await P(page, () => __pitch.state()));
+    const ends = m => { const u = clone(t); apply(u, m); return u.turn === 1 || (u.winner >= 0 && u.how !== 'goal'); };
+    const safe = m => { const u = clone(t); apply(u, m); return u.winner < 0; };
+    await tapDir(page, legal(t).find(ends) ?? legal(t).find(safe));
+  }
+  await until(page, () => __pitch.puzzle.misses === 1 && __pitch.canTap && __pitch.segments === __pitch.puzzle.attemptStart, 'the puzzle resets after a miss');
+  assert.equal((await P(page, () => __pitch.puzzle)).tries, 1, 'the miss counted one try');
+  assert.ok((await P(page, () => __pitch.fx)).includes('reset'), 'the reset after a miss has its own feedback');
+  for (const step of solve(restore(await P(page, () => __pitch.state())), 7)) await tapDir(page, step);
+  await until(page, () => __pitch.screen === 'end', 'puzzle result card');
+  const book = await P(page, () => __pitch.more().book);
+  assert.deepEqual(book[p2.id], { tries: 2, solved: true, at: 2 }, 'puzzle 2 saved as solved on try 2');
+  assert.match(await P(page, () => __pitch.shareLine), /puzzle 2: solved on try 2/, 'the share line names the puzzle');
+  assert.equal(await page.textContent('#again'), 'Next puzzle');
+  for (const id of ['#endTitle', '#pic', '#again', '#savePic', '#endMenu']) assert.ok(await visibleIn(page, id), `${id} fits on the puzzle card`);
+  await shot(page, phone, '5c-puzzle-end');
+  const stored = await P(page, () => JSON.parse(localStorage.getItem('pitch:more')));
+  assert.equal(stored.book[p2.id].solved, true, 'the book is stored under its own key');
+  await page.click('#endMenu');
+  assert.match(await page.textContent('#bookDone'), /^1\/18$/, 'the menu shows the book count');
 
   // Two players on one phone: the turn passes and the pill takes the ink colour.
   await page.click('#two');
@@ -623,6 +664,38 @@ async function run(test, phone) {
   assert.deepEqual(errors, [], 'no page, console or network errors');
 }
 
+// From the small games' home at 320 x 568 (2026-11-24): the return link on the menu and end card, nothing scrolls,
+// and a solved puzzle is reported to hub:results.
+async function fromSmall(browser, phone) {
+  const still = async (page, label) => { await noOverflow(page, label); assert.ok(await P(page, () => document.documentElement.scrollHeight <= innerHeight && [...document.querySelectorAll('.screen:not([hidden]) .card')].every(c => c.scrollHeight <= c.clientHeight + 1)), `${label}: nothing scrolls`); };
+  const test = await open(browser, { viewport: { width: 320, height: 568 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }), { page } = test;
+  try {
+    await page.goto(`${base}/lab/pitch/?date=${DATE}&lang=en&from=small`);
+    await until(page, () => window.__pitch?.ready && __pitch.screen === 'menu', 'menu from small');
+    assert.ok(await visibleIn(page, '#menu .kit-home'), 'the return link is on the menu');
+    for (const id of ['#play', '#daily', '#puzzles', '#friend', '#two']) assert.ok(await visibleIn(page, id), `320: ${id} visible`);
+    await still(page, '320 menu');
+    await page.click('#puzzles');
+    await until(page, () => __pitch.screen === 'book', '320 book');
+    await still(page, '320 book');
+    assert.ok(await visibleIn(page, '#bookMenu'), '320: the book fits');
+    await page.locator('#bookGrid button').first().click();
+    await until(page, () => __pitch.mode === 'puzzle' && __pitch.canTap, '320 puzzle 1');
+    await still(page, '320 puzzle');
+    for (const step of solve(restore(await P(page, () => __pitch.state())), 7)) await tapDir(page, step);
+    await until(page, () => __pitch.screen === 'end', '320 puzzle card');
+    await until(page, () => document.querySelector('#pic').naturalWidth > 0, '320 puzzle picture');
+    await still(page, '320 puzzle card');
+    for (const id of ['#again', '#savePic', '#endMenu', '#end .kit-home']) assert.ok(await visibleIn(page, id), `320: ${id} fits on the puzzle card`);
+    const hub = await P(page, () => JSON.parse(localStorage.getItem('hub:results') || '{}'));
+    assert.equal(hub.pitch?.wins, 1, 'the solved puzzle is reported to the small games home');
+    assert.equal(hub.pitch?.last, 'won');
+    await shot(page, `320-${phone}`, 'puzzle-end');
+    assert.deepEqual(test.errors, [], '320: no page errors');
+    console.log(`ok   pitch from the small games home on ${phone} 320x568`);
+  } finally { await test.context.close(); }
+}
+
 async function small(browser, width, height) {
   const test = await open(browser, { viewport: { width, height }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }), { page } = test;
   const tag = `${width}x${height}`;
@@ -638,7 +711,9 @@ async function small(browser, width, height) {
     await page.click('#play');
     await until(page, () => __pitch.canTap, 'small play');
     assert.deepEqual(await P(page, () => __pitch.size), { w: 8, h: 10 });
-    assert.equal(await P(page, () => __pitch.level), 2, 'a saved Hard level plays Hard');
+    // Changed on purpose (2026-11-24): __pitch.level is the rung now; a saved Hard (level 2) is rung 8 (index 7), which plays Hard.
+    assert.equal(await P(page, () => __pitch.level), 7, 'a saved Hard level plays the top rung, Hard');
+    assert.equal(await P(page, () => __pitch.rung), 7, 'an old save with no pitch:more starts on its own level');
     const t = await P(page, () => __pitch.legal);
     for (const m of t) assert.ok(m.sx >= 22 && m.sx <= width - 22 && m.sy > 60 && m.sy < height - 40, 'small: targets on screen');
     await noOverflow(page, 'small play');
@@ -761,7 +836,7 @@ async function turkish(browser, device, phone, tag) {
     await until(page, () => __pitch.mode === 'bot' && __pitch.canTap, 'Turkish first match');
     assert.equal(await text(page, '#turnText'), 'Sıra sende');
     assert.equal(await text(page, '#tag'), 'Küçük saha');
-    assert.equal(await text(page, '#score div:last-child small'), 'Kolay bot');
+    assert.equal(await text(page, '#score div:last-child small'), 'Seviye 1 bot'); // was 'Kolay bot' before the eight levels
     await shotTr(page, '2-play');
     await page.waitForSelector('.kit-hint.on .label', { timeout: 12000 }).catch(() => null);
     if (await P(page, () => !!document.querySelector('.kit-hint.on'))) {
@@ -807,7 +882,7 @@ async function turkish(browser, device, phone, tag) {
     try { await playMatch(page, tag, null, 1); } finally { betweenCheck = null; }
     await until(page, () => document.querySelector('#pic').naturalWidth > 0, 'Turkish picture');
     assert.match(await text(page, '#endTitle'), /^(Kazandın!|Bot kazandı)$/);
-    assert.match(await text(page, '#endLine'), /^Sıradaki: (yine )?(Kolay|Orta|Zor) bot\.$|^Şimdi tam boy saha, rakip Orta bot\.$|^Sıradaki: tam boy saha\.$/);
+    assert.match(await text(page, '#endLine'), /^Sıradaki: (yine )?Seviye [1-8] bot\.$|^Şimdi tam boy saha, 2\. seviye bota karşı\.$|^Sıradaki: tam boy saha\.$/);
     assert.equal(await text(page, '#again'), 'Rövanş');
     assert.equal(await text(page, '#savePic'), 'Resmi kaydet');
     assert.equal(await text(page, '#endMenu'), 'Menü');
@@ -946,6 +1021,7 @@ try {
         if (phone === 'chromium') for (const [w, h] of [[360, 640], [390, 844]]) { await small(browser, w, h); console.log(`ok   pitch on chromium ${w}x${h}`); }
       }
       if (!process.argv.includes('--friends-only')) await recording(browser, device, phone);
+      if (!process.argv.includes('--friends-only')) await fromSmall(browser, phone);
       await playFriend(browser, device, phone);
       if (!process.argv.includes('--friends-only')) {
         await turkish(browser, device, phone, `${phone}-${device.viewport.width}x${device.viewport.height}`);
