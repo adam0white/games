@@ -66,6 +66,7 @@ export const labMoved = {
   'lantern-tide': '/lantern/?mode=tide',
   'lantern-duet': '/lantern/?mode=duet',
   'lantern-race': '/lantern/?mode=race',
+  'lantern-ripples': '/lantern/?view=3d',
   'lantern-fp': '/lantern/',
   'lantern-song': '/lantern/',
   'lantern-echo': '/lantern/',
