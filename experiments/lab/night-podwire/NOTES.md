@@ -148,7 +148,7 @@ Saves: `night-podwire:progress` keeps its shipped format and meaning (`{v:1,next
 - `night-podwire:book`: `{v:1,reached 1–18,done,best}`
 - `night-podwire:daily`: `{v:1,days:{date:{plucks,par}}}`, keeping the last 40 days
 
-Each write merges with what another tab wrote first. The hub (`hub-a/hub.js`) reads both keys and counts out of 18. Its catalogue entry now has `tr: true`.
+Each write merges with what another tab wrote first. The small games' home reads both keys and counts out of 18 (`experiments/small/marks.js`; main moved the hub from `hub-a` while this branch was open). Its catalogue entry (`experiments/small/catalog.js`) now has `tr: true`.
 
 ### The owner's point in numbers: the clumsy player
 
@@ -203,6 +203,7 @@ This shows the drawing carries enough information. It does not show that a perso
   - page work per frame at 390×844 while the daily par is computed and the wire rings: p95 4 ms / max 4 ms on WebKit (its timer has a 1 ms step), and p95 0.4–4 ms / max 4.5–5 ms on Chromium over two runs. The budget is 8 ms.
 - `node experiments/kit/check/phone.mjs lab/night-podwire,lab/hub-a` passes on both profiles, with no change to the shared entry. The legacy progress seed still restores plate II, one done mark and sound.
 - `npm test` passes (73 tests).
+- After merging main: `npm test` (73), `bots.mjs`, `--mutate` (exits 1), `--mutations` (12 of 12 fail), `check.mjs` on both browsers (page work p95 4 ms WebKit, 0.3 ms Chromium) and `phone.mjs lab/night-podwire,small` all pass again. The share check stubs the share sheet and the clipboard and asserts the exact line and link.
 
 Intentional check changes in `check.mjs`:
 - After plate VI, Next opens plate VII; it used to return to plate I. A reload keeps plate VII.
@@ -221,3 +222,7 @@ No assertion was loosened.
 - Frame time on a real mid-range Android phone.
 - Whether rhythm plates IX and XVI feel fair to a person. Their windows come from the bot.
 - The difficulty curve comes from bots with uniform noise. People make different errors.
+- No browser check plays a live-wire plate (IX, XVI) through real pointer input; their page code (holding while the wire rings) is covered only by `bots.mjs` in Node.
+- The daily par is checked against Node for 2 dates in the browsers, not across many dates; WebKit could round `Math.sin`/`Math.exp` differently.
+- On Peony (XVIII) the fret peg sits under the winding, so a low touch may toggle the fret instead of gripping the wire.
+- In Turkish, the kit's recording checkbox on the pause card is still in English (kit text, not this page's).
