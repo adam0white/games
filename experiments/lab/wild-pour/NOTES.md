@@ -285,14 +285,14 @@ Written and committed (commit "a frozen clumsy-thumb bot and a flow-against-tilt
 
 | Level | Before, seeds 1–500 | After, seeds 1–500 | After, held-out seeds 4201–4700 |
 | --- | --- | --- | --- |
-| 1 | 7.4% (456 over) | 92.8% | SWEEP1 |
-| 2 | 17.4% | 86.2% | SWEEP2 |
-| 3 | 14.6% | 79.4% | SWEEP3 |
-| 4 | 19.4% | 74.4% | SWEEP4 |
-| 5 | 12.8% | 67.4% | SWEEP5 |
-| 6 | 22.0% | 59.8% | SWEEP6 |
-| 7 | 14.6% | 52.4% | SWEEP7 |
-| 8 | 22.2% | 41.0% | SWEEP8 |
+| 1 | 7.4% (456 over) | 92.8% | 92.4% |
+| 2 | 17.4% | 86.2% | 83.8% |
+| 3 | 14.6% | 79.4% | 81.2% |
+| 4 | 19.4% | 74.4% | 74.6% |
+| 5 | 12.8% | 67.4% | 71.6% |
+| 6 | 22.0% | 59.8% | 62.6% |
+| 7 | 14.6% | 52.4% | 55.2% |
+| 8 | 22.2% | 41.0% | 41.8% |
 
 Before, losses were mostly overfills. After, juice losses are overfills and sway losses are spills. Average stars on a win run from 1.2 (two glasses) to 2.6 (sway levels, where the slow careful pour lands close).
 
@@ -323,17 +323,17 @@ All player-facing strings are in `words.js` (English and Turkish, through `kit/i
 
 ### Checks changed on purpose
 
-- `bots.mjs`: `careful()` and the planner aim a pour rate instead of the old "tilt where juice runs" formula. The old clumsy bot and its checks ("late levels at least 0.25 below early levels"; `--sweep`: "careless bots under 50% on levels 5 to 8") were replaced by the frozen thumb and the owner's targets: level 1 at least 88%, levels 2 and 3 above 75%, no level under 35%, no level easier than the one after it (within 4 points on 200 seeds, 3 points on the 500-seed sweep), no step down over 20 points. The planner minimum (5 of 6) is unchanged. New: conservation on a two-glass level; the band's edges give 1 star and the line 3.
+- `bots.mjs`: `careful()` and the planner aim a pour rate instead of the old "tilt where juice runs" formula. The old clumsy bot and its checks ("late levels at least 0.25 below early levels"; `--sweep`: "careless bots under 50% on levels 5 to 8") were replaced by the frozen thumb and the owner's targets: level 1 at least 88%, levels 2 and 3 above 75%, no level under 35%, no level easier than the one after it (within 4 points on 200 seeds, 3 points on the 500-seed sweep), no step down over 20 points. The planner minimum (5 of 6) is unchanged. The sloppy-aim bot and its `--sweep` line were removed with the old careless checks; the frozen thumb covers careless play. New: conservation on a two-glass level; the stars check uses the page's own `starsFor` and needs 3 stars on the line, 1 at the band's edges and never fewer stars nearer the line.
 - `grid-check.mjs`: the old check compared the grid with the original sim's Git blob, which no longer applies. It now runs one relaxation pass through the grid and over every pair on 6,876 states from 129 runs (every level, two seeds, four thumbs, the mutation, odd states) and needs them equal to 1e-9; largest difference 2.8e-14. It first shows that it catches a 1e-6 difference. At 80 drops the grid is about as fast as every pair (14 against 12 ms for 4,000 passes); it is kept for bigger pours.
-- `check.mjs`: the scripted thumb slides to a steady pour; p95 frame work must be under 8 ms (was 16.67); a failed pour must show its card within 0.6 s and one tap must restart it within 1 s; the page must reach the same end state as Node for a scripted pour on three levels.
+- `check.mjs`: the scripted thumb slides to a steady pour; p95 frame work must be under 8 ms (was 16.67); a failed pour must show its card within 0.6 s and one tap off the card (on the dimmed scene) must restart it within 1 s; the Again button is used by the attempt loop; the page must reach the same end state as Node for a scripted pour on three levels.
 
 ### Checked
 
 - `node bots.mjs`: 0 failed (planner 6/6 on every level). `node bots.mjs --mutate` (glass without a floor): 4 checks fail, exit 1, as it must. `node bots.mjs --sweep` (planner 64 seeds, thumb 500 seeds, held out): SWEEPRESULT.
 - `node grid-check.mjs`, `node daily.test.mjs`: pass. `npm test`: 73 pass.
-- `check.mjs` on WebKit (iPhone 13) and Chromium (Pixel 7): ok. Same digest in Node, WebKit and Chromium. Frame work p95 1 ms (WebKit timer step) and 0.3 ms (Chromium), whole loop: rules and canvas calls, not the browser's own painting. Failed pour: card 361 and 366 ms after the loss, restart 28 and 48 ms after one tap.
+- `check.mjs` on WebKit (iPhone 13) and Chromium (Pixel 7): ok. Same digest in Node, WebKit and Chromium. Frame work p95 1 ms (WebKit timer step) and 0.3 ms (Chromium), whole loop: rules and canvas calls, not the browser's own painting. Failed pour: card 360 and 366 ms after the loss, restart 3 and 16 ms after one tap off the card (after merging main). Before the merge, with the Again button: 28 and 48 ms.
 - `kit/check/phone.mjs lab/wild-pour` and its hint run: ok on both.
-- Played in headless Playwright at 390 x 844 and looked at the screenshots: first minute, every level mid-pour, end cards, pause card (`/tmp/claude-improve-wild-pour/after/`).
+- Played in headless Playwright at 390 x 844 and looked at the screenshots (outside the repo, `/tmp/claude-improve-wild-pour/after/`): WebKit start, mid-pour, end card and pause card; Chromium mid-pour; levels 2, 4, 5, 6 and 7 mid-pour (`after/levels/`); a lost pour's card. Levels 3 and 8 were played by the scripts but not looked at.
 
 ### Not verified
 

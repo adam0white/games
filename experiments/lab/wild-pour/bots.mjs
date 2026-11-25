@@ -7,7 +7,7 @@
 // 2026-11-24: the flow now follows the thumb (sim.js), so careful() and the planner aim a pour rate instead of the old
 // "tilt where the juice starts to run". The old clumsy bot and its "late levels at least 0.25 below early levels" check
 // were replaced by the frozen thumb bot (thumb.mjs) and the owner's targets; NOTES.md says why.
-import { create, step, band, LEVELS, digest, glassX, clone, POUR_FROM, POUR_FULL, MAX_TILT } from './sim.js';
+import { create, step, band, LEVELS, digest, glassX, clone, starsFor, POUR_FROM, POUR_FULL, MAX_TILT } from './sim.js';
 import { thumb } from './thumb.mjs';
 
 const MUTATE = process.argv.includes('--mutate');
@@ -160,12 +160,13 @@ thumbChecks(thumbRates(1, thumbSeeds), 0.04);
     ok(bad === 0, `level ${n}: every drop is counted in exactly one place on every step`);
   }
 }
-// 6. a near miss counts: a pour that ends anywhere in the band wins, and the stars rise as it gets closer
+// 6. a near miss counts: stars from sim.js's own starsFor rise as the pour gets closer to the line
 {
-  const s = create(1, 1); const [lo, hi] = band(s); const L = s.L;
-  const starsAt = n => { const c = clone(s); c.glasses[0].n = n; c.inGlass = n; return n >= lo && n <= hi ? (Math.abs(n - L.target) <= Math.ceil(L.band * 0.25) ? 3 : Math.abs(n - L.target) <= Math.ceil(L.band * 0.6) ? 2 : 1) : 0; };
-  ok(starsAt(L.target) === 3 && starsAt(lo) === 1 && starsAt(hi) === 1, `level 1 band ${lo} to ${hi}: the line gives 3 stars, the band's edges give 1`);
+  const s = create(1, 1); const [lo, hi] = band(s);
+  const starsAt = n => { const c = clone(s); c.glasses[0].n = n; c.inGlass = n; return starsFor(c); };
+  const row = []; for (let n = lo; n <= hi; n++) row.push(starsAt(n));
+  let rises = true; for (let n = lo; n < s.L.target; n++) if (starsAt(n + 1) < starsAt(n)) rises = false;
+  ok(starsAt(s.L.target) === 3 && starsAt(lo) === 1 && starsAt(hi) === 1 && rises, `level 1 band ${lo} to ${hi}: stars ${row.join('')} (3 on the line, 1 at the edges, never fewer nearer the line)`);
 }
-
 console.log(MUTATE ? `mutation run: ${fail} check(s) failed (expected some)` : `${fail} failed`);
 process.exit(fail ? 1 : 0);

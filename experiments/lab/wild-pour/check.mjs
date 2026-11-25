@@ -217,12 +217,15 @@ async function run(name) {
   assert.ok(!failed.won, `pouring everything at once fails level ${failed.level} (${failed.why})`);
   assert.ok(failed.endShownAt - failed.overAt < 600, `the card shows ${Math.round(failed.endShownAt - failed.overAt)} ms after the pour fails`);
   await page.screenshot({ path: join(SHOTS, `${name}-4-failed.png`) });
+  // One tap anywhere off the card (here: the dimmed scene under it) pours again.
+  const box = await page.locator('#end .card').boundingBox(), vp = page.viewportSize();
+  const tapY = Math.min(vp.height - 20, box.y + box.height + 40);
   const tapAt = Date.now();
-  await page.tap('#retry');
+  await page.touchscreen.tap(vp.width / 2, tapY);
   await until(page, () => window.pourState().playing && !window.pourState().over, 'playing again');
   const restartMs = Date.now() - tapAt;
-  console.log(`${name}: a failed pour (${failed.why}) restarts ${restartMs} ms after one tap; card after ${Math.round(failed.endShownAt - failed.overAt)} ms`);
-  assert.ok(restartMs < 1000, `one tap restarts a failed pour within a second (${restartMs} ms)`);
+  console.log(`${name}: a failed pour (${failed.why}) restarts ${restartMs} ms after one tap off the card; card after ${Math.round(failed.endShownAt - failed.overAt)} ms`);
+  assert.ok(restartMs < 1000, `one tap off the card restarts a failed pour within a second (${restartMs} ms)`);
   await page.tap('#pause'); await page.tap('#quit');
 
   // Daily retries share seed, do not award campaign stars, and retain the device best.
