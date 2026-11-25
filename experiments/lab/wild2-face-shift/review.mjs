@@ -90,7 +90,7 @@ async function run(kind,device){
     await p.goto(base+'?seed=0');await p.waitForFunction(()=>window.faceShiftState);
     await shot(p,kind.name()+'-menu');
     assert.equal(await p.evaluate(()=>document.querySelector('#hero').getContext('2d').getImageData(300,150,1,1).data[3]),255,'Menu portrait canvas must be painted');
-    await p.locator('#play').tap();
+    await p.locator('#classic').tap();
     if(!process.argv.includes('--lifecycle')){
       await p.waitForTimeout(1800);await shot(p,kind.name()+'-first-play');
       assert.equal(await p.evaluate(()=>{const c=document.querySelector('#c');return c.getContext('2d').getImageData(c.width-2,c.height-2,1,1).data[3];}),255,'Game canvas must paint the full backing surface');
@@ -116,7 +116,7 @@ async function run(kind,device){
       assert.equal(restarted.state.index,0);assert.equal(restarted.state.shots.length,0);assert.equal(restarted.score,0);assert.equal(restarted.cleared,0);
       assert.ok(restarted.state.elapsed<paused.state.elapsed,'Restart clears elapsed time');assert.equal(restarted.state.held,0);
       await shot(p,kind.name()+'-retry');await p.reload();await p.waitForFunction(()=>window.faceShiftState);
-      assert.equal((await state(p)).mode,'menu');await shot(p,kind.name()+'-reload');await p.locator('#play').tap();
+      assert.equal((await state(p)).mode,'menu');await shot(p,kind.name()+'-reload');await p.locator('#classic').tap();
     }
     await lifecycle(p,kind.name());assert.deepEqual(errors,[]);
     console.log(`PASS ${kind.name()}: lifecycle${process.argv.includes('--lifecycle')?'':' plus seed zero, two fingers, pause, restart, reload and painted canvases'}`);
