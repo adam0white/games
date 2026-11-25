@@ -123,6 +123,7 @@ const rec = home(lab('night-bells'), { back: ['#menu .card', '#end .card'] });
 - `back`: the menu and end cards, as selectors or elements, that get the link. Nothing is added when the page was not opened from the home (the `from` is remembered for the tab, so a reload or the next level keeps it). The link goes back in history when the player came from the home, so the home keeps its scroll and its deck position.
 - `rec` is the same recorder: `notice`, `toggle`, `start` and `event` are unchanged, and `end(outcome, summary)` still goes to the lab. A run whose outcome is `'won'` counts as a win. A game with other words for a win passes `'won'` or calls `homeResult('<slug>', 'won')` itself.
 - What it writes: the home's own key `hub:results` (`{ <slug>: { runs, wins, last, at, wonAt } }`). It never reads or writes the game's keys. `home(null, ...)` works without a recorder.
+- `home()` adds the links once, when it is called. A game that redraws a card with `innerHTML` calls `backLink(card)` (also exported) after drawing it; it adds nothing when the page was not opened from the home, and never adds a second link.
 - Until a game has this line, nothing changes for it: the browser's back button returns to the home, and the home reads the game's own save to mark it "moved forward".
 - The slug comes from the folder in the address and must be the game's name in `experiments/small/catalog.js` (they are equal today).
 

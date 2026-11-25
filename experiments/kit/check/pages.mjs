@@ -322,6 +322,15 @@ export const pageRuns = {
     await page.waitForTimeout(2400); await page.click('#introOk');
     await until(page, () => !window.smallState().intro, 'Start hides it');
     await page.reload(); await until(page, () => window.smallState && !window.smallState().intro, 'and it stays hidden');
+    // The way back from a real game page opened from the home, as a wired game would add it (game files untouched).
+    await page.click('li.now a.stop.wild-pour'); await page.waitForURL(url => url.pathname === '/lab/wild-pour/');
+    await page.evaluate(async () => { const { home } = await import('/kit/home.js'); home(null, { back: ['#menu .card'] }); });
+    assert.equal(await page.isVisible('#menu .card a.kit-home'), true, 'the back link shows on the game’s menu card');
+    await page.locator('#menu .card').screenshot({ path: `/tmp/claude-small-games-home/${page.context().checkName}-back-link.png` }).catch(() => {});
+    await page.tap('#menu .card a.kit-home');
+    await page.waitForURL(url => url.pathname === '/small/'); await until(page, () => window.smallState, 'back on the home by the link');
+    assert.equal(new URL(page.url()).searchParams.get('day'), DAY, 'the link went back in history (the home keeps its address and place)');
+    assert.equal(await page.getAttribute('#stops li:nth-child(1)', 'class'), 'opened', 'the home shows the stop opened');
   },
 };
 async function smallOpen(page, until, selector, slug) {

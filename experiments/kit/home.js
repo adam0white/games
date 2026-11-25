@@ -29,11 +29,11 @@ export function fromHome() {
 }
 const slugHere = () => { try { return location.pathname.split('/').filter(Boolean).pop() || ''; } catch { return ''; } };
 
-// The link itself. Going back keeps the home's scroll and its swipe deck where the player left them.
+// The link itself, only on a page opened from the home. Going back keeps the home's scroll and its swipe deck where the player left them.
 export function backLink(where) {
   try {
     const parent = typeof where === 'string' ? document.querySelector(where) : where;
-    if (!parent || parent.querySelector(':scope > .kit-home')) return null;
+    if (!fromHome() || !parent || parent.querySelector(':scope > .kit-home')) return null;
     const a = document.createElement('a');
     a.className = 'kit-home'; a.href = HOME + (lang() === 'tr' ? '?lang=tr' : ''); a.textContent = `‹ ${WORDS[lang()]}`;
     Object.assign(a.style, { display: 'inline-flex', alignItems: 'center', minHeight: '44px', padding: '0 .4em', color: 'inherit', opacity: '.85', fontSize: '15px', pointerEvents: 'auto', textUnderlineOffset: '3px' });
