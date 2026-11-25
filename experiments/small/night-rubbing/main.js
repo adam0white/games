@@ -474,5 +474,8 @@ rec.toggle(el('paused').firstElementChild);
 window.rubbingState = () => ({ screen: mode, level: s.level, unlocked, sound: soundOn, coverage: s.coverage, goal: s.goal, distance: s.distance,
   kind: kind(), lead: s.lead, par: s.par, smudge: s.smudge, smudgeLimit: s.smudgeLimit, spoiled: s.spoiled, stars: shownStars(),
   filedNow, best: { ...best }, daily: daily ? daily.day : null, dailyRecord: dailyRecord(), fx: fxLog(), lang: lang() });
-const startLevel = plateNumber(more.level) && more.level <= unlocked ? more.level : oldNumber(prefs.level) && prefs.level <= unlocked ? prefs.level : unlocked;
+// The old key holds the plate for plates 1 to 6 (and 6 for later plates); the new key is read only for a plate past 6
+// that the old key agrees with, so a save written by the old page (or set by hand) still decides the plate.
+const startLevel = plateNumber(more.level) && more.level > OLD && more.level <= unlocked && prefs.level === OLD ? more.level
+  : oldNumber(prefs.level) && prefs.level <= unlocked ? prefs.level : unlocked;
 open(startLevel);
