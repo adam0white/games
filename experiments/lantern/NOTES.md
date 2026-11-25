@@ -766,7 +766,7 @@ Not verified: tilt, slide and the tutorial on a real phone; whether a new player
 ## How a mode plugs in
 
 A mode is a way to play Lantern's river with other rules on top, chosen in the "Game mode" group and played inside `/lantern/`.
-Spark is the first, Tide the second, Duet the third. Race will follow the same pattern.
+Spark is the first, Tide the second, Duet the third, Race the fourth.
 
 **Files.** A mode is `modes/<id>.js`, plus any rules of its own (`modes/<id>-sim.js`) and bots (`modes/<id>-bots.mjs`).
 A mode's rules wrap Lantern's `sim.js` state. They never edit `sim.js`.
@@ -798,6 +798,9 @@ With `mod === null`, every line of index.html runs as it did before modes. `bots
 | `steers` | optional, `true` for a mode with its own steering (Duet's two pads): the page's one-finger hint stays away |
 | `own` | optional, `true` for a mode whose run state is not Lantern's (Duet's two boats): the page makes a fresh `create(1, stage)` when the player leaves the mode for the menu, so the menu's river and the shop previews never read the mode's state |
 | `share` | optional, 0 to 1: the share of a run's embers the page banks (Duet's rope takes about twice a night's embers a minute, so 0.5). Absent means 1 |
+| `pause(why)` | optional (Race): before the page pauses. `why` is `'button'`, `'key'` or nothing (the page lost the screen). Returning `true` means the mode handled it and the page does not pause (a live race cannot stop its clock) |
+| `go()` | optional (Race): the end card's main button. Returning `true` means the mode handled it (Race's Rematch goes to its lobby) |
+| `top(now)` | optional (Race): each frame of a mode run, after the page's own drawing and before the sparks; Race draws the other boats there |
 | `screen(name, box)` | when the page changes screens (show or hide the mode's own buttons; going to `menu` ends the mode) |
 | `state()`, `game()` | for the browser checks (`window.lanternMode()`, `window.lanternSpark()`) |
 
@@ -808,6 +811,7 @@ With `mod === null`, every line of index.html runs as it did before modes. `bots
 | `boat(now)`, `crashed()`, `win(now)` | draw the boat in its looks (or its crash effect); draw the victory effect |
 | `say`, `tone`, `noise`, `ctx()` | the page's spoken line, sounds and audio context (from the kit's `audio.js`) |
 | `live()`, `paused()`, `resume()`, `play()` | run state; start a run |
+| `card()`, `screen()` | show the mode's card (`show('mode')`); the name of the screen on show (Race, 2026-11-24) |
 
 **What a mode may change:** its drawing (flat), the light, extra input (its own listeners, which act only while a run of the mode is on), extra sounds, its own save keys (`lantern-mode-<id>:*`), its end card lines.
 **What it may not:** `sim.js`, Lantern's save keys, the shared leaderboard (a mode's runs never post), `lantern-night`, `lantern-best-*`, stats (a mode neither uses nor spends them, as on the endless river).
@@ -944,3 +948,35 @@ The pointers are synthetic `PointerEvent`s sent to the element under each point,
 
 **Not verified.** Two real thumbs on a real phone (the lab page's open question, still open); whether four melody notes and a chime for a swept line sound right; the warning tones by ear.
 The lab page moved to `archive/lab/lantern-duet/`. Its old address needs `'lantern-duet': '/lantern/?mode=duet'` in `labMoved` (`worker-settings.mjs`, the lead adds it).
+
+## 2026-11-24: Race is a mode inside Lantern (owner, lab cleanup: "accepted as is")
+
+**What the player sees.** "Game mode", then "Lantern Race", opens Race's card: a boat name, Quick race (or "Join room ABCD" when a shared link names a room), Race friends, the best crossing.
+Race friends makes a four-letter room or joins one. The lobby lists the boats; Ready starts the round when everyone is ready, or 8 s after the first Ready, with a countdown.
+Every boat races the same river from the same seed; the others show as pale boats with their names, and a bar on the right shows where each boat is. The first boat to dawn wins.
+The end card says how the run ended, then the results, which fill in as the other boats finish; Rematch is Ready again. Alone, or with no connection, Race races three bots (Reed, Glimmer, Drift).
+
+**Faithful.** `modes/race-sim.js` is the lab page's `sim.js` with one line changed (the import path of Lantern's `sim.js`). `modes/race-bots.mjs` is the lab page's `bots.mjs` with its import paths changed and its claims unchanged; `bots.mjs race` runs it.
+`modes/race.js` is the lab page's `main.js` moved inside Lantern: the room (a WebSocket to `/lab-api/room/lantern-race/<code>`, `workers/lab-ai/src/room.mjs`, unchanged), the lobby, the countdown, the bots, the ghosts and the results.
+The room is not the kit's `table` (`room.js`): the lab room's frames are its own, and `workers/lab-ai/test/table.test.mjs` keeps `lantern-race` out of the table's names. `workers/lab-ai/test/room.test.mjs` now imports the decoder from `modes/race-sim.js` (a path change only).
+
+**What changed, and why.**
+- The page draws the river and the player's boat with Lantern's own drawing, looks, HUD, pause button and music; the lab page drew its own. Each ember plays the night's melody, as on a night.
+- The other boats are drawn in the new `top(now)` hook. Their names are pushed apart when boats run side by side, and are hidden on the cards (on the lab page they overlapped).
+- The pause button in a live race asks first ("A live race cannot pause: tap again to retire"); P, Escape and leaving the page retire at once, as on the lab page. Offline, Race pauses like a night (new hook `pause(why)`).
+- The end card's main button is Rematch (new hook `go()`); Menu leaves the room and goes back to Race's card. In the lobby the page's Back is hidden, so the room is left only by Leave room.
+- The share link is `/lantern/?mode=race&room=ABCD` (kit `shareLink`). The kit's `linkFor` would drop `mode`.
+- English only on the lab page; every line is in `words.js` in English and Turkish now. The lab page's own sound switch is gone (Lantern's music switch is on the pause card).
+- Recording: a race is recorded like any mode run (`mode: 'race'`) when the player has recording on.
+- Embers: a race banks its embers like a night (no `share`). The lab page banked nothing. This is an owner decision; `share` is one number.
+- Race's river is not Lantern's (`own: true`): the menu gets a fresh river after a race.
+
+**Saves.** `lantern-mode-race:save` is `{ v: 1, best: 0..100000, name, played }`. If it is missing and any of the lab page's `lantern-race-best`, `lantern-race-name` or `lantern-race-played` is there, they are carried over once. The lab keys are never written. Race makes no shared-board calls; a race's result goes only to the room.
+
+**Checks.** `bots.mjs race`: the lab page's ten claims hold (wire limits, ranking, interpolation, deterministic ghosts, difficulty). Bots: night 1, clumsy 34 of 120 reach dawn (78.6% mean distance), careful 40 of 40; night 3, 10 of 120 and 35 of 40; night 6, 5 of 120 and 35 of 40. `--mutate` reverses the ranking and fails "distance first, time second" (exit 1).
+`phone.mjs lantern` on both browsers, with a stand-in WebSocket on pages with `mode=race` (the check plays the server): the room link opens Race with "Join room ABCD"; the lab save carries over; hi, `you`, Ready, `roster`, `round`, the countdown, a ghost from a `p` frame, the page's own `p` frames; one tap of the pause button asks and goes quiet; dawn, the end card and two result rows, `done` sent; Rematch sends Ready; a second round where P retires the boat; with no server, three bots, and P pauses; Menu leaves; only the new key; no board call; a fresh river on the menu. Fault injected by hand: the pause button retiring on the first tap fails "one tap asks to retire".
+Changed on purpose in `phone.mjs`: the Game mode card has no links any more (`[]`), and the Turkish mode buttons list Race first (`['race', 'Fener Yarışı']`).
+`experiments/kit/check/lab-pages.mjs` loses the `lab/lantern-race` entry and its offline-socket helpers, which only it used.
+
+**Not verified.** Two real devices racing through the real relay (the lab page's open question, still open); the check's server is a stand-in. The countdown tones by ear.
+The lab page moved to `archive/lab/lantern-race/`. Its old address needs `'lantern-race': '/lantern/?mode=race'` in `labMoved` (`worker-settings.mjs`, the lead adds it). The redirect keeps the query, so `/lab/lantern-race/?room=ABCD` reaches `/lantern/?mode=race&room=ABCD`.

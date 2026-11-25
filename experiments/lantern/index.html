@@ -114,7 +114,7 @@
   <p class="opt"><button id="daily" data-i18n="daily">Today's river</button><small data-i18n="dailyWhat"></small></p>
   <p class="opt"><button id="tower">Tower climb</button><small data-i18n="towerWhat"></small><button id="anew" hidden>New climb from level 1</button></p>
   <div class="more">
-    <p class="opt"><a class="mode" href="/lab/lantern-race/" data-i18n="modeRace">Lantern Race</a><small data-i18n="modeRaceWhat">Race other boats on the same river, with friends or bots.</small></p>
+    <p class="opt"><button class="mode" data-mode="race" data-i18n="modeRace">Lantern Race</button><small data-i18n="modeRaceWhat">Race other boats on the same river, with friends or bots.</small></p>
     <p class="opt"><button class="mode" data-mode="spark" data-i18n="modeSpark">Lantern Spark</button><small data-i18n="modeSparkWhat">The lantern is out. Strike sparks to see the river.</small></p>
     <p class="opt"><button class="mode" data-mode="tide" data-i18n="modeTide">Lantern Tide</button><small data-i18n="modeTideWhat">Ride the bright water. Slack water burns the flame.</small></p>
     <p class="opt"><button class="mode" data-mode="duet" data-i18n="modeDuet">Lantern Duet</button><small data-i18n="modeDuetWhat">Two boats, one flame, one thumb each.</small></p>
@@ -307,12 +307,12 @@ window.lanternSim = () => s; // the browser checks use this to reach late stretc
 const cards = screens(['menu', 'shop', 'credits', 'card', 'board', 'modes', 'perspective', 'tutor', 'mode']);
 // More modes (NOTES.md, "How a mode plugs in"): a mode is a module in modes/ that index.html loads when it is chosen. mod is the mode
 // chosen, or null; with null, every line below runs as before modes. A mode is drawn flat: the view the player chose comes back after.
-const MODES = { spark: () => import('./modes/spark.js'), tide: () => import('./modes/tide.js'), duet: () => import('./modes/duet.js') }, made = {};
+const MODES = { spark: () => import('./modes/spark.js'), tide: () => import('./modes/tide.js'), duet: () => import('./modes/duet.js'), race: () => import('./modes/race.js') }, made = {};
 let mod = null;
 const pct = () => mod ? mod.reach() : progress(s);
 async function chooseMode(id) {
   if (!Object.hasOwn(MODES, id ?? '')) return;
-  const m = made[id] ??= (await MODES[id]()).mode({ canvas, g: () => g, size: () => ({ W, H, unit, left, dpr }), skin, live: () => playing && !paused, paused: () => paused, resume: () => resume(), play: () => begin(), say, tone, noise: (...a) => snd.ctx && snd.noise(...a), ctx: () => snd.ctx, boat: now => boatAt(now, sx(s.x), sy(s.y)), crashed: () => !!crash, win: now => { if (victory) winDraw(now); } });
+  const m = made[id] ??= (await MODES[id]()).mode({ canvas, g: () => g, size: () => ({ W, H, unit, left, dpr }), skin, live: () => playing && !paused, paused: () => paused, resume: () => resume(), play: () => begin(), card: () => show('mode'), screen: () => screen, say, tone, noise: (...a) => snd.ctx && snd.noise(...a), ctx: () => snd.ctx, boat: now => boatAt(now, sx(s.x), sy(s.y)), crashed: () => !!crash, win: now => { if (victory) winDraw(now); } });
   mod = m; endless = tower = daily = false; tutor = null; setView('2d', false); show('mode'); // a mode is never the endless river, a climb or the tutorial, so it never takes a board ticket
 }
 window.lanternMode = () => mod ? { id: mod.id, ...mod.state() } : null; window.lanternSpark = () => mod?.game(); // read by the browser checks
@@ -923,7 +923,7 @@ $('name').addEventListener('input', () => { store.set('lantern-name', cleanName(
 $('name').addEventListener('change', () => { $('name').value = playerName(); boardShow(); });
 $('name').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') $('name').blur(); });
 for (const b of document.querySelectorAll('.back')) b.addEventListener('click', () => show('menu'));
-$('go').addEventListener('click', () => { if (paused) resume(); else if (performance.now() - ended > 600) { if (tower) { onward = s.over === 'dawn' && climbNext > climb; climb = climbNext; fromFloor = towerFloor(); } begin(); } });
+$('go').addEventListener('click', () => { if (paused) resume(); else if (performance.now() - ended > 600) { if (mod?.go?.()) return; if (tower) { onward = s.over === 'dawn' && climbNext > climb; climb = climbNext; fromFloor = towerFloor(); } begin(); } });
 // Lab recording (experiments/kit/lab.js): the notice on the menu, the switch on the pause card; begin, finish, quit and the shop call rec.
 const rec = lab('lantern'), notice = rec.notice($('menu').firstElementChild), recording = rec.toggle($('card').firstElementChild);
 // The kit's notice and switch take their words from words.js. The space between the parts stays where the kit puts it.
@@ -936,8 +936,9 @@ $('toMenu').addEventListener('click', () => { if (paused) { rec.end('quit', { mo
 function pauseText() { // the pause card's words; the language button draws them again
   $('toMenu').textContent = t('menu'); $('title').textContent = t('paused'); $('line').textContent = mod ? mod.pauseLine() : endless ? t('pauseScore', { n: score(s) }) : tutor ? t('pauseTutor') : tower ? t('pauseTower', { tag: tag(climb), f: Math.floor(progress(s) * FLOORS), of: FLOORS }) : t('pauseNight', { n: stage, pct: Math.floor(progress(s) * 100) }); $('sub').textContent = t(view === 'first' && steering !== 'slide' ? (tilting() ? 'touchGoTilt' : 'touchGoFirst') : 'touchGo'); $('go').textContent = t('goOn');
 }
-function pause() {
-  if (!playing || paused) return; paused = true; steer.drop(); pads.drop(); keys.clear(); $('viewNext').hidden = !!mod;
+function pause(why) { // why: 'button', 'key', or nothing (the page lost the screen)
+  if (!playing || paused) return; if (mod?.pause?.(why)) return; // a mode may take the pause (Race: a live race cannot stop its clock, so the boat retires)
+  paused = true; steer.drop(); pads.drop(); keys.clear(); $('viewNext').hidden = !!mod;
   pauseText();
   $('ask').hidden = true; $('say').style.opacity = 0; show('card'); snd.hold();
 }
@@ -945,12 +946,12 @@ function resume() {
   if (!paused) return; paused = false; acc = 0; snap3 = true; last = performance.now(); target = s.x; slide = 0; tilt.zero();
   show('play'); snd.release();
 }
-pauseButton.addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); pause(); });
+pauseButton.addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); pause('button'); });
 onLeave(pause);
 const keys = new Set();
 addEventListener('keydown', e => {
   if (looking) { unlook(); return; }
-  if (isPauseKey(e)) { paused ? resume() : pause(); return; }
+  if (isPauseKey(e)) { paused ? resume() : pause('key'); return; }
   if (paused) { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); resume(); } return; }
   keys.add(e.key);
 });
@@ -1204,6 +1205,7 @@ function draw(now) {
     shine(g, ex, ey, unit, e.kind === 'wisp' ? '150,235,110' : e.kind === 'heart' ? '255,60,80' : e.kind === 'shield' ? '90,170,255' : '255,150,60', e.kind === 'wisp' ? 0.25 : 0.45, now / 1000, e.y); // its light lies on the water
     if (e.kind === 'heart') { g.fillStyle = '#ff4d5e'; g.font = `${0.05 * unit}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('♥', ex, ey); }
   }
+  if (mod && !looking) mod.top?.(now); // a mode's things that show through the dark, as embers do (Race's other boats and their names)
   for (const p of sparks) { g.fillStyle = p.blue ? `rgba(150,210,255,${p.life})` : p.red ? `rgba(255,80,90,${p.life})` : `rgba(255,200,120,${p.life})`; g.fillRect(sx(p.x), sy(p.y), 3 * dpr, 3 * dpr); }
   // the shield: a blue ring while it is held, blinking just after it breaks
   // powers waiting in the water: gold arrows boost, violet clock slow water, teal rings size, pink magnet, white sun flare

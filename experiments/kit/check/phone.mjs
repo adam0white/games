@@ -897,6 +897,88 @@ const GAMES = {
       await page.evaluate(() => localStorage.removeItem('lantern-duet:v1'));
       await page.goto(`${base}/lantern/`); await until(page, () => document.getElementById('notes-button'), 'notes button'); await page.click('#toShop'); // back where the erase below starts
     }
+    // Lantern Race, a mode inside Lantern (modes/race.js). The room is faked: a WebSocket stand-in on pages with mode=race records what
+    // the page sends, and the check plays the server (workers/lab-ai/src/room.mjs frames). The room link opens Race with Join room; the
+    // lab page's save carries over once; a live round runs from Ready to the countdown, a ghost, dawn, the results and Rematch; a key
+    // retires a live boat; with no server Race falls back to three bots and pauses like a night; only the new key; no board call.
+    {
+      await page.addInitScript(() => {
+        if (!location.search.includes('mode=race')) return;
+        const all = window.raceSockets = [];
+        window.WebSocket = class { static OPEN = 1;
+          constructor(url) { this.url = url; this.readyState = 0; this.sent = []; all.push(this); queueMicrotask(() => { if (localStorage.getItem('check-race-offline')) this.onerror?.({}); else { this.readyState = 1; this.onopen?.(); } }); }
+          send(text) { this.sent.push(JSON.parse(text)); } close() { this.readyState = 3; } };
+      });
+      await page.evaluate(() => { localStorage.setItem('lantern-race-best', '42000'); localStorage.setItem('lantern-race-name', 'Old boat'); localStorage.setItem('lantern-race-played', '1'); });
+      const before = await saved(), board = []; const spy = r => { if (r.url().includes('/lab-api/board')) board.push(r.url()); }; page.on('request', spy);
+      const serve = m => page.evaluate(m => window.raceSockets.at(-1).onmessage({ data: JSON.stringify(m) }), m);
+      const sent = () => page.evaluate(() => window.raceSockets.at(-1).sent);
+      const race = () => page.evaluate(() => window.lanternMode());
+      await page.goto(`${base}/lantern/?mode=race&room=ABCD`);
+      await until(page, () => window.lanternState().screen === 'mode' && window.lanternMode()?.id === 'race', 'the room link opens Race');
+      let r = await race();
+      assert.deepEqual([r.best, r.name, r.played, r.linked], [42000, 'Old boat', 1, 'ABCD'], 'the lab save carries over and the link names the room');
+      assert.equal(await page.textContent('#raceQuick'), 'Join room ABCD'); assert.equal(await page.inputValue('#raceName'), 'Old boat');
+      await page.click('#raceQuick');
+      await until(page, () => window.raceSockets?.length === 1 && window.raceSockets[0].sent.length === 1, 'the page says hi to the room');
+      assert.match(await page.evaluate(() => window.raceSockets[0].url), /^wss?:\/\/[^/]+\/lab-api\/room\/lantern-race\/ABCD$/, 'the socket is the lab room\'s');
+      assert.deepEqual((await sent())[0], { t: 'hi', n: 'Old boat' });
+      await serve({ t: 'you', id: 2, peers: [{ id: 1, n: 'Ghost' }], round: null });
+      r = await race(); assert.equal(r.me, 2, 'the room numbers the boat'); assert.equal(r.online, true); assert.equal(r.phase, 'lobby');
+      assert.equal(await page.textContent('#raceConn'), 'Live: ABCD'); assert.match(await page.textContent('#racePeers'), /Ghost/);
+      assert.equal(await page.evaluate(() => document.querySelector('#mode .back').hidden), true, 'in the lobby only Leave room leaves');
+      await page.click('#raceReady'); assert.deepEqual((await sent()).at(-1), { t: 'ready' }, 'Ready tells the room');
+      await serve({ t: 'roster', ids: [1, 2] }); await serve({ t: 'round', seed: 12345, start: await page.evaluate(() => Date.now() + 1500) });
+      await until(page, () => window.lanternState().screen === 'play' && window.lanternMode().phase === 'countdown', 'the round counts down');
+      assert.equal(await page.evaluate(() => getComputedStyle(document.getElementById('raceCount')).display), 'grid', 'the countdown shows');
+      const hearts = await page.evaluate(async () => { const { create } = await import('/lantern/sim.js?v=15'), m = window.lanternMode(), s = window.lanternSim(); return [s.hearts, create(m.seed, m.night, false, []).hearts, s.powers.length]; });
+      assert.deepEqual(hearts.slice(0, 2), [hearts[1], hearts[1]], 'a race starts bare: no stats');
+      await until(page, () => window.lanternMode().phase === 'race', 'the race starts', 6000);
+      await page.evaluate(() => { const s = window.lanternSim(); s.safe = 1e9; s.rocks = []; s.next = Infinity; });
+      await serve({ t: 'p', id: 1, x: 0, d: 2000, a: 1 });
+      await until(page, () => window.lanternMode().ghosts.some(g => g.n === 'Ghost'), 'the other boat shows as a ghost');
+      await until(page, () => window.raceSockets[0].sent.some(m => m.t === 'p'), 'the page sends its position');
+      // The pause button in a live race asks first: one tap arms it, and it goes quiet again.
+      await page.click('#pause'); r = await race();
+      assert.equal((await state()).paused, false, 'a live race does not pause'); assert.equal(await page.evaluate(() => document.getElementById('raceStrip').classList.contains('retire')), true, 'one tap asks to retire');
+      await sleep(2700); assert.equal(await page.evaluate(() => document.getElementById('raceStrip').classList.contains('retire')), false, 'the ask goes quiet');
+      await serve({ t: 'p', id: 1, x: 0, d: 100000, a: 1 }); await serve({ t: 'done', id: 1, s: 61000 });
+      await page.evaluate(() => { const s = window.lanternSim(); s.y = 78 - 0.12; });
+      await until(page, () => window.lanternState().screen === 'card', 'dawn ends the race', 12000);
+      assert.equal(await page.evaluate(() => window.lanternSim().over), 'dawn');
+      assert.equal(await page.textContent('#title'), 'First light!'); assert.equal(await page.textContent('#go'), 'Rematch'); assert.equal(await page.textContent('#line'), 'Night ' + (await race()).night + ' · 2 boats');
+      assert.equal(await page.$$eval('#raceRanks .rank', rows => rows.length), 2, 'the results list both boats');
+      assert.ok((await sent()).some(m => m.t === 'done' && Number.isInteger(m.s)), 'the page tells the room it finished');
+      let mine = JSON.parse((await saved())['lantern-mode-race:save']); assert.deepEqual(mine, { v: 1, best: 100000, name: 'Old boat', played: 2 });
+      await page.click('#go'); await until(page, () => window.lanternState().screen === 'mode' && window.lanternMode().phase === 'lobby', 'Rematch goes to the lobby');
+      assert.deepEqual((await sent()).at(-1), { t: 'ready' }, 'Rematch is Ready again');
+      // A key retires a live boat at once (the lab page's rule): the end card says so.
+      await serve({ t: 'roster', ids: [1, 2] }); await serve({ t: 'round', seed: 777, start: await page.evaluate(() => Date.now() + 1000) });
+      await until(page, () => window.lanternMode().phase === 'race', 'a second round', 8000);
+      await page.keyboard.press('p'); await until(page, () => window.lanternState().screen === 'card', 'P retires a live boat');
+      assert.equal(await page.evaluate(() => window.lanternSim().over), 'left'); assert.equal(await page.textContent('#title'), 'Boat retired'); assert.equal((await state()).paused, false);
+      // No server: three bots, and the race pauses like a night.
+      await page.click('#toMenu'); await until(page, () => window.lanternMode().phase === 'menu', 'Menu leaves the room');
+      assert.equal(await page.evaluate(() => window.raceSockets[0].readyState), 3, 'and closes the socket');
+      await page.evaluate(() => localStorage.setItem('check-race-offline', '1'));
+      await page.click('#raceQuick'); await until(page, () => window.lanternMode().offline, 'no server: offline');
+      assert.equal(await page.textContent('#raceLobbyLine'), 'Offline: race today\'s river with bots.');
+      await page.click('#raceReady'); await until(page, () => window.lanternMode().phase === 'race', 'an offline race', 8000);
+      assert.deepEqual((await race()).results.map(p => p.n).sort(), ['Drift · bot', 'Glimmer · bot', 'Old boat', 'Reed · bot'], 'three bots race');
+      await page.keyboard.press('p'); assert.equal((await state()).paused, true, 'offline, P pauses'); assert.equal((await race()).phase, 'paused');
+      await page.click('#toMenu'); assert.equal((await state()).screen, 'mode'); assert.equal((await race()).phase, 'menu', 'Menu from the pause card leaves the race');
+      await page.evaluate(() => localStorage.removeItem('check-race-offline'));
+      const after = await saved(); mine = JSON.parse(after['lantern-mode-race:save']); assert.equal(mine.played, 4, 'every race that ends counts, a retired one too');
+      for (const k of ['lantern-race-best', 'lantern-race-name', 'lantern-race-played']) assert.equal(after[k], before[k], `the lab key ${k} is never written`);
+      for (const k of Object.keys(before)) if (!['lantern-bank'].includes(k)) assert.equal(after[k], before[k], `Race leaves ${k} as it was`);
+      assert.deepEqual(Object.keys(after).filter(k => !(k in before)).sort(), ['lantern-mode-race:save'], 'Race writes only its own new key');
+      await page.click('#mode .back'); assert.equal((await state()).screen, 'menu'); assert.equal(await page.evaluate(() => window.lanternMode()), null, 'leaving Race turns it off');
+      assert.equal(await page.evaluate(() => ['raceStrip', 'raceBar', 'raceCount'].some(id => getComputedStyle(document.getElementById(id)).display !== 'none')), false, 'the race overlays are gone from the menu');
+      await sleep(1500); assert.equal((await state()).over, null, 'the menu has a fresh river of its own, not the race\'s');
+      page.off('request', spy); assert.deepEqual(board, [], 'Race never calls the shared board');
+      await page.evaluate(() => { for (const k of ['lantern-race-best', 'lantern-race-name', 'lantern-race-played']) localStorage.removeItem(k); });
+      await page.goto(`${base}/lantern/`); await until(page, () => document.getElementById('notes-button'), 'notes button'); await page.click('#toShop'); // back where the erase below starts
+    }
     // Erase everything (note #73, tester tools): two taps; every lantern- key goes and nothing else.
     await page.click('[data-test="reset"]'); assert.ok(Object.keys(await saved()).length > 3, 'one tap erases nothing');
     await Promise.all([page.waitForEvent('load'), page.click('[data-test="reset"]')]);
@@ -908,7 +990,7 @@ const GAMES = {
     await until(page, () => document.querySelector('#menu h1').textContent === 'Fener', 'the Turkish menu');
     assert.equal(await page.evaluate(() => document.documentElement.lang), 'tr');
     assert.equal(await page.textContent('#toShop b'), 'Mağaza'); assert.equal(await page.textContent('#toBoard'), 'Sıralama');
-    await page.click('#toModes'); assert.deepEqual(await page.$$eval('#modes a.mode', as => as.map(a => a.getAttribute('href'))), ['/lab/lantern-race/'], 'Race is one tap away'); assert.deepEqual(await page.$$eval('#modes button.mode', bs => bs.map(b => [b.dataset.mode, b.textContent])), [['spark', 'Fener Kıvılcım'], ['tide', 'Fener Gelgit'], ['duet', 'Fener Düet']], 'Spark, Tide and Duet are chosen inside Lantern'); await page.click('#modes .back');
+    await page.click('#toModes'); assert.deepEqual(await page.$$eval('#modes a.mode', as => as.map(a => a.getAttribute('href'))), [], 'no mode is a link away now'); assert.deepEqual(await page.$$eval('#modes button.mode', bs => bs.map(b => [b.dataset.mode, b.textContent])), [['race', 'Fener Yarışı'], ['spark', 'Fener Kıvılcım'], ['tide', 'Fener Gelgit'], ['duet', 'Fener Düet']], 'Race, Spark, Tide and Duet are chosen inside Lantern'); await page.click('#modes .back');
     await page.click('#menuLanguage');
     assert.equal(await page.evaluate(() => document.documentElement.lang), 'en');
     assert.equal(await page.textContent('#menu h1'), 'Lantern'); assert.equal(await page.textContent('#toShop b'), 'Shop');

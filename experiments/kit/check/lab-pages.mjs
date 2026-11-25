@@ -30,25 +30,6 @@ function dragTouch(before, moved, points = [[150, 430], [195, 430]]) {
     await finger(page, '#c', [['pointerup', ...points[1]]]);
   };
 }
-function offlineSocket() {
-  if (!location.pathname.startsWith('/lab/lantern-race/')) return;
-  window.WebSocket = class {
-    static OPEN = 1;
-    constructor() { this.readyState = 0; queueMicrotask(() => this.onerror?.({ type: 'error' })); }
-    close() { this.readyState = 3; }
-    send() { throw new Error('offline race fixture cannot send'); }
-  };
-}
-async function raceStart(page) {
-  await page.addInitScript(offlineSocket);
-  await page.evaluate(offlineSocket);
-  await page.click('#quick');
-  await page.waitForFunction(() => window.raceState().offline);
-  await page.click('#ready');
-  await page.waitForFunction(() => window.raceState().phase === 'race', null, { timeout: 12000 });
-  assert.equal(await page.evaluate(() => window.raceState().offline), true, 'offline race uses the pausable local clock');
-}
-
 async function ringBell(page, { until }) {
   const count = await page.evaluate(() => {
     const { hits, misses } = window.bellsState();
@@ -176,16 +157,6 @@ async function rubPlate(page, { until, knob }) {
 const splitlightLegacy = { 'night-splitlight:plate': '2', 'night-splitlight:sound': 'on' };
 
 export const labPages = {
-  'lab/lantern-race': {
-    seeds: { 'lantern-race-best': '100000', 'lantern-race-sound': '1', 'lantern-race-name': 'Test boat', 'lantern-race-played': '1', 'lantern-race:hint': '1' },
-    play: '#quick', start: raceStart, menu: '#paused .toMenu', sound: '#sound', soundKey: 'lantern-race-sound', soundOff: '0',
-    state: () => { const s = window.raceState?.(); return s && { ...s, screen: s.phase === 'race' ? 'play' : s.phase, paused: s.phase === 'paused' }; },
-    verify: () => ({ best: window.raceState().best, name: document.querySelector('#name').value, sound: document.querySelector('#sound').textContent, played: localStorage.getItem('lantern-race-played') }),
-    expect: { best: 100000, name: 'Test boat', sound: 'Sound: on', played: '1' },
-    touch: dragTouch(() => window.raceState().target, n => window.raceState().target !== n),
-    hint: { key: 'lantern-race:hint', delay: 1500, start: raceStart, before: () => window.raceState().target, moved: n => window.raceState().target !== n,
-      legacy: { 'lantern-race-best': '100000', 'lantern-race-sound': '1', 'lantern-race-name': 'Test boat', 'lantern-race-played': '1' } },
-  },
   'lab/wild2-face-shift': pageEntry('wild2-face-shift:save', saves.face, 'wild2-face-shift:hint', {
     menu: '#toMenu', sound: '#sound',
     state: () => { const s = window.faceShiftState?.(); return s && { screen: s.mode, paused: s.mode === 'paused', t: s.state?.elapsed ?? 0 }; },
