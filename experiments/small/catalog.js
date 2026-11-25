@@ -6,7 +6,7 @@
 // kind: quick, think or calm, the three stops of "Three tonight". tr: true when the game itself plays in Turkish.
 const g = (slug, href, name, line, time, kind, extra = {}) => ({ slug, href, name, line, time, kind, ...extra });
 export const SMALL = [
-  g('night-bells', '/lab/night-bells/', { en: 'Night Bells' }, { en: 'Tap each bell at the top of its swing to light the village.', tr: 'Her çanı salınımının en tepesinde vur, köyün ışıkları yansın.' }, ['minLevel', 1], 'quick'),
+  g('night-bells', '/lab/night-bells/', { en: 'Night Bells', tr: 'Gece Çanları' }, { en: 'Tap each bell at the top of its swing to light the village.', tr: 'Her çanı salınımının en tepesinde vur, köyün ışıkları yansın.' }, ['minLevel', 1], 'quick', { tr: true }),
   g('wild-pour', '/lab/wild-pour/', { en: 'Pour' }, { en: 'Tip a jug of real drops and fill the glass to the line.', tr: 'Gerçek damlalarla dolu sürahiyi eğ, bardağı çizgiye kadar doldur.' }, ['minLevel', 1], 'quick'),
   g('night-podwire', '/lab/night-podwire/', { en: 'Podwire' }, { en: 'Pull the string and let go. The wave splits the seed pods.', tr: 'Teli çek ve bırak. Dalga tohum keselerini patlatır.' }, ['minLevel', 1], 'quick'),
   g('wild2-face-shift', '/lab/wild2-face-shift/', { en: 'Face Shift' }, { en: 'Stretch a rubber face until it matches the portrait.', tr: 'Lastik yüzü portreye benzeyene kadar esnet.' }, ['minRound', 2], 'quick'),
