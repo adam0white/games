@@ -5,6 +5,7 @@ import { onLeave, isPauseKey } from '../../kit/pause.js';
 import { noZoom } from '../../kit/zoom.js';
 import { screens } from '../../kit/screens.js';
 import { hint } from '../../kit/hint.js';
+import { lab } from '../../kit/lab.js';
 import { t, lang, apply, setLang, num, dateLabel } from './words.js';
 
 noZoom();
@@ -87,7 +88,12 @@ const finger = { id: -1, down: false, lift: false, x: 0, y: 0 };
 const show = screens(['menu', 'paused', 'end'], name => {
   $('pause').classList.toggle('on', name === 'play');
 });
+// Play recording for the game lab: one run is one night, today's meadow, an endless meadow or a practice jar.
+const rec = lab('ring');
+let running = false;
+function recEnd(outcome, extra) { if (!running) return; running = false; rec.end(outcome, { kind, score: s.score, level: s.level + 1, cleared: s.cleared, bestRing: s.bestRing, ...extra }); }
 function begin(k) {
+  recEnd('quit');
   kind = k; snd.unlock();
   const seed = k === 'daily' ? dailySeed(today) : (Math.random() * 4294967296) >>> 0;
   if (k === 'practice') s = create(seed, { start: practiceLevel - 1, single: true });
@@ -99,6 +105,7 @@ function begin(k) {
   for (let i = 0; i < NP; i++) pl[i] = 0;
   handle();
   mode = 'play'; show('play');
+  running = true; rec.start({ kind, level: s.level + 1, lang: lang() });
 }
 function trimDaily() { const keys = Object.keys(save.daily).sort(); while (keys.length > 40) delete save.daily[keys.shift()]; }
 function pauseGame() {
@@ -111,7 +118,7 @@ function pauseText() {
   $('pauseLine').textContent = kind === 'endless' ? t('pauseEndless', { score: num(s.score) }) : kind === 'practice' ? t('pausePractice', { n: num(s.level + 1) }) : t('pauseNight', { n: num(s.level + 1), total: num(NIGHT), score: num(s.score) });
 }
 function resume() { if (mode !== 'paused') return; snd.release(); mode = 'play'; last = performance.now(); acc = 0; show('play'); }
-function toMenu() { snd.release(); mode = 'menu'; menuText(); show('menu'); }
+function toMenu() { recEnd('quit'); snd.release(); mode = 'menu'; menuText(); show('menu'); }
 onLeave(pauseGame);
 addEventListener('keydown', e => { if (!isPauseKey(e)) return; if (mode === 'play') pauseGame(); else if (mode === 'paused') resume(); });
 $('pause').addEventListener('click', pauseGame);
@@ -282,6 +289,11 @@ function finish() {
   }
   if (s.bestRing > save.bestRing) save.bestRing = s.bestRing;
   persist();
+  if (running) {
+    rec.event('dawn', { kind, stars: st, cleared: s.cleared, wicks });
+    if (kind === 'daily') rec.event('daily-finished', { scored, stars: st });
+    recEnd(wicks ? 'lost' : 'won', { stars: st, round: s.round || 0 });
+  }
   $('endTop').textContent = top; $('endTitle').textContent = title; $('endLine').textContent = lines.join(' ');
   $('total').textContent = num(s.score); $('bestRing').textContent = num(s.bestRing);
   const showJars = kind !== 'endless';
@@ -613,3 +625,7 @@ window.__ring = Object.freeze({
   },
   save() { return readJson(KEY, null); },
 });
+
+// The notice is on the menu card, seen before Play; the switch is on the pause card.
+rec.notice($('menu').firstElementChild);
+rec.toggle($('paused').firstElementChild);

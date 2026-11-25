@@ -6,6 +6,7 @@ import {screens} from '../../kit/screens.js';
 import {stick} from '../../kit/stick.js';
 import {hint} from '../../kit/hint.js';
 import {noZoom} from '../../kit/zoom.js';
+import {lab} from '../../kit/lab.js';
 noZoom();
 const $=id=>document.getElementById(id), canvas=$('c'), g=canvas.getContext('2d');
 const KEY='wild2-face-shift:save', old=readJson(KEY), save={v:1,best:0,runs:0,stars:[0,0,0,0],sound:true};
@@ -26,14 +27,19 @@ const show=screens(['menu','paused','end'],name=>{mode=name;$('pause').style.dis
 const tone=(f=420,d=.09,v=.045,slide=0)=>snd.tone(f,d,v,'triangle',slide);
 const tap=()=>{snd.unlock();tone();};
 function resetInput(){pad.drop();keys.clear();input={x:0,y:0,active:false};}
-function start(){tap();snd.release();resetInput();allShots=[];total=0;cleared=0;const requestedSeed=new URLSearchParams(location.search).get('seed');seed=requestedSeed!==null&&requestedSeed.trim()!==''&&Number.isFinite(Number(requestedSeed))?Number(requestedSeed):17;s=create(seed,0);visual={x:0,y:0};flash=0;shake=0;particles=[];acc=0;show('play');}
+// Play recording for the game lab (kit/lab.js): one run for each go through the four rounds, from Play to the contact sheet.
+const rec=lab('wild2-face-shift');let runOpen=false;
+function runEnd(outcome){if(!runOpen)return;runOpen=false;rec.end(outcome,{rounds:cleared,round:s?s.level+1:null,score:total,photos:allShots.length,best:save.best,stars:save.stars.reduce((a,n)=>a+n,0)});}
+function start(){runEnd('quit');tap();snd.release();resetInput();allShots=[];total=0;cleared=0;const requestedSeed=new URLSearchParams(location.search).get('seed');seed=requestedSeed!==null&&requestedSeed.trim()!==''&&Number.isFinite(Number(requestedSeed))?Number(requestedSeed):17;s=create(seed,0);visual={x:0,y:0};flash=0;shake=0;particles=[];acc=0;show('play');runOpen=true;rec.start({seed});}
 function pause(){if(mode!=='play')return;resetInput();if(s.phase==='play')s={...s,held:0};snd.hold();show('paused');}
 function resume(){tap();snd.release();resetInput();acc=0;show('play');}
-function end(won){allShots.push(...s.shots);total+=s.score;save.runs++;save.best=Math.max(save.best,total);store();resetInput();show('end');$('end-title').textContent=won?'Picture perfect.':'One more take?';$('end-score').textContent=String(total);$('stats').textContent=`${allShots.length} photos · Best ${save.best}`;$('stars').textContent=save.stars.map(n=>'★'.repeat(n)+'☆'.repeat(3-n)).join('  ');drawAlbum();if(won){burst(cx,cy,65);[523,659,784,1047].forEach((f,i)=>setTimeout(()=>{if(mode==='end')tone(f,.28,.055);},i*100));}else tone(180,.24,.05,-60);}
-function success(){cleared++;save.stars[s.level]=Math.max(save.stars[s.level],starsFor(s));store();if(s.level===LEVELS.length-1){end(true);return;}allShots.push(...s.shots);total+=s.score;s=create(seed,s.level+1);visual={x:0,y:0};tone(660,.2,.06,220);}
+function end(won){allShots.push(...s.shots);total+=s.score;save.runs++;save.best=Math.max(save.best,total);store();runEnd(won?'won':'lost');resetInput();show('end');$('end-title').textContent=won?'Picture perfect.':'One more take?';$('end-score').textContent=String(total);$('stats').textContent=`${allShots.length} photos · Best ${save.best}`;$('stars').textContent=save.stars.map(n=>'★'.repeat(n)+'☆'.repeat(3-n)).join('  ');drawAlbum();if(won){burst(cx,cy,65);[523,659,784,1047].forEach((f,i)=>setTimeout(()=>{if(mode==='end')tone(f,.28,.055);},i*100));}else tone(180,.24,.05,-60);}
+function success(){cleared++;rec.event('round-cleared',{round:s.level+1,stars:starsFor(s)});save.stars[s.level]=Math.max(save.stars[s.level],starsFor(s));store();if(s.level===LEVELS.length-1){end(true);return;}allShots.push(...s.shots);total+=s.score;s=create(seed,s.level+1);visual={x:0,y:0};tone(660,.2,.06,220);}
 $('play').onclick=start;$('again').onclick=start;$('restart').onclick=start;$('pause').onclick=pause;$('resume').onclick=resume;
-for(const id of ['toMenu','endMenu'])$(id).onclick=()=>{snd.release();tap();resetInput();show('menu');};
+for(const id of ['toMenu','endMenu'])$(id).onclick=()=>{runEnd('quit');snd.release();tap();resetInput();show('menu');};
 $('sound').textContent=`Sound: ${save.sound?'on':'off'}`;$('sound').onclick=()=>{save.sound=!save.sound;store();$('sound').textContent=`Sound: ${save.sound?'on':'off'}`;if(save.sound)tap();};
+// The recording notice is on the menu card, which the player sees before Play; its switch is on the pause card.
+rec.notice($('menu').firstElementChild);rec.toggle($('paused').firstElementChild);
 onLeave(pause);
 canvas.addEventListener('pointerdown',()=>{if(mode==='play'){snd.unlock();tone(240,.12,.05,130);}});
 canvas.addEventListener('pointerup',()=>{if(mode==='play')tone(280,.09,.035,-80);});
