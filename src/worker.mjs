@@ -36,7 +36,7 @@ export function createHandler(games, archived = archivedHosts) {
         const moved = experimentPath(url.pathname);
         if (moved) return Response.redirect(`${PLAY}${moved}${url.search}`, 301);
         const left = labPath(url.pathname);
-        if (left) return Response.redirect(`${PLAY}${left}${url.search}`, 302);
+        if (left) return Response.redirect(`${PLAY}${left}${left.includes('?') ? url.search.replace(/^\?/, '&') : url.search}`, 302);
         if (/^\/lefthand\/engine\/game-[a-f0-9]+\.wasm$/.test(url.pathname)) {
           if (request.method !== 'GET' && request.method !== 'HEAD') return new Response('Method not allowed', { status: 405, headers: { Allow: 'GET, HEAD' } });
           url.pathname += '.gz';
