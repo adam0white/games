@@ -1,7 +1,7 @@
 import {LOOKS,ROWS,TRAY,ALIAS,localDay,validDay,load,count,counts,addStar,place,member,demo,celebration,species} from './sim.js';
 import * as sky from './sky.js';import * as lamps from './lamps.js';import * as garden from './garden.js';
 import {t,lang,setLang,apply} from './words.js';
-import {readJson,writeJson} from '../../kit/save.js';import {sound} from '../../kit/audio.js';import {onLeave} from '../../kit/pause.js';import {noZoom} from '../../kit/zoom.js';import {screens} from '../../kit/screens.js';import {lab} from '../../kit/lab.js';
+import {readJson,writeJson} from '../../kit/save.js';import {sound} from '../../kit/audio.js';import {onLeave} from '../../kit/pause.js';import {noZoom} from '../../kit/zoom.js';import {screens} from '../../kit/screens.js';import {lab} from '../../kit/lab.js';import {home} from '../../kit/home.js';
 const $=id=>document.getElementById(id),query=new URLSearchParams(location.search),override=query.get('day'),isDemo=query.has('demo'),KEY='thankful:v1';
 let today=validDay(override)?override:localDay(),state=isDemo?demo(today,Number(query.get('demo'))||0):load(readJson(KEY)),W=0,H=0,dpr=1,pan=0,drag=null,hits=[],flight=null,bloom=0,shoot=0,paused=false,card='',labelTimer,lookFade=0;
 if(LOOKS.includes(query.get('look')))state.look=query.get('look');
@@ -10,7 +10,8 @@ const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches,renderers={
 noZoom();
 // Play recording for the game lab. One run is the day's thanks: it starts with the first thank given in this
 // visit and ends 'won' with the third. Only the kind of each thanks is sent, never the typed words.
-const rec=lab('thankful');let running=false,opened=0;
+// Opened from the small games' home (?from=small): a way back on the settings card and under the tray, and a finished day reported there.
+const rec=home(lab('thankful'),{back:['#settingsCard .card','#ritual']});let running=false,opened=0;
 rec.notice($('ritual'));rec.toggle($('settingsCard').firstElementChild);
 function recGive(k,n){if(isDemo)return;if(!running){running=true;opened=n-1;rec.start({day:today===localDay()?'today':'set',look:state.look,already:n-1,lang:lang()});}rec.event('thanks',{kind:k,n,flower:species(today,k)});if(n===3){running=false;rec.event('daily-finished',{look:state.look});rec.end('won',{thanks:3,look:state.look,kinds:(state.days[today]||[]).map(i=>i.k),flowers:(state.days[today]||[]).map(i=>species(today,i.k))});}}
 

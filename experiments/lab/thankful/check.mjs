@@ -126,8 +126,9 @@ async function extras(name,engine,device,base){
  await context.close();
  // The smallest phone, in both languages: every control inside the screen, the title clear of the look button, no scroll.
  for(const lang of ['en','tr']){({context,page}=await fresh({viewport:{width:320,height:568}}));
-  await page.goto(`${base}/lab/thankful/?day=2026-11-26&lang=${lang}`);await page.waitForFunction(()=>!!window.__thankful);await page.waitForTimeout(500);
-  const fit=await page.evaluate(()=>({out:[...document.querySelectorAll('header button,#tray button,#line')].filter(e=>{const q=e.getBoundingClientRect();return q.left<0||q.top<0||q.right>innerWidth||q.bottom>innerHeight;}).length,gap:document.getElementById('looks').getBoundingClientRect().left-document.getElementById('name').getBoundingClientRect().right,scroll:document.scrollingElement.scrollHeight-innerHeight+document.scrollingElement.scrollWidth-innerWidth}));
+  await page.goto(`${base}/lab/thankful/?day=2026-11-26&lang=${lang}${lang==='tr'?'&from=small':''}`);await page.waitForFunction(()=>!!window.__thankful);await page.waitForTimeout(500);
+  if(lang==='tr')assert.equal(await page.locator('#ritual .kit-home').innerText(),'‹ Küçük oyunlar','opened from the small games: a way back under the tray');
+  const fit=await page.evaluate(()=>({out:[...document.querySelectorAll('header button,#tray button,#line,#ritual .kit-home')].filter(e=>{const q=e.getBoundingClientRect();return q.left<0||q.top<0||q.right>innerWidth||q.bottom>innerHeight;}).length,gap:document.getElementById('looks').getBoundingClientRect().left-document.getElementById('name').getBoundingClientRect().right,scroll:document.scrollingElement.scrollHeight-innerHeight+document.scrollingElement.scrollWidth-innerWidth}));
   assert.deepEqual([fit.out,fit.scroll],[0,0],`${lang} 320x568: everything inside, no scroll`);assert.ok(fit.gap>=8,`${lang} 320x568: title clear of the look button (${fit.gap} px)`);
   await page.screenshot({path:join(shots,`${name}-320-${lang}.png`)});await context.close();}
  assert.deepEqual(errors,[],'no browser exceptions');console.log(`ok thankful extras ${name}: sounds ${Object.keys(sounds).length}/${Object.keys(sounds).length} actions, mean work ${work.mean.toFixed(2)} ms, max ${work.max.toFixed(1)} ms over ${work.n} frames`);
