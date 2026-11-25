@@ -630,3 +630,9 @@ Not verified: how they feel on a real phone; whether 51 skills are fair against 
 
 - Old hunters that use these skills against you.
 - Skills with a picture of their own in the 3D look (a pack, a decoy and a meal are simple shapes there).
+
+Also checked: dying and reviving with a lasting skill in 2D and 3D ends it and raises no page error. Lab pages that use these rules: `ant-evolve` parity and `ant-creatures` still run; `ant-hide`'s parity test already failed at tick 0 on main before this change.
+
+### 2026-11-24: note #244
+
+The answer to #243 (how are old hunters now that they use their skills): has not met one yet. Nothing changes; ask again after a full climb.

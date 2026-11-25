@@ -403,7 +403,7 @@ $('power').addEventListener('pointerdown', e => { e.preventDefault(); e.stopProp
 $('power').addEventListener('click', () => { if (mode === 'play' && performance.now() - powerTap > 700) wantPower = true; }); // Enter, or a screen reader's activate
 addEventListener('keydown', e => { if (e.key === ' ' && mode === 'play') { wantPower = true; e.preventDefault(); } });
 // What each kind of skill does, said once after a promotion. The button pulses when the skill would help right now.
-// The words are 'does.sting' and so on in words.js.
+// The words are 'does.Frog' and so on in words.js.
 let skillTip = 0;
 const HUNTS = new Set(['Fire Ant', 'Mouse', 'Frog', 'Snake', 'Squirrel', 'Wolf', 'Panther', 'Python', 'Tiger', 'Hippo', 'Sabertooth', 'Raptor', 'Dragon', 'Thunderbird', 'Hydra', 'Bat']); // these help when prey is close; the others when a hunter is
 function powerHelps(W) {
