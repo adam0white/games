@@ -45,8 +45,8 @@ const P = {
   'night-bells'() { const n = count(J('night-bells:save')?.stars); return { score: n, of: 8, finished: n >= 8 }; },
   'night-podwire'() { const s = J('night-podwire:progress') || {}, b = J('night-podwire:book') || {}; const six = s.complete === true ? 6 : Math.max(0, num(s.next, 6) - 1); const n = b.done === true ? 18 : Math.max(six, num(b.reached, 18) - 1); return { score: n, of: 18, finished: n >= 18 }; },
   'night-saltplate'() { const n = num(J('night-saltplate:save')?.cleared, 18); return { score: n, of: 18, finished: n >= 18 }; },
-  // the highest plate reached, a plain number: the last plate's clear is not visible here
-  'night-splitlight'() { return { score: Math.max(0, num(readNumber('night-splitlight:plate', 1), 6) - 1), of: 6 }; },
+  // the highest plate reached, a plain number; since 2026-11-24 the last plate's clear writes night-splitlight:done
+  'night-splitlight'() { const done = read('night-splitlight:done') === '1'; return { score: done ? 18 : Math.max(0, num(readNumber('night-splitlight:plate', 1), 18) - 1), of: 18, finished: done }; },
   'wild-pour'() { const n = count(J('wild-pour:save')?.stars); return { score: n, of: 8, finished: n >= 8 }; },
   'wild2-face-shift'() { const s = J('wild2-face-shift:save') || {}; return { score: num(s.runs, 1e6), finished: count(s.stars) >= 4 }; },
   // the next print opens when one is filed: the sixth print's filing is not visible here
