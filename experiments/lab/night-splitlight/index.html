@@ -10,29 +10,31 @@
 </head>
 <body>
   <main class="instrument">
-    <header class="masthead">
-      <h1 id="title">Splitlight</h1>
-      <button id="pause" type="button" aria-label="Pause"><span aria-hidden="true"></span></button>
-    </header>
     <div class="bench">
-      <div class="readout">
-        <div>
-          <div id="plate" class="engraving">Plate 01 / 06</div>
-          <div id="plate-name">First light</div>
+      <header class="readout">
+        <div class="names">
+          <div id="plate" class="engraving">Plate 01 / 18</div>
+          <h1 id="plate-name">First light</h1>
         </div>
         <div class="receivers">
-          <div class="engraving" id="receiver-label">Receivers</div>
           <output id="captured" aria-labelledby="receiver-label">0 / 1</output>
+          <div class="engraving" id="turns">Turns 0 · par 1</div>
+          <span id="receiver-label" class="sr" data-i18n="receivers">Receivers</span>
         </div>
-      </div>
+        <button id="daily" type="button">Today</button>
+        <button id="pause" type="button" aria-label="Pause"><span aria-hidden="true"></span></button>
+      </header>
       <div class="window">
-        <canvas id="field" width="360" height="400" aria-label="A light beam passes through the prism. Turn the prism to align the beam with the receivers."></canvas>
+        <canvas id="field" width="360" height="400" aria-label="A light beam passes through glass. Turn the glass so each colour reaches its receiver."></canvas>
       </div>
       <div class="dial">
-        <label class="engraving" for="angle">Turn prism</label>
-        <div class="control">
-          <span class="cue" aria-hidden="true"></span>
-          <input id="angle" type="range" min="0" max="1000" step="1" value="80">
+        <label class="engraving" for="angle" id="dial-label">Turn prism</label>
+        <div class="row">
+          <div id="parts" hidden></div>
+          <div class="control">
+            <span class="cue" aria-hidden="true"></span>
+            <input id="angle" type="range" min="0" max="1000" step="1" value="80">
+          </div>
         </div>
       </div>
       <section id="result" aria-labelledby="result-title">
@@ -40,7 +42,8 @@
         <p id="result-line"></p>
         <div class="pair">
           <button class="primary" id="next" type="button">Next plate</button>
-          <button id="again" type="button">Replay plate</button>
+          <button id="again" type="button" data-i18n="again">Replay plate</button>
+          <button id="share" type="button" data-i18n="share" hidden>Share</button>
         </div>
       </section>
     </div>
@@ -48,13 +51,16 @@
 
   <section id="paused" class="sheet" role="dialog" aria-modal="true" aria-labelledby="pause-title">
     <div class="card">
-      <h2 id="pause-title">Paused</h2>
-      <button class="primary" id="resume" type="button">Resume</button>
+      <h2 id="pause-title" data-i18n="paused">Paused</h2>
+      <button class="primary" id="resume" type="button" data-i18n="resume">Resume</button>
       <div class="pair">
-        <button id="restart" type="button">Restart plate</button>
+        <button id="restart" type="button" data-i18n="restart">Restart plate</button>
         <button id="sound" type="button" aria-pressed="true">Sound on</button>
       </div>
-      <button id="first" type="button">Replay plate 1</button>
+      <div class="pair">
+        <button id="first" type="button" data-i18n="first">Replay plate 1</button>
+        <button id="lang" type="button" data-i18n="otherLang">Türkçe</button>
+      </div>
     </div>
   </section>
   <script type="module" src="./main.js"></script>
