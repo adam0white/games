@@ -432,11 +432,16 @@ function goalMarks(c,s,p,time) {
     if(s.progress<.8){
       // A buried lamp still shows through the sand as a warm glow, so the player knows where to dig.
       const pulse=.65+.35*Math.cos(time*2.8);
-      const glow=c.createRadialGradient(g.x,g.y,0,g.x,g.y,13);
-      glow.addColorStop(0,'#ffd27a'+Math.round(70+60*pulse).toString(16));glow.addColorStop(1,'#ffd27a00');
-      c.fillStyle=glow;c.fillRect(g.x-13,g.y-13,26,26);
+      c.save();c.globalCompositeOperation='lighter';
+      const glow=c.createRadialGradient(g.x,g.y,0,g.x,g.y,16);
+      const a=n=>Math.round(n).toString(16).padStart(2,'0');
+      glow.addColorStop(0,'#fff0c0'+a(110+70*pulse));glow.addColorStop(.45,'#ffb84a'+a(40+40*pulse));glow.addColorStop(1,'#ffb84a00');
+      c.fillStyle=glow;c.fillRect(g.x-16,g.y-16,32,32);
+      c.restore();
+      // A glint on the surface right above the lamp.
+      let top=1;while(top<H-1&&!s.cells[top*W+Math.round(g.x)])top++;
       c.save();c.globalAlpha=pulse;
-      star(c,g.x-1.55,g.y-13.45,1.6,p.rim);
+      star(c,g.x,top-3,1.8,p.rim);
       c.restore();
     }
   }

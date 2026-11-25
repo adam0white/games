@@ -120,7 +120,7 @@ The five weakest things, in order:
 
 Replaced: the old bed 2 (an hourglass any nudge won), beds 5 and 10 (the same lamp, hidden), bed 8 (a second sieve) and the old bed 7 (a second seed). A "skim the blue off the top" bed was built and dropped: strokes always took ochre with it.
 
-**Garden and share.** Once bed 1 is cleared a garden button sits in the mast on every bed. In the garden that slot is a share button: it draws the raked bed at 4× with the score under it and hands a PNG to the phone's share sheet (`navigator.share` with files). Where that is missing it saves the picture instead. The kit has no image share helper (`room.js` `shareLink` takes a URL only), so this lives in `main.js`; if a second game needs it, it belongs in the kit. Shares are recorded as `garden-shared` / `garden-saved` events in the garden run.
+**Garden and share.** Once bed 1 is cleared a garden button sits in the mast on every bed. In the garden that slot is a share button: it draws the raked bed at 6× with the score under it and hands a PNG to the phone's share sheet (`navigator.share` with files). Where that is missing it saves the picture instead. The kit has no image share helper (`room.js` `shareLink` takes a URL only), so this lives in `main.js`; if a second game needs it, it belongs in the kit. Shares are recorded as `garden-shared` / `garden-saved` events in the garden run.
 
 **Feel.** A short crunch through `kit/audio.js` when grains are taken, scaled by how many; the existing hiss still follows grains in motion; a second chime and a warm light wash on a win; a buried glow and glint over a covered lamp.
 
@@ -131,10 +131,13 @@ Replaced: the old bed 2 (an hourglass any nudge won), beds 5 and 10 (the same la
 | Measure | Before | After |
 | --- | --- | --- |
 | Clumsy bot, bed 1 (15 runs, frozen seeds) | 15/15, median 10.6 s | 15/15, median 8.5 s |
-| Touch to grains in the hand (check, page clock) | first grain moved 5 ms WebKit / 132 ms Chromium | same event, 0–0.2 ms; drawn on the next frame |
+| Touch to the first frame that shows moved sand (`timing.mjs`, same probe as before, sampled each frame) | 5 ms WebKit / 132 ms Chromium | 7 ms WebKit / 260 ms Chromium |
 | Random first touch that takes sand (bed 1 grid) | 43% | 45% |
 | Page work per frame, p95, bed full (garden, about 12,000 grains) | — | 1 ms WebKit, 0.3 ms Chromium |
+| Informed player, bed 1, first touch to win (sim) | one stroke, about 2 s | four strokes, 446 ticks (7.4 s) |
 | `check.mjs` first bed, start to result card | 6.4 s / 9.9 s | 10.6 s / 11.7 s (four strokes now, each waits for the sand to settle) |
+
+The Chromium figure is the first touch creating the Web Audio context, not the sand: the pointer handler takes 215–223 ms in headless Chromium with sound on and 0.4 ms with sound off, and the grains are in the hand when it returns (WebKit: 2–3 ms either way). It was the same cost before. A real Android phone was not measured. Bed 1 now takes more strokes for a player who follows the hint, on purpose: the hand carries a handful, not 680 grains.
 
 Clumsy bot after, all beds: 1: 15/15 8.5 s · 2: 1/15 · 3: 5/15 · 4: 0/15 · 5: 15/15 38.1 s · 6: 0/15 · 7: 0/15 · 8: 2/15 · 9: 9/15 102.5 s · 10: 0/15. Beds 2–10 are meant to need intent, so random drags failing them is expected. The before numbers show bed 1 already met the 45 s target; the owner's complaint was the feel, not the time.
 
@@ -156,6 +159,8 @@ In `check.mjs`: beds 1–4 are lamp, seed, stop-glass and sieve, played by follo
 
 - A real phone: thumb feel of the reach (5 cells), the trickle rates, and whether the held handful reads under a finger.
 - Sound by ear: the crunch and win chime were checked only as gain on a node.
-- Colours in daylight: not measured; the dark sky behind ochre sand is high contrast, the plum look less so.
+- Colours in daylight: not changed. WCAG luminance contrast of the darkest grain colour against the nearest ridge: basalt ochre 1.95, basalt blue 1.78, plum ochre 1.29, plum blue 1.59; ochre against blue only 1.09 (basalt) and 1.23 (plum), so the two sands differ by hue alone. Darker near ridges would lift this, but that changes the look and is the owner's choice.
 - The real share sheet: checked with a stand-in `navigator.share`; the download fallback was not exercised.
 - Turkish wording.
+
+The hub's entry for this page (`lab/hub-a/hub.js`) now has `tr: true` and the Turkish name, so the hub no longer marks it English only. Bed 5's buried glow was too faint to read at first; it is now a brighter additive glow with a glint on the surface above the lamp, checked in a screenshot. The shared picture is 720 × 1056 px, drawn without smoothing, and was looked at in both inks and in Turkish.

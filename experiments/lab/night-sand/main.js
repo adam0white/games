@@ -266,19 +266,20 @@ onLeave(pause);
 // The raked garden as a picture: the bed itself, with its score and the game's name under it.
 // The kit has a share helper for links only (room.js shareLink), so the image share lives here.
 async function gardenImage() {
-  const scale = 4, foot = 64;
+  const scale = 6, foot = 96;
   const out = document.createElement('canvas');
   out.width = W * scale; out.height = H * scale + foot;
   const c = out.getContext('2d');
   c.fillStyle = getComputedStyle(document.body).getPropertyValue('--paper') || '#ede5cf';
   c.fillRect(0, 0, out.width, out.height);
+  c.imageSmoothingEnabled = false;
   c.drawImage(field, 0, 0, W * scale, H * scale);
   c.fillStyle = getComputedStyle(document.body).getPropertyValue('--ink') || '#162e2b';
-  c.font = '500 30px ui-serif, Baskerville, serif';
-  c.fillText(t('title'), 18, H * scale + 42);
-  c.font = '600 20px ui-monospace, monospace';
+  c.font = '500 46px ui-serif, Baskerville, serif';
+  c.fillText(t('title'), 26, H * scale + 62);
+  c.font = '600 30px ui-monospace, monospace';
   c.textAlign = 'right';
-  c.fillText(t('percent', { n: bed.score }), W * scale - 18, H * scale + 40);
+  c.fillText(t('percent', { n: bed.score }), W * scale - 26, H * scale + 60);
   return new Promise(resolve => out.toBlob(resolve, 'image/png'));
 }
 async function shareGarden() {
