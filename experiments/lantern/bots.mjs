@@ -3,9 +3,10 @@
 //   node experiments/lantern/bots.mjs parity [seeds] [--mutate]   with no mode chosen, sim.js plays exactly as on main (see parity below)
 //   node experiments/lantern/bots.mjs spark [runs] [--mutate[=flies-anywhere]]   Spark's claims (modes/spark-bots.mjs)
 //   node experiments/lantern/bots.mjs tide [seeds] [--mutate]   Tide's claims (modes/tide-bots.mjs)
+//   node experiments/lantern/bots.mjs duet [--mutate]   Duet's claims (modes/duet-bots.mjs)
 import { create, step, centre, half, sight, score, progress, towerStage, GOAL, BOAT, DT } from './sim.js';
-const SUB = ['parity', 'spark', 'tide'].includes(process.argv[2]) ? process.argv[2] : '';
-if (SUB === 'spark' || SUB === 'tide') { // its own process: the mode's bots read their own arguments (spark-bots.mjs runs worker threads)
+const SUB = ['parity', 'spark', 'tide', 'duet'].includes(process.argv[2]) ? process.argv[2] : '';
+if (SUB === 'spark' || SUB === 'tide' || SUB === 'duet') { // its own process: the mode's bots read their own arguments (spark-bots.mjs runs worker threads)
   const { spawnSync } = await import('node:child_process');
   const out = spawnSync(process.execPath, [new URL(`./modes/${SUB}-bots.mjs`, import.meta.url).pathname, ...process.argv.slice(3)], { stdio: 'inherit' });
   process.exit(out.status ?? 1);

@@ -117,6 +117,7 @@
     <p class="opt"><a class="mode" href="/lab/lantern-race/" data-i18n="modeRace">Lantern Race</a><small data-i18n="modeRaceWhat">Race other boats on the same river, with friends or bots.</small></p>
     <p class="opt"><button class="mode" data-mode="spark" data-i18n="modeSpark">Lantern Spark</button><small data-i18n="modeSparkWhat">The lantern is out. Strike sparks to see the river.</small></p>
     <p class="opt"><button class="mode" data-mode="tide" data-i18n="modeTide">Lantern Tide</button><small data-i18n="modeTideWhat">Ride the bright water. Slack water burns the flame.</small></p>
+    <p class="opt"><button class="mode" data-mode="duet" data-i18n="modeDuet">Lantern Duet</button><small data-i18n="modeDuetWhat">Two boats, one flame, one thumb each.</small></p>
   </div>
   <p><button class="back" data-i18n="back">Back</button></p>
 </div></div>
@@ -306,7 +307,7 @@ window.lanternSim = () => s; // the browser checks use this to reach late stretc
 const cards = screens(['menu', 'shop', 'credits', 'card', 'board', 'modes', 'perspective', 'tutor', 'mode']);
 // More modes (NOTES.md, "How a mode plugs in"): a mode is a module in modes/ that index.html loads when it is chosen. mod is the mode
 // chosen, or null; with null, every line below runs as before modes. A mode is drawn flat: the view the player chose comes back after.
-const MODES = { spark: () => import('./modes/spark.js'), tide: () => import('./modes/tide.js') }, made = {};
+const MODES = { spark: () => import('./modes/spark.js'), tide: () => import('./modes/tide.js'), duet: () => import('./modes/duet.js') }, made = {};
 let mod = null;
 const pct = () => mod ? mod.reach() : progress(s);
 async function chooseMode(id) {
@@ -323,7 +324,7 @@ function show(name) {
   $('hud').style.display = $('big').style.display = play ? 'block' : 'none'; pauseButton.style.display = play ? 'grid' : 'none';
   if (!play) $('warn').classList.remove('on'); $('tip').style.display = play ? 'block' : 'none';
   $('pauseLanguage').hidden = !paused; // the card is also the end of a run, which has no language button
-  mod?.screen(name, $('modePanel')); if (name === 'menu' && mod) { mod = null; if (read('lantern-view', '2d') !== '2d') setView(read('lantern-view'), false); }
+  mod?.screen(name, $('modePanel')); if (name === 'menu' && mod) { if (mod.own) { s = create(1, stage); target = s.x; } mod = null; if (read('lantern-view', '2d') !== '2d') setView(read('lantern-view'), false); }
   if (name === 'menu' || name === 'modes') menu(); if (name === 'perspective') views(); if (name === 'shop') shop(); if (name === 'board') boardShow();
 }
 // Three ways to see the same river (notes #158, #159): 2d is this page's own drawing; 3d and first are drawn by view3d.js on a WebGL
@@ -638,7 +639,7 @@ function begin() {
   rec.start({ view, mode: mode(), night: mod ? mod.night() : tower || endless ? 0 : stage, ...(tower ? { level: climb, floor: fromFloor } : {}) });
 }
 const mode = () => mod ? mod.id : tutor ? 'tutorial' : tower ? 'tower' : endless ? 'endless' : 'night';
-function bankRun() { s.banked = Math.round(s.taken * boon()); bank += s.banked; store.set('lantern-bank', bank); } // a rebirth's bonus is added as the run banks
+function bankRun() { s.banked = Math.round(s.taken * boon() * (mod?.share ?? 1)); bank += s.banked; store.set('lantern-bank', bank); } // a rebirth's bonus is added as the run banks; a mode can bank a share (Duet's rope takes about twice a night's embers)
 function finish() {
   const paid = s.over === 'dawn' && !tower && !endless && !mod && reborn ? 10 * Math.min(5, reborn) : 0; s.taken += paid; // a reborn night pays more at dawn
   playing = false; ended = performance.now(); steer.drop(); pads.drop(); bankRun();
@@ -879,7 +880,7 @@ function glide() { if (steering === 'slide') { slide = 0; aim(target); return; }
   const room = Math.max(0, half(s, s.y) - boat(s) - 0.01), c = centre(s, s.y), to = s.x + slide * DT;
   target = slide > 0 ? Math.min(to, c + room) : slide < 0 ? Math.max(to, c - room) : s.x;
 }
-hint(canvas, { kind: 'drag', label: t('hint'), key: 'lantern-hint', delay: 1500, bottom: () => mod ? 120 : 56, when: () => playing && !paused && screen === 'play' && dragging(), played: read('lantern-bank') !== null }); // a first-time player who does not touch sees how (experiments/kit/hint.js); 1.5 s, as a boat left alone meets a rock in 3 to 9 s; low, below the boat
+hint(canvas, { kind: 'drag', label: t('hint'), key: 'lantern-hint', delay: 1500, bottom: () => mod ? 120 : 56, when: () => playing && !paused && screen === 'play' && dragging() && !mod?.steers, played: read('lantern-bank') !== null }); // a first-time player who does not touch sees how (experiments/kit/hint.js); 1.5 s, as a boat left alone meets a rock in 3 to 9 s; low, below the boat
 
 // Buttons.
 $('play').addEventListener('click', () => { endless = tower = daily = false; if (newcomer()) { show('tutor'); return; } begin(); });

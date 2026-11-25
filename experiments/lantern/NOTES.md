@@ -766,10 +766,11 @@ Not verified: tilt, slide and the tutorial on a real phone; whether a new player
 ## How a mode plugs in
 
 A mode is a way to play Lantern's river with other rules on top, chosen in the "Game mode" group and played inside `/lantern/`.
-Spark is the first, Tide the second. Duet and Race will follow the same pattern.
+Spark is the first, Tide the second, Duet the third. Race will follow the same pattern.
 
 **Files.** A mode is `modes/<id>.js`, plus any rules of its own (`modes/<id>-sim.js`) and bots (`modes/<id>-bots.mjs`).
 A mode's rules wrap Lantern's `sim.js` state. They never edit `sim.js`.
+Duet is the exception that proves the seam: its rules are its own (`modes/duet-sim.js`, two boats and a rope, which Lantern's state cannot hold), so `start()` returns Duet's state with the few Lantern fields the page reads set to a plain story night's values (`bonus: 0`, `endless: false`, embers marked `kind: 'ember'`, and so on; the list is in `modes/duet.js`, `begin()`).
 
 **How index.html finds it.** Three places:
 - `MODES` maps an id to a loader: `{ spark: () => import('./modes/spark.js') }`. The module loads only when chosen.
@@ -794,6 +795,9 @@ With `mod === null`, every line of index.html runs as it did before modes. `bots
 | `draw(now, day)` | optional. Each frame instead of the page's drawing (2D only). `day` is 0 to 1 after dawn |
 | `water(now)` | optional, for a mode without `draw` (Tide, 2026-11-24): each frame, on the page's own flat river after the current streaks and before the rocks and the dark. The mode draws on `page.g()` in the page's transform |
 | `frame(dt, now, live)` | each frame, for the mode's own sound and timers |
+| `steers` | optional, `true` for a mode with its own steering (Duet's two pads): the page's one-finger hint stays away |
+| `own` | optional, `true` for a mode whose run state is not Lantern's (Duet's two boats): the page makes a fresh `create(1, stage)` when the player leaves the mode for the menu, so the menu's river and the shop previews never read the mode's state |
+| `share` | optional, 0 to 1: the share of a run's embers the page banks (Duet's rope takes about twice a night's embers a minute, so 0.5). Absent means 1 |
 | `screen(name, box)` | when the page changes screens (show or hide the mode's own buttons; going to `menu` ends the mode) |
 | `state()`, `game()` | for the browser checks (`window.lanternMode()`, `window.lanternSpark()`) |
 
@@ -907,3 +911,36 @@ The ember melody (kit/music.js) plays as in any run: `begin()` starts the song f
 **Not verified.** Whether the channel reads at a glance on a real phone in bright light; the rush sound's level on a phone speaker; how stage 4's turn feels (the bot effect is small:
 3.5 s more fast water for reading the water now, and no difference in dawn rate). Stage 5 at 62% for the careful bot may be hard for a thumb; the owner's play decides.
 The lab page moved to `archive/lab/lantern-tide/`. Its old address needs `'lantern-tide': '/lantern/?mode=tide'` in `labMoved` (`worker-settings.mjs`, the lead adds it).
+
+## 2026-11-24: Duet is a mode inside Lantern (owner, lab cleanup: "accepted as is")
+
+**What the player sees.** "Game mode", then "Lantern Duet", opens Duet's card: what it is, the rule, nights 1 to 3, Play, the best so far, and the keys.
+In a run each half of the screen steers its own boat; a rope of light joins them, takes the embers it sweeps over, and snags on a rock that passes between the boats.
+The end card says why the run ended, how far it got, the embers and the snags, and the best so far.
+
+**Faithful.** `modes/duet-sim.js` is a byte-for-byte copy of the lab page's `sim.js` (`cmp archive/lab/lantern-duet/sim.js experiments/lantern/modes/duet-sim.js` is silent).
+`modes/duet.js` carries the lab page's camera, drawing, lines, sounds and two-pad steering (kit `drag.js`, as on the lab page), redrawn in the canvas's device pixels.
+`modes/duet-bots.mjs` is the lab page's bots, with the acceptance it fixed before its first run and never loosened, unchanged.
+
+**What changed, and why.**
+- The boats, flame and water are the player's own from Lantern's shop (`page.skin`), not the lab page's fixed colours.
+- Lantern's HUD (hearts, embers, %) and pause button replace the lab page's; the lab page's sound switch is gone (Lantern's music switch is on the pause card).
+- The ember sound is Lantern's: each ember plays the next note of the night's melody (kit `music.js`). A swept line of five plays four notes on the next sixteenths and a chime for the fifth (the kit plays at most four waiting notes).
+- After a crash the boats and the rope sink and fade; the lab page left them on the water.
+- Broken on the lab page, fixed: a loss at 0% was saved as the best. A best now needs at least 1% or dawn.
+- English only on the lab page; every line is in `words.js` in English and Turkish now. The end lines read "Embers: 4. Snags: 1." so a count of 1 reads right.
+- Embers to the bank: the rope lays 74, 90 and 92 embers a minute on nights 1 to 3; Lantern's story nights 1, 3 and 5 lay 35, 37 and 38 (`bots.mjs duet` measures both). The adaptive bot takes 65 to 80 a minute. So Duet banks half (`share: 0.5`), and its card says so.
+
+**Steering.** Two pads (`#duetL`, `#duetR`) lie over the canvas, under the HUD, only while a Duet run is on the screen or paused; the page's own one-finger steering never sees those fingers. The pause card lets touches through (`.screen` has `pointer-events: none`), so on the pause card a thumb on a pad resumes the run and steers that boat, as a touch on the canvas does in Lantern; the split line and the side labels show only in play. A hurt rebases both held fingers, as on the lab page. Keys: A and D for the left boat, the arrows for the right, only while the run is live.
+The page's one-finger hint stays away (`steers`); Duet's own hint (kit `hint.js`, "Drag each half with one thumb") uses `lantern-mode-duet:hint`. The pads go in before `#hud`, after the page's hint box, because the language button renames the first `.kit-hint .label` on the page; Duet renames its own hint's label in its `words()`.
+**Leaving.** Duet's run state is not Lantern's, so the mode says `own: true` and the page makes a fresh `create(1, stage)` when the player goes back to the menu. Checked headless on WebKit and Chromium, 2D and 3D saved: end card or pause, then Menu, Back, the menu's river for 2 s, eight shop taps, a normal night: no page error.
+
+**Saves.** `lantern-mode-duet:save` is `{ v: 1, best: { night, pct }, unlocked, played }`. If it is missing and the lab page's `lantern-duet:v1` is there, its best and its open nights are carried over once. The lab key is never written.
+
+**Checks.** `bots.mjs duet`: the lab page's claims hold. Night 1, 30 seeds: adaptive reaches dawn on 30 (median progress 1.0), together 0.18 (all dark), wide 0.165 (all ended by the rope); adaptive reaches dawn on 30 of 30 on nights 2 and 3 too. Plus the embers-a-minute claim. `--mutate` (a rock between the boats never catches the rope) fails "staying wide snags more" and exits 1.
+`phone.mjs lantern` on both browsers: the deep link and the lab save; two pointers at once, one per half, hit-tested to the left and right pads, spread the boats, then the left one alone moves only the left boat; pause; dawn with four embers taken and two banked; a loss by the rope with its line; only the new key written; no board call. Added after review: on the pause card a thumb on the left pad (below the card's buttons) resumes the run and steers the left boat; D moves the left boat and the left arrow the right one (the other boat moves under a quarter as far); after going back to the menu the page's river is a fresh one (`over` is null). Faults injected by hand: both pads wired to the left boat fails "two thumbs spread the boats"; `own: false` fails "the menu has a fresh river of its own".
+Changed on purpose in `phone.mjs`: the Turkish mode-button assertion now lists Duet (`['duet', 'Fener Düet']`) after Spark and Tide.
+The pointers are synthetic `PointerEvent`s sent to the element under each point, not a real two-finger touch.
+
+**Not verified.** Two real thumbs on a real phone (the lab page's open question, still open); whether four melody notes and a chime for a swept line sound right; the warning tones by ear.
+The lab page moved to `archive/lab/lantern-duet/`. Its old address needs `'lantern-duet': '/lantern/?mode=duet'` in `labMoved` (`worker-settings.mjs`, the lead adds it).

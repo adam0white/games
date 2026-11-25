@@ -806,6 +806,80 @@ const GAMES = {
       await page.evaluate(v => { localStorage.removeItem('lantern-tide:night'); if (v === undefined) localStorage.removeItem('lantern-view'); else localStorage.setItem('lantern-view', v); }, before['lantern-view'] === '3d' ? undefined : before['lantern-view']);
       await page.goto(`${base}/lantern/`); await until(page, () => document.getElementById('notes-button'), 'notes button'); await page.click('#toShop'); // back where the erase below starts
     }
+    // Lantern Duet, a mode inside Lantern (modes/duet.js). The deep link opens it; the lab page's save opens its nights once; each half
+    // of the screen steers its own boat, two fingers at once; the end card says why a run ended; half the embers go to the bank;
+    // nothing else of Lantern's save changes; no board call.
+    {
+      await page.evaluate(() => { localStorage.setItem('lantern-duet:v1', JSON.stringify({ best: { night: 2, pct: 40 }, unlocked: 2, sound: false })); });
+      const before = await saved(), board = []; const spy = r => { if (r.url().includes('/lab-api/board')) board.push(r.url()); }; page.on('request', spy);
+      await page.goto(`${base}/lantern/?mode=duet`);
+      await until(page, () => window.lanternState().screen === 'mode' && window.lanternMode()?.id === 'duet', 'the deep link opens Duet');
+      const m0 = await page.evaluate(() => window.lanternMode());
+      assert.equal(m0.unlocked, 2, 'the lab save opens night 2'); assert.deepEqual(m0.best, { night: 2, pct: 40 }, 'and carries its best');
+      assert.deepEqual(await page.$$eval('#modePanel .nights button', bs => bs.map(b => b.disabled)), [false, false, true], 'nights 1 and 2 open');
+      await page.click('#modePlay');
+      await until(page, () => window.lanternState().screen === 'play' && window.lanternMode().night === 2 && window.lanternMode().pads, 'a Duet run on night 2');
+      await page.evaluate(() => { const s = window.lanternSim(); s.safe = 1e9; s.rocks = []; s.narrows = []; }); // no blow while the check works
+      // Two thumbs at once, one on each half: the pads under them are the left and the right boat's, and each moves its own boat.
+      const [vw, vh] = await page.evaluate(() => [innerWidth, innerHeight]);
+      const touch = (type, x, y, id) => page.evaluate(([type, x, y, id]) => { const el = document.elementFromPoint(x, y); el.dispatchEvent(new PointerEvent(type, { bubbles: true, clientX: x, clientY: y, pointerId: id, pointerType: 'touch', isPrimary: id === 11 })); return el.id; }, [type, x, y, id]);
+      const boats = () => page.evaluate(() => { const m = window.lanternMode(); return [m.left, m.right]; });
+      assert.deepEqual([await touch('pointerdown', vw * 0.25, vh * 0.6, 11), await touch('pointerdown', vw * 0.75, vh * 0.6, 12)], ['duetL', 'duetR'], 'each half of the screen is its own boat\'s');
+      const b0 = await boats();
+      for (let i = 1; i <= 6; i++) { await touch('pointermove', vw * 0.25 - 6 * i, vh * 0.6, 11); await touch('pointermove', vw * 0.75 + 6 * i, vh * 0.6, 12); await sleep(25); }
+      await sleep(400); const b1 = await boats();
+      assert.ok(b1[0] < b0[0] - 0.02 && b1[1] > b0[1] + 0.02, `two thumbs spread the boats (${b0.map(v => v.toFixed(3))} to ${b1.map(v => v.toFixed(3))})`);
+      for (let i = 1; i <= 4; i++) { await touch('pointermove', vw * 0.25 - 36 + 6 * i, vh * 0.6, 11); await sleep(25); }
+      await sleep(400); const b2 = await boats();
+      assert.ok(b2[0] > b1[0] + 0.01 && Math.abs(b2[1] - b1[1]) < 0.01, `the left thumb moves only the left boat (${b1.map(v => v.toFixed(3))} to ${b2.map(v => v.toFixed(3))})`);
+      await touch('pointerup', vw * 0.25, vh * 0.6, 11); await touch('pointerup', vw * 0.75, vh * 0.6, 12);
+      await page.keyboard.press('p'); assert.ok((await state()).paused, 'P pauses Duet');
+      assert.match(await page.textContent('#line'), /^Duet night 2, \d+% to dawn\. Two boats, one flame\.$/); assert.equal((await page.evaluate(() => window.lanternMode())).pads, true, 'the pads stay under the pause card, which lets touches through');
+      // A thumb on the left half, below the card's buttons, resumes the run, and moving it steers the left boat (kit/drag.js waits 12 px before it steers).
+      const p0 = await boats(); assert.equal(await touch('pointerdown', vw * 0.25, vh * 0.85, 11), 'duetL', 'under the pause card the left half is still the left boat\'s');
+      assert.equal((await state()).paused, false, 'a touch on a pad resumes Duet');
+      for (let i = 1; i <= 6; i++) { await touch('pointermove', vw * 0.25 + 6 * i, vh * 0.85, 11); await sleep(25); }
+      await sleep(400); const p1 = await boats(); await touch('pointerup', vw * 0.25 + 36, vh * 0.85, 11);
+      assert.ok(p1[0] > p0[0] + 0.02 && Math.abs(p1[1] - p0[1]) < 0.01, `the resuming thumb steers the left boat (${p0.map(v => v.toFixed(3))} to ${p1.map(v => v.toFixed(3))})`);
+      // Keys: A and D steer the left boat, the arrows the right one. 'Only' is: the other boat moves under a quarter as far.
+      const hold = async (key, ms) => { await page.keyboard.down(key); await sleep(ms); await page.keyboard.up(key); await sleep(300); };
+      const spread = () => page.evaluate(async () => { const { centre } = await import('/lantern/modes/duet-sim.js'), s = window.lanternSim(), m = centre(s, s.y); s.left = m - 0.09; s.right = m + 0.09; window.lanternDuetAim(m - 0.09, m + 0.09); }).then(() => sleep(300)); // clear of both banks
+      // A held key aims a boat 0.08 past where it is and the boat runs 0.95 a second, so a 30 ms hold moves it about 0.1: toward the other boat, the rope stays slack.
+      await spread(); const k0 = await boats(); await hold('d', 30); const k1 = await boats();
+      assert.ok(k1[0] > k0[0] + 0.02 && Math.abs(k1[1] - k0[1]) < 0.25 * (k1[0] - k0[0]), `D moves only the left boat (${k0.map(v => v.toFixed(3))} to ${k1.map(v => v.toFixed(3))})`);
+      await spread(); const k2 = await boats(); await hold('ArrowLeft', 30); const k3 = await boats();
+      assert.ok(k3[1] < k2[1] - 0.02 && Math.abs(k3[0] - k2[0]) < 0.25 * (k2[1] - k3[1]), `the left arrow moves only the right boat (${k2.map(v => v.toFixed(3))} to ${k3.map(v => v.toFixed(3))})`);
+      // Four embers in a line between the boats, then dawn.
+      await page.evaluate(async () => { const { centre } = await import('/lantern/modes/duet-sim.js'), s = window.lanternSim(); s.y = 78 - 0.12; const m = centre(s, s.y); s.left = m - 0.06; s.right = m + 0.06; window.lanternDuetAim(m - 0.06, m + 0.06); s.embers = [-0.03, -0.01, 0.01, 0.03].map(d => ({ x: m + d, y: s.y + 0.03, got: false, kind: 'ember' })); });
+      await until(page, () => window.lanternState().screen === 'card', 'the end card', 12000);
+      const sim = await page.evaluate(() => ({ taken: window.lanternSim().taken, banked: window.lanternSim().banked, over: window.lanternSim().over }));
+      assert.equal(sim.over, 'dawn'); assert.equal(sim.taken, 4, 'the rope takes the line of embers');
+      const boon = 1 + 0.25 * (Math.floor(Number(before['lantern-rebirths'])) || 0); assert.equal(sim.banked, Math.round(4 * 0.5 * boon), `half the embers go to the bank (rebirth bonus ${boon})`);
+      assert.equal(await page.textContent('#title'), 'Dawn'); assert.equal(await page.textContent('#go'), 'Play night 3');
+      assert.match(await page.textContent('#line'), /^Embers: 4\. Snags: 0\. Night 3: the river runs faster\.$/);
+      let mine = JSON.parse((await saved())['lantern-mode-duet:save']);
+      assert.equal(mine.unlocked, 3); assert.equal(mine.played, 1); assert.deepEqual(mine.best, { night: 2, pct: 100 });
+      // A rock between the boats snags the rope; with one heart left the snag ends the run, and the card says so.
+      await page.click('#go'); await until(page, () => window.lanternState().screen === 'play' && window.lanternMode().night === 3, 'a Duet run on night 3');
+      await page.evaluate(() => { const s = window.lanternSim(), m = (s.left + s.right) / 2; s.safe = 0; s.hearts = 1; s.light = 1; s.rocks = [{ x: m, y: s.y + 0.03, rad: 0.012, snagged: false, spent: false, warned: false }]; s.narrows = []; s.left = m - 0.06; s.right = m + 0.06; window.lanternDuetAim(m - 0.06, m + 0.06); });
+      await until(page, () => window.lanternState().screen === 'card', 'the snag ends the run', 12000);
+      assert.equal(await page.evaluate(() => window.lanternSim().over), 'rope');
+      assert.match(await page.textContent('#line'), /^The snagged rope cost the last heart\. \d+% to dawn\. Embers: 0\. Snags: 1\. Best: night \d, \d+% to dawn\.$/, 'the card says why the run ended and the best');
+      const after = await saved(); mine = JSON.parse(after['lantern-mode-duet:save']);
+      assert.equal(mine.played, 2); assert.equal(mine.unlocked, 3, 'a loss opens nothing');
+      assert.equal(after['lantern-duet:v1'], before['lantern-duet:v1'], 'the lab save is never written');
+      assert.ok(Number(after['lantern-bank']) >= Number(before['lantern-bank'] ?? 0) + sim.banked, 'Duet\'s embers reach the bank');
+      for (const k of Object.keys(before)) if (!['lantern-bank'].includes(k)) assert.equal(after[k], before[k], `Duet leaves ${k} as it was`);
+      assert.deepEqual(Object.keys(after).filter(k => !(k in before)).sort(), ['lantern-mode-duet:save'], 'Duet writes only its own new key');
+      await page.click('#toMenu'); assert.equal((await state()).screen, 'mode', 'Menu goes back to the Duet card');
+      await page.click('#mode .back'); assert.equal((await state()).screen, 'menu'); assert.equal(await page.evaluate(() => window.lanternMode()), null, 'leaving Duet turns it off');
+      assert.equal(await page.evaluate(() => [...document.querySelectorAll('.duetPad')].some(el => getComputedStyle(el).display !== 'none')), false, 'the pads are gone from the menu');
+      await sleep(1500); // the menu draws its river for a while after Duet: a page error here fails the whole check
+      assert.equal((await state()).over, null, 'the menu has a fresh river of its own, not Duet\'s ended run');
+      page.off('request', spy); assert.deepEqual(board, [], 'Duet never calls the shared board');
+      await page.evaluate(() => localStorage.removeItem('lantern-duet:v1'));
+      await page.goto(`${base}/lantern/`); await until(page, () => document.getElementById('notes-button'), 'notes button'); await page.click('#toShop'); // back where the erase below starts
+    }
     // Erase everything (note #73, tester tools): two taps; every lantern- key goes and nothing else.
     await page.click('[data-test="reset"]'); assert.ok(Object.keys(await saved()).length > 3, 'one tap erases nothing');
     await Promise.all([page.waitForEvent('load'), page.click('[data-test="reset"]')]);
@@ -817,7 +891,7 @@ const GAMES = {
     await until(page, () => document.querySelector('#menu h1').textContent === 'Fener', 'the Turkish menu');
     assert.equal(await page.evaluate(() => document.documentElement.lang), 'tr');
     assert.equal(await page.textContent('#toShop b'), 'Mağaza'); assert.equal(await page.textContent('#toBoard'), 'Sıralama');
-    await page.click('#toModes'); assert.deepEqual(await page.$$eval('#modes a.mode', as => as.map(a => a.getAttribute('href'))), ['/lab/lantern-race/'], 'Race is one tap away'); assert.deepEqual(await page.$$eval('#modes button.mode', bs => bs.map(b => [b.dataset.mode, b.textContent])), [['spark', 'Fener Kıvılcım'], ['tide', 'Fener Gelgit']], 'Spark and Tide are chosen inside Lantern'); await page.click('#modes .back');
+    await page.click('#toModes'); assert.deepEqual(await page.$$eval('#modes a.mode', as => as.map(a => a.getAttribute('href'))), ['/lab/lantern-race/'], 'Race is one tap away'); assert.deepEqual(await page.$$eval('#modes button.mode', bs => bs.map(b => [b.dataset.mode, b.textContent])), [['spark', 'Fener Kıvılcım'], ['tide', 'Fener Gelgit'], ['duet', 'Fener Düet']], 'Spark, Tide and Duet are chosen inside Lantern'); await page.click('#modes .back');
     await page.click('#menuLanguage');
     assert.equal(await page.evaluate(() => document.documentElement.lang), 'en');
     assert.equal(await page.textContent('#menu h1'), 'Lantern'); assert.equal(await page.textContent('#toShop b'), 'Shop');
