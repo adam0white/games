@@ -656,7 +656,7 @@ Compared on one frozen moment (the same seed and placements; `__ant.look(n)` swi
 ### Numbers
 - `rig-bots.mjs` (run first by `bots.mjs`): 55 species walk 10,000 steps each at up to 360, above the game's top speed, with every pose; no NaN, spine and chain error under 1e-10 %, no foot past its leg (worst 98.0 %), the gait alternates 100.0 % of 66,345 waves, feet drag 0.08 % at a walk and 0.39 % at a run. A fleeing Dog steps 92 times in 10 s against 75 calm. 240 s of a real run with the look stepping ends in the same sim state as without it, with up to 63 rigs. Three more runs (seeds 3, 17, 29; 200 to 300 s) with a brute rival, three old animals and a fast player end in the same state too, and in them animals leave the ground in a pounce (49 rig-ticks), crouch and are bigger as the rival; making the look nudge the rival's heading by 1e-9 fails this check on all three runs. 11 sim states each give the pose they should, a calm animal none. Every species in 11 poses draws on a context that rejects NaN (164,034 calls).
 - `--mutate=gait`, `clamp` and `spine` each fail 3 or 4 of those checks; `node bots.mjs --mutate` exits 1.
-- Rules parity: `node bots.mjs 6 12` prints the same 67 lines after the rig checks as main's `bots.mjs` on main's `sim.js` (`sim.js` is unchanged).
+- Rules parity: `node bots.mjs 6 12` prints the same 66 lines after the rig checks as main's `bots.mjs` on main's `sim.js` (`sim.js` is unchanged).
 - Page work per frame (the sim steps, the rigs and the drawing; `__ant.work`), headless at 390x844, median / 95th percentile in ms:
 
 | | level 6 | level 12 | level 18 |
