@@ -30,25 +30,6 @@ function dragTouch(before, moved, points = [[150, 430], [195, 430]]) {
     await finger(page, '#c', [['pointerup', ...points[1]]]);
   };
 }
-function offlineSocket() {
-  if (!location.pathname.startsWith('/lab/lantern-race/')) return;
-  window.WebSocket = class {
-    static OPEN = 1;
-    constructor() { this.readyState = 0; queueMicrotask(() => this.onerror?.({ type: 'error' })); }
-    close() { this.readyState = 3; }
-    send() { throw new Error('offline race fixture cannot send'); }
-  };
-}
-async function raceStart(page) {
-  await page.addInitScript(offlineSocket);
-  await page.evaluate(offlineSocket);
-  await page.click('#quick');
-  await page.waitForFunction(() => window.raceState().offline);
-  await page.click('#ready');
-  await page.waitForFunction(() => window.raceState().phase === 'race', null, { timeout: 12000 });
-  assert.equal(await page.evaluate(() => window.raceState().offline), true, 'offline race uses the pausable local clock');
-}
-
 async function ringBell(page, { until }) {
   const count = await page.evaluate(() => {
     const { hits, misses } = window.bellsState();
@@ -147,15 +128,6 @@ async function turnPrism(page, { until }) {
   }, 'touch turns the prism and starts exposure', 8000, previous);
 }
 
-async function steerTide(page, { until }) {
-  const { point: [x, y], game: { river }, target, scale } = await page.evaluate(() => window.tideState());
-  await pointerDrag(page, { x, y }, { x: x + 40, y });
-  await until(page, ({ minimumTarget, minimumX }) => {
-    const s = window.tideState();
-    return s.target > minimumTarget && s.game.river.x > minimumX;
-  }, 'drag steers the boat right', 8000, { minimumTarget: target + 24 / scale, minimumX: river.x + 4 / scale });
-}
-
 export async function fieldPoint(page, width, height) {
   const box = await page.locator('#field').boundingBox();
   return (x, y) => ({ x: box.x + x * box.width / width, y: box.y + y * box.height / height });
@@ -183,19 +155,8 @@ async function rubPlate(page, { until, knob }) {
 }
 
 const splitlightLegacy = { 'night-splitlight:plate': '2', 'night-splitlight:sound': 'on' };
-const tideLegacy = { 'lantern-tide:night': '2', 'lantern-tide:sound': '1' };
 
 export const labPages = {
-  'lab/lantern-race': {
-    seeds: { 'lantern-race-best': '100000', 'lantern-race-sound': '1', 'lantern-race-name': 'Test boat', 'lantern-race-played': '1', 'lantern-race:hint': '1' },
-    play: '#quick', start: raceStart, menu: '#paused .toMenu', sound: '#sound', soundKey: 'lantern-race-sound', soundOff: '0',
-    state: () => { const s = window.raceState?.(); return s && { ...s, screen: s.phase === 'race' ? 'play' : s.phase, paused: s.phase === 'paused' }; },
-    verify: () => ({ best: window.raceState().best, name: document.querySelector('#name').value, sound: document.querySelector('#sound').textContent, played: localStorage.getItem('lantern-race-played') }),
-    expect: { best: 100000, name: 'Test boat', sound: 'Sound: on', played: '1' },
-    touch: dragTouch(() => window.raceState().target, n => window.raceState().target !== n),
-    hint: { key: 'lantern-race:hint', delay: 1500, start: raceStart, before: () => window.raceState().target, moved: n => window.raceState().target !== n,
-      legacy: { 'lantern-race-best': '100000', 'lantern-race-sound': '1', 'lantern-race-name': 'Test boat', 'lantern-race-played': '1' } },
-  },
   'lab/wild2-face-shift': pageEntry('wild2-face-shift:save', saves.face, 'wild2-face-shift:hint', {
     menu: '#toMenu', sound: '#sound',
     state: () => { const s = window.faceShiftState?.(); return s && { screen: s.mode, paused: s.mode === 'paused', t: s.state?.elapsed ?? 0 }; },
@@ -270,35 +231,24 @@ export const labPages = {
   }),
   'lab/night-splitlight': {
     startsOnBoard: true, sound: '#sound', soundKey: 'night-splitlight:sound', soundOff: 'off',
-    seeds: { ...splitlightLegacy, 'night-splitlight:hint': '1' },
+    // :best, :daily, :done and :parts were added on 2026-11-24 with the 18-plate bench; they are seeded so a save that
+    // has them must survive too.
+    seeds: { ...splitlightLegacy, 'night-splitlight:hint': '1', 'night-splitlight:best': '{"1":1}', 'night-splitlight:parts': '1',
+      'night-splitlight:daily': '{"day":"2026-11-23","turns":3,"par":2,"seconds":9.5}' },
     state: () => {
       const s = window.splitlightState?.();
       return s && { screen: s.screen, t: s.elapsed };
     },
     verify: () => {
       const { level, sound } = window.splitlightState();
-      return { level, sound, plate: document.querySelector('#plate').textContent };
+      const today = document.querySelector('#daily').getBoundingClientRect();
+      return { level, sound, plate: document.querySelector('#plate').textContent, best: localStorage.getItem('night-splitlight:best'),
+        todayButton: today.width >= 44 && today.height >= 44 && today.right <= innerWidth };
     },
-    expect: { level: 2, sound: true, plate: 'Plate 02 / 06' },
+    // 'Plate 02 / 06' until 2026-11-24, when the page grew to 18 plates (deliberate; see the page's NOTES).
+    expect: { level: 2, sound: true, plate: 'Plate 02 / 18', best: '{"1":1}', todayButton: true },
     touch: turnPrism,
     hint: { key: 'night-splitlight:hint', delay: 2200, play: '#angle', timing: { board: true },
       input: turnPrism, legacy: splitlightLegacy },
-  },
-  'lab/lantern-tide': {
-    query: 'check=1', play: '#start', sound: '#sound', soundKey: 'lantern-tide:sound', soundOff: '0',
-    start: page => page.tap('#start'),
-    seeds: { ...tideLegacy, 'lantern-tide:hint': '1' },
-    state: () => {
-      const s = window.tideState?.();
-      return s && { screen: s.screen, t: s.game.river.t };
-    },
-    verify: () => {
-      const { night, screen } = window.tideState();
-      return { night, screen };
-    },
-    expect: { night: 2, screen: 'ready' },
-    touch: steerTide,
-    hint: { key: 'lantern-tide:hint', delay: 1500, timing: { start: '#start' },
-      input: steerTide, legacy: tideLegacy },
   },
 };

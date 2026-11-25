@@ -612,6 +612,31 @@ Section 6 of `bots.mjs`, 6 seeds, 12 minutes, median top level / median deaths:
 ### Not verified
 A real phone; whether the hunts are more exciting; the skills at high levels by hand. The straight runner is never caught by design, so the skills bite mostly on a player who stops or turns.
 
+## 2026-11-24: a skill of its own for every animal (tester t1, note #238)
+
+The note: every ability feels the same, they all make you faster, freeze things or teleport you; no ability may repeat; every animal should have its own, from the traits of its species. It names "draft" and was tagged Lantern. The lab reads it as this game, where 51 promoted animals shared six kinds of skill; the reply says so.
+
+- **51 animals, 51 skills** in `skills.js`, none with another's rule. One animal each keeps an old kind: Turtle (shell), Rabbit (leap), Lion (the only freeze), Eagle (dive), Cheetah (sprint). The other 46 are new: a Frog's tongue, a Mole under the ground, a Wolf's pack, a Panther's silent kill, a Dragon's fire that leaves meals, and so on. `skills.js` lists them by level; the button says what one does after a promotion, in English and Turkish.
+- A skill with a target is not spent when nothing is in reach. A promotion, a death and a revive end every effect. A rival or an old hunter that is stronger can be pushed, lured or escaped, never eaten by a skill.
+- **Nothing runs until the button is pressed.** 24 bot runs of four minutes without a press (12 seeds, classic and wild) are identical to main's, position and all.
+- Old hunters keep the six kinds they had (`powerFor`), so note #225's checks hold.
+- My own small experiment: a ring of colour under an animal shows what a skill did to it (green weakened, white running, purple lured or blinded, orange marked), and a yellow arc round you shows how long yours lasts.
+
+Checks: `bots.mjs` section 4c has a stage for each of the 46 new skills; switching off any one skill fails its stage (46 of 46 caught). In Chromium at phone size the button of every animal was pressed on a stage in English, Turkish and the 3D look: no page error, no label cut off.
+
+Not verified: how they feel on a real phone; whether 51 skills are fair against each other (bots press them, people choose them); the Turkish wording by a native reader.
+
+### Left as a proposal (2026-11-24, note #238)
+
+- Old hunters that use these skills against you.
+- Skills with a picture of their own in the 3D look (a pack, a decoy and a meal are simple shapes there).
+
+Also checked: dying and reviving with a lasting skill in 2D and 3D ends it and raises no page error. Lab pages that use these rules: `ant-evolve` parity and `ant-creatures` still run; `ant-hide`'s parity test already failed at tick 0 on main before this change.
+
+### 2026-11-24: note #244
+
+The answer to #243 (how are old hunters now that they use their skills): has not met one yet. Nothing changes; ask again after a full climb.
+
 ## 2026-11-24: the Living look (lab page ant-creatures folded in, owner's lab cleanup)
 
 ### Done
@@ -679,6 +704,22 @@ Compared on one frozen moment (the same seed and placements; `__ant.look(n)` swi
 - At play size the dog and the lynx are still close (both tan with dark spots); at 9 pixels most mammals read by colour and size more than by outline.
 - The ostrich's plumes and the gorilla's face are first drafts.
 - A rig's heading lags when an animal is moved at once (a revive, a check placing animals); in play animals walk, so this shows only in tests.
+
+## 2026-11-25: the skills and the Living look merged
+
+The skills (note #238) and the Living look were built at the same time. After the merge:
+
+- `rig-bots.mjs` asked for a crouch in its plain run. On main all 175 crouches of that run were stuns by a player's skill; only the Lion's skill stuns now, so that part of the claim was dropped. The run with a rival and old animals still requires crouches that are not stuns, and the 11-state check still requires the stunned pose.
+- Promotion cards still named the old six skills ("Skill: Roar" on T-Rex). They name the new ones now (`skillFor` in `index.html`).
+- In Chromium and WebKit at 390x844 the button of every animal was pressed in Living: 40 and 36 of 51 fired with animals placed near, the rest had no fitting target; no page error.
+- Left as a proposal: Living has no body language of its own for the new skills. The rings and marks of `skillMarks` show them.
+
+## 2026-11-25: the cards and the book say what a skill does (follows note #238)
+
+- With 51 different skills, a promotion card that said only "Skill: Dung ball" made the pick a guess. Each card now also has the skill's line (`does.<animal>`, English and Turkish), and the animal book has it for every animal you have been. Long words wrap inside a card. My own addition, not asked for; to remove it, delete the two `does` lines in `index.html`.
+- Checked in Chromium: one promotion from each of levels 1 to 17, in English and Turkish, at 390x844 and 320x568: every card has its line, inside the card and on the screen. The phone check asserts the line on the first card.
+- Not verified: a real phone; whether four lines of small text on a card is too much to read.
+- Left as a proposal (2026-11-25): meeting an old hunter sooner than after a full climb. The tester has not met one (#244), and they only come after a climb that reaches the top ends in a new game.
 
 ## 2026-11-24: rocks and tall grass (lab page ant-hide folded in, "but less prevalent")
 

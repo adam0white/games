@@ -186,6 +186,7 @@ async function acceleratedWin(page, level) {
       const st = window.bellsState(), s = st.s || st;
       if (s.events.some(e => e.type === 'harmony')) {
         const atApex = s.bells.every(b => {
+          if (b.free) return true; // a bell with no rope is not rung and not part of a harmony
           const distance = Math.abs(b.phase - Math.round(b.phase / Math.PI) * Math.PI);
           return distance / b.omega <= s.window + 1e-10;
         });
@@ -382,12 +383,27 @@ async function run(name) {
       assert.equal(await page.locator('#objective').isVisible(), false, 'harmony cue hides on the result card');
       validSave((await snapshot(page)).saved);
       assert.ok((await snapshot(page)).saved.stars[level - 1] > 0, `level ${level} stars saved`);
-      if (level < 8) await touch(page, '#next');
+      await touch(page, '#next');
+    }
+    // Nights 9-24 (new): each one is won by the same accelerated controller; their stars live in a new key.
+    assert.equal(rules(await snapshot(page)).level, 9, 'night 8 leads on to night 9');
+    for (let level = 9; level <= 24; level++) {
+      assert.equal(rules(await snapshot(page)).level, level, 'campaign advances sequentially');
+      assert.ok((await snapshot(page)).cue.length > 0, `night ${level} explains its idea`);
+      accelerated.push(await acceleratedWin(page, level));
+      const after = await snapshot(page);
+      validSave(after.saved);
+      assert.ok(after.more.stars[level - 9] > 0, `night ${level} stars saved in the new key`);
+      if (level === 9) await shot(page, `${name}-3b-night-9-won`);
+      if (level < 24) await touch(page, '#next');
     }
     console.log(`${name}: ACCELERATED test-only campaign ${JSON.stringify(accelerated)}`);
     assert.match(await page.locator('#next').textContent(), /Endless/, 'final primary action offers endless');
     await touch(page, '#next'); assert.ok(rules(await snapshot(page)).endless, 'final primary action starts endless');
     await touch(page, '#pause'); await touch(page, '#quit'); await menu(page);
+    assert.equal(await page.locator('#levels button:not([disabled])').count(), 8, 'all eight nights of the last chapter unlocked');
+    assert.equal(await page.locator('#chapters button:not([disabled])').count(), 3, 'all three chapters open');
+    await touch(page, '#chapters button[data-chapter="1"]');
     assert.equal(await page.locator('#levels button:not([disabled])').count(), 8, 'all eight levels unlocked');
 
     // Screenshot actual play under each palette. The palette changes the drawing, not campaign rules.
@@ -427,7 +443,8 @@ async function run(name) {
     assert.match(await page.locator('#next').textContent(), /Try again/, 'endless primary action offers a retry');
     await shot(page, `${name}-5-endless-result`);
     const best = st.saved.best;
-    await touch(page, '#retry'); assert.ok(rules(await snapshot(page)).endless, 'Retry retains endless mode');
+    assert.equal(await page.locator('#retry').isVisible(), false, 'a lost run has one retry button, the primary one');
+    await touch(page, '#next'); assert.ok(rules(await snapshot(page)).endless, 'Retry retains endless mode');
     assert.equal(rules(await snapshot(page)).score, 0, 'Retry resets score');
     await page.evaluate(() => { for (let n = 0; n < 24000 && window.bellsState().screen === 'play'; n++) window.bellsAdvance(1 / 120); });
     st = await snapshot(page);
@@ -483,6 +500,54 @@ async function run(name) {
       await palettePage.context().close();
     }
     console.log(`${name}: three palette menus ${functionalOnly ? 'checked (capture skipped: functional-only mode)' : 'captured'}`);
+    // Daily peal, Turkish and the small-games home: one seed and one idea per day for everyone, a picture to share,
+    // a back link and a result for the home, and nothing scrolls on a 320x568 phone.
+    {
+      const dp = await context(() => { try { localStorage.setItem('hf-lab-send-localhost', '1'); } catch {} }, '?test=1&day=2026-11-24&lang=tr&from=small&labRunSource=agent');
+      assert.equal(await dp.evaluate(() => document.documentElement.lang), 'tr', 'lang=tr turns the page Turkish');
+      assert.equal(await dp.locator('#daily').textContent(), 'Günün çanları', 'Turkish daily button');
+      assert.equal(await dp.locator('#menu .kit-home').count(), 1, 'opened from the home: back link on the menu');
+      const fits = async label => { const r = await dp.evaluate(() => [...document.querySelectorAll('.screen.on')].map(el => ({ id: el.id, over: el.scrollHeight - el.clientHeight })).concat([{ id: 'page', over: document.documentElement.scrollHeight - innerHeight }])); for (const x of r) assert.ok(x.over <= 0, `${label}: ${x.id} does not scroll (${x.over}px)`); };
+      await dp.setViewportSize({ width: 320, height: 568 }); await delay(200);
+      await fits('320x568 Turkish menu'); await geometry(dp, '320x568 Turkish menu'); await shot(dp, `${name}-7-tr-320-menu`);
+      const before = (await snapshot(dp)).saved;
+      await touch(dp, '#daily');
+      let d = await snapshot(dp);
+      assert.equal(rules(d).daily, '2026-11-24', 'daily peal of the asked day');
+      assert.ok(d.cue.startsWith('Günün çanları'), 'daily idea is shown in Turkish');
+      const seed = rules(d).seed, idea = rules(d).idea;
+      await touch(dp, '#pause'); await fits('320x568 Turkish pause'); await touch(dp, '#resume');
+      const daily = await acceleratedWin(dp, 'daily');
+      d = await snapshot(dp);
+      assert.equal(d.dailySave.plays, 1, 'daily play counted'); assert.ok(d.dailySave.best > 0, 'daily best saved');
+      assert.equal(d.dailySave.peal.length, rules(d).hits, 'every strike of the peal is kept for the picture');
+      // Sound and music on: every strike's pitch is a note of the kit/music.js bell chord, not the fixed fallback.
+      assert.ok(d.saved.sound && d.music, 'daily played with sound and music on'); assert.deepEqual(d.voices, { music: d.strikes }, 'every strike takes its pitch from kit/music.js');
+      assert.deepEqual(d.saved, { ...before, tries: before.tries + 1 }, 'the daily peal changes nothing in the old save but tries');
+      assert.ok(await dp.locator('#share').isVisible(), 'daily result offers Share'); assert.equal((await dp.locator('#share').textContent()).trim(), 'Paylaş', 'Share is in Turkish');
+      assert.ok(await dp.locator('#replay').isVisible(), 'a won run can play its tune again');
+      await waitFor(dp, () => window.bellsState().picture, 'daily share picture drawn');
+      const png = await dp.evaluate(() => window.bellsPicture());
+      const size = await dp.evaluate(src => new Promise(ok => { const i = new Image(); i.onload = () => ok([i.width, i.height]); i.src = src; }), png);
+      assert.deepEqual(size, [1080, 1350], 'share picture is 1080x1350');
+      assert.equal(await dp.locator('#end .kit-home').count(), 1, 'back link on the result card');
+      await fits('320x568 Turkish daily result'); await shot(dp, `${name}-8-tr-320-daily-result`);
+      const home = await dp.evaluate(() => JSON.parse(localStorage.getItem('hub:results') || '{}')['night-bells']);
+      assert.ok(home && home.runs >= 1, 'the home learns the result');
+      const run = assertRun(dp.context().lab, 'night-bells', { outcomes: ['won'], summaryKeys: ['level', 'endless', 'hits', 'score'] });
+      assert.equal(run.data.summary.daily, '2026-11-24'); assert.ok(run.data.events.some(e => e.type === 'daily-finished'), 'daily run records daily-finished');
+      console.log(`${name}: DAILY ${idea} seed ${seed} ${JSON.stringify(daily)}`);
+      await touch(dp, '#toMenu'); await menu(dp); await fits('320x568 Turkish menu after daily');
+      await dp.context().close();
+      // Same day on a fresh device: the same seed and idea. Another day: another seed.
+      for (const [day, same] of [['2026-11-24', true], ['2026-11-25', false]]) {
+        const other = await context(null, `?test=1&day=${day}`);
+        await touch(other, '#daily'); const o = rules(await snapshot(other));
+        if (same) { assert.equal(o.seed, seed, 'same day, same seed'); assert.equal(o.idea, idea, 'same day, same idea'); }
+        else assert.notEqual(o.seed, seed, 'another day, another seed');
+        await other.context().close();
+      }
+    }
     // Play recording: the notice is on the menu before Play; a played run sends one record under 'night-bells';
     // with the switch off in the pause card the next run sends nothing.
     {
@@ -495,14 +560,14 @@ async function run(name) {
       await delay(600);
       const run = assertRun(lab, 'night-bells', { outcomes: ['lost', 'won'], summaryKeys: ['level', 'endless', 'hits', 'score'] });
       assert.equal(run.data.summary.endless, true); assert.ok(run.data.events.some(e => e.type === 'endless-finished'));
-      await touch(recPage, '#retry'); await touch(recPage, '#pause');
+      await touch(recPage, '#next'); await touch(recPage, '#pause');
       await assertOffSendsNothing(recPage, lab, 'night-bells', { play: async () => { await touch(recPage, '#resume'); await advance(); await waitFor(recPage, () => window.bellsState().screen === 'end', 'second run ended'); } });
       console.log(`${name}: play recording sent ${lab.sent.length} records and nothing more once switched off`);
     }
     assert.ok(requests.some(r => r.url.endsWith('/notes/button.js')), 'page loads actual notes button script');
     assert.ok(requests.every(r => r.method === 'GET' && new URL(r.url).origin === base), 'no telemetry, writes, or outbound requests');
     assert.deepEqual(errors, [], 'no page, console, HTTP, or request errors');
-    console.log(`${name}: PASS${functionalOnly ? ' FUNCTIONAL ONLY' : ''} pause/resume/blur, save/reload, 8 levels, endless best ${best}, invalid/corrupt/blocked storage; ${requests.length} same-origin GETs only; ${functionalOnly ? 'screenshots skipped' : `screenshots ${SHOTS}`}`);
+    console.log(`${name}: PASS${functionalOnly ? ' FUNCTIONAL ONLY' : ''} pause/resume/blur, save/reload, 24 levels, daily peal, Turkish 320x568, endless best ${best}, invalid/corrupt/blocked storage; ${requests.length} same-origin GETs only; ${functionalOnly ? 'screenshots skipped' : `screenshots ${SHOTS}`}`);
   } catch (error) {
     if (errors.length) console.error(`${name}: captured errors ${JSON.stringify(errors)}`);
     throw error;
