@@ -100,3 +100,122 @@ All 34 phone captures were inspected, 17 per profile. They show the untouched cu
 The page sends play records to the lab under the name `night-podwire` through `kit/lab.js` (the name is in human-framework `LAB_PROTOTYPES` once its pull request lands; until then every send is refused). This page has no start card, so the recording notice sits in the footer under the plate from the first moment, and the off switch is on the pause sheet. A run is one plate, from the first pluck of the wire to all pods open (`won`), or a restart or the next plate (`quit`). Opening the page and not plucking records nothing. Event: `plate-complete`. The check allows `/kit/lab.js` and answers the lab address itself.
 
 `check.mjs` answers the lab address itself (no check reaches the real one), loads the page with `?labRunSource=agent`, and asserts: the notice is on the page before play, a played run sends one run record under `night-podwire` with its events record, and after the switch is turned off a further run sends nothing and the player id is removed. Not verified: delivery to the real lab (the Worker does not accept this name yet), a real phone.
+
+## 2026-11-24 — eighteen plates, today's plate, the string's own sound
+
+The owner's note: "podwire good but improve/extend". Plates I–VI keep their shipped rules exactly. Twelve new plates each add one effect from real string physics. There is a plate of the day with a par, and the sound now comes from the string.
+
+### Five weakest things before the change, and what became of each
+
+Written down after playing main on both phone profiles and before any edit (captures in `/tmp/claude-improve-night-podwire/before/`).
+
+1. **The wave was not the star.** The wire was a thin, low-contrast line, and the board used about 45% of the phone height. Now the wire is drawn with a paper halo and a heavier ink line, with a crest glint and a short wake of earlier shapes. The side gutter is 16 px. Unchanged: the board's share of the height. The plate heading still takes the top third.
+2. **The drawn finger was ambiguous.** The hand had the winding's colour, the release was not shown, and the arrow did not say how far to pull. Now the finger runs a timeline: approach, tug, hold, then a let-go flick. A dashed drop line, an arrowhead and a target dot mark where to pull to. Fret taps are drawn on the brass peg. Two-pluck and rhythm plates show each pull at the spacing that works.
+3. **Six plates on one idea.** Plates IV–VI repeated II–III with more pods, and play ran out after about two minutes. Now there are eighteen plates, and plates VII–XVIII each add one new effect (table below).
+4. **The sound did not come from the string.** Pitch followed the grip index (132 + 1.8·i Hz), and pods popped on a fixed scale. Now the pitch follows f = √(T/μ)/2L: shorter spans (a clamped fret), tighter plates and heavier wire change it. The plucked harmonics are weighted by sin(nπp)/n², where p is the grip position. Pods pop on harmonics of the open string; a tuned pod pops on its own harmonic. Through `kit/audio.js`.
+5. **No score and English only.** A plate ended with only "Next plate". Now a result line shows plucks against par. A mark is drawn taller when the best is at or under par. Today's plate has a shareable result line. English and Turkish come through `kit/i18n.js` (`words.js`).
+
+### The twelve new plates and their ideas
+
+The par is the look-ahead player's pluck count on the plate's stable seed (`level * 417`).
+
+| Plate | Plant | Idea | Par |
+| --- | --- | --- | ---: |
+| VII | Bladder campion | Grip position and harmonics. A pluck at the exact middle has no even harmonics, so a pod tuned to the second harmonic stays shut; a pluck a quarter along opens it. | 1 |
+| VIII | Sweet pea | Free end. A ring on a stem holds the wire's right end, so the end follows the finger and the crest comes back the same way up. | 1 |
+| IX | Spanish broom | Two-crest pods. A pod cracks on one crest and opens only on a second crest within 1.2 s. Pluck twice in rhythm. | 2 |
+| X | Hop | Heavy section. A heavier stretch carries the wave more slowly, so the crest no longer lands at the mirror point. | 1 |
+| XI | Rattlebox | Harmonics again. A pluck a third along has no third harmonic. | 1 |
+| XII | Job's tears | Heavy bead. A point mass sends part of the wave back early and passes the rest on. | 1 |
+| XIII | Lupin | Two wires coupled by a bridge. A sprung bridge throws much of the wave back and drives the far span through it. | 1 |
+| XIV | Cotton | Damped section. Felt soaks up a crest that reaches it. | 1 |
+| XV | Quaking grass | Moving pod. The pod swings, so the crest must arrive as it passes. | 1 |
+| XVI | Squirting cucumber | Standing waves from repeated plucks. Small pulls in time with the wire's period (1.6 s) build up; pulls out of time cancel. | 4 |
+| XVII | Wallflower | Fret with a second finger. Tapping the brass peg clamps the wire: the short span rings an octave higher and the far side stays still. | 2 |
+| XVIII | Peony | Everything at once: fret, tuned pod and swinging pod. | 1 |
+
+Reflections invert on every fixed-end plate (I–VII, IX–XVIII): the finger pulls the wire down, and the crest that returns from the far end stands up. That has been the game's core since plate II. A bot claim names it now. The order of VII–XVIII was set by the clumsy player's clear rate (below), not by the list in the brief.
+
+Physics notes for later sessions:
+- Pods hang above the wire. A pod below the wire was tried and dropped. In the discrete sim, the far side's downward excursion never exceeds the finger's static triangle, so such a pod tests the static shape, not the wave.
+- Live plates (IX, XVI): the wire keeps ringing under the finger, and a pull adds its triangle on release. The look-ahead player holds each pull for 0.25 s on these plates, so it cannot stack instant pulls (it did, before that change).
+
+### Rules on plates I–VI are unchanged
+
+`sim.js` keeps the shipped code path for plates I–VI (`plain`). The new effects run on a separate path (`rich`). `bots.mjs` carries a frozen copy of main's rules. It drives both copies with the same random fingers (grabs anywhere, pulls, cancels, releases) on plates I–VI with 12 seeds each: 288,707 ticks and 117 plucks. Wire, velocities, time, plucks, pods and wins are identical at every 60th tick. `--mutate=parity` changes one velocity by 0.1% and fails.
+
+Saves: `night-podwire:progress` keeps its shipped format and meaning (`{v:1,next 1–6,complete,sound}`). A save from main loads; a finished one continues at plate VII. New state uses new keys:
+- `night-podwire:book`: `{v:1,reached 1–18,done,best}`
+- `night-podwire:daily`: `{v:1,days:{date:{plucks,par}}}`, keeping the last 40 days
+
+Each write merges with what another tab wrote first. The hub (`hub-a/hub.js`) reads both keys and counts out of 18. Its catalogue entry now has `tr: true`.
+
+### The owner's point in numbers: the clumsy player
+
+The look-ahead player (`solve.js`) tries every grip, fret setting and release time. It simulates 2.6 s ahead and keeps the pluck that opens the most pods, or comes closest. The clumsy player plays the same plan with noise: aim ±E world units, a pull short by up to D, and release time off by up to ±T s. It is limited to 8 plucks.
+
+Before. Main's rules with main's mirror bot, 32 seeds per plate (aim ±E, pull short by up to D):
+
+| Noise | I | II | III | IV | V | VI |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| ±8 / 10 | 32 | 32 | 32 | 32 | 32 | 23 |
+| ±16 / 20 | 32 | 32 | 32 | 32 | 30 | 13 |
+| ±24 / 30 | 32 | 32 | 32 | 27 | 13 | 4 |
+
+After. 16 seeds per plate, clears at three noise levels (`node bots.mjs --report`). Plates I–VI have the same rules as before, so their rows are also their "before" for this player.
+
+| Plate | I | II | III | IV | V | VI | VII | VIII | IX | X | XI | XII | XIII | XIV | XV | XVI | XVII | XVIII |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| ±8, 10, 0.1 s | 16 | 16 | 16 | 11 | 13 | 10 | 16 | 16 | 16 | 16 | 16 | 16 | 15 | 11 | 16 | 16 | 14 | 12 |
+| ±16, 20, 0.2 s | 16 | 16 | 16 | 12 | 4 | 2 | 15 | 15 | 16 | 14 | 13 | 11 | 11 | 10 | 10 | 10 | 8 | 5 |
+| ±24, 30, 0.3 s | 16 | 16 | 14 | 7 | 4 | 4 | 11 | 12 | 14 | 12 | 10 | 11 | 10 | 9 | 7 | 1 | 6 | 4 |
+
+Across VII–XVIII, the middle row falls from 15 to 5 in steps of at most 3 (one step up, at IX). The heights of the new pods were tuned by bisection to hit a straight-line target at the middle noise level. Not fixed: the cliff from IV to VI (12 → 4 → 2). Those plates' rules are frozen by the parity rule. After VI the rate rises again to 15, so a player who struggles on V–VI meets easier plates next. This needs the owner's call: change V–VI on main, or leave them.
+
+The aiming player clears every plate on seeds 1–8 (`bots.mjs`, every run). With `--report` it clears every plate on seeds 1–16.
+
+### Today's plate
+
+A UTC date hash picks a plate from II–XVIII and a seed. Pods get 2.2× the usual position jitter. The pick is the same for everyone and needs no network. The page works out the par with the look-ahead player in slices of up to 4 ms inside the frame (worst case in Node: 310 ms of work over 1,500 days). Over 1,500 days from 2026-11-24, every daily plate can be cleared (`/tmp` script; `bots.mjs` checks 30 days on every run). The first result of the day is kept. The result line reads, for example, `Podwire 2026-12-04 · Sweet pea: 1 plucks, par 1 ◆`. `kit/room.js shareLink` shares it, or copies it, with a `?daily` link. The daily score goes to no leaderboard. `?date=YYYY-MM-DD` opens another day's plate (for checks).
+
+### The first ten seconds: does the drawn finger teach the pluck?
+
+Two bots copy only what is drawn:
+- `solve.js followCue` replays the drawn gestures (grip, depth, release spacing, fret taps). It opens at least one pod on all 18 campaign plates (all pods on 12 of them). A pull at the middle of the first winding, which is what a player who ignores the drawing might do, opens nothing on VII, IX, XI, XV, XVI and XVIII.
+- `check.mjs` adds a bot that reads only the canvas. It finds the lowest blush-red pixels under the wire (the drawn target dot), grabs the wire above it and pulls to it. On a cleared save it opened the first pod 0.7 s after navigation on both WebKit and Chromium (target found at x 180, depth ≈ 45; the drawn cue is 44).
+
+This shows the drawing carries enough information. It does not show that a person reads it. That still needs first-time human players.
+
+### Checks run (2026-11-24, this branch, before merging main)
+
+- `node bots.mjs` exits 0 in about 35 s. It covers the shipped claims (192/192 mirror-bot clears; 133/192 with a 15-unit offset), parity, one physical claim per new idea, the aiming player on all 18 plates, the drawn finger, `PARS` equal to the solver, 30 daily plates and the clumsy table.
+- `node bots.mjs --mutate` exits 1 at the reflected-crest claim (as before). `node bots.mjs --mutations` runs 12 mutations, and each fails at its own claim: momentum, harmonic, heavy, bead, bridge, felt, moving, double, fret, pump, free, parity.
+- `node check.mjs` passes on WebKit (iPhone 13) and Chromium (Pixel 7). New coverage:
+  - an old finished save continuing at plate VII
+  - plate VII cleared at par
+  - a peg tap clamping plate XVII, with the near side ringing and the far side still (< 1 unit)
+  - Turkish on the pause card and back
+  - today's plate (plate VIII on 2026-12-04, par 1 computed in the page), its saved result, share and the Today ✓ button; a second go is marked as practice and leaves the first result in place
+  - a recorded daily run carrying `mode: 'daily'` and `par`
+  - the pixel-copying bot
+  - page work per frame at 390×844 while the daily par is computed and the wire rings: p95 4 ms / max 4 ms on WebKit (its timer has a 1 ms step), and p95 0.4–4 ms / max 4.5–5 ms on Chromium over two runs. The budget is 8 ms.
+- `node experiments/kit/check/phone.mjs lab/night-podwire,lab/hub-a` passes on both profiles, with no change to the shared entry. The legacy progress seed still restores plate II, one done mark and sound.
+- `npm test` passes (73 tests).
+
+Intentional check changes in `check.mjs`:
+- After plate VI, Next opens plate VII; it used to return to plate I. A reload keeps plate VII.
+- The corrupt-save check corrupts both `progress` and `book`.
+- Tests that cleared `progress` now clear all three keys (`clearSaves`).
+- Captures go to `$SHOTS` when it is set.
+
+No assertion was loosened.
+
+### Not verified
+
+- Turkish wording has not been read by a native speaker. Some plant names are uncertain: Ay otu (Honesty), Çıngıraklı bakla (Rattlebox), Gözyaşı otu (Job's tears), Titrek ot (Quaking grass), Gıvışkan otu (Bladder campion).
+- Not heard on a phone: pitch, timbre and pod pops. The checks confirm only that calls reach `kit/audio.js` without errors.
+- Not verified on a real phone in daylight: thumb feel, the fret peg's 24-unit reach, or whether the wave reads well.
+- No first-time human players have tried the new plates.
+- Frame time on a real mid-range Android phone.
+- Whether rhythm plates IX and XVI feel fair to a person. Their windows come from the bot.
+- The difficulty curve comes from bots with uniform noise. People make different errors.
