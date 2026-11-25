@@ -32,7 +32,7 @@ export const STAGES = [null,
 export const GRACE = 6; // seconds at the start of every stage when the bank holds the boat in instead of costing a hull
 export const SLACK = { every: 13, from: 7, len: 4, ease: 1 }; // a slack stretch of 4 river units every 13, the first at 7
 export const NIGHTS = STAGES.length - 1;
-export const CLEAR = 4.5; // no rock lies in the first stretch of any stage: about five seconds of open water to find the channel
+export const CLEAR = 6.5; // no rock lies in the first stretch of any stage, past the ember path: about six seconds of open water to find the channel
 export const NEW = ['', 'bright', 'shoulder', 'lee', 'turn', 'ice']; // each stage's one new idea, for the card and the checks
 
 export function config(n) { n = Math.max(1, Math.min(NIGHTS, Math.floor(n) || 1)); return { n, ...STAGES[n] }; }
@@ -95,7 +95,7 @@ export function tick(e, target) {
   const burn = cf.burn * (1 - 0.95 * flow.rush) * (s.warm > DT ? 0.72 : 1), relight = cf.relight * flow.lee;
   s.calm = calm * flow.rate; s.st.wick = 12.5; // 1 - 0.08 * 12.5 = 0: Lantern's own fade stops; the tide's burn is the fade
   s.light = clamp(before + (relight - burn) * DT, -1, 1); // at 0 Lantern's step ends the night 'dark'
-  if (s.t < GRACE) { const y = s.y + 0.02, c = centre(s, y), edge = half(s, y) - boat(s) - 0.012; s.x = clamp(s.x, c - edge, c + edge); } // the bank holds the boat in
+  if (s.t < GRACE) { const y = s.y + 0.02, c = centre(s, y), edge = half(s, y) - boat(s) - 0.012; s.x = clamp(s.x, c - edge, c + edge); target = clamp(target, c - edge, c + edge); } // the bank holds the boat in
   try { step(s, target); } finally { s.calm = calm; s.st.wick = wick; }
   e.rested += Math.max(0, relight - burn) * DT * (s.light < 1 ? 1 : 0);
   if (flow.rush > 0.5) e.ridden += DT;
@@ -124,7 +124,7 @@ function tidy(e) {
     return k;
   });
   for (; e.laid < Math.min(cf.path, s.y + 2.4); e.laid += 0.42) {
-    const y = e.laid, x = centre(s, y) + half(s, y) * jet(e, y, s.t + (y - s.y) / 0.9); // where the channel will be when the boat comes
+    const y = e.laid, x = centre(s, y) + half(s, y) * jet(e, y, s.t + (y - s.y) / 1.5); // where the channel will be when the boat comes (in fast water the boat runs about 1.5 river units a second)
     s.embers.push({ x, y, got: false, kind: 'ember', path: true });
   }
   s.embers.sort((a, b) => a.y - b.y); // Lantern drops passed embers from the front

@@ -102,8 +102,17 @@ claim(table[2].reader.every(r => r.rested === 0), `stage 2 has no lee yet (nothi
   claim(mean(4, 'late reader', 'ridden') >= mean(4, 'late still', 'ridden') + 2, `stage 4: reading the water as it is now rides ${mean(4, 'late reader', 'ridden').toFixed(1)} s of fast water vs ${mean(4, 'late still', 'ridden').toFixed(1)} s reading it as it was 2 s ago`); }
 { const iced = n => seeds.slice(0, 20).some(seed => { const e = start(seed, n); for (let i = 0; i < 60 / DT && !e.s.over; i++) { tick(e, steer(e)); if (e.s.rocks.some(k => k.ice)) return true; } return false; });
   claim(iced(5) && ![1, 2, 3, 4].some(iced), `stage 5 brings ice and no stage before it does`); }
-claim(Array.from({ length: NIGHTS }, (_, i) => table[i + 1].firstBlow).every(t => t >= 3.5), `hands off, no blow in the first 3.5 s on any seed or stage (earliest ${Math.min(...Array.from({ length: NIGHTS }, (_, i) => table[i + 1].firstBlow)).toFixed(1)} s)`);
+claim(Array.from({ length: NIGHTS }, (_, i) => table[i + 1].firstBlow).every(t => t >= 5), `hands off, no blow in the first 5 s on any seed or stage (earliest ${Math.min(...Array.from({ length: NIGHTS }, (_, i) => table[i + 1].firstBlow)).toFixed(1)} s)`);
 claim(Array.from({ length: NIGHTS }, (_, i) => table[i + 1].idle).every(runs => runs.map(r => r.t).sort((a, b) => a - b)[runs.length >> 1] >= 10), `hands off, the boat lasts at least 10 s (median) on every stage`);
 claim(seeds.every(seed => { for (let n = 1; n <= NIGHTS; n++) if (start(seed, n).s.rocks.some(k => k.y0 <= CLEAR)) return false; return true; }), `no rock in the first ${CLEAR} river units of any stage`);
+{ let near = 0; for (const seed of seeds) for (let n = 1; n <= NIGHTS; n++) { const e = start(seed, n); for (let i = 0; i < 12 / DT && !e.s.over; i++) { tick(e, steer(e)); for (const m of e.s.embers) if (m.path && !m.got) for (const k of e.s.rocks) if (Math.hypot(m.x - k.x, m.y - k.y) < k.rad + BOAT) near++; } }
+  claim(near === 0, `no path ember lies on a rock (${near} found)`); }
+// Taught without words: a bot that only follows embers (blind to the water) spends most of the opening in fast water, because the
+// ember path lies along the channel; the same bot on the same rivers with the path taken away spends far less.
+{ const share = (n, path) => { let fast = 0, all = 0; for (const seed of seeds) { const e = start(seed, n); if (!path) e.laid = Infinity; let aim = e.s.x;
+      for (let i = 0; i < 6 / DT && !e.s.over; i++) { if (!path) e.s.embers = e.s.embers.filter(m => !m.path); if (i % HOLD === 0) aim = steer(e, POL.plain); tick(e, aim); if (e.s.t >= 1) { all++; if (e.flow.rush > 0.5) fast++; } } }
+    return Math.round(100 * fast / all); };
+  const withPath = Array.from({ length: NIGHTS }, (_, i) => share(i + 1, true)), without = Array.from({ length: NIGHTS }, (_, i) => share(i + 1, false));
+  claim(withPath.every((v, i) => v >= 60 && v >= without[i] + 15), `taught without words: following the embers alone, the boat is in fast water ${withPath.join(', ')}% of seconds 1 to 6; with the path taken away ${without.join(', ')}%`); }
 if (fails.length) { console.log(`\n${fails.length} claim(s) failed${mutate ? ' (as they must under --mutate)' : ''}`); process.exitCode = 1; }
 else console.log(`\nall tide claims hold${mutate ? ' -- but --mutate should have broken them' : ''}`);

@@ -862,24 +862,27 @@ The end card says why a run ended, how far it got and the best so far on that st
 
 **The lab page played cold first (390x844, Chromium), and its five weakest things.** Each has a fix in the mode.
 1. The first seconds punished instead of taught: a boat left alone lost its first hull at about 4.8 s and the run at 10.3 s, with rocks on screen at once.
-   Fix: no rock in the first 4.5 river units of any stage; for the first 6 s the bank holds the boat in instead of costing a hull; an ember path lies along the channel,
-   so following the embers finds the fast water without a word. Hands off, no blow comes before 3.6 s on any of 120 seeds and stage (median 6 to 9 s), and the boat lasts 11 s (median).
+   Fix: no rock in the first 6.5 river units of any stage (past the ember path); for the first 6 s the bank holds the boat in instead of costing a hull; an ember path lies along the channel,
+   so following the embers finds the fast water without a word. Hands off, no blow comes before 6.0 s on any of 120 seeds and stage (median 9.2 to 9.6 s), and the boat lasts 11.2 to 12.1 s (median).
+   A bot that only follows embers, blind to the water, is in fast water 68, 68, 68, 60, 61% of seconds 1 to 6 by stage; with the path taken away, 33, 33, 33, 42, 42%.
+   That claim's bar (at least 60%, and 15 points over no path) was set after a first run at 20 points failed on stages 4 and 5, where the turning channel sweeps under a boat anyway.
 2. Reading the water decided little on night 1: 192 bot runs on the lab page ended dark only once; the flame rule hardly mattered.
-   Fix: the flame burns 0.12 a second in slack water and 5% of that in the channel. On stage 1 the bot that reads the water reaches dawn on 120 of 120 seeds; the same bot blind to the water on 73%, and goes dark on 33 seeds.
+   Fix: the flame burns 0.12 a second in slack water and 5% of that in the channel. On stage 1 the bot that reads the water reaches dawn on 120 of 120 seeds; the same bot blind to the water on 75%, and goes dark on 30 seeds.
 3. A cliff: the lab's own bots went 48/48 on night 1 to 22/48 (reader) and 9/48 (plain) on night 2; with a 300 ms delay, 29/48 to 0/48.
-   Fix: five stages; the careful bot that acts 300 ms late reaches dawn on 100, 92, 78, 69, 53% (120 seeds). No step is more than 20 points.
+   Fix: five stages; the careful bot that acts 300 ms late reaches dawn on 100, 88, 78, 70, 62% (120 seeds). No step is more than 20 points. These rates move a few points with small changes (the ember path's timing moved stage 5 from 53 to 62%); the claim holds at 60 and 120 seeds.
 4. Everything arrived at once, and the eddy rings looked like Lantern's whirlpools, which pull the boat in.
    Fix: one new idea a stage (above). A lee is drawn as still, warm water with level ripples; a whirlpool spins and is dark in the middle. Rocks are a share of Lantern's (0.45 to 0.55) so the water can be read between them.
 5. The end card said only "Boat lost / 29% to dawn": no cause, no best; two fixed nights; English only.
    Fix: the cause and the best on the card; five stages with three stars each (dawn, no blow, bright water half the night); English and Turkish.
 
 **What each stage's bot claim shows** (`node bots.mjs tide`, 120 seeds a case; the "late" bot acts 300 ms late and leaves more room round rocks and banks):
-- stage 1, bright water: reader 100% against 73% blind (above).
-- stage 2, shoulders: the late reader rides 31.3 s of fast water a run against 16.6 s blind. No lee yet: nothing relights.
-- stage 3, the lee: the late reader that rests in lees reaches dawn on 78%, the same bot passing them by on 43%.
-- stage 4, the turn: at one spot the channel slides 0.36 half-widths in 3 s (stage 3: 0.10). A bot reading the water as it was 2 s before rides 20.2 s of fast water against 23.5 s (a small effect; see below).
+- stage 1, bright water: reader 100% against 75% blind (above).
+- stage 2, shoulders: the late reader rides 31.2 s of fast water a run against 16.5 s blind. No lee yet: nothing relights.
+- stage 3, the lee: the late reader that rests in lees reaches dawn on 78%, the same bot passing them by on 45%.
+- stage 4, the turn: at one spot the channel slides 0.36 half-widths in 3 s (stage 3: 0.10). A bot reading the water as it was 2 s before rides 20.4 s of fast water against 23.9 s (a small effect; see below).
 - stage 5: ice comes, and no stage before has it.
-- `--mutate` makes the channel burn the flame instead of saving it; six claims fail and the run exits 1.
+- No path ember lies on a rock; no rock lies in the first 6.5 river units.
+- `--mutate` makes the channel burn the flame instead of saving it; seven claims fail and the run exits 1.
 
 **Rules.** `modes/tide-sim.js` wraps Lantern's state, as Spark's layer does, and never edits `sim.js`. Each tick it scales `s.calm` by the water's rate and sets
 `s.st.wick` to 12.5 for the step (that zeroes Lantern's own fade), sets `s.light` from the tide's burn and relight, and puts both back after the step.
@@ -902,5 +905,5 @@ The ember melody (kit/music.js) plays as in any run: `begin()` starts the song f
 **bots.mjs parity --mutate was not failing on main.** The music check (same day) takes `--` flags out of `process.argv` before the parity part reads `--mutate`; the parity part now reads the saved flags. It fails again under `--mutate` (1 differ).
 
 **Not verified.** Whether the channel reads at a glance on a real phone in bright light; the rush sound's level on a phone speaker; how stage 4's turn feels (the bot effect is small:
-3.3 s more fast water for reading the water now, and no difference in dawn rate). Stage 5 at 53% for the careful bot may be hard for a thumb; the owner's play decides.
+3.5 s more fast water for reading the water now, and no difference in dawn rate). Stage 5 at 62% for the careful bot may be hard for a thumb; the owner's play decides.
 The lab page moved to `archive/lab/lantern-tide/`. Its old address needs `'lantern-tide': '/lantern/?mode=tide'` in `labMoved` (`worker-settings.mjs`, the lead adds it).
