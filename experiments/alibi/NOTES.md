@@ -612,3 +612,21 @@ Both browsers saved `retries: { 3: 1 }` and `stars: { 3: 3 }`, and Chromium also
 | `bots.mjs` | Passed. Every table is identical to the run before the changes. |
 | `check.mjs`, iphone, pixel and 360 | Passed: all three groups on each profile. |
 | `kit/check/phone.mjs alibi` | ok on WebKit and Chromium. |
+
+## 2026-11-24: a practice case and times under the line (tester t1, note #245)
+
+The note: make a tutorial level because the game is confusing, and add the time underneath the line. "The line" is read as the timeline; the reply asks whether that is right.
+
+- **Practice case.** "How to play" on the menu opens it (gold edge until there is a save). Three suspects, eight short steps in words, English and Turkish: story, drag the clock, open an alibi, jump to its time, compare a true alibi, compare a false one, accuse. A step ends when the player does the move. Accuse appears only at the last step. A wrong accusation costs nothing and says so. `practiceCase()` in `sim.js` is fixed and is not in `CASES`, so level numbers and saves do not change.
+- Nothing of practice is saved, and a reload does not resume it. The lab record names the run `practice`.
+- **Times under the line.** Every mark shows its time, the current one in gold. The line moved up 8 units to make room. Cases with more than 10 marks use smaller figures.
+- Own addition: the practice result states the rule in one line ("Same picture: true. Different picture: a lie.") and Play goes on to the next campaign case.
+
+Checks: `checkPractice` in `check.mjs` (steps, time labels, no loss, nothing saved, no resume) and a practice line in `kit/check/phone.mjs`, both engines. `bots.mjs` is unchanged and passes. The check's portrait hold was too short on a busy Mac (the notebook checks failed the same way on untouched main); it is longer now.
+
+Not verified: a new player, a real phone, a native Turkish reader; the 9-unit figures of 11- and 12-mark timelines on a small phone.
+
+### Left as a proposal (2026-11-24)
+
+- Offer practice by itself on a first visit, as Lantern does.
+- Show the step sentences in words in cases 1–7 too; they exist in both languages but only screen readers get them.
