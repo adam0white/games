@@ -1,41 +1,53 @@
 // Pour: bots that prove the rules and measure difficulty.
 //   node bots.mjs            all checks; exits 1 on a failure
 //   node bots.mjs --mutate   the same checks with a broken rule (the glass has no floor); must exit 1
-//   node bots.mjs --sweep    held-out checks, 64 planner and 256 careless seeds per level
+//   node bots.mjs --sweep    held-out checks: 64 planner seeds and 500 clumsy-thumb seeds per level, from seed 4201
 //   node bots.mjs --planner-only --from=100 --count=21   all levels on held-out seeds; same 5/6 win-rate check
 //   node bots.mjs --level=6 --from=1 --count=12   one level, with each result and the same win-rate check
-import { create, step, band, LEVELS, digest, rng, glassX, clone } from './sim.js';
+// 2026-11-24: the flow now follows the thumb (sim.js), so careful() and the planner aim a pour rate instead of the old
+// "tilt where the juice starts to run". The old clumsy bot and its "late levels at least 0.25 below early levels" check
+// were replaced by the frozen thumb bot (thumb.mjs) and the owner's targets; NOTES.md says why.
+import { create, step, band, LEVELS, digest, glassX, clone, starsFor, POUR_FROM, POUR_FULL, MAX_TILT } from './sim.js';
+import { thumb } from './thumb.mjs';
 
 const MUTATE = process.argv.includes('--mutate');
-const AIM = 55; // where a gentle pour lands at glass height: about 4 units right of the spout plus 7 to 14, measured with the jug at x 40
 
-// A policy sees the state (maybe late) and returns the tilt it asks for.
-export function careful() {
+// Where the stream meets the glass rim: the mean x of drops just above the glass, or a guess before any are there.
+function landing(s) {
+  let x = 0, n = 0;
+  for (const q of s.p) if (q.air && q.y > s.glass.top - 10 && q.y < s.glass.top + 2) { x += q.x; n++; }
+  return n ? x / n : s.liq.throw[0] > 6 ? 52 : 48;
+}
+
+// A policy sees the state and returns the tilt it asks for. careful() pours at a steady half rate (a faster one when the
+// glass moves) while the glass will be under the stream when the drops arrive, waits just short of a pour while it is
+// not, and lifts when what is in the glass, in the air and still to come from the jug reaches the line.
+export function careful(rate = 0.55) {
   return s => {
-    const g = s.glass, ahead = glassX(s, s.t + 0.7); // where the glass will be when the drops arrive
-    const coming = s.inGlass + s.flying;
+    const g = s.glass, [lo] = band(s);
+    const pourAt = POUR_FROM + (POUR_FULL - POUR_FROM) * (s.L.sway ? 0.85 : rate);
+    const coming = s.inGlass + s.flying + s.flow * s.liq.lag + s.acc;
     if (coming >= s.L.target - 1) return 0;
-    const need = 1.28 + (1 - s.inJug / s.L.drops) * 0.85; // the tilt where this much juice starts to run
-    const under = Math.abs(ahead - AIM) < g.w * 0.45 && Math.abs(glassX(s, s.t + 1.1) - AIM) < g.w * 0.6;
-    const close = s.L.target - coming < 6;
-    return under ? need + (close ? 0.05 : 0.15) : need - 0.15;
+    const under = Math.abs(glassX(s, s.t + s.liq.lag + 0.7) - landing(s)) < g.w * 0.75; // drops take about 0.7 s to fall
+    const close = s.L.target - coming < 6 || s.inGlass >= lo - 2;
+    return under ? (close ? POUR_FROM + (pourAt - POUR_FROM) * 0.6 : pourAt) : POUR_FROM - 0.1;
   };
 }
-// The planner: every 0.3 s it tries four tilts on copies of the world (the rules are deterministic), holds each for
-// 0.3 s, plays the copy to the end with careful(), and keeps the tilt whose outcome is best. It shows each level can be won.
+// The planner: every 0.4 s it tries careful()'s tilt and four others on copies of the world (the rules are deterministic), holds each for
+// 0.3 s, plays the copy on for 12 s with careful(), and keeps the tilt whose outcome is best. It shows each level can be won.
 export function planner() {
   let plan = 0, next = 0;
   const score = c => c.won ? 1000 + c.stars * 10 - c.spilled : c.over ? -1000 - Math.abs(c.inGlass - c.L.target) - c.spilled : -Math.abs(c.L.target - c.inGlass - c.flying) * 3 - c.spilled * 2;
+  const tilts = [0, POUR_FROM + 0.25, POUR_FROM + 0.6, POUR_FROM + 1.0], guide = careful();
   return s => {
     if (s.t < next) return plan;
-    next = s.t + 0.3;
-    const need = 1.28 + (1 - s.inJug / s.L.drops) * 0.85;
+    next = s.t + 0.4;
     let best = -Infinity;
-    for (const tilt of [0, need - 0.12, need + 0.04, need + 0.16]) {
+    for (const tilt of [guide(s), ...tilts]) { // careful()'s own choice first, so it wins a tie
       const c = clone(s); c.events = [];
       for (let i = 0; i < 18 && !c.over; i++) step(c, tilt);
       const rest = careful(); // then play the rest of the level with the careful rule of thumb
-      for (let i = 0; i < 480 && !c.over; i++) step(c, rest(c));
+      for (let i = 0; i < 60 * 12 && !c.over; i++) step(c, rest(c));
       const v = score(c);
       if (v > best) { best = v; plan = tilt; }
     }
@@ -43,39 +55,15 @@ export function planner() {
   };
 }
 
-export function clumsy(seed) {
-  const r = rng(seed * 31 + 5), lag = 14 + Math.floor(r() * 12), stopAt = r() * 2 - 1, wild = 0.35;
-  const seen = [];
-  let tilt = 0;
-  return s => {
-    seen.push({ x: s.glass.x, w: s.glass.w, n: s.inGlass + s.flying, target: s.L.target, band: s.L.band });
-    const v = seen[Math.max(0, seen.length - 1 - lag)]; // reacts about a quarter to half a second late
-    const under = Math.abs(v.x - AIM) < v.w * 0.8;
-    const enough = v.n >= v.target + stopAt * v.band;
-    const want = enough ? 0 : under ? 1.5 : 1.0;
-    tilt += (want - tilt) * 0.2 + (r() - 0.5) * wild;
-    return tilt;
-  };
-}
-
-// Adjust tilt as the jug empties, but aim at the glass now instead of where the drops will land.
-export function sloppyAim() {
-  return s => {
-    if (s.inGlass + s.flying >= s.L.target - 1) return 0;
-    const need = 1.28 + (1 - s.inJug / s.L.drops) * 0.85;
-    return Math.abs(s.glass.x - AIM) < s.glass.w * 0.6 ? need + 0.15 : need - 0.15;
-  };
-}
-
 export function play(n, seed, policy, opts = {}) {
   const s = create(n, seed, { mutate: MUTATE, ...opts });
-  for (let i = 0; i < 60 * 40 && !s.over; i++) step(s, policy(s));
+  for (let i = 0; i < 60 * 60 && !s.over; i++) step(s, policy(s));
   return s;
 }
 
 let fail = 0;
 const ok = (cond, msg) => { console.log(`${cond ? 'ok  ' : 'FAIL'} ${msg}`); if (!cond) fail++; };
-const SEEDS = 16, PSEEDS = 6;
+const PSEEDS = 6;
 const integerArg = (name, fallback) => {
   const arg = process.argv.find(a => a.startsWith(`--${name}=`));
   const value = arg ? Number(arg.slice(name.length + 3)) : fallback;
@@ -85,92 +73,100 @@ const integerArg = (name, fallback) => {
 const sweep = process.argv.includes('--sweep');
 const firstSeed = integerArg('from', Number(process.env.FROM || (sweep ? 4201 : 1)));
 const plannerSeeds = integerArg('count', sweep ? 64 : PSEEDS);
-const carelessSeeds = sweep ? integerArg('count', 256) : SEEDS;
+const thumbSeeds = sweep ? integerArg('count', 500) : 200;
 
-// 1. careful bot finishes every level; 2. clumsy bot finishes level 1 often and less as levels rise
-const careRate = [], clumRate = [], stars = [];
+// The clumsy thumb's clear rate per level, against the owner's targets (2026-11-24): level 1 about 90% or more,
+// levels 2 and 3 above 75%, a gentle slope, no level under 35%, and no level harder than the one after it.
+// `slack` allows for sampling noise between neighbouring levels (one standard error at these rates is about 2 to 3 points).
+function thumbRates(from, count) {
+  const rates = [];
+  for (let n = 1; n <= LEVELS; n++) {
+    let wins = 0, stars = 0; const why = {};
+    for (let seed = from; seed < from + count; seed++) {
+      const s = play(n, seed, thumb(seed * 1000 + n));
+      if (s.won) { wins++; stars += s.stars; }
+      why[s.why] = (why[s.why] || 0) + 1;
+    }
+    rates.push(wins / count);
+    console.log(`level ${n}: clumsy thumb ${wins}/${count} (${(wins / count * 100).toFixed(1)}%, stars ${(wins ? stars / wins : 0).toFixed(2)}), seeds ${from}-${from + count - 1}; ${JSON.stringify(why)}`);
+  }
+  return rates;
+}
+function thumbChecks(rates, slack) {
+  const pct = x => (x * 100).toFixed(1) + '%';
+  ok(rates[0] >= 0.88, `clumsy thumb clears level 1 at least 88% of the time (${pct(rates[0])})`);
+  ok(rates[1] > 0.75 && rates[2] > 0.75, `clumsy thumb clears levels 2 and 3 above 75% (${pct(rates[1])}, ${pct(rates[2])})`);
+  ok(Math.min(...rates) >= 0.35, `no level under 35% for the clumsy thumb (lowest ${pct(Math.min(...rates))})`);
+  const rises = [];
+  for (let i = 1; i < LEVELS; i++) if (rates[i] > rates[i - 1] + slack) rises.push(`${i}->${i + 1}`);
+  ok(rises.length === 0, `no level is harder than the one after it, within ${pct(slack)} (${rises.join(', ') || 'none'})`);
+  let cliff = 0; for (let i = 1; i < LEVELS; i++) cliff = Math.max(cliff, rates[i - 1] - rates[i]);
+  ok(cliff <= 0.2, `a gentle slope: no step down of more than 20 points (largest ${pct(cliff)})`);
+}
+
 const only = process.argv.find(a => a.startsWith('--level='));
 if (sweep || only || process.argv.includes('--planner-only')) {
   const levels = only ? [integerArg('level', 1)] : Array.from({ length: LEVELS }, (_, i) => i + 1);
   if (levels.some(n => n > LEVELS)) throw new Error(`--level must be at most ${LEVELS}`);
   for (const n of levels) {
-    if (sweep) {
-      const policies = [
-        ['planner', planner, plannerSeeds],
-        ['clumsy', seed => clumsy(seed * 100 + n), carelessSeeds],
-        ['sloppy aim', sloppyAim, carelessSeeds],
-      ];
-      for (const [name, makePolicy, count] of policies) {
-        let wins = 0, deadlines = 0;
-        const losses = { spill: 0, over: 0, under: 0 };
-        for (let seed = firstSeed; seed < firstSeed + count; seed++) {
-          const s = play(n, seed, makePolicy(seed));
-          if (s.won) wins++;
-          else {
-            losses[s.why]++;
-            if (s.t > s.L.time) deadlines++;
-          }
-        }
-        const result = `level ${n}: ${name} ${wins}/${count}, seeds ${firstSeed}–${firstSeed + count - 1}; losses ${JSON.stringify(losses)}, ${deadlines} at deadline`;
-        if (name === 'planner') ok(wins / count >= 0.9, result);
-        else if (n >= 5) ok(wins / count < 0.5, result);
-        else console.log(result);
-      }
-      continue;
-    }
     let wins = 0;
     for (let seed = firstSeed; seed < firstSeed + plannerSeeds; seed++) {
       const a = play(n, seed, planner());
       if (a.won) wins++;
-      console.log(n, seed, a.won, a.why, a.inGlass, a.spilled, a.t.toFixed(1));
+      if (!sweep) console.log(n, seed, a.won, a.why, a.inGlass, a.spilled, a.t.toFixed(1));
     }
-    ok(wins / plannerSeeds >= 5 / 6 - 1e-9, `level ${n}: planner ${wins}/${plannerSeeds}, seeds ${firstSeed}-${firstSeed + plannerSeeds - 1}; minimum win rate 5/6`);
+    const need = sweep ? 0.9 : 5 / 6;
+    ok(wins / plannerSeeds >= need - 1e-9, `level ${n}: planner ${wins}/${plannerSeeds}, seeds ${firstSeed}-${firstSeed + plannerSeeds - 1}; minimum win rate ${sweep ? '0.9' : '5/6'}`);
   }
+  if (sweep) thumbChecks(thumbRates(firstSeed, thumbSeeds), 0.03);
   process.exit(fail ? 1 : 0);
 }
-if (process.argv.includes('--why')) {
-  for (let n = 1; n <= LEVELS; n++) {
-    const tally = (pol) => { const t = {}; for (let seed = 1; seed <= SEEDS; seed++) { const s = play(n, seed, pol(seed)); const k = s.why + (s.won ? '' : `(${s.inGlass}/${s.spilled})`); t[s.why] = (t[s.why] || 0) + 1; if (seed <= 4) t['e' + seed] = `${s.inGlass}g ${s.spilled}s ${s.inJug}j ${s.t.toFixed(1)}t`; } return JSON.stringify(t); };
-    console.log(n, 'careful', tally(() => careful()), '\n  clumsy', tally(seed => clumsy(seed * 100 + n)));
-  }
-  process.exit(0);
-}
+
+// 1. the planner finishes every level
+const careRate = [];
 for (let n = 1; n <= LEVELS; n++) {
-  let c = 0, k = 0, st = 0;
-  for (let seed = 1; seed <= SEEDS; seed++) {
-    const a = seed <= PSEEDS ? play(n, seed, planner()) : null; if (a?.won) { c++; st += a.stars; }
-    const b = play(n, seed, clumsy(seed * 100 + n)); if (b.won) k++;
-  }
-  careRate.push(c / PSEEDS); clumRate.push(k / SEEDS); stars.push(c ? st / c : 0);
-  console.log(`level ${n}: planner ${c}/${PSEEDS} (stars ${(c ? st / c : 0).toFixed(2)}), clumsy ${k}/${SEEDS}`);
+  let c = 0, st = 0;
+  for (let seed = 1; seed <= PSEEDS; seed++) { const a = play(n, seed, planner()); if (a.won) { c++; st += a.stars; } }
+  careRate.push(c / PSEEDS);
+  console.log(`level ${n}: planner ${c}/${PSEEDS} (stars ${(c ? st / c : 0).toFixed(2)})`);
 }
 ok(careRate.every(x => x >= 5 / 6 - 1e-9), `planner wins at least 5 of 6 on every level (lowest ${Math.min(...careRate).toFixed(2)})`);
-ok(clumRate[0] >= 0.5, `clumsy bot finishes level 1 at least half the time (${clumRate[0].toFixed(2)})`);
-const firstHalf = (clumRate[0] + clumRate[1] + clumRate[2]) / 3, lastHalf = (clumRate[5] + clumRate[6] + clumRate[7]) / 3;
-ok(lastHalf < firstHalf - 0.25, `clumsy success falls with level (levels 1-3 ${firstHalf.toFixed(2)}, levels 6-8 ${lastHalf.toFixed(2)})`);
-let drops = 0; for (let i = 1; i < LEVELS; i++) if (clumRate[i] > clumRate[i - 1] + 0.2) drops++;
-ok(drops <= 1, `clumsy success never rises by more than 0.2 (3 of 16 runs) between levels, at most once (${drops})`);
+// 2. the clumsy thumb: the difficulty curve
+thumbChecks(thumbRates(1, thumbSeeds), 0.04);
 
 // 3. determinism: same seed and inputs give the same result
 {
-  const a = play(4, 9, clumsy(77)), b = play(4, 9, clumsy(77));
+  const a = play(4, 9, thumb(77)), b = play(4, 9, thumb(77));
   ok(digest(a) === digest(b), `same seed and inputs, same end state (${digest(a)})`);
-  const c = play(4, 10, clumsy(77));
+  const c = play(4, 10, thumb(77));
   ok(digest(a) !== digest(c), 'a different seed gives a different run');
 }
 // 4. doing nothing never wins; tipping everything out never wins after level 1
 {
   const idle = play(1, 1, () => 0);
   ok(!idle.won && idle.inJug === idle.L.drops, `doing nothing: the jug stays full and the level is not won (${idle.why})`);
-  let dumpWins = 0; for (let n = 2; n <= LEVELS; n++) for (let seed = 1; seed <= 10; seed++) if (play(n, seed, () => 2.4).won) dumpWins++;
+  let dumpWins = 0; for (let n = 2; n <= LEVELS; n++) for (let seed = 1; seed <= 10; seed++) if (play(n, seed, () => MAX_TILT).won) dumpWins++;
   ok(dumpWins <= 3, `tipping the whole jug at once wins at most 3 of 70 runs on levels 2 to 8 (${dumpWins})`);
 }
-// 5. conservation: every drop is in the jug, the glass, the air or spilled
+// 5. conservation: every drop is in the jug, a glass, the air or spilled
 {
-  const s = create(3, 4, { mutate: MUTATE }); const pol = careful(); let bad = 0;
-  for (let i = 0; i < 1200 && !s.over; i++) { step(s, pol(s)); if (s.inJug + s.inGlass + s.flying + s.spilled !== s.L.drops) bad++; }
-  ok(bad === 0, 'every drop is counted in exactly one place on every step');
+  for (const n of [3, 7]) {
+    const s = create(n, 4, { mutate: MUTATE }); const pol = careful(); let bad = 0;
+    for (let i = 0; i < 2400 && !s.over; i++) {
+      step(s, pol(s));
+      const inGlasses = s.glasses.reduce((a, g) => a + g.n, 0), others = inGlasses - s.inGlass;
+      if (s.inJug + s.inGlass + others + s.flying + s.spilled !== s.L.drops) bad++;
+    }
+    ok(bad === 0, `level ${n}: every drop is counted in exactly one place on every step`);
+  }
 }
-
+// 6. a near miss counts: stars from sim.js's own starsFor rise as the pour gets closer to the line
+{
+  const s = create(1, 1); const [lo, hi] = band(s);
+  const starsAt = n => { const c = clone(s); c.glasses[0].n = n; c.inGlass = n; return starsFor(c); };
+  const row = []; for (let n = lo; n <= hi; n++) row.push(starsAt(n));
+  let rises = true; for (let n = lo; n < s.L.target; n++) if (starsAt(n + 1) < starsAt(n)) rises = false;
+  ok(starsAt(s.L.target) === 3 && starsAt(lo) === 1 && starsAt(hi) === 1 && rises, `level 1 band ${lo} to ${hi}: stars ${row.join('')} (3 on the line, 1 at the edges, never fewer nearer the line)`);
+}
 console.log(MUTATE ? `mutation run: ${fail} check(s) failed (expected some)` : `${fail} failed`);
 process.exit(fail ? 1 : 0);
