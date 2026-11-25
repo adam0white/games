@@ -15,7 +15,8 @@ import { update, numbers, mutate } from './rig.js';
 import { speciesFor, creature, drawCreature } from './creature.js';
 import { living, portraitLiving } from './living.js';
 
-const arg = process.argv.find(a => a.startsWith('--mutate'));
+const RIG_MUTATIONS = ['gait', 'clamp', 'spine'], asked = process.argv.find(a => a.startsWith('--mutate'));
+const arg = asked && RIG_MUTATIONS.includes(asked.split('=')[1] || 'gait') ? asked : null; // other names (rocks) belong to bots.mjs section 7
 if (arg) { const m = arg.split('=')[1] || 'gait'; mutate(m); console.log(`MUTATION ON: ${m}`); }
 let failed = 0;
 const claim = (ok, text) => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${text}`); if (!ok) failed++; };
