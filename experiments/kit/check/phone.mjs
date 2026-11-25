@@ -883,6 +883,12 @@ const GAMES = {
     assert.equal(await page.evaluate(() => window.__thankful.state.days['2026-11-23'].length), 3, 'the fourth thanks did not change today');
     const picture = await page.evaluate(() => window.__thankful.picture());
     assert.equal(picture.width, 1080); assert.equal(picture.height, 1350); assert.ok(picture.bytes > 20000, 'picture has PNG image data');
+    // Daily flowers (2026-11-25): the buttons show the flower each kind grows that day, the same for everyone, in Turkish too.
+    await page.goto(`${base}/lab/thankful/?day=2026-11-25&lang=tr`); await until(page, () => window.__thankful, 'game script');
+    assert.equal(await page.getAttribute('[data-kind="bread"]', 'aria-label'), 'ekmek: arpa', 'bread grows barley on 25 Nov, named in Turkish');
+    assert.equal(await page.textContent('#line'), 'Bugün için üç teşekkür.', 'Turkish line');
+    await page.goto(`${base}/lab/thankful/?day=2026-11-24&lang=en`); await until(page, () => window.__thankful, 'game script');
+    assert.equal(await page.getAttribute('[data-kind="bread"]', 'aria-label'), 'bread: wheat', 'before the change bread grows wheat');
   },
   async 'lab/pitch'(page) {
     // Paper Pitch: an old save survives, a tap on a pulsing point draws a line, leaving the page pauses.

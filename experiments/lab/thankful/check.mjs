@@ -83,5 +83,54 @@ async function recording(name,engine,device,base){
  assert.equal(runRecords(lab,'thankful').length,1,'one run record in all');assert.equal(eventRecords(lab,'thankful').length,1);
  assert.deepEqual(errors,[],'no browser exceptions');console.log(`ok thankful recording ${name}`);
  }finally{await browser.close();}}
+
+// Daily flowers, Turkish, sound for each action, the smallest phone and the frame budget (2026-11-25).
+async function extras(name,engine,device,base){
+ const browser=await engine.launch();
+ try{const errors=[];
+ const fresh=async(opts={})=>{const context=await browser.newContext({...device,...opts});await context.route('**/*',route=>new URL(route.request().url()).origin===base?route.continue():route.abort());
+  await context.addInitScript(()=>{window.__notes=0;const A=window.AudioContext||window.webkitAudioContext;if(A){for(const m of ['createOscillator','createBufferSource']){const f=A.prototype[m];A.prototype[m]=function(...a){window.__notes++;return f.apply(this,a);};}}
+   const raf=window.requestAnimationFrame.bind(window);window.__work=[];window.requestAnimationFrame=cb=>raf(t=>{const a=performance.now();cb(t);window.__work.push(performance.now()-a);});
+   try{Object.defineProperty(navigator,'canShare',{value:undefined});}catch{}});
+  const page=await context.newPage();page.on('pageerror',e=>errors.push(String(e)));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});return {context,page};};
+ // The flowers on the buttons follow the date, the same for everyone; days before the change grow the old ones.
+ let {context,page}=await fresh();
+ for(const [day,bread,light] of [['2026-11-24','wheat','sunflower'],['2026-11-25','barley','dandelion'],['2026-11-26','oats','sunflower'],['2026-11-27','wheat','marigold']]){
+  await page.goto(`${base}/lab/thankful/?day=${day}&lang=en`);await page.waitForFunction(()=>!!window.__thankful);
+  assert.equal(await page.locator('[data-kind="bread"]').getAttribute('aria-label'),`bread: ${bread}`,`${day}: bread grows ${bread}`);assert.equal(await page.locator('[data-kind="light"]').getAttribute('aria-label'),`light: ${light}`);}
+ // Every action makes a sound (counted as notes started on the one audio context) and moves something.
+ await page.goto(`${base}/lab/thankful/?day=2026-11-26&lang=en`);await page.evaluate(()=>localStorage.removeItem('thankful:v1'));await page.reload();await page.waitForFunction(()=>!!window.__thankful);
+ const notes=()=>page.evaluate(()=>window.__notes);const sounds={};
+ const act=async(label,fn)=>{const a=await notes();await fn();await page.waitForTimeout(250);sounds[label]=(await notes())-a;};
+ await act('thanks',()=>page.locator('[data-kind="bread"]').tap());
+ assert.ok(await page.evaluate(()=>window.__thankful.zoom)>1.3,'a one-day garden is drawn larger');
+ await act('look',()=>page.locator('#look').tap());await act('look back',async()=>{await page.locator('#look').tap();await page.locator('#look').tap();});
+ await act('settings',()=>page.locator('#settings').tap());await act('language',()=>page.locator('#lang').tap());
+ assert.equal(await page.locator('[data-kind="bread"] span').innerText(),'ekmek','the buttons speak Turkish');assert.equal(await page.locator('#line').innerText(),'Bugün için üç teşekkür.');
+ await act('language back',()=>page.locator('#lang').tap());await act('back',()=>page.locator('#settingsCard .close').tap());
+ await act('something else',()=>page.locator('[data-kind="spark"]').tap());await act('give words',async()=>{await page.fill('#word','tea');await page.locator('#wordForm button[type=submit]').tap();});
+ await page.waitForTimeout(1300);const p=await page.evaluate(()=>window.__thankful.lights.find(l=>l.day==='2026-11-26'));
+ await act('flower',()=>page.locator('canvas').first().tap({position:{x:p.x,y:p.y}}));assert.match(await page.locator('#label').innerText(),/oats|passionflower/,'the label names the flower');
+ await act('third',()=>page.locator('[data-kind="home"]').tap());await page.waitForTimeout(1200);
+ assert.match(await page.locator('#info').innerText(),/^Day 1 · 3 thanks/,'the finished day says which day it is');
+ await act('picture',async()=>{await Promise.all([page.waitForEvent('download'),page.locator('#picture').tap()]);});
+ await act('reset',async()=>{await page.locator('#settings').tap();await page.locator('#reset').tap();});await act('clear',()=>page.locator('#clear').tap());
+ for(const [k,v] of Object.entries(sounds))assert.ok(v>0,`${k} makes a sound`);
+ // Nothing hides behind the words in a grown garden, and the page stays inside the frame budget.
+ await page.goto(`${base}/lab/thankful/?day=2026-11-26&lang=en&demo=60`);await page.waitForFunction(()=>!!window.__thankful);await page.waitForTimeout(800);
+ await page.evaluate(()=>{window.__work.length=0;for(const k of ['bread','rain','tree'])window.__thankful.give(k);});await page.waitForTimeout(3000);
+ const work=await page.evaluate(()=>{const a=window.__work;return {mean:a.reduce((x,y)=>x+y,0)/a.length,max:Math.max(...a),n:a.length};});
+ assert.ok(work.mean<8,`mean page work per frame ${work.mean.toFixed(2)} ms`);
+ const under=await page.evaluate(()=>{const L=document.getElementById('line').getBoundingClientRect(),P=document.getElementById('picture').getBoundingClientRect();return window.__thankful.lights.filter(l=>l.y>L.top-20&&l.y<P.bottom).length;});
+ assert.equal(under,0,'no flower behind the words');
+ await context.close();
+ // The smallest phone, in both languages: every control inside the screen, the title clear of the look button, no scroll.
+ for(const lang of ['en','tr']){({context,page}=await fresh({viewport:{width:320,height:568}}));
+  await page.goto(`${base}/lab/thankful/?day=2026-11-26&lang=${lang}`);await page.waitForFunction(()=>!!window.__thankful);await page.waitForTimeout(500);
+  const fit=await page.evaluate(()=>({out:[...document.querySelectorAll('header button,#tray button,#line')].filter(e=>{const q=e.getBoundingClientRect();return q.left<0||q.top<0||q.right>innerWidth||q.bottom>innerHeight;}).length,gap:document.getElementById('looks').getBoundingClientRect().left-document.getElementById('name').getBoundingClientRect().right,scroll:document.scrollingElement.scrollHeight-innerHeight+document.scrollingElement.scrollWidth-innerWidth}));
+  assert.deepEqual([fit.out,fit.scroll],[0,0],`${lang} 320x568: everything inside, no scroll`);assert.ok(fit.gap>=8,`${lang} 320x568: title clear of the look button (${fit.gap} px)`);
+  await page.screenshot({path:join(shots,`${name}-320-${lang}.png`)});await context.close();}
+ assert.deepEqual(errors,[],'no browser exceptions');console.log(`ok thankful extras ${name}: sounds ${Object.keys(sounds).length}/${Object.keys(sounds).length} actions, mean work ${work.mean.toFixed(2)} ms, max ${work.max.toFixed(1)} ms over ${work.n} frames`);
+ }finally{await browser.close();}}
 await new Promise(done=>server.listen(0,'127.0.0.1',done));const base=`http://127.0.0.1:${server.address().port}`;
-try{const failures=[];for(const [name,engine,device] of [['iphone13',webkit,devices['iPhone 13']],['pixel7',chromium,devices['Pixel 7']]]){try{await run(name,engine,device,base);await recording(name,engine,device,base);}catch(error){console.error(`${name}: ${error.stack || error}`);failures.push(error);}}if(failures.length)throw new AggregateError(failures,'Phone checks failed');console.log(`Screenshots: ${shots}`);}finally{await new Promise(done=>server.close(done));}
+try{const failures=[];for(const [name,engine,device] of [['iphone13',webkit,devices['iPhone 13']],['pixel7',chromium,devices['Pixel 7']]]){try{await run(name,engine,device,base);await recording(name,engine,device,base);await extras(name,engine,device,base);}catch(error){console.error(`${name}: ${error.stack || error}`);failures.push(error);}}if(failures.length)throw new AggregateError(failures,'Phone checks failed');console.log(`Screenshots: ${shots}`);}finally{await new Promise(done=>server.close(done));}
