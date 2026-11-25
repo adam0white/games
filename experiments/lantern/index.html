@@ -113,9 +113,10 @@
   <p class="opt"><button id="daily" data-i18n="daily">Today's river</button><small data-i18n="dailyWhat"></small></p>
   <p class="opt"><button id="tower">Tower climb</button><small data-i18n="towerWhat"></small><button id="anew" hidden>New climb from level 1</button></p>
   <p class="opt"><a class="mode" href="/lab/lantern-race/" data-i18n="modeRace">Lantern Race</a><small data-i18n="modeRaceWhat">Race other boats on the same river, with friends or bots.</small></p>
-  <p class="opt"><a class="mode" href="/lab/lantern-spark/" data-i18n="modeSpark">Lantern Spark</a><small data-i18n="modeSparkWhat">The lantern is out. Strike sparks to see the river.</small></p>
+  <p class="opt"><button class="mode" data-mode="spark" data-i18n="modeSpark">Lantern Spark</button><small data-i18n="modeSparkWhat">The lantern is out. Strike sparks to see the river.</small></p>
   <p><button class="back" data-i18n="back">Back</button></p>
 </div></div>
+<div id="mode" class="screen veil"><div><div id="modePanel"></div><p><button class="back" data-i18n="back">Back</button></p></div></div>
 <div id="perspective" class="screen veil"><div>
   <h2 data-i18n="perspective">Perspective</h2>
   <div id="views">
@@ -298,7 +299,19 @@ window.lanternTicks = plan => { // the checks steer some ticks by real presses, 
 };
 window.lanternSim = () => s; // the browser checks use this to reach late stretches quickly
 
-const cards = screens(['menu', 'shop', 'credits', 'card', 'board', 'modes', 'perspective', 'tutor']);
+const cards = screens(['menu', 'shop', 'credits', 'card', 'board', 'modes', 'perspective', 'tutor', 'mode']);
+// More modes (NOTES.md, "How a mode plugs in"): a mode is a module in modes/ that index.html loads when it is chosen. mod is the mode
+// chosen, or null; with null, every line below runs as before modes. A mode is drawn flat: the view the player chose comes back after.
+const MODES = { spark: () => import('./modes/spark.js') }, made = {};
+let mod = null;
+const pct = () => mod ? mod.reach() : progress(s);
+async function chooseMode(id) {
+  if (!Object.hasOwn(MODES, id ?? '')) return;
+  const m = made[id] ??= (await MODES[id]()).mode({ canvas, g: () => g, size: () => ({ W, H, unit, left, dpr }), skin, live: () => playing && !paused, paused: () => paused, resume: () => resume(), play: () => begin(), say, tone, noise: (...a) => snd.ctx && snd.noise(...a), ctx: () => snd.ctx, boat: now => boatAt(now, sx(s.x), sy(s.y)), crashed: () => !!crash, win: now => { if (victory) winDraw(now); } });
+  mod = m; endless = tower = daily = false; tutor = null; setView('2d', false); show('mode'); // a mode is never the endless river, a climb or the tutorial, so it never takes a board ticket
+}
+window.lanternMode = () => mod ? { id: mod.id, ...mod.state() } : null; window.lanternSpark = () => mod?.game(); // read by the browser checks
+for (const b of document.querySelectorAll('[data-mode]')) b.addEventListener('click', () => chooseMode(b.dataset.mode));
 function show(name) {
   screen = name;
   cards(name);
@@ -306,6 +319,7 @@ function show(name) {
   $('hud').style.display = $('big').style.display = play ? 'block' : 'none'; pauseButton.style.display = play ? 'grid' : 'none';
   if (!play) $('warn').classList.remove('on'); $('tip').style.display = play ? 'block' : 'none';
   $('pauseLanguage').hidden = !paused; // the card is also the end of a run, which has no language button
+  mod?.screen(name, $('modePanel')); if (name === 'menu' && mod) { mod = null; if (read('lantern-view', '2d') !== '2d') setView(read('lantern-view'), false); }
   if (name === 'menu' || name === 'modes') menu(); if (name === 'perspective') views(); if (name === 'shop') shop(); if (name === 'board') boardShow();
 }
 // Three ways to see the same river (notes #158, #159): 2d is this page's own drawing; 3d and first are drawn by view3d.js on a WebGL
@@ -604,9 +618,10 @@ function begin() {
   audio(); // a tower level holds the things of the nights up to towerStage(level); see sim.js
   // Stats last one run; a whole climb is one run. They do not work on the endless river (tester t1, notes #119 and #120), so its
   // leaderboard is fair: an endless run neither uses them nor spends them, and they wait for the next night or climb.
-  const fresh = !tutor && (!tower || !onward); onward = false; if (tutor) runStats = {}; else if (fresh) { runStats = endless ? {} : stats; if (!endless) { stats = {}; store.set('lantern-stats', '{}'); } }
-  const waiting = endless && Object.values(stats).some(v => v > 0);
-  s = create(daily && endless && !tower ? daySeed(ranDay = today()) : (Math.random() * 2 ** 31) | 0, tower ? towerStage(climb) : endless || tutor ? 1 : stage, tower ? 'tower' : endless, tutor ? [] : powersOwned(), runStats, climb, tutor ? 0 : reborn); // after a rebirth the story nights run faster
+  const fresh = !tutor && (!tower || !onward); onward = false; if (tutor) runStats = {}; else if (fresh) { runStats = endless || mod ? {} : stats; if (!endless && !mod) { stats = {}; store.set('lantern-stats', '{}'); } } // a mode neither uses nor spends stats
+  const waiting = (endless || mod) && Object.values(stats).some(v => v > 0);
+  if (mod) setView('2d', false);
+  s = mod ? mod.start(powersOwned()) : create(daily && endless && !tower ? daySeed(ranDay = today()) : (Math.random() * 2 ** 31) | 0, tower ? towerStage(climb) : endless || tutor ? 1 : stage, tower ? 'tower' : endless, tutor ? [] : powersOwned(), runStats, climb, tutor ? 0 : reborn); // after a rebirth the story nights run faster
   if (!tower) fromFloor = 0; else if (fromFloor) startAt(s, fromFloor); // part-way up the level (note #142)
   song?.start(s.seed); // a new tune for each river; today's river has the same tune for everyone
   if (endless && !tower) boardTicket(); else ticket = null; // the shared board's run ticket, only for a player who shares
@@ -615,20 +630,21 @@ function begin() {
   if (tutor) { s.next = Infinity; s.rocks = []; s.embers = []; s.powers = []; s.calm = 0.75; s.hearts = 2; } // an empty, slow river
   $('tip').textContent = ''; shown = ''; show('play'); hud();
   if (tutor) { floor = 0; rec.start({ view, mode: 'tutorial', night: 0 }); return; }
-  say((tower ? t(climb > LEVELS ? (fromFloor ? 'saySectorFloor' : 'saySector') : (fromFloor ? 'sayTowerFloor' : 'sayTower'), { n: climb > LEVELS ? climb - LEVELS : climb, of: LEVELS, f: fromFloor }) : endless ? t('endless') : t('sayNight', { n: stage })) + (boosted ? '. ' + t('statsOn') : waiting ? '. ' + t('statsWait') : ''), waiting ? 2800 : 1800); floor = fromFloor;
-  rec.start({ view, mode: mode(), night: tower || endless ? 0 : stage, ...(tower ? { level: climb, floor: fromFloor } : {}) });
+  say(mod ? mod.hello() : (tower ? t(climb > LEVELS ? (fromFloor ? 'saySectorFloor' : 'saySector') : (fromFloor ? 'sayTowerFloor' : 'sayTower'), { n: climb > LEVELS ? climb - LEVELS : climb, of: LEVELS, f: fromFloor }) : endless ? t('endless') : t('sayNight', { n: stage })) + (boosted ? '. ' + t('statsOn') : waiting ? '. ' + t('statsWait') : ''), waiting ? 2800 : 1800); floor = fromFloor;
+  rec.start({ view, mode: mode(), night: mod ? mod.night() : tower || endless ? 0 : stage, ...(tower ? { level: climb, floor: fromFloor } : {}) });
 }
-const mode = () => tutor ? 'tutorial' : tower ? 'tower' : endless ? 'endless' : 'night';
+const mode = () => mod ? mod.id : tutor ? 'tutorial' : tower ? 'tower' : endless ? 'endless' : 'night';
 function bankRun() { s.banked = Math.round(s.taken * boon()); bank += s.banked; store.set('lantern-bank', bank); } // a rebirth's bonus is added as the run banks
 function finish() {
-  const paid = s.over === 'dawn' && !tower && !endless && reborn ? 10 * Math.min(5, reborn) : 0; s.taken += paid; // a reborn night pays more at dawn
+  const paid = s.over === 'dawn' && !tower && !endless && !mod && reborn ? 10 * Math.min(5, reborn) : 0; s.taken += paid; // a reborn night pays more at dawn
   playing = false; ended = performance.now(); steer.drop(); pads.drop(); bankRun();
-  rec.end(s.over, { mode: mode(), night: tower || endless ? 0 : stage, reached: Math.floor(progress(s) * 100), score: endless ? score(s) : null, embers: s.taken, hearts: s.hearts, bank });
+  rec.end(s.over, { mode: mode(), night: mod ? mod.night() : tower || endless ? 0 : stage, reached: Math.floor(pct() * 100), score: endless ? score(s) : null, embers: s.taken, hearts: s.hearts, bank });
   $('hud').style.display = $('big').style.display = pauseButton.style.display = 'none'; $('warn').classList.remove('on');
   const won = s.over === 'dawn', why = t(['dark', 'bank', 'ice', 'log', 'pool', 'geyser', 'isle'].includes(s.over) ? `why_${s.over}` : 'why_rock');
   const gained = t(s.banked > s.taken ? 'gainedBonus' : s.banked === 1 ? 'gained1' : 'gained', { n: s.banked, taken: s.taken, bank });
   $('toMenu').textContent = t('menu'); $('ask').hidden = $('viewNext').hidden = true;
-  if (tower) { // after each level: climb on to a harder one, or stop. The next climb goes on where this one left off (tester t1, note #73)
+  if (mod) { const c = mod.end(); $('title').textContent = c.title; $('line').textContent = c.line; $('go').textContent = c.go; } // a mode keeps its own save: no board, no night, no best
+  else if (tower) { // after each level: climb on to a harder one, or stop. The next climb goes on where this one left off (tester t1, note #73)
     const at = Math.min(FLOORS, Math.floor(progress(s) * FLOORS)); store.set('lantern-best-tower', Math.max(at, store.get('lantern-best-tower'))); // the old best floor, still kept
     const cleared = won ? climb : climb - 1, best = Math.max(cleared, store.get('lantern-best-level')); store.set('lantern-best-level', best);
     climbNext = won && climb < TOP ? climb + 1 : won ? 1 : climb; store.set('lantern-tower-at', climbNext); // a lost level is tried again
@@ -819,7 +835,7 @@ function crashFx(cause, shown = '') { // shown: a crash effect previewed in the 
   else if (how === 'splash') { snd.noise(0.25, 0.4, 900); setTimeout(() => snd.noise(0.7, 0.25, 500), 300); tone(180, 0.6, 0.15, 'sine', -120); shake = 0.7; }
 }
 function hud() {
-  const big = tutor ? '' : endless ? `${score(s)}` : `${Math.floor(progress(s) * 100)}%`, low = playing && !paused && !tutor && s.light < 0.28, now = `${s.hearts}|${s.taken}|${big}|${low}`;
+  const big = tutor ? '' : endless ? `${score(s)}` : `${Math.floor(pct() * 100)}%`, low = playing && !paused && !tutor && s.light < 0.28, now = `${s.hearts}|${s.taken}|${big}|${low}`;
   if (now === shown) return; shown = now; // touch the page only when a number changes
   $('hearts').textContent = '♥'.repeat(Math.max(0, s.hearts)); $('count').textContent = s.taken; $('big').textContent = big;
   $('warn').classList.toggle('on', low);
@@ -859,7 +875,7 @@ function glide() { if (steering === 'slide') { slide = 0; aim(target); return; }
   const room = Math.max(0, half(s, s.y) - boat(s) - 0.01), c = centre(s, s.y), to = s.x + slide * DT;
   target = slide > 0 ? Math.min(to, c + room) : slide < 0 ? Math.max(to, c - room) : s.x;
 }
-hint(canvas, { kind: 'drag', label: t('hint'), key: 'lantern-hint', delay: 1500, bottom: 56, when: () => playing && !paused && screen === 'play' && dragging(), played: read('lantern-bank') !== null }); // a first-time player who does not touch sees how (experiments/kit/hint.js); 1.5 s, as a boat left alone meets a rock in 3 to 9 s; low, below the boat
+hint(canvas, { kind: 'drag', label: t('hint'), key: 'lantern-hint', delay: 1500, bottom: () => mod ? 120 : 56, when: () => playing && !paused && screen === 'play' && dragging(), played: read('lantern-bank') !== null }); // a first-time player who does not touch sees how (experiments/kit/hint.js); 1.5 s, as a boat left alone meets a rock in 3 to 9 s; low, below the boat
 
 // Buttons.
 $('play').addEventListener('click', () => { endless = tower = daily = false; if (newcomer()) { show('tutor'); return; } begin(); });
@@ -909,16 +925,16 @@ const rec = lab('lantern'), notice = rec.notice($('menu').firstElementChild), re
 if (notice) { const link = notice.querySelector('a'), copy = document.createElement('span'); copy.dataset.i18n = 'notice'; link.dataset.i18n = 'privacy'; notice.replaceChildren(copy, ' ', link); }
 if (recording) { const input = recording.querySelector('input'), copy = document.createElement('span'); copy.dataset.i18n = 'record'; recording.replaceChildren(input, ' ', copy); }
 // Leaving a paused run for the menu ends it and keeps its embers.
-$('toMenu').addEventListener('click', () => { if (paused) { rec.end('quit', { mode: mode(), night: tower || endless ? 0 : stage, reached: Math.floor(progress(s) * 100), embers: s.taken, hearts: s.hearts }); } if (paused) { paused = false; playing = false; if (!tutor) bankRun(); snd.release(); } tutor = null; $('tip').textContent = ''; show('menu'); });
+$('toMenu').addEventListener('click', () => { if (paused) { rec.end('quit', { mode: mode(), night: mod ? mod.night() : tower || endless ? 0 : stage, reached: Math.floor(pct() * 100), embers: s.taken, hearts: s.hearts }); } if (paused) { paused = false; playing = false; if (!tutor) bankRun(); snd.release(); } tutor = null; $('tip').textContent = ''; show(mod ? 'mode' : 'menu'); });
 
 // Pause: the button, P or Escape, and whenever the page loses the screen (a phone call, another app).
 function pauseText() { // the pause card's words; the language button draws them again
-  $('toMenu').textContent = t('menu'); $('title').textContent = t('paused'); $('line').textContent = endless ? t('pauseScore', { n: score(s) }) : tutor ? t('pauseTutor') : tower ? t('pauseTower', { tag: tag(climb), f: Math.floor(progress(s) * FLOORS), of: FLOORS }) : t('pauseNight', { n: stage, pct: Math.floor(progress(s) * 100) }); $('sub').textContent = t(view === 'first' && steering !== 'slide' ? (tilting() ? 'touchGoTilt' : 'touchGoFirst') : 'touchGo'); $('go').textContent = t('goOn');
+  $('toMenu').textContent = t('menu'); $('title').textContent = t('paused'); $('line').textContent = mod ? mod.pauseLine() : endless ? t('pauseScore', { n: score(s) }) : tutor ? t('pauseTutor') : tower ? t('pauseTower', { tag: tag(climb), f: Math.floor(progress(s) * FLOORS), of: FLOORS }) : t('pauseNight', { n: stage, pct: Math.floor(progress(s) * 100) }); $('sub').textContent = t(view === 'first' && steering !== 'slide' ? (tilting() ? 'touchGoTilt' : 'touchGoFirst') : 'touchGo'); $('go').textContent = t('goOn');
 }
 function pause() {
-  if (!playing || paused) return; paused = true; steer.drop(); pads.drop(); keys.clear(); $('viewNext').hidden = false;
+  if (!playing || paused) return; paused = true; steer.drop(); pads.drop(); keys.clear(); $('viewNext').hidden = !!mod;
   pauseText();
-  $('ask').hidden = true; show('card'); snd.hold();
+  $('ask').hidden = true; $('say').style.opacity = 0; show('card'); snd.hold();
 }
 function resume() {
   if (!paused) return; paused = false; acc = 0; snap3 = true; last = performance.now(); target = s.x; slide = 0; tilt.zero();
@@ -973,8 +989,8 @@ function tick() {
   const keyed = keys.has('ArrowLeft') || keys.has('a') || keys.has('ArrowRight') || keys.has('d');
   if (view === 'first' && !keyed) glide(); else slide = 0;
   const was = s.x; if (tutor) { s.light = Math.max(s.light, tutor.at === 2 ? 0.2 : 0.45); s.hearts = Math.max(2, s.hearts); }
-  step(s, target);
-  for (const e of s.events) react(e);
+  const events = mod ? mod.step(target) : (step(s, target), s.events);
+  for (const e of events) { react(e); mod?.react(e); }
   for (const e of s.embers) if (e.kind === 'ember' && !e.got && e.y < s.y - 0.35 && !passed.has(e)) { passed.add(e); song?.miss(); } // past the magnet's reach: a note of the melody not played
   if (tutor) { tutorTick(was); hud(); return; }
   // Things worth saying aloud: the waterfall coming up, and each step harder on the endless river.
@@ -1076,10 +1092,17 @@ function draw3(now, dt, dawn, day) {
   if (victory) winDraw(now);
   if (!s.endless) { g.fillStyle = 'rgba(255,217,160,.5)'; g.fillRect(0, 0, W * progress(s), 3 * dpr); }
 }
+function boatAt(now, bx, by) { // the boat in its looks, or its crash; a mode draws it with this too
+  const lean = Math.max(-0.5, Math.min(0.5, (target - s.x) * 4));
+  g.save(); g.translate(bx, by); g.rotate(lean * 0.5); size += ((looking && looking !== 'power' ? (s.size ? 1.3 : 2.2) : boat(s) / BOAT) - size) * 0.2; g.scale(size * 1.2, size * 1.2); // drawn a little larger than it collides; a look in the shop shows it larger still
+  if (crash) wreck(now); else { if (playing || looking) wake(g, unit, now / 1000); hull(g, skin('boat')[0], unit, skin('boat')[2], now / 1000); }
+  g.restore();
+}
 let lastDraw = 0;
 function draw(now) {
   const step3 = Math.min(0.1, (now - lastDraw) / 1000 || 0); lastDraw = now;
   const dawn = looking === 'win' ? 1 : s.endless ? 0 : Math.max(0, (progress(s) - 0.86) / 0.14), day = looking === 'win' ? 0.7 : s.over === 'dawn' ? Math.max(0, Math.min(1, (now - ended) / 2500)) : 0; // a frame's time can be a little older than ended, and a day below 0 gave the dawn light a negative radius
+  if (mod && !looking) { canvas3.hidden = true; mod.draw(now, day); return; } // a mode draws its own river, flat
   const solid = view !== '2d' && R3 && !looking; canvas3.hidden = !solid; if (solid) { draw3(now, step3, dawn, day); return; } // a look in the shop stays flat
   const ox = shake * (Math.random() - 0.5) * 14 * dpr, oy = shake * (Math.random() - 0.5) * 14 * dpr;
   g.setTransform(1, 0, 0, 1, ox, oy);
@@ -1149,10 +1172,7 @@ function draw(now) {
     if (k.kind === 'chaser') { g.fillStyle = '#ff4030'; for (const e of [-0.35, 0.35]) { g.beginPath(); g.arc(x + e * R, y + R * 0.2, R * 0.16, 0, 7); g.fill(); } }
   }
   // boat
-  const bx = sx(s.x), by = sy(s.y), lean = Math.max(-0.5, Math.min(0.5, (target - s.x) * 4));
-  g.save(); g.translate(bx, by); g.rotate(lean * 0.5); size += ((looking && looking !== 'power' ? (s.size ? 1.3 : 2.2) : boat(s) / BOAT) - size) * 0.2; g.scale(size * 1.2, size * 1.2); // drawn a little larger than it collides; a look in the shop shows it larger still
-  if (crash) wreck(now); else { if (playing || looking) wake(g, unit, now / 1000); hull(g, skin('boat')[0], unit, skin('boat')[2], now / 1000); }
-  g.restore();
+  const bx = sx(s.x), by = sy(s.y); boatAt(now, bx, by);
   // darkness with a hole of light
   const flick = 1 + Math.sin(now / 90) * 0.015 + Math.sin(now / 37) * 0.01, r = (sight(s) + glow * 0.09) * unit * flick, flash = dazzle(s) < 0;
   const dark = flash ? 0.25 : looking === 'win' ? 0.2 : looking === 'power' ? 0.8 : looking ? 0.45 : Math.max(0, 0.97 - dawn * 0.75 - day); // a look shown in the shop is lit wider
@@ -1237,7 +1257,8 @@ function frame(now) {
   for (const p of sparks) { p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; } sparks = sparks.filter(p => p.life > 0);
   if (snd.ctx) { water.frequency.value = 400 + 500 * Math.min(1.4, s.y / GOAL); waterGain.gain.value = 0.05 + (playing ? 0.14 * Math.max(fall(s, s.y), fall(s, s.y + 0.8)) : 0); droneGain.gain.value = playing ? 0.05 * (1 - s.light) : 0;
     // The endless river has no dawn, so its music fills out over two and a half minutes and stays in the night's key.
-    song.set({ on: musicOn && playing && !paused, progress: endless && !tower ? Math.min(0.8, s.t / 150) : Math.max(0, Math.min(1, progress(s))), light: s.light, danger: playing ? Math.min(1, Math.max(fall(s, s.y + 0.8), fall(s, s.y), 1 - s.light * 2.5)) : 0 }); }
+    song.set({ on: musicOn && playing && !paused, progress: endless && !tower ? Math.min(0.8, s.t / 150) : Math.max(0, Math.min(1, pct())), light: s.light, danger: playing ? Math.min(1, Math.max(fall(s, s.y + 0.8), fall(s, s.y), 1 - s.light * 2.5)) : 0 }); }
+  mod?.frame(dt, now, playing && !paused);
   try { draw(now); } catch (e) { g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; throw e; } // a bad frame must not leave the next one drawn in a blend mode
 }
 // Language (experiments/kit/i18n.js): ?lang=tr, else the saved kit:lang, else the browser's language. The globe button on the menu and on
@@ -1250,7 +1271,7 @@ function redraw() {
   $('name').placeholder = $('askName').placeholder = t('typeName'); $('got').textContent = t('got');
   for (const id of ['menuLanguage', 'pauseLanguage']) { $(id).innerHTML = GLOBE + `<span aria-hidden="true">${t('langCode')}</span>`; $(id).setAttribute('aria-label', t('switchLanguage')); }
   const label = document.querySelector('.kit-hint .label'); if (label) label.textContent = t('hint');
-  if (screen === 'menu') menu(); if (paused) pauseText();
+  if (screen === 'menu') menu(); if (paused) pauseText(); if (screen === 'mode') mod?.card($('modePanel'));
 }
 for (const id of ['menuLanguage', 'pauseLanguage']) $(id).addEventListener('click', () => {
   setLang(langs[(langs.indexOf(lang()) + 1) % langs.length]);
@@ -1258,8 +1279,9 @@ for (const id of ['menuLanguage', 'pauseLanguage']) $(id).addEventListener('clic
   redraw();
 });
 redraw();
-views(); if (read('lantern-view', '2d') !== '2d') setView(read('lantern-view'), false);
-show('menu');
+const askedMode = (query.get('mode') ?? '').split('?')[0]; // the worker's lab redirect adds the old address's own query after ?mode=spark
+views(); if (read('lantern-view', '2d') !== '2d' && !Object.hasOwn(MODES, askedMode)) setView(read('lantern-view'), false);
+show('menu'); chooseMode(askedMode); // /lantern/?mode=spark opens with Spark chosen
 requestAnimationFrame(frame);
 </script>
 <script src="/notes/button.js" id="notesScript" defer></script>

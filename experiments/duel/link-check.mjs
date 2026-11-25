@@ -5,6 +5,12 @@
 // Covers: the code and the link, the match on both phones (dealt from the seed: at least three duel kinds across the matches) to the same result tick for tick, a cut and reconnect mid-duel
 // (the waiting banner), a rematch, one side leaving mid-duel (the other is offered the bot), a phone that just vanishes,
 // and the relay not deployed (a 404: "could not reach your friend", then the bot). Screenshots go to $SHOTS.
+//
+// DUEL_BASE=https://play.adamwhite.work runs one live match instead: the deployed page and the deployed relay, no
+// routing and no stand-ins. WebKit iPhone 13 hosts, Chromium Pixel 7 joins by the shared link, one full match by tapping
+// thumbs, one full rematch, then both leave by Menu (the relay keeps nothing, so no room is left behind). Lab recording
+// is switched off on both pages so the run is not counted as play. Reports the result on each phone, stalls, the round
+// trip the host measured and the input delay. Unset, the run is exactly as before.
 import { createServer } from 'node:http';
 import { readFile, mkdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -77,6 +83,7 @@ const base = `http://127.0.0.1:${server.address().port}`;
 const require = createRequire(import.meta.url);
 const { webkit, chromium, devices } = require(process.env.PLAYWRIGHT ? join(resolve(process.env.PLAYWRIGHT), 'playwright') : 'playwright');
 const PHONES = { webkit: [webkit, devices['iPhone 13']], chromium: [chromium, devices['Pixel 7']] };
+const LIVE = process.env.DUEL_BASE ? new URL(process.env.DUEL_BASE).origin : null;
 const sleep = ms => new Promise(done => setTimeout(done, ms));
 const state = page => page.evaluate(() => window.duelState());
 async function until(page, fn, what, ms = 20000, arg) {
@@ -248,8 +255,54 @@ async function notDeployed(engine) {
   } finally { await browser.close(); }
 }
 
+// One live match through the deployed relay (DUEL_BASE).
+async function live() {
+  const [hb, gb] = await Promise.all([webkit.launch(), chromium.launch()]);
+  const A = await phone(hb, 'host', PHONES.webkit[1], null, { route: false }), B = await phone(gb, 'guest', PHONES.chromium[1], null, { route: false });
+  for (const p of [A, B]) await p.context.addInitScript(() => { try { localStorage.setItem('hf-lab-events-off:duel', '1'); } catch {} });
+  const line = s => `stalls ${s.link.stalls}, delay ${s.link.delay} ticks at the start (${Math.round(s.link.delay * 1000 / 60)} ms), ${s.link.delayNow} now (${Math.round(s.link.delayNow * 1000 / 60)} ms)`;
+  try {
+    await A.page.goto(`${LIVE}/duel/?fast=1&lang=en`);
+    await until(A.page, () => window.duelState?.().screen === 'menu', 'host menu');
+    await A.page.click('#toFriend');
+    await until(A.page, () => window.duelState().link?.state === 'alone', 'host room open on the live relay', 20000);
+    await A.page.click('#fShare');
+    const shared = await A.page.evaluate(() => window.__shared[0]);
+    assert.equal(new URL(shared).origin, LIVE, 'the shared link is on the live site');
+    await B.page.goto(shared);
+    await Promise.all([A, B].map(p => until(p.page, () => window.duelState().screen === 'play' && window.duelState().link?.state === 'match', `${p.name} in the live match`, 30000)));
+    for (const id of [1, 2]) {
+      await until(A.page, () => window.duelState().phase === 'play', `match ${id}: the duel is on`, 20000);
+      await Promise.all([thumb(A.page, 120), thumb(B.page, 160)]);
+      if (id === 1) { await sleep(2500); await Promise.all([shot(A.page, 'live-host-mid-duel'), shot(B.page, 'live-guest-mid-duel')]); }
+      await Promise.all([A, B].map(p => until(p.page, () => window.duelState().screen === 'end', `${p.name} end card of match ${id}`, 240000)));
+      await Promise.all([stopThumb(A.page), stopThumb(B.page)]);
+      await sleep(600);
+      const [a, b] = await Promise.all([state(A.page), state(B.page)]);
+      assert.equal(a.link.id, id); assert.equal(b.link.id, id);
+      assert.deepEqual(summary(b), summary(a), `match ${id}: both phones end identically`);
+      assert.equal(a.link.mismatch, null); assert.equal(b.link.mismatch, null);
+      console.log(`     live match ${id}: ${a.score.join('-')} after ${a.link.tick} ticks, identical on both (hash ${a.link.hash}); duels ${a.duels.map(d => d.kind).join(', ')}`);
+      console.log(`       host (WebKit): round trip ${Math.round(a.link.rtt)} ms; ${line(a)}`);
+      console.log(`       guest (Chromium): ${line(b)}`);
+      if (id === 1) {
+        await B.page.click('#re0');
+        await until(A.page, () => document.getElementById('endL0').textContent === 'Your friend is ready', 'the host sees the friend is ready', 15000);
+        await A.page.click('#re0');
+        await Promise.all([A, B].map(p => until(p.page, () => window.duelState().link?.id === 2 && window.duelState().screen === 'play', `${p.name} in the rematch`, 20000)));
+      }
+    }
+    await Promise.all([A.page.click('#endMenu'), B.page.click('#endMenu')]);
+    await Promise.all([A, B].map(p => until(p.page, () => window.duelState().screen === 'menu' && window.duelState().link === null, `${p.name} left the room`)));
+  } finally {
+    for (const p of [A, B]) if (p.errors.length) { failed++; console.log(`FAIL console or network errors on ${p.name}: ${p.errors.join(' | ')}`); }
+    await Promise.all([A.context.close().catch(() => {}), B.context.close().catch(() => {})]);
+    await Promise.all([hb.close(), gb.close()]);
+  }
+}
+
 const only = process.argv[2];
-for (const [name, fn] of [
+for (const [name, fn] of LIVE ? [[`live: webkit hosts, chromium joins, on ${LIVE}`, live]] : [
   ['webkit hosts, chromium joins', () => run('webkit', 'chromium')],
   ['chromium hosts, webkit joins', () => run('chromium', 'webkit')],
   ['not deployed on webkit', () => notDeployed('webkit')],
