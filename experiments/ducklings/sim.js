@@ -15,6 +15,9 @@ export const R_MOM = 0.034; // collision radii
 export const R_DUCK = 0.022;
 export const TOUCH = 0.075; // the mother takes a waiting duckling within this distance
 export const NEST_R = 0.17;
+// The nest is a drop-off, not a trap: the line comes home as it swims through, and she may leave to fetch more.
+// With enough home and birds still waiting, staying this long in the nest ends the level; leaving cancels it.
+export const SETTLE = 1.4;
 export const X_MIN = 0.07, X_MAX = 0.93;
 export const HEARTS = 3;
 export const LINE_MAX = 10;
@@ -336,7 +339,7 @@ export function create({ stage = 1, endless = false, seed } = {}) {
     line: [], lost: [], arrived: [], gone: [], duckCount: 0,
     hazards: [], rocks: [], reeds: [], gusts: [], rowCount: 0, top: 0.75,
     score: 0, joins: 0, scatters: 0, hits: 0, quackT: 0, quackCool: 0, quacks: 0,
-    home: false, over: null, why: null, events: [], time: spec ? spec.time ?? Infinity : ENDLESS_TIME, checkpoints: [], lastPadScatters: 0, total: 0,
+    home: false, settle: 0, over: null, why: null, events: [], time: spec ? spec.time ?? Infinity : ENDLESS_TIME, checkpoints: [], lastPadScatters: 0, total: 0,
     nest: null, best: 0.35,
   };
   // the trail before the start: a straight line below her, so the first ducklings stand in a row
@@ -444,7 +447,8 @@ export function step(s, target, quack = false) {
   if (quack && s.quackCool <= 0 && !s.home && s.line.length) { s.quackT = QUACK_TIME; s.quackCool = QUACK_COOL; s.quacks++; s.events.push({ type: 'quack' }); }
   // the mother
   s.stun = Math.max(0, s.stun - DT); s.safe = Math.max(0, s.safe - DT);
-  const goal = s.home ? s.nest : target;
+  // In the nest she settles on it unless the finger points somewhere clearly outside it.
+  const goal = s.home && (!target || Math.hypot(target.x - s.nest.x, target.y - s.nest.y) < NEST_R * 1.5) ? s.nest : target;
   moveMom(s, s.mom, goal, t, DT, s.stun > 0);
   s.tick++; const w = mod(s.tick, HIST); s.hx[w] = s.mom.x; s.hy[w] = s.mom.y;
   if (s.endless) endlessAhead(s);
@@ -463,12 +467,12 @@ export function step(s, target, quack = false) {
     const k = hitAny(s, t, m.x, m.y, R_MOM);
     if (k) {
       s.hearts--; s.hits++; s.stun = 0.6; s.safe = 2.0; s.events.push({ type: 'hit', by: k, x: m.x, y: m.y });
-      if (s.hearts <= 0) { end(s, 'lost-all', 'hearts'); return s; }
+      if (s.hearts <= 0) { end(s, banked(s) ? 'nest' : 'lost-all', banked(s) ? 'home' : 'hearts'); return s; }
     }
   }
   for (let i = 0; i < s.line.length; i++) {
     const f = s.line[i], p = followerPos(s, f);
-    if (s.home && s.nest && Math.hypot(p.x - s.nest.x, p.y - s.nest.y) < NEST_R) {
+    if (s.nest && Math.hypot(p.x - s.nest.x, p.y - s.nest.y) < NEST_R - 0.02) {
       s.line.splice(i--, 1); s.arrived.push(f);
       s.score += 50 * s.arrived.length; s.events.push({ type: 'arrive', id: f.id, k: s.arrived.length, x: p.x, y: p.y });
       continue;
@@ -513,15 +517,26 @@ export function step(s, target, quack = false) {
     }
   }
   // home
-  if (s.nest && !s.home && Math.hypot(m.x - s.nest.x, m.y - s.nest.y) < NEST_R - 0.02) { s.home = true; s.events.push({ type: 'home' }); }
-  if (s.t >= s.time) { end(s, 'lost-all', 'dusk'); return s; }
-  if (s.home && s.line.length === 0) {
-    const enough = s.arrived.length >= LEVELS[s.stage].need;
-    s.score += 25 * s.hearts;
-    end(s, enough ? 'nest' : 'lost-all', enough ? 'home' : 'short');
+  if (s.nest) {
+    const inside = Math.hypot(m.x - s.nest.x, m.y - s.nest.y) < NEST_R - 0.02;
+    if (inside && !s.home) s.events.push({ type: 'home' });
+    s.home = inside;
+  }
+  if (s.t >= s.time) { end(s, banked(s) ? 'nest' : 'lost-all', banked(s) ? 'home' : 'dusk'); return s; }
+  if (!s.endless) {
+    const need = LEVELS[s.stage].need, home = s.arrived.length;
+    // Too few left anywhere to reach the minimum: say so now, not after the hearts run out.
+    if (home + s.line.length + s.lost.length < need) { end(s, 'lost-all', 'short'); return s; }
+    s.settle = s.home && !s.line.length && s.lost.length && home >= need ? s.settle + DT : 0;
+    if (s.home && !s.line.length && (!s.lost.length || s.settle >= SETTLE)) {
+      s.score += 25 * s.hearts;
+      end(s, home >= need ? 'nest' : 'lost-all', home >= need ? 'home' : 'short');
+    }
   }
   return s;
 }
+// Birds dropped at the nest stay won: with the minimum home, running out of time or hearts while fetching more still clears the level.
+function banked(s) { return !s.endless && s.arrived.length >= LEVELS[s.stage].need; }
 function end(s, outcome, why) {
   s.over = outcome; s.why = why;
   // ducklings still in line when the run ends count as lost, as do those still waiting
