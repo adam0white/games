@@ -42,12 +42,14 @@
   button.step { font-size: 1.5em; min-width: 44px; text-decoration: none; padding: 0 .4em; }
   #nightNote:empty { display: none; }
   /* Phones up to 760 px tall (320x568 to 390x760): the whole menu, with the way home, the night chooser and the lab notice, fits without scrolling. */
+  @media (max-height: 620px) { #menu > div > p:nth-of-type(2) { display: none; } }
   @media (max-height: 760px) {
     #menu h1 { font-size: 1.75em; margin-bottom: .1em; }
     #menu > div { padding-top: .2em; padding-bottom: .2em; }
     #menu p { margin: .2em 0; line-height: 1.3; }
     #menu > div > p:nth-of-type(1) { font-size: .9em; }
-    #menu > div > p:nth-of-type(2) { display: none; }
+    /* The second intro line goes only for a returning player (the night chooser is showing), or on the shortest screens. */
+    #menu > div:has(#nights:not([hidden])) > p:nth-of-type(2) { display: none; }
     #menu button { min-height: 44px; padding: .25em 1em; margin: .1em; }
     #menu button.main { font-size: 1.1em; }
     #menu button.line { padding: 0 .5em; }

@@ -568,6 +568,11 @@ async function tiny(browser) {
       await seeded(page, { 'ring:v1': OLD, 'ring:nights': '{"v":1,"open":3,"pick":2,"best":[0,0,300]}', 'ring:hint': '1' }, '&from=small', 'tr');
       const over = await page.evaluate(() => { const d = document.querySelector('#menu > div'); return d.scrollHeight - d.clientHeight; });
       assert.ok(over <= 1 && await noOverflow(page), `${w}x${h} tr: the fullest menu does not scroll (${over} px over)`);
+      // A new player on these screens still reads the second intro line (mixed colours, moths), and nothing scrolls.
+      await seeded(page, { 'ring:hint': '1' }, '&from=small', 'tr');
+      const fresh = await page.evaluate(() => { const d = document.querySelector('#menu > div'); return d.scrollHeight - d.clientHeight; });
+      assert.ok(await page.isVisible('#menu > div > p:nth-of-type(2)'), `${w}x${h} tr: a new player sees the second intro line`);
+      assert.ok(fresh <= 1 && await noOverflow(page), `${w}x${h} tr: the new player's menu does not scroll (${fresh} px over)`);
     }
     assert.deepEqual(test.errors, [], '320: no errors');
     console.log('ok   ring at 320x568 with every menu line, and 360x640, 390x700, 390x760 in Turkish');
