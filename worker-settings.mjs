@@ -59,6 +59,7 @@ export const labMoved = {
   'night-kite': '/lab/',
   'night-loaves': '/lab/',
   'lantern-3d': '/lantern/',
+  'lantern-spark': '/lantern/?mode=spark',
   'lantern-fp': '/lantern/',
   'lantern-song': '/lantern/',
   'lantern-echo': '/lantern/',
