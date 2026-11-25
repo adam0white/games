@@ -42,8 +42,8 @@
     devicePixelRatio: Math.min(window.devicePixelRatio || 1, 1.5),
     showBanner: (msg, type) => { if (type === 'error') { card.style.display = 'grid'; status.textContent = msg; } }
   }, p => { document.getElementById('fill').style.width = Math.round(p * 100) + '%'; })
-    .then(() => { card.style.display = 'none'; canvas.focus(); })
-    .catch(err => { status.textContent = 'Could not start: ' + err; });
+    .then(() => { card.style.display = 'none'; canvas.focus(); window.exileEvent?.('loaded', JSON.stringify({ s: Math.round(performance.now() / 1000) })); })
+    .catch(err => { status.textContent = 'Could not start: ' + err; window.exileEvent?.('loadFailed', JSON.stringify({ msg: String(err).slice(0, 200) })); });
   addEventListener('pointerdown', () => canvas.focus());
   // A phone must not zoom or scroll the page under the game's own touch controls.
   for (const type of ['gesturestart', 'gesturechange', 'dblclick']) addEventListener(type, e => e.preventDefault(), { passive: false });
