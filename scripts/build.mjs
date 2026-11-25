@@ -3,6 +3,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, write
 import { registry, run, head, clean } from './context.mjs';
 import { manifest, packageReleaseMetadata, scopedHeaders, scopedRedirects } from './lib.mjs';
 import { validateGame } from './game.mjs';
+import { isProbe } from '../src/probe.mjs';
 import { planExperiments } from './experiments.mjs';
 if (!registry.games.length) throw new Error('Cannot build an empty game registry');
 const commit = head();
@@ -53,7 +54,15 @@ for (const game of registry.games) {
 // Experiment lane: static directories served at /<slug>/. No registry entry, HF pin or release manifest.
 for (const { slug, from } of experiments) {
   rejectRootWorker(from);
-  cpSync(from, `dist/${slug}`, { recursive: true });
+  // Dotfiles (.gitignore) are for the repository, not for players.
+  cpSync(from, `dist/${slug}`, { recursive: true, filter: source => !/[/\\]\.[^/\\]+$/.test(source) });
+}
+// Every built file must be one the Worker serves (src/probe.mjs), checked as the Worker would see it.
+const topLevel = readdirSync('dist');
+for (const entry of readdirSync('dist', { recursive: true, withFileTypes: true })) {
+  if (!entry.isFile()) continue;
+  const path = `${entry.parentPath}/${entry.name}`.replaceAll('\\', '/').replace(/^dist/, '');
+  if (isProbe(path.split('/').map(encodeURIComponent).join('/'), topLevel)) throw new Error(`${path}: the Worker refuses this path (src/probe.mjs)`);
 }
 if (existsSync('dist/sw.js')) throw new Error('Root service worker forbidden');
 if (headers.length) writeFileSync('dist/_headers', headers.join('\n'));
