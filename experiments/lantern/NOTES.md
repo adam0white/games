@@ -766,10 +766,11 @@ Not verified: tilt, slide and the tutorial on a real phone; whether a new player
 ## How a mode plugs in
 
 A mode is a way to play Lantern's river with other rules on top, chosen in the "Game mode" group and played inside `/lantern/`.
-Spark is the first. Tide, Duet and Race will follow the same pattern.
+Spark is the first, Tide the second, Duet the third, Race the fourth.
 
 **Files.** A mode is `modes/<id>.js`, plus any rules of its own (`modes/<id>-sim.js`) and bots (`modes/<id>-bots.mjs`).
 A mode's rules wrap Lantern's `sim.js` state. They never edit `sim.js`.
+Duet is the exception that proves the seam: its rules are its own (`modes/duet-sim.js`, two boats and a rope, which Lantern's state cannot hold), so `start()` returns Duet's state with the few Lantern fields the page reads set to a plain story night's values (`bonus: 0`, `endless: false`, embers marked `kind: 'ember'`, and so on; the list is in `modes/duet.js`, `begin()`).
 
 **How index.html finds it.** Three places:
 - `MODES` maps an id to a loader: `{ spark: () => import('./modes/spark.js') }`. The module loads only when chosen.
@@ -791,8 +792,15 @@ With `mod === null`, every line of index.html runs as it did before modes. `bots
 | `hello()` | the line said as a run starts |
 | `pauseLine()` | the pause card's line |
 | `end()` | at the end of a run, after the embers are banked: saves the mode's own progress and returns `{ title, line, go }` for the end card |
-| `draw(now, day)` | each frame instead of the page's drawing (2D only). `day` is 0 to 1 after dawn |
+| `draw(now, day)` | optional. Each frame instead of the page's drawing (2D only). `day` is 0 to 1 after dawn |
+| `water(now)` | optional, for a mode without `draw` (Tide, 2026-11-24): each frame, on the page's own flat river after the current streaks and before the rocks and the dark. The mode draws on `page.g()` in the page's transform |
 | `frame(dt, now, live)` | each frame, for the mode's own sound and timers |
+| `steers` | optional, `true` for a mode with its own steering (Duet's two pads): the page's one-finger hint stays away |
+| `own` | optional, `true` for a mode whose run state is not Lantern's (Duet's two boats): the page makes a fresh `create(1, stage)` when the player leaves the mode for the menu, so the menu's river and the shop previews never read the mode's state |
+| `share` | optional, 0 to 1: the share of a run's embers the page banks (Duet's rope takes about twice a night's embers a minute, so 0.5). Absent means 1 |
+| `pause(why)` | optional (Race): before the page pauses. `why` is `'button'`, `'key'` or nothing (the page lost the screen). Returning `true` means the mode handled it and the page does not pause (a live race cannot stop its clock) |
+| `go()` | optional (Race): the end card's main button. Returning `true` means the mode handled it (Race's Rematch goes to its lobby) |
+| `top(now)` | optional (Race): each frame of a mode run, after the page's own drawing and before the sparks; Race draws the other boats there |
 | `screen(name, box)` | when the page changes screens (show or hide the mode's own buttons; going to `menu` ends the mode) |
 | `state()`, `game()` | for the browser checks (`window.lanternMode()`, `window.lanternSpark()`) |
 
@@ -803,6 +811,7 @@ With `mod === null`, every line of index.html runs as it did before modes. `bots
 | `boat(now)`, `crashed()`, `win(now)` | draw the boat in its looks (or its crash effect); draw the victory effect |
 | `say`, `tone`, `noise`, `ctx()` | the page's spoken line, sounds and audio context (from the kit's `audio.js`) |
 | `live()`, `paused()`, `resume()`, `play()` | run state; start a run |
+| `card()`, `screen()`, `unlock()` | show the mode's card (`show('mode')`); the name of the screen on show; `unlock()`, the audio context, from a tap (Race, 2026-11-24: a live round starts from the socket, not a tap) |
 
 **What a mode may change:** its drawing (flat), the light, extra input (its own listeners, which act only while a run of the mode is on), extra sounds, its own save keys (`lantern-mode-<id>:*`), its end card lines.
 **What it may not:** `sim.js`, Lantern's save keys, the shared leaderboard (a mode's runs never post), `lantern-night`, `lantern-best-*`, stats (a mode neither uses nor spends them, as on the endless river).
@@ -850,3 +859,124 @@ Two tips, once per player: fireflies over safe water (night 1), a gap in the sta
 The lab page moved to `archive/lab/lantern-spark/`. Its old address goes to `/lantern/?mode=spark` (`labMoved` in `worker-settings.mjs`, added in this branch with the lead's leave). The worker adds the old address's own query after it (`?mode=spark?lang=tr`), so the page reads the mode up to a second `?`; the old `lang` is lost on that hop.
 
 **The ember melody in Spark** (kit/music.js, merged the same day). With Music on, an ember taken in Spark plays the next note of the night's melody, as in any run, and a passed ember counts as a missed note. The end card shows the melody share under the same rule as a night (Music on, at least four notes laid). `song.start()` resets the counts every run, so a Spark run does not change a later night's share.
+
+## 2026-11-24: Tide is a mode inside Lantern (owner, lab cleanup: fold it "but improve")
+
+**What the player sees.** "Game mode", then "Lantern Tide", opens Tide's card: five stages with their stars, the stage's one new idea, Play, Back.
+A bright channel of fast water winds down the river, with flecks running in it. In the channel the boat runs faster and the flame holds; in slack water it burns down.
+An ember path along the channel opens every stage. Stage by stage: the bright water; shoulders of rock (fast water squeezed round rocks); the lee
+(the tide goes slack in stretches, and the still, warm water behind a rock relights the wick); the tide turns (the channel slides across with time); ice.
+The end card says why a run ended, how far it got and the best so far on that stage, or at dawn how long was spent in bright water and the next stage's idea.
+
+**The lab page played cold first (390x844, Chromium), and its five weakest things.** Each has a fix in the mode.
+1. The first seconds punished instead of taught: a boat left alone lost its first hull at about 4.8 s and the run at 10.3 s, with rocks on screen at once.
+   Fix: no rock in the first 6.5 river units of any stage (past the ember path); for the first 6 s the bank holds the boat in instead of costing a hull; an ember path lies along the channel,
+   so following the embers finds the fast water without a word. Hands off, no blow comes before 6.0 s on any of 120 seeds and stage (median 9.2 to 9.6 s), and the boat lasts 11.2 to 12.1 s (median).
+   A bot that only follows embers, blind to the water, is in fast water 68, 68, 68, 60, 61% of seconds 1 to 6 by stage; with the path taken away, 33, 33, 33, 42, 42%.
+   That claim's bar (at least 60%, and 15 points over no path) was set after a first run at 20 points failed on stages 4 and 5, where the turning channel sweeps under a boat anyway.
+2. Reading the water decided little on night 1: 192 bot runs on the lab page ended dark only once; the flame rule hardly mattered.
+   Fix: the flame burns 0.12 a second in slack water and 5% of that in the channel. On stage 1 the bot that reads the water reaches dawn on 120 of 120 seeds; the same bot blind to the water on 75%, and goes dark on 30 seeds.
+3. A cliff: the lab's own bots went 48/48 on night 1 to 22/48 (reader) and 9/48 (plain) on night 2; with a 300 ms delay, 29/48 to 0/48.
+   Fix: five stages; the careful bot that acts 300 ms late reaches dawn on 100, 88, 78, 70, 62% (120 seeds). No step is more than 20 points. These rates move a few points with small changes (the ember path's timing moved stage 5 from 53 to 62%); the claim holds at 60 and 120 seeds.
+4. Everything arrived at once, and the eddy rings looked like Lantern's whirlpools, which pull the boat in.
+   Fix: one new idea a stage (above). A lee is drawn as still, warm water with level ripples; a whirlpool spins and is dark in the middle. Rocks are a share of Lantern's (0.45 to 0.55) so the water can be read between them.
+5. The end card said only "Boat lost / 29% to dawn": no cause, no best; two fixed nights; English only.
+   Fix: the cause and the best on the card; five stages with three stars each (dawn, no blow, bright water half the night); English and Turkish.
+
+**What each stage's bot claim shows** (`node bots.mjs tide`, 120 seeds a case; the "late" bot acts 300 ms late and leaves more room round rocks and banks):
+- stage 1, bright water: reader 100% against 75% blind (above).
+- stage 2, shoulders: the late reader rides 31.2 s of fast water a run against 16.5 s blind. No lee yet: nothing relights.
+- stage 3, the lee: the late reader that rests in lees reaches dawn on 78%, the same bot passing them by on 45%.
+- stage 4, the turn: at one spot the channel slides 0.36 half-widths in 3 s (stage 3: 0.10). A bot reading the water as it was 2 s before rides 20.4 s of fast water against 23.9 s (a small effect; see below).
+- stage 5: ice comes, and no stage before has it.
+- No path ember lies on a rock; no rock lies in the first 6.5 river units.
+- `--mutate` makes the channel burn the flame instead of saving it; seven claims fail and the run exits 1.
+
+**Rules.** `modes/tide-sim.js` wraps Lantern's state, as Spark's layer does, and never edits `sim.js`. Each tick it scales `s.calm` by the water's rate and sets
+`s.st.wick` to 12.5 for the step (that zeroes Lantern's own fade), sets `s.light` from the tide's burn and relight, and puts both back after the step.
+After the step it removes the rocks the stage does not have, thins Lantern's embers to the stage's share, and lays the ember path. It draws nothing from Lantern's random streams.
+Lantern's own whirlpools, fog and so on do not come up on the story nights 1 and 2 that Tide uses.
+**Abilities are not laid in Tide**, as on the lab page: a flare or a boost holds the flame up or carries the boat, and the water would stop mattering.
+
+**Drawing.** Tide has no `draw()`. The page draws its own flat river, boat, rocks, dark and embers; Tide draws the channel, its flecks and the lees through the new optional `water(now)` hook (see "How a mode plugs in").
+index.html: `MODES.tide`, `mod.draw` now optional, the one `water()` call, and the Tide button. With no mode chosen nothing changes (`bots.mjs parity`: 394,647 ticks, 0 differ).
+
+**Menu.** With Race, Spark and Tide the Game mode card ran past a 320x568 screen (657 px tall). The modes inside Lantern now sit two to a row (`.more`): 586 px in English, 571 in Turkish, Back on screen after a short scroll in English.
+The phone check's assertion on the mode buttons now lists Spark and Tide (changed on purpose).
+
+**Saves.** `lantern-mode-tide:save` is `{ v: 1, best, stars: { stage: 0..3 }, far: { stage: best % }, played }`.
+If it is missing and the lab page's `lantern-tide:night` is `'2'` (its first night won), stage 2 opens once. The lab's keys are never written.
+
+**Sound.** A band of noise under the hull rises with the fast water; entering fast water gives a short rush, entering a lee a soft two-note chime.
+The ember melody (kit/music.js) plays as in any run: `begin()` starts the song for every run, embers play its notes, and a low flame raises the music's danger as on a night.
+
+**bots.mjs parity --mutate was not failing on main.** The music check (same day) takes `--` flags out of `process.argv` before the parity part reads `--mutate`; the parity part now reads the saved flags. It fails again under `--mutate` (1 differ).
+
+**Not verified.** Whether the channel reads at a glance on a real phone in bright light; the rush sound's level on a phone speaker; how stage 4's turn feels (the bot effect is small:
+3.5 s more fast water for reading the water now, and no difference in dawn rate). Stage 5 at 62% for the careful bot may be hard for a thumb; the owner's play decides.
+The lab page moved to `archive/lab/lantern-tide/`. Its old address needs `'lantern-tide': '/lantern/?mode=tide'` in `labMoved` (`worker-settings.mjs`, the lead adds it).
+
+## 2026-11-24: Duet is a mode inside Lantern (owner, lab cleanup: "accepted as is")
+
+**What the player sees.** "Game mode", then "Lantern Duet", opens Duet's card: what it is, the rule, nights 1 to 3, Play, the best so far, and the keys.
+In a run each half of the screen steers its own boat; a rope of light joins them, takes the embers it sweeps over, and snags on a rock that passes between the boats.
+The end card says why the run ended, how far it got, the embers and the snags, and the best so far.
+
+**Faithful.** `modes/duet-sim.js` is a byte-for-byte copy of the lab page's `sim.js` (`cmp archive/lab/lantern-duet/sim.js experiments/lantern/modes/duet-sim.js` is silent).
+`modes/duet.js` carries the lab page's camera, drawing, lines, sounds and two-pad steering (kit `drag.js`, as on the lab page), redrawn in the canvas's device pixels.
+`modes/duet-bots.mjs` is the lab page's bots, with the acceptance it fixed before its first run and never loosened, unchanged.
+
+**What changed, and why.**
+- The boats, flame and water are the player's own from Lantern's shop (`page.skin`), not the lab page's fixed colours.
+- Lantern's HUD (hearts, embers, %) and pause button replace the lab page's; the lab page's sound switch is gone (Lantern's music switch is on the pause card).
+- The ember sound is Lantern's: each ember plays the next note of the night's melody (kit `music.js`). A swept line of five plays four notes on the next sixteenths and a chime for the fifth (the kit plays at most four waiting notes).
+- After a crash the boats and the rope sink and fade; the lab page left them on the water.
+- Broken on the lab page, fixed: a loss at 0% was saved as the best. A best now needs at least 1% or dawn.
+- English only on the lab page; every line is in `words.js` in English and Turkish now. The end lines read "Embers: 4. Snags: 1." so a count of 1 reads right.
+- Embers to the bank: the rope lays 74, 90 and 92 embers a minute on nights 1 to 3; Lantern's story nights 1, 3 and 5 lay 35, 37 and 38 (`bots.mjs duet` measures both). The adaptive bot takes 65 to 80 a minute. So Duet banks half (`share: 0.5`), and its card says so.
+
+**Steering.** Two pads (`#duetL`, `#duetR`) lie over the canvas, under the HUD, only while a Duet run is on the screen or paused; the page's own one-finger steering never sees those fingers. The pause card lets touches through (`.screen` has `pointer-events: none`), so on the pause card a thumb on a pad resumes the run and steers that boat, as a touch on the canvas does in Lantern; the split line and the side labels show only in play. A hurt rebases both held fingers, as on the lab page. Keys: A and D for the left boat, the arrows for the right, only while the run is live.
+The page's one-finger hint stays away (`steers`); Duet's own hint (kit `hint.js`, "Drag each half with one thumb") uses `lantern-mode-duet:hint`. The pads go in before `#hud`, after the page's hint box, because the language button renames the first `.kit-hint .label` on the page; Duet renames its own hint's label in its `words()`.
+**Leaving.** Duet's run state is not Lantern's, so the mode says `own: true` and the page makes a fresh `create(1, stage)` when the player goes back to the menu. Checked headless on WebKit and Chromium, 2D and 3D saved: end card or pause, then Menu, Back, the menu's river for 2 s, eight shop taps, a normal night: no page error.
+
+**Saves.** `lantern-mode-duet:save` is `{ v: 1, best: { night, pct }, unlocked, played }`. If it is missing and the lab page's `lantern-duet:v1` is there, its best and its open nights are carried over once. The lab key is never written.
+
+**Checks.** `bots.mjs duet`: the lab page's claims hold. Night 1, 30 seeds: adaptive reaches dawn on 30 (median progress 1.0), together 0.18 (all dark), wide 0.165 (all ended by the rope); adaptive reaches dawn on 30 of 30 on nights 2 and 3 too. Plus the embers-a-minute claim. `--mutate` (a rock between the boats never catches the rope) fails "staying wide snags more" and exits 1.
+`phone.mjs lantern` on both browsers: the deep link and the lab save; two pointers at once, one per half, hit-tested to the left and right pads, spread the boats, then the left one alone moves only the left boat; pause; dawn with four embers taken and two banked; a loss by the rope with its line; only the new key written; no board call. Added after review: on the pause card a thumb on the left pad (below the card's buttons) resumes the run and steers the left boat; D moves the left boat and the left arrow the right one (the other boat moves under a quarter as far); after going back to the menu the page's river is a fresh one (`over` is null). Faults injected by hand: both pads wired to the left boat fails "two thumbs spread the boats"; `own: false` fails "the menu has a fresh river of its own".
+Changed on purpose in `phone.mjs`: the Turkish mode-button assertion now lists Duet (`['duet', 'Fener Düet']`) after Spark and Tide.
+The pointers are synthetic `PointerEvent`s sent to the element under each point, not a real two-finger touch.
+
+**Not verified.** Two real thumbs on a real phone (the lab page's open question, still open); whether four melody notes and a chime for a swept line sound right; the warning tones by ear.
+The lab page moved to `archive/lab/lantern-duet/`. Its old address needs `'lantern-duet': '/lantern/?mode=duet'` in `labMoved` (`worker-settings.mjs`, the lead adds it).
+
+## 2026-11-24: Race is a mode inside Lantern (owner, lab cleanup: "accepted as is")
+
+**What the player sees.** "Game mode", then "Lantern Race", opens Race's card: a boat name, Quick race (or "Join room ABCD" when a shared link names a room), Race friends, the best crossing.
+Race friends makes a four-letter room or joins one. The lobby lists the boats; Ready starts the round when everyone is ready, or 8 s after the first Ready, with a countdown.
+Every boat races the same river from the same seed; the others show as pale boats with their names, and a bar on the right shows where each boat is. The first boat to dawn wins.
+The end card says how the run ended, then the results, which fill in as the other boats finish; Rematch is Ready again. Alone, or with no connection, Race races three bots (Reed, Glimmer, Drift).
+
+**Faithful.** `modes/race-sim.js` is the lab page's `sim.js` with one line changed (the import path of Lantern's `sim.js`). `modes/race-bots.mjs` is the lab page's `bots.mjs` with its import paths changed and its claims unchanged; `bots.mjs race` runs it.
+`modes/race.js` is the lab page's `main.js` moved inside Lantern: the room (a WebSocket to `/lab-api/room/lantern-race/<code>`, `workers/lab-ai/src/room.mjs`, unchanged), the lobby, the countdown, the bots, the ghosts and the results.
+The room is not the kit's `table` (`room.js`): the lab room's frames are its own, and `workers/lab-ai/test/table.test.mjs` keeps `lantern-race` out of the table's names. `workers/lab-ai/test/room.test.mjs` now imports the decoder from `modes/race-sim.js` (a path change only).
+
+**What changed, and why.**
+- The page draws the river and the player's boat with Lantern's own drawing, looks, HUD, pause button and music; the lab page drew its own. Each ember plays the night's melody, as on a night.
+- The other boats are drawn in the new `top(now)` hook. Their names are pushed apart when boats run side by side, and are hidden on the cards (on the lab page they overlapped).
+- The pause button in a live race asks first ("A live race cannot pause: tap again to retire"); P, Escape and leaving the page retire at once, as on the lab page. Offline, Race pauses like a night (new hook `pause(why)`).
+- The end card's main button is Rematch (new hook `go()`); Menu leaves the room and goes back to Race's card. In the lobby the page's Back is hidden, so the room is left only by Leave room.
+- The share link is `/lantern/?mode=race&room=ABCD` (kit `shareLink`). The kit's `linkFor` would drop `mode`.
+- English only on the lab page; every line is in `words.js` in English and Turkish now. The lab page's own sound switch is gone (Lantern's music switch is on the pause card).
+- Recording: a race is recorded like any mode run (`mode: 'race'`) when the player has recording on.
+- Embers: a race banks its embers like a night (no `share`). The lab page banked nothing. This is an owner decision; `share` is one number.
+- Race's river is not Lantern's (`own: true`): the menu gets a fresh river after a race.
+
+**Saves.** `lantern-mode-race:save` is `{ v: 1, best: 0..100000, name, played }`. If it is missing and any of the lab page's `lantern-race-best`, `lantern-race-name` or `lantern-race-played` is there, they are carried over once. The lab keys are never written. Race makes no shared-board calls; a race's result goes only to the room.
+
+**Checks.** `bots.mjs race`: the lab page's ten claims hold (wire limits, ranking, interpolation, deterministic ghosts, difficulty). Bots: night 1, clumsy 34 of 120 reach dawn (78.6% mean distance), careful 40 of 40; night 3, 10 of 120 and 35 of 40; night 6, 5 of 120 and 35 of 40. `--mutate` reverses the ranking and fails "distance first, time second" (exit 1).
+`phone.mjs lantern` on both browsers, with a stand-in WebSocket on pages with `mode=race` (the check plays the server): the room link opens Race with "Join room ABCD"; the lab save carries over; hi, `you`, Ready, `roster`, `round`, the countdown, a ghost from a `p` frame, the page's own `p` frames; one tap of the pause button asks and goes quiet; dawn, the end card and two result rows, `done` sent; Rematch sends Ready; a second round where P retires the boat; with no server, three bots, and P pauses; Menu leaves; only the new key; no board call; a fresh river on the menu. The tap that joins the room starts the sound (`page.unlock()`): a live round starts from a socket frame, not a tap, so iPhone Safari would otherwise play it silent. Faults injected by hand: the pause button retiring on the first tap fails "one tap asks to retire"; no `page.unlock()` fails "the tap that joins the room starts the sound".
+Changed on purpose in `phone.mjs`: the Game mode card has no links any more (`[]`), and the Turkish mode buttons list Race first (`['race', 'Fener Yarışı']`).
+`experiments/kit/check/lab-pages.mjs` loses the `lab/lantern-race` entry and its offline-socket helpers, which only it used.
+
+**Not verified.** Two real devices racing through the real relay (the lab page's open question, still open); the check's server is a stand-in. The countdown tones by ear.
+The lab page moved to `archive/lab/lantern-race/`. Its old address needs `'lantern-race': '/lantern/?mode=race'` in `labMoved` (`worker-settings.mjs`, the lead adds it). The redirect keeps the query, so `/lab/lantern-race/?room=ABCD` reaches `/lantern/?mode=race&room=ABCD`.
