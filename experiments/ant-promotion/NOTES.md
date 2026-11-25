@@ -808,7 +808,7 @@ The owner on the lab page: evolution "can make things interesting for long time 
 - The lab page `ant-evolve` is in `archive/lab/ant-evolve/`. The redirect `'ant-evolve': '/ant-promotion/'` is for the owner to add to `labMoved` in `worker-settings.mjs`.
 
 ### Checks
-- `evolve-bots.mjs` runs third from `bots.mjs`, and also alone: `node experiments/ant-promotion/evolve-bots.mjs [--ref=<main's sim.js>] [--quick] [--mutate=meadow]`. Give `--ref` only when running it alone. `cover-bots.mjs` reads the same flag and expects a sim from before cover, so through `bots.mjs` its parity check fails at tick 0.
+- `evolve-bots.mjs` runs third from `bots.mjs`, and also alone: `node experiments/ant-promotion/evolve-bots.mjs [--ref=<main's sim.js>] [--quick] [--mutate=meadow]`. Give `--ref` only when running it alone. `cover-bots.mjs` reads the same flag, and through `bots.mjs` with main's current `sim.js` its `{ cover: false }` parity check failed at tick 0. The evolve parity shows this branch's sim plays as main's for 86,400 ticks with cover on, so the same check should fail on main itself with that ref; it was written against a sim from before cover. I did not run it on main to confirm.
 - **Parity.** With `--ref` = main's `sim.js` after PR 242, a new player's world plays 86,400 ticks identically at levels 1, 6, 12 and 18, Classic and Wild, with cover on and power presses. The page's own path under GRACE plays 14,400 ticks identically.
 - **Staged traits.**
   - stay: a plain hunter tires after 10.0 s, a persistent one after 15.0 s, and a quitter after 6.3 s;
@@ -825,6 +825,7 @@ The owner on the lab page: evolution "can make things interesting for long time 
 | zigzags | 0.00 / 0.00 | 0.00 / 0.00 | 0.06 / 0.12 | 0.00 / 0.00 |
 
   Every two habits are apart on some trait, with both series of one beyond both of the other by 0.05. The pairs and their traits are: left/power lead, left/zig lead, creep/left lead, creep/power grass, creep/zig grass, power/zig shake. Prey traits are alike for all four (wary about 0.3, bold about 0.17), because all four eat what they meet. An earlier claim that habits differ more than two series of one habit failed, because stay wanders from run to run. I replaced it with the per-trait claim above.
+- **What a player would see in those habit runs.** Over 30 runs, 18 to 23 runs end with a "what the meadow learned" card, with 30 to 68 lines in all. After 30 runs, 13 to 19 species carry dots in play (a trait at 0.25 or more). The first card comes at run 6, and it can hold several lines at once, because changes before GRACE are held back.
 - **Clear rate.**
   - The band 0.75 to 1.15 of the plain meadow was stated before measuring.
   - The measure is the highest level a competent bot (skill user, revives on death) reaches from an Ant in 8 minutes, as a mean over 10 seeds:
@@ -838,7 +839,8 @@ The owner on the lab page: evolution "can make things interesting for long time 
     - levels climbed in a minute from mid levels was dropped because the values sat near 0 and the ratios ran from -2.37 to 2.37.
   - The prey traits were turned down three times until the own meadow fell inside the band.
 - **Bounds.** At the strongest corner, a fresh world has at least 31 catchable animals (bots.mjs asks for 8). Over 300 runs with real tallies and bursts of the most extreme possible: no NaN, 0 values out of bounds, largest step 0.150. A stored meadow survives a round trip, and a broken one is cleaned. Every trait has words, up and down, in English and Turkish.
-- **Mutation.** `--mutate=meadow` (a test-only switch in `meadow.js` that removes the clamp and the step cap) fails 5 checks and exits 1, both alone and through `bots.mjs`.
+- **Mutation.** `--mutate=meadow` (a test-only switch in `meadow.js` that removes the clamp and the step cap) exits 1: 5 checks fail through `bots.mjs`, 4 alone with `--quick`.
+- **`node bots.mjs 6 12`** (1800 s limit) exits 1, from six skill stage tests in section 4c: Bat, Owl, Fox, Lynx, Ostrich and Zebra. Main fails the same six. A harness with section 4b and 4c alone, built from `bots.mjs` the same way for both trees, fails these six on `origin/main` and on this branch. Every other section passes: rig, cover, the evolving meadow, rule table, tree, food, bots, wild rules, powers, same-kind picks, rival and old animals. I did not fix them here; they belong to PR 242's skills meeting cover, not to the meadow. Bare `--mutate` exits 1 through the rig mutation (3 rig checks fail).
 - **Phone check.** The `ant-promotion` section of `kit/check/phone.mjs` ran on WebKit iPhone 13 and Chromium Pixel 7. It checks that:
   - a new player has no meadow, and a short run does not count;
   - after 5 runs the world is still plain and the guide says "(1 to go)";

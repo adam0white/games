@@ -139,17 +139,20 @@ const traitMeans = M => MW.TRAITS.map((_, i) => { const l = Object.values(M.sp).
 const dist = (a, b) => Math.hypot(...[T.grass, T.stay, T.lead, T.shake].map(i => a[i] - b[i])); // the hunter traits: what habits teach (prey traits follow what you eat)
 const t0 = Date.now();
 for (const habit of HABITS) for (const rep of [0, 1]) {
-  let M = MW.newMeadow(); const hist = [];
+  let M = MW.newMeadow(); const hist = []; let lines = 0, cards = 0;
   for (let r = 0; r < RUNS; r++) {
     const tally = MW.newTally(); playRun(habit, 7000 + rep * 500 + r + HABITS.indexOf(habit) * 97, 5 + (r % 5), r % 3, M, tally);
     if (tally.time < MW.MIN_RUN) tally.time = MW.MIN_RUN; // a short life still counts here, so every series has 30 generations
-    tallies.push(tally); M = MW.advance(M, tally).meadow; hist.push(traitMeans(M));
+    const out = MW.advance(M, tally); tallies.push(tally); M = out.meadow; hist.push(traitMeans(M));
+    lines += out.changes.length; if (out.changes.length) cards++;
   }
-  series[`${habit}/${rep}`] = { M, hist };
+  // what a player would see: runs that ended with a "what the meadow learned" card, its lines, and species marked in play (a dot needs 0.25)
+  const marked = Object.values(M.sp).filter(v => v.some(x => Math.abs(x) >= 0.25)).length;
+  series[`${habit}/${rep}`] = { M, hist, seen: `${cards} of ${RUNS} runs end with a card (${lines} lines), ${marked} species marked` };
 }
 console.log(`     habits: ${HABITS.length} habits x 2 series x ${RUNS} runs of up to ${RUN_S} s in ${((Date.now() - t0) / 1000).toFixed(0)} s`);
 const show = v => MW.TRAITS.map((t, i) => `${t.k} ${v[i].toFixed(2)}`).join(', ');
-for (const k in series) console.log(`     ${k.padEnd(8)} after ${RUNS}: ${show(series[k].hist.at(-1))} (${MW.changed(series[k].M).length} species)`);
+for (const k in series) console.log(`     ${k.padEnd(8)} after ${RUNS}: ${show(series[k].hist.at(-1))} (${MW.changed(series[k].M).length} species); ${series[k].seen}`);
 const mean = h => series[`${h}/0`].hist.at(-1).map((v, i) => (v + series[`${h}/1`].hist.at(-1)[i]) / 2);
 const top = (i, h) => HABITS.every(o => o === h || mean(h)[i] > mean(o)[i]);
 claim(top(T.grass, 'creep'), 'the player who creeps in grass leaves the meadow that looks into grass most');
