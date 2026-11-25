@@ -1,4 +1,4 @@
-// Phone acceptance: PLAYWRIGHT=<directory containing playwright> node experiments/lab/pitch/check.mjs [webkit|chromium]
+// Phone acceptance: PLAYWRIGHT=<directory containing playwright> node experiments/small/pitch/check.mjs [webkit|chromium]
 // Serves experiments/ (so ../../kit/ resolves) and taps the screen points the page reports; moves are chosen by the rules in Node.
 import { createServer } from 'node:http';
 import { readFile, mkdir } from 'node:fs/promises';
@@ -33,7 +33,7 @@ const base = `http://127.0.0.1:${server.address().port}`;
 const require = createRequire(import.meta.url);
 const { webkit, chromium, devices } = require(process.env.PLAYWRIGHT ? join(resolve(process.env.PLAYWRIGHT), 'playwright') : 'playwright');
 const PHONES = { webkit: [webkit, devices['iPhone 13']], chromium: [chromium, devices['Pixel 7']] };
-const DATE = '2026-11-24', URL_ = `${base}/lab/pitch/?date=${DATE}&lang=en`;
+const DATE = '2026-11-24', URL_ = `${base}/small/pitch/?date=${DATE}&lang=en`;
 const sleep = ms => new Promise(done => setTimeout(done, ms));
 const P = (page, expr, arg) => page.evaluate(expr, arg);
 const shot = (page, phone, name) => page.screenshot({ path: join(SHOTS, `${phone}-${name}.png`) });
@@ -267,7 +267,7 @@ async function playFriend(browser, device, phone) {
     await a.click('#shareLink');
     await until(a, () => !!window.__sharedLink, 'Share link supplies a URL');
     const link = await P(a, () => window.__sharedLink);
-    assert.deepEqual(link, { text: 'Play Paper Pitch with me', url: `${base}/lab/pitch/?room=${code}` });
+    assert.deepEqual(link, { text: 'Play Paper Pitch with me', url: `${base}/small/pitch/?room=${code}` });
     await b.goto(link.url);
 
     async function bothSeated() {
@@ -670,7 +670,7 @@ async function fromSmall(browser, phone) {
   const still = async (page, label) => { await noOverflow(page, label); assert.ok(await P(page, () => document.documentElement.scrollHeight <= innerHeight && [...document.querySelectorAll('.screen:not([hidden]) .card')].every(c => c.scrollHeight <= c.clientHeight + 1)), `${label}: nothing scrolls`); };
   const test = await open(browser, { viewport: { width: 320, height: 568 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }), { page } = test;
   try {
-    await page.goto(`${base}/lab/pitch/?date=${DATE}&lang=en&from=small`);
+    await page.goto(`${base}/small/pitch/?date=${DATE}&lang=en&from=small`);
     await until(page, () => window.__pitch?.ready && __pitch.screen === 'menu', 'menu from small');
     assert.ok(await visibleIn(page, '#menu .kit-home'), 'the return link is on the menu');
     for (const id of ['#play', '#daily', '#puzzles', '#friend', '#two']) assert.ok(await visibleIn(page, id), `320: ${id} visible`);
@@ -801,7 +801,7 @@ async function fitsCard(page, label) {
 async function turkish(browser, device, phone, tag) {
   const tests = [], wire = tableWire();
   const shotTr = (page, name) => page.screenshot({ path: join(WORD_SHOTS, `${tag}-${name}.png`), timeout: 25000 });
-  const TR = `${base}/lab/pitch/?date=${DATE}&lang=tr`;
+  const TR = `${base}/small/pitch/?date=${DATE}&lang=tr`;
   async function mk() {
     const test = await open(browser, device, true);
     tests.push(test);
@@ -937,7 +937,7 @@ async function turkish(browser, device, phone, tag) {
       assert.equal(await P(page, () => document.documentElement.lang), 'en');
       assert.equal(await page.getAttribute('#c', 'aria-label'), tables.en.canvasLabel);
       await stray(page, 'en', `${tag} English menu after switch`);
-      await page.goto(`${base}/lab/pitch/?date=${DATE}`);
+      await page.goto(`${base}/small/pitch/?date=${DATE}`);
       await until(page, () => window.__pitch?.ready && __pitch.screen === 'menu', 'English menu after reload');
       assert.equal(await text(page, '#friend'), 'Play a friend', 'English is remembered without ?lang=');
       await page.click('#langMenu');

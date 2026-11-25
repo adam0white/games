@@ -60,7 +60,7 @@ function socketsFor(room) {
 function player(room, Socket, store, name, version = 1) {
   const seen = { states: [], moves: [], seats: [], games: [], agains: [], status: [] };
   const timers = { waits: [], setTimeout(fn, ms) { this.waits.push({ fn, ms }); return this.waits.length; }, clearTimeout() {}, run() { const w = this.waits.splice(0); for (const x of w) x.fn(); } };
-  const t = kitTable({ game: 'pitch', version, name: () => name, Socket, where: { protocol: 'https:', host: 'play.adamwhite.work', href: 'https://play.adamwhite.work/lab/pitch/' }, store, timers,
+  const t = kitTable({ game: 'pitch', version, name: () => name, Socket, where: { protocol: 'https:', host: 'play.adamwhite.work', href: 'https://play.adamwhite.work/small/pitch/' }, store, timers,
     onState: s => seen.states.push(s), onMove: (s, m, i) => seen.moves.push([i, s, ...m]), onSeats: s => seen.seats.push(s), onGame: g => seen.games.push(g), onAgain: s => seen.agains.push(s), onStatus: s => seen.status.push(s) });
   return { t, seen, timers };
 }
@@ -209,8 +209,8 @@ test('limits: a flood closes the socket, and an idle table is deleted by its ala
 test('codes and links', () => {
   for (let i = 0; i < 50; i++) assert.match(newCode(), /^[A-HJ-NP-Z]{4}$/);
   assert.equal(cleanCode(' ab-cd '), 'ABCD'); assert.equal(cleanCode('abc'), ''); assert.equal(cleanCode('ab1cd'), 'ABCD');
-  const where = { href: 'https://play.adamwhite.work/lab/pitch/?look=1#x' };
-  assert.equal(linkFor('ABCD', where), 'https://play.adamwhite.work/lab/pitch/?room=ABCD');
-  assert.equal(codeFromLink({ href: 'https://play.adamwhite.work/lab/pitch/?room=abcd' }), 'ABCD');
-  assert.equal(codeFromLink({ href: 'https://play.adamwhite.work/lab/pitch/' }), '');
+  const where = { href: 'https://play.adamwhite.work/small/pitch/?look=1#x' };
+  assert.equal(linkFor('ABCD', where), 'https://play.adamwhite.work/small/pitch/?room=ABCD');
+  assert.equal(codeFromLink({ href: 'https://play.adamwhite.work/small/pitch/?room=abcd' }), 'ABCD');
+  assert.equal(codeFromLink({ href: 'https://play.adamwhite.work/small/pitch/' }), '');
 });

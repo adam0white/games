@@ -11,7 +11,7 @@ import { assertHomeLinks } from '../../kit/check/home-link.mjs';
 import { answerLab, allowLocalSend, withAgent, assertNotice, assertRun, assertNoLeak, assertOffSendsNothing, waitForRuns } from '../../kit/check/lab-record.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const path = '/lab/night-rubbing/';
+const path = '/small/night-rubbing/';
 const away = '/rubbing-test-away';
 const notes = '/notes/button.js';
 const shots = process.env.SHOTS || '/private/tmp/night-r6-review/rubbing/check';

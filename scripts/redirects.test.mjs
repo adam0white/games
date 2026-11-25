@@ -36,7 +36,7 @@ test('old experiment links move permanently to the top level and keep the query'
     assert.equal(response.headers.get('location'), `https://play.adamwhite.work${to}`, from);
   }
   // Only the exact /proto segment moves; new paths and look-alikes reach the assets.
-  for (const path of ['/lantern/', '/lab/thankful/', '/kit/save.js', '/protocol/', '/proto-x/']) assert.equal(await (await get(`https://play.adamwhite.work${path}`)).text(), 'asset', path);
+  for (const path of ['/lantern/', '/small/thankful/', '/kit/save.js', '/protocol/', '/proto-x/']) assert.equal(await (await get(`https://play.adamwhite.work${path}`)).text(), 'asset', path);
   // Another origin never gets this redirect.
   assert.equal((await get('https://rope.adamwhite.work/proto/lantern/')).headers.get('location'), 'https://play.adamwhite.work/rope/proto/lantern/');
 });
@@ -44,6 +44,11 @@ test('a lab page that left the lab sends its old address on, with the query, by 
   const cases = {
     '/lab/night-vine/?lang=tr': '/vine/?lang=tr', '/lab/ant-creatures/?lang=tr': '/ant-promotion/?look=4&lang=tr', '/lab/ant-creatures/': '/ant-promotion/?look=4', '/lab/night-flock-2/': '/flock/', '/lab/night-flock-2': '/flock/',
     '/lab/lantern-echo/echo.js': '/lantern/', '/lab/ant-nest/?a=b&c=d': '/ant-promotion/?a=b&c=d', '/lab/boat-b/': '/boat/',
+    // The small games (2026-11-25): shared links keep their query (a Paper Pitch room, a Splitlight or Podwire daily,
+    // the way back to the home); a deeper path goes to the page, as for every moved name.
+    '/lab/night-sand/?lang=tr': '/small/night-sand/?lang=tr', '/lab/thankful/': '/small/thankful/', '/lab/pitch/?room=ABCD': '/small/pitch/?room=ABCD',
+    '/lab/night-splitlight/?daily&day=2026-11-25': '/small/night-splitlight/?daily&day=2026-11-25', '/lab/night-podwire/?daily': '/small/night-podwire/?daily',
+    '/lab/wild-pour/?from=small&lang=tr': '/small/wild-pour/?from=small&lang=tr', '/lab/night-sand/words.js': '/small/night-sand/', '/lab/ring': '/small/ring/',
   };
   for (const [from, to] of Object.entries(cases)) {
     const response = await get(`https://play.adamwhite.work${from}`);
@@ -51,10 +56,10 @@ test('a lab page that left the lab sends its old address on, with the query, by 
     assert.equal(response.headers.get('location'), `https://play.adamwhite.work${to}`, from);
   }
   // Pages still in the lab, the lab index and look-alike names reach the assets.
-  for (const path of ['/lab/', '/lab', '/lab/thankful/', '/lab/night-vines/', '/lab/night-vine-x/a.js', '/labs/night-vine/', '/flock/lab/night-vine/']) assert.equal(await (await get(`https://play.adamwhite.work${path}`)).text(), 'asset', path);
+  for (const path of ['/lab/', '/lab', '/small/thankful/', '/lab/thankfully/', '/lab/night-vines/', '/lab/night-vine-x/a.js', '/labs/night-vine/', '/flock/lab/night-vine/']) assert.equal(await (await get(`https://play.adamwhite.work${path}`)).text(), 'asset', path);
   // Every target is a plain path on this site, and no moved name is still a folder in the lab.
   for (const [name, to] of Object.entries(labMoved)) {
-    assert.match(to, /^\/[a-z0-9-]+\/(?:\?[a-z0-9=&-]+)?$/, name);
+    assert.match(to, /^(?:\/[a-z0-9-]+)+\/(?:\?[a-z0-9=&-]+)?$/, name);
     assert.equal(existsSync(new URL(`../experiments/lab/${name}`, import.meta.url)), false, `${name} is in labMoved and still in experiments/lab`);
   }
 });

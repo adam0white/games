@@ -31,7 +31,7 @@ async function run(name,engine,device,base){
  page.on('response',r=>{if(r.status()>=400)errors.push(`${r.status()} ${r.url()}`);});
  await context.route('**/*',route=>{if(new URL(route.request().url()).origin!==base){external.push(route.request().url());return route.abort();}return route.continue();});
  for(const look of ['sky','lamps','garden']){
-  await page.goto(`${base}/lab/thankful/?day=2026-11-23&look=${look}`);await page.waitForFunction(()=>!!window.__thankful);
+  await page.goto(`${base}/small/thankful/?day=2026-11-23&look=${look}`);await page.waitForFunction(()=>!!window.__thankful);
   await page.evaluate(()=>localStorage.clear());await page.reload();await page.waitForFunction(()=>!!window.__thankful);
   assert.equal(await page.evaluate(()=>window.__thankful.look),look,'look query selects renderer');
   assert.equal(total(await state(page)),0);await nonblank(page);await page.screenshot({path:join(shots,`${name}-${look}-empty.png`)});
@@ -50,7 +50,7 @@ async function run(name,engine,device,base){
   await page.evaluate(()=>window.__thankful.give('family'));assert.equal(total(await state(page)),3,'fourth light rejected');
   await page.reload();await page.waitForFunction(()=>!!window.__thankful);assert.equal(total(await state(page)),3,'reload preserves lights');
   const saved=await page.evaluate(()=>JSON.stringify({...localStorage}));
-  await page.goto(`${base}/lab/thankful/?day=2026-11-23&look=${look}&demo=40`);await page.waitForFunction(()=>!!window.__thankful);
+  await page.goto(`${base}/small/thankful/?day=2026-11-23&look=${look}&demo=40`);await page.waitForFunction(()=>!!window.__thankful);
   assert.equal(await page.evaluate(()=>window.__thankful.look),look,'demo look query selects renderer');
   assert.equal(total(await state(page)),120,'40 completed demo days');await nonblank(page);
   assert.ok(await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>r(window.__thankful.lights.length)))))>=45,'a grown sky shows at least 15 days at once');
@@ -68,7 +68,7 @@ async function recording(name,engine,device,base){
  page.on('pageerror',e=>errors.push(String(e)));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
  await context.route('**/*',route=>new URL(route.request().url()).origin===base?route.continue():route.abort());
  const lab=await answerLab(context,base);await allowLocalSend(context);
- const url=day=>withAgent(`${base}/lab/thankful/?day=${day}&look=lamps`);
+ const url=day=>withAgent(`${base}/small/thankful/?day=${day}&look=lamps`);
  await page.goto(url('2026-11-24'));await page.waitForFunction(()=>!!window.__thankful);await page.evaluate(()=>localStorage.removeItem('thankful:v1'));await page.reload();await page.waitForFunction(()=>!!window.__thankful);
  await assertNotice(page);assert.equal(lab.sent.length,0,'nothing is sent before a thanks is given');
  await page.locator('[data-kind="bread"]').tap();await page.locator('[data-kind="water"]').tap();
@@ -96,10 +96,10 @@ async function extras(name,engine,device,base){
  // The flowers on the buttons follow the date, the same for everyone; days before the change grow the old ones.
  let {context,page}=await fresh();
  for(const [day,bread,light] of [['2026-11-24','wheat','sunflower'],['2026-11-25','barley','dandelion'],['2026-11-26','oats','sunflower'],['2026-11-27','wheat','marigold']]){
-  await page.goto(`${base}/lab/thankful/?day=${day}&lang=en`);await page.waitForFunction(()=>!!window.__thankful);
+  await page.goto(`${base}/small/thankful/?day=${day}&lang=en`);await page.waitForFunction(()=>!!window.__thankful);
   assert.equal(await page.locator('[data-kind="bread"]').getAttribute('aria-label'),`bread: ${bread}`,`${day}: bread grows ${bread}`);assert.equal(await page.locator('[data-kind="light"]').getAttribute('aria-label'),`light: ${light}`);}
  // Every action makes a sound (counted as notes started on the one audio context) and moves something.
- await page.goto(`${base}/lab/thankful/?day=2026-11-26&lang=en`);await page.evaluate(()=>localStorage.removeItem('thankful:v1'));await page.reload();await page.waitForFunction(()=>!!window.__thankful);
+ await page.goto(`${base}/small/thankful/?day=2026-11-26&lang=en`);await page.evaluate(()=>localStorage.removeItem('thankful:v1'));await page.reload();await page.waitForFunction(()=>!!window.__thankful);
  const notes=()=>page.evaluate(()=>window.__notes);const sounds={};
  const act=async(label,fn)=>{const a=await notes();await fn();await page.waitForTimeout(250);sounds[label]=(await notes())-a;};
  await act('thanks',()=>page.locator('[data-kind="bread"]').tap());
@@ -117,20 +117,20 @@ async function extras(name,engine,device,base){
  await act('reset',async()=>{await page.locator('#settings').tap();await page.locator('#reset').tap();});await act('clear',()=>page.locator('#clear').tap());
  for(const [k,v] of Object.entries(sounds))assert.ok(v>0,`${k} makes a sound`);
  // Nothing hides behind the words in a grown garden, and the page stays inside the frame budget.
- await page.goto(`${base}/lab/thankful/?day=2026-11-26&lang=en&demo=60`);await page.waitForFunction(()=>!!window.__thankful);await page.waitForTimeout(800);
+ await page.goto(`${base}/small/thankful/?day=2026-11-26&lang=en&demo=60`);await page.waitForFunction(()=>!!window.__thankful);await page.waitForTimeout(800);
  await page.evaluate(()=>{window.__work.length=0;for(const k of ['bread','rain','tree'])window.__thankful.give(k);});await page.waitForTimeout(3000);
  const work=await page.evaluate(()=>{const a=window.__work;return {mean:a.reduce((x,y)=>x+y,0)/a.length,max:Math.max(...a),n:a.length};});
  assert.ok(work.mean<8,`mean page work per frame ${work.mean.toFixed(2)} ms`);
  const under=await page.evaluate(()=>{const L=document.getElementById('line').getBoundingClientRect(),P=document.getElementById('picture').getBoundingClientRect();return window.__thankful.lights.filter(l=>l.y>L.top-20&&l.y<P.bottom).length;});
  assert.equal(under,0,'no flower behind the words');
  // Zoom never pushes days in a column into each other: where the rows are already tight (a short screen), the garden stays at zoom 1, as on main.
- for(const n of [2,4,14]){await page.goto(`${base}/lab/thankful/?day=2026-11-28&lang=en&demo=${n}`);await page.waitForFunction(()=>!!window.__thankful);await page.waitForTimeout(2500);
+ for(const n of [2,4,14]){await page.goto(`${base}/small/thankful/?day=2026-11-28&lang=en&demo=${n}`);await page.waitForFunction(()=>!!window.__thankful);await page.waitForTimeout(2500);
   const gap=await page.evaluate(()=>{const z=window.__thankful.zoom,c=new Map();for(const l of window.__thankful.lights)c.set(l.day,l);const a=[...c.values()];let worst=Infinity;for(const p of a)for(const q of a)if(p!==q&&Math.abs(p.cx-q.cx)<1)worst=Math.min(worst,Math.abs(p.cy-q.cy)-(2*p.radius+20*z)*.85);return {worst,z};});
   assert.ok(gap.worst>=0||gap.z<1.01,`demo ${n}: zoom ${gap.z.toFixed(2)} pushes days in a column together (${gap.worst.toFixed(1)} px)`);}
  await context.close();
  // The smallest phone, in both languages: every control inside the screen, the title clear of the look button, no scroll.
  for(const lang of ['en','tr']){({context,page}=await fresh({viewport:{width:320,height:568}}));
-  await page.goto(`${base}/lab/thankful/?day=2026-11-26&lang=${lang}${lang==='tr'?'&from=small':''}`);await page.waitForFunction(()=>!!window.__thankful);await page.waitForTimeout(500);
+  await page.goto(`${base}/small/thankful/?day=2026-11-26&lang=${lang}${lang==='tr'?'&from=small':''}`);await page.waitForFunction(()=>!!window.__thankful);await page.waitForTimeout(500);
   if(lang==='tr')assert.equal(await page.locator('#ritual .kit-home').innerText(),'‹ Küçük oyunlar','opened from the small games: a way back under the tray');
   const fit=await page.evaluate(()=>({out:[...document.querySelectorAll('header button,#tray button,#line,#ritual .kit-home')].filter(e=>{const q=e.getBoundingClientRect();return q.left<0||q.top<0||q.right>innerWidth||q.bottom>innerHeight;}).length,gap:document.getElementById('looks').getBoundingClientRect().left-document.getElementById('name').getBoundingClientRect().right,scroll:document.scrollingElement.scrollHeight-innerHeight+document.scrollingElement.scrollWidth-innerWidth}));
   assert.deepEqual([fit.out,fit.scroll],[0,0],`${lang} 320x568: everything inside, no scroll`);assert.ok(fit.gap>=8,`${lang} 320x568: title clear of the look button (${fit.gap} px)`);

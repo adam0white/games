@@ -1,6 +1,6 @@
 // A game wired to the small games' home (kit/home.js): opened with ?from=small, it shows the "‹ Small games" link on
 // the cards it names, in the page's language. Used by each wired game's own check.mjs:
-//   await assertHomeLinks(context, `${base}/lab/night-sand/?from=small&lang=tr`, ['paused', 'result'], '‹ Küçük oyunlar');
+//   await assertHomeLinks(context, `${base}/small/night-sand/?from=small&lang=tr`, ['paused', 'result'], '‹ Küçük oyunlar');
 // `where` lists the id of the nearest element with an id around each link. Opens its own tab and closes it, so the
 // game's other checks are not affected (the "from" is remembered per tab). Note: ?lang= is remembered in kit:lang.
 import assert from 'node:assert/strict';

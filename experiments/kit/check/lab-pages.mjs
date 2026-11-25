@@ -157,7 +157,7 @@ async function rubPlate(page, { until, knob }) {
 const splitlightLegacy = { 'night-splitlight:plate': '2', 'night-splitlight:sound': 'on' };
 
 export const labPages = {
-  'lab/wild2-face-shift': pageEntry('wild2-face-shift:save', saves.face, 'wild2-face-shift:hint', {
+  'small/wild2-face-shift': pageEntry('wild2-face-shift:save', saves.face, 'wild2-face-shift:hint', {
     clock: true, menu: '#toMenu', sound: '#sound',
     state: () => { const s = window.faceShiftState?.(); return s && { screen: s.mode, paused: s.mode === 'paused', t: s.state?.elapsed ?? 0 }; },
     verify: () => { const s = window.faceShiftState(); return { saved: s.saved, booth: s.booth, daily: s.daily, line: document.querySelector('#dailyLine').textContent }; },
@@ -165,7 +165,7 @@ export const labPages = {
     touch: dragTouch(() => window.faceShiftState().state.x, n => window.faceShiftState().state.x > n),
     hint: { delay: 1600, before: () => window.faceShiftState().state.x, moved: n => window.faceShiftState().state.x > n },
   }, { 'wild2-face-shift:booth': json(saves.faceBooth), 'wild2-face-shift:daily': json({ v: 1, day: utcDay, best: 412 }) }),
-  'lab/wild-pour': pageEntry('wild-pour:save', saves.pour, 'wild-pour:hint', {
+  'small/wild-pour': pageEntry('wild-pour:save', saves.pour, 'wild-pour:hint', {
     clock: true, menu: '#quit', sound: '#sound2', changed: { 'wild-pour:save': { tries: 1 } },
     state: () => { const s = window.pourState?.(); return s && { ...s, paused: !!s.paused }; },
     verify: () => ({ stars: window.pourState().saved, tries: JSON.parse(localStorage.getItem('wild-pour:save')).tries, sound: document.querySelector('#sound1').textContent, daily: document.querySelector('#dailyBest').textContent }),
@@ -173,7 +173,7 @@ export const labPages = {
     touch: dragTouch(() => window.pourState().angle, n => window.pourState().angle > n + .02, [[140, 430], [200, 430]]),
     hint: { before: () => window.pourState().angle, moved: n => window.pourState().angle > n + .02 },
   }, { 'wild-pour:daily': json({ v: 1, day: utcDay, off: 1, spilled: 2 }) }),
-  'lab/night-bells': pageEntry('night-bells:save', saves.bells, 'night-bells:hint', {
+  'small/night-bells': pageEntry('night-bells:save', saves.bells, 'night-bells:hint', {
     menu: '#quit', sound: '#sound2', changed: { 'night-bells:save': { tries: 1 } },
     state: () => { const s = window.bellsState?.(); return s && { screen: s.screen, t: s.t }; },
     verify: () => ({ save: window.bellsState().saved, play: document.querySelector('#play').ariaLabel }),
@@ -181,7 +181,7 @@ export const labPages = {
     touch: ringBell,
     hint: { delay: 1600, timing: { start: '#play' }, input: ringBell },
   }),
-  'lab/night-channels': pageEntry('night-channels:save', saves.channels, 'night-channels:hint', {
+  'small/night-channels': pageEntry('night-channels:save', saves.channels, 'night-channels:hint', {
     startsOnBoard: true, menu: '#gardens', sound: '#sound',
     state: () => { const s = window.channelView?.(); return s && { screen: s.screen === 'selection' ? 'menu' : s.screen, t: s.state.ticks }; },
     verify: () => {
@@ -193,7 +193,7 @@ export const labPages = {
     hint: { delay: 4000, play: '#openList', timing: { start: '#pickDaily' }, input: digChannel,
       start: async page => { await page.click('#openList'); await page.click('#pickDaily'); } },
   }),
-  'lab/night-podwire': pageEntry('night-podwire:progress', saves.podwire, 'night-podwire:next-hint', {
+  'small/night-podwire': pageEntry('night-podwire:progress', saves.podwire, 'night-podwire:next-hint', {
     startsOnBoard: true, sound: '#sound',
     state: () => { const s = window.podwireView?.(); return s && { screen: s.screen, t: s.time }; },
     verify: () => {
@@ -208,7 +208,7 @@ export const labPages = {
         await until(page, () => window.podwireView().level === 2 && window.podwireView().screen === 'play', 'Next opens the second plate');
       } },
   }),
-  'lab/night-rubbing': pageEntry('night-rubbing:save', saves.rubbing, 'night-rubbing:hint', {
+  'small/night-rubbing': pageEntry('night-rubbing:save', saves.rubbing, 'night-rubbing:hint', {
     startsOnBoard: true, sound: '#sound', resumeTouch: true,
     state: () => {
       const s = window.rubbingState?.();
@@ -229,7 +229,7 @@ export const labPages = {
     touch: rubPlate,
     hint: { delay: 2200, play: '#field', timing: { board: true }, input: rubPlate },
   }),
-  'lab/night-splitlight': {
+  'small/night-splitlight': {
     startsOnBoard: true, sound: '#sound', soundKey: 'night-splitlight:sound', soundOff: 'off',
     // :best, :daily, :done and :parts were added on 2026-11-24 with the 18-plate bench; they are seeded so a save that
     // has them must survive too.

@@ -272,7 +272,7 @@ async function run(name) {
     page.on('console', msg => { if (msg.type() === 'error') errors.push(`console: ${msg.text()}`); });
     page.on('requestfailed', req => errors.push(`requestfailed: ${req.url()} ${req.failure()?.errorText}`));
     page.on('response', res => { if (res.status() >= 400) errors.push(`HTTP ${res.status()}: ${res.url()}`); });
-    await page.goto(`${base}/lab/night-bells/${route}`);
+    await page.goto(`${base}/small/night-bells/${route}`);
     await menu(page);
     return page;
   };

@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const experiments = resolve(here, '../..');
-const route = '/lab/night-podwire/';
+const route = '/small/night-podwire/';
 const progressKey = 'night-podwire:progress', bookKey = 'night-podwire:book', dayKey = 'night-podwire:daily';
 const shots = process.env.SHOTS || '/private/tmp/night-r4-review/podwire';
 const modules = process.env.PLAYWRIGHT || join(homedir(), 'code/human-framework/node_modules');

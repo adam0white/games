@@ -48,6 +48,10 @@ test('the phone check runs for experiments, the notes button and what the check 
 test('a change inside one experiment runs only that experiment\'s phone checks', () => {
   assert.equal(phoneChecks(['experiments/lantern/index.html', 'games/rope/src/main.ts']), 'lantern');
   assert.equal(phoneChecks(['experiments/lab/ant-nest/game.js', 'experiments/lantern/a/b.js', 'experiments/lab/ant-nest/index.html']), 'lab/ant-nest,lantern');
+  // A small game is its own check; a file of the home itself is the home's check ('small').
+  assert.equal(phoneChecks(['experiments/small/night-sand/main.js', 'experiments/small/pitch/sim.js']), 'small/night-sand,small/pitch');
+  assert.equal(phoneChecks(['experiments/small/catalog.js', 'experiments/small/index.html']), 'small');
+  assert.equal(phoneChecks(['experiments/small/thankful/a/b.js', 'experiments/small/marks.js']), 'small,small/thankful');
   for (const path of ['experiments/kit/save.js', 'experiments/kit/check/phone.mjs', 'prototypes/x/index.html', 'workers/feedback/public/notes/button.js', 'src/worker.mjs', 'scripts/experiments.mjs', '.github/workflows/ci.yml']) assert.equal(phoneChecks(['experiments/lantern/index.html', path]), 'all', path);
   for (const paths of [[], ['games/rope/src/main.ts'], ['experiments/NOTES.md', 'experiments/lantern/README.md'], ['experiments/lab/index.html']]) assert.equal(phoneChecks(paths), '', paths.join());
 });

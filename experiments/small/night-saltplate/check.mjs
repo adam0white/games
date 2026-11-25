@@ -1,4 +1,4 @@
-// PLAYWRIGHT=<directory containing playwright> fnm exec --using=26.12.0 node experiments/lab/night-saltplate/check.mjs [webkit|chromium]
+// PLAYWRIGHT=<directory containing playwright> fnm exec --using=26.12.0 node experiments/small/night-saltplate/check.mjs [webkit|chromium]
 import assert from 'node:assert/strict';
 import { mkdir, readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
@@ -11,7 +11,7 @@ import { LEVELS, answerHandle, dailySpec } from './sim.js';
 import { assertHomeLinks } from '../../kit/check/home-link.mjs';
 import { answerLab, withAgent, assertNotice, assertRun, assertOffSendsNothing, assertNoLeak, waitForRuns, runRecords } from '../../kit/check/lab-record.mjs';
 
-const mount = '/lab/night-saltplate/';
+const mount = '/small/night-saltplate/';
 const experiments = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const notesButton = resolve(experiments, '../workers/feedback/public/notes/button.js');
 const shots = process.env.SHOTS || '/private/tmp/night-r6-wild';

@@ -24,7 +24,7 @@ Shared code for the games under `experiments/`. It is served at `/kit/` as plain
 | `fx.js` | `feedback({ canSound })` gives `fx(name, sound, motion)`, `bump(el)` and `log()`: every action's sound and motion through one call, named in a log a check can read. Used by `lab/ring`; `lab/pitch` has the same helper inline |
 | `home.js` | `home(rec, { back })`: the way back to the small games' home at `/small/` and a finished run reported to it, in one line; see below |
 | `/notes/button.js` | the notes button for testers (it lives in `workers/feedback/public/notes/`) |
-| `check/phone.mjs` | phone runs of every live experiment, of the lab pages under `/lab/` and of this kit, on WebKit iPhone 13 and Chromium Pixel 7 |
+| `check/phone.mjs` | phone runs of every live experiment, of the small games under `/small/` (until 2026-11-25 lab pages under `/lab/`), of any lab page under `/lab/` and of this kit, on WebKit iPhone 13 and Chromium Pixel 7 |
 | `index.html` | a self-test page at `/kit/` |
 | `games.json` | the list of every game a tester can open; the notes page builds its games menu and game picker from it, and the phone check fails if an experiment is missing |
 
@@ -139,7 +139,7 @@ A game calls `const rec = lab('<slug>')`, then `rec.notice(menuCard)`, `rec.togg
 The home at `/small/` opens every game with `?from=small`. A game wired to it shows a "‹ Small games" link ("‹ Küçük oyunlar" in Turkish) on the cards it names, and tells the home how each run ended, so "Three tonight" can show a win (★) and not only "moved forward" (✦). The one line, in place of the game's `const rec = lab('<slug>')`:
 
 ```js
-import { home } from '../../kit/home.js';           // from a page in experiments/lab/<slug>/ (top-level games: '../kit/home.js')
+import { home } from '../../kit/home.js';           // from a page in experiments/small/<slug>/ (top-level games: '../kit/home.js')
 const rec = home(lab('night-bells'), { back: ['#menu .card', '#end .card'] });
 ```
 
@@ -154,7 +154,7 @@ const rec = home(lab('night-bells'), { back: ['#menu .card', '#end .card'] });
 ## Deliberate differences from the code the kit replaced
 
 - `readNumber` gives the fallback for stored text that is not a finite number. Lantern's old code gave `NaN`, which then could never buy anything and was written back. Reviewed 2026-11-23.
-- A page two levels down (`/lab/<name>/`) imports `../../kit/`.
+- A page two levels down (`/small/<name>/`, `/lab/<name>/`) imports `../../kit/`.
 - The lab pages (`lab/ant-nemesis`, `lab/ant-wilds`, `lab/ant-nest`, `lab/lantern-3d`) moved onto `save.js`, `audio.js`, `pause.js` and `screens.js` on 2026-11-23. The three ant pages now also pause when the window loses focus or the page is put away, take capital P as a pause key, and retry the audio start when a finger lifts, as Ant Promotion did when it moved. `lantern-3d` already did all three. Storage keys and formats are unchanged.
 
 ## Not shared yet, and why

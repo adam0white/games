@@ -1,4 +1,4 @@
-// PLAYWRIGHT=<directory containing playwright> node experiments/lab/night-splitlight/check.mjs [webkit|chromium]
+// PLAYWRIGHT=<directory containing playwright> node experiments/small/night-splitlight/check.mjs [webkit|chromium]
 import assert from 'node:assert/strict';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { answerLab, withAgent, assertNotice, assertRun, assertOffSendsNothing, assertNoLeak, waitForRuns } from '../../kit/check/lab-record.mjs';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const notesButton = resolve(root, '../workers/feedback/public/notes/button.js');
-const mount = '/lab/night-splitlight/';
+const mount = '/small/night-splitlight/';
 // The daily checks use the real date, so today's save rules apply; PAST is the day before.
 const DAY = new Date().toISOString().slice(0, 10);
 const PAST = new Date(Date.parse(DAY) - 864e5).toISOString().slice(0, 10);
@@ -330,7 +330,7 @@ async function extras({ name, engine, device }) {
     const line = await page.evaluate(() => window.splitlightShareLine());
     assert.match(line, new RegExp(`^Splitlight ${DAY}: 2 turns, par 2, [\\d.]+ s \\S+$`, 'u'), 'the share line: ' + line);
     const link = await page.evaluate(() => window.splitlightShareUrl());
-    assert.ok(link.endsWith(`/lab/night-splitlight/?daily&day=${DAY}`), 'the shared link opens the same bench: ' + link);
+    assert.ok(link.endsWith(`/small/night-splitlight/?daily&day=${DAY}`), 'the shared link opens the same bench: ' + link);
     await noScroll(page, 'daily result with the way back');
     await screenshot(page, name, '08-daily-result');
     // A shared link to another day plays that day's bench but leaves today's saved result alone.

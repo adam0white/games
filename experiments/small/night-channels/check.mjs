@@ -21,7 +21,7 @@ const profiles = [
   ['chromium', chromium, devices['Pixel 7']],
 ];
 const mime = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' };
-const pagePath = '/lab/night-channels/';
+const pagePath = '/small/night-channels/';
 const server = createServer(async (req, res) => {
   const { pathname } = new URL(req.url, 'http://localhost');
   if (pathname === '/away') {

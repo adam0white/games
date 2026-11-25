@@ -13,7 +13,7 @@ Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: {
 const { SMALL } = await import('../experiments/small/catalog.js');
 const { progress } = await import('../experiments/small/marks.js');
 
-const lab = path => import(new URL(`../experiments/lab/${path}`, import.meta.url).href);
+const lab = path => import(new URL(`../experiments/small/${path}`, import.meta.url).href);
 // Where each game keeps its level count. Exported by the game wherever it is; Night Sand's BEDS has the endless
 // garden as bed 0 before its ten numbered beds (night-sand/sim.js), which is how its save counts them.
 const COUNTS = {
