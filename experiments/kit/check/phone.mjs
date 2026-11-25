@@ -330,6 +330,37 @@ async function started(page, slug, hook, toMenu) {
 }
 
 const GAMES = {
+  // Thumb Duel, playing a friend by link. The match between two phones is experiments/duel/link-check.mjs; here, one
+  // phone: the menu choice, a four-letter code, and with the room unreachable (the relay not deployed, or no network)
+  // "could not reach your friend" and the bot, in English and Turkish. The saves are untouched.
+  async 'duel friend'(page) {
+    const save = { v: 1, sound: true, matches: 4, friend: { side: 1, run: 2, best: 3 }, solo: { easy: { won: 2, run: 1, best: 2 }, medium: { won: 1, run: 0, best: 1 }, hard: { won: 0, run: 0, best: 0 } } };
+    let tries = 0;
+    await page.routeWebSocket(/\/lab-api\/room\/duel\/[A-Z]{4}\?k=[a-z0-9]{16,40}$/, ws => { tries++; ws.close({ code: 1011 }); });
+    await page.goto(`${base}/duel/?lang=en`);
+    await page.evaluate(v => localStorage.setItem('duel-save', v), JSON.stringify(save)); await page.reload();
+    await until(page, () => window.duelState?.().screen === 'menu', 'duel menu');
+    assert.equal(await page.locator('#toFriend').textContent(), 'Play a friend');
+    await page.click('#toFriend');
+    await until(page, () => window.duelState().link?.role === 'host', 'a room is opened');
+    const code = await page.locator('#fCode').textContent();
+    assert.match(code, /^[A-Z]{4}$/, 'a four-letter code'); assert.equal((await page.evaluate(() => window.duelState().link.code)), code);
+    await until(page, () => window.duelState().link.state === 'failed', 'the unreachable room gives up', 15000);
+    assert.equal(tries, 4, 'the first try and three more before giving up');
+    assert.equal(await page.locator('#fStatus').textContent(), 'Could not reach your friend.');
+    await page.click('#fBot'); await until(page, () => window.duelState().screen === 'solo' && window.duelState().link === null, 'the bot is offered');
+    await page.goto(`${base}/duel/?room=${code}&lang=tr`);
+    await until(page, () => window.duelState?.().link?.role === 'guest', 'the link joins as the guest');
+    assert.equal(await page.locator('#fJoin').inputValue(), code);
+    await until(page, () => window.duelState().link.state === 'failed', 'the guest gives up too', 15000);
+    assert.equal(await page.locator('#fStatus').textContent(), 'Arkadaşına ulaşılamadı.');
+    assert.equal(await page.locator('#fBot').textContent(), 'Bota karşı oyna');
+    await page.click('#fBack'); await until(page, () => window.duelState().screen === 'menu', 'back on the menu');
+    await page.click('#toFriend'); await page.locator('#fJoin').pressSequentially('wx-yz'); assert.equal(await page.locator('#fJoin').inputValue(), 'WXYZ', 'a typed code is cleaned');
+    await page.click('#fJoinGo'); await until(page, () => window.duelState().link?.role === 'guest' && window.duelState().link.code === 'WXYZ', 'a typed code joins as the guest');
+    await page.click('#fBack'); await until(page, () => window.duelState().screen === 'menu' && window.duelState().link === null, 'back on the menu again');
+    assert.deepEqual(JSON.parse(await page.evaluate(() => localStorage.getItem('duel-save'))), save, 'the saves are untouched');
+  },
   async kit(page) {
     await page.goto(`${base}/kit/`);
     await until(page, () => window.kitResults, 'self-test');
@@ -945,7 +976,7 @@ for (const [slug, run] of Object.entries(labHubs)) GAMES[slug] = page => run(pag
 const [onlyGame, onlyPhone] = process.argv.slice(2);
 // The first argument is 'all' or a comma list of experiments. An experiment's name picks its own check, its
 // first-time help check, and for Lantern the three checks below that play Lantern.
-const WITH = { lantern: ['old links', 'lab down', 'leaving mid-run'] };
+const WITH = { lantern: ['old links', 'lab down', 'leaving mid-run'], duel: ['duel friend'] };
 const picked = game => !onlyGame || onlyGame === 'all' || onlyGame.split(',').some(only => game === only || game === `hint ${only}` || game.startsWith(`hint ${only} `) || WITH[only]?.includes(game));
 // A check that never answers becomes a FAIL line naming it, not a job that runs until its time limit.
 const within = (p, ms, what) => { let t; return Promise.race([p, new Promise((_, no) => { t = setTimeout(() => no(new Error(`no answer in ${ms / 1000}s: ${what}`)), ms); })]).finally(() => clearTimeout(t)); };

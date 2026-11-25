@@ -16,7 +16,9 @@ Shared code for the games under `experiments/`. It is served at `/kit/` as plain
 | `tilt.js` | `tiltSteer()`: steering by leaning the phone, with the iPhone permission, a straight position, and the screen kept on (Lantern's first person) |
 | `hint.js` | `hint(el, { kind, key, when, played, delay, look, label, reach, bottom })`: help for a first-time player who does not touch: a see-through copy of the control with a finger showing how; see below |
 | `i18n.js` | `words({ en: {...}, tr: {...} })` gives `{ t, lang, setLang, apply, langs }`: text in the player's language, chosen by `?lang=`, a remembered choice (`kit:lang`, shared by every game) or the browser; `apply()` fills `data-i18n` elements |
-| `room.js` | `table({ game, version, name, onState, onMove, ... })`, `newCode`, `linkFor`, `codeFromLink`, `share` (and `shareLink(url, words)` for any other link): a table for friends by four-letter code or link, no account, for turn-based games; see below |
+| `room.js` | `table({ game, version, name, onState, onMove, ... })`, `newCode`, `linkFor`, `codeFromLink`, `share` (and `shareLink(url, words)` for any other link): a table for friends by four-letter code or link, no account, for turn-based games; and `relay({ game, onFrame, onPeer, onStatus })`, a two-phone room that passes frames on and stores nothing, for real-time games; see below |
+| `lockstep.js` | `lockstep({ id, delay, adapt, fill })`: two phones step one seeded game tick by tick, each tick only once both players' inputs for it are here; inputs stamped `delay` ticks ahead (optionally adapting), resent until confirmed, state checks every 30 ticks; pure, no timers; see below |
+| `samemath.js` | `sameMath` (`exp`, `sin`, `cos`, `hypot`): the same bits on every JavaScript engine, for a sim that two phones run in lockstep; see below |
 | `lab.js` | `lab(slug)`: play recording for the game lab, with its notice and off switch; see below |
 | `/notes/button.js` | the notes button for testers (it lives in `workers/feedback/public/notes/`) |
 | `check/phone.mjs` | phone runs of every live experiment, of the lab pages under `/lab/` and of this kit, on WebKit iPhone 13 and Chromium Pixel 7 |
@@ -97,6 +99,20 @@ For a turn-based game two friends play on two phones. One player makes a code (`
 - **Status.** `onStatus`: `connecting`, `live`, `waiting` (lost, retrying by itself), `full`, `version`, `closed` (the seat was opened in another tab, or the table expired), `off`.
 - **Rematch.** `t.again()` votes; `onAgain(seat)` shows who has; `onGame({ game, seed })` starts the next game when every seat has voted.
 - **Never feed a shared board from a table.** Both pages know the seed, and the server does not check moves.
+
+## Two phones in lockstep (`relay()`, `lockstep.js`, `samemath.js`)
+
+For a real-time game between two phones (first used by Thumb Duel's "Play a friend", 2026-11-24). Each phone runs the same seeded sim; the server only passes frames on.
+
+- **Room.** `relay({ game, onFrame, onPeer, onStatus })` opens `/lab-api/room/<game>/<CODE>` (`r.open(code)`); `r.send([...ints])` reaches the other phone as `onFrame(ints)`. Nothing is stored and nothing comes back after a reload. The game must be in `RELAY` in `workers/lab-ai/src/room.mjs` (two seats, 30 frames a second, 64 integers, 200 bytes), and that Worker deployed. The seat key is in sessionStorage (`kit-relay:<game>:<code>`), so a reconnecting phone takes its own seat back. Status: `connecting`, `live`, `waiting` (lost, retrying), `full`, `closed` (opened in another tab), `failed` (the first try and three more, or six in a row after being in: offer the bot), `off`. A page that is not yet deployed against gets `failed` in about 3.5 s.
+- **Lockstep.** `lockstep({ id, delay })`. Each tick: `if (ls.canSample()) ls.push(myInts)`; `ls.ready()` gives `{ mine, theirs }` or null (stall, and say so); step the sim with both; `ls.advance()`. Every ~50 ms send `ls.frame(now)`; feed the friend's frames to `ls.receive(ints, now)`; after a reconnect call `ls.resend()`. `ls.check(tick, hash)` on both phones at the same ticks; `ls.mismatch` is the first tick they disagree. Start both phones on the same `delay`, so neither thumb is faster.
+- **Start together.** The phone that sends "start" steps its first tick half a measured round trip later, when the start reaches the other phone. Otherwise it runs a one-way trip ahead for the whole match and stalls whenever the line jitters: Thumb Duel's simulated 40-70 ms line went from a median of 17 stalls a match to 0.
+- **Adaptive delay.** `adapt: { up, downAfter, min, max }` and `fill(lastInts)`: a stall raises this phone's own delay by `up` ticks at once and it falls back as many (`ls.takeOwed()`: wait that many ticks of time before stepping on); `downAfter` calm ticks lower it by one. Each phone changes only its own delay; the other needs only one input per tick, so the game stays identical. `fill` makes the inputs for the ticks a raise skips: keep holds, drop taps.
+- **Bound one tick's input.** A tick whose integers do not fit in one frame can never be sent, and both phones wait for ever. Cap what one tick carries and leave the rest queued for the next tick (Thumb Duel: `PER_TICK` in net.js, 2 taps and 1 release).
+- **Apply the decoded input, your own included.** Quantize what goes on the wire (whole thousandths, whole ms) and step the sim with the decoded values on both phones.
+- **Same maths.** `Math.exp`, `Math.sin` and `Math.hypot` differ in the last bit between WebKit, Chromium and Node (measured 2026-11-24: 5-37% of 20,000 arguments; replayed Thumb Duel matches came apart in 104 of 200 between WebKit and Node). Route the sim's calls through `sameMath` while linked (Thumb Duel: `useMath(sameMath)`), and keep `Math` otherwise so one-phone play is unchanged. `+ - * /` and `Math.sqrt` are the same everywhere.
+- **No shared board** from a linked match: both phones know the seed and the server checks nothing.
+- Proof for Thumb Duel: `experiments/duel/link-bots.mjs` (identity under delay, jitter, loss and cuts; `--mutate=late` must fail) and `experiments/duel/link-check.mjs` (two pages, WebKit against Chromium, through the real `Room` class).
 
 ## Lab recording (`lab.js`)
 
