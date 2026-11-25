@@ -260,3 +260,64 @@ New strings (`holdTip`, `nextChapterName`, `endlessNext`) have English and Turki
 - Whether players read the green stretch on the leaf ring as "quack now" without the finger is unknown.
 - `levels.js` and `words.js` are imported without a version query, as before. A phone holding an old cached copy could see the old stage 14 and 23 until the cache clears.
 - During one full `check.mjs` run with other browsers running alongside, chromium-pixel7 timed out at "late gap does not advertise a crossing" (stage 5, unchanged). It passed when run alone.
+
+## Second cold play — 2026-11-24
+
+A first-time player who reads no English played in Turkish (tr-TR) with touch only: WebKit with the iPhone 13 profile and Chromium at 360×640. The run started from an empty save and covered stages 1–11, the menus, the language button, pause, a reload mid-level, Endless runs, the album and several losses. The game has no Daily mode and no share card. Screenshot names refer to the session's `shots/cold2-ducklings/` folder, which is outside the repository.
+
+### Findings, ranked by harm to a first-time player
+
+1. **Touching the nest ended the level.** Once the minimum was reached, any touch of the nest ended the level. This happened even when the mother only swam through the nest on her way to a waiting duckling. Each time it cost two stars, and the player could not tell why. Examples: stage 4 at 3/4 (`chromium-20-s4e`), stage 8 at 3/4 (`chromium-68-a`), and stage 9 at 2/3, where the route ran through the nest (`chromium-71-strip`, `chromium-72-a`).
+2. **A level that could no longer be won kept going.** On stage 8 the ducklings hid in the reeds, which left 1 following and 1 waiting against a need of 3. The level ran on until the hearts were gone and then said "Can kalmadı" (`chromium-59-s8l`, `chromium-62-s8o`).
+3. **Brushing past a waiting duckling does not pick it up.** In Endless, passing about 35 px from one did nothing (`chromium-105-strip`). Stopping on it worked (`chromium-106-strip`).
+4. **The speaker bubble over a waiting duckling read as "press Quack".** Pressing Quack did nothing (`chromium-54-s8g`, `chromium-55-s8h`). This was already known.
+5. **The Endless sun number did not read as a countdown** until the "Güneş battı" card appeared. The refill pill "☀ +1 − 🐥" was unclear (`chromium-111-strip`). This was partly known.
+6. **The reeds icon on the loss card was not understood** (`chromium-62-s8o`). Reeds also slowed the mother hard in Endless, with no first look (`chromium-e-12-strip`, `chromium-e-13-strip`). This was already known.
+7. **Overlaps.** A waiting duckling sat under the hearts and the HUD on stages 7 and 8 (`chromium-40-s7`, `chromium-66-a`). The nest sign, speaker sign and "!" sign stacked on top of each other (`chromium-66-strip`). Minor.
+8. **The album chose each name's look by its index** (`chromium-81-album`). This was already known.
+
+Confirmed fine:
+- Steering by thumb is accurate. Holding at (60,330) ended with the mother there (`chromium-86-strip`), and WebKit taps landed where tapped. The earlier 70 px offset stays fixed.
+- The language button works on the menu and in pause.
+- Pause stops the clock.
+- A reload mid-level returns to the map with progress kept (`chromium-47-reload`).
+- No English was seen on a Turkish screen.
+- The third star animates in about 1.5 s after the card opens, so an early screenshot shows two stars. This is not a bug.
+
+Endless first looks:
+- **Log.** The picture shows the log hitting a duckling (`chromium-84-strip`). It shows the threat but not the escape. The log still cost a duckling.
+- **Pike.** The ring and picture appeared when the mother was already inside the ring (`chromium-112-strip`).
+- **Turtle, cyclist, heron and gust** were not reached by touch in this pass. The runs ended at sunset before row 8.
+
+### What was fixed
+
+| Finding | Change | Assertion (each failed on the old code) |
+| --- | --- | --- |
+| 1. Nest ends the level on touch | **Builder.** The nest is a drop-off. Each duckling that swims into the nest stays home, and the mother may leave to fetch more. While she sits in the nest with her whole line home, the minimum met and birds still waiting, an orange ring fills around the nest for `SETTLE` (1.4 s). When it is full the level ends. Leaving the nest cancels it. With no birds left waiting the level ends at once, as before. The HUD shows a nest count once anyone is home. The arrow to the nest counts home plus following birds. | `bots.mjs` `nestDropOff()`: stage 4 leaves 3 at the nest, fetches the last one and gets 3★ 4/4; parking ends the level 1.4 s ± 0.05 s after the line is home |
+| 1a. Banked birds (found while fixing 1) | Once the nest stopped ending the level on touch, a player could leave it with the minimum home and then run out of time or hearts, and that lost the whole level. Birds at the nest now count as banked: if the clock or the hearts run out with the minimum home, the level ends as `nest` and is scored on the birds that are home. | `bots.mjs` `nestDropOff()`: on stage 4, 3 birds are home and one is still waiting; she leaves, a 3 s clock runs out, and the level must end as `nest` with 1★. This failed (`dusk`) when the banking was switched off. |
+| 2. Lost level keeps going | **Builder.** When home plus following plus waiting falls below the need, the level ends at once with the existing reason `short`. | `bots.mjs` `nestDropOff()`: stage 8 ends as `short` |
+| 8. Album looks by index | Each arriving bird saves its trait under `looks[name]`. This is a new field with a default under the same save key. The album and the final card draw each name with that look. Names met before this change fall back to the old look by index. | `check.mjs` after the stage 4 win: every arrived bird's `albumLooks[i]` equals its trait. On the old album rule it failed with "curious" against "sleepy". |
+
+`index.html` loads `sim.js?v=6`. The state hook gains `albumLooks` and `arrivedLooks`; `.screen` and `.paused` are unchanged. No new words were added, so `words.js` is unchanged.
+
+Difficulty: stars, the straight-bot table, the naive table and the Endless tables are unchanged. The campaign clear-time column rose by 0.1 s on 17 of 24 stages and is unchanged on stages 5, 6, 8, 9, 13, 17 and 18. The column is rounded to 0.1 s. The cause: a duckling now arrives only within `NEST_R - 0.02` of the nest centre, the same radius that counts the mother as home. Before, it arrived within `NEST_R`. Clear time does not feed the score, which counts arrivals, joins, the line bonus and hearts. No threshold moved.
+
+### Replayed by touch after the fixes
+
+- **`short` early end.** In both browsers, stage 8 was played into two car hits: the first scattered the line, and the second sent two ducklings into the reeds. The level ended at once with "Yeterince yavru gelmedi" while a heart was still left. The card shows 0/4, the minimum with a cross, and the reeds count (`chromium-q-08-strip`, `webkit-q-11-strip`). Before the fix, the same play ran on until the hearts were gone (`chromium-62-s8o`).
+- **Chromium.** Stage 4: the mother swam through the nest, the three birds stayed home, she fetched the fourth, came back, and got 3★ 4/4 (`chromium-p3-15`, `chromium-p3-16`, `chromium-p3-17`). Parking in the nest showed the settle ring filling and then ended the level at 3/4 (`chromium-p3-09-strip`). The album shows the saved looks (`chromium-p3-18`).
+- **WebKit.** Same stage 4 drop-off: three home while she fetched the fourth (`webkit-p3-dropoff-strip`), then 3★ 4/4 (`webkit-p3-19`). Album (`webkit-p3-20`). No console errors in either browser.
+
+### Left, and why
+
+- **3. Brush pickup.** Raising `TOUCH` changes difficulty across every stage and Endless. It needs its own tuning pass.
+- **6. Reeds.** Reeds still have no first look, and the reeds icon on the loss card is still unexplained. A first look needs a new picture in `introScene` and an Endless drive that reliably reaches the first reeds row, so that it can be asserted.
+- **4, 5 and 7.** These are known or minor and were left for a layout pass.
+- **Settle time.** Whether 1.4 s is long enough for a player who taps (not holds) to decide to leave the nest is unknown. My own attempts in WebKit ended while I was still looking at a screenshot, so they do not answer it.
+
+### Not verified
+
+- **The turtle, cyclist, heron and gust first looks were not met by touch in this pass.** Three Chromium Endless runs never got past the opening log and reed rows, which come before row 4. Two runs ended at sunset after one pad (`chromium-e-13-strip`). One was stopped at one heart after logs hit the mother twice (`chromium-f-11-strip`). The driver pauses the game between moves, but each move is still a fixed hold planned from a still screenshot. A still screenshot does not show which way a log is moving, so the logs kept arriving where the hold was aimed. This says more about the driver than about the game; the earlier pass met the cyclist and the heron by touch.
+- No real phone was used.
+- The Turkish was not checked by a native speaker.
+- Whether a first-time player reads the orange settle ring as "staying here ends the level" is untested.

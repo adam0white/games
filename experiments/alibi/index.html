@@ -61,7 +61,11 @@
   #hardDaily small { display: block; margin-top: 2px; font-size: 12px; }
   #shareStatus { margin: 0; color: #f5d9b5; }
   #shareStatus svg { display: block; margin: 0 auto 12px; }
-  #menuSound { padding-inline: 3px; }
+  /* The Daily, Cases and sound row keeps one line in both languages at 360 px,
+     so toggling sound never changes the menu's height. */
+  #menu .row.tight { gap: 6px; }
+  #menu .row.tight button, #pauseSound { white-space: nowrap; padding-inline: 5px; }
+  #menu .row.tight button { flex: 1 1 auto; }
   #menu .lab-notice a { display: block; min-height: 44px; width: max-content; min-width: 44px; margin: auto; align-content: center; }
   #menu .panel { padding-bottom: 0; }
   #hardDaily:disabled { color: #ebd1cf; background: #433044; cursor: default; }
@@ -86,7 +90,7 @@
       <button id="menuLanguage" class="language" data-i18n-aria="switchLanguage"><svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="10" cy="10" r="8"/><ellipse cx="10" cy="10" rx="3.5" ry="8"/><path d="M2 10h16"/></svg><span data-i18n="languageCode"></span></button>
       <div class="panel">
         <button id="play" class="primary"><span data-i18n="play"></span> <span id="progress"></span></button>
-        <div class="row">
+        <div class="row tight">
           <button id="daily"><span data-i18n="daily"></span> <span id="streak"></span></button>
           <button id="pickCase" data-i18n="cases"></button>
           <button id="menuSound"></button>

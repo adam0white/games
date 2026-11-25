@@ -524,6 +524,10 @@ async function run(name, engine, device, localizationOnly = false) {
     await end();
     assert.equal((await state(page)).over, 'nest');
     assert.equal(await page.textContent('#next'), 'Next: Road', 'the chapter card names the next chapter');
+    // The album and the final card draw each name with the look of the bird of that name that came home.
+    st = await state(page);
+    assert.ok(st.arrivedLooks.length > 0);
+    for (const [i, trait] of st.arrivedLooks) assert.equal(st.albumLooks[i], trait, `the album draws ${i} as the bird that came home`);
     // A chapter's last nest has its own picture and opens the album.
     assert.equal((await state(page)).postcard, 'chapter', 'the chapter card has its own picture');
     assert.ok(await page.locator('#endAlbum').isVisible(), 'the chapter card opens the album');

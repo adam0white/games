@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { create, step, stars, LAST_STAGE, DT, SPEED, GAP, R_MOM, R_DUCK, LINE_MAX, QUACK_TIME, QUACK_SQUEEZE, TRAITS,
-  hitAny, moveMom, pathAt, stepDelay, duskRate, WAIT_APART } from './sim.js';
+  hitAny, moveMom, pathAt, stepDelay, duskRate, WAIT_APART, SETTLE } from './sim.js';
 import { bands, routeCheck } from './route.mjs';
 import { LEVELS } from './levels.js';
 import { starFeedback, warningOnScreen, nestMarkerShows, padCueShows, leafLeft, leafQuackCue, LEAF_QUACK, driftMarks } from './feedback.js';
@@ -305,11 +305,63 @@ function campaign() {
   }, 10).s;
   assert.equal(dash.why, 'dusk', 'the direct dash times out without the current');
 
+  nestDropOff();
+
   const opts = { stage: 24, seed: 0xffffffff };
   const a = play(opts, waypoints(ROUTES[24]));
   const b = play(opts, waypoints(ROUTES[24]));
   assert.equal(a.trace, b.trace, 'campaign fixed-tick determinism');
   assert.deepEqual(a.s, b.s, 'campaign resulting state');
+}
+
+// Second cold play: the level ended the moment she brushed the nest, while the player was steering past it
+// for a last waiting duckling (stages 4, 8 and 9 each ended at one star). The nest is a drop-off now.
+function nestDropOff() {
+  // Stage 4: follow the authored route but end it in the nest before the last duckling, then go back for it.
+  const route = ROUTES[4], last = route.at(-1);
+  let phase = 0, i = 0, settledAt = null;
+  const s = create({ stage: 4 });
+  while (!s.over && s.t < 40) {
+    let target;
+    if (phase === 0) { // the route up to the last waypoint, then the nest
+      if (i < route.length - 1) { const [x, y] = route[i]; if (Math.hypot(s.mom.x - x, s.mom.y - y) < .045) i++; target = { x, y }; }
+      else target = s.nest;
+      if (s.home && !s.line.length) phase = 1;
+    } else if (phase === 1) { // out of the nest to the last waiting bird, then home
+      target = s.lost.length ? { x: s.lost[0].x, y: s.lost[0].y } : s.nest;
+      if (!s.lost.length) phase = 2;
+    } else target = s.nest;
+    step(s, target);
+  }
+  assert.equal(s.over, 'nest', 'stage 4: leaving the nest for the last duckling still ends at the nest');
+  assert.equal(s.arrived.length, s.total, 'stage 4: the birds dropped at the nest stay home while she fetches the last');
+  assert.equal(stars(s), 3, 'stage 4: the fetched duckling counts for the third star');
+  assert.ok(last, 'stage 4 has a route');
+  // Staying in the nest with enough home and a bird still waiting ends the level after SETTLE seconds, not at once.
+  const stay = create({ stage: 4 });
+  for (const [x, y] of route.slice(0, 3)) while (!stay.over && Math.hypot(stay.mom.x - x, stay.mom.y - y) >= .045) step(stay, { x, y });
+  while (!stay.over && stay.t < 40) {
+    step(stay, stay.nest);
+    if (stay.home && !stay.line.length && settledAt === null) settledAt = stay.t;
+  }
+  assert.equal(stay.over, 'nest', 'staying in the nest with enough home ends the level');
+  assert.ok(stay.lost.length > 0 && stay.arrived.length >= LEVELS[4].need, 'it ended with a duckling still waiting');
+  assert.ok(Math.abs(stay.t - settledAt - SETTLE) < .05, `it ended ${SETTLE} s after the line was home, not at once`);
+  // Birds dropped at the nest stay won: leaving with enough home and running out of time still clears the level.
+  const late = create({ stage: 4 });
+  for (const [x, y] of route.slice(0, 3)) while (!late.over && Math.hypot(late.mom.x - x, late.mom.y - y) >= .045) step(late, { x, y });
+  while (!late.over && !(late.home && !late.line.length)) step(late, late.nest);
+  assert.ok(!late.over && late.arrived.length >= LEVELS[4].need && late.lost.length > 0, 'enough home with one still waiting');
+  late.time = late.t + 3; // stage 4 has no clock; give it one that runs out while she is away
+  while (!late.over) step(late, { x: late.nest.x, y: late.nest.y - .4 });
+  assert.equal(late.over, 'nest', `leaving the nest with enough home and running out (${late.why}) still clears the level`);
+  assert.equal(stars(late), 1);
+  // Too few birds left anywhere to make the minimum ends the level at once, with the reason.
+  const doomed = create({ stage: 8 });
+  step(doomed, null);
+  doomed.lost.length = 0; doomed.line.length = 1;
+  step(doomed, null);
+  assert.equal(doomed.why, 'short', 'a level that can no longer be won ends as short at once');
 }
 
 function endless() {
