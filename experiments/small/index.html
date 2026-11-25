@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0d14">
+<meta name="description" content="Small games to play on a phone. Three new ones every night.">
+<title>Small games</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <span class="brand" data-i18n="title"></span>
+  <button class="lang" id="lang" type="button"></button>
+</header>
+<main>
+  <section id="tonight" class="wrap" aria-labelledby="tonightTitle">
+    <div class="head"><h1 id="tonightTitle" data-i18n="tonight"></h1><span class="date" id="date"></span></div>
+    <p class="lead" data-i18n="lead"></p>
+    <p class="run" id="run"></p>
+    <div id="intro" class="intro" hidden>
+      <ol><li><i>1</i><span data-i18n="introA"></span></li><li><i>2</i><span data-i18n="introB"></span></li><li><i>3</i><span data-i18n="introC"></span></li></ol>
+      <p><span data-i18n="introNew"></span><button type="button" id="introOk" data-i18n="introOk"></button></p>
+    </div>
+    <ol class="stops" id="stops"></ol>
+    <p class="legend" data-i18n="legend"></p>
+    <div id="result"></div>
+  </section>
+  <section id="all" aria-labelledby="allTitle">
+    <div class="wrap"><h2 id="allTitle" data-i18n="allGames"></h2><p class="lead" data-i18n="allLead"></p></div>
+    <div class="deck" id="deck" aria-roledescription="carousel"></div>
+    <div class="bar">
+      <button class="arrow" id="prev" type="button" data-i18n-aria="prev">‹</button>
+      <div class="dots" id="dots" aria-hidden="true"></div>
+      <button class="arrow" id="next" type="button" data-i18n-aria="next">›</button>
+    </div>
+    <div class="more">
+      <button type="button" id="surprise" data-i18n="surprise"></button>
+      <button type="button" id="shareAll" class="quiet" data-i18n="shareAll"></button>
+    </div>
+  </section>
+</main>
+<footer id="foot"></footer>
+<div class="toast" id="toast" role="status" data-i18n="copied"></div>
+<script type="module" src="main.js"></script>
+</body>
+</html>
