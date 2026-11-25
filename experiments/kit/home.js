@@ -1,5 +1,5 @@
 // The way back to the small games' home (/small/), and a finished run reported to it. One line in a game:
-//   const rec = home(lab('night-bells'), { back: ['#menu .card', '#won .card'] });
+//   const rec = home(lab('night-bells'), { back: ['#menu .card', '#end .card'] });
 // in place of `const rec = lab('night-bells')`. Everything else in the game stays as it is: `rec` is the same
 // recorder, and its end(outcome, summary) also tells the home how the run ended.
 //

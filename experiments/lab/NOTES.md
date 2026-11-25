@@ -140,7 +140,9 @@ Owner's decision on the small pages (2026-11-24, after playing them): "Good but 
 | `pisti`, `night-lamp-keeper`, `night-kite`, `night-loaves` | Rejected | `archive/lab/`; old addresses go to `/lab/` |
 | `night-rubbing` | Undecided: the owner could not find it (the index calls it "Carbon Cabinet") | Stays |
 
-The kept pages do not move to a top-level address or into `kit/games.json` until the owner picks a home for the small games (variants at `/lab/hub-a/`, `hub-b/`, `hub-c/` are being built for that pick), so no address changes twice. Their recording names stay equal to the folder names through any move.
+The kept pages do not move to a top-level address or into `kit/games.json` until the owner picks a home for the small games (variants at `/lab/hub-a/`, `hub-b/`, `hub-c/` are being built for that pick), so no address changes twice.
+
+Update, 2026-11-24: the owner picked C with B's deck. The home is `/small/` (`experiments/small/`); the drafts are in `archive/lab/hub-a`, `hub-b`, `hub-c`. The games stay at `/lab/<name>/` for now: `experiments/small/catalog.js` is the one list of their addresses, so a move is one line per game there. A page that gains Turkish sets `tr: true` on its entry in that file (it was `lab/hub-a/hub.js`). Their recording names stay equal to the folder names through any move.
 
 Play records: the lab accepted no records from any lab page up to this date (no lab page name is in human-framework `LAB_PROTOTYPES`; five pages import `kit/lab.js` and are refused). The site Worker's request log shows two real phones opening lab pages on 2026-11-24. Opens are the only evidence of play for these pages.
 
