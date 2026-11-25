@@ -29,7 +29,9 @@ The home for the small games, picked by the owner on 2026-11-24 from three draft
 
 Each game's code was read after the improve passes of 2026-11-24. Changed in `catalog.js`: Night Channels is called by its own name (it was "Channels"); Night Bells, Face Shift and Night Sand have new lines (24 nights; sitters who lose patience; ten beds and an endless garden); Pour and Face Shift now play in Turkish (`tr: true`); `of` added (above). Paper Pitch and Firefly Ring were left as they were: another builder had them open. `marks.js` takes totals from `of`, counts Night Bells' nights 9 on (`night-bells:more`), Face Shift's booth runs (`wild2-face-shift:booth`) and Carbon Cabinet's sixth print (its `night-rubbing:proof:6`, so a finished cabinet now reads "Finished").
 
-Every small game but Paper Pitch and Firefly Ring now has the way back (`kit/home.js`): Podwire, Saltplate, Night Sand, Pour, Face Shift and Carbon Cabinet were added; each game's `check.mjs` asserts it. The small run in `kit/check/pages.mjs` now expects "1 / 24" for Night Bells and checks Pour's own link instead of adding one itself.
+Every small game now has the way back (`kit/home.js`); Paper Pitch and Firefly Ring brought theirs in their own pull requests (#270, #278), merged while this one was open. Added here: Podwire, Saltplate, Night Sand, Pour, Face Shift and Carbon Cabinet; each game's `check.mjs` asserts it. The small run in `kit/check/pages.mjs` now expects "1 / 24" for Night Bells and checks Pour's own link instead of adding one itself.
+
+After that merge, Pitch and Ring got the language hook, and new card lines: Pitch names its three ways to play (the computer, a friend, a puzzle), Ring its three nights. Both stay without `of`: Pitch's eighteen puzzles are one part of a game whose matches have no end, and a Ring night has many levels with no finished mark in the save, so their cards keep saying played or finished (`UNCOUNTED` in the test).
 
 ## Not verified
 

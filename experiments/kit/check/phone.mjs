@@ -665,6 +665,9 @@ const GAMES = {
     // The ember melody (kit/music.js, 2026-11-24): with the music on, each ember plays the next note of the night's melody, on the score's
     // sixteenth grid when the audio clock runs; the end card says how much of the melody was played.
     await page.click('#play'); await page.evaluate(() => { const s = window.lanternSim(); s.safe = 60; s.light = 1; });
+    // An ember taken before the audio clock runs plays no note (kit/music.js), so wait for the clock where it runs (Chromium);
+    // without this the first ember raced the clock's start and the check failed about one run in three, on main as well.
+    if (page.context().browser().browserType().name() === 'chromium') await until(page, () => window.lanternMusic?.()?.ctx === 'running', 'the audio clock runs after Play');
     for (let i = 0; i < 4; i++) { await page.evaluate(() => { const s = window.lanternSim(); s.embers.push({ x: s.x, y: s.y + 0.02, got: false, kind: 'ember' }); }); await until(page, n => window.lanternMusic().played > n, 'an ember is taken', 10000, i); }
     const tune = await page.evaluate(() => window.lanternMusic()), embers = tune.log.filter(l => l.kind === 'ember'), ticks = tune.log.filter(l => l.kind === 'walk' || l.kind === 'pad' || l.kind === 'bass');
     if (page.context().browser().browserType().name() === 'chromium') { assert.equal(tune.ctx, 'running', 'the audio clock runs after Play'); assert.equal(embers.length, 4, 'four embers, four melody notes'); }

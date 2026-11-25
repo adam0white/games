@@ -105,7 +105,7 @@ const show = screens(['menu', 'paused', 'end'], name => {
 });
 // Play recording for the game lab: one run is one night, today's meadow, an endless meadow or a practice jar.
 // Opened from the small games' home, the menu and end cards get the way back, and a finished run is reported there.
-const rec = home(lab('ring'), { back: ['#menu > div', '#end > div'] });
+const rec = home(lab('ring', { lang }), { back: ['#menu > div', '#end > div'], lang });
 let running = false;
 function recEnd(outcome, extra) { if (!running) return; running = false; rec.end(outcome, { kind, night: night + 1, score: s.score, level: s.level + 1, cleared: s.cleared, bestRing: s.bestRing, ...extra }); }
 function begin(k) {
