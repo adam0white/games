@@ -8,7 +8,7 @@ const g = (slug, href, name, line, time, kind, extra = {}) => ({ slug, href, nam
 export const SMALL = [
   g('night-bells', '/lab/night-bells/', { en: 'Night Bells' }, { en: 'Tap each bell at the top of its swing to light the village.', tr: 'Her çanı salınımının en tepesinde vur, köyün ışıkları yansın.' }, ['minLevel', 1], 'quick'),
   g('wild-pour', '/lab/wild-pour/', { en: 'Pour' }, { en: 'Tip a jug of real drops and fill the glass to the line.', tr: 'Gerçek damlalarla dolu sürahiyi eğ, bardağı çizgiye kadar doldur.' }, ['minLevel', 1], 'quick'),
-  g('night-podwire', '/lab/night-podwire/', { en: 'Podwire' }, { en: 'Pull the string and let go. The wave splits the seed pods.', tr: 'Teli çek ve bırak. Dalga tohum keselerini patlatır.' }, ['minLevel', 1], 'quick'),
+  g('night-podwire', '/lab/night-podwire/', { en: 'Podwire' }, { en: 'Pull the string and let go. The wave splits the seed pods.', tr: 'Teli çek ve bırak. Dalga tohum keselerini patlatır.' }, ['minLevel', 1], 'quick', { tr: true }),
   g('wild2-face-shift', '/lab/wild2-face-shift/', { en: 'Face Shift' }, { en: 'Stretch a rubber face until it matches the portrait.', tr: 'Lastik yüzü portreye benzeyene kadar esnet.' }, ['minRound', 2], 'quick'),
   g('night-channels', '/lab/night-channels/', { en: 'Channels', tr: 'Kanallar' }, { en: 'Dig with your thumb so the spring reaches the seedbeds.', tr: 'Kaynak suyu tohum yataklarına ulaşsın diye parmağınla kanal kaz.' }, ['minLevel', 2], 'think', { tr: true }),
   g('night-sand', '/lab/night-sand/', { en: 'Night Sand', tr: 'Gece Kumu' }, { en: 'Dig, pour and sift thousands of grains of sand.', tr: 'Binlerce kum tanesini kaz, dök, ele.' }, ['minLevel', 1], 'think', { tr: true }),
