@@ -71,7 +71,7 @@ const P = {
   ring() { const s = J('ring:v1') || {}; return { score: num(s.nights, 1e6), of: null, finished: num(s.dawns, 1e6) > 0 }; },
   'night-sand'() { const n = num(J('night-sand:save')?.completed, 10); return { score: n, of: 10, finished: n >= 10 }; },
   'night-bells'() { const n = count(J('night-bells:save')?.stars); return { score: n, of: 8, finished: n >= 8 }; },
-  'night-podwire'() { const s = J('night-podwire:progress') || {}, b = J('night-podwire:book') || {}; const six = s.complete === true ? 6 : Math.max(0, num(s.next, 6) - 1); const n = b.done === true ? 18 : Math.max(six, num(b.reached, 18) - 1); return { score: n, of: 18, finished: n >= 18 }; },
+  'night-podwire'() { const s = J('night-podwire:progress') || {}; const n = s.complete === true ? 6 : Math.max(0, num(s.next, 6) - 1); return { score: n, of: 6, finished: n >= 6 }; },
   'night-saltplate'() { const n = num(J('night-saltplate:save')?.cleared, 6); return { score: n, of: 6, finished: n >= 6 }; },
   // Splitlight keeps the highest plate reached (a plain number), so the last plate's clear is not visible here.
   'night-splitlight'() { const n = Math.max(0, num(readNumber('night-splitlight:plate', 1), 6) - 1); return { score: n, of: 6 }; },
@@ -104,7 +104,7 @@ const g = (slug, href, name, line, time, kind, extra = {}) => ({ slug, href, nam
 export const SMALL = [
   g('night-bells', '/lab/night-bells/', { en: 'Night Bells' }, { en: 'Tap each bell at the top of its swing to light the village.', tr: 'Her çanı salınımının en tepesinde vur, köyün ışıkları yansın.' }, ['minLevel', 1], 'quick'),
   g('wild-pour', '/lab/wild-pour/', { en: 'Pour' }, { en: 'Tip a jug of real drops and fill the glass to the line.', tr: 'Gerçek damlalarla dolu sürahiyi eğ, bardağı çizgiye kadar doldur.' }, ['minLevel', 1], 'quick'),
-  g('night-podwire', '/lab/night-podwire/', { en: 'Podwire' }, { en: 'Pull the string and let go. The wave splits the seed pods.', tr: 'Teli çek ve bırak. Dalga tohum keselerini patlatır.' }, ['minLevel', 1], 'quick', { tr: true }),
+  g('night-podwire', '/lab/night-podwire/', { en: 'Podwire' }, { en: 'Pull the string and let go. The wave splits the seed pods.', tr: 'Teli çek ve bırak. Dalga tohum keselerini patlatır.' }, ['minLevel', 1], 'quick'),
   g('wild2-face-shift', '/lab/wild2-face-shift/', { en: 'Face Shift' }, { en: 'Stretch a rubber face until it matches the portrait.', tr: 'Lastik yüzü portreye benzeyene kadar esnet.' }, ['minRound', 2], 'quick'),
   g('night-channels', '/lab/night-channels/', { en: 'Channels' }, { en: 'Dig with your thumb so the spring reaches the seedbeds.', tr: 'Kaynak suyu tohum yataklarına ulaşsın diye parmağınla kanal kaz.' }, ['minLevel', 2], 'think'),
   g('night-sand', '/lab/night-sand/', { en: 'Night Sand', tr: 'Gece Kumu' }, { en: 'Dig, pour and sift thousands of grains of sand.', tr: 'Binlerce kum tanesini kaz, dök, ele.' }, ['minLevel', 1], 'think', { tr: true }),

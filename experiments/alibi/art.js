@@ -175,7 +175,10 @@ export function animal(g, x, y, size, species, { head = false, phase = 0, walk =
       oval(g, side * 10, -8, big ? 4.7 : 2.1, big ? 4.7 : 2.1, '#e5a99e');
     }
   } else if (species === 'owl') {
-    path(g, [[-13, -3], [-13, -14], [-3, -8], [3, -8], [13, -14], [13, -3]], color, INK);
+    // Ear tufts: two short feather tips leaning out, with a notch, not cat ears.
+    for (const side of [-1, 1]) {
+      path(g, [[side * 4, -9], [side * 10, -18], [side * 10.5, -14], [side * 14, -16.5], [side * 12, -6]], '#a8794a', INK, 1.3);
+    }
   } else if (species === 'frog') {
     oval(g, -8, -7, 6.5, 7, color, INK);
     oval(g, 8, -7, 6.5, 7, color, INK);
@@ -188,17 +191,36 @@ export function animal(g, x, y, size, species, { head = false, phase = 0, walk =
     path(g, [[-13, 2], [-6, 1], [0, 5], [6, 1], [13, 2], [0, 10]], CREAM);
   } else {
     const skin = species === 'hedgehog' ? '#f3ca92' : color;
-    oval(g, species === 'hedgehog' ? 2 : 0, species === 'frog' ? 3 : 1, species === 'mouse' ? 11 : 13,
-      species === 'frog' ? 8 : 11, skin, INK);
+    const owl = species === 'owl';
+    oval(g, species === 'hedgehog' ? 2 : 0, species === 'frog' ? 3 : owl ? 0 : 1, species === 'mouse' ? 11 : owl ? 14 : 13,
+      species === 'frog' ? 8 : owl ? 13 : 11, skin, INK);
     if (species === 'bear' || species === 'mouse') oval(g, 0, 5, 7, 4.6, '#ebc4a1');
-    if (species === 'owl') for (const side of [-1, 1]) oval(g, side * 5.7, -1, 6, 7, '#fff1c8');
+    // The owl's round face disc: two pale rings that meet over the beak.
+    if (owl) for (const side of [-1, 1]) oval(g, side * 5.8, -.5, 6.6, 7, '#fff1c8', '#b68a5c', 1);
   }
   const blink = !head && phase % 37 > 36.5;
-  for (const side of [-1, 1]) {
-    const eye = species === 'frog' ? -7 : -1;
-    oval(g, side * 5.8, eye, 1.5, blink ? .55 : 2, INK);
+  if (species === 'owl') {
+    // Big front-facing eyes with yellow irises, and a small hooked beak.
+    for (const side of [-1, 1]) {
+      if (blink || mood === 'hurt') {
+        path(g, [[side * 9, -1], [side * 5.8, 1], [side * 2.6, -1]], null, INK, 1.6);
+        continue;
+      }
+      oval(g, side * 5.8, -.5, 4.6, 4.6, '#f6cf45', INK, 1.2);
+      oval(g, side * 5.8, -.5, mood === 'caught' ? 1.6 : 2.6, mood === 'caught' ? 1.6 : 2.6, INK);
+      oval(g, side * 5.8 - 1, -1.6, .9, .9, '#fffbe8');
+    }
+    path(g, [[-2.4, 3], [2.4, 3], [0, 8]], '#d48147', INK, .9);
+    if (mood === 'hurt') oval(g, 10, 6, 1.7, 2.7, '#bce0ef');
+  } else {
+    for (const side of [-1, 1]) {
+      const eye = species === 'frog' ? -7 : -1;
+      oval(g, side * 5.8, eye, 1.5, blink ? .55 : 2, INK);
+    }
   }
-  if (mood === 'hurt') {
+  if (species === 'owl') {
+    // Drawn above: the owl's eyes and beak carry its moods.
+  } else if (mood === 'hurt') {
     for (const side of [-1, 1]) path(g, [[side * 3, -5], [side * 9, -3]], null, INK, 1.35);
     path(g, [[-3, 8], [0, 6], [3, 8]], null, INK, 1.25);
     oval(g, 8, 4, 1.7, 2.7, '#bce0ef');
@@ -206,8 +228,6 @@ export function animal(g, x, y, size, species, { head = false, phase = 0, walk =
     for (const side of [-1, 1]) oval(g, side * 5.8, -1, 3.5, 3.7, CREAM, INK, .9);
     for (const side of [-1, 1]) oval(g, side * 5.8, -.5, 1.4, 1.8, INK);
     oval(g, 0, 6, 2.4, 3, INK);
-  } else if (species === 'owl') {
-    path(g, [[-2.4, 2], [2.4, 2], [0, 6]], '#d48147', INK, .75);
   } else if (species === 'frog') {
     g.beginPath();
     g.arc(0, 2, 4, .2, Math.PI - .2);

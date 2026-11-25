@@ -17,6 +17,11 @@ export const INTRO = 3, RESULT = 1.6, MAX_DUELS = 12;
 // One deliberate rule break for `node bots.mjs --mutate` (see bots.mjs): never set by the page.
 let MUT = null;
 export const mutate = name => { MUT = name; };
+// The three functions that may differ in the last bit between JavaScript engines. One phone and the bots use Math, as
+// before; two phones playing one duel by link both switch to the kit's sameMath (kit/samemath.js), so an iPhone and an
+// Android phone compute every tick alike. Everything else in this file is exact arithmetic or integer work.
+let M = Math;
+export const useMath = m => { M = m && typeof m.exp === 'function' ? m : Math; };
 
 export function rand(box) { // mulberry32 on a { r } state box
   let t = (box.r = (box.r + 0x6D2B79F5) >>> 0);
@@ -32,9 +37,11 @@ const sideOfY = y => y > 0.04 ? 0 : y < -0.04 ? 1 : -1;
 // ---------------------------------------------------------------- the match
 // options: seed; only (every duel is that kind); first (the first duel's kind; the page uses 'tug' for a first-ever match,
 // so the tap hint never meets quick draw, where an early tap loses); intro and result (seconds, shortened only by tests).
-export function createMatch({ seed = 1, only = null, first = null, intro = INTRO, result = RESULT } = {}) {
+// kinds: the deck to deal from (by default every kind; a match by link leaves out the duels a network delay spoils).
+export function createMatch({ seed = 1, only = null, first = null, intro = INTRO, result = RESULT, kinds = null } = {}) {
+  const deck = Array.isArray(kinds) && kinds.some(k => KINDS.includes(k)) ? KINDS.filter(k => kinds.includes(k)) : null;
   const s = { seed, box: { r: (seed >>> 0) || 1 }, score: [0, 0], duels: [], pool: [], kind: null, d: null, phase: 'intro', timer: intro,
-    t: 0, over: false, winner: -1, events: [], intro, result, only: KINDS.includes(only) ? only : null, first: KINDS.includes(first) ? first : null };
+    t: 0, over: false, winner: -1, events: [], intro, result, only: KINDS.includes(only) ? only : null, first: KINDS.includes(first) && (!deck || deck.includes(first)) ? first : null, kinds: deck };
   nextKind(s);
   return s;
 }
@@ -42,7 +49,7 @@ function nextKind(s) {
   if (s.only) s.kind = s.only;
   else {
     if (!s.pool.length) {
-      const p = shuffle(KINDS.slice(), s.box);
+      const p = shuffle((s.kinds ?? KINDS).slice(), s.box);
       if (!s.duels.length && s.first) { p.splice(p.indexOf(s.first), 1); p.unshift(s.first); }
       if (p[0] === s.kind) p.push(p.shift()); // a fresh deck never repeats the duel just played
       s.pool = p;
@@ -102,7 +109,7 @@ const tug = {
       d.v += TUG.pull * dir; d.taps[side]++; d.jerk[side] = 1; ev.push({ e: 'pull', side });
     }
     d.jerk = d.jerk.map(j => Math.max(0, j - DT * 6));
-    d.v *= Math.exp(-TUG.drag * DT); d.p += d.v * DT;
+    d.v *= M.exp(-TUG.drag * DT); d.p += d.v * DT;
     if (d.p >= TUG.mark) return 0;
     if (d.p <= -TUG.mark) return 1;
     if (d.t >= TUG.limit) return Math.abs(d.p) < 0.02 ? -1 : d.p > 0 ? 0 : 1;
@@ -256,7 +263,7 @@ const hockey = {
       if (ip.px !== null && ip.py !== null) { tx = ip.px; ty = ip.py; }
       tx = clamp(tx, r, 1 - r);
       ty = i === 0 ? clamp(ty, r * 0.6, 1 - r) : clamp(ty, -1 + r, -r * 0.6); // never past the middle
-      const dx = tx - p.x, dy = ty - p.y, dist = Math.hypot(dx, dy), maxStep = H.padSpeed * DT;
+      const dx = tx - p.x, dy = ty - p.y, dist = M.hypot(dx, dy), maxStep = H.padSpeed * DT;
       const k = dist > maxStep ? maxStep / dist : 1;
       p.vx = dx * k / DT; p.vy = dy * k / DT; p.x += dx * k; p.y += dy * k;
     }
@@ -274,7 +281,7 @@ const hockey = {
       if (pk.y < -1 - H.puck) { d.goals[0]++; ev.push({ e: 'goal', side: 0 }); resetPuck(d, 1); break; }
       if (pk.y > 1 + H.puck) { d.goals[1]++; ev.push({ e: 'goal', side: 1 }); resetPuck(d, 0); break; }
       for (const i of [0, 1]) {
-        const p = d.pads[i], dx = pk.x - p.x, dy = pk.y - p.y, dist = Math.hypot(dx, dy), min = H.pad + H.puck;
+        const p = d.pads[i], dx = pk.x - p.x, dy = pk.y - p.y, dist = M.hypot(dx, dy), min = H.pad + H.puck;
         if (dist < min && dist > 1e-6) {
           const nx = dx / dist, ny = dy / dist;
           pk.x = p.x + nx * min; pk.y = p.y + ny * min;
@@ -282,12 +289,12 @@ const hockey = {
           if (rv < 0) { pk.vx -= (1 + H.e) * rv * nx; pk.vy -= (1 + H.e) * rv * ny; d.hits[i]++; ev.push({ e: 'hit', side: i, power: Math.min(1, -rv / 3) }); }
         }
       }
-      const sp = Math.hypot(pk.vx, pk.vy);
+      const sp = M.hypot(pk.vx, pk.vy);
       if (sp > H.max) { pk.vx *= H.max / sp; pk.vy *= H.max / sp; }
     }
-    const f = Math.exp(-H.fric * DT); pk.vx *= f; pk.vy *= f;
+    const f = M.exp(-H.fric * DT); pk.vx *= f; pk.vy *= f;
     // A slow seed slides back toward the middle (the table is gently bowled), so it never rests out of one side's reach.
-    if (d.wait <= 0 && Math.hypot(pk.vx, pk.vy) < H.slow) pk.vy -= Math.sign(pk.y) * H.bowl * DT;
+    if (d.wait <= 0 && M.hypot(pk.vx, pk.vy) < H.slow) pk.vy -= Math.sign(pk.y) * H.bowl * DT;
     if (d.goals[0] >= H.need) return 0;
     if (d.goals[1] >= H.need) return 1;
     if (d.t >= H.limit) return d.goals[0] > d.goals[1] ? 0 : d.goals[1] > d.goals[0] ? 1 : -1;
@@ -304,7 +311,7 @@ export const MEMORY = { r: 0.17, on: 0.42, off: 0.14, answer: 6, gap: 1.1, lens:
 export function padAt(side, x, y) {
   const [lx, ly] = mirror(side, x, y);
   let best = -1, bd = MEMORY.r * 1.15;
-  PADS.forEach((p, i) => { const dd = Math.hypot(lx - p.x, ly - p.y); if (dd < bd) { bd = dd; best = i; } });
+  PADS.forEach((p, i) => { const dd = M.hypot(lx - p.x, ly - p.y); if (dd < bd) { bd = dd; best = i; } });
   return best;
 }
 function newRound(d) {
@@ -360,7 +367,7 @@ const memory = {
 // it), letting go tips it left. The same wobble pushes both drops. Time with the drop near the middle scores; a drop
 // that rolls off is lost for a second. At the limit, more time in the middle wins.
 export const BALANCE = { tilt: 1.7, wobble: 1.05, damp: 1.3, band: 0.28, fall: 1.0, limit: 14 };
-export const wobble = (d, t) => BALANCE.wobble * (0.6 * Math.sin(1.3 * t + d.ph[0]) + 0.35 * Math.sin(2.7 * t + d.ph[1]) + 0.45 * Math.sin(0.55 * t + d.ph[2]));
+export const wobble = (d, t) => BALANCE.wobble * (0.6 * M.sin(1.3 * t + d.ph[0]) + 0.35 * M.sin(2.7 * t + d.ph[1]) + 0.45 * M.sin(0.55 * t + d.ph[2]));
 const balance = {
   limit: BALANCE.limit,
   init: box => ({ box, x: [0, 0], v: [0, 0], score: [0, 0], fall: [0, 0], tilt: [0, 0], ph: [rand(box) * 6.283, rand(box) * 6.283, rand(box) * 6.283] }),
@@ -370,7 +377,7 @@ const balance = {
       d.tilt[i] += ((inp[i].held ? 1 : -1) - d.tilt[i]) * Math.min(1, DT * 12);
       if (d.fall[i] > 0) { d.fall[i] -= DT; if (d.fall[i] <= 0) { d.x[i] = 0; d.v[i] = 0; ev.push({ e: 'back', side: i }); } continue; }
       const a = (inp[i].held ? BALANCE.tilt : -BALANCE.tilt) + w;
-      d.v[i] = (d.v[i] + a * DT) * Math.exp(-BALANCE.damp * DT); d.x[i] += d.v[i] * DT;
+      d.v[i] = (d.v[i] + a * DT) * M.exp(-BALANCE.damp * DT); d.x[i] += d.v[i] * DT;
       if (Math.abs(d.x[i]) > 1) { d.fall[i] = BALANCE.fall; ev.push({ e: 'fall', side: i, dir: Math.sign(d.x[i]) }); }
       else if (Math.abs(d.x[i]) < BALANCE.band) d.score[i] += DT;
     }

@@ -177,6 +177,20 @@ per socket. The class uses `ctx.acceptWebSocket`, `webSocketMessage`, `webSocket
 Hibernation avoids idle duration charges; active rooms and upgrade attempts still incur charges and
 are not subject to the model daily cap.
 
+### Relay rooms (Thumb Duel, 2026-11-24)
+
+`GET /lab-api/room/duel/<CODE>?k=<key>` uses the same `Room` class and binding, with no migration and no new route.
+A game listed in `RELAY` (`src/room.mjs`; only `duel`) gets a relay room instead of a race: four uppercase letters only
+(no `open` room), two sockets (the third upgrades then closes with 4001), and one frame type, `{t:'r', d:[...]}` with
+1 to 64 integers in -2147483648..4294967295 and at most 200 bytes, passed on as `{t:'r', id, d}` to the other socket and
+never echoed. Race frames are ignored in a relay room; relay frames are ignored in a race room. The rolling second allows
+30 frames (the race keeps 12); the 31st closes the socket with 1008. `k` is a 16-40 character seat key from the page's
+sessionStorage: a new socket with the key of a connected one closes the old one with 4003 and takes its slot, so a phone
+whose old socket has not timed out is not refused as full. The key lives only in the socket attachment and disappears
+with the socket. The same `PER_IP` limit (6 upgrades a minute, `room:<address>`), Origin check, `you`/`join`/`leave`
+frames and observability apply. Nothing is written to SQLite or logged; the frames are game inputs (integers), not text.
+Tests: `test/relay.test.mjs`, including a full Thumb Duel match through the class with a cut and a stale-seat return.
+
 ## Friends' tables (2026-11-24)
 
 `GET /lab-api/table/<game>/<CODE>` upgrades to a WebSocket. `<game>` must be listed in `TABLE.games`

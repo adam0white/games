@@ -1,7 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import { handle, takeOne, readSpend, originAllowed } from './core.mjs';
 import { handleBoard, boardTop, boardPut, boardRemove, boardStart } from './board.mjs';
-import { ROOM, roomName, roomMessage, rateWindow, needsRound, freshRound, freeId } from './room.mjs';
+import { ROOM, RELAY, roomName, roomMessage, relayMessage, rateWindow, needsRound, freshRound, freeId, gameOf, limitsOf, seatKey } from './room.mjs';
 import { TABLE, tableName, tableMessage, freshTable, sit, move, again, shown } from './table.mjs';
 
 // One instance of this class (named "global") counts model calls per UTC day for the shared daily cap.
@@ -78,13 +78,17 @@ export class Room extends DurableObject {
     const now = Date.now();
     this.clearFinishedRound(now);
     this.startIfReady(now);
+    // A relay room (RELAY in room.mjs) has two seats and passes frames on; a returning seat key replaces its own stale socket.
+    const url = new URL(request.url), game = gameOf(roomName(url.pathname)), relay = !!RELAY[game], key = relay ? seatKey(url.searchParams.get('k')) : null;
+    if (key) for (const [old, c] of [...this.clients]) if (c.k === key) { try { old.close(4003, 'replaced'); } catch {} this.drop(old); }
     const pair = new WebSocketPair(), ws = pair[1];
-    // The ninth socket gets a WebSocket close, not an HTTP error. It never becomes a room participant.
-    const id = freeId([...this.clients.values()]);
+    // The ninth socket (the third in a relay room) gets a WebSocket close, not an HTTP error. It never becomes a participant.
+    const id = freeId([...this.clients.values()], limitsOf(game).sockets);
     if (id === null) { ws.accept(); ws.close(4001, 'room full'); return new Response(null, { status: 101, webSocket: pair[0] }); }
     const peers = [...this.clients.values()].map(c => ({ id: c.id, n: c.n }));
     this.ctx.acceptWebSocket(ws);
     const c = { id, n: 'Boat', times: [], readyBy: null, inRound: false, done: false, round: this.round };
+    if (relay) { c.game = game; c.k = key; }
     this.clients.set(ws, c); this.save(ws, c);
     this.send(ws, { t: 'you', id, peers, round: this.round });
     this.broadcast({ t: 'join', id, n: c.n }, ws);
@@ -92,9 +96,10 @@ export class Room extends DurableObject {
   }
   webSocketMessage(ws, text) {
     const c = this.clients.get(ws); if (!c) return;
-    const now = Date.now(), rate = rateWindow(c.times, now); c.times = rate.times;
+    const now = Date.now(), rate = rateWindow(c.times, now, limitsOf(c.game).messages); c.times = rate.times;
     if (!rate.ok) { ws.close(1008, 'message rate'); this.drop(ws); return; }
     this.save(ws, c);
+    if (RELAY[c.game]) { const r = relayMessage(text); if (r) this.broadcast({ t: 'r', id: c.id, d: r.d }, ws); return; }
     const q = roomMessage(text); if (!q) return;
     if (q.t === 'hi') {
       c.n = q.n; this.save(ws, c); this.broadcast({ t: 'join', id: c.id, n: c.n }, ws);

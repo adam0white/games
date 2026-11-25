@@ -29,6 +29,9 @@
   #grid button.locked { border-style: dashed; color: #fff4dc66; background: transparent; }
   #grid button.next { border-color: #ffb347; background: #ffb34733; box-shadow: 0 0 10px #ffb34788; }
   #daily small { color: #ffd24a; }
+  /* Locked until the village that teaches the daily's last piece: dimmed, a padlock and that village's number. */
+  #daily.locked { opacity: .5; border-style: dashed; }
+  #daily.locked small { color: #fff4dc; }
   .stars { font-size: 46px; line-height: 1; letter-spacing: 4px; margin: .1em 0 .2em; }
   .stars span { display: inline-block; color: #ffffff22; transform: scale(.4); transition: transform .35s cubic-bezier(.3,1.8,.5,1), color .2s; }
   .stars span.on { color: #ffd24a; text-shadow: 0 0 14px #ffb347; transform: scale(1); }
@@ -69,7 +72,12 @@
   #doneLine, #payoff { color: #ffd98a; }
   #doneLine { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; }
   #doneLine > span { background: #211733; border-radius: 99px; padding: 2px 8px; font-size: 15px; white-space: nowrap; }
-  .result-check { display: grid; place-items: center; width: 32px; height: 32px; margin: 0 auto; border: 2px solid #7fe07a;
+  /* The win tick sits on the top bar's own tick (the bar is 46 px high, 10 px below the safe top), and the card's story
+     starts below the row of hop dots under the bar (its dots reach 75 px below the safe top), so the two never meet. */
+  #done > div { position: relative; }
+  #done .result-body { margin-top: 72px; }
+  .result-check { position: absolute; left: 50%; top: calc(15px + env(safe-area-inset-top)); transform: translateX(-50%);
+    display: grid; place-items: center; width: 32px; height: 32px; margin: 0; border: 2px solid #7fe07a;
     border-radius: 50%; color: #a4ec9d; background: #213523; font-size: 22px; line-height: 1; }
   #share { min-width: 9em; }
   #postcardDialog { box-sizing: border-box; width: min(95vw, 480px); max-height: 92dvh; overflow-y: auto; touch-action: pan-y; padding: 14px; text-align: center; color: #fff4dc; background: #281e3d; border: 2px solid #ffd98a; border-radius: 18px; }
@@ -132,9 +140,9 @@
   </div>
 </div></div>
 <div id="done" class="screen veil"><div>
+  <div class="result-check" aria-hidden="true">✓</div>
   <div class="result-body"><div>
     <h2 id="doneTitle" class="sr-only"></h2>
-    <div class="result-check" aria-hidden="true">✓</div>
     <div class="stars" id="stars" role="img"><span aria-hidden="true">★</span><span aria-hidden="true">★</span><span aria-hidden="true">★</span></div>
     <p id="doneLine"></p>
     <p id="payoff" hidden></p>
@@ -156,7 +164,7 @@
 </dialog>
 <script type="module">
 import { LEVELS, CHAPTERS } from './levels.js';
-import { MAX_HOPS, walk, refuse, hint as hintRoute, stars as starsFor, same, daily, dailySeed, ONEWAY, isGate, gateOpen, lane, tierFor, fromKey, SHAPES, COLOURS } from './sim.js';
+import { MAX_HOPS, walk, refuse, hint as hintRoute, stars as starsFor, same, daily, dailySeed, DAILY_TIERS, ONEWAY, isGate, gateOpen, lane, tierFor, fromKey, SHAPES, COLOURS } from './sim.js';
 import { token, villager, badge, bubble, backdrop, lanterns, barrier, look, emblem, sun, change, shape, tapHand, WIDE, BOARD_HALF, COLOUR, INK, CREAM, roundRect } from './art.js';
 import { readJson, writeJson } from '../kit/save.js';
 import { sound } from '../kit/audio.js';
@@ -214,7 +222,8 @@ const INTRO = { 31: 'lane', 36: 'bell', 46: 'keeper' };
 
 // ---------------------------------------------------------------- sound
 const snd = sound({ on: () => save.sound });
-const tone = (f, d, v, type = 'triangle', slide = 0) => { if (snd.ctx) snd.tone(f, d, v, type, slide); };
+let lastTone = null; // for the browser check: the pitch of the last tone sent to a live audio context
+const tone = (f, d, v, type = 'triangle', slide = 0) => { if (snd.ctx) { lastTone = f; snd.tone(f, d, v, type, slide); } };
 const SCALE = [392, 440, 523.25, 587.33, 659.25, 783.99, 880, 1046.5, 1174.66, 1318.5, 1567.98, 1760, 2093, 2349.3, 2637];
 const voice = kind => { // each kind of villager says something as they pass it on
   if (!snd.ctx) return;
@@ -323,6 +332,10 @@ let keepers = [], gateT = [], laneFlash = null, introT = 0, bannerT = 0, payoff 
 // plate a refusal teaches (the bow and red news, a sleepy villager who went home); it stays until the route changes.
 const REFUSE_TICKS = 84;
 let refusal = null, lesson = null, late = false;
+// A tap on a villager already on the route who cannot be entered again cuts the route back to them. The cut-off
+// hops shrink back into that villager and a ring closes on them, so the player sees what the tap did (CUT_TICKS).
+const CUT_TICKS = 40;
+let cut = null; // { v, tail: the villagers cut off, from v on, t: 1 to 0 }
 const next = () => Math.min(LEVELS.length, Math.max(1, save.opened));
 // After the last village: the first village still short of three stars (0 before then, or when every village has them).
 const chase = () => save.opened > LEVELS.length ? LEVELS.findIndex((_, i) => (save.best[i + 1] || 0) < 3) + 1 : 0;
@@ -352,7 +365,7 @@ function begin(i, how = 'level', day = null) {
   } else { index = i; level = LEVELS[i]; late = false; setChapter(chapterOf(i)); }
   keepers = level.nodes.map((n, v) => (n.kind === 'keeper' ? v : -1)).filter(v => v >= 0);
   gateT = level.edges.map(([, , type]) => (isGate(type) && gateOpen(type, 0) ? 1 : 0));
-  laneFlash = null; payoff = 0; refusal = null; lesson = null;
+  laneFlash = null; payoff = 0; refusal = null; lesson = null; cut = null;
   introT = mode === 'level' && INTRO[i + 1] ? 1 : 0;
   bannerT = mode === 'level' && CHAPTERS.some(([a]) => a === i + 1) && i > 0 ? 1 : 0;
   route = [level.from]; trail = walk(level, route);
@@ -449,7 +462,10 @@ canvas.addEventListener('pointerdown', e => {
   const at = route.lastIndexOf(v);
   // A villager already on the route: if the route can go on to them (a loop back), it does; otherwise the route is cut there.
   if (at >= 0 && at < route.length - 1 && !refuse(level, trail.state, v)) { enter(v); return; }
-  if (at >= 0 && at < route.length - 1) { setRoute(route.slice(0, at + 1)); tone(SCALE[Math.max(0, at - 1)] / 2, 0.1, 0.05, 'sine'); return; }
+  if (at >= 0 && at < route.length - 1) {
+    cut = { v, tail: route.slice(at), t: 1 }; react[v] = 0.8;
+    setRoute(route.slice(0, at + 1)); tone(SCALE[Math.max(0, at - 1)] / 2, 0.1, 0.05, 'sine'); return;
+  }
   if (at === route.length - 1) { react[v] = 0.4; tone(SCALE[Math.min(SCALE.length - 1, at)], 0.06, 0.04); return; }
   enter(v);
 });
@@ -581,6 +597,7 @@ function tick() {
   }
   if (laneFlash && (laneFlash.t -= 1 / REFUSE_TICKS) <= 0) laneFlash = null;
   if (refusal && (refusal.t -= 1 / REFUSE_TICKS) <= 0) refusal = null;
+  if (cut && (cut.t -= 1 / CUT_TICKS) <= 0) cut = null;
   if (bannerT > 0 && t - startT > 150) bannerT = Math.max(0, bannerT - 1 / 30);
   // the end of a chapter: fireworks behind the card
   if (screen === 'done' && payoff && t % (reduced ? 90 : 24) === 0) {
@@ -620,6 +637,7 @@ function draw(alpha) {
   listenerBubble(time);
   readyRing(time);
   refusalCue(time);
+  cutCue();
   if (sending) flying(alpha);
   else if (route.length && !result && !(mode === 'level' && index === 0)) headRing(time);
   for (const p of particles) { g.globalAlpha = Math.max(0, p.life); g.fillStyle = p.col; g.beginPath(); g.arc(p.x, p.y, p.size, 0, Math.PI * 2); g.fill(); }
@@ -702,6 +720,29 @@ function gates() {
     const rattle = hit && !reduced ? Math.sin(t * 1.4) * 4 * refusal.t : 0;
     barrier(g, x + rattle, y, R * 0.85, o, Math.atan2(B.y - A.y, B.x - A.x));
   });
+}
+// The route just cut back to a villager: the cut-off hops, in pale blue, shrink back into them while a ring closes
+// on them. Under reduced motion the hops and the ring stay where they are and fade.
+const CUT_INK = '#9be7ff';
+function cutCue() {
+  if (!cut || sending || result === 'won') return;
+  const k = cut.t, fade = Math.min(1, k * 2.5), pts = cut.tail.map(v => pos[v]);
+  const d0 = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y), skip = Math.min(d0, R * 1.15);
+  const start = { x: pts[0].x + (pts[1].x - pts[0].x) * skip / d0, y: pts[0].y + (pts[1].y - pts[0].y) * skip / d0 };
+  let total = -skip;
+  for (let i = 1; i < pts.length; i++) total += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+  let left = total * (reduced ? 1 : ease(k));
+  g.save(); g.globalAlpha = fade; g.lineCap = 'round'; g.lineJoin = 'round';
+  g.beginPath(); g.moveTo(start.x, start.y);
+  for (let i = 1, a = start; i < pts.length && left > 0; a = pts[i], i++) {
+    const b = pts[i], d = Math.hypot(b.x - a.x, b.y - a.y), f = d ? Math.min(1, left / d) : 1;
+    g.lineTo(a.x + (b.x - a.x) * f, a.y + (b.y - a.y) * f); left -= d;
+  }
+  g.strokeStyle = INK; g.lineWidth = 10; g.stroke(); g.strokeStyle = CUT_INK; g.lineWidth = 5; g.stroke();
+  const p = pos[cut.v];
+  g.beginPath(); g.arc(p.x, p.y, R * (reduced ? 1.3 : 1.2 + 0.7 * k), 0, Math.PI * 2);
+  g.strokeStyle = INK; g.lineWidth = 7; g.stroke(); g.strokeStyle = CUT_INK; g.lineWidth = 3.5; g.stroke();
+  g.restore();
 }
 // The feedback of a refused touch, on top of the board, for as long as it lasts (REFUSE_TICKS).
 function refusalCue(time) {
@@ -899,8 +940,7 @@ function hud(time) {
   else if (right) { g.beginPath(); g.moveTo(cx - 7, top + th / 2 - 4); g.lineTo(cx + 7, top + th / 2 - 4); g.moveTo(cx - 7, top + th / 2 + 4); g.lineTo(cx + 7, top + th / 2 + 4); g.stroke(); }
   else { g.beginPath(); g.moveTo(cx - 8, top + th / 2); g.lineTo(cx + 7, top + th / 2); g.moveTo(cx + 2, top + th / 2 - 6); g.lineTo(cx + 8, top + th / 2); g.lineTo(cx + 2, top + th / 2 + 6); g.stroke(); }
   // hop dots: one per hop of the shortest route; a hop past it shows as a dim dot
-  const hops = (sending ? sending.route.length : route.length) - 1, n = Math.max(level.min, hops);
-  const gap = Math.min(16, (W - 120) / n), dy = top + th + 14;
+  const { hops, n, gap, y: dy } = hopDots();
   for (let k = 0; k < n; k++) {
     const x = cx + (k - (n - 1) / 2) * gap;
     g.beginPath(); g.arc(x, dy, k < level.min ? 5 : 4, 0, Math.PI * 2);
@@ -908,6 +948,13 @@ function hud(time) {
     else g.fillStyle = 'rgba(255,244,220,.25)';
     g.fill();
   }
+}
+// The row of hop dots under the top bar (46 px high, 10 px below the safe top): its centre line, first and last dot
+// and the dot radius. The result card starts below it (#done .result-body), so nothing on the card covers it.
+function hopDots() {
+  const hops = (sending ? sending.route.length : route.length) - 1, n = Math.max(level.min, hops);
+  const gap = Math.min(16, (W - 120) / n), y = safe.t + 10 + 46 + 14;
+  return { hops, n, gap, y, x0: W / 2 - (n - 1) / 2 * gap, x1: W / 2 + (n - 1) / 2 * gap, r: 5 };
 }
 // The news is right and can be delivered: the route ends at the listener, or one more hop reaches them. While the
 // message travels, whether it will arrive right.
@@ -1324,7 +1371,15 @@ function menu() {
   soundLabel();
 }
 function dailyLabel() {
-  const button = $('daily'), ds = save.daily[today()] || 0, run = streak();
+  const button = $('daily'), open = dailyOpen();
+  button.classList.toggle('locked', !open);
+  if (open) button.removeAttribute('aria-disabled'); else button.setAttribute('aria-disabled', 'true');
+  if (!open) {
+    button.querySelector('small').textContent = `🔒\u00a0${number(DAILY_AT)}`;
+    button.setAttribute('aria-label', `${word('daily')} · ${word('unlock', { n: number(DAILY_AT) })}`);
+    return;
+  }
+  const ds = save.daily[today()] || 0, run = streak();
   const stars = ds ? '★'.repeat(ds) + '☆'.repeat(3 - ds) : '';
   const icon = run > 1 ? `🔥 ${number(run)}` : '';
   // Today solved: the button goes on to the newest unsolved day of the week, and shows that day's name.
@@ -1338,6 +1393,12 @@ function dailyLabel() {
 }
 // The village the menu's daily button opens: today's, or once today is solved, the newest unsolved day of the
 // week (the week strip on the result card then reaches the rest). With every day solved, today's again.
+// The daily village can use every piece of tier 0, so the menu's daily button opens once the player has cleared the
+// village that teaches the last of them (DAILY_AT, the first village with each piece; 25, the parrot). A save that
+// already has a daily result keeps it open. Which village a date gives does not change.
+const DAILY_AT = Math.max(...[...DAILY_TIERS[0].kinds.map(([kind]) => kind), ...(DAILY_TIERS[0].sleepy?.[1] ? ['once'] : [])]
+  .map(kind => LEVELS.findIndex(lv => lv.nodes.some(n => (kind === 'once' ? n.once : n.kind === kind))) + 1));
+const dailyOpen = () => save.opened > DAILY_AT || Object.keys(save.daily).length > 0 || Object.keys(save.dailyLate).length > 0;
 const dailyTarget = () => (save.daily[today()] || save.dailyLate[today()] ? nextDayFrom(null) : null) ?? today();
 const openTo = i => i + 1 <= save.opened || i + 1 === urlLevel; // can the player start 0-based level i?
 function showPrerequisite() {
@@ -1399,7 +1460,16 @@ $('play').addEventListener('click', () => {
   const n = Number($('play').dataset.level) || 1;
   begin(n - 1);
 });
-$('daily').addEventListener('click', () => begin(0, 'daily', dailyTarget()));
+// A tap on the locked daily button stays on the menu: a low tone, and the Play button nudges.
+let dailyNudges = 0;
+$('daily').addEventListener('click', () => {
+  if (dailyOpen()) return begin(0, 'daily', dailyTarget());
+  dailyNudges++;
+  snd.unlock(); tone(130, 0.18, 0.06, 'square', -20);
+  $('play').animate?.(reduced
+    ? [{ boxShadow: '0 4px 0 #b8642a, 0 0 0 0 #ffd24a' }, { boxShadow: '0 4px 0 #b8642a, 0 0 0 5px #ffd24a' }, { boxShadow: '0 4px 0 #b8642a, 0 0 0 0 #ffd24a' }]
+    : [{ transform: 'none' }, { transform: 'scale(1.1)' }, { transform: 'scale(.97)' }, { transform: 'none' }], { duration: 520, easing: 'ease-out' });
+});
 function pause() {
   if (screen !== 'play' || paused) return;
   paused = true; finger = null; show('paused'); snd.hold();
@@ -1447,6 +1517,8 @@ window.grapevineState = () => ({
   dailyHops: save.dailyHops[today()] ?? null, shareText, shared, payoff, hintClear,
   day: mode === 'daily' ? dailyKey : null, late: mode === 'daily' && late, dailyLate: { ...save.dailyLate },
   refusal: refusal && { why: refusal.why, v: refusal.v, from: refusal.from, t: +refusal.t.toFixed(3) },
+  dailyOpen: dailyOpen(), dailyAt: DAILY_AT, dailyNudges, lastTone,
+  cut: cut && { v: cut.v, tail: [...cut.tail], t: +cut.t.toFixed(3) }, hopDots: level ? hopDots() : null,
   lesson: lesson && lesson.kind, right: level ? same(trail.msgs.at(-1), level.want) : null, deliver: level ? deliverable() : null,
 });
 window.grapevineLevel = () => level; // the check solves the level in Node from this
