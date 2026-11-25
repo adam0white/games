@@ -80,3 +80,86 @@ Records under `night-rubbing` (`kit/lab.js`). One run for each plate the player 
 
 Opened from `/small/` (`?from=small`), the page shows "‹ Small games" on the pause card and under the title, through `kit/home.js`. The page has no menu or end card, and the status row where Next plate appears is too narrow for a second control, so the title is where the way back stays in sight. A filed print is reported to the home as a win. The page is in English only, so the link is English even for a Turkish browser (`lang: () => 'en'`). `check.mjs` asserts the two links. The home now also counts the sixth print as filed (from `night-rubbing:proof:6`, read only). Same keys, same records.
 The check serves only the files it allows; `kit/home.js` is added to that list (on purpose: the page now loads it).
+
+## 2026-11-25 — Deeper: twelve plates, the stick, glaze, grit, stars, a daily plate, Turkish
+
+The owner's decision (2026-11-25): keep it for now, though it is too basic. This change adds depth from the existing rule (pigment goes where the paper presses on a ridge, and the stroke direction decides which flank darkens).
+
+### Why it read as basic (played before any change, WebKit iPhone 13 and Chromium Pixel 7, cleared save)
+
+1. One verb, one plan: sweep back and forth over the whole sheet. The same blind sweep filed all six plates, 48 of 48 in the bots.
+2. No cost and no fail: rubbing bare paper costs nothing, so there was nothing to plan.
+3. No skill ceiling: a plate is filed or not; no score, no reason to rub a filed plate again.
+4. The one interesting rule (direction decides the flank) only changed shading; play never asked for it.
+5. Nothing to come back for: six plates, no daily, no share, English only.
+
+What became of each: 1 to 4 are answered by the stick, glaze, grit and stars below. 5: twelve plates, a daily plate, share and Turkish. Also seen on the first sheet and left as it is: the pencil demo and the kit hand show at the same time (two teachers at once). The first plate is unchanged on purpose.
+
+### What changed
+
+- Plates 7 to 12 (`plates.js`): young ammonite, crinoid stem, brittle star, sea urchin, horseshoe crab, feather. Plates 1 to 6 are unchanged.
+- The stick (from plate 7): each plate has a stick length. Rubbing bare paper wears it down too. If it runs out before the print is filed, the sheet is spoiled ("The stick wore out", Try again). A meter on the sheet shows what is left.
+- Glaze (plates 8, 10, 12): contact is `GLAZE_BITE · (stroke direction · slope)` only, so a stroke marks only the flank it moves towards. A line has to be rubbed across, both ways.
+- Grit (plates 9, 11, 12): grey pebbles round the fossil (`stoneField` in `sim.js`, with a clear pocket round the specimen). Each grit cell the stick darkens counts as a smudge; more than 48 spoils the sheet. A smudge meter shows the count.
+- Stars: three for a print filed within par, two within a quarter over par, one otherwise. Plates 1 to 6 have a par too, so the first plates now have a reason to be rubbed again. Best stars per plate show in the drawer.
+- Par and stick come from a careful rubber (`plan.js`): par is its distance plus a quarter, the stick twice its distance, both rounded up to tens. `bots.mjs` fails if the numbers in `plates.js` drift from that rule.
+- Daily plate (the button with today's date): the UTC date picks a specimen, a way (stick, glaze or grit) and a mirror, the same for everyone. The page computes par and stick with the same careful rubber. `?date=YYYY-MM-DD` opens another day. Best stars, distance and tries for the day are kept.
+- Share (after a filed print): `kit/share.js` with a picture of the print and a line with the plate, the stars and the share of the stick left.
+- Sound and motion: `kit/music.js` (flute, quiet; brighter as the print fills, tense when the stick is low) and `kit/fx.js` cues for each tenth filled, past par, stick low, smudge, filed, spoiled, daily, next and share.
+- English and Turkish for every string (`words.js`, `kit/i18n.js`). The name stays "Carbon Cabinet" in both. The way back to the small games home is now in the page's language ("‹ Küçük oyunlar").
+- The first plate is the same as on main and still teaches without words: the pencil demo, then the kit hand.
+- The plate label stays on one line; a long taxon name is cut with an ellipsis (the sheet canvas covers a second line). Worst case seen: plate 12, three stars, "Archaeopt…".
+
+### Saves
+
+`night-rubbing:save` keeps its format and still holds plates 1 to 6 (level and unlocked are clamped to 6 there, so the page on main can read it). New keys: `night-rubbing:more` `{v:1, level, unlocked}` for plates 7 to 12, `night-rubbing:stars` `{v:1, best:{plate:stars}}`, `night-rubbing:daily` `{v:1, day, stars, distance, tries}`. Proofs stay at `night-rubbing:proof:<n>` (also for 7 to 12; none for the daily plate). An old save with plate 6 filed opens with plate 7 unlocked. `check.mjs` loads a save written in the old format and checks this.
+
+### Play recording
+
+Same slug and records (`kit/lab.js`). Runs now end `won`, `lost` (a spoiled sheet) or `quit`. The summary adds kind, stars, stick used, smudges and the day for a daily plate. New events: `plate-filed` (with stars and day), `plate-spoiled` (why), `shared`.
+
+### Bot results (`bots.mjs`, exit 0, about 8.5 s)
+
+The original claims for plates 1 to 6 are unchanged and pass. Parity: plates 1 to 6 give the same pigment bit for bit as on main (12 runs of 400 strokes). Strategies: naive is the old sweep unchanged; rows trims sweeps to the fossil; hatch cross-hatches the whole sheet; pocket rows that step round grit; careful plans rows (and columns on glaze) cut to the fossil and broken round grit.
+
+| Plate | Kind | naive | rows | hatch | pocket | careful |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1–6 | free | 8/8 ★ | 8/8 ★★★ | 8/8 ★ | 8/8 ★★★ | 8/8 ★★★ |
+| 7 young ammonite | stick | 0/8 (stick) | 8/8 ★★★ | 8/8 ★★ | 8/8 ★★★ | 8/8 ★★★ |
+| 8 crinoid | glaze | 0/8 (stick) | 0/8 | 8/8 ★★★ | 0/8 | 8/8 ★★★ |
+| 9 brittle star | grit | 0/8 (smudge) | 0/8 (smudge) | 0/8 (smudge) | 8/8 ★★★ | 8/8 ★★★ |
+| 10 urchin | glaze | 0/8 (stick) | 0/8 | 8/8 ★★★ | 0/8 | 8/8 ★★★ |
+| 11 horseshoe crab | grit | 0/8 (smudge) | 0/8 (smudge) | 0/8 (smudge) | 8/8 ★★★ | 8/8 ★★★ |
+| 12 feather | glaze and grit | 0/8 (smudge) | 0/8 | 8/8 ★★★ | 0/8 | 8/8 ★★★ |
+
+Filed count over eight papers; stars on the plate's own paper. Before this change the naive sweep filed 48/48 with no score. Now it scores one star on plates 1 to 6 and files none of plates 7 to 12; the careful rubber files all 96 with three stars, using 50% of the stick and about 80% of par on its own paper. Daily: all 72 specimen, way and mirror combinations are filed by the careful rubber; over 60 days the careful rubber gets three stars 60/60 and the old sweep files 0/60.
+
+A shaky careful rubber, closer to a thumb (every stroke starts and ends up to 6 cells off and bows sideways by up to 6), still files plates 7 to 12 on all eight papers: 48/48, three stars each, at most 59% of the stick, no smudges. It still plans its lines from the clean sheet; a person who does not plan will use more.
+
+The page computes the daily par and stick itself. Its numbers are the same in WebKit, Chromium and Node for all 72 combinations and for 60 days from 2026-11-25 (checked once with a scratch script on 2026-11-25, not part of `check.mjs`), so the daily plate is the same for everyone on these engines.
+
+Mutations, each exits 1: `--mutate` (no direction in transfer) fails at the original direction claim; `--mutate=glaze` (glaze ignores direction) fails at the par drift check for plate 8; `--mutate=stone` (grit takes no smudges) fails at "rows that cross the grit spoil a stone plate"; `--mutate=lead` (the stick never wears) fails at "the old sweep cannot file plate 7".
+
+### Phone check (`check.mjs`)
+
+New part `deeper()`, on WebKit iPhone 13 and Chromium Pixel 7: an old-format save opens plate 7; the old sweep spoils plate 7 and the careful strokes file it with three stars; share sends one picture; save formats; glaze marks across but hardly along (along 0.004, across 0.042 coverage); plate 9 smudges and spoils; plates 10 to 12 open with their teaching line; the daily plate is filed and kept; Turkish strings and the Turkish home link; run outcomes and the stars event.
+
+Changed on purpose in the existing check: unlocked after plate 6 is now 7, not 6, and seven drawer buttons are enabled; the Turkish home link is "‹ Küçük oyunlar" (it was English only); the allowed files add `kit/fx.js`, `kit/i18n.js`, `kit/music.js`, `kit/share.js`. In `scripts/small-catalog.test.mjs` the "finished" seed for this game now also writes `night-rubbing:more` and twelve proofs, because finished now means twelve plates. The shared phone check (`experiments/kit/check/phone.mjs small,small/night-rubbing`, entry in `lab-pages.mjs`) is unchanged and passes on both browsers. It caught a save bug in the first push: it opens the page once (which writes `night-rubbing:more`), then sets an old save on plate 2 and reloads, and the page opened plate 1 from the new key. The page now reads the plate from the new key only when it is past 6 and the old key says 6, so the old key decides plates 1 to 6.
+
+### Not verified
+
+- Turkish wording: not read by a native speaker.
+- Sound and music by ear.
+- Whether a thumb reaches par and stays within the stick and the smudge limit. The careful rubber needs half the stick, the shaky one at most 59%; the phone check files plate 7 and one daily plate by pointer, but plates 8 to 12 are filed only in the simulation. The numbers are in `plates.js` and in `rate()` if they need loosening.
+- How grit and glaze read on a real phone screen, and the denser two-row drawer under a thumb.
+- The live recording endpoint.
+- The kit's recording switch on the pause card stays English in Turkish ("Record this play for the game lab"); that string is the kit's, not this page's.
+
+### Reproduce
+
+```
+fnm exec --using=26.12.0 node experiments/small/night-rubbing/bots.mjs
+fnm exec --using=26.12.0 node experiments/small/night-rubbing/bots.mjs --mutate        # also =glaze, =stone, =lead
+PLAYWRIGHT=~/code/human-framework/node_modules fnm exec --using=26.12.0 node experiments/small/night-rubbing/check.mjs webkit   # or chromium
+```
+The older reproduce commands above still name `experiments/lab/night-rubbing/`; the page moved to `experiments/small/night-rubbing/` on 2026-11-25.

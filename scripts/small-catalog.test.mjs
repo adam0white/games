@@ -49,7 +49,7 @@ const finished = {
   'night-sand': { 'night-sand:save': { v: 1, unlocked: 10, level: 10, completed: 10 } },
   'night-splitlight': { 'night-splitlight:plate': 18, 'night-splitlight:done': '1' },
   'wild-pour': { 'wild-pour:save': { v: 1, stars: ones(8) } },
-  'night-rubbing': { 'night-rubbing:save': { level: 6, unlocked: 6 }, ...Object.fromEntries(ones(6).map((_, i) => [`night-rubbing:proof:${i + 1}`, {}])) },
+  'night-rubbing': { 'night-rubbing:save': { level: 6, unlocked: 6 }, 'night-rubbing:more': { v: 1, level: 12, unlocked: 12 }, ...Object.fromEntries(ones(12).map((_, i) => [`night-rubbing:proof:${i + 1}`, {}])) },
 };
 const seed = saves => { store.clear(); for (const [k, v] of Object.entries(saves)) store.set(k, typeof v === 'string' ? v : JSON.stringify(v)); };
 

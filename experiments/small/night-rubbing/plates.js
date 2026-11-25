@@ -226,11 +226,162 @@ function dragonfly() {
   return lines;
 }
 
+
+// Plates 7 to 12 (2026-11-25). Same ridges, same rule; each one asks for a different way to rub.
+const moved = (lines, f) => lines.map(line => ({ ...line, points: line.points.map(f) }));
+
+// A young ammonite, small and low on the sheet: the whole sheet is not worth the lead.
+function juvenile() {
+  return moved(ammonite(), ([x, y]) => [150 + (x - 120) * 0.46, 196 + (y - 150) * 0.46]);
+}
+
+// A crinoid stem: a column of flat discs. Almost every ridge runs across the sheet.
+function crinoid() {
+  const { lines, stroke, curve } = drawing();
+  const axis = t => [112 + 14 * Math.sin(t * 2.4), 246 - 168 * t];
+  for (let i = 0; i <= 26; i++) {
+    const t = i / 26, [x, y] = axis(t), w = 16 - 5 * t;
+    curve([x - w, y], [x - w * 0.4, y + 2.2], [x + w * 0.4, y + 2.2], [x + w, y], i % 2 ? 1.6 : 2.6, i % 2 ? 0.78 : 1);
+  }
+  // The crown: arms that branch upward, each with flat pinnules.
+  const [cx, cy] = axis(1);
+  for (const [dx, lean] of [[-34, -0.5], [-14, -0.15], [10, 0.2], [30, 0.55]]) {
+    const arm = u => [cx + dx * u + lean * 24 * u * u, cy - 4 - 52 * u];
+    stroke(sample(14, arm), 2.2);
+    for (let j = 1; j < 9; j++) {
+      const [x, y] = arm(j / 9);
+      stroke([[x - 8, y + 1], [x + 8, y - 1]], 1.6, 0.86);
+    }
+  }
+  curve([cx - 26, cy - 2], [cx - 12, cy + 10], [cx + 12, cy + 10], [cx + 26, cy - 2], 3);
+  return lines;
+}
+
+// A brittle star: five thin arms from a small disc, with stone between them.
+function brittleStar() {
+  const { lines, stroke, oval } = drawing();
+  const cx = 122, cy = 140;
+  oval(cx, cy, 17, 16, 2.8);
+  oval(cx, cy, 6, 6, 2);
+  for (let k = 0; k < 5; k++) {
+    const a0 = -Math.PI / 2 + k * Math.PI * 2 / 5;
+    const arm = u => {
+      const a = a0 + 0.55 * Math.sin(u * 2.6 + k) * u;
+      const r = 17 + 88 * u;
+      return [cx + r * Math.cos(a), cy + r * 1.05 * Math.sin(a)];
+    };
+    stroke(sample(30, arm), 3 - 0.8, 1);
+    for (let j = 1; j < 15; j++) {
+      const u = j / 15, [x, y] = arm(u), [x2, y2] = arm(u + 0.01);
+      const nx = -(y2 - y), ny = x2 - x, n = Math.hypot(nx, ny) || 1, l = 6.5 * (1 - 0.55 * u);
+      stroke([[x - nx / n * l, y - ny / n * l], [x + nx / n * l, y + ny / n * l]], 1.7, 0.9);
+    }
+  }
+  return lines;
+}
+
+// A sea urchin seen from above: rings of knobs round a five-petal star. Its ridges face every way.
+function urchin() {
+  const { lines, stroke, oval } = drawing();
+  const cx = 120, cy = 146;
+  for (const [r, w] of [[64, 3.2], [52, 1.6], [38, 1.6], [24, 1.6]]) oval(cx, cy, r, r * 0.96, w, r === 64 ? 1 : 0.84);
+  for (let k = 0; k < 5; k++) {
+    const a = -Math.PI / 2 + k * Math.PI * 2 / 5;
+    for (const side of [-1, 1]) {
+      const petal = u => {
+        const r = 8 + 46 * u, spread = side * 0.16 * Math.sin(Math.PI * u);
+        return [cx + r * Math.cos(a + spread), cy + r * 0.96 * Math.sin(a + spread)];
+      };
+      stroke(sample(16, petal), 1.9);
+    }
+  }
+  oval(cx, cy, 7, 7, 2.4);
+  return lines;
+}
+
+// A horseshoe crab: a broad head shield, a shorter body and a long tail spine.
+function horseshoeCrab() {
+  const { lines, stroke, curve } = drawing();
+  for (const side of [-1, 1]) {
+    const p = (x, y) => [118 + side * x, y];
+    curve(p(0, 46), p(46, 46), p(70, 82), p(68, 124), 3.4);
+    curve(p(68, 124), p(50, 116), p(30, 114), p(20, 118), 2.6);
+    curve(p(20, 64), p(28, 80), p(30, 98), p(22, 114), 2);
+    curve(p(34, 70), p(40, 74), p(42, 80), p(38, 84), 2.4);
+    curve(p(20, 118), p(44, 124), p(48, 150), p(36, 172), 3);
+    curve(p(36, 172), p(22, 180), p(10, 182), p(0, 182), 2.8);
+    for (let j = 0; j < 6; j++) stroke([p(26 + j * 1.5, 128 + j * 8), p(44 - j * 1.5, 130 + j * 8)], 1.6, 0.84);
+  }
+  stroke([[118, 52], [118, 112]], 1.8, 0.8);
+  stroke(sample(20, t => [118 + 6 * Math.sin(t * 2), 182 + 64 * t]), 2.8);
+  return lines;
+}
+
+// A feather: an upright shaft and two vanes of nearly level barbs, pressed into stone. Level ridges and grit:
+// the stick has to go up and down the barbs, and stay off the stone.
+function feather() {
+  const { lines, stroke, curve } = drawing();
+  const shaft = t => [118 + 10 * Math.sin(t * 2.2), 236 - 182 * t];
+  stroke(sample(30, shaft), 3);
+  for (let i = 2; i < 30; i++) {
+    const t = i / 30, [x, y] = shaft(t);
+    for (const side of [-1, 1]) {
+      const len = (side < 0 ? 46 : 38) * Math.sin(Math.PI * Math.min(1, t * 1.05)) + 6;
+      stroke([[x, y], [x + side * len, y - 2]], 1.8, 0.9);
+    }
+  }
+  return lines;
+}
+
+// Grit cells a stone plate lets darken before the print is spoiled.
+export const SMUDGE_LIMIT = 48;
+
 export const PLATES = [
-  { name: 'Scallop', taxon: 'Pectinidae', age: 'Miocene', lines: scallop() },
-  { name: 'Fern frond', taxon: 'Filicopsida', age: 'Carboniferous', lines: fern() },
-  { name: 'Trilobite', taxon: 'Trilobita', age: 'Devonian', lines: trilobite() },
-  { name: 'Ammonite', taxon: 'Ammonoidea', age: 'Jurassic', lines: ammonite() },
-  { name: 'Fish skeleton', taxon: 'Actinopterygii', age: 'Eocene', lines: fish() },
-  { name: 'Dragonfly', taxon: 'Anisoptera', age: 'Jurassic', lines: dragonfly() }
+  { id: 'scallop', name: 'Scallop', taxon: 'Pectinidae', age: 'miocene', lines: scallop(), par: 1110 },
+  { id: 'fern', name: 'Fern frond', taxon: 'Filicopsida', age: 'carboniferous', lines: fern(), par: 1280 },
+  { id: 'trilobite', name: 'Trilobite', taxon: 'Trilobita', age: 'devonian', lines: trilobite(), par: 1300 },
+  { id: 'ammonite', name: 'Ammonite', taxon: 'Ammonoidea', age: 'jurassic', lines: ammonite(), par: 1400 },
+  { id: 'fish', name: 'Fish skeleton', taxon: 'Actinopterygii', age: 'eocene', lines: fish(), par: 1010 },
+  { id: 'dragonfly', name: 'Dragonfly', taxon: 'Anisoptera', age: 'jurassic', lines: dragonfly(), par: 1310 },
+  // par: sheet units of stick for three stars (a quarter more than the careful rubber in plan.js needed on the
+  // plate's own paper); lead: the stick's length, twice what it needed. bots.mjs recomputes both and fails on drift.
+  // From here on the stick has a length (lead), some plates are glazed (only the flank a stroke climbs takes
+  // graphite) and some sit in stone (grit that must stay clean). radius and goal as in sim.js PROOFS.
+  { id: 'juvenile', name: 'Young ammonite', taxon: 'Ammonoidea', age: 'jurassic', lines: juvenile(), radius: 22, goal: 0.84, par: 450, lead: 710 },
+  { id: 'crinoid', name: 'Crinoid stem', taxon: 'Crinoidea', age: 'silurian', lines: crinoid(), radius: 22, goal: 0.78, glaze: true, par: 2730, lead: 4360 },
+  { id: 'brittle', name: 'Brittle star', taxon: 'Ophiuroidea', age: 'ordovician', lines: brittleStar(), radius: 16, goal: 0.80, stone: 101, par: 1160, lead: 1860, smudge: SMUDGE_LIMIT },
+  { id: 'urchin', name: 'Sea urchin', taxon: 'Echinoidea', age: 'cretaceous', lines: urchin(), radius: 20, goal: 0.82, glaze: true, par: 3390, lead: 5430 },
+  { id: 'crab', name: 'Horseshoe crab', taxon: 'Xiphosura', age: 'jurassic', lines: horseshoeCrab(), radius: 13, goal: 0.82, stone: 202, par: 3220, lead: 5140, smudge: SMUDGE_LIMIT },
+  { id: 'feather', name: 'Feather', taxon: 'Archaeopteryx', age: 'jurassic', lines: feather(), radius: 15, goal: 0.78, glaze: true, stone: 303, par: 4870, lead: 7790, smudge: SMUDGE_LIMIT },
 ];
+
+// How each plate is played: 'free' (plates 1 to 6, the stick never runs out), 'lead' (the stick wears down),
+// 'glaze' and 'stone' (as above, with the stick wearing down too).
+export const kindOf = plate => plate.glaze && plate.stone ? 'glaze-stone' : plate.glaze ? 'glaze' : plate.stone ? 'stone' : plate.lead ? 'lead' : 'free';
+
+// The daily plate: one of the twelve specimens, one way of rubbing it, maybe mirrored, and its own paper,
+// chosen by the date (UTC), the same for everyone. Its par and stick length come from the careful rubber
+// (plan.js rate), so they are the same for everyone too. The bots finish every specimen in every way.
+export const DAILY_KINDS = [
+  { kind: 'lead', radius: 22, goal: 0.80, scale: 0.7 },
+  { kind: 'glaze', radius: 20, goal: 0.80, glaze: true },
+  { kind: 'stone', radius: 15, goal: 0.80 },
+];
+export function dayHash(day) {
+  let hash = 2166136261;
+  for (const char of String(day)) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619) >>> 0;
+  return hash;
+}
+export function dailySpec(day, pick = null) {
+  const hash = dayHash(day);
+  const plate = PLATES[pick?.plate ?? hash % PLATES.length];
+  const way = DAILY_KINDS[pick?.kind ?? (hash >>> 8) % DAILY_KINDS.length];
+  const mirror = pick?.mirror ?? ((hash >>> 16) & 1) === 1;
+  // A lead day shrinks the specimen to seven tenths, somewhere on the sheet: sweeping the whole sheet never pays.
+  const k = way.scale ?? 1, cx = 120 + (k < 1 ? ((hash >>> 20) % 41) - 20 : 0), cy = 145 + (k < 1 ? ((hash >>> 26) % 41) - 20 : 0);
+  const place = ([x, y]) => [cx + ((mirror ? 240 - x : x) - 120) * k, cy + (y - 145) * k];
+  const lines = mirror || k !== 1 ? plate.lines.map(line => ({ ...line, points: line.points.map(place) })) : plate.lines;
+  return { day, plate: plate.id, kind: way.kind, mirror, lines, radius: way.radius, goal: way.goal,
+    ...(way.glaze ? { glaze: true } : {}), ...(way.kind === 'stone' ? { stone: (hash | 1) >>> 0, smudge: SMUDGE_LIMIT } : {}),
+    seed: (hash ^ 0x5bd1e995) >>> 0 };
+}
