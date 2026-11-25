@@ -262,6 +262,34 @@ async function checkFit(page) {
   return out;
 }
 
+// Opened from the small-games home (?from=small), the pause and list cards carry the kit's way back and still fit 320 x 568.
+// Opened any other way they carry nothing.
+async function checkHome(context, url) {
+  const out = {};
+  for (const from of ['', 'small']) {
+    const page = await context.newPage();
+    await page.setViewportSize({ width: 320, height: 568 });
+    await page.goto(url + '?hint=0' + (from ? '&from=small' : ''));
+    await page.waitForFunction(() => window.channelView?.().screen === 'play');
+    const look = () => page.evaluate(() => {
+      const card = document.querySelector('.screen.on .card'), r = card.getBoundingClientRect();
+      return { link: card.querySelector('.kit-home')?.getAttribute('href') ?? null, over: card.scrollHeight - card.clientHeight, bottom: Math.round(r.bottom), height: innerHeight };
+    });
+    await page.tap('#pause');
+    const paused = await look();
+    await page.tap('#gardens');
+    await page.waitForFunction(() => window.channelView().screen === 'selection');
+    const list = await look();
+    for (const card of [paused, list]) {
+      assert.equal(card.link, from ? '/small/' : null, (from || 'direct') + ': the way back to the small games ' + JSON.stringify(card));
+      assert.ok(card.over <= 0 && card.bottom <= card.height, (from || 'direct') + ': the card fits 320 x 568 ' + JSON.stringify(card));
+    }
+    out[from || 'direct'] = { paused: paused.bottom, list: list.bottom };
+    await page.close();
+  }
+  return out;
+}
+
 async function run(name, engine, profile, origin) {
   const browser = await engine.launch();
   try {
@@ -424,6 +452,7 @@ async function run(name, engine, profile, origin) {
     assert.match(await page.locator('#result').innerText(), /par/, 'the win shows cuts against par');
     await stamp(page, name + '-07-last-garden');
     const fit = await checkFit(page);
+    fit.home = await checkHome(context, url);
     await page.setViewportSize(profile.viewport);
     await page.tap('#next');
     assert.equal(await page.locator('#levels .completed').count(), sim.GARDENS, 'all thirty gardens show their blooms as complete');

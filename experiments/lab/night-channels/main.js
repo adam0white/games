@@ -10,6 +10,7 @@ import { noZoom } from '../../kit/zoom.js';
 import { screens } from '../../kit/screens.js';
 import { hint } from '../../kit/hint.js';
 import { lab } from '../../kit/lab.js';
+import { home } from '../../kit/home.js';
 
 noZoom();
 const get = id => document.getElementById(id);
@@ -179,7 +180,7 @@ function lift() {
   if (id !== null && canvas.hasPointerCapture(id)) canvas.releasePointerCapture(id);
 }
 // Play recording for the game lab: one run is one garden, from the first cut to bloom, replant or leaving it.
-const rec = lab('night-channels');
+const rec = home(lab('night-channels'), { back: ['#paused .card', '#selection .card'] });
 let running = false;
 function recEnd(outcome) {
   if (!running) return;

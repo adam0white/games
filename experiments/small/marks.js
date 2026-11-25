@@ -39,7 +39,7 @@ const num = (v, max) => (Number.isFinite(v) ? Math.max(0, Math.min(max, Math.tru
 const P = {
   thankful() { const d = J('thankful:v1')?.days || {}; const n = Object.keys(d).filter(k => Array.isArray(d[k]) && d[k].length).length; const now = d[localDay()]?.length || 0; return { score: n * 3 + Math.min(3, now), today: now >= 3 }; },
   pitch() { const s = J('pitch:v1') || {}; return { score: num(s.played, 1e6) + Object.keys(s.daily || {}).length }; },
-  'night-channels'() { const s = J('night-channels:save') || {}; const n = s.completed === true ? 10 : num(s.unlocked, 10) - 1; return { score: Math.max(0, n), of: 10, finished: s.completed === true }; },
+  'night-channels'() { const s = J('night-channels:save') || {}, g = J('night-channels:gardens') || {}; const n = Math.max(s.completed === true ? 10 : 0, num(s.unlocked, 30) - 1, Object.keys(g).length); const done = g[30] !== undefined; return { score: done ? 30 : Math.min(30, n), of: 30, finished: done }; },
   ring() { const s = J('ring:v1') || {}; return { score: num(s.nights, 1e6), finished: num(s.dawns, 1e6) > 0 }; },
   'night-sand'() { const n = num(J('night-sand:save')?.completed, 10); return { score: n, of: 10, finished: n >= 10 }; },
   'night-bells'() { const n = count(J('night-bells:save')?.stars); return { score: n, of: 8, finished: n >= 8 }; },
