@@ -37,7 +37,7 @@ describe.skipIf(!process.env.PLAYWRIGHT_MODULE)('playSession with a real browser
       const page = (await browser.newPage({ viewport: { width: 1280, height: 800 } })) as Page;
       const result = await playSession({
         session: {
-          model: '@cf/qwen/qwen3-30b-a3b-fp8',
+          model: '@cf/google/gemma-4-26b-a4b-it',
           game: 'fixture',
           url: `http://127.0.0.1:${address.port}/`,
           persona: 'Maya Chen',

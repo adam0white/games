@@ -6,6 +6,7 @@ import { onLeave, isPauseKey } from '../../kit/pause.js';
 import { noZoom } from '../../kit/zoom.js';
 import { screens } from '../../kit/screens.js';
 import { hint } from '../../kit/hint.js';
+import { lab } from '../../kit/lab.js';
 import { table, newCode, cleanCode, linkFor, codeFromLink, share } from '../../kit/room.js';
 
 noZoom();
@@ -30,6 +31,13 @@ let first = false, pop = null, drag = null, today = null, dailyRec = null, attem
 let room = null, roomSeat = null, roomSeats = [], roomGame = 0, roomSeed = 0, roomMoves = 0, roomVotes = [];
 let roomNext = null, roomInviting = false, roomLag = false, roomLagTimer = 0;
 let L = { cell: 40, ox: 0, oy: 0 }, W = innerWidth, H = innerHeight, dpr = 1, safe = { top: 0, bottom: 0 };
+// Play recording for the game lab. One run is a match against the bot, a two-player match, a friend's table match
+// or today's pitch. The data holds modes, levels and results only: never a name, a typed word or a table code.
+const rec = lab('pitch');
+let running = false;
+function recStart(info) { recEnd('quit'); running = true; rec.start(info); }
+function recEnd(outcome) { if (!running) return; running = false; rec.end(outcome, recSummary()); }
+function recSummary() { return { mode, level, goals: score.slice(), games: game + 1, ...(mode === 'daily' && dailyRec ? { tries: dailyRec.used, solved: dailyRec.solved } : {}) }; }
 const paperLayer = document.createElement('canvas'), inkLayer = document.createElement('canvas');
 
 // ---------- drawing
@@ -268,12 +276,14 @@ function kickOff() {
   layout(); updateHud();
 }
 function startMatch(m) {
+  recEnd('quit');
   snd.unlock();
   mode = m; score = [0, 0]; game = 0; after = []; paused = false;
   first = m === 'bot' && save.played === 0;
   level = m === 'bot' ? (first ? 0 : save.level) : 0;
   seats = [false, m === 'bot'];
   show(null); $('hud').classList.add('on'); $('turn').classList.add('on');
+  recStart({ mode: m, level, first });
   kickOff();
 }
 function gameOver() {
@@ -282,6 +292,7 @@ function gameOver() {
   if (mode === 'demo') { later(2200, () => { game++; kickOff(); }); return; }
   if (mode === 'daily') return dailyEnd();
   if (mode !== 'table') score[scorer]++;
+  rec.event('goal', { by: mode === 'table' ? (scorer === roomSeat ? 'you' : 'friend') : scorer, how });
   if (canSound()) {
     if (how === 'stuck') snd.tone(196, 0.4, 0.08, 'sine', -60);
     else { [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => snd.tone(f, 0.22, 0.09, 'triangle'), i * 110)); }
@@ -323,6 +334,7 @@ function matchOver() {
   $('again').textContent = t('rematch');
   $('again').disabled = false;
   $('again').parentElement.hidden = false;
+  recEnd(mode === 'two' ? 'finished' : winner === (mode === 'table' ? roomSeat : 0) ? 'won' : 'lost');
   showEnd(`${score[0]} – ${score[1]}`);
   if (mode === 'table') updateRoomEnd();
 }
@@ -431,6 +443,8 @@ function receiveRoomSeats(nextSeats) {
   if (roomSeats.every(Boolean) && (screen === 'friend' || (screen === 'end' && !ended))) {
     $('hud').classList.add('on'); $('turn').classList.add('on');
     show(null);
+    rec.event('table-joined', { seat: roomSeat, rematch: screen === 'end' });
+    recStart({ mode: 'table', seat: roomSeat });
   }
   updateRoomView();
 }
@@ -495,6 +509,7 @@ function utcDate() {
   return q && /^\d{4}-\d{2}-\d{2}$/.test(q) ? q : new Date().toISOString().slice(0, 10);
 }
 function startDaily() {
+  recEnd('quit');
   snd.unlock();
   const date = utcDate();
   if (!today || today.date !== date) today = daily(date);
@@ -502,6 +517,7 @@ function startDaily() {
   mode = 'daily'; after = []; paused = false; game = 0;
   show(null); $('hud').classList.add('on'); $('turn').classList.add('on');
   if (dailyRec.solved || dailyRec.used >= 3) return dailyResult();
+  recStart({ mode: 'daily', triesUsed: dailyRec.used });
   resetAttempt();
 }
 function resetAttempt() {
@@ -535,6 +551,7 @@ function dailyResult() {
   reveal = !dailyRec.solved;
   if (reveal) { const t = clone(today.state); for (const d of today.solution) apply(t, d); s.ball = t.ball; }
   layout(); updateHud();
+  if (running) { rec.event('daily-finished', { solved: !!dailyRec.solved, tries: dailyRec.used }); recEnd(dailyRec.solved ? 'won' : 'lost'); }
   $('endTitle').textContent = t(dailyRec.solved ? 'scored' : 'hereWasTheWay');
   $('endTitle').style.color = dailyRec.solved ? INK[0] : '';
   const hours = Math.max(1, Math.ceil((Date.UTC(...nextDay()) - Date.now()) / 3600000));
@@ -700,6 +717,7 @@ function setPauseTitle() { $('pauseTitle').textContent = t(mode === 'table' ? 't
 function setPauseLabel() { $('pauseBtn').setAttribute('aria-label', t(mode === 'table' ? 'tableMenu' : 'pause')); }
 function resume() { paused = false; snd.release(); show(null); }
 function toMenu() {
+  recEnd('quit');
   if (mode === 'table') leaveRoom();
   paused = false; snd.release(); mode = 'demo'; game = 0; after = [];
   $('hud').classList.remove('on'); $('turn').classList.remove('on');
@@ -818,3 +836,8 @@ const linkedRoom = codeFromLink();
 if (linkedRoom) openRoom(linkedRoom, false);
 else kickOff();
 requestAnimationFrame(frame);
+
+// The notice is on the menu card, which is on screen before Play; the switch is on the pause card (the table menu at a table).
+rec.notice($('menu').firstElementChild);
+rec.notice($('friendCard').firstElementChild); // a friend's link opens on this card, before any Play
+rec.toggle($('paused').firstElementChild);

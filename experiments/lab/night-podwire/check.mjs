@@ -1,4 +1,5 @@
 // Exercise the game through the board and its buttons. The view exposes observations only.
+import { answerLab, assertNotice, assertRun, assertOffSendsNothing, waitForRuns } from '../../kit/check/lab-record.mjs';
 import assert from 'node:assert/strict';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
@@ -154,7 +155,7 @@ async function run(name, base) {
       const request = handler.request(), url = new URL(request.url());
       const path = url.pathname;
       const allowed = path === route || path === '/notes/button.js' ||
-        ((path.startsWith(route) || path.startsWith('/kit/')) && /\.(?:css|js)$/.test(path) && !path.endsWith('/lab.js'));
+        ((path.startsWith(route) || path.startsWith('/kit/')) && /\.(?:css|js)$/.test(path));
       if (url.origin !== base || request.method() !== 'GET' || !allowed) {
         unapproved.push(request.method() + ' ' + url.href);
         return handler.abort();
@@ -162,6 +163,8 @@ async function run(name, base) {
       assets.add(path);
       return handler.continue();
     });
+    // The lab endpoint is answered here (registered after the catch-all, so it takes lab requests first).
+    const lab = await answerLab(context, base);
     const page = await context.newPage();
     page.on('pageerror', error => errors.push(error.message));
     page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
@@ -363,6 +366,33 @@ async function run(name, base) {
     assert.deepEqual(await page.evaluate(key => JSON.parse(localStorage.getItem(key)), progressKey),
       { v: 1, next: 6, complete: true, sound: true }, 'a stale tab sound tap preserves newer progress and toggles current sound');
     await page.evaluate(key => localStorage.removeItem(key), progressKey);
+
+    // Play recording: the notice is on the page before the first pull; a won plate sends one run record under
+    // 'night-podwire'; with the switch off in the pause card the next plate sends nothing.
+    assert.equal(lab.sent.length, 0, 'nothing was sent by the checks above (nothing sends from localhost unless allowed)');
+    await page.evaluate(() => localStorage.setItem('hf-lab-send-localhost', '1'));
+    await page.goto(base + route + '?labRunSource=agent');
+    await ready(page);
+    await assertNotice(page);
+    assert.equal(lab.sent.length, 0, 'nothing is sent before the first pull');
+    await hand.pull();
+    await hand.release();
+    await page.waitForFunction(() => window.podwireView().screen === 'won');
+    await waitForRuns(lab, 'night-podwire', 1);
+    const recorded = assertRun(lab, 'night-podwire', { outcomes: ['won'], summaryKeys: ['plate', 'plucks', 'opened'] });
+    assert.deepEqual(recorded.data.events.map(e => e.type), ['plate-complete']);
+    await page.evaluate(key => localStorage.removeItem(key), progressKey);
+    await page.reload();
+    await ready(page);
+    await page.tap('#pause');
+    await assertOffSendsNothing(page, lab, 'night-podwire', { play: async () => {
+      await page.tap('#resume');
+      await hand.pull();
+      await hand.release();
+      await page.waitForFunction(() => window.podwireView().screen === 'won');
+    } });
+    await page.evaluate(key => localStorage.removeItem(key), progressKey);
+    await page.evaluate(() => localStorage.removeItem('hf-lab-recording-off'));
 
     // A blocked write still permits play and progression for this visit.
     await page.addInitScript(() => {

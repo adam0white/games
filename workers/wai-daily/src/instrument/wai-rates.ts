@@ -3,10 +3,12 @@ import { DAILY_HARD_NEURONS } from './daily-counter.ts';
 
 export const LOCAL_BUDGET_USD = 4;
 // Token models: neurons per million input/output tokens. Whisper: neurons per audio minute, 0.
-// Token rates checked 2026-10-23; Whisper checked 2026-11-03.
+// Token rates checked 2026-10-23; Whisper checked 2026-11-03; Gemma 4 checked 2026-11-25.
+// The Qwen and Llama 3.2 3B rows are retired models, kept so old receipts still price.
 // https://developers.cloudflare.com/workers-ai/platform/pricing/
 export const RATES: Record<string, readonly [number, number]> = {
   '@cf/openai/whisper-large-v3-turbo': [46.63, 0],
+  '@cf/google/gemma-4-26b-a4b-it': [9091, 27273],
   '@cf/qwen/qwen3-30b-a3b-fp8': [4625, 30475],
   '@cf/meta/llama-3.2-3b-instruct': [4625, 30475],
   '@cf/mistralai/mistral-small-3.1-24b-instruct': [31876, 50488],

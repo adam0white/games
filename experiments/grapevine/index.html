@@ -83,7 +83,8 @@
 
   .start-actions { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 8px 0; }
   .start-actions button { min-width: 0; margin: 0; padding-inline: .7em; }
-  .start-actions #play { flex: 1; font-size: clamp(18px, 5.4vw, 21px); }
+  .start-actions #play { flex: 1 0 auto; font-size: clamp(16px, 5vw, 21px); white-space: nowrap; }
+  .start-actions #daily { flex: 0 1 auto; }
   .start-actions #play.chase { font-size: clamp(15px, 4.4vw, 17px); white-space: nowrap; }
   .settings { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 6px 0; }
   .settings button { margin: 0; }
@@ -440,7 +441,9 @@ canvas.addEventListener('pointerdown', e => {
   finger = { id: e.pointerId, x, y, reached: false };
   if (sending || result === 'won') return;
   lastRefused = -1;
-  const v = nodeAt(x, y, R * 1.6);
+  // After a wrong delivery the reset symbol beside the teller is a button: a 48 px circle around it starts again.
+  const reset = result === 'wrong' ? resetSpot() : null, near = nodeAt(x, y, R * 1.6);
+  const v = reset && Math.hypot(x - reset.x, y - reset.y) < 24 && (near < 0 || near === level.from) ? level.from : near;
   if (v < 0) { tone(660, 0.04, 0.03, 'sine'); return; }
   if (v === level.from) { if (route.length > 1) tone(300, 0.1, 0.05, 'sine'); setRoute([level.from]); react[v] = 0.6; return; }
   const at = route.lastIndexOf(v);
@@ -612,6 +615,7 @@ function draw(alpha) {
   const order = level.nodes.map((_, i) => i).sort((a, b) => pos[a].y - pos[b].y);
   const onRoute = new Set(route);
   for (const i of order) person(i, time, onRoute);
+  for (const [a, b, type] of level.edges) if (type === ONEWAY) laneHead(pos[a], pos[b], b);
   ghosts(time);
   listenerBubble(time);
   readyRing(time);
@@ -637,7 +641,7 @@ function paths(time) {
     g.strokeStyle = L[1]; g.lineWidth = 13; g.stroke();
     if (type !== ONEWAY) { g.setLineDash([3, 11]); g.strokeStyle = L[2]; g.lineWidth = 5; g.stroke(); g.setLineDash([]); }
   }
-  for (const [a, b, type] of level.edges) if (type === ONEWAY) laneArrows(pos[a], pos[b], reduced ? 0 : time);
+  for (const [a, b, type] of level.edges) if (type === ONEWAY) laneArrows(pos[a], pos[b], reduced ? 0 : time, b);
   if (laneFlash) { // the lane or gate that just said no: it throbs red for as long as the refusal lasts
     const A = pos[laneFlash.a], B = pos[laneFlash.b], k = laneFlash.t;
     const beat = reduced ? 1 : 0.7 + 0.3 * Math.cos((1 - k) * REFUSE_TICKS / 60 * Math.PI * 2 * 2.5);
@@ -648,9 +652,9 @@ function paths(time) {
 // A one-way lane: a big yellow arrowhead with a dark outline just short of the villager it leads to, and small
 // chevrons pointing the same way in the middle. The direction is in the shape, so it reads in a still frame,
 // with reduced motion and without colour; nothing yellow sits at the end the lane comes from.
-function laneArrows(A, B, time) {
+function laneArrows(A, B, time, b) {
   const dx = B.x - A.x, dy = B.y - A.y, len = Math.hypot(dx, dy), ang = Math.atan2(dy, dx);
-  const tip = len - R * 1.12, head = 17, half = 12;
+  const tip = len - laneBack(A, B, b), head = 17;
   g.save(); g.lineJoin = 'round';
   // chevrons between the two ends, drifting towards B unless motion is reduced
   const gap = 26, s = 6, from = R * 2.1, to = tip - head - 8, shift = (time * 12) % gap;
@@ -660,7 +664,25 @@ function laneArrows(A, B, time) {
     g.fillStyle = '#ffd84a'; g.fill(); g.lineWidth = 1.5; g.strokeStyle = INK; g.stroke();
     g.restore();
   }
-  g.translate(A.x + dx * tip / len, A.y + dy * tip / len); g.rotate(ang);
+  g.restore();
+}
+// How far before the villager a lane leads to its arrowhead's tip sits: just outside the villager, or, for a lane
+// that comes in from below, further back so the tip is clear of the villager's badge. The teller and the listener
+// have no badge. A lane too short to clear the badge keeps its head by the villager, drawn over the badge.
+function laneBack(A, B, b) {
+  const near = R * 1.12, kind = level.nodes[b].kind;
+  if (kind === 'teller' || kind === 'listener') return near;
+  const len = Math.hypot(B.x - A.x, B.y - A.y), ux = (B.x - A.x) / len, uy = (B.y - A.y) / len;
+  const onBadge = d => Math.abs(ux * d) <= R * 1.05 + 6 && Math.abs(-uy * d - R * 1.42) <= R * 0.43 + 6;
+  let back = near;
+  while (back < len - near - 17 && onBadge(back)) back += 2;
+  return onBadge(back) ? near : back;
+}
+// The arrowhead is drawn after the villagers, so a raised arm, a hat or a badge cannot hide which way a lane runs.
+function laneHead(A, B, b) {
+  const dx = B.x - A.x, dy = B.y - A.y, len = Math.hypot(dx, dy), tip = len - laneBack(A, B, b), head = 17, half = 12;
+  g.save(); g.lineJoin = 'round';
+  g.translate(A.x + dx * tip / len, A.y + dy * tip / len); g.rotate(Math.atan2(dy, dx));
   g.beginPath(); g.moveTo(0, 0); g.lineTo(-head, -half); g.lineTo(-head * 0.72, 0); g.lineTo(-head, half); g.closePath();
   g.lineWidth = 4.5; g.strokeStyle = INK; g.stroke();
   g.fillStyle = '#ffd84a'; g.fill();
@@ -1013,8 +1035,8 @@ function tutorial(time) {
   const press = reduced ? 1 : 0.5 + 0.5 * Math.cos(time * 5);
   if (!help.shown) tapHand(g, p.x + side * R * 0.67, p.y + 1, side, press);
   if (retry) {
-    // The same reset symbol as the restart action, directly beside the teller.
-    const rx = p.x - side * (R + 23), ry = p.y + R * 0.45;
+    // The same reset symbol as the restart action, directly beside the teller. A tap on it starts again too.
+    const { x: rx, y: ry } = resetSpot();
     cuePlate(rx, ry, 34, 34);
     g.strokeStyle = CREAM; g.lineWidth = 2.5; g.lineCap = 'round'; g.lineJoin = 'round';
     g.beginPath(); g.arc(rx, ry, 8, -2.6, 2.6); g.stroke();
@@ -1023,6 +1045,11 @@ function tutorial(time) {
     cuePlate(x, y, 94, 34);
     messagePair(level.start, trail.msgs.at(-1), x, y);
   }
+}
+// Where the reset symbol sits after a wrong delivery: beside the teller, on the side away from the screen edge.
+function resetSpot() {
+  const p = pos[level.from], side = p.x > W * 0.66 ? -1 : 1;
+  return { x: p.x - side * (R + 23), y: p.y + R * 0.45 };
 }
 function menuScene(time) {
   // a few villagers chatting in the square below the menu, when there is room for them
@@ -1084,8 +1111,9 @@ function labelledPicture(text, label) {
 }
 const weekday = (key, style = 'short') => new Intl.DateTimeFormat(lang(), { weekday: style }).format(new Date(`${key}T12:00:00`));
 // The newest day of the last seven (today first) with its village unsolved, other than the one just played.
-function nextDay() {
-  for (let k = 0; k < WEEK; k++) { const key = daysAgo(k); if (key !== dailyKey && !dayStars(key)) return key; }
+function nextDay() { return nextDayFrom(dailyKey); }
+function nextDayFrom(skip) {
+  for (let k = 0; k < WEEK; k++) { const key = daysAgo(k); if (key !== skip && !dayStars(key)) return key; }
   return null;
 }
 // The last seven days under a daily result: weekday and stars, pale stars for a day solved later, today outlined.
@@ -1299,11 +1327,18 @@ function dailyLabel() {
   const button = $('daily'), ds = save.daily[today()] || 0, run = streak();
   const stars = ds ? '★'.repeat(ds) + '☆'.repeat(3 - ds) : '';
   const icon = run > 1 ? `🔥 ${number(run)}` : '';
-  button.querySelector('small').textContent = [stars, icon].filter(Boolean).join(' · ');
+  // Today solved: the button goes on to the newest unsolved day of the week, and shows that day's name.
+  // No-break spaces keep "★★★ → Mon" together when the button wraps.
+  const day = dailyTarget(), on = day && day !== today() ? `→\u00a0${weekday(day)}` : '';
+  button.querySelector('small').textContent = [[stars, icon].filter(Boolean).join(' · '), on].filter(Boolean).join('\u00a0');
   const score = ds ? word('stars', { n: number(ds), total: number(3) }) : '';
   const days = run > 1 ? word('days', { n: number(run) }) : '';
-  button.setAttribute('aria-label', [word('daily'), score, days].filter(Boolean).join(' · '));
+  const then = on ? (day === daysAgo(1) ? word('yesterday') : word('dayVillage', { day: weekday(day, 'long') })) : '';
+  button.setAttribute('aria-label', [word('daily'), score, days, then].filter(Boolean).join(' · '));
 }
+// The village the menu's daily button opens: today's, or once today is solved, the newest unsolved day of the
+// week (the week strip on the result card then reaches the rest). With every day solved, today's again.
+const dailyTarget = () => (save.daily[today()] || save.dailyLate[today()] ? nextDayFrom(null) : null) ?? today();
 const openTo = i => i + 1 <= save.opened || i + 1 === urlLevel; // can the player start 0-based level i?
 function showPrerequisite() {
   $('unlockCue').textContent = prerequisite === null ? '' : `${number(prerequisite)} ✓ → 🔓`;
@@ -1364,7 +1399,7 @@ $('play').addEventListener('click', () => {
   const n = Number($('play').dataset.level) || 1;
   begin(n - 1);
 });
-$('daily').addEventListener('click', () => begin(0, 'daily'));
+$('daily').addEventListener('click', () => begin(0, 'daily', dailyTarget()));
 function pause() {
   if (screen !== 'play' || paused) return;
   paused = true; finger = null; show('paused'); snd.hold();
