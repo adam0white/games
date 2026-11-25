@@ -7,7 +7,7 @@ import { extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gunzipSync } from 'node:zlib';
 import { setTimeout as delay } from 'node:timers/promises';
-import { createCase, dailyCase, observe } from './sim.js';
+import { caseVariant, createCase, dailyCase, observe } from './sim.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const shots = process.env.SHOTS || join(tmpdir(), 'alibi-shots');
@@ -92,6 +92,11 @@ async function stubLab(context, origin, records, errors) {
 }
 
 const state = page => page.evaluate(() => window.alibiState());
+// The case on screen: a Daily, or a campaign case at its retry variant.
+async function shownCase(page) {
+  const st = await state(page);
+  return st.daily ? dailyCase(st.day, st.hard) : caseVariant(st.level, st.variant, seed);
+}
 const press = (page, selector) => page.locator(selector).tap({ timeout: 30000 });
 const see = (page, screen) => page.waitForFunction(
   wanted => window.alibiState?.().screen === wanted, screen, { timeout: 5000 },
@@ -233,18 +238,43 @@ async function checkMenus(page, url) {
   await consent.check();
   await press(page, '#resume');
   const wrong = campaign.cast.filter(person => person.id !== campaign.culprit);
+  const layout = (await state(page)).points.actors;
   for (const person of wrong.slice(0, 3)) await accuse(page, person.id);
   await see(page, 'done');
   expect(/3 wrong accusations/i.test(await page.locator('#resultArt').getAttribute('aria-label')), 'loss describes the rejected portraits');
+  // A lost campaign case shows its liar, and Retry deals a fresh variant whose
+  // liar and layout differ, so the reveal cannot win the retry.
+  expect((await state(page)).lossReveal === campaign.culprit, 'the loss card reveals the liar');
+  expect(/the liar was this one/i.test(await page.locator('#resultArt').getAttribute('aria-label')), 'the loss card names the reveal');
   await press(page, '#again');
-  await accuse(page, campaign.culprit);
+  const retry = await state(page);
+  const variant = caseVariant(1, retry.variant, seed);
+  expect(retry.level === 1 && retry.variant === 1, 'Retry after a loss deals variant 1 of the same case');
+  expect(JSON.stringify(retry.points.actors) !== JSON.stringify(layout), 'the retry has a different layout');
+  expect(variant.cast[variant.culprit].species !== campaign.cast[campaign.culprit].species, 'the retry has a different liar');
+  const revealedWins = (await accuse(page, campaign.culprit)).outcome === 'solved';
+  expect(!revealedWins, 'accusing the revealed portrait does not win the retry');
+  await accuse(page, variant.culprit);
   await press(page, '#skipReveal');
+  expect(JSON.parse(await page.evaluate(() => localStorage.getItem('alibi-save'))).stars[1] === (revealedWins ? 3 : 2),
+    'the variant win earns the case stars');
   expect(await page.locator('#next').evaluate(button => button.classList.contains('primary')), 'Next is the primary campaign action');
   await press(page, '#endMenu');
   await press(page, '#daily');
   const day = (await state(page)).day;
-  await accuse(page, dailyCase(day).culprit);
+  // A lost Daily can be retried for full credit, so its loss card keeps the
+  // liar hidden and Retry replays the same case.
+  const today = dailyCase(day);
+  for (const person of today.cast.filter(person => person.id !== today.culprit).slice(0, 3)) await accuse(page, person.id);
+  await see(page, 'done');
+  expect((await state(page)).lossReveal === null, 'a lost Daily does not reveal its liar');
+  expect(!/the liar was this one/i.test(await page.locator('#resultArt').getAttribute('aria-label')), 'a lost Daily card does not name a reveal');
+  await press(page, '#again');
+  expect((await state(page)).day === day && (await state(page)).variant === 0, 'Daily retry replays the same case');
+  await accuse(page, today.culprit);
   await press(page, '#skipReveal');
+  expect(JSON.parse(await page.evaluate(() => localStorage.getItem('alibi-save'))).daily.days[day]?.stars === 3,
+    'a won Daily retry counts for full credit');
   const cardWords = await page.evaluate(() => {
     const drawn = [];
     const ctx = document.querySelector('#shareArt').getContext('2d');
@@ -370,6 +400,9 @@ async function checkFirstPlay(page, url) {
     'releasing the third accusation leaves the loss visible');
   expect(!await page.evaluate(() => window.lossTapClicked), 'the final tap dispatches no compatibility click');
   assert.deepEqual(failures, [], 'cold-play regressions');
+  // That loss moved case 1 to a retry variant. The campaign run that follows
+  // starts from an empty save, as it did before losses were recorded.
+  await page.evaluate(() => localStorage.removeItem('alibi-save'));
 }
 
 async function runCampaign(page, profile, url) {
@@ -468,6 +501,16 @@ async function runCampaign(page, profile, url) {
   await press(page, '#again');
   await see(page, 'play');
   assert.equal((await state(page)).stars, 3, 'retry starts with three stars');
+  assert.equal((await state(page)).variant, 1, 'retry after a loss deals a fresh variant');
+  await page.reload();
+  await see(page, 'paused');
+  assert.equal((await state(page)).variant, 1, 'a reload during a retry keeps its variant');
+  await press(page, '#toMenu');
+  await see(page, 'menu');
+  await press(page, '#play');
+  await see(page, 'play');
+  const again = await state(page);
+  assert.ok(again.level === 2 && again.variant === 1, 'Menu then Play does not bring back the revealed case');
   await press(page, '#pause');
   await press(page, '#toMenu');
   await see(page, 'menu');
@@ -1026,6 +1069,102 @@ async function checkProgress(page, profile, url) {
   assert.equal(await solve(9), 'Stars 3 of 108', 'a mid-chapter case shows only the star total');
 }
 
+// The owl must read as an owl at the small portrait size (24 px at 3x): big
+// front-facing eyes with a yellow iris around a large dark pupil, a beak, and
+// no whiskers past the face. The same samples on every other portrait find
+// none of these, so no other animal shares the owl's eyes.
+async function checkPortraits(page, url) {
+  await page.goto(url);
+  await see(page, 'menu');
+  const found = await page.evaluate(async () => {
+    const { animal } = await import('/alibi/art.js');
+    const unit = 24 / 40 * 3;
+    const center = 36;
+    const at = (data, x, y) => {
+      const i = (Math.round(center + x * unit) + Math.round(center + (y + 2) * unit) * 72) * 4;
+      const [r, g, b, a] = data.slice(i, i + 4);
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      return { a, lum: .3 * r + .59 * g + .11 * b, sat: max ? (max - min) / max : 0, yellow: r > 140 && g > 110 && b < g / 2 };
+    };
+    return Object.fromEntries(['rabbit', 'fox', 'bear', 'owl', 'frog', 'cat', 'mouse', 'hedgehog'].map(species => {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 72;
+      const g = canvas.getContext('2d');
+      animal(g, center, center, 24 * 3, species, { head: true });
+      const data = g.getImageData(0, 0, 72, 72).data;
+      const eyes = [-1, 1].map(side => ({
+        pupil: [[-1.6, 0], [1.6, 0], [0, 0], [0, 1.5]].every(([dx, dy]) => at(data, side * 5.8 + dx, -.5 + dy).lum < 90),
+        iris: [[-3.6, 0], [3.6, 0], [0, -3.6], [0, 3.4]].filter(([dx, dy]) => at(data, side * 5.8 + dx, -.5 + dy).yellow).length >= 3,
+      }));
+      const beak = at(data, 0, 4.5);
+      const whiskers = [-1, 1].some(side => [[15, 3.2], [14.5, 7.6]].some(([x, y]) => at(data, side * x, y).a > 128 && at(data, side * x, y).lum < 90));
+      return [species, {
+        bigEyes: eyes.every(eye => eye.pupil && eye.iris),
+        beak: beak.sat > .5 && beak.lum > 90 && beak.lum < 200,
+        whiskers,
+      }];
+    }));
+  });
+  for (const [species, look] of Object.entries(found)) {
+    if (species === 'owl') {
+      assert.ok(look.bigEyes && look.beak && !look.whiskers, `the owl reads as an owl at 24 px: ${JSON.stringify(look)}`);
+    } else {
+      assert.ok(!look.bigEyes, `${species} does not share the owl's big eyes`);
+    }
+  }
+}
+
+// The sound button keeps one line in both languages, sound on or off, with a
+// Daily streak showing, so toggling it never moves the menu under the thumb.
+async function checkSoundLabel(page, url) {
+  const oneLine = async selector => page.locator(selector).evaluate(row => [...row.querySelectorAll('button')].map(button => {
+    // Count text lines from the text's own boxes; icons are not lines.
+    const walker = document.createTreeWalker(button, NodeFilter.SHOW_TEXT);
+    const tops = [];
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      for (const box of range.getClientRects()) {
+        if (box.width && !tops.some(top => Math.abs(top - box.top) < box.height / 2)) tops.push(box.top);
+      }
+    }
+    return { id: button.id, text: button.innerText.replace(/\n/g, ' / '), lines: tops.length, overflow: button.scrollWidth > button.clientWidth + 1 };
+  }));
+  await page.goto(url);
+  await see(page, 'menu');
+  for (const language of ['tr', 'en']) {
+    for (const streak of [12, 365]) {
+      await page.evaluate(([streak]) => localStorage.setItem('alibi-save', JSON.stringify({
+        level: 20, stars: { 1: 3 }, sound: true, daily: { last: new Date().toISOString().slice(0, 10), streak, best: 3 },
+      })), [streak]);
+      await page.goto(url.replace('lang=en', `lang=${language}`).replace('&level=1', ''));
+      await see(page, 'menu');
+      const tops = [];
+      for (const sound of ['on', 'off', 'on']) {
+        const row = await oneLine('#menu .row:has(#menuSound)');
+        for (const button of row) {
+          assert.ok(button.lines === 1 && !button.overflow,
+            `${language}, sound ${sound}, streak ${streak}: menu button ${button.id} "${button.text}" keeps one line`);
+        }
+        tops.push(await page.locator('#menu .panel').evaluate(panel => Math.round(panel.getBoundingClientRect().top)));
+        await press(page, '#menuSound');
+      }
+      assert.equal(new Set(tops).size, 1, `${language}, streak ${streak}: the menu panel stays put when sound toggles (${tops})`);
+    }
+    await press(page, '#play');
+    await see(page, 'play');
+    await press(page, '#pause');
+    for (const sound of ['on', 'off']) {
+      for (const button of await oneLine('#paused .row:has(#pauseSound)')) {
+        assert.ok(button.lines === 1 && !button.overflow, `${language}, sound ${sound}: pause button ${button.id} "${button.text}" keeps one line`);
+      }
+      await press(page, '#pauseSound');
+    }
+  }
+  await page.evaluate(() => localStorage.clear());
+}
+
 async function checkLanguages(page, profile, url) {
   const day = '2026-11-24';
   const date = new Date(`${day}T12:00:00Z`);
@@ -1132,7 +1271,9 @@ async function checkLanguages(page, profile, url) {
     await press(page, '#calendarMenu');
     await press(page, '#play');
     const { points } = await state(page);
-    const innocent = campaign.cast.find(person => person.id !== campaign.culprit);
+    // The first language's loss below moves case 1 to a retry variant.
+    const opened = await shownCase(page);
+    const innocent = opened.cast.find(person => person.id !== opened.culprit);
     assert.ok((await capture(language, 'first-level')).includes(table.objective), 'opening objective is painted on canvas');
     await tap(page, points.suspects[innocent.id]);
     await capture(language, 'alibi-time');
@@ -1148,15 +1289,18 @@ async function checkLanguages(page, profile, url) {
     assert.ok((await capture(language, 'armed')).includes(table.cancel), 'armed stamp paints the localized cancel action');
     await tap(page, points.suspects[innocent.id]);
     assert.ok((await capture(language, 'wrong')).includes('='), 'wrong accusation shows a matching alibi');
-    await accuse(page, campaign.culprit);
+    await accuse(page, opened.culprit);
     await see(page, 'reveal');
     await capture(language, 'reveal');
     await press(page, '#skipReveal');
     await capture(language, 'win');
     await press(page, '#again');
-    for (const person of campaign.cast.filter(person => person.id !== campaign.culprit).slice(0, 3)) await accuse(page, person.id);
+    const retried = await shownCase(page);
+    for (const person of retried.cast.filter(person => person.id !== retried.culprit).slice(0, 3)) await accuse(page, person.id);
     assert.equal((await state(page)).outcome, 'wrong');
-    assert.ok((await capture(language, 'loss')).includes('='), 'loss models a same-time comparison');
+    // The loss card now replays the liar's contradiction (≠) in place of the
+    // last wrong accusation's matching alibi (=).
+    assert.ok((await capture(language, 'loss')).includes('≠'), 'loss shows the liar’s same-time contradiction');
     await press(page, '#endMenu');
 
     await press(page, '#daily');
@@ -1222,6 +1366,8 @@ async function runProfile(profile, engine, device, origin) {
         await stubLab(languageContext, origin, [], errors);
         const page = await languageContext.newPage();
         page.on('pageerror', error => errors.push(error.message));
+        await checkSoundLabel(page, url);
+        await checkPortraits(page, url);
         await checkLanguages(page, profile, url);
         assert.deepEqual(errors, [], 'localization browser errors');
         console.log(`PASS ${profile} English and Turkish ${device.viewport.width}×${device.viewport.height}`);

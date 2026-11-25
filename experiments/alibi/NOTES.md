@@ -550,3 +550,65 @@ Phase 3 used the `level` URL parameter to open cases 16, 22 and 23, as `check.mj
 | `bots.mjs` | Passed. Every table is identical to the run before the changes; the sim's cases did not change. |
 | `check.mjs`, iphone, pixel and 360 | Passed: all three groups on each profile |
 | `kit/check/phone.mjs alibi` | ok on WebKit and Chromium |
+
+## Loss reveal, owl portrait and sound label — 2026-11-24
+
+Three items left open by "Second cold play". Paths below are relative to the scratch directory `shots/fix-alibi/`.
+
+### What changed
+
+1. **A lost campaign case shows its liar; Retry deals a fresh variant.**
+   - **Loss card.** The liar's portrait sits in a gold frame. A small copy of the liar's head starts in the claimed room (cream box) and moves to the room where they really were at that mark (dark box). Then `≠` and the clock fade in. The move takes 1.4 s; with reduced motion the card shows the end state. The three crossed-out portraits stay. The last wrong comparison (`=`) and the empty stars are gone from this card. The label adds `liarShown` (English and Turkish).
+   - **Variants.** `sim.js` `caseVariant(level, n, seed)`: variant 0 is `createCase({ seed, level })`. Variants 1–8 are the same case spec drawn from other seeds, and they repeat in a cycle after 8. Each variant's liar differs in id and portrait from the variant before it and from the original. Variant 1 also differs from variant 8, where the cycle wraps. `createCase` is unchanged.
+   - **Storage.** The variant is recorded at the moment of loss in `alibi-save` as `retries: { [level]: losses }`. The field is new and defaults to `{}`; `readProfile` validates it and `syncProfile` merges it by maximum. Every later start of that case, including Menu then Play and the case picker, uses that variant, so going back to the menu cannot bring back the revealed case. The reload checkpoint in `sessionStorage` gains `variant`, defaulting to 0, and keeps `version: 1`. Stars go to the case number, whichever variant was won.
+   - **Daily and Hard Daily: no reveal.** A lost Daily writes nothing, Yeniden replays the same date's case, and a win then saves full credit (`saveWin`, `betterScore`). So a lost Daily can be retried for credit, and its loss card keeps the old picture without the liar.
+   - `window.alibiState()` gains `variant` and `lossReveal`. `lossReveal` is the liar's id on a revealing loss card and `null` otherwise.
+2. **The owl redrawn** (`art.js`). It now has a round face disc made of two pale rings, big front-facing eyes with yellow irises and large pupils, and a small hooked beak. Its ear tufts are short, brown and notched. It has no whiskers and no cat nose. Its hurt mood squints instead of using the shared brows and mouth; its caught mood shrinks the pupils. Contact sheets of all eight at 19, 24 and 39 px heads and 34 px bodies, old row above new: `sheet-webkit.png`, `sheet-chromium.png`. No other portrait has round yellow eyes; bear and hedgehog, the other tan faces, stay distinct.
+3. **The menu row with the sound button keeps one line** (`index.html`, class `tight` on that row). Daily, Cases and Sound do not wrap, and they have less side padding and a 6 px gap, so the widths follow the labels. `#pauseSound` also does not wrap. Before this, at 360 px in Turkish, "Ses kapalı" and "Günlük ✦12" each wrapped to two lines. "Sound off" wrapped in English at 360 and 390.
+
+### Assertions, and the failure on old code
+
+| Item | Assertion | Old code |
+| --- | --- | --- |
+| 1 | `bots.mjs`: for all 36 cases, variants 1–8 keep the case spec. Each passes `prove`, `checkAlternatives` (case 3 on), and the carrier-trail, mask-on, masked-lie, floor and two-mark checks. Each liar differs in id and portrait from the run before and from the original, and each layout differs. | With `caseVariant` returning the original: "case 1: retry 1 has a different liar from the run it follows". With the liar filter removed: the same failure at retry 2. |
+| 1 | `check.mjs` `checkMenus`: the loss card reveals the liar; Retry deals variant 1 with a different layout and liar; the revealed portrait does not win; the variant win saves the stars. A lost Daily shows no reveal, Retry replays the same Daily, and the win saves 3 stars. `runCampaign`: a reload during a retry keeps the variant, and Menu then Play does not bring back the revealed case. | The old `game.js` failed all eight new `checkMenus` findings. The two Daily findings failed only because the state fields `lossReveal` and `variant` did not exist, so they guard the new behaviour rather than show an old fault. |
+| 2 | `check.mjs` `checkPortraits` renders each head at 24 px, 3×. The owl needs a large dark pupil inside a yellow iris ring in both eyes, an orange beak and no dark whisker pixels beside the face. No other animal may have the owl's eyes. | Old art: "the owl reads as an owl at 24 px: bigEyes false, beak false". |
+| 3 | `check.mjs` `checkSoundLabel`, on all three profiles: in tr and en, with streaks 12 and 365, sound on, off and on, every button in the sound row is one text line with no overflow, and the panel top does not move. The two pause-row buttons are one line too. | Old CSS: "tr, sound on, streak 12: menu button daily "Günlük ✦12" keeps one line". |
+
+**Changed assertions, and why.**
+- `checkMenus` accused `campaign.culprit` after Yeniden. Yeniden now deals a variant, so it accuses the variant's liar.
+- `checkLanguages` required `=` on the loss card. It now requires `≠`, the liar's contradiction, which replaced the last wrong comparison on that card.
+- `checkLanguages` used case 1's fixed liar in both languages. The first language's loss moves case 1 to a variant, so it reads the case actually on screen.
+- `checkFirstPlay` loses case 1, and that loss now records a variant. It clears `alibi-save` at its end, so `runCampaign` still starts from an empty save.
+
+### Confirmed by touch (tr-TR)
+
+| Step | Chromium 360×640 | WebKit iPhone 13 |
+| --- | --- | --- |
+| Menu, Ses açık → Ses kapalı on one line; panel did not move | `c/002-sound-off.png` | `w/002-sound-off.png` |
+| Case 3: lost by accusing frog, bear and mouse; the owl is revealed | `c/006-acc-mouse-loss.png` (mid-move), `c/007-loss-final.png` | `w/007-loss-final.png` |
+| Yeniden: the new cast has no owl; solved by comparing the cat's 7:20 claim with the replay; 3 stars saved | `c/012-win.png` | `w/013-win.png` |
+| Case 12 (two marks): lost by accusing frog, bear and fox; the hedgehog is revealed. In the variant the hedgehog's two marks both held, and the cat's 7:15 mark did not; 3 stars saved | `c12/006-loss12.png`, `c12/009-h-715.png`, `c12/013-win12.png` | — |
+| The new owl in the menu scene, the lineup and the loss card | `c/002-sound-off.png`, `c/007-loss-final.png` | `w/002-sound-off.png`, `w/007-loss-final.png` |
+
+Both browsers saved `retries: { 3: 1 }` and `stars: { 3: 3 }`, and Chromium also saved `retries: { 12: 1 }` and `stars: { 12: 3 }`. Neither logged a console error. Cases 3 and 12 were opened with `?level=`. Everything inside each case was played by touch.
+
+**A known property.** Each variant's liar differs from the previous liar's id as well as its animal. So the liar never sits in the same lineup slot twice in a row, which a player could in principle use to rule out one slot.
+
+### Not verified
+
+- Whether players read the moving head as "where they said" against "where they were." The motion is short and the head is small (19 px).
+- Variants are checked for 8 per case. A ninth loss repeats variant 1, whose liar differs from variant 8 but may match an earlier variant's liar.
+- A lost Daily by touch. That path is covered only by `check.mjs`, and only for the standard Daily. The Hard Daily uses the same `daily` flag but its loss card was not asserted.
+- The reduced-motion end state of the loss card.
+- Whether two portraits can be confused. This was judged by eye from the contact sheets; `checkPortraits` only checks that no other animal has the owl's eyes.
+- Whether a player understands that Yeniden deals a new case. The revealed animal can come back innocent, as the hedgehog did in case 12.
+- Physical phones, audio and a native Turkish speaker.
+
+### Verification
+
+| Check | Result |
+| --- | --- |
+| `bots.mjs` | Passed. Every table is identical to the run before the changes. |
+| `check.mjs`, iphone, pixel and 360 | Passed: all three groups on each profile. |
+| `kit/check/phone.mjs alibi` | ok on WebKit and Chromium. |

@@ -252,6 +252,35 @@ export function createCase({ seed = campaignSeed, level = 1, culpritOverride, fl
     carryBeat, carrier, trail, exchangeBeat, maskKinds, frames, beatCount: spec.beats };
 }
 
+// After a lost campaign case the loss card shows the liar, so Retry deals a
+// fresh draw of the same case: same rules and size, another seed. Variant 0 is
+// the case itself. Variants 1..RETRY_VARIANTS repeat in a cycle, and each one's
+// liar differs in id and portrait from the variant before it (variant 1 also
+// from the last, where the cycle wraps) and from the original.
+export const RETRY_VARIANTS = 8;
+const variantSeeds = new Map();
+const liarOf = c => [c.culprit, c.cast[c.culprit].species];
+export function caseVariant(level, variant = 0, seed = campaignSeed) {
+  if (!variant) return createCase({ seed, level });
+  const key = `${seed}/${level}`;
+  if (!variantSeeds.has(key)) {
+    const original = liarOf(createCase({ seed, level }));
+    const seeds = [];
+    const liars = [];
+    for (let k = 1; seeds.length < RETRY_VARIANTS; k++) {
+      const candidate = (seed ^ Math.imul(k, 0x632be5ab)) >>> 0;
+      if (candidate === seed) continue;
+      const liar = liarOf(createCase({ seed: candidate, level }));
+      const avoid = [original, liars.at(-1), seeds.length === RETRY_VARIANTS - 1 ? liars[0] : null].filter(Boolean);
+      if (avoid.some(([id, species]) => id === liar[0] || species === liar[1])) continue;
+      seeds.push(candidate);
+      liars.push(liar);
+    }
+    variantSeeds.set(key, seeds);
+  }
+  return createCase({ seed: variantSeeds.get(key)[(variant - 1) % RETRY_VARIANTS], level });
+}
+
 // Every clock mark a suspect's alibi names: one, or two in a two-mark case.
 export const claims = person => person.claim2 ? [person.claim, person.claim2] : [person.claim];
 
