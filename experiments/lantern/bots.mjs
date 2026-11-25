@@ -2,7 +2,12 @@
 // Modes (exit non-zero on a failed check):
 //   node experiments/lantern/bots.mjs parity [seeds] [--mutate]   with no mode chosen, sim.js plays exactly as on main (see parity below)
 //   node experiments/lantern/bots.mjs spark [runs] [--mutate[=flies-anywhere]]   Spark's claims (modes/spark-bots.mjs)
+//   node experiments/lantern/bots.mjs ripples [--mutate]   the 3D view's water (ripple-bots.mjs)
 import { create, step, centre, half, sight, score, progress, towerStage, GOAL, BOAT, DT } from './sim.js';
+if (process.argv[2] === 'ripples') { // the 3D view's water: its own claims (ripple-bots.mjs), in its own process
+  const { spawnSync } = await import('node:child_process');
+  process.exit(spawnSync(process.execPath, [new URL('./ripple-bots.mjs', import.meta.url).pathname, ...process.argv.slice(3)], { stdio: 'inherit' }).status ?? 1);
+}
 const SUB = ['parity', 'spark'].includes(process.argv[2]) ? process.argv[2] : '';
 if (SUB === 'spark') { // its own process: spark-bots.mjs reads its arguments and runs worker threads
   const { spawnSync } = await import('node:child_process');
