@@ -7,7 +7,7 @@ import { homedir } from 'node:os';
 import { dirname, extname, join, resolve, sep } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
-import { LEVELS } from './sim.js';
+import { LEVELS, answerHandle, dailySpec } from './sim.js';
 import { answerLab, withAgent, assertNotice, assertRun, assertOffSendsNothing, assertNoLeak, waitForRuns } from '../../kit/check/lab-record.mjs';
 
 const mount = '/lab/night-saltplate/';
@@ -240,10 +240,30 @@ async function tapTuner(page, { marker, fraction }) {
   assert.deepEqual(touches, [['touch', true]], 'one trusted touch reaches the range');
 }
 
+// Where a point of the plate (0..1 across the engraved square) is on the screen.
+async function platePoint(page, [x, y]) {
+  const box = await page.locator('#plate').boundingBox();
+  return { x: box.x + (29 + 342 * x) / 400 * box.width, y: box.y + (29 + 342 * y) / 400 * box.height };
+}
+
 async function clear(page, level, marker = false) {
   const start = performance.now();
-  await tapTuner(page, { marker, fraction: LEVELS[level - 1].target });
-  const tuned = await waitFor(page, s => s?.active, `plate ${level} responds to one touch`);
+  const spec = LEVELS[level - 1];
+  // Plates 10, 11, 13 and 18: put the bow or the finger where the plate needs it, with one touch.
+  if (spec.handle) {
+    const point = await platePoint(page, answerHandle(spec));
+    await page.touchscreen.tap(point.x, point.y);
+    const placed = await state(page);
+    assert.ok(placed.handle && Math.hypot(placed.handle[0] - answerHandle(spec)[0], placed.handle[1] - answerHandle(spec)[1]) < 0.01,
+      `plate ${level}: one touch puts the ${spec.handle === 'bow' ? 'bow' : 'finger'} there: ${JSON.stringify(placed.handle)}`);
+  }
+  // The stiff plate: touch a little below the pitch, then slide up with the arrow keys.
+  await tapTuner(page, { marker, fraction: spec.stiff ? spec.target - 0.1 : spec.target });
+  if (spec.stiff) {
+    await waitFor(page, s => s?.active, `plate ${level} responds to one touch`);
+    for (let step = 0; step < 10; step++) { await page.keyboard.press('ArrowRight'); await sleep(40); }
+  }
+  const tuned = await waitFor(page, s => s?.active && (!spec.stiff || Math.abs(s.drive - spec.target) < 0.015), `plate ${level} responds to one touch`);
   assert.ok(Math.abs(tuned.drive - LEVELS[level - 1].target) < 0.015,
     `plate ${level} tunes to its expected resonance: ${tuned.drive}`);
   const released = await waitFor(page, s => s?.t > tuned.t, `plate ${level} vibrates after release`);
@@ -409,12 +429,147 @@ async function run({ name, engine, device }) {
   }
 }
 
+// The additions of 2026-11-24: an old save opens the new plates, the daily figure, the instrument,
+// pictures, the plate list, Turkish, the layout on short phones, and the page's work per frame.
+async function extras({ name, engine, device }) {
+  const browser = await engine.launch({ headless: true, timeout: 30000 });
+  try {
+    const context = await browser.newContext({ ...devices[device], serviceWorkers: 'block' });
+    await context.addInitScript(() => {
+      window.saltplateShared = [];
+      navigator.canShare = () => true;
+      navigator.share = async data => { window.saltplateShared.push({ files: data.files?.map(file => [file.type, file.size]), text: data.text }); };
+    });
+    const page = await context.newPage();
+    page.setDefaultTimeout(6000);
+    const { errors, unexpected, lab } = await attachAudit(context, page);
+    if (name === 'webkit') await wakeDisplay(page);
+    const day = '2026-11-24';
+    const at = query => withAgent(url) + '&hint=0&date=' + day + query;
+
+    // A save from before the twelve new plates (six cleared) opens plate 7, and keeps its format.
+    await page.goto(at(''));
+    await page.evaluate(() => localStorage.setItem('night-saltplate:save', JSON.stringify({ v: 1, cleared: 6, look: 'oxide', sound: false })));
+    await page.reload();
+    const seventh = await waitFor(page, s => s?.screen === 'play', 'old save opens');
+    assert.deepEqual([seventh.level, seventh.cleared, seventh.look, seventh.sound], [7, 6, 'oxide', false], 'a six-plate save opens plate 7 with its settings');
+    await readyToPaint(page, name);
+    await checkBounds(page, ['tuner', 'pause', 'daily', 'free']);
+    await screenshot(page, name, '07-old-save-plate-7');
+    await clear(page, 7);
+    assert.deepEqual(JSON.parse(await page.evaluate(() => localStorage.getItem('night-saltplate:save'))), { v: 1, cleared: 7, look: 'oxide', sound: false },
+      'the save keeps its first format');
+
+    // The daily figure: the same for everyone on the day, timed, best kept under its own key, shared as a picture.
+    await page.tap('#daily');
+    const daily = dailySpec(day);
+    const opened = await waitFor(page, s => s?.screen === 'play' && s.mode === 'daily', 'the daily figure opens');
+    assert.ok(!opened.active && opened.t === 0, 'the daily figure opens untouched');
+    assert.match(await page.locator('#number').textContent(), new RegExp(day), 'the daily caption names the day');
+    await tapTuner(page, { fraction: daily.target });
+    const printed = await waitFor(page, s => s?.screen === 'result' && s.won, 'the daily figure prints', 15000);
+    const record = JSON.parse(await page.evaluate(() => localStorage.getItem('night-saltplate:daily')));
+    assert.deepEqual([record.v, record.day, record.tries], [1, day, 1], 'the daily record is kept under its own key');
+    assert.ok(Math.abs(record.best - printed.t) < 0.11, `the best time is the print time: ${record.best} ${printed.t}`);
+    assert.equal(JSON.parse(await page.evaluate(() => localStorage.getItem('night-saltplate:save'))).cleared, 7, 'the daily figure leaves the plate save alone');
+    await screenshot(page, name, '08-daily-result');
+    await page.tap('#share');
+    await page.waitForFunction(() => window.saltplateShared.length === 1);
+    const [shared] = await page.evaluate(() => window.saltplateShared);
+    assert.ok(shared.files.length === 1 && shared.files[0][0] === 'image/png' && shared.files[0][1] > 20000, 'one PNG picture is shared');
+    assert.match(shared.text, new RegExp(`${day}.* in ${printed.t.toFixed(1)} s`), 'the shared words carry the day and the time');
+    await waitForRuns(lab, 'night-saltplate', 2);
+    const dailyRun = assertRun(lab, 'night-saltplate', { outcomes: ['won'], count: 2, summaryKeys: ['mode', 'day'] });
+    assert.equal(dailyRun.data.summary.mode, 'daily', 'the daily run is recorded as daily');
+    assert.ok(dailyRun.data.events.some(event => event.type === 'daily-printed'), 'the daily print is an event');
+
+    // The instrument: any shape, any pitch, the bow where the finger is; it never ends.
+    await page.tap('#free');
+    await waitFor(page, s => s?.screen === 'play' && s.mode === 'free', 'the instrument opens');
+    const bow = await platePoint(page, [0.3, 0.3]);
+    await page.touchscreen.tap(bow.x, bow.y);
+    const bowed = await waitFor(page, s => s?.active && s.handle, 'a touch on the plate bows it');
+    assert.ok(Math.abs(bowed.handle[0] - 0.3) < 0.01 && Math.abs(bowed.handle[1] - 0.3) < 0.01, 'the bow is where the touch was');
+    await tapTuner(page, { fraction: 0.62 });
+    await sleep(1200);
+    const ringing = await state(page);
+    assert.ok(ringing.active && !ringing.won && ringing.screen === 'play', 'the instrument rings on');
+    await page.tap('#shape');
+    await waitFor(page, s => s?.mode === 'free', 'shape changes');
+    assert.deepEqual(JSON.parse(await page.evaluate(() => localStorage.getItem('night-saltplate:free'))), { v: 1, shape: 'disk' }, 'the shape is kept under its own key');
+    await tapTuner(page, { fraction: 0.45 });
+    await sleep(1500);
+    await checkBounds(page, ['shape', 'picture', 'resalt', 'home']);
+    await screenshot(page, name, '09-instrument');
+    await page.tap('#picture');
+    await page.waitForFunction(() => window.saltplateShared.length === 2);
+    assert.match((await page.evaluate(() => window.saltplateShared[1].text)), /\d+ Hz/, 'the instrument picture names its pitch');
+
+    // The plate list: cleared plates and the next one open, the rest closed.
+    await page.tap('#pause');
+    await waitFor(page, s => s?.screen === 'paused', 'paused');
+    await page.tap('#to-plates');
+    await waitFor(page, s => s?.screen === 'chooser', 'the plate list opens');
+    assert.deepEqual(await page.locator('#plate-list button').evaluateAll(buttons => [buttons.length, buttons.filter(b => !b.disabled).length]), [LEVELS.length, 8],
+      'eighteen plates listed; seven cleared and the eighth open');
+    await screenshot(page, name, '10-plate-list');
+    await page.locator('#plate-list button').nth(1).tap();
+    await waitFor(page, s => s?.screen === 'play' && s.mode === 'plates' && s.level === 2, 'a listed plate opens');
+
+    // Turkish: every string through words.js.
+    await page.tap('#pause');
+    await page.tap('#lang');
+    assert.equal(await page.evaluate(() => document.documentElement.lang), 'tr');
+    assert.equal(await page.locator('#resume').textContent(), 'Devam');
+    await page.tap('#resume');
+    assert.equal(await page.locator('#level-name').textContent(), 'Köşegen', 'the plate name is Turkish');
+    await screenshot(page, name, '11-turkish');
+    await page.tap('#pause');
+    await page.tap('#lang');
+    await page.tap('#resume');
+
+    // Nothing scrolls, from a 320 x 568 phone up, and the plate takes what is left.
+    const portrait = page.viewportSize();
+    const sizes = [];
+    for (const [width, height] of [[320, 568], [375, 667], [390, 844]]) {
+      await page.setViewportSize({ width, height });
+      await sleep(120);
+      const fit = await page.evaluate(() => ({ scroll: document.documentElement.scrollHeight - innerHeight, wide: document.documentElement.scrollWidth - innerWidth,
+        plate: document.getElementById('plate').getBoundingClientRect().width }));
+      assert.ok(fit.scroll <= 0 && fit.wide <= 0, `${width} x ${height} does not scroll: ${JSON.stringify(fit)}`);
+      sizes.push(`${width}x${height} plate ${Math.round(fit.plate)}`);
+    }
+    assert.ok(Number(sizes[0].split(' ').at(-1)) >= 250, `the plate fills a 320 x 568 phone: ${sizes[0]}`);
+
+    // Page work per frame at 390 x 844 with the most grains (the Powder plate: 700).
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.evaluate(() => localStorage.setItem('night-saltplate:save', JSON.stringify({ v: 1, cleared: 15, look: 'blue', sound: true })));
+    await page.goto(at(''));
+    await waitFor(page, s => s?.screen === 'play' && s.level === 16, 'the Powder plate opens');
+    await readyToPaint(page, name);
+    await tapTuner(page, { fraction: 0.3 });
+    await page.evaluate(() => window.saltplatePerfReset());
+    await sleep(2500);
+    const perf = await page.evaluate(() => window.saltplatePerf());
+    assert.ok(perf.grains === 700 && perf.frames > 60, `frames measured with every grain: ${JSON.stringify(perf)}`);
+    assert.ok(perf.p95 < 8, `page work per frame under 8 ms: ${JSON.stringify(perf)}`);
+    await page.setViewportSize(portrait);
+
+    assert.deepEqual(unexpected, [], 'no external requests');
+    assert.deepEqual(errors, [], 'no browser errors');
+    console.log(JSON.stringify({ browser: name, extras: { daily: daily.shape + ':' + daily.mode, dailySeconds: printed.t, sizes, perf } }));
+  } finally {
+    await browser.close();
+  }
+}
+
 try {
   for (const profile of profiles) {
     if (process.argv[2] && process.argv[2] !== profile.name) continue;
     try {
       await run(profile);
       await recording(profile);
+      await extras(profile);
     } catch (error) {
       process.exitCode = 1;
       console.error(profile.name, error);

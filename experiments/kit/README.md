@@ -17,6 +17,7 @@ Shared code for the games under `experiments/`. It is served at `/kit/` as plain
 | `i18n.js` | `words({ en: {...}, tr: {...} })` gives `{ t, lang, setLang, apply, langs }`: text in the player's language, chosen by `?lang=`, a remembered choice (`kit:lang`, shared by every game) or the browser; `apply()` fills `data-i18n` elements |
 | `room.js` | `table({ game, version, name, onState, onMove, ... })`, `newCode`, `linkFor`, `codeFromLink`, `share` (and `shareLink(url, words)` for any other link): a table for friends by four-letter code or link, no account, for turn-based games; see below |
 | `lab.js` | `lab(slug)`: play recording for the game lab, with its notice and off switch; see below |
+| `share.js` | `shareImage(source, { name, text })`: share a picture the game drew (a canvas or a Blob) through the phone's share sheet, or download it where files cannot be shared; returns `'shared'`, `'saved'`, `'cancelled'` or `'failed'` and never throws. `canvasBlob(canvas)`. Used by `lab/night-sand` (its garden) and `lab/night-saltplate` (prints, the daily figure, the instrument) |
 | `/notes/button.js` | the notes button for testers (it lives in `workers/feedback/public/notes/`) |
 | `check/phone.mjs` | phone runs of every live experiment, of the lab pages under `/lab/` and of this kit, on WebKit iPhone 13 and Chromium Pixel 7 |
 | `index.html` | a self-test page at `/kit/` |
