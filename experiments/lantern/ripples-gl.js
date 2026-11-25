@@ -34,15 +34,15 @@ void main() {
 }`;
 // One solver step. A wall neighbour counts as the cell itself (no water crosses a wall); off the grid's ends counts as still water.
 const STEP = `${HEAD}
-uniform sampler2D uPrev, uMask; uniform float uC2, uKeep;
-float nb(ivec2 p, float h) { if (p.y < 0 || p.y >= uSize.y) return 0.; if (p.x < 0 || p.x >= uSize.x || texelFetch(uMask, p, 0).r > 0.5) return h; return texelFetch(uPrev, p, 0).r; }
+uniform sampler2D uPrev, uMask; uniform float uC2, uKeep, uVisc;
+vec2 nb(ivec2 p, vec2 c) { if (p.y < 0 || p.y >= uSize.y) return vec2(0); if (p.x < 0 || p.x >= uSize.x || texelFetch(uMask, p, 0).r > 0.5) return c; return texelFetch(uPrev, p, 0).rg; }
 void main() {
   ivec2 q = ivec2(gl_FragCoord.xy);
   if (texelFetch(uMask, q, 0).r > 0.5) { o = vec4(0, 0, 0, 1); return; }
   vec2 c = texelFetch(uPrev, q, 0).rg; float h = c.r;
-  float lap = nb(q + ivec2(1, 0), h) + nb(q - ivec2(1, 0), h) + nb(q + ivec2(0, 1), h) + nb(q - ivec2(0, 1), h) - 4. * h;
+  vec2 l2 = nb(q + ivec2(1, 0), c) + nb(q - ivec2(1, 0), c) + nb(q + ivec2(0, 1), c) + nb(q - ivec2(0, 1), c) - 4. * c; // now and before
   float d = float(min(q.y, uSize.y - 1 - q.y)), sp = d >= ${SPONGE}. ? 1. : 1. - 0.1 * pow((${SPONGE}. - d) / ${SPONGE}., 2.);
-  o = vec4(clamp((h + uKeep * (h - c.g) + uC2 * lap) * sp, -${CLAMP}., ${CLAMP}.), h * sp, 0, 1);
+  o = vec4(clamp((h + uKeep * (h - c.g) + uC2 * l2.x + uVisc * (l2.x - l2.y)) * sp, -${CLAMP}., ${CLAMP}.), h * sp, 0, 1);
 }`;
 
 // gl: the 3D view's context. level: 1 or 2 (ripples.js LEVELS). cpu: use the CPU solver even when the GPU one would work.
@@ -110,7 +110,7 @@ export function createWaterGL(gl, level, { cpu = false } = {}) {
     pass(P.splash, pair[1 - cur].f, u => { bindTex(0, pair[cur].t, u.uPrev); gl.uniform1i(u.uShift, shift); gl.uniform4fv(u.uDrops, dropsU); gl.uniform1i(u.uNDrops, nd); });
     cur = 1 - cur;
     for (let i = 0; i < ticks * g.steps; i++) {
-      pass(P.step, pair[1 - cur].f, u => { bindTex(0, pair[cur].t, u.uPrev); bindTex(1, mask.t, u.uMask); gl.uniform1f(u.uC2, g.c2); gl.uniform1f(u.uKeep, g.keep); });
+      pass(P.step, pair[1 - cur].f, u => { bindTex(0, pair[cur].t, u.uPrev); bindTex(1, mask.t, u.uMask); gl.uniform1f(u.uC2, g.c2); gl.uniform1f(u.uKeep, g.keep); gl.uniform1f(u.uVisc, g.visc); });
       cur = 1 - cur;
     }
     gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.bindVertexArray(null); gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, null); gl.activeTexture(gl.TEXTURE0); gl.depthMask(true);

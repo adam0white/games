@@ -14,17 +14,19 @@ import { centre, half, rain, DT } from './sim.js?v=15';
 export const X0 = -0.02, SPAN = 1.04; // the grid across: river x from X0, SPAN wide (the river never leaves 0 to 1)
 export const BACK = 0.45, AHEAD = 2.3; // the grid along: from BACK behind the boat to AHEAD in front (the 3D camera sees 0.34 behind)
 export const SPEED = 0.98; // how fast a ring spreads, river units a second: a little faster than the boat at the start of a night
-export const TAU = 0.9; // seconds for a ring's height to fall to 1/e of what it was, in open water
+export const TAU = 1.5; // seconds for a long wave's height to fall to 1/e from this alone (visc in LEVELS takes the short ones faster)
 export const SPONGE = 14; // rows at each end of the grid that soak waves up
 export const MAX_ROCKS = 48, MAX_DROPS = 64, CLAMP = 4;
 // Quality levels: 2 is the full grid, 1 half as fine (same wave speed), 0 is no ripples (the 3D view as before).
-export const LEVELS = [null, { nx: 64, steps: 2 }, { nx: 128, steps: 3 }];
+// visc: damping of a wave's speed by its neighbours' (Kelvin-Voigt), which kills grid-sized ripples the eye reads as a checker
+// and hardly touches a ring; level 1 has fewer, larger cells, so less of it.
+export const LEVELS = [null, { nx: 64, steps: 2, visc: 0.012 }, { nx: 128, steps: 3, visc: 0.02 }];
 
 // The grid at a level: cells across and along, the cell's size, solver steps per game tick and the two constants.
 export function grid(level) {
   const { nx, steps } = LEVELS[level], cell = SPAN / nx, ny = Math.ceil((BACK + AHEAD) / cell);
   const courant = SPEED / (cell * steps / DT); // must stay under 0.707 for the solver to be stable
-  return { nx, ny, cell, steps, c2: courant * courant, keep: Math.exp(-2 * DT / steps / TAU) };
+  return { nx, ny, cell, steps, visc: LEVELS[level].visc, c2: courant * courant, keep: Math.exp(-2 * DT / steps / TAU) };
 }
 // A sponge row's factor: 1 in open water, a little under 1 in the last SPONGE rows at either end.
 export function sponge(j, ny) { const d = Math.min(j, ny - 1 - j); return d >= SPONGE ? 1 : 1 - 0.1 * ((SPONGE - d) / SPONGE) ** 2; }
@@ -32,7 +34,7 @@ export function sponge(j, ny) { const d = Math.min(j, ny - 1 - j); return d >= S
 export const firstRow = (sy, cell) => Math.floor((sy - BACK) / cell);
 
 // The CPU solver. step() takes the boat's river y, river(y) -> [centre, half], rocks [{ x, y, rad, len }] and drops [{ x, y, r, a }],
-// and runs `ticks` game ticks of water. mutate (checks only): 'leaky-rocks' lets water through rocks, 'no-sponge' keeps the ends hard.
+// and runs `ticks` game ticks of water. mutate (checks only): 'leaky-rocks' lets water through rocks, 'no-sponge' keeps the ends hard, 'no-visc' lets grid-sized ripples ring on.
 export function createField(level, { mutate = '' } = {}) {
   const g = grid(level), { nx, ny, cell } = g, n = nx * ny;
   let now = new Float32Array(n), before = new Float32Array(n), next = new Float32Array(n);
@@ -69,16 +71,18 @@ export function createField(level, { mutate = '' } = {}) {
     }
   }
   function once() {
-    const { c2, keep } = g;
+    const { c2, keep } = g, visc = mutate === 'no-visc' ? 0 : g.visc;
     for (let j = 0; j < ny; j++) {
       const sp = mutate === 'no-sponge' ? 1 : sponge(j, ny);
       for (let i = 0; i < nx; i++) {
         const k = j * nx + i;
         if (solid[k]) { next[k] = 0; continue; }
         const h = now[k];
-        const l = i > 0 && !solid[k - 1] ? now[k - 1] : h, r = i < nx - 1 && !solid[k + 1] ? now[k + 1] : h;
-        const d = j > 0 && !solid[k - nx] ? now[k - nx] : (j > 0 ? h : 0), u = j < ny - 1 && !solid[k + nx] ? now[k + nx] : (j < ny - 1 ? h : 0);
-        const v = (h + keep * (h - before[k]) + c2 * (l + r + d + u - 4 * h)) * sp;
+        const b = before[k], L = i > 0 && !solid[k - 1], R = i < nx - 1 && !solid[k + 1], D = j > 0 && !solid[k - nx], U = j < ny - 1 && !solid[k + nx];
+        const l = L ? now[k - 1] : h, r = R ? now[k + 1] : h, d = D ? now[k - nx] : (j > 0 ? h : 0), u = U ? now[k + nx] : (j < ny - 1 ? h : 0);
+        const bl = L ? before[k - 1] : b, br = R ? before[k + 1] : b, bd = D ? before[k - nx] : (j > 0 ? b : 0), bu = U ? before[k + nx] : (j < ny - 1 ? b : 0);
+        const lap = l + r + d + u - 4 * h, lapB = bl + br + bd + bu - 4 * b;
+        const v = (h + keep * (h - b) + c2 * lap + visc * (lap - lapB)) * sp; // visc: the shortest waves (a grid-sized checker) die fast, long ones hardly at all
         next[k] = v > CLAMP ? CLAMP : v < -CLAMP ? -CLAMP : v;
       }
     }

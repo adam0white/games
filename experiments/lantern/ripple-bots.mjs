@@ -1,6 +1,7 @@
 // The 3D view's water (ripples.js): its claims, measured with the CPU solver, which runs the same rules as the GPU one.
 //   node experiments/lantern/bots.mjs ripples [--mutate]
-// --mutate runs the claims twice more with the water broken on purpose (rocks let water through; the grid's ends throw waves back)
+// --mutate runs the claims three times more with the water broken on purpose (rocks let water through; the grid's ends throw waves back;
+// grid-sized ripples are not damped)
 // and must fail (exit 1 when each break is caught, 2 when one is not).
 import { createField, disturb, solids, riverOf, SPEED, BACK, CLAMP } from './ripples.js';
 import { create, step, centre, half, rain } from './sim.js?v=15';
@@ -52,6 +53,14 @@ function claims(mutate = '') {
     { const s = { v: 0 }; ring(level, { mutate: 'no-sponge', at: end, ticks: 40, look: (f, t) => late(f, t, s) }); hard = s.v; }
     claim(soft < 0.5 * hard, `R5 level ${level}. the grid's near end soaks the ring up: ${(100 * soft / hard).toFixed(0)}% of the water a hard end leaves (wanted under 50%)`);
   }
+  // R8. Grid-sized ripples (a checker, which the eye reads as noise) die within 10 ticks; a ring loses far less in that time.
+  for (const level of [2, 1]) {
+    const f = createField(level, { mutate }); f.step(SY, open, [], [], 0);
+    for (let j = 40; j < 80; j++) for (let i = 20; i < f.nx - 20; i++) f.h[j * f.nx + i] = ((i + j) % 2 ? 0.1 : -0.1);
+    const e0 = f.energy(); f.step(SY, open, [], [], 10); const left = f.energy() / e0;
+    let r0 = 0, r10 = 0; ring(level, { mutate, ticks: 16, look: (g, t) => { if (t === 6) r0 = g.energy(); if (t === 16) r10 = g.energy(); } });
+    claim(left < 0.05 && r10 / r0 > 0.3, `R8 level ${level}. a grid-sized checker keeps ${(100 * left).toFixed(2)}% of its energy after 10 ticks (wanted under 5%; 71 to 156% without the damping); a ring keeps ${(100 * r10 / r0).toFixed(0)}% (wanted over 30%)`);
+  }
   // R6. Whole nights: the game's own runs, with rain, rocks, pickups and blows feeding the water every tick: it stays finite and bounded,
   // and never rings on forever (energy at the end of a calm stretch is small). R7. Reading the game changes nothing in it.
   let worst = 0, finite = true, same = true, drops = 0, kinds = new Set();
@@ -77,7 +86,7 @@ function claims(mutate = '') {
 const show = (res, label) => { for (const r of res) console.log(`${r.ok ? 'ok ' : 'FAIL'}  ${label}${r.text}`); return res.every(r => r.ok); };
 const good = show(claims(), '');
 if (process.argv.includes('--mutate')) {
-  const caught = ['leaky-rocks', 'no-sponge'].map(m => { const ok = show(claims(m), `(mutate ${m}) `); return !ok; });
+  const caught = ['leaky-rocks', 'no-sponge', 'no-visc'].map(m => { const ok = show(claims(m), `(mutate ${m}) `); return !ok; });
   console.log(caught.every(Boolean) ? 'mutation caught: the claims fail on broken water' : 'MUTATION NOT CAUGHT');
   process.exit(caught.every(Boolean) && good ? 1 : 2);
 }
