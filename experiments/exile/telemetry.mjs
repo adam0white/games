@@ -64,7 +64,8 @@ const rows = [...runs.values()].sort((a, b) => a.at - b.at).map(r => {
     build: d.start?.build ?? '', touch: d.start?.touch ? 'touch' : 'keys', outcome: d.outcome ?? 'left', minutes: +((d.ended - d.started) / 60000).toFixed(1),
     gameT: last.t ?? 0, phase: last.phase ?? 'Camp', level: last.level ?? 1, falls: last.falls ?? 0, buildings: last.buildings ?? 0,
     followers: last.followers ?? 0, soldiers: last.soldiers ?? 0, founded: !!last.founded, raid: of('raid').length > 0, raidWon: of('raidWon').length > 0,
-    witness: !!last.witness, brotherDown: of('brotherDown').length > 0, swings: last.swings ?? 0, hits: last.hits ?? 0, rolls: last.rolls ?? 0,
+    witness: !!last.witness, brotherDown: of('brotherDown').length > 0, crowned: of('crowned').length > 0, season: last.season ?? 0, difficulty: d.start?.difficulty ?? '',
+    petitions: of('petition').map(p => p.answer).join(', '), crises: of('crisis').map(c => c.kind).join(' '), swings: last.swings ?? 0, hits: last.hits ?? 0, rolls: last.rolls ?? 0,
     parries: last.parries ?? 0, blocks: last.blocks ?? 0, locks: last.locks ?? 0, potions: last.potions ?? 0, mounts: last.mounts ?? 0, ride: last.ride ?? 0,
     kills: (last.kills ?? []).reduce((a, b) => a + b, 0), dmgOut: last.dmgOut ?? 0, dmgIn: last.dmgIn ?? 0, coins: last.coins ?? 0,
     stats: (last.stats ?? []).join('/'), cam: (last.camTime ?? []).map(Math.round).join('/'),
@@ -72,10 +73,11 @@ const rows = [...runs.values()].sort((a, b) => a.at - b.at).map(r => {
     fpsMin: Math.min(...snaps.map(s => s.fpsMin ?? 999), last.fpsMin ?? 999),
     strangers: of('stranger').map(s => s.choice).join(' '), builds: of('build').map(b => b.what).join(', '),
     panels: of('panel').length, errors: of('error').length + of('pageError').length, truncated: !!d.truncated,
-    _falls: of('fall'), _path: path, _strangers: of('stranger'), _errors: of('error').concat(of('pageError')), _stat: of('stat'),
+    _falls: of('fall'), _path: path, _strangers: of('stranger'), _errors: of('error').concat(of('pageError')), _stat: of('stat'), _ev: ev,
   };
 });
 
+const of2 = (r, t) => r._ev.filter(e => e.type === t).map(e => e.data ?? {});
 const count = (list, key) => { const m = new Map(); for (const x of list) { const k = key(x); m.set(k, (m.get(k) ?? 0) + 1); } return [...m].sort((a, b) => b[1] - a[1]); };
 const table = (head, lines) => { const w = head.map((h, i) => Math.max(h.length, ...lines.map(l => String(l[i]).length))); return [head, ...lines].map(l => l.map((c, i) => String(c).padEnd(w[i])).join('  ')).join('\n'); };
 const pct = (n, of) => of ? `${n} (${Math.round(100 * n / of)}%)` : '0';
@@ -89,7 +91,7 @@ else {
   out.push(`\nPage loads that finished: ${loaded}; that failed: ${loadFailed}; runs started: ${n}`);
   out.push('\nHow far runs got');
   const steps = [['started', () => true], ['placed a building', r => r.buildings > 0], ['founded the kingdom', r => r.founded], ['raid began', r => r.raid], ['raid won', r => r.raidWon],
-    ['freed the witness', r => r.witness], ['brother beaten', r => r.brotherDown], ['reached an ending', r => r.outcome.startsWith('won')]];
+    ['freed the witness', r => r.witness], ['brother beaten', r => r.brotherDown], ['took the crown', r => r.crowned || r.outcome.startsWith('won')], ['reign: season 4', r => r.season >= 4 || r.outcome.startsWith('reign-held')], ['held the kingdom', r => r.outcome.startsWith('reign-held')]];
   out.push(table(['step', 'runs'], steps.map(([name, f]) => [name, pct(rows.filter(f).length, n)])));
   out.push('\nOutcomes'); out.push(table(['outcome', 'runs'], count(rows, r => r.outcome)));
   const left = rows.filter(r => r.outcome === 'left');
@@ -98,6 +100,10 @@ else {
   if (falls.length) { out.push(`\nFalls: ${falls.length}`); out.push(table(['phase', 'nearest enemy', 'falls'], count(falls, f => `${f.phase}|${f.near}`).map(([k, c]) => [...k.split('|'), c]))); }
   const str = rows.flatMap(r => r._strangers);
   if (str.length) { out.push('\nStranger choices'); out.push(table(['choice', 'times'], count(str, s => s.choice))); }
+  const pet = rows.flatMap(r => of2(r, 'petition'));
+  if (pet.length) { out.push('\nPetitions answered'); out.push(table(['who', 'answer', 'times'], count(pet, p => `${p.who}|${p.answer}`).map(([k, c]) => [...k.split('|'), c]))); }
+  const cr = rows.flatMap(r => of2(r, 'crisis'));
+  if (cr.length) { out.push('\nCrises'); out.push(table(['kind', 'times'], count(cr, c => c.kind))); }
   const st = rows.flatMap(r => r._stat);
   if (st.length) { out.push('\nStat points spent'); out.push(table(['stat', 'points'], count(st, s => s.stat))); }
   const builds = rows.flatMap(r => r.builds.split(', ').filter(Boolean));
@@ -110,7 +116,7 @@ else {
   if (errs.length) { out.push('\nErrors'); out.push(table(['message', 'times'], count(errs, e => String(e.msg).slice(0, 90)))); }
   if (between.length) { out.push('\nOutside a run (title screen, shop)'); out.push(table(['event', 'times'], count(between.flatMap(b => b.data.events ?? []), e => e.type + (e.data?.page ? ` ${e.data.page}` : e.data?.what ? ` ${e.data.what}` : '')))); }
   out.push('\nRuns');
-  const cols = ['when', 'player', 'who', 'build', 'touch', 'outcome', 'minutes', 'phase', 'level', 'falls', 'buildings', 'followers', 'kills', 'fps', 'strangers'];
+  const cols = ['when', 'player', 'who', 'build', 'difficulty', 'touch', 'outcome', 'season', 'minutes', 'phase', 'level', 'falls', 'buildings', 'followers', 'kills', 'fps', 'strangers'];
   out.push(table(cols, rows.map(r => cols.map(c => r[c]))));
 }
 console.log(out.join('\n'));
