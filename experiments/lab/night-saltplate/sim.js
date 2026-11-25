@@ -414,8 +414,8 @@ const MODAL = [
   { name: 'Duet', idea: 'duet', shape: 'square', mode: 'grid', drone: 'cross', threshold: 0.84, hold: 0.8 },
   { name: 'Stiff Plate', idea: 'stiff', shape: 'triangle', mode: 't4', stiff: true, threshold: 0.85, hold: 0.8 },
   { name: 'Powder', idea: 'powder', shape: 'disk', mode: 'd41', which: 0, powder: true, threshold: 0.8, hold: 0.8 },
-  { name: 'Shaker', idea: 'shaker', shape: 'triangle', mode: 't6', shake: { grace: 9, span: 6 }, threshold: 0.86, hold: 0.8 },
-  { name: 'Violin Ring', idea: 'ring', shape: 'violin', mode: 'v-ring', which: 0, handle: 'damp', shake: { grace: 14, span: 6 }, threshold: 0.8, hold: 0.85 },
+  { name: 'Shaker', idea: 'shaker', shape: 'triangle', mode: 't6', shake: { grace: 5, span: 25 }, threshold: 0.86, hold: 0.8 },
+  { name: 'Violin Ring', idea: 'ring', shape: 'violin', mode: 'v-ring', which: 0, handle: 'damp', shake: { grace: 8, span: 30 }, threshold: 0.8, hold: 0.85 },
 ];
 
 // The tuner position of each plate's mode is part of the plate.

@@ -107,6 +107,10 @@ h2 { font-weight:400; font-size:32px; letter-spacing:-.055em; }
 #work.busy .readouts label { display:none; }
 .clock { white-space:nowrap; font:400 18px/1 var(--mono); letter-spacing:-.05em; }
 .meter.salt #salt-bar { background:#6c7f78; }
+#salt-gauge.warn .mono { color:var(--red); }
+#salt-gauge.warn #salt-bar { background:var(--red); animation:salt-warn .5s ease-in-out infinite alternate; }
+@keyframes salt-warn { to { opacity:.45; } }
+@media (prefers-reduced-motion: reduce) { #salt-gauge.warn #salt-bar { animation:none; } }
 #salt-bar { display:block; height:100%; transform-origin:left; }
 .free-tools { display:none; gap:6px; }
 #work[data-mode="free"] .free-tools { display:flex; }

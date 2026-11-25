@@ -214,6 +214,7 @@ function start(spec, seed) {
   byId('match-bar').style.transform = 'scaleX(0)';
   byId('salt-gauge').hidden = !spec.shake;
   byId('salt-bar').style.transform = 'scaleX(1)';
+  byId('salt-gauge').classList.remove('warn');
   byId('clock').hidden = mode !== 'daily';
   byId('clock-value').textContent = '0.0';
   tools();
@@ -484,7 +485,14 @@ function frame(now) {
       if (state.failed) { shookOff(); break; }
     }
     byId('match-bar').style.transform = 'scaleX(' + state.match + ')';
-    if (state.spec.shake) byId('salt-bar').style.transform = 'scaleX(' + state.salt + ')';
+    if (state.spec.shake) {
+      byId('salt-bar').style.transform = 'scaleX(' + state.salt + ')';
+      // The first grains leaving: the gauge turns red and the plate hisses once.
+      if (state.lost > 0 && !byId('salt-gauge').classList.contains('warn')) {
+        byId('salt-gauge').classList.add('warn');
+        audio.noise(0.3, 0.05, 5000);
+      }
+    }
     if (mode === 'daily') byId('clock-value').textContent = state.t.toFixed(1);
     needsPaint = true;
     worked = true;
