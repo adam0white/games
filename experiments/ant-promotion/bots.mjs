@@ -1,11 +1,13 @@
 // Checks and measured play: node experiments/ant-promotion/bots.mjs [seeds] [minutes] [--mutate[=gait|clamp|spine|rocks]] [--ref=<main's sim.js>]
 // 0. the Living look's rig and drawing (rig-bots.mjs, run first; --mutate breaks the rig, runs only those checks and fails)
 // 0b. cover: rocks and tall grass (cover-bots.mjs, run second; --mutate=rocks makes rocks see-through, runs only its rule checks and fails)
+// 0c. the evolving meadow (evolve-bots.mjs, run third; --mutate=meadow lets traits run past their bounds, runs only its checks and fails)
 // 1. the contact rule, every cell   2. the form tree   3. food exists for every form   4. bots play
 // 5. the rival: a death makes one, it persists and gains power, no animal eats it, temperaments differ, it can be eaten
 import assert from 'node:assert/strict';
 import './rig-bots.mjs';
 import './cover-bots.mjs';
+import './evolve-bots.mjs'; // the evolving meadow (meadow.js); --mutate=meadow breaks its bounds, runs only its checks and fails
 import { SPAWN_WEIGHTS, HIDE_S, hideReady, SAME_FAST, FAST_CAP, crown, powerOf, nemesisMob, nemesisSave, cleanKnobs, TEMPERAMENT_NAMES, NEM_STEP, NEM_MAX_BONUS, NEM_PRIZE, MOBS,
   FORMS, ANT, TOP, CONE, encounter, create, step, choose, revive, me, level, catchable, optionsFor, article, chasePace, PACE_UP, PREY, TIRE, POWER, powerFor, powerReady, POUNCE, pounces, sightOf, placeOld, OLD_EVERY, OLD_HUNT, OLD_WEAK, OLD_PRIZE, OLD_SKILL, WORLD } from './sim.js';
 const args = process.argv.slice(2).filter(a => !a.startsWith('--')), seeds = Number(args[0] ?? 20), minutes = Number(args[1] ?? 12);

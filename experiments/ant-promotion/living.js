@@ -16,7 +16,7 @@
 //   rival temperament            ambusher lies low until it has seen you; stalker creeps long and slow; brute is bigger; coward trembles
 //   player skills                shell: a dome over the body (a porcupine raises its quills); sprint and dive: quick steps, stretched, a dive lifts; leap: an arc through the air
 //   Wild hide growing back       scratches on the back; slowed by an old animal's roar: a stagger
-import { FORMS, me, powerOf, tirePace, POUNCE, OLD_SKILL, powerFor, hideReady } from './sim.js';
+import { FORMS, me, powerOf, tirePace, POUNCE, OLD_SKILL, powerFor, hideReady, formOf } from './sim.js';
 import { update, poke } from './rig.js';
 import { creature, drawCreature, speciesFor as speciesOf } from './creature.js';
 
@@ -29,7 +29,7 @@ export function living() {
 
   // What the sim says about an animal, as a pose. Plain numbers; the rig and the drawing take them.
   function moodOf(s, m, F) {
-    const M = FORMS[m.f], o = {}, strong = powerOf(m) > F.power;
+    const M = formOf(s, m), o = {}, strong = powerOf(m) > F.power;
     if (m.pounce > 0) { // a pounce: crouch for the first moment, then a leap that lands
       const u = 1 - m.pounce / POUNCE.secs;
       if (u < 0.15) o.crouch = u / 0.15; else { const k = (u - 0.15) / 0.85; o.lift = Math.sin(Math.PI * Math.min(1, k * 1.7)) * 0.7; o.stretch = 0.22 * (1 - k); }
@@ -71,7 +71,7 @@ export function living() {
     for (const m of s.mobs) {
       if (Math.abs(m.x - p.x) > hw || Math.abs(m.y - p.y) > hh) continue; // far animals have no rig; one is laid out fresh when it comes near
       seen.add(m.id); let c = rigs.get(m.id);
-      if (!c || c.F.id !== m.f) rigs.set(m.id, c = creature(FORMS[m.f], m.x, m.y, m.a));
+      const E = formOf(s, m); if (!c || c.F !== E) rigs.set(m.id, c = creature(E, m.x, m.y, m.a)); // a new body when the meadow changes it (formOf: FORMS[m.f] itself when nothing has)
       c.mood = moodOf(s, m, F); c.hurry = c.mood.hurry || 1;
       const look = m.chase && !m.chase.gone ? m.chase : m.fear && !m.fear.gone ? m.fear : m.alert ? p : null; // eyes on what it hunts or flees
       update(c, m.x, m.y, m.a, DT, look); stat.stepped++;

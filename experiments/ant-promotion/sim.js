@@ -175,6 +175,7 @@ export function create(seed = 1, stack = [ANT], xp = 0, weights = SPAWN_WEIGHTS,
   if (nemesis && FORMS[nemesis.f]) placeNemesis(s, nemesis);
   if (old.length) placeOld(s, old);
   if (opts.cover !== false) { s.cover = layout(seed, WORLD); s.cover.teach = !!opts.teach; s.coverLost = 0; }
+  if (opts.meadow) s.meadow = opts.meadow; // meadow.js: the species as this player's meadow evolved them (none before GRACE runs)
   return s;
 }
 // What the player is now. Picking the same kind again builds on it: each earlier fast pick makes a fast animal faster (fastBoost),
@@ -259,6 +260,9 @@ function spawn(s, minDist) {
 // ---------- cover (cover.js): rocks and tall grass, from level COVER.from up. Below it, or in a world made with { cover: false },
 // none of this runs and the rules are exactly as before cover.
 export const coverOn = s => (s.cover && s.player.stack.length >= COVER.from ? s.cover : null);
+// The form an animal moves, sees and bites with: FORMS[m.f] itself, or the copy the evolved meadow made of it (meadow.js) for its role
+// against the player now. Without a meadow (a new player's first runs, or bots) it is always FORMS[m.f], so the world is as before.
+export const formOf = (s, m) => (s.meadow && !m.nem && !m.old && !m.teach ? s.meadow.form(FORMS[m.f], powerOf(m) > me(s).power, powerOf(m) < me(s).power) : FORMS[m.f]);
 function coverPlayer(s, C, F, v) {
   const p = s.player; pushOut(C, p, F.r); p.v = v; p.speed = F.speed;
   if (!C.taught) { C.taught = true; if (C.teach) teachCover(s, C, F); }
@@ -315,14 +319,14 @@ export function step(s, input) {
     if (N.seek > 0) { N.seek -= dt; N.home = { x: p.x, y: p.y }; } // it comes looking for you
   }
   for (let i = s.mobs.length - 1; i >= 0; i--) {
-    const m = s.mobs[i], M = FORMS[m.f], dx = p.x - m.x, dy = p.y - m.y, d = Math.hypot(dx, dy), to = Math.atan2(dy, dx);
+    const m = s.mobs[i], M = formOf(s, m), dx = p.x - m.x, dy = p.y - m.y, d = Math.hypot(dx, dy), to = Math.atan2(dy, dx);
     if (m.hunt > 0) m.hunt -= dt;
     const T = m.nem ? TEMPERAMENTS[N.knobs.temperament] : null, power = powerOf(m);
     const [far, half] = sightOf(M), range = M.range * far * (T ? T.sight : 1) * (m.old && !(m.hunt > 0) && !m.alert && power > F.power ? OLD_DIM : 1), cone = Math.min(Math.PI, half * (T ? T.cone : 1));
     if (m.winded > 0) m.winded -= dt;
     if (m.spring > 0) m.spring -= dt; if (m.pounce > 0) m.pounce -= dt;
-    if (m.stun > 0) m.stun -= dt;
-    const hid = C && (m.alert || m.hunt > 0 || d < range * F.stealth + F.r) && hidden(C, m, p, M.r + F.r); // cover: a rock between, or creeping in grass
+    if (m.stun > 0) m.stun -= dt * (M.shake || 1); // meadow: an evolved animal shakes off a stun sooner
+    const hid = C && (m.alert || m.hunt > 0 || d < range * F.stealth + F.r) && hidden(C, m, p, (M.r + F.r) * (M.look || 1)); // meadow: M.look, it looks into grass. cover: a rock between, or creeping in grass
     const sees = p.safe <= 0 && !(p.veil > 0) && !(m.winded > 0) && !(m.stun > 0) && (m.hunt > 0 || d < range * F.stealth + F.r && Math.abs(wrap(to - m.a)) < cone) && !hid;
     const wasAlert = m.alert;
     if (sees) { if (!m.alert && power !== F.power) s.events.push({ t: 'notice', strong: power > F.power, id: m.id, nem: !!m.nem }); m.alert = true; m.lost = 0; if (C) m.seen = { x: p.x, y: p.y }; }
@@ -352,14 +356,14 @@ export function step(s, input) {
     if (m.alert && power !== F.power) {
       turn = 7; speed = M.speed;
       if (!flees) {
-        m.want = hid && m.seen ? Math.atan2(m.seen.y - m.y, m.seen.x - m.x) : to; const pace = m.old ? Math.min(chasePace(M, F), F.speed * OLD_PACE) : chasePace(M, F); speed = pace; hunting = true;
+        m.want = hid && m.seen ? Math.atan2(m.seen.y - m.y, m.seen.x - m.x) : M.lead ? s.meadow.aim(s, m, M, to) : to; const pace = m.old ? Math.min(chasePace(M, F), F.speed * OLD_PACE) : chasePace(M, F); speed = pace; hunting = true;
         if (!T) {
           speed = pace * tirePace(m);
           if (m.pounce > 0) speed = Math.max(speed, F.speed * POUNCE.up);
           else if (!m.old && !(m.spring > 0) && pounces(M, F) && tirePace(m) === 1 && p.safe <= 0 && d < (range * F.stealth + F.r) * POUNCE.near) { m.pounce = POUNCE.secs; m.spring = POUNCE.rest; s.pounced = (s.pounced || 0) + 1; s.events.push({ t: 'pounce', id: m.id, name: M.name, x: m.x, y: m.y }); }
           if (m.old) speed = oldSkill(s, m, M, F, d, to, speed, dt);
-          if (!(m.guard > 0)) m.tire = (m.tire || 0) + dt;
-          if (m.tire >= TIRE.spent) { m.alert = false; m.hunt = 0; m.winded = TIRE.rest; m.tire = TIRE.fresh; s.tired++; s.events.push({ t: 'tired', id: m.id, name: M.name, x: m.x, y: m.y }); }
+          if (!(m.guard > 0)) m.tire = (m.tire || 0) + dt * (M.tire || 1); // meadow: M.tire, M.rest
+          if (m.tire >= TIRE.spent) { m.alert = false; m.hunt = 0; m.winded = TIRE.rest * (M.rest || 1); m.tire = TIRE.fresh; s.tired++; s.events.push({ t: 'tired', id: m.id, name: M.name, x: m.x, y: m.y }); }
         }
         if (T) {
           turn = T.turn; speed = pace * T.chase; N.chase += dt;
