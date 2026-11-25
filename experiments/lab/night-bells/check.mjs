@@ -521,6 +521,8 @@ async function run(name) {
       d = await snapshot(dp);
       assert.equal(d.dailySave.plays, 1, 'daily play counted'); assert.ok(d.dailySave.best > 0, 'daily best saved');
       assert.equal(d.dailySave.peal.length, rules(d).hits, 'every strike of the peal is kept for the picture');
+      // Sound and music on: every strike's pitch is a note of the kit/music.js bell chord, not the fixed fallback.
+      assert.ok(d.saved.sound && d.music, 'daily played with sound and music on'); assert.deepEqual(d.voices, { music: d.strikes }, 'every strike takes its pitch from kit/music.js');
       assert.deepEqual(d.saved, { ...before, tries: before.tries + 1 }, 'the daily peal changes nothing in the old save but tries');
       assert.ok(await dp.locator('#share').isVisible(), 'daily result offers Share'); assert.equal((await dp.locator('#share').textContent()).trim(), 'Paylaş', 'Share is in Turkish');
       assert.ok(await dp.locator('#replay').isVisible(), 'a won run can play its tune again');

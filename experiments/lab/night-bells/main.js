@@ -183,10 +183,11 @@ function chime(i) {
   const f = i < 0 ? 523.25 : pitch(i); bellVoice(f); return f;
 }
 const FIXED = [523.25, 659.25, 783.99];
+let voice = 'fixed'; // where the last strike's pitch came from: 'music' (kit/music.js chord) or 'fixed'
 function pitch(i) {
   const r = rank(i);
-  if (song && musicOn && save.sound) { try { return song.chime(r); } catch {} }
-  return FIXED[Math.min(2, r)];
+  if (song && musicOn && save.sound) { try { const f = song.chime(r); if (Number.isFinite(f) && f > 0) { voice = 'music'; return f; } } catch {} }
+  voice = 'fixed'; return FIXED[Math.min(2, r)];
 }
 // The village plays back what the player rang: the same bells in the same order, gaps tightened.
 function playTune() {
@@ -225,7 +226,7 @@ function pictureSvg() {
     ${lanes}${dots}${towers}
     <path d="M90 1172h900" stroke="#ffcd7533" stroke-width="2"/>
     <text x="90" y="1236" font-size="40" fill="#f9e7be">${esc(t('pictureStats', { rings: daily.rings, together: daily.together, misses: daily.misses }))}</text>
-    <text x="990" y="1290" font-family="-apple-system, system-ui, sans-serif" font-size="28" text-anchor="end" fill="#f9e7be99">${esc(t('pictureUrl'))}</text>
+    <text x="990" y="1290" font-family="-apple-system, system-ui, sans-serif" font-size="28" text-anchor="end" fill="#f9e7be99">${esc(location.host + location.pathname)}</text>
   </svg>`;
 }
 async function makePicture() {
@@ -304,7 +305,7 @@ function update() {
   step(s, queue.splice(0, 1));
   for (const e of s.events) {
     if (e.type === 'hit') {
-      const f = chime(e.index); strikes.push({ i: e.index, t: s.t, f });
+      voice = 'silent'; const f = chime(e.index); strikes.push({ i: e.index, t: s.t, f, voice });
       const p = positions[e.index]; if (p && !reduced) fx.push({ kind: 'ring', x: p.x, y: p.y, t: 0, life: .8, c: palette.bells[e.index] });
       spark(e.index, Math.round(litShare() * 88) - 1); ringTime = s.t;
     } else if (e.type === 'harmony' || e.type === 'chord' || e.type === 'woke') { burst = 1; chime(-1); }
@@ -499,7 +500,7 @@ window.bellsState = () => ({
   ...structuredClone(s), screen: mode, W, H, views: s.bells.map((_, i) => view(s, i)), saved: structuredClone(save),
   more: structuredClone(more), dailySave: structuredClone(daily), music: musicOn, lang: WORDS.lang(), today, chapter, cue: objective.hidden ? '' : objective.textContent,
   pads: structuredClone(pads), positions: structuredClone(positions), markers: structuredClone(markers), gallery: { ...gallery }, hintBottom: pads[0]?.y + HINT_LIFT + HINT_HEIGHT,
-  replay: replay ? { k: replay.k, of: replay.notes.length } : null, strikes: strikes.length, frame: frameCost(), picture: !!picture,
+  replay: replay ? { k: replay.k, of: replay.notes.length } : null, strikes: strikes.length, voices: strikes.reduce((o, n) => (o[n.voice] = (o[n.voice] || 0) + 1, o), {}), frame: frameCost(), picture: !!picture,
   minTouchPx: Math.min(...[...document.querySelectorAll('button')].filter(b => b.getClientRects().length).map(b => Math.min(b.getBoundingClientRect().width, b.getBoundingClientRect().height))),
 });
 if (query.get('test') === '1') window.bellsPicture = async () => { const p = picture || await makePicture(); if (!p) return null; return await new Promise(ok => { const r = new FileReader(); r.onload = () => ok(r.result); r.readAsDataURL(p); }); };
