@@ -467,6 +467,8 @@ async function run(name, engine, profile, origin) {
     await page.tap('#daily');
     let daily = await view(page);
     assert.equal(daily.day, '2026-11-24');
+    await page.waitForFunction(() => window.channelView().par !== null);
+    assert.equal((await view(page)).par, par(sim, 10, daily.day).cuts, 'the page finds the same daily par as the rules in Node');
     const dailyMap = levelGeometry(daily.state);
     const routes = routesToBeds(daily.state);
     await stamp(page, name + '-04-daily-clay');

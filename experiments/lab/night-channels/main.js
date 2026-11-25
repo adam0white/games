@@ -65,12 +65,23 @@ function store(soundChanged = false) {
 }
 const audio = sound({ on:() => saved.sound });
 // Par for each garden and date is worked out once: the fewest cuts of a planned route the rules confirm flowers.
+// A daily's par is found once per date, in a worker so the tap that opens the daily does not stall.
+// Until it answers the par reads "–". Without workers it is found here.
 const pars = new Map();
+let planner = null;
+try {
+  planner = new Worker(new URL('./par-worker.js', import.meta.url), { type: 'module' });
+  planner.onmessage = ({ data }) => { pars.set(data.id, data.cuts); update(); };
+  planner.onerror = () => { planner = null; for (const [id, v] of pars) if (v === undefined) pars.delete(id); update(); };
+} catch { planner = null; }
 function parOf(n, date) {
-  const id = date ? 'd' + date : 'g' + n;
   if (!date) return PARS[n - 1] ?? null;
-  if (!pars.has(id)) pars.set(id, findPar({ create, dig, tick }, n, date)?.cuts ?? null);
-  return pars.get(id);
+  const id = 'd' + n + ':' + date;
+  if (!pars.has(id)) {
+    if (planner) { pars.set(id, undefined); planner.postMessage({ id, level: n, date }); }
+    else pars.set(id, findPar({ create, dig, tick }, n, date)?.cuts ?? null);
+  }
+  return pars.get(id) ?? null;
 }
 let level = saved.unlocked, day = null, state = create(level), screen = 'play';
 let pointer = null, previous = null, lastSound = -Infinity, line = null;
