@@ -20,6 +20,8 @@ const canvas = $('c');
 const g = canvas.getContext('2d');
 const params = new URLSearchParams(location.search);
 const KEY = 'alibi-save';
+// A new player's first Play opens the practice case (note #260). alibi-practice: '1' once practice has been opened.
+const PRACTICE_KEY = 'alibi-practice';
 const validLevel = n => Number.isInteger(n) && n >= 1 && n <= CASES.length;
 const validStars = n => Number.isInteger(n) && n >= 1 && n <= 3;
 const seed = params.has('seed') && Number.isFinite(Number(params.get('seed'))) ? Number(params.get('seed')) >>> 0 : 32342;
@@ -379,6 +381,7 @@ const STEPS = [
 const canAccuse = () => step === null || step === STEPS.length - 1;
 let stepAt = 0;
 function learn() {
+  save.write(PRACTICE_KEY, '1');
   start(false, 1, false, '', { case: practiceCase(), variant: 0 });
   snd.release();
   snd.unlock();
@@ -452,7 +455,8 @@ function toggleSound() {
   updateMenu();
 }
 
-$('play').onclick = () => start(false, validLevel(forceLevel) ? forceLevel : profile.level);
+const newcomer = () => !validLevel(forceLevel) && save.readJson(KEY) === null && save.read(PRACTICE_KEY) === null;
+$('play').onclick = () => newcomer() ? learn() : start(false, validLevel(forceLevel) ? forceLevel : profile.level);
 $('learn').onclick = learn;
 $('coachOk').onclick = () => { if (playing() && STEPS[step]?.tap) nextStep(); };
 $('daily').onclick = () => start(true);

@@ -1181,6 +1181,18 @@ const GAMES = {
   borrowed: page => started(page, 'borrowed', 'borrowedState', '#toMenu'),
   async alibi(page) {
     await started(page, 'alibi', 'alibiState', '#toMenu');
+    // A new player's first Play opened the practice case (note #260); alibi-practice remembers it, so the next Play is case 1.
+    { const st = () => page.evaluate(() => window.alibiState()); const play = async () => { await page.click('#play'); await until(page, () => window.alibiState().screen === 'play', 'a case starts'); };
+      const back = async () => { await page.click('#pause'); await page.click('#toMenu'); await until(page, () => window.alibiState().screen === 'menu', 'back on the menu'); };
+      assert.equal(await page.evaluate(() => localStorage.getItem('alibi-practice')), '1', 'the first Play opened practice');
+      assert.equal(await page.evaluate(() => localStorage.getItem('alibi-save')), null, 'opening practice writes no game save');
+      await page.evaluate(() => localStorage.removeItem('alibi-practice')); await page.reload(); await until(page, () => window.alibiState?.().screen === 'menu', 'menu');
+      await play(); assert.equal((await st()).step, 0, 'a fresh save: Play opens practice'); await back();
+      await page.reload(); await until(page, () => window.alibiState?.().screen === 'menu', 'menu'); await play(); assert.equal((await st()).step, null, 'after practice, Play opens case 1'); await back();
+      await page.evaluate(() => { localStorage.removeItem('alibi-practice'); localStorage.setItem('alibi-save', JSON.stringify({ level: 3, campaignVersion: 2, stars: { 1: 3, 2: 2 } })); }); await page.reload(); await until(page, () => window.alibiState?.().screen === 'menu', 'menu');
+      await play(); assert.equal((await st()).step, null, 'a player with a save is never sent to practice'); await back();
+      assert.equal(await page.evaluate(() => localStorage.getItem('alibi-practice')), null, 'and is not marked');
+      await page.evaluate(() => { localStorage.removeItem('alibi-save'); localStorage.setItem('alibi-practice', '1'); }); await page.reload(); await until(page, () => window.alibiState?.().screen === 'menu', 'menu'); }
     // The practice case (note #245): from the menu, one step at a time, and nothing of it is saved.
     const kept = await page.evaluate(() => localStorage.getItem('alibi-save'));
     await page.click('#learn'); await until(page, () => window.alibiState().step === 0 && !document.querySelector('#coach').hidden, 'practice starts');
