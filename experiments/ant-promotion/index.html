@@ -27,6 +27,12 @@
   #pages div { background: #0003; border-radius: .6em; padding: .2em 0 .35em; font-size: .78em; line-height: 1.2; }
   #pages canvas { width: 72px; height: 72px; display: block; margin: auto; }
   #pages .no { opacity: .55; }
+  /* the practice meadow (practice.js): every animal, a row per level */
+  #practiceList { display: grid; grid-template-columns: repeat(3, 1fr); gap: .3em; }
+  #practiceList h3 { grid-column: 1 / -1; margin: .5em 0 0; font-size: .85em; opacity: .8; }
+  #practiceList button { min-width: 0; margin: 0; padding: .2em 0 .35em; font-size: .78em; line-height: 1.2; display: flex; flex-direction: column; align-items: center; }
+  #practiceList canvas { width: 64px; height: 64px; display: block; }
+  #practiceList small { color: #ffd23a; }
   #pages div:first-child { grid-column: 1 / -1; }
   .opt small { opacity: .9; font-size: .8em; }
   .opt b, .opt small { max-width: 100%; overflow-wrap: anywhere; }
@@ -109,6 +115,7 @@
   <p><button id="toSkins" data-i18n="toSkins">Ant skins</button><button id="toHow" data-i18n="howToPlay">How to play</button></p>
   <p><button id="toBook"></button></p>
   <p><button id="toMeadow"></button></p>
+  <p><button id="toPractice" data-i18n="practice.button">Practice meadow</button></p>
   <p><button id="look" style="min-width:0"></button><button id="sound" style="min-width:0"></button></p>
   <p><button id="rules" style="min-width:0"></button><button id="langMenu" class="language" data-i18n-aria="switchLanguage"></button></p>
 </div></div>
@@ -133,6 +140,13 @@
   <p id="meadowSay"></p>
   <div id="meadowList"></div>
   <p><button id="meadowReset"></button></p>
+  <p><button class="main back" data-i18n="done">Done</button></p>
+</div></div>
+
+<div id="practice" class="screen"><div>
+  <h2 data-i18n="practice.title">Practice meadow</h2>
+  <p data-i18n="practice.say"></p>
+  <div id="practiceList"></div>
   <p><button class="main back" data-i18n="done">Done</button></p>
 </div></div>
 
@@ -180,6 +194,7 @@
 <div id="paused" class="screen"><div>
   <h2 data-i18n="paused">Paused</h2><button id="langPause" class="language" data-i18n-aria="switchLanguage"></button>
   <p><button id="resume" class="main" data-i18n="keepPlaying">Keep playing</button></p>
+  <p><button id="practiceOther" data-i18n="practice.other" style="display:none">Try another animal</button></p>
   <p><button class="toMenu" data-i18n="menu">Menu</button></p>
 </div></div>
 
@@ -207,6 +222,7 @@ import { hint } from '../kit/hint.js';
 import { lab } from '../kit/lab.js'; // lab recording: the rec lines below
 import { noZoom } from '../kit/zoom.js'; noZoom(); // no double-tap or pinch zoom (note #74)
 import { t, lang, setLang, apply, animal, skill, trait, line, title as titleOf, sight as sightText, tx, rivalName, tables, EPITHETS, TITLES, LINES, FEAR, KIN } from './words.js'; // English and Turkish
+import { practiceStack, practiceStage, practicePicker, PRACTICE_CD } from './practice.js'; // the practice meadow: any animal, any skill, nothing saved
 import { meadowPage, formOf } from './meadow-page.js'; // the meadow evolves with how you play (meadow.js); its words are in meadow-words.js
 
 const $ = id => document.getElementById(id), cv = $('c'), g = cv.getContext('2d');
@@ -230,7 +246,8 @@ save.trophies = (Array.isArray(save.trophies) ? save.trophies : []).filter(t => 
 const PLAYABLE = FORMS.filter(f => f.level >= 1);
 const saw = ids => { for (const id of ids) if (!save.seen.includes(id)) save.seen.push(id); }; saw(save.stack); // the animal book: every animal you have been
 const buzz = ms => { try { if (save.sound) navigator.vibrate?.(ms); } catch {} };
-const store = () => writeJson(KEY, save);
+let practice = null, practiceSaved = null; // the practice meadow: the animal being tried, and the real save kept aside while it runs
+const store = () => { if (!practice) writeJson(KEY, save); }; // practice writes nothing
 
 let arrowTo = null; // the id the green food arrow points at, for the checks
 const L4 = living(), isLiving = () => save.look === 4; // the Living look's rigs; stepped with the sim (frame) and drawn in draw()
@@ -283,13 +300,15 @@ function burst(x, y, colours, n, speed, size) {
 }
 
 // ---------- screens
-const cards = screens(['menu', 'skins', 'how', 'book', 'evolve', 'dead', 'paused', 'win', 'meadow']);
+const cards = screens(['menu', 'skins', 'how', 'book', 'evolve', 'dead', 'paused', 'win', 'meadow', 'practice']);
 function show(name) {
+  if (name === 'menu' && practice) { practice = null; save = practiceSaved; practiceSaved = null; s = null; } // every way to the menu ends practice and puts the real save back
   mode = name;
   if (name !== 'play') { $('say').classList.remove('on'); sayTimer = 0; } // a message from play must not show through a card
   cards(name);
   const play = name === 'play';
-  $('hud').style.display = s && name !== 'menu' && name !== 'skins' && name !== 'how' && name !== 'book' && name !== 'meadow' ? 'block' : 'none';
+  $('hud').style.display = s && name !== 'menu' && name !== 'skins' && name !== 'how' && name !== 'book' && name !== 'meadow' && name !== 'practice' ? 'block' : 'none';
+  $('practiceOther').style.display = practice ? '' : 'none';
   $('pause').style.display = play ? 'block' : 'none'; if (!play) $('power').style.display = 'none';
   if (name === 'menu') menu();
   pad.drop(); keys.clear(); last = 0;
@@ -343,12 +362,12 @@ function hud() {
   const F = me(s), need = needFor(level(s));
   const pct = Math.min(100, Math.floor(s.player.xp / need * 100));
   $('fill').style.width = pct + '%'; $('pct').textContent = pct + '%';
-  $('who').textContent = t('hudWho', { n: level(s), name: animal(F.name) }) + (F.again > 1 && F.role === 'runner' ? t('hudSpeed', { n: Math.round((F.speed / FORMS[F.id].speed - 1) * 100) }) : F.again > 1 && F.role === 'sneak' ? t('hudSneak', { n: Math.round((1 - F.stealth / FORMS[F.id].stealth) * 100) }) : '') + (s.wild && F.role === 'brute' ? t(hideReady(s) ? 'hideReady' : 'hideGrowing') : '');
+  $('who').textContent = practice ? t('practice.hud', { name: animal(F.name) }) : t('hudWho', { n: level(s), name: animal(F.name) }) + (F.again > 1 && F.role === 'runner' ? t('hudSpeed', { n: Math.round((F.speed / FORMS[F.id].speed - 1) * 100) }) : F.again > 1 && F.role === 'sneak' ? t('hudSneak', { n: Math.round((1 - F.stealth / FORMS[F.id].stealth) * 100) }) : '') + (s.wild && F.role === 'brute' ? t(hideReady(s) ? 'hideReady' : 'hideGrowing') : '');
   const m = nemesisMob(s), r = $('rival');
   r.textContent = m && save.nem ? t('hudRival', { name: rivalName(save.nem.persona.name), p: powerOf(m) }) : '';
   r.style.color = save.nem ? save.nem.persona.colour : '';
 }
-function say(text) { $('say').textContent = text; $('say').classList.add('on'); sayTimer = 2.6; }
+function say(text, secs = 2.6) { $('say').textContent = text; $('say').classList.add('on'); sayTimer = secs; }
 
 function offer() {
   $('evolveSay').textContent = t('evolveSay', nameVars(me(s).name));
@@ -412,6 +431,16 @@ for (const b of document.querySelectorAll('.back')) b.onclick = () => show('menu
 for (const b of document.querySelectorAll('.toMenu')) b.onclick = () => { if (s?.dead) revive(s, false); riseNow = false; if (s) { save.stack = s.player.stack.slice(); save.xp = s.player.xp; keepNem(); store(); } s = null; show('menu'); };
 $('goOn').onclick = () => back(false); $('restart').onclick = () => back(true);
 $('pause').onclick = () => show('paused'); $('resume').onclick = () => show('play');
+function practiceStart(F, words) {
+  if (!practice) practiceSaved = JSON.parse(JSON.stringify(save)); // kept aside until the menu
+  practice = F;
+  s = create(Number(query.get('seed')) || (Math.random() * 1e9 | 0), practiceStack(F), 0, SPAWN_WEIGHTS, !!save.wild, null, [], { cover: query.get('cover') !== '0', teach: false });
+  practiceStage(s, F);
+  L4.clear(); floats.length = 0; bits.length = 0; flash = 0; glow = 0; beam = 0; bubble = null; noticeAt = -99; riseNow = false; pendingOffer = false; offerAt = 0; skillTip = 0; hud(); show('play');
+  say(words || t('practice.start', { name: animal(F.name), label: skill(skillFor(F).label), does: t('does.' + F.name) }), words ? 2.6 : 5);
+}
+const practicePick = () => { practicePicker($('practiceList'), portrait, F => { unlock(); rec.event('practice', { form: F.name }); practiceStart(F); }); show('practice'); };
+$('toPractice').onclick = practicePick; $('practiceOther').onclick = practicePick;
 $('winOn').onclick = () => show('play'); $('winNew').onclick = () => { save.stack = s.player.stack.slice(); start(true); };
 // Lab recording (experiments/kit/lab.js): the notice on the menu, the switch on the pause card, each life, promotions and skins.
 const rec = lab('ant-promotion'), notice = rec.notice($('menu').firstElementChild), recToggle = rec.toggle($('paused').firstElementChild);
@@ -457,7 +486,7 @@ function powerButton() { // once a frame while playing
   const b = $('power'), W = s && skillFor(me(s));
   if (!W || mode !== 'play') { b.style.display = 'none'; powerShown = ''; return; }
   const cd = Math.max(0, s.player.cd || 0), key = W.label + (cd > 0 ? Math.ceil(cd) : '');
-  b.style.background = cd > 0 ? `conic-gradient(#ffd23a ${(1 - cd / W.cd) * 360}deg, #00000088 0)` : '#ffd23a';
+  b.style.background = cd > 0 ? `conic-gradient(#ffd23a ${(1 - cd / (practice ? Math.min(W.cd, PRACTICE_CD) : W.cd)) * 360}deg, #00000088 0)` : '#ffd23a';
   b.classList.toggle('now', cd <= 0 && powerHelps(W)); if (skillTip > 0 && (skillTip -= 1 / 60) <= 0) say(t('skillSay', { label: skill(W.label), does: t('does.' + W.name) }));
   b.style.display = 'block'; // every frame: a pause hides the button and the text below may not have changed
   if (key === powerShown) return; powerShown = key;
@@ -863,11 +892,11 @@ function frame(now) {
   if (mode === 'play' && s) {
     acc += dt; const inp = input(); inp.power = wantPower; powerButton();
     while (acc >= 1 / 60 && mode === 'play') {
-      acc -= 1 / 60; step(s, inp); inp.power = wantPower = false; // a tap between two steps waits for the next one
+      acc -= 1 / 60; step(s, inp); inp.power = wantPower = false; if (practice && s.player.cd > PRACTICE_CD) s.player.cd = PRACTICE_CD; // a tap between two steps waits for the next one
       if (isLiving()) { for (const e of s.events) L4.event(e, s); L4.step(s, W / zoom / 2 + 300, H / zoom / 2 + 300); } // the rigs walk at the sim's own step
-      mp.tick(s); // the meadow watches the run; a death or a long life ends it
+      if (!practice) mp.tick(s); // the meadow watches the run; a death or a long life ends it. Practice is not a run.
       for (const e of s.events) {
-        if (e.t === 'coverTeach') writeJson(COVER_KEY, { taught: true }); // shown once: later climbs meet rocks without the staged hunter
+        if (e.t === 'coverTeach' && !practice) writeJson(COVER_KEY, { taught: true }); // shown once: later climbs meet rocks without the staged hunter
         if (e.t === 'eat') {
           const M = FORMS.find(f => f.name === e.name);
           streak = now - streakAt < 4000 ? streak + 1 : 1; streakAt = now; buzz(12);
@@ -920,19 +949,21 @@ function frame(now) {
         if (e.t === 'oldEaten') { save.old = save.old.filter(f => f !== e.f); store(); rec.event('old eaten', { form: FORMS[e.f].name }); say(t(e.left ? 'oldAte' : 'oldAll', nameVars(FORMS[e.f].name))); burst(s.player.x, s.player.y, ['#b9a8ff', '#ffffff', '#ffd23a'], 40, 220, 5); }
         if (e.t === 'hunt') { say(t('hunting', { who: e.id === s.nemesis?.id && save.nem ? rivalName(save.nem.persona.name) : nameVars(e.name).A })); blip(140, 0.5, 'sawtooth', 0.1, 120); buzz(60); }
         if (e.t === 'hide') { say(t('hideTook', nameVars(e.name))); shake = 0.4; flash = 0.6; crunch(0.18, 0.28, 500); buzz([30, 40, 30]); bits.push({ ring: 1, x: e.x, y: e.y, r: me(s).r * 1.6, c: '#9ad8ff', age: 0, life: 0.6 }); hud(); }
+        if (e.t === 'full' && practice) { s.choosing = null; s.player.xp = 0; hud(); say(t('practice.full', nameVars(me(s).name))); continue; } // no promotion in practice
         if (e.t === 'full') { if (now < offerAt) pendingOffer = true; else offer(); } // after the rival is eaten the card waits for the celebration
-        if (e.t === 'die') rec.end('died', { ...life(), by: s.dead?.to ?? null });
+        if (e.t === 'die' && !practice) rec.end('died', { ...life(), by: s.dead?.to ?? null });
+        if (e.t === 'win' && practice) continue;
         if (e.t === 'win') rec.event('win', life());
         if (e.t === 'die') { // show the bite for a moment, then the card
           const F = me(s), p = s.player, killer = s.mobs.find(m => m.id === e.killer);
-          if (!e.nem && !s.nemesis && killer && !killer.old) { // the animal that killed you becomes your rival. crown() adds a 'nemRise' to the list being read here.
+          if (!practice && !e.nem && !s.nemesis && killer && !killer.old) { // the animal that killed you becomes your rival. crown() adds a 'nemRise' to the list being read here.
             const gen = (save.gens | 0) + 1, persona = newPersona(killer.f, gen);
             if (crown(s, e.killer, persona.knobs)) { save.gens = gen; save.nem = { gen, persona, history: [], sim: nemesisSave(s) }; }
           }
           shake = 0.6; flash = 1; streak = 0; buzz([40, 60, 120]); burst(p.x, p.y, [F.c, F.d, '#c0271f', '#ff5a3a'], 30, 140 + F.r * 7, F.r * 0.36);
           bits.push({ ring: 1, x: p.x, y: p.y, r: F.r * 1.4, c: '#ff3a2a', age: 0, life: 0.5 });
           crunch(0.22, 0.3, 700); blip(220, 0.6, 'sawtooth', 0.14, -170);
-          save.stack = s.player.stack.slice(0, Math.max(1, s.player.stack.length - 1)); save.xp = 0; store(); // closing the tab now still costs the level
+          if (!practice) save.stack = s.player.stack.slice(0, Math.max(1, s.player.stack.length - 1)); save.xp = 0; store(); // closing the tab now still costs the level
           dying = performance.now() + 900; mode = 'dying'; $('pause').style.display = 'none'; pad.drop(); keys.clear();
         }
         if (e.t === 'nemRise' && save.nem) { riseNow = true; remember('rise'); keepNem(); store(); hud(); }
@@ -952,7 +983,7 @@ function frame(now) {
     if (beam > 0) beam = Math.max(0, beam - dt / 1.8);
   }
   if (pendingOffer && mode === 'play' && now >= offerAt && s?.choosing) { pendingOffer = false; offer(); }
-  if (mode === 'dying' && now >= dying) { flash = 0; died(); }
+  if (mode === 'dying' && now >= dying) { flash = 0; if (practice) practiceStart(practice, t('practice.caught', { a: an(s.dead.to), to: animal(s.dead.to) })); else died(); } // practice: the same animal again, nothing lost
   if (shake > 0) shake -= dt;
   if (sayTimer > 0 && (sayTimer -= dt) <= 0) $('say').classList.remove('on');
   if (bubble && now > bubble.until) bubble = null;
@@ -976,6 +1007,7 @@ function translatePage() {
   menu();
   if (mode === 'skins') skins();
   if (mode === 'book') book();
+  if (mode === 'practice') practicePicker($('practiceList'), portrait, F => { unlock(); rec.event('practice', { form: F.name }); practiceStart(F); });
   mp.translate();
   if (s) hud();
   if (mode === 'dead' && deadText) deadText();
@@ -997,7 +1029,7 @@ for (const id of ['langMenu', 'langPause']) {
 translatePage();
 
 addEventListener('pagehide', () => { if (s && !s.dead) { save.stack = s.player.stack.slice(); save.xp = s.player.xp; keepNem(); store(); } });
-window.__ant = { get s() { return s; }, get mode() { return mode; }, get input() { return input(); }, get arrowTo() { return arrowTo; }, get save() { return save; }, get bubble() { return bubble; }, get beam() { return beam; }, get living() { return isLiving() ? L4 : null; }, get work() { return work.slice(); }, get meadow() { return mp; }, look(n) { save.look = n; setLook(n); }, FORMS, me, level, step, powerOf, nemesisMob };
+window.__ant = { get s() { return s; }, get mode() { return mode; }, get input() { return input(); }, get arrowTo() { return arrowTo; }, get save() { return save; }, get bubble() { return bubble; }, get beam() { return beam; }, get living() { return isLiving() ? L4 : null; }, get work() { return work.slice(); }, get meadow() { return mp; }, get practice() { return practice; }, look(n) { save.look = n; setLook(n); }, FORMS, me, level, step, powerOf, nemesisMob };
 show('menu'); requestAnimationFrame(frame);
 </script>
 <script src="/notes/button.js" defer></script>

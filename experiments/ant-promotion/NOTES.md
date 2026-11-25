@@ -922,3 +922,31 @@ The owner on the lab page: evolution "can make things interesting for long time 
 ### Not verified
 - No person has judged whether the spots read as "this animal changed" without the field guide. A real phone was not used.
 - In the Living look, the spots follow the heading `m.a`, not the rig's own body bend.
+
+## 2026-11-25: the practice meadow (tester t1, note #261, answering #255)
+
+The note picked "a practice meadow to try every ability" from the lab's question about what should come next.
+
+### Done
+- **Practice meadow** on the menu. A card lists all 51 animals that have a skill, a row per level, each with its picture and skill name. Tap one to play it in a normal meadow at that animal's own level (a full climb is built behind it from the other kinds, so it gets no "fast again" or "sneaky again" boost).
+- One weaker animal waits just ahead and one stronger one to the side, both looking away, so a skill that needs a target has one at once.
+- Skills fill again in 3 seconds at most (`PRACTICE_CD`). The first line says what the skill does, for 5 seconds.
+- Nothing is saved. Being caught brings the same animal straight back, with no death card, no lost level and no new rival. A full bar empties without a promotion. Level 18 shows no win card. The pause card gains "Try another animal".
+- **How the save is kept safe:** while practice runs, `store()` writes nothing and the cover lesson is not marked. The real save is copied when practice starts and put back by every way to the menu (`show('menu')`). The evolving meadow does not watch practice (`mp.tick` is skipped, and `mp.world` is not called). There is no lab life record for a practice run; choosing an animal sends one `practice` event with the animal's name.
+- **Decision:** all 51 animals can be picked, including those the player has not reached yet. That is what "every ability" asks for. Practised animals are not added to the animal book.
+- Code: `practice.js` (the stack, the two staged animals and the picker) and `practice-words.js` (English and Turkish). The page changes are marked "practice" in `index.html`. To remove it, delete both files and those lines.
+
+### Checks
+- `kit/check/phone.mjs ant-promotion`: ok on WebKit iPhone 13 and Chromium Pixel 7, with a new block. It starts from a level-6 save with a rival, practises as a Wolf (skill, eating, full bar, being caught), switches to a Dragon, fires `pagehide` and goes back to the menu. Then it asserts that `ant-promotion:v1`, `ant-promotion:meadow` and `ant-promotion:cover` are byte-identical, and that Continue resumes the level-6 climb with its rival.
+- Mutation: with the `store()` guard removed, that block fails ("pagehide in practice writes nothing").
+- Looked at in WebKit at iPhone 13 size: the picker in English and Turkish, the Frog's tongue catching the staged animal, the Dragon's fire leaving a meal, and the pause card. No page errors.
+- `sim.js` is unchanged, so `bots.mjs` was not run.
+
+### Not verified
+- How it feels on a real phone, and whether 3 seconds is the right wait for trying things.
+- That every one of the 51 skills has a fitting target from the two staged animals. Bat, Owl, Lynx and others act on how you are seen, so they show best near a hunter that is looking. Each was not tried by hand.
+- The Turkish wording by a native reader.
+
+### Left as a proposal (2026-11-25)
+- A row of small arrows in practice to step to the next or the previous animal without the pause card.
+- A target dummy for each skill type, for example a hunter that walks at you for the escape skills.
