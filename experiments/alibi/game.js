@@ -7,7 +7,7 @@ import { hint } from '../kit/hint.js';
 import { noZoom } from '../kit/zoom.js';
 import { t, lang, setLang, apply } from './words.js';
 import {
-  CASES, CHAPTER_TWO_END, CLOCK_START, CLOCK_STEP, aids, claims, createCase, dailyCase, dailyWin, dayKey, offsetDay, dossiers,
+  CASES, CHAPTER_TWO_END, CLOCK_START, CLOCK_STEP, aids, caseVariant, claims, createCase, dailyCase, dailyWin, dayKey, offsetDay, dossiers,
   floorOf, freshRun, accuse, observe,
 } from './sim.js';
 import {
@@ -62,10 +62,13 @@ function readDaily(value) {
 }
 
 function readProfile(value) {
-  const { level, stars, sound, daily, hardDaily, campaignVersion } = value ?? {};
+  const { level, stars, sound, daily, hardDaily, campaignVersion, retries } = value ?? {};
   const best = Object.fromEntries(Object.entries(stars ?? {}).filter(([key, stars]) => validLevel(Number(key)) && validStars(stars)));
+  // Losses per campaign case. Each loss shows the liar, so the next run of
+  // that case deals a fresh variant (sim.js `caseVariant`).
+  const lost = Object.fromEntries(Object.entries(retries ?? {}).filter(([key, n]) => validLevel(Number(key)) && validTime(n) && n > 0));
   const nextLevel = campaignVersion == null && level === 21 && best[21] ? 22 : level;
-  return { level: validLevel(nextLevel) ? nextLevel : 1, campaignVersion: 2, stars: best, sound: sound !== false,
+  return { level: validLevel(nextLevel) ? nextLevel : 1, campaignVersion: 2, stars: best, retries: lost, sound: sound !== false,
     daily: readDaily(daily), hardDaily: readDaily(hardDaily) };
 }
 const profile = readProfile(loaded);
@@ -100,6 +103,8 @@ let daily = false;
 let hard = false;
 let day = '';
 let run = freshRun();
+let variant = 0;
+let lossReveal = false;
 let time = 0;
 let selected = null;
 let pointer = null;
@@ -176,6 +181,7 @@ function syncProfile() {
   for (const [level, stars] of Object.entries(latest.stars)) {
     profile.stars[level] = Math.max(profile.stars[level] ?? 0, stars);
   }
+  for (const [level, n] of Object.entries(latest.retries)) profile.retries[level] = Math.max(profile.retries[level] ?? 0, n);
   for (const key of ['daily', 'hardDaily']) {
     const local = profile[key];
     const incoming = latest[key];
@@ -328,7 +334,8 @@ function start(isDaily, level = profile.level, isHard = false, dailyDate = dayKe
   daily = isDaily;
   hard = isHard;
   day = daily ? dailyDate : '';
-  loadBoard(restoredCase ?? (daily ? dailyCase(day, hard) : createCase({ seed, level })));
+  variant = daily ? 0 : restoredCase?.variant ?? profile.retries[level] ?? 0;
+  loadBoard(restoredCase?.case ?? (daily ? dailyCase(day, hard) : caseVariant(level, variant, seed)));
   time = 0;
   selected = null;
   pointer = null;
@@ -337,6 +344,7 @@ function start(isDaily, level = profile.level, isHard = false, dailyDate = dayKe
   notebook = false;
   noteFlash = null;
   wrongNotice = false;
+  lossReveal = false;
   outlineLesson = null;
   loupe = null;
   trailBack = false;
@@ -584,7 +592,9 @@ function showResult(solved) {
   $('again').classList.toggle('primary', !solved);
   $('share').classList.toggle('primary', !$('share').hidden);
   $('endMenu').classList.toggle('primary', solved && $('next').hidden && $('share').hidden);
-  $('resultArt').setAttribute('aria-label', solved ? t('result') : t('wrongResult', { n: number(run.rejected.length) }));
+  $('resultArt').setAttribute('aria-label', solved ? t('result') : [t('wrongResult', { n: number(run.rejected.length) }),
+    lossReveal ? t('liarShown') : ''].join(' ').trim());
+  resultStart = performance.now();
   drawResult();
   setScreen('done');
 }
@@ -628,6 +638,15 @@ function accuseId(id) {
     setScreen('reveal');
   } else if (run.outcome) {
     rec.end('wrong', endSummary());
+    // A lost campaign case shows its liar, and the next run of the case deals
+    // a fresh variant. A lost Daily can be retried for full credit, so it
+    // keeps the old card and does not show the liar.
+    lossReveal = !daily;
+    if (lossReveal) {
+      if (save.readJson(KEY) !== null) syncProfile();
+      profile.retries[c.level] = Math.max(profile.retries[c.level] ?? 0, variant) + 1;
+      persist();
+    }
     showResult(false);
   }
 }
@@ -1516,7 +1535,39 @@ function draw() {
   }
 }
 
+// The loss card replays the liar's contradiction once: the liar's head sits in
+// the claimed room, then crosses to where they really were at that mark.
+const REVEAL_MOVE = 1.4;
+let resultStart = 0;
+function drawLossReveal(context, progress) {
+  const person = cast[c.culprit];
+  const lie = decidingMark(person.id);
+  const ease = k => k * k * (3 - 2 * k);
+  const move = ease(Math.min(1, Math.max(0, (progress - .25) / .55)));
+  for (const [i, id] of run.rejected.entries()) {
+    const x = 106 + i * 34;
+    rect(context, x - 13, 13, 26, 25, 6, '#734d61', '#bd8790');
+    animal(context, x - 1, 25, 21, cast[id].species, { head: true });
+    rect(context, x + 4, 25, 11, 11, 6, '#603549', '#eaa69a');
+    text(context, '×', x + 9.5, 30.5, 10, CREAM);
+  }
+  rect(context, 14, 17, 62, 68, 12, '#e6b59f', '#f6c17b', 2.4);
+  animal(context, 45, 50, 52, person.species, { head: true, mood: 'caught' });
+  rect(context, 89, 47, 34, 34, 7, '#fff0d2', '#ac7680');
+  place(context, 106, 64, 26, lie.room, c.spec.site);
+  rect(context, 157, 47, 34, 34, 7, '#654b60', '#f9d8aa');
+  place(context, 174, 64, 26, c.frames[lie.beat][person.id].room, c.spec.site);
+  context.save();
+  context.globalAlpha = Math.min(1, Math.max(0, (progress - .7) / .3));
+  text(context, '≠', 140, 64, 19, CREAM);
+  clock(context, 213, 64, 12, minute(lie.beat));
+  context.restore();
+  animal(context, 112 + 56 * move, 72 - 14 * Math.sin(Math.PI * move), 19, person.species, { head: true });
+}
+
 function drawResult() {
+  const progress = calm.matches ? 1 : Math.min(1, (performance.now() - resultStart) / 1000 / REVEAL_MOVE);
+  if (lossReveal && progress < 1) requestAnimationFrame(() => { if (lossReveal) drawResult(); });
   const context = $('resultArt').getContext('2d');
   context.setTransform(2, 0, 0, 2, 0, 0);
   context.clearRect(0, 0, 240, 107);
@@ -1531,6 +1582,8 @@ function drawResult() {
     text(context, '≠', 132, 47, 19, CREAM);
     place(context, 157, 47, 27, c.frames[lie.beat][person.id].room, c.spec.site);
     clock(context, 201, 47, 13, minute(lie.beat));
+  } else if (lossReveal) {
+    drawLossReveal(context, progress);
   } else {
     for (const [i, id] of run.rejected.entries()) {
       const x = 82 + i * 38;
@@ -1542,6 +1595,7 @@ function drawResult() {
     drawEvidencePair(context, 120, 62, run.rejected.at(-1));
   }
   const solved = run.outcome === 'solved';
+  if (lossReveal) return;
   for (let i = 0; i < 3; i++) star(context, (solved ? 132 : 96) + i * 24, solved ? 76 : 87, 8, i < run.stars ? GOLD : '#6e4b64', '#dc9d81');
 }
 
@@ -1618,7 +1672,7 @@ function cssPoint(p) {
 
 window.alibiState = () => ({
   screen, paused: screen === 'paused', level: c.level, daily, hard, day, time, frame: beatNow(), stars: run.stars,
-  selected, outcome: run.outcome, streak: profile.daily.streak, hardStreak: profile.hardDaily.streak,
+  selected, outcome: run.outcome, variant, lossReveal: screen === 'done' && lossReveal ? c.culprit : null, streak: profile.daily.streak, hardStreak: profile.hardDaily.streak,
   site: c.spec.site, hardUnlocked: hardUnlocked(), notes: notes.map(entry => ({ ...entry })), notebook, solvedSeconds,
   revealStage: screen === 'reveal' ? Math.min(2, Math.floor((phase - revealStart) / .86)) : null,
   points: {
@@ -1666,7 +1720,7 @@ addEventListener('pagehide', () => {
     }
     sessionStorage.setItem(KEY, JSON.stringify({
       version: 1,
-      seed, level: c.level, daily, hard, day, frame: beatNow(), selected, rejected: run.rejected,
+      seed, level: c.level, variant, daily, hard, day, frame: beatNow(), selected, rejected: run.rejected,
       notes, notebook, seen: [...seen], scrolled: [...scrolled],
       elapsed: playedMs + (playing() ? performance.now() - activeSince : 0),
     }));
@@ -1683,7 +1737,10 @@ function reopenInvestigation() {
   if (saved?.version !== 1 || performance.getEntriesByType('navigation')[0]?.type !== 'reload') return;
   if (saved.seed !== seed || !validLevel(saved.level) || (saved.daily && !validDay(saved.day))
     || (saved.hard && !hardUnlocked())) return;
-  const next = saved.daily ? dailyCase(saved.day, saved.hard) : createCase({ seed, level: saved.level });
+  // Checkpoints from before retry variants have none: the case itself.
+  const savedVariant = saved.daily ? 0 : saved.variant ?? 0;
+  if (!validTime(savedVariant)) return;
+  const next = saved.daily ? dailyCase(saved.day, saved.hard) : caseVariant(saved.level, savedVariant, seed);
   const index = (value, limit) => Number.isInteger(value) && value >= 0 && value < limit;
   const suspect = id => index(id, next.cast.length);
   const mark = beat => index(beat, next.beatCount);
@@ -1696,7 +1753,7 @@ function reopenInvestigation() {
     || !Array.isArray(saved.seen) || !saved.seen.every(suspect)
     || !Array.isArray(saved.scrolled) || !saved.scrolled.every(mark)
     || !Number.isFinite(saved.elapsed) || saved.elapsed < 0) return;
-  start(saved.daily, saved.level, saved.hard, saved.day, next);
+  start(saved.daily, saved.level, saved.hard, saved.day, { case: next, variant: savedVariant });
   time = saved.frame;
   selected = saved.selected;
   notes = saved.notes;

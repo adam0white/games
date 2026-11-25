@@ -8,6 +8,7 @@ import { dirname, extname, join, resolve, sep } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 
+import { answerLab, withAgent, assertNotice, assertRun, assertOffSendsNothing, assertNoLeak, waitForRuns } from '../../kit/check/lab-record.mjs';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const notesButton = resolve(root, '../workers/feedback/public/notes/button.js');
 const mount = '/lab/night-splitlight/';
@@ -267,17 +268,19 @@ async function watchRequests(context, page) {
       return route.abort();
     }
     const path = address.pathname;
-    if (request.method() !== 'GET' || !allowedAsset(path) || path === '/kit/lab.js') {
+    if (request.method() !== 'GET' || !allowedAsset(path)) {
       lab.push(`${request.method()} ${path}`);
       return route.abort();
     }
     assets.add(path);
     return route.continue();
   });
+  // The lab endpoint is answered here (registered after the catch-all, so it wins): no check reaches the real one.
+  const standIn = await answerLab(context, origin);
   await context.addInitScript(() => {
     if (location.protocol !== 'http:') return;
     localStorage.setItem('hf-lab-send-localhost', '1');
-    const forbiddenWrite = /^(hf-lab-|night-splitlight:lab)/;
+    const forbiddenWrite = /^(?!hf-lab-(?:send-localhost|player|session:night-splitlight)$)(hf-lab-|night-splitlight:lab)/;
     const setItem = Storage.prototype.setItem;
     window.splitlightCheckLabWrites = [];
     Storage.prototype.setItem = function (key, value) {
@@ -294,14 +297,52 @@ async function watchRequests(context, page) {
       if (event.target.id === 'angle') window.splitlightCheckTouches.push([event.pointerType, event.isTrusted]);
     }, { capture: true });
   });
-  return { errors, outside, lab, assets };
+  return { errors, outside, lab, assets, standIn };
 }
 
+// The page records play (kit/lab.js), so the lab client's player id and this page's session id are expected.
+// Changed deliberately on 2026-11-24 from "no hf-lab- keys at all"; any other lab key or write still fails.
 async function checkLabStorage(page) {
-  assert.deepEqual(await page.evaluate(() => window.splitlightCheckLabWrites), [], 'no lab storage writes attempted');
+  assert.deepEqual(await page.evaluate(() => window.splitlightCheckLabWrites), [], 'no other lab storage writes attempted');
   assert.deepEqual(await page.evaluate(() => [...Object.keys(localStorage), ...Object.keys(sessionStorage)]
-    .filter(key => key !== 'hf-lab-send-localhost' && /^(hf-lab-|night-splitlight:lab)/.test(key))),
-  [], 'no lab state stored');
+    .filter(key => !/^hf-lab-(?:send-localhost|player|session:night-splitlight)$/.test(key) && /^(hf-lab-|night-splitlight:lab)/.test(key))),
+  [], 'no other lab state stored');
+}
+
+// A played plate sends one run record under the page's name; with the switch off nothing is sent.
+async function recording({ name, engine, device }) {
+  const browser = await engine.launch({ headless: true, timeout: 45000 });
+  try {
+    const context = await browser.newContext(devices[device]);
+    const page = await context.newPage();
+    page.setDefaultTimeout(20000);
+    page.setDefaultNavigationTimeout(30000);
+    const { errors, outside, lab, standIn } = await watchRequests(context, page);
+    if (name === 'webkit') { await page.goto('about:blank'); await wakeDisplay(page); }
+    await page.goto(withAgent(url));
+    await waitForScreen(page, 'play');
+    await readyToPaint(page, name);
+    await assertNotice(page);
+    assert.equal(standIn.sent.length, 0, 'nothing is sent before the dial is turned');
+    await clearOpening(page);
+    await waitForRuns(standIn, 'night-splitlight', 1);
+    const won = assertRun(standIn, 'night-splitlight', { outcomes: ['won'], summaryKeys: ['level', 'captured', 'targets', 'seconds'] });
+    assert.equal(won.data.summary.level, 1);
+    assert.ok(won.data.events.some(e => e.type === 'plate-exposed'), 'the exposed plate is an event');
+    assertNoLeak(standIn, ['hf-lab']);
+    await page.tap('#again');
+    await waitForScreen(page, 'play');
+    await page.tap('#pause');
+    await waitForScreen(page, 'paused');
+    await assertOffSendsNothing(page, standIn, 'night-splitlight', { play: async () => {
+      await page.tap('#resume');
+      await waitForScreen(page, 'play');
+      await clearOpening(page);
+    } });
+    assert.deepEqual([errors, outside, lab], [[], [], []], 'no errors, external requests or stray lab requests');
+  } finally {
+    await browser.close();
+  }
 }
 
 async function run({ name, engine, device }) {
@@ -316,7 +357,7 @@ async function run({ name, engine, device }) {
       await page.goto('about:blank');
       await wakeDisplay(page);
     }
-    await page.goto(url);
+    await page.goto(withAgent(url));
     await waitForScreen(page, 'play');
     await readyToPaint(page, name);
     await controls(page, ['pause', 'angle']);
@@ -390,7 +431,7 @@ async function run({ name, engine, device }) {
     assert.equal(Number(await stored(page)), 2, 'replay preserves the unlocked plate');
     await checkLabStorage(page);
 
-    await page.goto(`${url}?look=oxide`);
+    await page.goto(`${url}?look=oxide&labRunSource=agent`);
     await waitForScreen(page, 'play');
     assert.equal((await state(page)).level, 2, 'the alternate look loads the same saved progress');
     assert.equal(await page.locator('html').getAttribute('data-look'), 'oxide', 'the alternate look is selected');
@@ -426,6 +467,7 @@ try {
     if (process.argv[2] && profile.name !== process.argv[2]) continue;
     try {
       await run(profile);
+      await recording(profile);
     } catch (error) {
       process.exitCode = 1;
       console.error(profile.name, error);

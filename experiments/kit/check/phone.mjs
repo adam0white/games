@@ -15,8 +15,8 @@ import { gunzipSync } from 'node:zlib';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { experimentPath } from '../../../src/worker.mjs';
 import { experimentRoots } from '../../../scripts/experiments.mjs';
-import { pages } from './pages.mjs';
-import { labPages, labHubs } from './lab-pages.mjs';
+import { pages, pageRuns } from './pages.mjs';
+import { labPages } from './lab-pages.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 // The notes page builds its games menu and game picker from kit/games.json, so every experiment has to be in it.
@@ -330,6 +330,37 @@ async function started(page, slug, hook, toMenu) {
 }
 
 const GAMES = {
+  // Thumb Duel, playing a friend by link. The match between two phones is experiments/duel/link-check.mjs; here, one
+  // phone: the menu choice, a four-letter code, and with the room unreachable (the relay not deployed, or no network)
+  // "could not reach your friend" and the bot, in English and Turkish. The saves are untouched.
+  async 'duel friend'(page) {
+    const save = { v: 1, sound: true, matches: 4, friend: { side: 1, run: 2, best: 3 }, solo: { easy: { won: 2, run: 1, best: 2 }, medium: { won: 1, run: 0, best: 1 }, hard: { won: 0, run: 0, best: 0 } } };
+    let tries = 0;
+    await page.routeWebSocket(/\/lab-api\/room\/duel\/[A-Z]{4}\?k=[a-z0-9]{16,40}$/, ws => { tries++; ws.close({ code: 1011 }); });
+    await page.goto(`${base}/duel/?lang=en`);
+    await page.evaluate(v => localStorage.setItem('duel-save', v), JSON.stringify(save)); await page.reload();
+    await until(page, () => window.duelState?.().screen === 'menu', 'duel menu');
+    assert.equal(await page.locator('#toFriend').textContent(), 'Play a friend');
+    await page.click('#toFriend');
+    await until(page, () => window.duelState().link?.role === 'host', 'a room is opened');
+    const code = await page.locator('#fCode').textContent();
+    assert.match(code, /^[A-Z]{4}$/, 'a four-letter code'); assert.equal((await page.evaluate(() => window.duelState().link.code)), code);
+    await until(page, () => window.duelState().link.state === 'failed', 'the unreachable room gives up', 15000);
+    assert.equal(tries, 4, 'the first try and three more before giving up');
+    assert.equal(await page.locator('#fStatus').textContent(), 'Could not reach your friend.');
+    await page.click('#fBot'); await until(page, () => window.duelState().screen === 'solo' && window.duelState().link === null, 'the bot is offered');
+    await page.goto(`${base}/duel/?room=${code}&lang=tr`);
+    await until(page, () => window.duelState?.().link?.role === 'guest', 'the link joins as the guest');
+    assert.equal(await page.locator('#fJoin').inputValue(), code);
+    await until(page, () => window.duelState().link.state === 'failed', 'the guest gives up too', 15000);
+    assert.equal(await page.locator('#fStatus').textContent(), 'Arkadaşına ulaşılamadı.');
+    assert.equal(await page.locator('#fBot').textContent(), 'Bota karşı oyna');
+    await page.click('#fBack'); await until(page, () => window.duelState().screen === 'menu', 'back on the menu');
+    await page.click('#toFriend'); await page.locator('#fJoin').pressSequentially('wx-yz'); assert.equal(await page.locator('#fJoin').inputValue(), 'WXYZ', 'a typed code is cleaned');
+    await page.click('#fJoinGo'); await until(page, () => window.duelState().link?.role === 'guest' && window.duelState().link.code === 'WXYZ', 'a typed code joins as the guest');
+    await page.click('#fBack'); await until(page, () => window.duelState().screen === 'menu' && window.duelState().link === null, 'back on the menu again');
+    assert.deepEqual(JSON.parse(await page.evaluate(() => localStorage.getItem('duel-save'))), save, 'the saves are untouched');
+  },
   async kit(page) {
     await page.goto(`${base}/kit/`);
     await until(page, () => window.kitResults, 'self-test');
@@ -611,6 +642,15 @@ const GAMES = {
     assert.equal((await state()).music, true); assert.equal(await page.textContent('#menu button.music'), 'Music: on');
     await page.click('#menu button.music'); assert.equal((await state()).music, false); assert.equal((await saved())['lantern-music'], '0'); assert.equal(await page.textContent('#card button.music'), 'Music: off');
     await page.reload(); assert.equal((await state()).music, false, 'off is kept'); await page.click('#menu button.music'); assert.equal((await saved())['lantern-music'], '1'); assert.equal((await state()).music, true);
+    // The ember melody (kit/music.js, 2026-11-24): with the music on, each ember plays the next note of the night's melody, on the score's
+    // sixteenth grid when the audio clock runs; the end card says how much of the melody was played.
+    await page.click('#play'); await page.evaluate(() => { const s = window.lanternSim(); s.safe = 60; s.light = 1; });
+    for (let i = 0; i < 4; i++) { await page.evaluate(() => { const s = window.lanternSim(); s.embers.push({ x: s.x, y: s.y + 0.02, got: false, kind: 'ember' }); }); await until(page, n => window.lanternMusic().played > n, 'an ember is taken', 10000, i); }
+    const tune = await page.evaluate(() => window.lanternMusic()), embers = tune.log.filter(l => l.kind === 'ember'), ticks = tune.log.filter(l => l.kind === 'walk' || l.kind === 'pad' || l.kind === 'bass');
+    if (page.context().browser().browserType().name() === 'chromium') { assert.equal(tune.ctx, 'running', 'the audio clock runs after Play'); assert.equal(embers.length, 4, 'four embers, four melody notes'); }
+    if (tune.ctx === 'running' && ticks.length) { const a = ticks[0].at - ticks[0].step * tune.STEP; assert.ok(embers.length >= 1 && embers.every(l => { const g = (l.at - a) / tune.HALF; return Math.abs(g - Math.round(g)) < 1e-3; }), `ember notes on the sixteenth grid (${embers.length})`); }
+    await page.evaluate(() => { const s = window.lanternSim(); s.safe = 0; s.light = 0.0001; s.warm = 0; }); await until(page, () => window.lanternState().screen === 'card' && !window.lanternState().playing, 'end card after the melody');
+    assert.match(await page.textContent('#sub'), /Melody played: 100%\./, 'the end card says how much of the melody was played'); await page.click('#toMenu');
     await sleep(400); await page.reload(); st = await state(); assert.equal(st.name, 'Rio <b>river</b'); assert.equal(st.board.length, 5, 'the board is kept');
     await page.evaluate(() => localStorage.setItem('hf-lab-recording-off', '1')); await page.reload(); // recording off again, as the steps below expect
     // Views (notes #158, #159): 2D, 3D and first person, saved under lantern-view. First person steers by pressing a side; a drag does not.
@@ -677,6 +717,48 @@ const GAMES = {
       await until(page, done, what, 8000); await page.click('#look');
     }
     assert.deepEqual(await saved(), saves0, 'showing an ability changes no save'); assert.equal(labSent(page).length, sent0, 'showing an ability sends nothing');
+    // Lantern Spark, a mode inside Lantern (modes/spark.js). The deep link opens it; the lab page's save carries over once; it is drawn
+    // flat; a second finger, Space and the button strike sparks; embers go to the bank; nothing else of Lantern's save changes; no board call.
+    {
+      await page.evaluate(() => { localStorage.setItem('lantern-spark:save', JSON.stringify({ v: 1, best: 3, stars: { 1: 2, 2: 1 }, played: 4 })); localStorage.setItem('lantern-view', '3d'); });
+      const before = await saved(), board = []; const spy = r => { if (r.url().includes('/lab-api/board')) board.push(r.url()); }; page.on('request', spy);
+      await page.goto(`${base}/lantern/?mode=spark`);
+      await until(page, () => window.lanternState().screen === 'mode' && window.lanternMode(), 'the deep link opens Spark');
+      let m = await page.evaluate(() => window.lanternMode());
+      assert.equal(m.best, 3, 'the lab save carries over: best'); assert.deepEqual(m.stars, { 1: 2, 2: 1 }, 'the lab save carries over: stars');
+      assert.equal((await state()).view, '2d', 'Spark is drawn flat');
+      assert.deepEqual(await page.$$eval('#modePanel .nights button', bs => bs.map(b => b.disabled)), [false, false, false, true, true, true], 'nights 1 to 3 open');
+      await page.click('#modePlay');
+      await until(page, () => window.lanternState().screen === 'play' && window.lanternMode().tin === 8, 'a Spark run');
+      assert.ok(await page.isVisible('#sparkBtn'), 'the spark button shows in a run');
+      await page.evaluate(() => { window.lanternSim().safe = 1e9; }); // no blow while the check works, so the stars below are certain
+      const touch = (type, id, x) => page.evaluate(([type, id, x]) => document.getElementById('c').dispatchEvent(new PointerEvent(type, { pointerId: id, pointerType: 'touch', isPrimary: id === 1, clientX: x, clientY: innerHeight * 0.7, bubbles: true, cancelable: true })), [type, id, x]);
+      const aim = (await state()).target;
+      await touch('pointerdown', 1, 195); await touch('pointerdown', 2, 300); await touch('pointermove', 2, 380);
+      await until(page, () => window.lanternMode().used === 1, 'a second finger strikes a spark (counted on the next tick)'); assert.equal((await state()).target, aim, 'the second finger does not steer');
+      await touch('pointerup', 2, 380); await touch('pointerup', 1, 195);
+      await page.keyboard.press(' '); await until(page, () => window.lanternMode().used === 2, 'Space strikes a spark');
+      await page.click('#sparkBtn'); await until(page, () => window.lanternMode().used === 3, 'the button strikes a spark');
+      await page.keyboard.press('p'); assert.ok((await state()).paused, 'P pauses Spark');
+      assert.match(await page.textContent('#line'), /^Spark, night 3, \d+% of the way\.$/); assert.ok(await page.evaluate(() => document.getElementById('viewNext').hidden), 'no view switch while Spark is on');
+      await page.keyboard.press('p'); assert.ok(!(await state()).paused);
+      await page.evaluate(() => { const e = window.lanternSpark(), s = e.s; s.rocks = []; s.embers = [{ x: s.x, y: s.y + 0.02, got: false }]; s.bonus = e.cf.length * 78 - s.y - 0.05; }); // an ember just ahead, then dawn
+      await until(page, () => window.lanternState().screen === 'card', 'the end card', 12000);
+      const sim = await page.evaluate(() => ({ taken: window.lanternSim().taken, banked: window.lanternSim().banked, over: window.lanternSim().over }));
+      assert.equal(sim.over, 'dawn'); assert.ok(sim.taken >= 1, 'an ember taken in Spark');
+      assert.match(await page.textContent('#title'), /^Dawn ★★★$/, 'three stars: dawn, no blow, 6 sparks left'); assert.equal(await page.textContent('#go'), 'Play night 4');
+      const after = await saved(), mine = JSON.parse(after['lantern-mode-spark:save']);
+      assert.deepEqual(mine, { v: 1, best: 4, stars: { 1: 2, 2: 1, 3: 3 }, played: 1 }, 'Spark keeps its own save');
+      assert.equal(after['lantern-spark:save'], before['lantern-spark:save'], 'the lab save is never written');
+      assert.equal(Number(after['lantern-bank']), Number(before['lantern-bank'] ?? 0) + sim.banked, 'embers taken in Spark go to the bank');
+      for (const k of Object.keys(before)) if (!['lantern-bank'].includes(k)) assert.equal(after[k], before[k], `Spark leaves ${k} as it was`);
+      assert.deepEqual(Object.keys(after).filter(k => !(k in before)).sort(), ['lantern-mode-spark:save', 'lantern-mode-spark:spark'], 'Spark writes only its own new keys');
+      await page.click('#toMenu'); assert.equal((await state()).screen, 'mode', 'Menu goes back to the Spark card');
+      await page.click('#mode .back'); assert.equal((await state()).screen, 'menu'); assert.equal(await page.evaluate(() => window.lanternMode()), null, 'leaving Spark turns it off');
+      page.off('request', spy); assert.deepEqual(board, [], 'Spark never calls the shared board');
+      await page.evaluate(v => { if (v === undefined) localStorage.removeItem('lantern-view'); else localStorage.setItem('lantern-view', v); }, before['lantern-view'] === '3d' ? undefined : before['lantern-view']);
+      await page.goto(`${base}/lantern/`); await until(page, () => document.getElementById('notes-button'), 'notes button'); await page.click('#toShop'); // back where the erase below starts
+    }
     // Erase everything (note #73, tester tools): two taps; every lantern- key goes and nothing else.
     await page.click('[data-test="reset"]'); assert.ok(Object.keys(await saved()).length > 3, 'one tap erases nothing');
     await Promise.all([page.waitForEvent('load'), page.click('[data-test="reset"]')]);
@@ -688,7 +770,7 @@ const GAMES = {
     await until(page, () => document.querySelector('#menu h1').textContent === 'Fener', 'the Turkish menu');
     assert.equal(await page.evaluate(() => document.documentElement.lang), 'tr');
     assert.equal(await page.textContent('#toShop b'), 'Mağaza'); assert.equal(await page.textContent('#toBoard'), 'Sıralama');
-    await page.click('#toModes'); assert.deepEqual(await page.$$eval('#modes a.mode', as => as.map(a => a.getAttribute('href'))), ['/lab/lantern-race/', '/lab/lantern-spark/'], 'the other modes are one tap away'); await page.click('#modes .back');
+    await page.click('#toModes'); assert.deepEqual(await page.$$eval('#modes a.mode', as => as.map(a => a.getAttribute('href'))), ['/lab/lantern-race/'], 'Race is one tap away'); assert.deepEqual(await page.$$eval('#modes button.mode', bs => bs.map(b => [b.dataset.mode, b.textContent])), [['spark', 'Fener Kıvılcım']], 'Spark is chosen inside Lantern'); await page.click('#modes .back');
     await page.click('#menuLanguage');
     assert.equal(await page.evaluate(() => document.documentElement.lang), 'en');
     assert.equal(await page.textContent('#menu h1'), 'Lantern'); assert.equal(await page.textContent('#toShop b'), 'Shop');
@@ -711,7 +793,7 @@ const GAMES = {
     const stack = await page.evaluate(() => { const F = window.__ant.FORMS; return [F.findIndex(f => f && f.level === 1), F.findIndex(f => f && f.level === 2)]; });
     await page.evaluate(([k, stack]) => { localStorage.setItem(k, JSON.stringify({ skin: { c: '#c0271f', p: 'stripes' }, stack, xp: 3, sound: true, look: 2 })); localStorage.setItem('ant-promotion:hint', '1'); localStorage.setItem('notes.k', 'check'); }, [KEY, stack]);
     await page.reload(); await until(page, () => window.__ant, 'game script');
-    assert.match(await page.textContent('#continue'), /^Continue as /, 'old save: continues'); assert.equal(await page.textContent('#rules'), 'Rules: Wild', 'Wild is the default (note #88)'); assert.match(await page.textContent('#look'), /^Look: /);
+    assert.match(await page.textContent('#continue'), /^Continue as /, 'old save: continues'); assert.equal(await page.textContent('#rules'), 'Rules: Wild', 'Wild is the default (note #88)'); assert.equal(await page.textContent('#look'), 'Look: Soft', 'old save: look 2 is still Soft');
     await until(page, () => document.getElementById('notes-button'), 'notes button');
     await noZoomed(page);
     assert.equal(await page.evaluate(() => window.audioLog.made), 0, 'no audio before the first tap');
@@ -782,6 +864,19 @@ const GAMES = {
     await page.evaluate(() => { const s = window.__ant.s, m = s.mobs.find(o => o.old); Object.assign(m, { x: s.player.x + 130, y: s.player.y, a: Math.PI, hunt: 6, alert: true, skillCd: 0, tire: 0 }); s.mobs = [m]; s.player.safe = 0; }); await until(page, () => (window.__ant.s.oldSkills || 0) > 0, 'it uses its skill');
     await page.click('#pause'); await page.click('#paused .toMenu'); await page.reload(); assert.equal(await page.evaluate(() => window.__ant.save.old.length), 3, 'they are kept in the save');
     await page.evaluate(([k, v]) => localStorage.setItem(k, v), [KEY, kept]); await page.reload(); await page.click('#continue');
+    // The Living look (look 4, from the lab page ant-creatures): chosen with the Look button, every animal on a rig; a death
+    // and going on in it; then the button goes round to the look the player had, and the save keeps it.
+    const lookWas = (await saved()).look, toMenu = async () => { if (await mode() === 'play') await page.click('#pause'); await page.click('.screen.on .toMenu'); assert.equal(await mode(), 'menu'); };
+    const lookTo = async want => { for (let i = 0; i < 6 && await page.textContent('#look') !== `Look: ${want}`; i++) await page.click('#look'); assert.equal(await page.textContent('#look'), `Look: ${want}`); };
+    await toMenu(); await lookTo('Living'); assert.equal((await saved()).look, 4, 'Living is saved as look 4');
+    await page.click('#continue'); assert.equal(await mode(), 'play');
+    await until(page, () => window.__ant.living && window.__ant.living.stat.drawn > 3 && window.__ant.living.rig(null), 'living bodies drawn');
+    await page.evaluate(() => { const { s, FORMS, me } = window.__ant, p = s.player, m = s.mobs.find(m => FORMS[m.f].power > me(s).power); p.safe = 0; p.hideAt = 1e9; p.x = m.x; p.y = m.y; });
+    await until(page, () => window.__ant.mode === 'dead', 'death card in Living');
+    await page.click('#goOn'); assert.equal(await mode(), 'play');
+    await until(page, () => window.__ant.living && window.__ant.living.stat.drawn > 3 && window.__ant.living.rig(null), 'living bodies after a death');
+    await toMenu(); await lookTo(['Flat', 'Cartoon', 'Soft', '3D', 'Living'][lookWas]); assert.equal((await saved()).look, lookWas, 'the look goes back round');
+    await page.click('#continue'); assert.equal(await page.evaluate(() => window.__ant.living), null, 'no rigs in the other looks');
   },
   // The three games of 2026-11-23. Each has its own full check (experiments/<slug>/check.mjs); this is the shared part:
   // the page loads through the kit with no error, a run starts from Play, pause holds it, and leaving for the menu
@@ -918,12 +1013,12 @@ for (const [slug, g] of Object.entries({ ...pages, ...labPages })) {
   }
 }
 
-for (const [slug, run] of Object.entries(labHubs)) GAMES[slug] = page => run(page, { base, until }); // the draft homes for the small games
+for (const [slug, run] of Object.entries(pageRuns)) GAMES[slug] = page => run(page, { base, until }); // pages that are not games: the small games' home
 
 const [onlyGame, onlyPhone] = process.argv.slice(2);
 // The first argument is 'all' or a comma list of experiments. An experiment's name picks its own check, its
 // first-time help check, and for Lantern the three checks below that play Lantern.
-const WITH = { lantern: ['old links', 'lab down', 'leaving mid-run'] };
+const WITH = { lantern: ['old links', 'lab down', 'leaving mid-run'], duel: ['duel friend'] };
 const picked = game => !onlyGame || onlyGame === 'all' || onlyGame.split(',').some(only => game === only || game === `hint ${only}` || game.startsWith(`hint ${only} `) || WITH[only]?.includes(game));
 // A check that never answers becomes a FAIL line naming it, not a job that runs until its time limit.
 const within = (p, ms, what) => { let t; return Promise.race([p, new Promise((_, no) => { t = setTimeout(() => no(new Error(`no answer in ${ms / 1000}s: ${what}`)), ms); })]).finally(() => clearTimeout(t)); };

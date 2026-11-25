@@ -34,36 +34,41 @@
   #tilt { position: fixed; top: calc(8px + env(safe-area-inset-top)); left: calc(8px + env(safe-area-inset-left)); width: 48px; height: 48px; min-width: 0; min-height: 0; margin: 0; padding: 0; border-radius: 50%; display: none; place-items: center; background: #fff6ea; box-shadow: 0 3px 0 #3b2a3f; }
   #tilt svg { width: 26px; height: 26px; }
   #tilt.on { background: #ff8a3d; }
+  #banner { position: fixed; left: 50%; top: calc(122px + env(safe-area-inset-top)); transform: translateX(-50%); max-width: calc(100% - 32px); box-sizing: border-box; padding: 6px 14px; border-radius: 14px; background: #fff6eaee; border: 2.5px solid #3b2a3f; font-weight: bold; text-align: center; pointer-events: none; opacity: 0; transition: opacity .3s; }
+  #banner.on { opacity: 1; }
+  #end { cursor: pointer; }
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
 <div id="probe"></div>
-<button id="pause" aria-label="Pause"></button>
-<button id="tilt" aria-label="Tilt the phone to pour"><svg viewBox="0 0 26 26"><rect x="8" y="3" width="11" height="19" rx="2.5" transform="rotate(28 13 13)" fill="none" stroke="#3b2a3f" stroke-width="2.4"/><path d="M3 20 q3 4 8 4" fill="none" stroke="#3b2a3f" stroke-width="2"/></svg></button>
+<div id="banner" aria-live="polite"></div>
+<button id="pause" aria-label="Pause" data-i18n-aria="pause"></button>
+<button id="tilt" aria-label="Tilt the phone to pour" data-i18n-aria="tilt"><svg viewBox="0 0 26 26"><rect x="8" y="3" width="11" height="19" rx="2.5" transform="rotate(28 13 13)" fill="none" stroke="#3b2a3f" stroke-width="2.4"/><path d="M3 20 q3 4 8 4" fill="none" stroke="#3b2a3f" stroke-width="2"/></svg></button>
 
 <div id="menu" class="screen on"><div class="card">
   <h1>Pour</h1>
-  <p class="sub">Fill it to the line.</p>
-  <p><button id="play" class="main">Play</button></p>
+  <p class="sub" data-i18n="tagline">Fill it to the line.</p>
+  <p><button id="play" class="main" data-i18n="play">Play</button></p>
   <div id="levels"></div>
-  <p><button id="daily">Daily pour</button></p>
+  <p><button id="daily" data-i18n="daily">Daily pour</button></p>
   <p id="dailyBest" class="sub"></p>
   <p><button id="sound1" class="small">Sound: on</button></p>
 </div></div>
 
 <div id="paused" class="screen"><div class="card">
-  <h2>Paused</h2>
-  <p><button id="resume" class="main">Go on</button></p>
-  <p><button id="quit">Menu</button><button id="sound2" class="small">Sound: on</button></p>
+  <h2 data-i18n="paused">Paused</h2>
+  <p><button id="resume" class="main" data-i18n="goOn">Go on</button></p>
+  <p><button id="quit" data-i18n="menu">Menu</button><button id="sound2" class="small">Sound: on</button></p>
 </div></div>
 
 <div id="end" class="screen"><div class="card">
   <h2 id="endTitle">Just right!</h2>
   <div id="endStars" class="stars"></div>
   <p id="endLine" class="sub"></p>
-  <p><button id="next" class="main">Next</button></p>
-  <p><button id="retry">Again</button><button id="toMenu">Menu</button></p>
+  <p id="endSub" class="sub"></p>
+  <p><button id="next" class="main" data-i18n="next">Next</button></p>
+  <p><button id="retry" data-i18n="again">Again</button><button id="toMenu" data-i18n="menu">Menu</button></p>
 </div></div>
 
 <script type="module" src="./main.js"></script>

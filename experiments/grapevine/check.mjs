@@ -10,7 +10,8 @@ import { dirname, extname, join, normalize, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { gunzipSync } from 'node:zlib';
 import assert from 'node:assert/strict';
-import { solve, walk, step, startState, refuse, ONEWAY } from './sim.js';
+import { solve, walk, step, startState, refuse, ONEWAY, DAILY_TIERS } from './sim.js';
+import { LEVELS } from './levels.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SHOTS = process.env.SHOTS || join(tmpdir(), 'grapevine-shots');
@@ -197,6 +198,7 @@ async function chapters(page, phone) {
   assert.equal(st.dailyHops, best.length - 1, 'fewest hops today saved'); assert.equal(st.streak, 1); assert.equal(st.bestStreak, 1);
   assert.match(st.shareText, /^Grapevine, Daily village/); assert.match(st.shareText, /Psst!.*Heard it!/);
   await shot(page, phone, 'c12-daily-done');
+  await tickClear(page, 'the daily village');
   const nb2 = await page.locator('#again').boundingBox();
   assert.ok(nb2.y + nb2.height <= vp.height, 'the daily card fits');
   // Preview works even when a native sheet is cancelled or clipboard access is denied.
@@ -276,12 +278,16 @@ async function chapters(page, phone) {
   await finger(page, '#c', dragSteps(st.nodes, best));
   await until(page, () => window.grapevineState().screen === 'done', 'level 40 solved');
   await sleep(2200); await shot(page, phone, 'c13-level40-strip');
+  await tickClear(page, 'village 40');
 
   // The first-time hint on crowded boards.
   await page.evaluate(() => localStorage.clear());
   for (const [url, name] of [['?level=1&hint=hand', 'level1'], ['?level=2&hint=hand', 'level2'], ['?level=3&hint=hand', 'level3'], ['?level=30&hint=hand', 'level30'], ['?level=52&hint=hand', 'level52'], ['?level=20&hint=hand', 'level20'], ['?tier=3&hint=hand', 'daily']]) {
     if (name === 'daily') {
+      // The daily button opens once village 25 is cleared (secondColdPlay): a save that has cleared it, no daily yet.
       await page.goto(`${base}/grapevine/${url}`); await until(page, () => window.grapevineState, 'state hook');
+      await page.evaluate(() => localStorage.setItem('grapevine-save', JSON.stringify({ v: 1, sound: true, best: Object.fromEntries(Array.from({ length: 25 }, (_, i) => [i + 1, 3])), opened: 26, daily: {} })));
+      await page.reload(); await until(page, () => window.grapevineState, 'state hook');
       await page.click('#daily');
       await until(page, () => !!document.querySelector('.kit-hint.on'), 'hint on the daily village', 9000); await sleep(1700);
       const hit = await page.evaluate(() => {
@@ -307,6 +313,85 @@ async function boardInk(page, region, rgb) {
     }
     return false;
   }, [region, rgb]);
+}
+
+// Second cold play, item 3: the win tick on the result card sat on the row of hop dots under the top bar (on the
+// daily and on long villages). Neither the tick nor the card's story may reach the dots.
+async function tickClear(page, what) {
+  const m = await page.evaluate(() => {
+    const box = el => { const r = document.querySelector(el).getBoundingClientRect(); return { top: Math.round(r.top), bottom: Math.round(r.bottom), left: Math.round(r.left), right: Math.round(r.right) }; };
+    return { dots: window.grapevineState().hopDots, tick: box('.result-check'), body: box('#done .result-body').top };
+  });
+  const d = m.dots, top = d.y - d.r, bottom = d.y + d.r, left = d.x0 - d.r, right = d.x1 + d.r, t = m.tick;
+  assert.ok(t.bottom <= top || t.top >= bottom || t.right <= left || t.left >= right, `${what}: the win tick clears the hop dots (${JSON.stringify(m)})`);
+  assert.ok(m.body >= bottom, `${what}: the result card's story starts below the hop dots (${JSON.stringify(m)})`);
+}
+// Items left open by the second cold play (NOTES.md, "Open items of the second cold play").
+// 1. The daily button stays locked until the village that teaches the last piece a tier-0 daily can hold is cleared.
+// 2. A tap that cuts the route back to a villager shows the cut on the board.
+async function secondColdPlay(page) {
+  const misses = [];
+  const expect = (condition, message) => { if (!condition) misses.push(message); };
+  const painted = () => page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))));
+  let visit = 0; // a new history entry each time, so no route kept in the old one is restored
+  const fresh = async save => {
+    await page.goto(`${base}/grapevine/?visit=${++visit}`);
+    await page.evaluate(s => { localStorage.clear(); if (s) localStorage.setItem('grapevine-save', JSON.stringify(s)); }, save);
+    await page.reload(); await until(page, () => window.grapevineState, 'state hook');
+  };
+  // The first village with each piece of tier 0 (sleepy counts when the spec allows one); the latest of them.
+  const spec = DAILY_TIERS[0], pieces = [...spec.kinds.map(([k]) => k), ...(spec.sleepy?.[1] ? ['once'] : [])];
+  const unlockAt = Math.max(...pieces.map(k => LEVELS.findIndex(lv => lv.nodes.some(n => (k === 'once' ? n.once : n.kind === k))) + 1));
+  expect(unlockAt === 25, `the last piece of a tier-0 daily is taught on village 25 (${unlockAt})`);
+  await fresh(null);
+  let st = await state(page);
+  expect(st.dailyOpen === false && st.dailyAt === unlockAt, `a new save has the daily locked until village ${unlockAt} (${st.dailyOpen}, ${st.dailyAt})`);
+  const look = () => page.evaluate(() => { const b = document.querySelector('#daily'); return { locked: b.classList.contains('locked'), opacity: +getComputedStyle(b).opacity, small: b.querySelector('small').textContent, label: b.getAttribute('aria-label') }; });
+  let button = await look();
+  expect(button.locked && button.opacity < 0.8 && button.small.includes('🔒') && button.small.includes(String(unlockAt)), `the locked daily button is dimmed with a padlock and ${unlockAt} (${JSON.stringify(button)})`);
+  expect(/Finish village 25/.test(button.label || ''), `the locked daily button says what opens it (${button.label})`);
+  await page.click('#daily', { force: true }); await sleep(60); // aria-disabled: Playwright would wait for it to enable
+  st = await state(page);
+  const nudged = await page.evaluate(() => document.querySelector('#play').getAnimations().length);
+  expect(st.screen === 'menu', `a tap on the locked daily stays on the menu (${st.screen}, ${st.mode})`);
+  expect(st.dailyNudges === 1 && nudged > 0, `a tap on the locked daily nudges Play (${st.dailyNudges}, ${nudged} animations)`);
+  expect(typeof st.lastTone === 'number' && st.lastTone <= 200, `a tap on the locked daily plays a low tone (${st.lastTone})`);
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('grapevine-save') || '{}'));
+  expect(!saved.dailyTier || Object.keys(saved.dailyTier).length === 0, `a locked tap pins no daily village (${JSON.stringify(saved.dailyTier)})`);
+  const cleared = n => ({ v: 1, sound: true, best: Object.fromEntries(Array.from({ length: n }, (_, i) => [i + 1, 3])), opened: n + 1, daily: {} });
+  await fresh(cleared(unlockAt - 1));
+  expect((await look()).locked, `village ${unlockAt} still to clear: the daily stays locked`);
+  await fresh(cleared(unlockAt));
+  expect(!(await look()).locked, `village ${unlockAt} cleared: the daily opens`);
+  await page.click('#daily');
+  expect((await state(page)).mode === 'daily', 'with village 25 cleared the daily button opens the daily village');
+  await fresh({ v: 1, sound: true, best: { 1: 3 }, opened: 2, daily: {}, dailyLate: { '2026-11-20': 2 } });
+  expect(!(await look()).locked, 'a save with a daily result keeps the daily open');
+  await fresh({ v: 1, sound: true, best: {}, opened: 1, daily: { '2026-11-20': 1 } });
+  expect(!(await look()).locked, 'a save with a daily result of its own day keeps the daily open');
+
+  // 2. Village 23: the route goes through the sleepy villager and on; a tap on them cuts it back. The cut-off hops
+  // are drawn in pale blue and shrink back into them, with a ring, and the cue is gone a moment later.
+  await page.goto(`${base}/grapevine/?level=23`); await until(page, () => window.grapevineState, 'state hook');
+  await page.click('#play'); st = await state(page);
+  const lv = await levelNow(page), best = solve(lv).best, k = best.findIndex(v => lv.nodes[v].once);
+  const partial = best.slice(0, k + 4).filter(v => v !== lv.to);
+  for (const v of partial.slice(1)) await tap(page, st.nodes[v]);
+  expect(JSON.stringify((await state(page)).route) === JSON.stringify(partial) && partial.length - 1 > k + 1, `village 23: the route passes the sleepy villager and goes on (${partial})`);
+  await tap(page, st.nodes[best[k]]); await painted();
+  st = await state(page);
+  expect(JSON.stringify(st.route) === JSON.stringify(partial.slice(0, k + 1)), `a tap on the sleepy villager cuts the route back to them (${st.route})`);
+  expect(st.cut && st.cut.v === best[k] && st.cut.t > 0.5, `the cut has a cue on that villager (${JSON.stringify(st.cut)})`);
+  const blue = [155, 231, 255], at = st.nodes[best[k]], on = st.nodes[partial[k + 1]];
+  const mid = { x: at.x + (on.x - at.x) * 0.6, y: at.y + (on.y - at.y) * 0.6 };
+  expect(await boardInk(page, [mid.x - 12, mid.y - 12, 24, 24], blue), 'the cut-off hop is drawn in pale blue');
+  // the ring, sampled on the side away from the cut-off hop so the hop's own ink does not count
+  const len = Math.hypot(on.x - at.x, on.y - at.y), away = { x: at.x - (on.x - at.x) / len * st.R * 1.6, y: at.y - (on.y - at.y) / len * st.R * 1.6 };
+  expect(await boardInk(page, [away.x - st.R * 0.45, away.y - st.R * 0.45, st.R * 0.9, st.R * 0.9], blue), 'a ring shows on the villager the route was cut back to');
+  await sleep(1200); await painted();
+  expect((await state(page)).cut === null && !await boardInk(page, [mid.x - 12, mid.y - 12, 24, 24], blue), 'the cut cue is brief');
+  await page.evaluate(() => localStorage.clear()); // the checks after this one start from an empty save
+  assert.deepEqual(misses, [], 'second cold play items');
 }
 
 async function boardFeedback(page) {
@@ -353,6 +438,16 @@ async function boardFeedback(page) {
   expect(await boardInk(page, 'bubble', red), 'wrong delivery marks the rejected message');
   await tap(page, st.nodes[st.from]); await sleep(100);
   expect(!await boardInk(page, 'bubble', red), 'editing clears the rejected message');
+  // Second cold play: the reset symbol looked like a button and did nothing. A tap on it, away from the teller, restarts.
+  await tap(page, st.nodes[wrong]); await tap(page, st.nodes[lv.to]);
+  await until(page, () => window.grapevineState().result === 'wrong', 'second wrong delivery');
+  const teller = st.nodes[st.from], side = teller.x > page.viewportSize().width * 0.66 ? -1 : 1;
+  const resetAt = { x: teller.x - side * (st.R + 23), y: teller.y + st.R * 0.45 };
+  expect(Math.hypot(resetAt.x - teller.x, resetAt.y - teller.y) > st.R * 1.6, 'the reset symbol is outside the teller\'s own touch circle');
+  expect(resetAt.x - 22 >= 0 && resetAt.x + 22 <= page.viewportSize().width, 'the reset symbol\'s 44 px target is on screen');
+  await tap(page, resetAt); await sleep(100);
+  const afterReset = await state(page);
+  expect(afterReset.result === null && afterReset.route.length === 1, `a tap on the reset symbol starts again (${afterReset.result}, ${afterReset.route})`);
   await page.goto(`${base}/grapevine/?level=10`);
   await page.click('#play');
   st = await state(page);
@@ -488,9 +583,15 @@ async function run(page, phone) {
   await sleep(300); await shot(page, phone, '6-level14-midroute');
   await finger(page, '#c', [['pointerup', st.nodes[best[3]].x, st.nodes[best[3]].y]]);
 
-  // The daily village: generated and solved in the browser.
+  // The daily village: generated and solved in the browser. The daily button opens once village 25 is cleared
+  // (secondColdPlay), so the save clears 4 to 25 before the reload that reads it.
   await finger(page, '#pause', [['pointerdown', 0, 0]]);
-  await page.click('#toMenu'); await page.click('#daily');
+  await page.click('#toMenu');
+  // The "left" run is posted on its own; let it arrive before the reload so the lab assertions below still see it.
+  for (let i = 0; i < 100 && !sent.some(r => r.game === 'grapevine' && r.kind === 'run' && r.data.outcome === 'left'); i++) await sleep(50);
+  await page.evaluate(() => { const s = JSON.parse(localStorage.getItem('grapevine-save')); for (let k = 1; k <= 25; k++) s.best[k] ??= 3; s.opened = Math.max(s.opened, 26); localStorage.setItem('grapevine-save', JSON.stringify(s)); });
+  await page.reload(); await until(page, () => window.grapevineState, 'state hook');
+  await page.click('#daily');
   st = await state(page); assert.equal(st.mode, 'daily'); assert.ok(st.min >= 4, 'daily village has a real route');
   await sleep(300); await shot(page, phone, '7-daily');
   lv = await levelNow(page); best = solve(lv).best;
@@ -664,6 +765,28 @@ async function openItems(page) {
     expect(await boardInk(page, at(B, -st.R * 1.4), lane), `level 31: lane ${a}→${b} has its arrowhead next to ${b}`);
     expect(!await boardInk(page, at(A, st.R * 1.4), lane), `level 31: lane ${a}→${b} has no arrow next to ${a}`);
   }
+  // Second cold play: on 35 the arrowheads sat under raised arms and hats. Every lane in every village shows its head.
+  const hidden = [], shortLanes = [];
+  for (let n = 31; n <= 60; n++) {
+    await open(`level=${n}`);
+    st = await state(page); lv = await levelNow(page);
+    if (!lv.edges.some(e => e[2] === ONEWAY)) continue;
+    await painted();
+    for (const [a, b] of lv.edges.filter(e => e[2] === ONEWAY)) {
+      const A = st.nodes[a], B = st.nodes[b], len = Math.hypot(B.x - A.x, B.y - A.y), ux = (B.x - A.x) / len, uy = (B.y - A.y) / len;
+      // the tip sits just outside B, or further back when a lane from below would put it on B's badge (laneBack);
+      // the teller and the listener have no badge
+      const R = st.R, near = R * 1.12, plain = ['teller', 'listener'].includes(lv.nodes[b].kind);
+      const onBadge = d => !plain && Math.abs(ux * d) <= R * 1.05 + 6 && Math.abs(-uy * d - R * 1.42) <= R * 0.43 + 6;
+      let back = near;
+      while (back < len - near - 17 && onBadge(back)) back += 2;
+      if (onBadge(back)) { shortLanes.push(`${n}:${a}→${b}`); back = near; } // too short to clear the badge
+      const d = -back - 8; // the middle of the arrowhead
+      if (!await boardInk(page, [B.x + ux * d - 3, B.y + uy * d - 3, 6, 6], lane)) hidden.push(`${n}:${a}→${b}`);
+    }
+  }
+  expect(!hidden.length, `every lane's arrowhead shows (${hidden.join(' ')})`);
+  expect(!shortLanes.length, `no lane is too short for its head to clear the badge (${shortLanes.join(' ')})`);
   await page.emulateMedia({ reducedMotion: 'no-preference' });
 
   // 2. The top bar: right news the listener cannot get from here shows no green tick; right and deliverable does.
@@ -751,6 +874,15 @@ async function openItems(page) {
     expect((await state(page)).streak === 1, 'a late solve does not join the streak');
     expect(await page.locator(`#week button[data-day="${day(1)}"] small.late`).count() === 1, 'the week shows the late stars apart');
   }
+  // Second cold play: the menu had no way into the week once today was solved. Its daily button now goes on to the
+  // newest unsolved day (today and yesterday are solved here, day 3 had stars already), and names it.
+  await page.goto(`${base}/grapevine/?visit=${++visit}`);
+  await until(page, () => window.grapevineState, 'menu after the week');
+  const dayName = await page.evaluate(k => new Intl.DateTimeFormat(document.documentElement.lang, { weekday: 'short' }).format(new Date(`${k}T12:00:00`)), day(2));
+  expect(new RegExp(`→\\s${dayName}`).test(await page.textContent('#daily small')), `the daily button names the day it opens (${await page.textContent('#daily small')})`);
+  await page.click('#daily');
+  expect((await state(page)).day === day(2), `with today solved, the menu's daily button opens the newest unsolved day (${(await state(page)).day})`);
+  await solveHere('daily from the menu');
   const cell = page.locator(`#week button[data-day="${day(3)}"]`);
   if (await cell.count()) await cell.click();
   expect((await state(page)).day === day(3), 'a day in the week opens its village');
@@ -1007,6 +1139,7 @@ async function localizedScreens(browser, device, phone) {
       await take('daily-board');
       await finish(solve(await levelNow(page)).best, await state(page));
       await take('daily-win');
+      await tickClear(page, `${lang} daily`);
       nextY['daily-win'] = Math.round((await page.locator('#next').boundingBox()).y);
       await page.locator('#share').tap();
       const daily = await page.evaluate(() => {
@@ -1037,6 +1170,20 @@ async function localizedScreens(browser, device, phone) {
       await page.locator('#sendCard').tap();
       await until(page, () => !document.querySelector('#manualShare').hidden, 'manual copy from a long card');
       await take('campaign-postcard-copy');
+      // Second cold play: "26. köye git" broke onto two lines beside a solved daily button on an iPhone 13.
+      await page.evaluate(() => {
+        const save = JSON.parse(localStorage.getItem('grapevine-save'));
+        save.opened = 26; save.best = Object.fromEntries(Array.from({ length: 25 }, (_, i) => [i + 1, 3]));
+        localStorage.setItem('grapevine-save', JSON.stringify(save));
+      });
+      await go({ hint: '0' });
+      const start = await page.evaluate(() => {
+        const box = document.querySelector('#play'), range = document.createRange(); range.selectNodeContents(box);
+        return { text: box.textContent, daily: document.querySelector('#daily').textContent, lines: new Set([...range.getClientRects()].map(r => Math.round(r.top))).size, fits: box.scrollWidth <= box.clientWidth + 1 };
+      });
+      assert.ok(/26/.test(start.text) && /★/.test(start.daily), `${lang}: the menu shows village 26 beside a solved daily (${JSON.stringify(start)})`);
+      assert.ok(start.lines === 1 && start.fits, `${phone} ${lang}: the start button is one line (${JSON.stringify(start)})`);
+      await take('menu-26-daily-solved');
       assert.deepEqual(errors, [], `${lang}: page errors`);
     } finally {
       await context.close();
@@ -1061,6 +1208,7 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
   try {
+    await secondColdPlay(page);
     await boardFeedback(page);
     await lateGame(page);
     await openItems(page);

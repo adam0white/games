@@ -636,3 +636,80 @@ Also checked: dying and reviving with a lasting skill in 2D and 3D ends it and r
 ### 2026-11-24: note #244
 
 The answer to #243 (how are old hunters now that they use their skills): has not met one yet. Nothing changes; ask again after a full climb.
+
+## 2026-11-24: the Living look (lab page ant-creatures folded in, owner's lab cleanup)
+
+### Done
+- A fifth look, **Living** (Turkish "Canlı"), on the Look button after 3D and in the URL as `?look=4`. Looks 0 to 3 keep their numbers, so a saved `look` in `ant-promotion:v1` means what it meant. Cartoon stays the default.
+- Every animal near the screen, and the player, walks on a rig: a spine that keeps its lengths, two-bone legs with an alternating gait, tails, antennae, necks and a trunk that swing, eyes on what it hunts or flees. `rig.js` and `creature.js` came from the lab page; `living.js` joins them to the game. Nothing is imported from `experiments/lab/`. The rigs step after each sim step and only read it.
+- Only the body drawing changes. Rings, numbers, "!", "zzz", the crown, the rival's tag, bubble and ring, hunt lines, sight wedges, the dim ground, edge arrows, the food arrow, old-animal rings and aims, floats, pieces, the light beam, flashes and cards come from the same code as in the other looks. Numbers rise with a body that is off the ground. The rival's scars are cut into its body.
+- Body language from the rules (`moodOf` and `playerMood` in `living.js`):
+  - pounce (`m.pounce`): a crouch for the first moment, then a leap off the ground with the body stretched out
+  - an old animal winding up its skill (`m.wind`): a crouch that deepens until it springs; its leap or dive rises off the ground, its sprint takes quick steps
+  - tired (`m.puff`, `m.winded`, a hunter's `tirePace` falling): panting, tongue out, quick breath
+  - fleeing (`m.fear`): quick short steps, body stretched; chasing: stretched a little
+  - stunned (`m.stun`): eyes shut, low and still
+  - the rival's temperament: an ambusher lies low until it has seen you, a stalker creeps long and slow, a brute is bigger, a coward is smaller and trembles when it sees you
+  - the player: a shell or a dig shows a see-through dome (a porcupine raises its quills instead), sprint and dive take quick stretched steps and a dive lifts, a leap or being thrown clear flies the body there in an arc (0.35 s; the sim has already moved), a roar's slow makes it stagger, a Wild hide growing back shows scratches
+  - a bite squashes the biter: the player on a meal, an animal that eats another, the killer
+- Hurrying animals take shorter, quicker steps and creeping ones longer, slower ones (`hurry` in `rig.js`).
+- Look-alikes: a contact sheet of all 55 at book size and at 16 and 9 pixels showed dog, lynx and cat; bear, boar, gorilla and mole; hippo and mouse; and the ostrich (a dark four-legged blob) as the worst. Each got its own outline (`shape()` in `creature.js`): the cat is slim with a long curled tail; the dog has a muzzle, big floppy ears and a fast wag; the lynx has long legs, ear tufts, a cheek ruff and a black-tipped stub tail; the sabertooth is heavy at the front with long fangs; the bear has a shoulder hump; the gorilla knuckle-walks on long front legs with a silver back and no tail; the boar has a pink snout disc and a bristle ridge; the mole is round with pink hands and a pink star nose; the mouse has big ears and a long pink tail; the hippo has a barrel body and a square muzzle; the ostrich is a black fluffy body with white plumes, a long pale neck and a beak; the lion's mane is bigger and shaggy.
+- The menu picture, the promotion cards and the animal book show the living animal when Living is chosen (a still rig).
+- The lab page's zoo was not carried over; it is archived with the page (`archive/lab/ant-creatures/`). It was a toy for poking animals, not part of a run.
+- Far and small bodies (under 6 pixels of radius) are drawn plain: no outline, eyes, shadow or marks.
+
+### Overlay checklist
+Compared on one frozen moment (the same seed and placements; `__ant.look(n)` switches the look without moving anything; the states are set after the freeze, so the sim cannot clear them): Chromium level 12 in looks 0 to 4, levels 6 and 17 in looks 1 and 4, WebKit level 12 in look 4, a variant with food off screen, and in motion (a meal, a leap, a death) at level 8. "Shared" means the code that draws it runs after the body is drawn and is the same in every look; the Living branch replaces only the call that draws a body. "Seen" means I saw it in a Living screenshot.
+
+| Overlay | Living |
+| --- | --- |
+| numbers, faster ">>" marks, "zzz" | shared, seen; raised over a body in the air |
+| "!" on a stronger animal that has seen you | shared, seen |
+| green food arrow | shared, seen |
+| red edge arrows (danger off screen) | shared; the test scene drew none in any look, so not compared |
+| rival: ring, crown, name tag, bubble | shared, seen |
+| rival: scars | drawn on the body by the rig's own marks, seen |
+| hunt (chase) lines, sight wedges, dimmed ground | shared, seen |
+| skill effects: "Pounce!", leap dust, shell | shared, seen; the shell is also a dome on the body |
+| skill effects: roar ring, sting | shared, not caught |
+| hide state (HUD "hide ready", dashed ring) | shared, seen |
+| old animals: purple ring, red aim while winding up | shared, seen; the wind-up crouch shows on the body |
+| "+n" floats, eat pieces | shared, seen |
+| death pieces, death card | shared, seen |
+| the promotion beam, flashes, cards | shared; cards seen, beam not caught |
+
+### Numbers
+- `rig-bots.mjs` (run first by `bots.mjs`): 55 species walk 10,000 steps each at up to 360, above the game's top speed, with every pose; no NaN, spine and chain error under 1e-10 %, no foot past its leg (worst 98.0 %), the gait alternates 100.0 % of 73,386 waves, feet slide 0.08 % at a walk and 0.40 % at a run (with every pose and speed mixed in, 0.98 % walking, 1.32 % running and 3.14 % in a pounce reach the leg's end before a step). A fleeing Dog steps 119 times in 10 s against 75 calm, a Mouse 235 against 148. 240 s of a real run with the look stepping ends in the same sim state as without it, with up to 63 rigs. Three more runs (seeds 3, 17, 29; 200 to 300 s) with a brute rival, three old animals and a fast player end in the same state too, and in them animals leave the ground in a pounce (49 rig-ticks), crouch and are bigger as the rival; making the look nudge the rival's heading by 1e-9 fails this check on all three runs. 11 sim states each give the pose they should, a calm animal none. Every species in 11 poses draws on a context that rejects NaN (168,056 calls).
+- `--mutate=gait`, `clamp` and `spine` each fail 3 or 4 of those checks; `node bots.mjs --mutate` exits 1.
+- Rules parity: `node bots.mjs 6 12` prints the same 66 lines after the rig checks as main's `bots.mjs` on main's `sim.js` (`sim.js` is unchanged).
+- Page work per frame (the sim steps, the rigs and the drawing; `__ant.work`), headless at 390x844, median / 95th percentile in ms:
+
+| | level 6 | level 12 | level 18 |
+| --- | --- | --- | --- |
+| Chromium, Cartoon | 0.6 / 1.2 | 0.9 / 1.6 | 0.8 / 1.3 |
+| Chromium, Living | 0.8 / 1.4 | 1.0 / 1.8 | 1.0 / 1.6 |
+| Chromium at 4x CPU slowdown, Cartoon | 2.4 / 3.3 | 3.2 / 4.2 | 3.4 / 4.8 |
+| Chromium at 4x CPU slowdown, Living | 2.7 / 3.7 | 3.9 / 6.1 | 4.4 / 5.7 |
+| WebKit (1 ms clock), Cartoon | 1 / 1 | 1 / 2 | 1 / 1 |
+| WebKit (1 ms clock), Living | 1 / 2 | 1 / 2 | 1 / 2 |
+
+  About 20 to 32 rigs are live near the screen. Living costs about 0.1 to 1 ms more than Cartoon, inside a 16 ms frame even at a 4x slowdown, so no further detail is dropped.
+
+### Checks
+- The phone check (`kit/check/phone.mjs ant-promotion`, WebKit iPhone 13 and Chromium Pixel 7): the old save with `look: 2` now must show "Look: Soft"; the Look button goes round to Living and saves 4; play draws living bodies; a death in Living, the death card, going on; the button goes back round to the old look; the other looks have no rigs. With Living switched off in the page, the check fails at "living bodies drawn".
+- Played headless at 390x844: the menu, the first minute from Ant, a meal, a leap, a death, the pause card, the book and the winning card in Living.
+
+### Not verified
+- A real phone, and how Living feels in the hand against Cartoon.
+- At play size the dog and the lynx are still close (both tan with dark spots); at 9 pixels most mammals read by colour and size more than by outline.
+- The ostrich's plumes and the gorilla's face are first drafts.
+- A rig's heading lags when an animal is moved at once (a revive, a check placing animals); in play animals walk, so this shows only in tests.
+
+## 2026-11-25: the skills and the Living look merged
+
+The skills (note #238) and the Living look were built at the same time. After the merge:
+
+- `rig-bots.mjs` asked for a crouch in its plain run. On main all 175 crouches of that run were stuns by a player's skill; only the Lion's skill stuns now, so that part of the claim was dropped. The run with a rival and old animals still requires crouches that are not stuns, and the 11-state check still requires the stunned pose.
+- Promotion cards still named the old six skills ("Skill: Roar" on T-Rex). They name the new ones now (`skillFor` in `index.html`).
+- In Chromium and WebKit at 390x844 the button of every animal was pressed in Living: 40 and 36 of 51 fired with animals placed near, the rest had no fitting target; no page error.
+- Left as a proposal: Living has no body language of its own for the new skills. The rings and marks of `skillMarks` show them.

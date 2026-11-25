@@ -617,3 +617,145 @@ New strings, English and Turkish: `sleepy`, `asleep`, `oneWay`, `gateShut`, `not
 | `bots.mjs` | All passed, including the new section 9; chapter 2 ramp 52% / 34% / 20%, chapter 3 47% / 34% / 17%. |
 | `check.mjs` | ok on webkit, chromium, chromium 360x640, colour cues, chromium desktop 1280x800; English and Turkish screens ok on webkit-iphone13 and chromium-360x640. |
 | `kit/check/phone.mjs grapevine` | grapevine and hint grapevine ok on webkit and chromium. |
+
+## 2026-11-24 — Second cold play
+
+A first-time player who reads no English, by touch only (`page.touchscreen.tap` at points picked from screenshots, a screenshot after every action), locale tr-TR, empty save: WebKit with the iPhone 13 profile and Chromium at 360 x 640. The source and these notes were read only after the play. The play screenshots (named in the tables below) were deleted by mistake during the scratch-folder cleanup; only their names and the notes taken while playing remain. What could be shown again was re-shot from a copy of the old code and from the new code (`old-webkit-*` and `new-webkit-*` in the session scratch folder `shots/cold2-grapevine/`, outside the repo), and every fixed finding also has a `check.mjs` assertion that fails on the old copy.
+
+### How it was played
+
+- WebKit: villages 1–44 all won by touch (2 stars on 28, 29, 30, 40, 44; 3 on the rest), losses on 5, 8 and 44, today's daily, then yesterday's, a Wednesday and a Sunday from the week strip, pause, the language button both ways, the share card, a reload in the middle of 9 (it came back paused with the route), the locked Winter tab. Village 45 was not won by touch in three tries (see finding 2).
+- Chromium 360 x 640: villages 1–3, a loss on 2, a reload in the middle of 3 (restored), pause, the menu, the daily board.
+- Remade villages won cold by touch: 35 (after four tries, see finding 2), 38, 39, 41, 42, 43 (3 stars each), 40 and 44 (2 stars). 38, 41, 42 and 43 felt fair and quick; 44 felt like a real puzzle and the loss there was mine; 35 and 45 were lost to the lanes, not to the puzzle.
+
+### Did the picture plates teach each new piece before it cost a village?
+
+| Piece | First met | Taught before it cost a try? |
+| --- | --- | --- |
+| Shaper (hard hat) | 13 | Yes: the before-and-after plate. |
+| Colour swapper (top hat) | 16 | Yes, though the dots on its badge are small. |
+| Bow (refuses red) | 19 | No: the badge's no-entry sign read as "does nothing"; learned from the refusal plate (`webkit-140-l19a`). Known. |
+| Sleepy villager | 22 | Partly: the moon plate shows once they end a route. |
+| Parrot | 25 | No: on 25 it follows the teller and copies nothing; learned by trying on 26 (`webkit-195-l26a`). Known; 1–30 are frozen. |
+| One-way lane | 31 | Yes on 31–34. On 35 and 45 no: the arrowhead was under a villager (finding 2). |
+| Bell and gate | 36 | Yes: the bell-gate badge. That one bell turns every gate was learned on 39. |
+| Keeper | 46 | Not judged cold: 45 was not won cold, and 46 was played by touch only after reading the source. Then her badge (swap arrows and the news she holds, updated after the swap) read clearly. |
+| Count limits (1 and 3) | 11, 17 | The floor at 1 was seen on 11; the cap at 3 is first needed on 17 and only shown after it happens (`webkit-120-l17c`). Known. |
+
+### Findings, most harmful first
+
+| # | Finding | Evidence | Status |
+| --- | --- | --- | --- |
+| 1 | After a wrong delivery a round reset arrow sits beside the teller. It looks like a button and a tap on it did nothing, on both browsers. Only a tap on the teller restarts. Met on the first loss of every new player. | `webkit-024-l8undo2`, `chromium-009-c2undo` (lost); re-shot `old-webkit-005-l2-tap-reset-symbol` (tapped, still lost) | Fixed |
+| 2 | A lane's yellow arrowhead can sit under a villager's raised arms, hat or badge, so the lane is unreadable. On 35 two lanes were misread (four tries); on 45 the parrot→swapper lane was invisible, so the solution looked impossible. The pixel check found heads hidden or on a badge on 34, 35, 45 (two lanes), 56, 59 and 60. | `webkit-266-go35`, `webkit-283-l35g`, `webkit-368-l45b` (lost); re-shot `old-webkit-007-l35`, `old-webkit-009-l45` | Fixed |
+| 3 | The daily button opens from the first screen, before village 1, and its tier-0 village uses pieces a new player has not met (sleepy, swappers, the bow, the parrot). | `chromium-017-cdaily`, `webkit-038-daily` (lost); re-shot `new-chromium-007-fresh-daily` (empty save, first tap on the daily: sleepy +1, two shape swappers) | Left |
+| 4 | The menu gives no way into the week (known open item). | — | Partly fixed: once today is solved the button goes on to the week. Before today is solved there is still no way in from the menu. |
+| 5 | A tap on a villager already on the route that cannot be entered again (a sleepy villager who went home) cuts the route back to them without the refusal plate. On 45 this silently undid two hops. | `webkit-376-l45c` | Left |
+| 6 | "26. köye git" broke onto two lines beside "Günün köyü ★★★" on the iPhone 13. | `webkit-191-go26` | Fixed |
+| 7 | The win tick in the top bar overlaps the row of step dots on long routes and the daily. | `webkit-051-dailywin`, `webkit-163-l21` | Left |
+| 8 | A road that runs close behind a villager seemed to connect to it (40). | `webkit-317-l40` | Not a bug: every road clears every other villager by at least 2.5 R on both screen sizes (computed from `levels.js` and the layout). My misreading. |
+| 9 | After winning 25, Next seemed to land on the menu. | `webkit-202-go27` | Not reproduced: Next always calls `begin(index + 1)`; most likely my tap hit Menu. |
+
+Good, to keep: the loss feedback (rejected bubble, ringed teller), the restore after reload, the chapter lock showing "30 ✓ → 🔓", the instant language switch, no English on any Turkish screen seen.
+
+### What was fixed, and the assertion for each
+
+Each new assertion was run on a copy of the code from before this section (`check.mjs webkit`) and failed there; the copy's own reset assertion was disabled for a second run so that the later sections could run.
+
+| Change | Assertion (`check.mjs`) | On the old code |
+| --- | --- | --- |
+| The reset symbol is a button: after a wrong delivery a tap within 24 px of it (and not on another villager) restarts from the teller. One function, `resetSpot()`, places both the drawing and the target. | Board feedback: a second wrong delivery on 2, a tap on the symbol (outside the teller's own touch circle, its 44 px target on screen) leaves `result` null and the route at the teller. | `a tap on the reset symbol starts again (wrong, 0,2,1)` |
+| Lane arrowheads are drawn after the villagers (`laneHead`); the chevrons stay under them. A lane that comes in from below would put its head on the badge, so its tip moves back along the lane until it clears the badge (`laneBack`); on 35 and 45 such a head now sits just above the villager the lane leaves. A lane too short to clear the badge would keep its head by the villager, over the badge; there is none on the phones the check uses. | Open items, reduced motion: on every village 31–60 with a lane, yellow ink in the middle of each arrowhead where `laneBack` puts it, and no lane too short for its head to clear the badge. The level-31 assertion (arrow ink at 1.4 R before the villager) is unchanged and still passes. | `34:0→3 35:3→7 45:8→2 45:8→6 56:0→5 59:2→3 60:0→6` hidden or on a badge |
+| With today's daily solved, the menu's daily button opens the newest unsolved day of the week and shows "→ weekday" under its stars; its spoken label adds "Yesterday's village" or the weekday's village (existing strings). With every day solved it opens today's as before. No new strings. | Open items: with today and yesterday solved, the button reads "→ (day 2's weekday)" and opens day 2; that village is then solved and its card joins the Next-height check. | `(★★★)` and today's date |
+| The start button does not wrap (`white-space: nowrap`, font 16–21 px); the daily button gives way instead. | English and Turkish screens, both phones: with village 26 next and today's daily solved, `#play` is one line and fits; the screen passes the existing fit check. | `tr: the start button is one line ({"text":"26. köye git", ... "lines":2})` |
+
+This reverses the decision of the open-items round that the menu's daily button always opens today's village (Builder: the week was the only part of the daily a player could not find).
+
+### Replay of the changed parts by touch
+
+Not cold any more. WebKit (iPhone 13) and Chromium (360 x 640), tr-TR, touch taps at points from the screenshots:
+
+- Village 2, a wrong painter, then a tap on the reset symbol: the route went back to the teller with the listener ringed, on both (re-shot: `new-webkit-005-l2-tap-reset-symbol`).
+- Village 35: all four arrowheads in view, none on a badge (re-shot: `new-webkit-007-l35`). Village 45: the parrot→swapper head now shows above the parrot (re-shot: `new-webkit-009-l45`); 45 was then won with the solver's route (3 stars) and 46 by reading the keeper's badge (she shows the news she holds and swaps it; after the swap her badge holds the teller's news): 3 stars.
+- Today's daily (tier 3, with a keeper) won by touch; the menu then showed "Günün köyü ★★★ → Pzt" and the button opened Monday's village (screenshots lost). The first try put "· → Pzt" alone on the second line; no-break spaces now keep "★★★ → Pzt" together.
+- The start button on one line in Turkish at 360 x 640 beside a solved daily: `chromium-360x640-tr-menu-26-daily-solved.png` from `check.mjs`.
+
+### What was left, and why
+
+- Finding 3 (beginner daily): fixing it changes which village every new player gets on a date and needs a tier below tier 0, which `dailyTier` saves by index; not done in this round. Builder: hold the daily button back until village 13, or add a beginner spec as a new tier index chosen while `opened` is under 13.
+- Finding 4, the rest: before today is solved, the week is still reached only from a daily result.
+- On 59 the 2→3 lane is short: its head, moved off the painter's badge, now sits on the yellow hard hat of the shaper the lane leaves; the dark outline keeps it readable, but it is the weakest head in the game (`new-webkit-004-l59`). 41's heads are clear (`new-webkit-002-l41`).
+- Finding 5: cutting the route back on a tap is how a route is edited; telling a deliberate cut from a mistaken re-entry needs a design decision.
+- Finding 7: cosmetic; not attempted.
+- Known items not touched: the parrot's teaching village 25 (1–30 are frozen by hash), the cap at 3 shown only after 17, the hint covering a villager on 32 and 54 at 360 x 640.
+
+### Not verified
+
+- 45 and 46 were won by touch only after reading the solver's route and the source, so there is no cold verdict on 45 or on the keeper.
+- Chromium cold play covered villages 1–3, not 4–10; the share card, the language button and the daily result with its week were played cold only in WebKit. The new daily-button behaviour was replayed by touch in WebKit only (`check.mjs` covers it in both engines).
+- The reset target was checked by computation on all 60 villages at 390 x 664 and 360 x 640: its 44 px circle is on screen and at least 49 px clear of every other villager's touch circle. The assertion taps it on village 2 only.
+- Taps were sent one at a time with 1.3 s between them; no drag was tried by touch, and no fast tapping.
+- No Turkish speaker, physical phone, sound or screen reader.
+- Whether the arrowheads drawn over villagers hide anything that matters was judged only by eye, on 35, 41, 45 and 59.
+- The start button is now narrower than the daily button once today is solved (`chromium-360x640-tr-menu-26-daily-solved`); whether that demotes the main action was not judged by a player.
+
+### Checks after all changes
+
+Each run alone.
+
+| Check | Result |
+| --- | --- |
+| `bots.mjs` | All passed. No level, generator or daily spec changed; the tables are the same as before this section (chapter 2 ramp 52% / 34% / 20%, chapter 3 47% / 34% / 17%, random bot 43.8%). |
+| `check.mjs` | ok on webkit, chromium, chromium 360x640, colour cues, chromium desktop 1280x800; English and Turkish screens ok on webkit-iphone13 and chromium-360x640. |
+| `kit/check/phone.mjs grapevine` | grapevine and hint grapevine ok on webkit and chromium. |
+
+## 2026-11-24 — Open items of the second cold play
+
+Three items the second cold play left open (findings 3, 5 and 7 there). Only `index.html`, `check.mjs` and these notes changed; `sim.js`, `levels.js` and the daily specs did not, so every date still gives everyone the same village.
+
+### What changed
+
+| Item | Change | Assertion (`check.mjs`) | On the old code |
+| --- | --- | --- | --- |
+| Beginner daily (finding 3) | The menu's daily button is locked until the player has cleared village 25. 25 is worked out in the page (`DAILY_AT`) as the latest first village of any piece a tier-0 daily can hold: `DAILY_TIERS[0].kinds` plus the sleepy villager (its spec allows one). First villages by code kind: `paint` 1, `honest` 3, `more` 4, `less` 7, `swap` 10, `carve` 13 (the shaper), `flip` 16 (the colour swapper), `timid` 19 (the bow), sleepy (`once`) 22, `parrot` 25. This replaces the village 13 the previous section proposed: by 13 a player has not met the colour swapper, the bow, the sleepy villager or the parrot, and a tier-0 daily can hold all four. "Cleared 25" is `save.opened > 25`, the rule the level grid uses. A save with any entry in `daily` or `dailyLate` keeps the button open. Locked look: dimmed (opacity .5), dashed border, "🔒 25" under the name; spoken label "Daily village · Finish village 25 to unlock this." (existing `unlock` string, no new words). A tap stays on the menu, plays a low tone (130 Hz; the tap starts the audio context if it is the first) and nudges the Play button (a scale pulse; a gold ring pulse under reduced motion); it pins no daily tier. No storage change. | `secondColdPlay`: the derived number is 25; a new save is locked, dimmed with 🔒 and 25; a tap stays on the menu, nudges Play, sends a tone at or under 200 Hz to a live audio context (`lastTone`, check-only state like `dailyNudges`) and stores no `dailyTier`; a save that cleared 24 is still locked; one that cleared 25 opens the daily; a save with only a `dailyLate` or only a `daily` entry is open. | 8 misses: the tap opened the daily and pinned today's tier. |
+| Cut cue (finding 5) | A tap on a villager already on the route who cannot be entered again cuts the route back to them, as before; now, on every such cut (a sleepy villager who went home or any other villager the route cannot go on to), the cut-off hops are drawn in pale blue with a dark edge and shrink back into that villager while a ring closes on them (0.67 s, `CUT_TICKS` 40). The villager bounces. Under reduced motion the hops and ring stay put and fade. No sentence. | `secondColdPlay`: on village 23 the route passes the sleepy villager and goes three hops on; a tap on them cuts it back, `cut` names them, pale-blue ink shows on the cut-off hop and on the ring on the side away from that hop, and both are gone 1.2 s later. The check ends by clearing the save, so the checks after it start empty as before. | 4 misses (no cue, no ink). |
+| Win tick (finding 7) | The tick on the result card moved out of the card's scrolling story to an absolute place over the top bar's own tick (15 px below the safe top), and the story starts 72 px down the card, below the hop dots (their row ends 75 px below the safe top). One function, `hopDots()`, places the dots for the top bar and the state hook. The scroll area is now 453 px high on 390 x 664 and 429 px on 360 x 640; on the cards measured (Turkish, the tier-3 daily and villages 1, 21, 48 and 60 on both phones) the content did not overflow, so nothing scrolls. The spare room on the 360 x 640 tier-3 daily card is about 16 px, computed from the old layout's measurements, not measured. | `tickClear`: after the daily and village 40 in `chapters()` (iPhone 13, Pixel 7, 360 x 640) and after the daily win in English and Turkish (`localizedScreens`, iPhone 13 and 360 x 640): the tick's box and the dot row do not meet, and the story starts below the dots. | `en daily: the win tick clears the hop dots` (tick 46–82 px, dots 65–75 px). |
+
+Old-code runs (`check.mjs` in full, both engines) used a copy of the game from before this section with the new `check.mjs` and one read-only addition (`hopDots` in `grapevineState`), so the tick assertion failed on measured overlap, not on a missing field.
+
+Existing checks that opened the daily from a fresh save now start from a save that has cleared 25, and nothing was loosened: the hint loop in `chapters()` seeds best 1–25 and `opened: 26` before the daily; `run()` keeps its own progress and fills best 4–25 and `opened: 26` after the level-14 "left" run, before the reload and the daily. Checks whose saves already had `opened` 31 or more or a daily entry are unchanged.
+
+### Replay by touch
+
+WebKit (iPhone 13) and Chromium (360 x 640), tr-TR, `page.touchscreen.tap` at points from the screenshots and the state hook:
+
+- Empty save: the daily button reads "☀ Günün köyü 🔒 25", dimmed and dashed (`chromium-02-locked-tap`, `webkit-02-locked-tap`); a tap left the menu up, the Play button pulsed, the tone asked for was 130 Hz.
+- A save that cleared 24: the daily still locked; "25. köye git" played and won (3 stars) by touch; back on the menu the daily was open and its tap opened today's village, won by touch (3 stars, 7 hops). The win card shows the tick in the top bar above the dots (`webkit-07-daily-win`).
+- Village 23: the route through the sleepy villager and three hops on, then a tap on her: the hops shrank back into her with a closing ring (`webkit-09-l23-cut-120ms`, `chromium-09-l23-cut-120ms`); the cue was gone within a second; 23 was then won by touch (3 stars), the win tick above the dots (`chromium-12-l23-win`).
+- The whole replay ran twice, the second time on the final code; both runs as above, no page errors.
+
+Screenshots: session scratch folder `shots/fix-grapevine/touch/` (outside the repo).
+
+### What is still open
+
+- The parrot is taught on 25 but the earlier cold play learned it on 26 (25's plate copies nothing); the lock counts 25 as taught. 1–30 are frozen, so not touched.
+- Before 25 nothing opens a daily: not the menu, not a `?seed` or `?tier` link (those set the seed or tier, the button still opens it), and the week is only on a daily result.
+- Read from the code, not tested: a save that opened a daily but has no daily result, with a daily route kept in the browser history, still restores that route on reload, because the lock is on the button only.
+- The cut-off hops are drawn over the villagers between; on village 23 the line crosses the painter's face for half a second.
+
+### Not verified
+
+- Sound: the tone was checked as the pitch asked for (`lastTone`), not heard.
+- The reduced-motion versions of the nudge and the cut cue were not looked at.
+- No player has judged whether "🔒 25" says "finish village 25"; the spoken label says it.
+- No Turkish speaker, physical phone or screen reader.
+
+### Checks after all changes
+
+Each run alone.
+
+| Check | Result |
+| --- | --- |
+| `bots.mjs` | All passed. Output identical to the run before this section except the wall-clock columns (`slowestMs` of the daily tiers and the total seconds); every level, ramp and daily row is the same. |
+| `check.mjs` | ok on webkit, chromium, chromium 360x640, colour cues, chromium desktop 1280x800; English and Turkish screens ok on webkit-iphone13 and chromium-360x640. |
+| `kit/check/phone.mjs grapevine` | grapevine and hint grapevine ok on webkit and chromium. |

@@ -5,6 +5,7 @@ import { isPauseKey, onLeave } from '../../kit/pause.js';
 import { read, readNumber, write } from '../../kit/save.js';
 import { screens } from '../../kit/screens.js';
 import { noZoom } from '../../kit/zoom.js';
+import { lab } from '../../kit/lab.js';
 import { draw } from './art.js';
 import { distanceAngle, expose, makePlate, optics, PLATES, turn } from './sim.js';
 
@@ -32,7 +33,16 @@ const show = screens(['paused', 'result'], name => {
   if (returningToPlay) slider.focus({ preventScroll: true });
   else if (name !== 'play') el(name === 'paused' ? 'resume' : 'next').focus({ preventScroll: true });
 });
+// Play recording for the game lab (kit/lab.js): one run for each plate the player starts to turn.
+const rec = lab('night-splitlight');
+let runOpen = false;
+function runEnd(outcome) {
+  if (!runOpen) return;
+  runOpen = false;
+  rec.end(outcome, { level: state.level, captured: litCount(), targets: state.targets.length, seconds: Math.round(state.elapsed * 10) / 10, plate: high });
+}
 function startPlate(level) {
+  if (state) runEnd('quit');
   steering.reset();
   state = makePlate(level, 0x51e17 + level * 97);
   field = optics(state);
@@ -52,6 +62,7 @@ function aim(pos) {
   advance(performance.now());
   if (state.won) return;
   turn(state, pos);
+  if (!runOpen && state.started) { runOpen = true; rec.start({ level: state.level }); }
   const next = optics(state);
   // A glint sounds once as a wavelength crosses into its receiver.
   if (performance.now() >= nextTickSound) {
@@ -151,6 +162,8 @@ function paint(time) {
 }
 function finishPlate() {
   high = Math.max(high, lastPlate(), Math.min(PLATES.length, state.level + 1));
+  rec.event('plate-exposed', { level: state.level, seconds: Math.round(state.elapsed * 10) / 10 });
+  runEnd('won');
   const saved = write(key + 'plate', high);
   el('result-line').textContent = saved ? '' : 'Progress lasts for this session.';
   audio.tone(784, .62, .045, 'sine');
@@ -187,6 +200,9 @@ function frame(now) {
   if (redraw) paint(now / 1000);
   requestAnimationFrame(frame);
 }
+// The recording notice is on the page from the first look; its switch is on the pause card.
+rec.notice(document.querySelector('.instrument'));
+rec.toggle(document.querySelector('#paused .card'));
 startPlate(high);
 paint(0);
 window.splitlightState = () => ({

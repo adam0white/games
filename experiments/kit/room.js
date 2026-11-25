@@ -91,3 +91,69 @@ export function table({ game, version = 1, name = () => '', onState = () => {}, 
     get code() { return code; }, get seat() { return seat; }, get status() { return status; }, get waiting() { return !!pending; },
   };
 }
+
+// A relay room for a real-time game between two phones (Thumb Duel): `/lab-api/room/<game>/<CODE>` passes short frames
+// of integers from one phone to the other and stores nothing. The pages keep the game in lockstep themselves
+// (kit/lockstep.js). Unlike a table, nothing comes back after a reload: a page that is reloaded has left.
+//
+//   const r = relay({ game: 'duel',
+//     onFrame(ints) {},            // a frame from the friend
+//     onPeer(here) {},             // the friend's phone joined (true) or left (false) the room
+//     onStatus(status) {} });      // 'connecting' | 'live' | 'waiting' (lost, retrying) | 'full' | 'closed' | 'failed' | 'off'
+//   r.open(code) · r.send([..ints]) → true when sent · r.leave() · r.code · r.peer · r.status
+// 'failed': the room could not be reached (3 more tries after the first before ever getting in, 6 in a row after): offer the bot.
+// 'closed': this seat was opened in another tab. 'full': two phones are in the room already.
+// The seat key lives in sessionStorage (`kit-relay:<game>:<code>`), so two tabs are two seats, and a phone whose old
+// socket the server still holds takes its own seat back instead of finding the room full.
+export function relay({ game, onFrame = () => {}, onPeer = () => {}, onStatus = () => {}, Socket = globalThis.WebSocket, where = globalThis.location,
+  store = (() => { try { return globalThis.sessionStorage; } catch { return null; } })(), timers = globalThis, firstTries = 3, laterTries = 6 }) {
+  let socket = null, epoch = 0, code = '', key = '', tries = 0, timer = null, wanted = false, wasLive = false, peer = false, status = 'off';
+  const say = s => { if (s !== status) { status = s; onStatus(s); } };
+  const setPeer = here => { if (here !== peer) { peer = here; onPeer(here); } };
+  function close() { epoch++; timers.clearTimeout(timer); const old = socket; socket = null; if (old) { old.onopen = old.onmessage = old.onclose = old.onerror = null; try { old.close(); } catch {} } }
+  function retry() {
+    if (!wanted) return;
+    close(); setPeer(false);
+    if (tries >= (wasLive ? laterTries : firstTries)) { wanted = false; say('failed'); return; }
+    say('waiting');
+    const wait = Math.min(8000, 500 * 2 ** Math.min(tries, 4)); tries++;
+    timer = timers.setTimeout(connect, wait);
+  }
+  function connect() {
+    if (!wanted) return;
+    close(); const mine = epoch;
+    if (!Socket) { wanted = false; say('failed'); return; }
+    if (!wasLive && tries === 0) say('connecting');
+    try { socket = new Socket(`${where.protocol === 'https:' ? 'wss' : 'ws'}://${where.host}/lab-api/room/${game}/${code}?k=${key}`); } catch { retry(); return; }
+    socket.onmessage = event => {
+      if (mine !== epoch) return;
+      let q; try { q = JSON.parse(event.data); } catch { return; }
+      if (!q || typeof q !== 'object') return;
+      if (q.t === 'you') { tries = 0; wasLive = true; say('live'); setPeer(Array.isArray(q.peers) && q.peers.length > 0); }
+      else if (q.t === 'join') setPeer(true);
+      else if (q.t === 'leave') setPeer(false);
+      else if (q.t === 'r' && Array.isArray(q.d)) onFrame(q.d);
+    };
+    socket.onerror = () => { if (mine === epoch) retry(); };
+    socket.onclose = event => {
+      if (mine !== epoch) return;
+      if (event?.code === 4001) { wanted = false; close(); setPeer(false); say('full'); }
+      else if (event?.code === 4003) { wanted = false; close(); setPeer(false); say('closed'); }
+      else retry();
+    };
+  }
+  const wake = () => { if (wanted && globalThis.document?.visibilityState !== 'hidden' && (!socket || socket.readyState > 1)) { tries = 0; connect(); } };
+  try { globalThis.document?.addEventListener('visibilitychange', wake); globalThis.addEventListener?.('online', wake); } catch {}
+  return {
+    open(c) {
+      code = cleanCode(c); if (!code) return false;
+      const at = `kit-relay:${game}:${code}`;
+      try { key = store?.getItem(at) || ''; } catch { key = ''; }
+      if (!/^[a-z0-9]{16,40}$/.test(key)) { key = seatKey(game, code, null); try { store?.setItem(at, key); } catch {} }
+      wanted = true; wasLive = false; tries = 0; setPeer(false); connect(); return true;
+    },
+    send(ints) { try { if (socket && socket.readyState === 1 && Array.isArray(ints)) { socket.send(JSON.stringify({ t: 'r', d: ints })); return true; } } catch {} return false; },
+    leave() { wanted = false; close(); setPeer(false); say('off'); },
+    get code() { return code; }, get peer() { return peer; }, get status() { return status; },
+  };
+}

@@ -1,4 +1,4 @@
-// Proves the rules of Thumb Duel: node experiments/duel/bots.mjs [--mutate] [--quick]
+// Proves the rules of Thumb Duel: node experiments/duel/bots.mjs [--mutate | --mutate=late] [--quick] [--friend]
 // Bots play through the same input a finger gives each tick, with reaction times and
 // tap rates capped at what a thumb can do (brain.js THUMB). Exits non-zero when a claim fails.
 //
@@ -8,10 +8,15 @@
 //
 // --mutate breaks one rule on purpose: in tug of war a tap from the top player pulls the rope toward the BOTTOM (as if
 // the top side's direction had been copied from the bottom's). The seat-fairness and careful-beats-idle claims must fail.
+// --mutate=late breaks playing a friend by link: one phone files the friend's inputs at the wrong tick (link-bots.mjs);
+// the claims that both phones stay identical must fail. --friend runs only the link claims (section 8).
 import { createMatch, step, blank, mutate, KINDS, WIN, DUELS, CONTROL, LAUNCH, SWIPE } from './sim.js';
 import { makeBot, SKILLS, THUMB, STRENGTHS } from './brain.js';
 
+import { linkClaims } from './link-bots.mjs';
+
 const MUTATE = process.argv.includes('--mutate'), QUICK = process.argv.includes('--quick');
+const LATE = process.argv.includes('--mutate=late'), FRIEND = process.argv.includes('--friend') || LATE;
 if (MUTATE) { mutate('tug'); console.log('MUTATION: a tap from the top side pulls the rope toward the bottom\n'); }
 let failed = 0;
 function claim(ok, text) { console.log(`${ok ? 'ok  ' : 'FAIL'} ${text}`); if (!ok) failed++; }
@@ -37,6 +42,11 @@ function play(opts, a, b, oneDuel = false) {
 const duel = (kind, seed, a, b) => play({ seed, only: kind, intro: 0.2, result: 0.05 }, a, b, true);
 
 const t0 = Date.now();
+if (FRIEND) { // only section 8
+  linkClaims({ claim, quick: QUICK, late: LATE });
+  console.log(`\n${failed ? failed + ' claim(s) FAILED' : 'all claims hold'} in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
+  process.exit(failed ? 1 : 0);
+}
 const N = QUICK ? 30 : 100;
 
 // 1. Determinism: the same seed and the same bots give the same match, duel by duel.
@@ -199,6 +209,10 @@ for (const other of ['slow-human', 'easy']) {
   claim(fastest <= Math.ceil(THUMB.rate) + 1, `no bot taps faster than a thumb: at most ${fastest} taps in any second (cap ${THUMB.rate}/s)`);
   claim(Object.values(SKILLS).every(k => k.react >= THUMB.react), `no bot reacts faster than ${THUMB.react} s`);
 }
+
+// 8. Playing a friend by link: two phones, one duel, a bad network in between (link-bots.mjs).
+console.log('\nPlaying a friend by link:');
+linkClaims({ claim, quick: QUICK });
 
 console.log(`\n${failed ? failed + ' claim(s) FAILED' : 'all claims hold'} in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
 process.exit(failed ? 1 : 0);

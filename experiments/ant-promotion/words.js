@@ -449,7 +449,7 @@ export const tables = {
     'trait.Strong, but slow': 'Güçlü ama yavaş', 'trait.Fast, but weaker': 'Hızlı ama daha zayıf', 'trait.Hard to notice': 'Zor fark edilir',
     // sightWords() pieces, joined by ', '
     'sight.almost all round': 'neredeyse her yan', 'sight.wide': 'geniş', 'sight.narrow': 'dar', 'sight.close': 'yakın', 'sight.far': 'uzak', 'sight.straight ahead': 'dümdüz ileri',
-    'look.Flat': 'Düz', 'look.Cartoon': 'Çizgi film', 'look.Soft': 'Yumuşak', 'look.3D': '3B',
+    'look.Flat': 'Düz', 'look.Cartoon': 'Çizgi film', 'look.Soft': 'Yumuşak', 'look.3D': '3B', 'look.Living': 'Canlı',
     'pattern.Plain': 'Düz', 'pattern.Stripes': 'Çizgili', 'pattern.Spots': 'Benekli', 'pattern.Crown': 'Taç',
     // The rival: "{epithet} the {animal}" becomes "{epithet} {animal}" ("Tek Göz Kurt").
     'epithet.Old Scar': 'Yaralı', 'epithet.Grim Pincers': 'Sert Kıskaç', 'epithet.Iron Jaw': 'Demir Çene', 'epithet.Snaggle': 'Eğri Diş',

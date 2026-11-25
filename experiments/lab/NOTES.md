@@ -125,6 +125,11 @@ The owner went through the lab and decided each page that came from a live game.
 | Lantern's `music.js` | Accepted: move to the kit for Night Flock, Night Vine, Paper Boat, Harvest Morning | |
 | Friend play by link (`kit/room.js`, from `pitch` and `pisti`) | Accepted for Thumb Duel | `pitch` stays; `pisti` was rejected later |
 
+Landed: `lantern-spark` is a mode inside Lantern (2026-11-24, branch `fold-lantern-spark`). It is chosen in Lantern's "Game mode" group or at `/lantern/?mode=spark`; its code is `experiments/lantern/modes/`. The page is in `archive/lab/lantern-spark/`; its old address needs `'lantern-spark': '/lantern/?mode=spark'` in `labMoved`.
+
+2026-11-24, landed: Lantern's score moved to the kit as `experiments/kit/music.js` (presets `lantern`, `river`, `bell`, `flute`; recipe in the kit README); Lantern's `music.js` is now a thin preset over it and sounds as before. The melody made of embers from `lantern-rhythm` is in Lantern: each ember plays the next note of the night's tune on the next sixteenth inside the chord, a streak adds harmony, a blow thins the music for two bars, and the end card says how much of the melody was played. `lantern-rhythm` is in `archive/lab/`.
+`ant-creatures` landed (2026-11-24): its rig and drawing are Ant Promotion's fifth look, Living (`/ant-promotion/?look=4`, on the Look button), with the rig checks in `ant-promotion/rig-bots.mjs`. The page is in `archive/lab/ant-creatures/`; the zoo was not carried over.
+
 Owner's decision on the small pages (2026-11-24, after playing them): "Good but improve: Thankful Garden, Paper pitch, channels, ring, sand needs a lot of improvements, bells, podwire good but improve/extend, pour but improve sim and it's too difficult right now, face shift but improve as it needs more variety and gameplay, saltplate but improve and extend, splitlight. Reject: pisti, keeper, kite, loaves. We should collect small games into 1-2 URLs, maybe split by single/multi player, or open to other ideas."
 
 | Page | Decision | State |
@@ -137,7 +142,9 @@ Owner's decision on the small pages (2026-11-24, after playing them): "Good but 
 | `pisti`, `night-lamp-keeper`, `night-kite`, `night-loaves` | Rejected | `archive/lab/`; old addresses go to `/lab/` |
 | `night-rubbing` | Undecided: the owner could not find it (the index calls it "Carbon Cabinet") | Stays |
 
-The kept pages do not move to a top-level address or into `kit/games.json` until the owner picks a home for the small games (variants at `/lab/hub-a/`, `hub-b/`, `hub-c/` are being built for that pick), so no address changes twice. Their recording names stay equal to the folder names through any move.
+The kept pages do not move to a top-level address or into `kit/games.json` until the owner picks a home for the small games (variants at `/lab/hub-a/`, `hub-b/`, `hub-c/` are being built for that pick), so no address changes twice.
+
+Update, 2026-11-24: the owner picked C with B's deck. The home is `/small/` (`experiments/small/`); the drafts are in `archive/lab/hub-a`, `hub-b`, `hub-c`. The games stay at `/lab/<name>/` for now: `experiments/small/catalog.js` is the one list of their addresses, so a move is one line per game there. A page that gains Turkish sets `tr: true` on its entry in that file (it was `lab/hub-a/hub.js`). Their recording names stay equal to the folder names through any move.
 
 Play records: the lab accepted no records from any lab page up to this date (no lab page name is in human-framework `LAB_PROTOTYPES`; five pages import `kit/lab.js` and are refused). The site Worker's request log shows two real phones opening lab pages on 2026-11-24. Opens are the only evidence of play for these pages.
 
