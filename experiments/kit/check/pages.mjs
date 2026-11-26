@@ -499,6 +499,8 @@ export const pageRuns = {
     await until(page, () => window.painter.state().spider === 2, 'the spider hunting', 30000);
     await until(page, () => /Spider: hunting/.test(document.querySelector('#crew').textContent), 'the hunting line');
     await until(page, () => window.painter.state().spider === 0 && window.painter.state().spiderVisits === 1, 'the spider gone', 30000);
+    const rooms = await page.evaluate(() => window.painter.rooms());
+    assert.ok(rooms.length >= 1 && rooms[0].queen, 'the nest view finds the queen\'s chamber');
     const labState = await page.evaluate(() => window.painter.lab());
     assert.equal(labState.open, true, 'the lab replay record is open'); assert.equal(labState.part, 1);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no sideways scroll');

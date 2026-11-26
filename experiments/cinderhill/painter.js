@@ -1,7 +1,7 @@
 // Cinderhill's trail painter (04-roadmap S3, 03-features "trail painter toy"): the deterministic sim at 20 ticks a
 // second, drawn with WebGL2, and the touch rules of 02-spec section 6.4. No goals; draw trails and watch the ants.
 import { Host, CMD, SURFACE, NEST, FIELD, COUNTS, TICK_MS, SEED, G as GI } from './host.js';
-import { START, STAGE, GOAL_KIND } from './sim/colony.js';
+import { START, GOAL_KIND } from './sim/colony.js';
 import { SPIDER } from './sim/spider.js';
 import { cellXY } from './sim/grid.js';
 import { makeGestures } from './gestures.js';
@@ -14,6 +14,7 @@ import { sound } from '../kit/audio.js';
 import { hint } from '../kit/hint.js';
 import { lab } from '../kit/lab.js';
 import { LabRecord } from './labrec.js';
+import { findRooms, drawNest } from './nestview.js';
 import { readJson, writeJson } from '../kit/save.js';
 
 noZoom();
@@ -421,26 +422,10 @@ function drawSpiderArrow(p) {
   ctx.fill();
 }
 
-// The queen and the brood, in the nest view: the queen in the middle of her chamber, each egg, larva and pupa
-// in its cell (several in one cell spread a little by their index). Placeholder shapes until the ant look work.
-const BROOD_LOOK = [[2, '#fbf7ec'], [3.5, '#f1e3b8'], [4, '#c9a46a']]; // radius in cells/10, colour: egg, larva, pupa
-function drawBrood() {
-  const s = host.sim, B = s.brood, z = cams[NEST].z;
-  ctx.strokeStyle = '#2b1d12'; ctx.lineWidth = 1;
-  for (let k = 0; k < B.n; k++) {
-    const [, cx, cy] = cellXY(s.L, B.cell[k]), [r, col] = BROOD_LOOK[B.stage[k]];
-    const p = toScreen(cx + 0.25 + ((k * 0.618034) % 1) * 0.5, cy + 0.25 + ((k * 0.381966) % 1) * 0.5);
-    if (p.x < -20 || p.y < -20 || p.x > W + 20 || p.y > H + 20) continue;
-    ctx.fillStyle = col; ctx.beginPath();
-    if (B.stage[k] === STAGE.EGG) ctx.arc(p.x, p.y, Math.max(1.5, z * r / 10), 0, 7);
-    else ctx.ellipse(p.x, p.y, Math.max(2, z * r / 10), Math.max(1.5, z * r / 14), 0.6, 0, 7);
-    ctx.fill(); if (z > 6) ctx.stroke();
-  }
-  if (!s.g[GI.QUEEN]) return;
-  const h = s.home, q = toScreen(h.x + h.w / 2, h.y + h.h / 2), u = Math.max(4, z * 0.9);
-  ctx.fillStyle = '#5a2e14'; ctx.strokeStyle = '#f4ecdc'; ctx.lineWidth = 1.5;
-  for (const [dx, rr] of [[-1.1, 0.75], [0, 0.45], [0.7, 0.35]]) { ctx.beginPath(); ctx.ellipse(q.x + dx * u, q.y, rr * u, rr * u * 0.75, 0, 0, 7); ctx.fill(); ctx.stroke(); }
-}
+// The nest view (nestview.js): chambers, stores, brood by growth, the queen. Rooms are found again when the terrain changes.
+let rooms = [], roomsAt = -1;
+function nestRooms() { if (roomsAt !== host.terrainVersion || rooms.host !== host) { rooms = findRooms(host.sim); rooms.host = host; roomsAt = host.terrainVersion; } return rooms; }
+function drawBrood() { drawNest({ ctx, sim: host.sim, g: GI, toScreen: (x, y) => toScreen(x, y, NEST), z: cams[NEST].z, W, H, now: performance.now(), rooms: nestRooms(), t }); }
 
 // ---- the HUD (a few times a second) ----
 function hud() {
@@ -518,6 +503,7 @@ requestAnimationFrame(frame);
 
 // ---- hooks for the phone check and the S3 script ----
 window.painter = {
+  rooms: () => nestRooms().map(r => ({ size: r.size, queen: r.queen })),
   day: () => host.day(), dusk: () => host.dusk, dawns: () => [...host.dawns.keys()], hashes: () => host.sim.hashes(),
   state: () => ({ screen: screen === 'paused' ? 'paused' : screen, dayCard: dayCard?.kind ?? null, spider: host.sim.g[GI.SP], spiderVisits: host.sim.g[GI.SP_VISITS], held, t: host.tick, paused: screen === 'paused', ants: host.ants, sound: save.sound, tapTrail: save.tapTrail, tool, layer, preview: preview ? preview.points.length : 0, orders: host.log.length, gl: !!renderer && !renderer.lost, glLosses: renderer?.losses ?? 0, glRestored: renderer?.restored ?? 0, glFailed, drawn: frames.drawn, selected, help: help.shown }),
   log: () => JSON.parse(JSON.stringify(host.log)),

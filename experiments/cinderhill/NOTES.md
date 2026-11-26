@@ -157,6 +157,16 @@ From day 2 a spider comes once a day (02-spec 6.5, feature 12; `sim/spider.js`).
 
 Choices the owner may want to change: from day 2, once a day at a quarter of the day; a harmless first visit; the busiest trail by ants near it now (not loads carried); 30 kills a visit; no way to fight it (bites or majors could hurt it later, 02-spec 6.5 says ants cannot); its look.
 
+## The nest view (2026-11-26, page only)
+
+The nest layer (`nestview.js`) now shows:
+- Each dug chamber, tinted and labelled with its size. The queen's chamber is the one around the middle of `sim.home`. A chamber is open cells grown by one cell from a core at least three cells wide and two high, six cells or more, so shafts and tunnels are not chambers. Rooms are found again only when the terrain changes.
+- Sugar and protein in store as heaps on the two sides of the queen's chamber (one grain per 4 units, 60 at most).
+- Brood by growth. Eggs swell with age. Larvae get bigger and close their curl with each meal; a hungry one is pale with a red spot. Pupae darken toward hatching.
+- The queen: three body parts, six legs, antennae, and an abdomen that pulses and swells before she lays.
+
+The sim is not touched (no hash change). Rooms with purposes (02-spec 6.2: nursery, granary, worth) are not built: they need sim rules, and brood still lies in the queen's chamber. All shapes are placeholders until the look variants.
+
 ## The lab record: a full replay (2026-11-26)
 
 Every game sends its whole replay to the game lab, so a session can be played again in Node and read minute by minute (`labrec.js`, using only kit/lab.js's `start`, `event`, `end` and its flush when the page is put away).
