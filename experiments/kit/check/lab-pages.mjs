@@ -251,4 +251,23 @@ export const labPages = {
     hint: { key: 'night-splitlight:hint', delay: 2200, play: '#angle', timing: { board: true },
       input: turnPrism, legacy: splitlightLegacy },
   },
+  // Cinderhill's tournament toy (lab page, unlisted): a seeded save survives, Send wave walks ants out, pause stops the contest.
+  'lab/cinderhill-tournament': {
+    sound: '#sound', saveKey: 'cinderhill-tournament:save',
+    seeds: { 'cinderhill-tournament:save': JSON.stringify({ v: 1, sound: true, foe: 'jarkeepers', played: 2, won: { jarkeepers: 1 } }), 'cinderhill-tournament:hint': '1' },
+    state: () => { const s = window.tournamentState?.(); return s && { screen: s.screen, t: s.t, paused: s.paused }; },
+    verify: () => { const s = window.tournamentState(); return { foe: s.foe, played: s.played, sound: s.sound,
+      picked: document.querySelector('#foes [aria-pressed=true]')?.dataset.foe, buttons: [...document.querySelectorAll('#foes button')].every(b => b.getBoundingClientRect().height >= 44) }; },
+    expect: { foe: 'jarkeepers', played: 2, sound: true, picked: 'jarkeepers', buttons: true },
+    touch: async (page, { until }) => {
+      const before = await page.evaluate(() => window.tournamentState().me);
+      assert.equal(before.out + before.edge + before.ring, 0, 'nobody has left the nest yet');
+      const box = await page.locator('#send').boundingBox();
+      assert.ok(box.height >= 56 && box.width >= 96, `Send wave is a big target (${box.width} by ${box.height})`);
+      await page.tap('#send');
+      await until(page, () => { const m = window.tournamentState().me; return m.out + m.edge + m.ring === 10; }, 'Send wave walks ten ants out', 4000);
+      await page.tap('#hold');
+      await until(page, () => { const m = window.tournamentState().me; return m.out + m.edge === 0; }, 'Hold calls them back', 4000);
+    },
+  },
 };
