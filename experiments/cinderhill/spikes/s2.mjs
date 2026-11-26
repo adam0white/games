@@ -47,7 +47,7 @@ for (const name of ['chromium', 'webkit', 'firefox']) {
   try { browser = await pw[name].launch(); }
   catch (e) { results.push({ engine: name, status: 'not run', why: e.message.split('\n')[0] }); continue; }
   const page = await browser.newPage();
-  await page.goto(base);
+  await page.goto(`${base}check.html`); // the determinism check page (index.html is the trail painter)
   await page.waitForFunction(() => window.cinderhill);
   const seen = await page.evaluate(async j => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(j)))].map(b => b.toString(16).padStart(2, '0')).join(''), json);
   const go = mutate => page.evaluate(([j, cfg, ticks, every, mutate]) => window.cinderhill.run({ cfg, commands: JSON.parse(j), ticks, every, mutate }), [json, cfg, TICKS, EVERY, mutate]);

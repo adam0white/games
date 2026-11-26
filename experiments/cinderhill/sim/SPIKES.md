@@ -1,4 +1,4 @@
-# Cinderhill M0 spikes: S1, S2, S4
+# Cinderhill M0 spikes: S1, S2, S3, S4
 
 Pass lines are from `docs/design/colony/04-roadmap.md`. Measured on 2026-11-25 on one Apple-silicon Mac, with Node 26.13.1 (the repository pins 26.12.0; the tests pass on both), Playwright 1.64.1, and wrangler 4.168.0 running workerd locally. Scripts are in `../spikes/`; NOTES.md one level up says how to run them.
 
@@ -33,7 +33,7 @@ The request round trip is included in these numbers. Clocks do not advance durin
 
 Pass line: 20.0 ticks a second deployed for 10 minutes; the room role's CPU and cost written down.
 
-The room is `workers/cinderhill/` (Worker `games-cinderhill`, one SQLite Durable Object per room code); its NOTES.md says how it works and how to run the load test. Each run: 4 scripted Node players on one Mac, each running the sim in lockstep at 20 Hz, sending about 31 orders a minute (every 10th sent twice) and a hash every second. Version 591301fd, 2026-11-26 02:00 to 02:31 UTC. Ticks a second and jitter are measured at the players, because a deployed Durable Object's clock does not advance during computation. CPU, duration and rows written are Cloudflare's own Durable Object analytics (`durableObjectsPeriodicGroups`, full minutes only).
+The room is `workers/cinderhill/` (Worker `games-cinderhill`, one SQLite Durable Object per room code); its NOTES.md says how it works and how to run the load test. Each run: 4 scripted Node players on one Mac, each running the sim in lockstep at 20 Hz, sending about 31 orders a minute (every 10th sent twice) and a hash every second. Worker version 591301fd, 2026-11-26 02:00 to 02:31 UTC. The room ran `SIM_VERSION` 1, the sim before the trail painter and trail-shape changes (the re-runs under S2); the CPU numbers predate those changes, which by the Node re-run above did not change the tick cost. Ticks a second and jitter are measured at the players, because a deployed Durable Object's clock does not advance during computation. CPU, duration and rows written are Cloudflare's own Durable Object analytics (`durableObjectsPeriodicGroups`, full minutes only).
 
 | Run (10 min, 4 players) | Ticks/s | Gap sd / p99 / max | DO CPU | Bytes/s per player (in / out) | Resets | Hash check | Verdict |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -87,26 +87,57 @@ Seed 2026, 2,000 ants, 12,000 ticks (10 minutes), 41 orders. Every engine got th
 - **60-minute bot soak:** see "S2 soak" below.
 - **In CI:** the phone check now runs the page's short replay (600 ticks, 300 ants) in WebKit (iPhone 13) and Chromium (Pixel 7) and fails if the hash differs from Node's. It failed as expected with a wrong expected hash.
 
+**Re-run after a sim change (2026-11-25, trail painter PR).** Foragers now keep following the newest trail while they are on it, instead of dropping it 30 seconds into their trip (`sim.js`, the trail rule in the forager step). That changes play, so every hash above changed. S2 was run again with the same script: Node's final total is now 471678023, and Chromium 156 and WebKit 27.2 again match Node at all 600 records; the planted mutation still diverges at tick 20 in `ants`. workerd was not re-run. S4 at 5,000 ants was re-run too: 36.8, 44.4 and 57.9 KB at 3,000, 8,000 and 24,000 ticks (was 37.6, 43.8 and 54.8 KB), still under 64 KB and restoring to the same hash. The S1 numbers predate the change.
+
+**Re-run after the trail-shape change (2026-11-25, `SIM_VERSION` 2).** Trails now keep their drawn shape (section "Trail shape" below). That changes play, so every hash changed again. S2 with the same script: Node's final total is now 158760334; Chromium 156.0.8078.4 and WebKit 27.2 match Node at all 600 records, and the planted mutation still diverges at tick 20 in `ants`. workerd and Firefox were not run. The phone check (`cinderhill`, `check` and `orders` in WebKit and Chromium) passes with the new `quick.js` hash.
+
+S1 re-run, Node 26.13.1, 5,400 timed ticks after 600 warm-up: 2,000 ants mean 1.61 ms, p95 1.68 ms, max 3.38 ms; 5,000 ants mean 1.87 ms, p95 2.00 ms, max 2.73 ms; 34 ticks with a flow rebuild (mean 2.32 and 2.47 ms). Rebuilding all 9 live fields at once: 6.15 ms (0.68 ms a field). Within the earlier numbers: a trail's field costs what a plain field cost, and the per-ant work added is one comparison.
+
 ## S2 soak
 
 Pass line: the same hash everywhere over a 60-minute bot soak.
 
-Seed 2026, 2,000 ants, 72,000 ticks (60 minutes of play), 249 scripted orders from `script()`; command log SHA-256 begins `f3d5489486deeeb5`, checked by every engine. Hashes of all seven subsystems were compared every 20 ticks: 3,600 records per engine. Run 2026-11-25 with `spikes/s2.mjs` and `spikes/workerd.mjs` at 72,000 ticks.
+Seed 2026, 2,000 ants, 72,000 ticks (60 minutes of play), 249 scripted orders from `script()`; command log SHA-256 begins `f3d5489486deeeb5`, checked by every engine. Hashes of all seven subsystems were compared every 20 ticks: 3,600 records per engine. Run with `spikes/s2.mjs --ticks=72000` and `spikes/workerd.mjs --ticks=72000`, first on `SIM_VERSION` 1 (2026-11-25) and again on `SIM_VERSION` 2, the trail-shape sim (2026-11-26).
 
-| Engine | Version | Clean run vs Node | Planted mutation vs Node | Wall time |
-| --- | --- | --- | --- | --- |
-| Node | 26.13.1 | (reference) final total 87767665 | diverges at tick 20, `ants` | - |
-| Chromium | 159.0.8154.6 (Playwright 1.66 alpha) | same at all 3,600 records | diverges at tick 20, `ants` | 124 s |
-| Chromium | 156.0.8078.4 (Playwright 1.64.1) | same at all 3,600 records | diverges at tick 20, `ants` | 128.5 s |
-| WebKit | 27.2 (Playwright 1.64.1) | same at all 3,600 records | diverges at tick 20, `ants` | 94.5 s |
-| workerd (Durable Object, local) | wrangler 4.168.0 | same at all 3,600 records | not run | 151.8 s |
-| Firefox | - | **not run** | - | - |
+| Engine | Version | Sim 2: clean run vs Node | Sim 2: wall time | Sim 1: clean run vs Node | Planted mutation vs Node (both) |
+| --- | --- | --- | --- | --- | --- |
+| Node | 26.13.1 | (reference) final total 1035232780 | 118 s | (reference) final total 87767665 | diverges at tick 20, `ants` |
+| Chromium | 156.0.8078.4 (Playwright 1.64.1) | same at all 3,600 records | 121 s | same at all 3,600 records | diverges at tick 20, `ants` |
+| Chromium | 159.0.8154.6 (Playwright 1.66 alpha) | not run | - | same at all 3,600 records | diverges at tick 20, `ants` (sim 1) |
+| WebKit | 27.2 (Playwright 1.64.1) | same at all 3,600 records | 94 s | same at all 3,600 records | diverges at tick 20, `ants` |
+| workerd (Durable Object, local) | wrangler 4.168.0 | same at all 3,600 records | 117 s | same at all 3,600 records | not run |
+| Firefox | - | **not run** | - | **not run** | - |
 
-**Verdict: pass for Node, two Chromiums, WebKit and workerd over 60 minutes. Firefox is open:** Playwright's Firefox build is not installed on this machine (neither firefox-1578 nor firefox-1555), and it was not installed for this run.
+**Verdict: pass for Node, Chromium, WebKit and workerd over 60 minutes, on both sim versions. Firefox is open:** Playwright's Firefox build is not installed on this machine (neither firefox-1578 nor firefox-1555), and it was not installed for this run.
 
 - The planted mutation again came from the engines: `Math.sin` bits differed from Node on 631 of 20,000 arguments in Chromium and 891 in WebKit.
-- Deployed workerd was also compared with Node, by a different route: in every S1 room above, an offline Node replay of the room's stored command log matched every hash the players sent (2,400 records a room), and in the authority rooms the deployed Durable Object's own sim agreed with the players at every compare. The longest of these is 10 minutes, not 60.
+- Deployed workerd was also compared with Node, by a different route (sim 1): in every S1 room above, an offline Node replay of the room's stored command log matched every hash the players sent (2,400 records a room), and in the authority rooms the deployed Durable Object's own sim agreed with the players at every compare. The longest of these is 10 minutes, not 60.
 - Not done: a 60-minute soak through a live room (the soak above is a replay of a fixed command log in each engine, not players sending orders over the network).
+
+## S3: phone frames
+
+Pass line (04-roadmap): 30 fps or better with 2,000 ants on an iPhone 13 class phone.
+
+Script: `../spikes/s3.mjs`. It opens the trail painter (`/cinderhill/`), draws a trail from the entrance to the nearest food pile with one finger, waits 4 s, then records every frame for 10 s. "Work" is the page's own time inside a frame (sim ticks due, uploads, the WebGL draw calls and the 2D overlay); the GPU's time is not in it. "Lift to applied" is the time from the finger lift to the order's state turning `applied` in the page; an order applies at the start of the next tick, so it is up to one tick (50 ms) plus a frame. Run on 2026-11-25, Playwright 1.64.1, an Apple M4 Mac.
+
+| Browser (emulated phone) | Ants | Frames | Frame mean | Frame p95 | fps | Work mean / p95 | Sim tick mean / p95 | Ants drawn | GPU reported | Lift to applied |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| WebKit 27.2 (iPhone 13, 390 x 664, dpr 2) | 2,000 | 720 | 13.9 ms | 15 ms | 72 | 0.54 / 2 ms | 1.37 / 2 ms | 1,373 | Apple GPU | 64 ms |
+| WebKit 27.2 (iPhone 13) | 5,000 | 721 | 13.9 ms | 15 ms | 72 | 0.65 / 2 ms | 1.81 / 2 ms | 3,407 | Apple GPU | 64 ms |
+| Chromium 156 headless (Pixel 7, 412 x 839, dpr 2) | 2,000 | 193 | 51.8 ms | 66.7 ms | 19 | 2.39 / 3.4 ms | 2.01 / 2.3 ms | 1,372 | SwiftShader (software) | 14 ms |
+| Chromium 156 headless (Pixel 7) | 5,000 | 136 | 74.0 ms | 83.4 ms | 14 | 4.14 / 5.8 ms | 2.55 / 2.9 ms | 3,393 | SwiftShader (software) | 8 ms |
+| Chromium 156 headless, ANGLE on Metal (Pixel 7) | 2,000 | 600 | 16.7 ms | 16.7 ms | 60 | 1.29 / 4.8 ms | 3.23 / 4.8 ms | 1,377 | Apple M4 (Metal) | 21 ms |
+| Chromium 156 headless, ANGLE on Metal (Pixel 7) | 5,000 | 601 | 16.7 ms | 16.8 ms | 60 | 1.82 / 6.3 ms | 4.67 / 6.0 ms | 3,407 | Apple M4 (Metal) | 70 ms |
+
+WebKit timer values come in whole milliseconds, so its p95 reads 15 ms. "Ants drawn" counts the ants on the shown layer; the rest are in the nest.
+
+**Verdict: pass in emulation, not shown on a phone.** With a hardware GPU, both engines hold their frame rate at 2,000 and at 5,000 ants, with the page's own work under 7 ms at p95. Headless Chromium's default software renderer (SwiftShader) runs at 19 fps at 2,000 ants. That is the renderer, not the page: the same browser on Metal holds 60 fps, and CI's phone check runs on that software renderer, so CI is no frame-rate gate.
+
+This is an emulated phone. The CPU and GPU are an M4 Mac's. An iPhone 13 (A15) has a slower CPU and a much smaller GPU. What is likely to matter on the phone, from these numbers: the sim tick (1.4 to 1.8 ms here, 20 times a second) is small; the full-screen ground shader at dpr 2 (it has fbm noise and smooth contours per pixel) is the most likely cost; ants are one instanced draw. None of that is measured on a phone. To measure on a real phone, open `/cinderhill/?fps=1` (frame mean and p95, work, sim tick, ants drawn, dpr and the GPU string on screen) or `/cinderhill/?fps=1&ants=5000`.
+
+- **WebGL context loss:** the page keeps the sim running while the context is gone, and rebuilds every GPU resource on `webglcontextrestored`. The phone check loses and restores the context in both engines (`cinderhill orders`) and checks frames are drawn again.
+- **Worker:** not used. The sim runs on the main thread; its tick is a few ms at most here, and a Worker would add a copy of every ant position per tick. Move it if a real phone shows long frames on tick frames.
+- **Not done:** a real iPhone 13 or Android phone; Firefox; a long run (thermal throttling).
 
 ## S4: snapshot size
 
@@ -145,3 +176,44 @@ Measured and dropped: the median (MED) predictor, a least-squares predictor over
 **Not built: checkpoint plus command suffix.** A checkpoint is the same state at an earlier tick, so it is the same size; it would help the room reuse one snapshot for several joiners, not shrink it. Only the extreme form, the seed plus the whole command log, is smaller, and the joiner then replays every tick (about 2 ms a tick at 5,000 ants, S1: 48 s at 24,000 ticks). Because the lossless format passes on its own, neither was built, and join cost was not measured beyond the restore times above.
 
 The roadmap's fallback, "terrain as a seed plus a dig log", does not help: terrain is 1.4 KB.
+
+**Re-run after the trail-shape change (2026-11-25).** 5,000 ants, compared with `origin/main`'s sim on the same day and script (the table above predates the painter PR):
+
+| Played ticks | gzip before / after | Scent before / after | Ants part before / after | Ants on the surface before / after |
+| --- | --- | --- | --- | --- |
+| 3,000 | 36.7 / 47.6 KB | 19.6 / 20.7 KB | 15.4 / 25.1 KB | 150 / 2,365 |
+| 8,000 | 44.3 / 60.5 KB | 24.6 / 32.6 KB | 17.9 / 25.9 KB | 72 / 2,400 |
+| 24,000 | 57.8 / 61.8 KB | 31.9 / 35.6 KB | 23.7 / 23.8 KB | 2,846 / 2,274 |
+
+Still a pass, each restoring to the same hash, but the margin is now 3.5 KB at 8,000 ticks (the CI assertion) and 2.2 KB at 24,000. At 3,000 and 8,000 ticks the ants part grew with the number of ants on the surface; at 8,000 and 24,000 the scent part grew. Why more ants are out at those ticks, and why scent grew, is not established: the scripted colony runs in waves, and the change shifts them (at 2,000 ticks fewer ants were out than before: 597 against about 2,790). A likely factor is that ants now walk the drawn strokes, which are longer than the straight line, and lay carrier scent along them; that is not measured. The new state itself is small: trail paths are coded as steps (in `globals`, 0.2 to 0.3 KB with everything else there) and `via` is one small integer per ant. Predicting a homeward carrier's `best` from her steps along the trail was tried and saved nothing measurable, so it was dropped. The open risk above (scent growing with the area walked) is closer now.
+
+## Trail shape (2026-11-25)
+
+Pass line (todo lab-5w7.17; 02-spec 6.4; 09-round2-findings trap 9): ants on a trail walk the stroke as drawn, out to the food and home with it; tick cost stays within S1.
+
+**The flaw.** A trail order laid scent along the stroke but set a flow goal only at its end cell, so ants walked the shortest way to the end: a dog-leg was walked as its hypotenuse. Homeward carriers took the shortest way home, and after one load a forager followed the pile's field straight, ignoring the trail.
+
+**The rule now (`sim.js` `trailPath`, `flow.js` `rebuildTrail`).**
+- The stroke becomes an ordered, 4-connected path of open surface cells. A diagonal step goes through an open side cell. Cells that are closed or that no ant can reach from home are left out, and the gap is bridged by the shortest way round: first inside a box 12 cells around the gap, then over the whole surface. Where the stroke comes back over a cell it already holds, the loop is cut out (loop erasure), so each cell is on the path once. At most 2,048 cells.
+- The trail's field is one integer per cell, as before. On the path it holds the steps left along the path to the end; off it, 4,096 plus the steps to the nearest path cell (breadth-first, surface only). Descending it from anywhere reaches the trail, then walks it in the drawn order. No per-ant progress is needed outbound. Walking back is the reverse on the path: the neighbour holding one more.
+- A carrier whose trip used a trail (`via`, one byte per ant) walks that trail back to its start, then takes the way home. A forager keeps that trail as her route for the next trip. `via` is cleared when she gives up or the trail's slot is reused.
+- A surface change rebuilds a trail's field (the in-place repair assumes uniform distance); nest digging never touches it. Off the path, the field value is not progress along the trail, so there a new cell counts as progress for the stall rule.
+
+**Candidates.** Three were considered: per-ant progress along waypoints, a corridor field, and this single field. The single field was built first because it reuses `nextCell`, the stall rule, the restore rebuild and the snapshot's prediction of `best` unchanged. It met every line below, including a tight U (arms 3 cells apart) and a self-crossing stroke, so per-ant progress was not built and has no numbers.
+
+**Measured** (`spikes/trail-shape.mjs`; pass lines in `test/trail.test.mjs`). The setup is a 96 x 96 open surface with one entrance, 200 foragers, 6,000 ticks, and a pile at the stroke's far end. Deviation is the 4-connected steps from an ant's cell to the nearest cell of the drawn stroke's Bresenham line, computed by the script, not by the sim. It is sampled every tick for every forager outbound on the trail or homeward with food. "In order" means a load picked up after passing within 3 cells of each corner of the stroke, in order. The before column is `origin/main`'s sim with the same script.
+
+| Stroke | Outbound mean / max, after | Homeward mean / max, after | Loads in order, after | Outbound mean / max, before | Homeward mean / max, before | Loads in order, before |
+| --- | --- | --- | --- | --- | --- | --- |
+| Dog-leg (east 31, north 33) | 0.21 / 2 | 0.22 / 1 | 795 of 795 | 16.82 / 34 | 1.08 / 3 | 0 of 800 |
+| U (87 cells, ends 23 apart) | 0.28 / 1 | 0.14 / 1 | 590 of 590 | 5.15 / 11 | 6.90 / 13 | 0 of 1,684 |
+| Tight U (arms 3 apart) | 0.29 / 1 | 0.16 / 1 | 851 of 851 | 0.65 / 2 | 1.45 / 2 | 0 of 3,933 |
+| Self-crossing (loop cut out) | 0.30 / 2 | 0.14 / 1 | not checked | 0.49 / 2 | 0.55 / 3 | not checked |
+| Dog-leg through a 7 x 7 stone | 0.84 / 5 | 0.72 / 5 | 729 of 729 | 16.82 / 34 | 2.02 / 5 | 0 of 800 |
+
+All 200 ants made 2 or more round trips in every case after the change. Food stored falls on long strokes (dog-leg 644 against 710 before): the drawn way is longer, and that is the point. The stone case's 5 cells is the way round the stone. Before, the outbound sample counts are smaller because after one load ants followed the pile's field, not the trail.
+
+**Decisions.** The stroke's first point is its nest end (02-spec: a trail is drawn from the nest). A loop in a stroke is dropped, not walked. A trail followed as a route outranks the remembered pile. Touching arms (adjacent path cells far apart along the path) are a shortcut the field allows; arms 3 apart showed none.
+
+**Painter.** Driven once in WebKit (iPhone 13, deviceScaleFactor 2, 2,000 ants): an L from the entrance east 41 cells, then north 48. After 35 s the ants were on both legs and none on the diagonal.
+

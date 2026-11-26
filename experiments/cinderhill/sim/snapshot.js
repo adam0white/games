@@ -21,7 +21,7 @@
 // Not written: the flow distances (rebuilt on restore before the ants are read; flow.js explains why that
 // is exact), the spatial hash and other scratch buffers, and counters marked "not state".
 
-import { G, INF, MAX_GOALS, rebuild } from './flow.js';
+import { G, INF, MAX_GOALS, PATH_MAX, SLOT, rebuild } from './flow.js';
 import { FIELDS, SCENT_MAX } from './scent.js';
 import { MAT, SUB } from './grid.js';
 import { SIM_VERSION, Sim } from './sim.js';
@@ -36,7 +36,7 @@ const MAGIC = [0x43, 0x48, 0x53, 0x4D]; // "CHSM"
 /** Every live goal's distances, rebuilt into a fresh array from terrain, links, dig marks and goals. */
 function rebuiltDistances(sim) {
   const F = sim.flow, n = sim.L.n;
-  const flow = { kind: F.kind, live: F.live, dirty: F.dirty.slice(), cell: F.cell, seq: F.seq, dist: new Uint16Array(MAX_GOALS * n).fill(INF), queue: new Int32Array(n), rebuilds: 0 };
+  const flow = { kind: F.kind, live: F.live, dirty: F.dirty.slice(), cell: F.cell, seq: F.seq, pathLen: F.pathLen, path: F.path, dist: new Uint16Array(MAX_GOALS * n).fill(INF), queue: new Int32Array(n), rebuilds: 0 };
   const view = { L: sim.L, mat: sim.mat, link: sim.link, dig: sim.dig, home: sim.home, flow };
   for (let s = 0; s < MAX_GOALS; s++) if (F.live[s]) rebuild(view, s);
   return flow.dist;
@@ -45,7 +45,7 @@ function rebuiltDistances(sim) {
 /** The state values not in the header, in a fixed order, through `io` (an Encoder or a Decoder). */
 function walk(sim, io, mark = () => {}) {
   const L = sim.L, n = L.n, F = sim.flow, mat = sim.mat;
-  const M = intModel(16); // small values: globals, goals, piles, lists, commands
+  const M = intModel(19); // small values: globals, goals, piles, lists, commands, trail paths
   const put = (ta, i, ctx) => { ta[i] = sint(io, M, ctx, ta[i]); };
   const putAll = (ta, ctx) => { for (let i = 0; i < ta.length; i++) put(ta, i, ctx); };
 
@@ -91,6 +91,16 @@ function walk(sim, io, mark = () => {}) {
   for (let s = 0; s < sim.rng.length; s++) sim.rng[s] = io.bits(sim.rng[s], 32);
   putAll(F.kind, 8); putAll(F.live, 8); putAll(F.dirty, 8); putAll(F.cell, 9);
   for (let s = 0; s < MAX_GOALS; s++) F.seq[s] = uint(io, M, 10, F.seq[s]);
+  // Trail paths: each cell as the step from the one before (mostly +-1 or +-width).
+  putAll(F.pathLen, 16);
+  for (let k = 0; k < SLOT.TRAILS; k++) {
+    const at = k * PATH_MAX, len = Math.min(F.pathLen[k], PATH_MAX);
+    for (let j = 0; j < len; j++) {
+      // The prediction is kept to a cell index, so the residual of any int32 fits the coder's 32 bits.
+      const p = j ? F.path[at + j - 1] : 0, pred = p >= 0 && p < n ? p : 0;
+      F.path[at + j] = sint(io, M, j ? 18 : 17, F.path[at + j] - pred) + pred;
+    }
+  }
   // Distances rebuilt from the terrain and goals just coded, the same on both sides whatever the sim's own
   // distances hold. The decoder installs them (as before: the sim's fields equal a rebuild at a tick
   // boundary); both sides predict the ants' `best` from them. Dirty marks are kept as coded.
@@ -159,6 +169,7 @@ function walk(sim, io, mark = () => {}) {
     sim.carry[i] = uint(io, AM, 9 + job, sim.carry[i]);
     sim.mem[i] = sint(io, AM, 13 + job, sim.mem[i]);
     sim.goal[i] = sint(io, AM, 17 + mode, sim.goal[i]);
+    sim.via[i] = sint(io, AM, 48 + mode, sim.via[i]);
     // lastCell: 0 the ant's cell, 1..4 a neighbour (up, right, down, left), 5 the linked cell, 6 raw.
     const c = sim.cellOfAnt(i), lc = sim.lastCell[i];
     let code = 6;

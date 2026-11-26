@@ -3,7 +3,7 @@
 import { replay, script } from './sim/replay.js';
 
 export const QUICK = { cfg: { seed: 2026, sw: 128, sh: 128, nw: 96, nh: 64, ants: 300 }, ticks: 600 };
-export const EXPECTED = { tick: 600, total: 1862688815 };
+export const EXPECTED = { tick: 600, total: 2732545835 };
 
 export function quick() {
   const { cfg, ticks } = QUICK;

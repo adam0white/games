@@ -62,7 +62,7 @@ Full tables, method and caveats: `experiments/cinderhill/sim/SPIKES.md`, "S1 dep
 - Unexplained: 8 of 11 authority rooms lost their sockets once, 25 to 71 s after first starting, same version, no exception; recovery 2.0 to 3.3 s with no hash difference. No relay room did.
 - **Recommendation: relay.** Same cost, 25 times less CPU, no replay on restart, no reset seen. Authority stays behind `DEBUG_ROLES` until join snapshots for an empty room or refusing a forged state need a server copy.
 - **Idle:** deployed with `DEBUG_ROLES` "0" (version 09286256, 2026-11-26). An empty room stops its clock after 5 s and is evicted, so no duration is billed while idle. What remains is SQLite storage of the test rooms (command logs and checkpoints, well under 1 MB in all), inside the 5 GB included; $0.20 per GB-month beyond it.
-- 60-minute determinism soak (offline replay of a fixed log): Node, Chromium 156 and 159, WebKit 27.2 and local workerd agree at all 3,600 records. Firefox not run (not installed).
+- 60-minute determinism soak (offline replay of a fixed log), on sim versions 1 and 2: Node, Chromium 156, WebKit 27.2 and local workerd agree at all 3,600 records (Chromium 159 too, on sim 1). Firefox not run (not installed). The deployed S1 runs used sim version 1.
 
 ## Open
 
