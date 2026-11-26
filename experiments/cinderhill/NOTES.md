@@ -165,7 +165,26 @@ The nest layer (`nestview.js`) now shows:
 - Brood by growth. Eggs swell with age. Larvae get bigger and close their curl with each meal; a hungry one is pale with a red spot. Pupae darken toward hatching.
 - The queen: three body parts, six legs, antennae, and an abdomen that pulses and swells before she lays.
 
-The sim is not touched (no hash change). Rooms with purposes (02-spec 6.2: nursery, granary, worth) are not built: they need sim rules, and brood still lies in the queen's chamber. All shapes are placeholders until the look variants.
+The sim is not touched (no hash change). Rooms with purposes (02-spec 6.2: nursery, granary, worth) are not built: they need sim rules, and brood still lies in the queen's chamber. Its colours follow the look (see Looks).
+
+## Looks (2026-11-26, page only)
+
+Three looks of the same scene, for the owner to pick one (04-roadmap M1 item 4). Open the page with `?look=ink`, `?look=ember` or `?look=field`, or use the Look row on the pause card. The row reloads the page with the new look and keeps the other parameters, such as `colony=1`. The game in progress is lost on that reload, because there is no autosave yet.
+
+| Look | Ground | Edges | Scent | Ants |
+|---|---|---|---|---|
+| `ink` (the default) | Paper ash, a soft wash, a few embers | Wobbly hand-inked lines | Watercolour washes | Small inked bodies |
+| `ember` | Night: dark ash with many embers and a vignette; warm light from the entrance | Rock edges glow and beat like cooling coals | Light added to the ground | Dark bodies with a hot rim; far away they are sparks |
+| `field` | A field-guide plate in daylight: flat stepped tones and halftone dots on solid ground | Thick, clean outlines | Marching stripes for trails, dots for food | 1.3 times bigger, coloured by job (black forager, orange digger, red guard), with a white outline |
+
+- `looks.js` holds the names and one palette per look for the Canvas 2D overlay: crews, the stroke preview, the selected ant, the spider and its arrow, room tints and labels, stores, brood and the queen. `index.html`'s page background and theme colour follow the look.
+- Each look is its own shader build: `render.js` adds `#define LOOK n` after `#version`, and the context-restore path builds the same variant.
+- An unknown name falls back to `ink`. The lab record's start carries the resolved name, not the raw query.
+- The sim and its hashes do not change.
+- The phone line `cinderhill looks` checks the following in WebKit and Chromium. `ember`, `field` and an unknown name each compile and draw, and each survives a lost context. The pause card keeps `colony=1` when it switches looks. A syntax error in the `field` shader made this line fail (`timed out waiting for: field: frames drawn`). Every other cinderhill line still passed, because a shader that does not compile leaves the page running with no WebGL.
+- S3 per look: see the table below.
+
+Choices the owner may want to change: which look to keep (or parts of each), the field look's bigger ants, and whether to reload or switch looks in place.
 
 ## The lab record: a full replay (2026-11-26)
 
