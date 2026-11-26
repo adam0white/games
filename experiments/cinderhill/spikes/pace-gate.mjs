@@ -19,6 +19,7 @@
 // Usage: node spikes/pace-gate.mjs [--seeds=20] [--minutes=12] [--update] [--json=out.json] [--quiet]
 //        node spikes/pace-gate.mjs --records <lab record files...>   (people lines from lab records, no gate)
 import { readFileSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { availableParallelism } from 'node:os';
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
 import { Host } from '../host.js';
@@ -60,6 +61,11 @@ export const LINES = [
   { id: 'queued-at-doors', stage: 'R1.3', text: 'Queued at doors outside a jam', target: '<= 0.10', bot: 'median', get: () => null },
   { id: 'chapter-1-length', stage: 'R1', text: 'Chapter 1 length, min', target: '4 to 6', bot: 'median', get: () => null },
   { id: 'passive-finishes', stage: 'R1', text: 'Passive bot finishes chapter 1', target: 'yes', bot: 'passive', get: () => null },
+  { id: 'chapters-2-6-length', stage: 'R2a', text: 'Chapters 2 to 6 length, min', target: '6 to 12', bot: 'median', get: () => null },
+  // Read from people and pages, not bots: --records reports first order; the others need tools not built yet.
+  { id: 'input-ready', stage: 'R1', text: 'Input ready after the page opens, s (mid-range phone)', target: '<= 3', bot: 'page', get: () => null },
+  { id: 'first-order-people', stage: 'R1', text: 'First order within 10 s, share of sessions (lab records, --records)', target: '>= 0.8', bot: 'people', get: () => null },
+  { id: 'chapter-1-length-people', stage: 'R1', text: 'Chapter 1 length, human median, min', target: '<= 8', bot: 'people', get: () => null },
   { id: 'idle-loses', stage: 'R2a', text: 'Idle bot loses chapter 2 or 3', target: 'yes', bot: 'idle', get: () => null },
 ];
 
@@ -179,7 +185,7 @@ const BOT_MINUTES = { median: m => m, passive: m => Math.min(m, 1), idle: () => 
 export async function gate({ seeds = 20, minutes = 12, fixture = null } = {}) {
   const jobs = [];
   for (const bot of Object.keys(BOT_MINUTES)) { const m = BOT_MINUTES[bot](minutes); if (m > 0) for (let s = 1; s <= seeds; s++) jobs.push({ bot, seed: s, minutes: m, fixture }); }
-  const results = await runAll(jobs), runs = { median: [], passive: [], idle: [] };
+  const results = await runAll(jobs), runs = { median: [], passive: [], idle: [], people: [], page: [] };
   jobs.forEach((j, k) => runs[j.bot].push(results[k]));
   const out = {};
   for (const line of LINES) {
@@ -194,6 +200,20 @@ export async function gate({ seeds = 20, minutes = 12, fixture = null } = {}) {
 }
 
 /** Compare the blocking lines with the baseline. Returns a list of problems (empty: the gate holds). */
+/** The recorded baseline against the base commit's: on a blocking line a pass may not become a fail and a value may
+ *  not get worse by more than a twentieth. Improvements are fine. */
+export function slack(now, old, stage = STAGE) {
+  const out = [];
+  for (const l of LINES) {
+    if (!blocks(l, stage) || !old[l.id] || old[l.id].value == null) continue;
+    const a = now[l.id], b = old[l.id];
+    if (!a || a.value == null) { out.push(`${l.id} was ${b.value}, no value now`); continue; }
+    if (b.status === 'pass' && a.status !== 'pass') out.push(`${l.id} passed at the base (${b.value}) and is recorded as ${a.status} (${a.value})`);
+    else if (l.up ? a.value > b.value * 1.05 + 0.25 : a.value < b.value * 0.95 - 0.25) out.push(`${l.id} recorded worse than at the base: ${a.value} against ${b.value}`);
+  }
+  return out;
+}
+
 export function ratchet(now, base, lines = LINES.filter(l => blocks(l)), hard = strict()) {
   const bad = [];
   for (const line of lines) {
@@ -249,6 +269,13 @@ if (isMainThread && import.meta.url === `file://${process.argv[1]}`) {
       console.log('baseline written');
     } else {
       const base = JSON.parse(readFileSync(BASELINE, 'utf8')), problems = ratchet(res, base);
+      // CI passes the base commit: a pull request may record progress with --update but not a regression.
+      const ref = opt('base-ref');
+      if (ref) {
+        let old = null;
+        try { old = JSON.parse(execFileSync('git', ['show', `${ref}:experiments/cinderhill/spikes/pace-baseline.json`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })); } catch { console.log(`no baseline at ${ref}: nothing to compare`); }
+        if (old) problems.push(...slack(base, old).map(p => `baseline: ${p}`));
+      }
       if (!quotaFails.length) problems.push('the quota opening fails no blocking line the current build passes: the table is too loose');
       const broodBad = ratchet(brood, base).filter(p => !/passes now|in this run/.test(p));
       console.log(`Brood x10 plant: ${broodBad.length ? `caught (${broodBad.join('; ')})` : 'NOT caught'}.`);

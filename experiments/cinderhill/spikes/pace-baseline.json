@@ -52,8 +52,8 @@
   "value": 82.55
  },
  "idle-share": {
-  "status": "pass",
-  "value": 0
+  "status": "fail",
+  "value": 0.261
  },
  "queued-at-doors": {
   "status": "not built",
@@ -64,6 +64,22 @@
   "value": null
  },
  "passive-finishes": {
+  "status": "not built",
+  "value": null
+ },
+ "chapters-2-6-length": {
+  "status": "not built",
+  "value": null
+ },
+ "input-ready": {
+  "status": "not built",
+  "value": null
+ },
+ "first-order-people": {
+  "status": "not built",
+  "value": null
+ },
+ "chapter-1-length-people": {
   "status": "not built",
   "value": null
  },

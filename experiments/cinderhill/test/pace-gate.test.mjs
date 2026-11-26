@@ -2,7 +2,7 @@
 // CI runs the whole gate on 20 seeds in its own step; these check that it can fail.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { LINES, blocks, play, ratchet } from '../spikes/pace-gate.mjs';
+import { LINES, blocks, play, ratchet, slack } from '../spikes/pace-gate.mjs';
 
 test('the ratchet on blocking lines: a pass that fails, a fail that gets worse by a twentieth or never happens, unrecorded progress and an unread line all fail', () => {
   const base = Object.fromEntries(LINES.map(l => [l.id, { status: 'not built', value: null }]));
@@ -17,6 +17,9 @@ test('the ratchet on blocking lines: a pass that fails, a fail that gets worse b
   assert.equal(ratchet({ ...now, 'first-birth': { status: 'not read', value: null } }, base).length, 1, 'a blocking line must be read');
   assert.deepEqual(ratchet({ ...now, 'gap-0-10': { status: 'fail', value: 999 } }, base), [], 'a line that does not block yet is only reported');
   assert.equal(ratchet(now, base, undefined, true).length, 2, 'from R1 step 2 a failing blocking line fails whatever its baseline');
+  assert.deepEqual(slack({ ...now, 'first-delivery': { status: 'pass', value: 9 } }, base), [], 'a recorded improvement is fine');
+  assert.equal(slack({ ...now, 'first-delivery': { status: 'fail', value: 30 } }, base).length, 1, 'a recorded regression is not');
+  assert.equal(slack({ ...now, 'first-birth': { status: 'fail', value: 16 } }, base).length, 1, 'nor a recorded pass turned fail');
   assert.deepEqual(LINES.filter(l => blocks(l)).map(l => l.id), ['first-delivery', 'first-delivery-passive', 'minute-1-deliveries', 'first-birth'], 'R0 blocks on these (02 section 3.1)');
 });
 

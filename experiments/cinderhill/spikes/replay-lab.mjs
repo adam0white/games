@@ -150,7 +150,7 @@ export class Observer {
     const F = s.flow; let gap = s.g[G.DIG_COUNT] > 0 && s.g[G.DIG_CREW] < Math.min(24, 4 * s.g[G.DIG_COUNT]);
     for (let k = 0; k < SLOT.TRAILS && !gap; k++) if (F.live[SLOT.TRAIL0 + k]) { const w = s.g[G.WANT0 + k]; gap = w === 0 || s.crew[k] < w - 1; }
     let wasted = 0;
-    if (gap) for (let i = 0; i < s.n; i++) if ((s.job[i] === JOB.FORAGE && !s.carry[i] && s.via[i] < 0 && s.mem[i] < 0 && s.mode[i] === MODE.SEEK && s.since[i] >= IDLE_FOR) || (s.job[i] === JOB.DIG && s.mode[i] === MODE.REST && s.since[i] >= IDLE_FOR)) wasted++;
+    if (gap) for (let i = 0; i < s.n; i++) if ((s.job[i] === JOB.FORAGE && !s.carry[i] && s.via[i] < 0 && s.mem[i] < 0 && s.mode[i] === MODE.SEEK && s.since[i] >= IDLE_FOR) || (s.job[i] === JOB.DIG && (s.mode[i] === MODE.REST || (s.mode[i] === MODE.SEEK && s.g[G.DIG_COUNT] === 0)) && s.since[i] >= IDLE_FOR)) wasted++;
     const share = s.n ? wasted / s.n : 0;
     if (share > this.idleMax) this.idleMax = share;
     this.idleSum += share; this.idleLooks++;
