@@ -33,6 +33,10 @@ footer { display:flex; gap:11px; align-items:center; padding:13px 0 8px; }
 .seal { flex:none; width:42px; height:42px; padding:4px; border:1px solid var(--rule); border-radius:50%; }
 .caption { flex:1; min-width:0; }
 .caption h2 { font-size:clamp(20px,5.9vw,28px); letter-spacing:-.035em; line-height:1.18; }
+/* The bed's instruction sits in the sky until the first touch. */
+.frame { position:relative; }
+.act { position:absolute; left:8%; right:8%; top:3.2%; margin:0; padding:6px 10px; text-align:center; font-size:13.5px; line-height:1.35; color:#f3e6c4; background:#0d1a1fb0; border-radius:6px; pointer-events:none; transition:opacity .5s; }
+.act:empty, .act.gone { opacity:0; }
 .meter { height:3px; margin:7px 0 0; background:var(--rule); }
 .meter span { display:block; height:100%; background:var(--muted); width:0; }
 .readings { display:grid; gap:3px; justify-items:end; align-self:end; padding-bottom:1px; font-variant-numeric:tabular-nums; }
