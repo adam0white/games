@@ -1,4 +1,4 @@
-# Cinderhill M0 spikes: S1, S2, S4
+# Cinderhill M0 spikes: S1, S2, S3, S4
 
 Pass lines are from `docs/design/colony/04-roadmap.md`. Measured on 2026-11-25 on one Apple-silicon Mac, with Node 26.13.1 (the repository pins 26.12.0; the tests pass on both), Playwright 1.64.1, and wrangler 4.168.0 running workerd locally. Scripts are in `../spikes/`; NOTES.md one level up says how to run them.
 
@@ -54,6 +54,33 @@ Seed 2026, 2,000 ants, 12,000 ticks (10 minutes), 41 orders. Every engine got th
 - **Firefox: not run.** Playwright's Firefox build is not installed on this machine. It was not installed for this spike, as the instructions asked.
 - **60-minute bot soak: not done.** The longest run is the 10-minute replay above.
 - **In CI:** the phone check now runs the page's short replay (600 ticks, 300 ants) in WebKit (iPhone 13) and Chromium (Pixel 7) and fails if the hash differs from Node's. It failed as expected with a wrong expected hash.
+
+**Re-run after a sim change (2026-11-25, trail painter PR).** Foragers now keep following the newest trail while they are on it, instead of dropping it 30 seconds into their trip (`sim.js`, the trail rule in the forager step). That changes play, so every hash above changed. S2 was run again with the same script: Node's final total is now 471678023, and Chromium 156 and WebKit 27.2 again match Node at all 600 records; the planted mutation still diverges at tick 20 in `ants`. workerd was not re-run. The S1 and S4 numbers predate the change.
+
+## S3: phone frames
+
+Pass line (04-roadmap): 30 fps or better with 2,000 ants on an iPhone 13 class phone.
+
+Script: `../spikes/s3.mjs`. It opens the trail painter (`/cinderhill/`), draws a trail from the entrance to the nearest food pile with one finger, waits 4 s, then records every frame for 10 s. "Work" is the page's own time inside a frame (sim ticks due, uploads, the WebGL draw calls and the 2D overlay); the GPU's time is not in it. "Lift to applied" is the time from the finger lift to the order's state turning `applied` in the page; an order applies at the start of the next tick, so it is up to one tick (50 ms) plus a frame. Run on 2026-11-25, Playwright 1.64.1, an Apple M4 Mac.
+
+| Browser (emulated phone) | Ants | Frames | Frame mean | Frame p95 | fps | Work mean / p95 | Sim tick mean / p95 | Ants drawn | GPU reported | Lift to applied |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| WebKit 27.2 (iPhone 13, 390 x 664, dpr 2) | 2,000 | 720 | 13.9 ms | 15 ms | 72 | 0.54 / 2 ms | 1.37 / 2 ms | 1,373 | Apple GPU | 64 ms |
+| WebKit 27.2 (iPhone 13) | 5,000 | 721 | 13.9 ms | 15 ms | 72 | 0.65 / 2 ms | 1.81 / 2 ms | 3,407 | Apple GPU | 64 ms |
+| Chromium 156 headless (Pixel 7, 412 x 839, dpr 2) | 2,000 | 193 | 51.8 ms | 66.7 ms | 19 | 2.39 / 3.4 ms | 2.01 / 2.3 ms | 1,372 | SwiftShader (software) | 14 ms |
+| Chromium 156 headless (Pixel 7) | 5,000 | 136 | 74.0 ms | 83.4 ms | 14 | 4.14 / 5.8 ms | 2.55 / 2.9 ms | 3,393 | SwiftShader (software) | 8 ms |
+| Chromium 156 headless, ANGLE on Metal (Pixel 7) | 2,000 | 600 | 16.7 ms | 16.7 ms | 60 | 1.29 / 4.8 ms | 3.23 / 4.8 ms | 1,377 | Apple M4 (Metal) | 21 ms |
+| Chromium 156 headless, ANGLE on Metal (Pixel 7) | 5,000 | 601 | 16.7 ms | 16.8 ms | 60 | 1.82 / 6.3 ms | 4.67 / 6.0 ms | 3,407 | Apple M4 (Metal) | 70 ms |
+
+WebKit timer values come in whole milliseconds, so its p95 reads 15 ms. "Ants drawn" counts the ants on the shown layer; the rest are in the nest.
+
+**Verdict: pass in emulation, not shown on a phone.** With a hardware GPU, both engines hold their frame rate at 2,000 and at 5,000 ants, with the page's own work under 7 ms at p95. Headless Chromium's default software renderer (SwiftShader) runs at 19 fps at 2,000 ants. That is the renderer, not the page: the same browser on Metal holds 60 fps, and CI's phone check runs on that software renderer, so CI is no frame-rate gate.
+
+This is an emulated phone. The CPU and GPU are an M4 Mac's. An iPhone 13 (A15) has a slower CPU and a much smaller GPU. What is likely to matter on the phone, from these numbers: the sim tick (1.4 to 1.8 ms here, 20 times a second) is small; the full-screen ground shader at dpr 2 (it has fbm noise and smooth contours per pixel) is the most likely cost; ants are one instanced draw. None of that is measured on a phone. To measure on a real phone, open `/cinderhill/?fps=1` (frame mean and p95, work, sim tick, ants drawn, dpr and the GPU string on screen) or `/cinderhill/?fps=1&ants=5000`.
+
+- **WebGL context loss:** the page keeps the sim running while the context is gone, and rebuilds every GPU resource on `webglcontextrestored`. The phone check loses and restores the context in both engines (`cinderhill orders`) and checks frames are drawn again.
+- **Worker:** not used. The sim runs on the main thread; its tick is a few ms at most here, and a Worker would add a copy of every ant position per tick. Move it if a real phone shows long frames on tick frames.
+- **Not done:** a real iPhone 13 or Android phone; Firefox; a long run (thermal throttling).
 
 ## S4: snapshot size
 

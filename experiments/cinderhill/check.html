@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2b2622">
+<title>Cinderhill: determinism check</title>
+<style>
+  html, body { margin: 0; background: #2b2622; color: #efe6da; font: 16px/1.45 system-ui, sans-serif; }
+  main { max-width: 34em; margin: 0 auto; padding: max(16px, env(safe-area-inset-top)) 16px 32px; box-sizing: border-box; }
+  h1 { font-size: 1.5em; margin: .3em 0; }
+  button { font: inherit; font-weight: 600; min-height: 48px; padding: .4em 1.2em; border-radius: 999px; border: 2px solid #d98b3a; background: #f2a24a; color: #2b1606; }
+  button:disabled { opacity: .5; }
+  table { border-collapse: collapse; margin-top: 1em; font-variant-numeric: tabular-nums; }
+  td { padding: .15em .8em .15em 0; }
+  #verdict { font-weight: 700; margin-top: 1em; }
+  .ok { color: #9fd67a; } .bad { color: #ff8a7a; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Cinderhill: determinism check</h1>
+  <p>This page runs the colony simulation in this browser for a fixed seed and a fixed list of orders, then compares its state hashes with the ones Node computed. A match means this browser runs the same game, tick for tick.</p>
+  <p><button id="run">Run the check</button></p>
+  <p id="status" aria-live="polite"></p>
+  <table id="hashes"></table>
+  <p id="verdict"></p>
+  <p><a href="./" style="color:#f2a24a">The trail painter</a></p>
+</main>
+<script type="module" src="check.js"></script>
+</body>
+</html>

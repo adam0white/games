@@ -256,7 +256,7 @@ export class Sim {
           const m = this.mem[i], t = this.newestTrail();
           if (m >= 0 && !this.flow.live[m]) this.mem[i] = -1;
           if (this.mem[i] >= 0 && distAt(this, m, c) !== INF) follow = m;
-          else if (t >= 0 && distAt(this, t, c) > 1 && distAt(this, t, c) !== INF && this.since[i] < SEEK_GIVE_UP >> 1) follow = t;
+          else if (t >= 0 && distAt(this, t, c) > 1 && distAt(this, t, c) !== INF && (this.since[i] < SEEK_GIVE_UP >> 1 || this.goal[i] === t)) follow = t;
           else { want = this.sense(i); if (want < 0) wander = true; }
         }
       }

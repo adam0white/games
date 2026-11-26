@@ -85,6 +85,114 @@ const flockHints = ['drag', 'hold', 'outrun'].map((name, index) => ({
   input: name === 'drag' ? driveFlock : (page, checks) => commandFlock(page, checks, name),
 }));
 
+// Cinderhill's command-log check (pageRuns 'cinderhill orders'). Pointers are synthetic PointerEvents with their own ids;
+// on Chromium a second part sends real touches through the DevTools protocol, so the browser makes the pointer events.
+async function cinderhillOrders(page, { base, until }) {
+  await page.goto(`${base}/notes/button.js`);
+  await page.evaluate(() => { localStorage.clear(); localStorage.setItem('cinderhill:hint', '1'); });
+  await page.goto(`${base}/cinderhill/?ants=500`);
+  await until(page, () => window.painter, 'painter script');
+  await page.click('#play');
+  await until(page, () => window.painter.state().screen === 'play', 'play');
+  const ptr = steps => page.evaluate(steps => {
+    const el = document.querySelector('#c');
+    for (const [type, id, x, y, primary = id === 1] of steps) el.dispatchEvent(new PointerEvent(type, { pointerId: id, pointerType: 'touch', isPrimary: primary, clientX: x, clientY: y, pressure: type === 'pointerup' || type === 'pointercancel' ? 0 : 0.5, bubbles: true, cancelable: true }));
+  }, steps);
+  const types = () => page.evaluate(() => window.painter.log().map(o => o.type));
+  const { w, h } = await page.evaluate(() => ({ w: innerWidth, h: innerHeight }));
+  const cx = w / 2, cy = h / 2;
+  const stroke = (id, x0, y0, dx, dy, n = 4) => Array.from({ length: n }, (_, k) => ['pointermove', id, x0 + dx * (k + 1) / n, y0 + dy * (k + 1) / n]);
+  const expected = [];
+  const same = async what => {
+    assert.deepEqual(await types(), expected, `${what}: the command log holds only the intended orders`);
+    assert.equal(await page.evaluate(() => window.painter.state().preview), 0, `${what}: no preview left`);
+  };
+  // A clean stroke: one trail order on lift.
+  await ptr([['pointerdown', 1, cx, cy], ...stroke(1, cx, cy, 20, -120)]);
+  assert.deepEqual(await types(), [], 'no order while the finger is down');
+  await ptr([['pointerup', 1, cx + 20, cy - 120]]);
+  expected.push('trail'); await same('a clean stroke');
+  // A pinch mid-stroke, the second finger up first, then the first finger up first.
+  for (const firstUp of [2, 1]) {
+    await ptr([['pointerdown', 1, cx - 30, cy], ...stroke(1, cx - 30, cy, 0, -40), ['pointerdown', 2, cx + 40, cy - 40],
+      ...stroke(1, cx - 30, cy - 40, -30, 20), ...stroke(2, cx + 40, cy - 40, 30, -20)]);
+    const other = firstUp === 1 ? 2 : 1;
+    await ptr([['pointerup', firstUp, cx, cy], ...stroke(other, cx, cy, 25, 25), ['pointerup', other, cx + 25, cy + 25]]);
+    await same(`a pinch mid-stroke, finger ${firstUp} up first`);
+  }
+  // A two-finger pan mid-stroke.
+  await ptr([['pointerdown', 1, cx, cy], ...stroke(1, cx, cy, 0, -40), ['pointerdown', 2, cx + 60, cy - 40], ...stroke(1, cx, cy - 40, 50, 50), ...stroke(2, cx + 60, cy - 40, 50, 50),
+    ['pointerup', 1, cx + 50, cy + 10], ['pointerup', 2, cx + 110, cy + 10]]);
+  await same('a two-finger pan mid-stroke');
+  // pointercancel mid-stroke (the browser took the touch, as for a scroll or a system gesture).
+  await ptr([['pointerdown', 1, cx, cy], ...stroke(1, cx, cy, -60, -60), ['pointercancel', 1, cx - 60, cy - 60]]);
+  await same('pointercancel mid-stroke');
+  // A layer switch mid-stroke; the lift lands on the nest.
+  await ptr([['pointerdown', 1, cx, cy], ...stroke(1, cx, cy, 40, -60)]);
+  await page.click('#layer'); await until(page, () => window.painter.state().layer === 1, 'the nest layer');
+  await ptr([...stroke(1, cx + 40, cy - 60, 20, 20), ['pointerup', 1, cx + 60, cy - 40]]);
+  await same('a layer switch mid-stroke');
+  await page.click('#layer'); await until(page, () => window.painter.state().layer === 0, 'back on the surface');
+  // The page loses focus mid-stroke (a call comes in); the lift arrives after Resume.
+  await ptr([['pointerdown', 1, cx, cy], ...stroke(1, cx, cy, -40, -80)]);
+  await page.evaluate(() => dispatchEvent(new Event('blur'))); await until(page, () => window.painter.state().paused, 'blur pauses');
+  await page.click('#resume'); await until(page, () => !window.painter.state().paused, 'resume');
+  await ptr([['pointerup', 1, cx - 40, cy - 80]]);
+  await same('a pause mid-stroke');
+  // Alarm: a quick pinch gives nothing; a still hold gives a start, and the lift its end.
+  await page.click('[data-tool="alarm"]');
+  await ptr([['pointerdown', 1, cx, cy], ['pointerdown', 2, cx + 50, cy + 50], ...stroke(1, cx, cy, -30, -30), ...stroke(2, cx + 50, cy + 50, 30, 30)]);
+  await page.waitForTimeout(600);
+  await ptr([['pointerup', 2, cx + 80, cy + 80]]); await page.waitForTimeout(600); await ptr([['pointerup', 1, cx - 30, cy - 30]]);
+  await same('a pinch with the alarm tool');
+  await ptr([['pointerdown', 1, cx, cy]]);
+  await until(page, () => window.painter.log().length > 1, 'a still hold sounds the alarm', 4000);
+  await ptr([['pointerup', 1, cx, cy]]);
+  expected.push('alarm', 'alarm'); await same('an alarm hold and lift');
+  // Dig on the nest: a pinch gives nothing; a stroke gives dig orders.
+  await page.click('#layer'); await until(page, () => window.painter.state().layer === 1, 'the nest layer');
+  await page.click('[data-tool="dig"]');
+  await ptr([['pointerdown', 1, cx, cy], ...stroke(1, cx, cy, 40, 0), ['pointerdown', 2, cx + 40, cy + 60], ...stroke(1, cx + 40, cy, 20, -20), ['pointerup', 2, cx + 40, cy + 60], ['pointerup', 1, cx + 60, cy - 20]]);
+  await same('a pinch with the dig tool');
+  await ptr([['pointerdown', 1, cx - 60, cy], ...stroke(1, cx - 60, cy, 120, 0), ['pointerup', 1, cx + 60, cy]]);
+  expected.push('dig'); await same('a dig stroke');
+  await page.click('#layer'); await until(page, () => window.painter.state().layer === 0, 'back on the surface');
+  await page.click('[data-tool="trail"]');
+  // Real touches (Chromium only): a pinch mid-stroke, then a clean stroke.
+  if (page.context().browser().browserType().name() === 'chromium') {
+    const cdp = await page.context().newCDPSession(page);
+    const touch = (type, points) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: points.map(([id, x, y]) => ({ id, x, y })) });
+    await touch('touchStart', [[1, cx, cy]]);
+    for (let k = 1; k <= 4; k++) await touch('touchMove', [[1, cx, cy - 12 * k]]);
+    await touch('touchStart', [[1, cx, cy - 48], [2, cx + 50, cy]]);
+    for (let k = 1; k <= 4; k++) await touch('touchMove', [[1, cx - 8 * k, cy - 48 - 8 * k], [2, cx + 50 + 8 * k, cy + 8 * k]]);
+    await touch('touchEnd', [[1, cx - 32, cy - 80]]);
+    for (let k = 1; k <= 3; k++) await touch('touchMove', [[1, cx - 32 + 10 * k, cy - 80]]);
+    await touch('touchEnd', []);
+    await same('a real two-finger pinch mid-stroke');
+    await touch('touchStart', [[1, cx, cy]]);
+    for (let k = 1; k <= 6; k++) await touch('touchMove', [[1, cx + 5 * k, cy - 20 * k]]);
+    await touch('touchEnd', []);
+    expected.push('trail'); await same('a real clean stroke');
+    await cdp.detach();
+  }
+  await until(page, () => window.painter.log().every(o => o.state !== 'queued'), 'every order reaches the sim');
+  const states = await page.evaluate(() => window.painter.log().map(o => `${o.type}:${o.state}`));
+  assert.deepEqual(states, expected.map(t => `${t}:applied`), 'every order applies');
+  // WebGL context loss and restore: the page keeps running and draws again.
+  if (await page.evaluate(() => window.painter.state().gl)) {
+    assert.ok(await page.evaluate(() => window.painter.loseContext()), 'the lose-context extension is there');
+    await until(page, () => window.painter.state().glLosses === 1, 'the context is lost');
+    const t = await page.evaluate(() => window.painter.state().t);
+    await until(page, t => window.painter.state().t > t + 5, 'the sim runs on with no context', 8000, t);
+    await page.evaluate(() => window.painter.restoreContext());
+    await until(page, () => window.painter.state().glRestored === 1 && window.painter.state().gl, 'the context comes back');
+    const d = await page.evaluate(() => window.painter.state().drawn);
+    await until(page, d => window.painter.state().drawn > d + 3, 'frames are drawn again after the restore', 8000, d);
+  }
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no sideways scroll');
+}
+
 export const pages = {
   breath: {
     seeds: saved('breath-save', { v: 1, stars: { 1: 2 }, opened: 2, best: 730, daily: { '2026-11-20': 620 }, runs: 4, sound: true, look: 'paper' }, 'breath:hint'),
@@ -204,6 +312,26 @@ export const pages = {
     music: { button: '#music', key: 'night-vine:music', on: 'Music on', off: 'Music off', hook: () => window.vineMusic?.() },
     hint: { key: 'night-vine:hint', delay: 3100, play: '#field', timing: { board: true }, input: moveVineLamp, legacy: { 'night-vine:save': '{"v":1,"unlocked":3,"level":2,"best":7,"sound":true,"look":"cobalt"}' } },
   },
+  // Cinderhill's trail painter: one finger on the canvas draws a trail; it becomes an order when the finger lifts.
+  cinderhill: {
+    seeds: saved('cinderhill:save', { v: 1, sound: true, ants: 500, tapTrail: false }, 'cinderhill:hint'),
+    saveKey: 'cinderhill:save', sound: '#sound', menu: '#toMenu',
+    state: () => { const s = window.painter?.state(); return s && { screen: s.screen, t: s.t, paused: s.paused }; },
+    verify: () => { const s = window.painter.state(); return [s.ants, s.sound, s.tapTrail]; },
+    expect: [500, true, false],
+    async touch(page, { finger }) {
+      const before = await page.evaluate(() => window.painter.log().length);
+      const { w, h } = await page.evaluate(() => ({ w: innerWidth, h: innerHeight }));
+      const x = w / 2, y = h / 2;
+      await finger(page, '#c', [['pointerdown', x, y], ['pointermove', x + 10, y - 30], ['pointermove', x + 20, y - 70], ['pointermove', x + 30, y - 120]]);
+      assert.equal(await page.evaluate(() => window.painter.log().length), before, 'no order while the finger is down');
+      assert.ok(await page.evaluate(() => window.painter.state().preview > 0), 'the stroke shows as a preview');
+      await finger(page, '#c', [['pointerup', x + 30, y - 120]]);
+      const log = await page.evaluate(() => window.painter.log());
+      assert.deepEqual(log.slice(before).map(o => o.type), ['trail'], 'lifting the finger gives one trail order');
+    },
+    hint: { key: 'cinderhill:hint', delay: 3000, moved: () => window.painter.state().preview > 0, legacy: { 'cinderhill:save': '{"v":1,"sound":true,"ants":2000,"tapTrail":false}' } },
+  },
 };
 
 // The home for the small games (/small/). It is not a game, so it has its own run instead of the save, pause and touch
@@ -233,14 +361,18 @@ async function smallGo(page, until, base, query = `?lang=en&day=${DAY}`) { await
 export const pageRuns = {
   // Cinderhill's determinism check: the browser runs a short fixed game and must reach the hash Node computes
   // (experiments/cinderhill/quick.js). The long cross-engine runs are spike S2, outside CI.
-  async cinderhill(page, { base, until }) {
-    await page.goto(`${base}/cinderhill/`);
+  async 'cinderhill check'(page, { base, until }) {
+    await page.goto(`${base}/cinderhill/check.html`);
     await page.click('#run');
     await until(page, () => window.cinderhill?.state().result, 'the determinism check finishes', 60000);
     const r = await page.evaluate(() => window.cinderhill.state().result);
     assert.ok(r.same, `this browser's total hash ${r.total} at tick ${r.tick} is not Node's`);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no sideways scroll');
   },
+  // The trail painter's touch rules (02-spec 6.4): a stroke is a local preview and becomes one order when the finger
+  // lifts; a second finger, a pointercancel, a layer switch or a pause ends it with no order. Every gesture below that
+  // should give no order is followed by a check that the command log did not grow. Then a WebGL context loss and restore.
+  'cinderhill orders': cinderhillOrders,
   async small(page, { base, until }) {
     const gameKeys = () => page.evaluate(() => Object.fromEntries(Object.keys(localStorage).filter(k => !/^(hub:|kit:|hf-lab-)/.test(k)).map(k => [k, localStorage.getItem(k)])));
     await page.goto(`${base}/notes/button.js`);
