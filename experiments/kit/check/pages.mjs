@@ -459,8 +459,10 @@ export const pageRuns = {
     const want1 = await page.evaluate(() => window.painter.stats().trails[0].want);
     assert.ok(want1 >= on + 1 - 2 && want1 <= on + 1 + 2, `wanted ${want1} from ${on} on it`);
     const box = await page.locator('#crewMinus').boundingBox();
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page.mouse.down(); await page.waitForTimeout(600); await page.mouse.up();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page.mouse.down();
+    // Held until the first eight goes out: a busy runner can fire the 400 ms timer late.
     await until(page, () => window.painter.log().some(o => o.type === 'crew' && o.delta === -8), 'a held minus asks eight fewer');
+    await page.mouse.up();
     await until(page, () => /of/.test(document.querySelector('#crewWho').textContent), 'the panel shows on and wanted');
   },
   async 'cinderhill speed'(page, { base, until }) {
