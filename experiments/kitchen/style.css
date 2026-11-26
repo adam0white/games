@@ -103,3 +103,18 @@ button.small { min-width: 0; font-size: 15px; }
 @media (max-height: 640px) { h1 { font-size: 2.1em; } .card { padding: 10px 12px 8px; } }
 
 #extra .note { font-size: 13px; line-height: 1.35; opacity: .75; margin: 6px 8px 0; }
+/* Shop: the buildings scroll; the next step and the open button always show */
+#shop .card.wide { max-height: calc(100dvh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); display: flex; flex-direction: column; margin: 8px 0; }
+#shop #builds { overflow-y: auto; flex: 1 1 auto; min-height: 120px; padding: 2px; }
+#shop .shopFoot { flex: none; margin: 8px 0 0; padding-top: 6px; border-top: 2px dashed #d9c7a8; }
+#starBox { flex: none; }
+#starBox .nextStep { font-weight: 900; color: var(--accent); margin: 2px 0 6px; }
+#starGo.ready { animation: pulse 1s ease-in-out infinite alternate; }
+.bld.goal { border-color: var(--accent); box-shadow: 0 0 0 3px #ffb34766; }
+.bld .for { display: block; font-size: 11px; color: var(--accent); font-weight: 800; }
+@keyframes pulse { from { transform: scale(1); } to { transform: scale(1.06); } }
+/* Golden recipe ticket */
+#ticket.gold { background: linear-gradient(160deg, #fff6c8, #ffd95a); border-color: #8a5a00; box-shadow: 0 5px 0 #b07a00, 0 0 18px #ffd95aaa; }
+#ticket.gold::before { background: radial-gradient(circle at 5px 9px, #0000 5px, #fff6c8 5.5px) 0 0 / 10px 9px repeat-x; }
+#ticket .goldTag { display: block; font-size: 11px; color: #8a5a00; letter-spacing: .1em; }
+#ticketHead { flex-wrap: wrap; }
