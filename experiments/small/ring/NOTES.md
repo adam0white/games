@@ -222,3 +222,4 @@ Cold play showed the most common failed gesture: a finger draws most of a circle
 Verified: `node bots.mjs` all pass, including a constructed test (with lift a "6" scores 16, without it 0; a 110-radius circle is one burnt miss) and the main parity digests. phone.mjs `small/ring` and its hint, both engines. A Pixel 7 Chromium screenshot of an open arc showed the dotted line, circle and words, fx log `button level penDown miss`, no console errors.
 
 Not verified: whether the dotted line reads clearly to a person; the burnt-miss words on a real screen; the ladder numbers above were not re-measured with lift (the bot hands close by crossing, so lift should not change them).
+- Variant for the owner to compare: `?v=b` plays without lift (the old closing rule); the default is lift on. The miss cue shows in both.

@@ -32,7 +32,8 @@ if (!Array.isArray(nights.best)) nights.best = [0, 0, 0];
 const persistNights = () => writeJson(NKEY, nights);
 const practiceNight = Math.max(0, Math.min(NIGHTN, Number(query.get('night')) | 0)) - 1;
 // The page plays with fair moths (a moth hovers a moment before it chases) and relight (a full jar relights one wick).
-const RULES = { fair: true, relight: true, lift: true };
+// ?v=b plays without lift (2026-11-26), to compare: a lift closes a ring only near the thread's tail, as before.
+const RULES = { fair: true, relight: true, lift: query.get('v') !== 'b' };
 const snd = sound({ on: () => save.sound });
 const { fx, bump, log: fxLog } = feedback({ canSound: () => save.sound, size: 1000 });
 
