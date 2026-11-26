@@ -319,6 +319,20 @@ export class Renderer {
     const dbg = gl.getExtension('WEBGL_debug_renderer_info');
     this.gpu = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
   }
+  /** Rebuilds the shaders for another look in place (the game goes on). The caller uploads terrain, scent and ants
+   *  again. If the new look does not compile, the old one is built again and the error is thrown. */
+  setLook(look) {
+    const gl = this.gl, old = this.look;
+    if (this.lost || (look | 0) === old) return;
+    const free = () => {
+      for (const p of [this.ground, this.ant]) if (p) gl.deleteProgram(p.p);
+      for (const b of [this.quad, this.inst]) if (b) gl.deleteBuffer(b);
+      for (const v of [this.gvao, this.avao]) if (v) gl.deleteVertexArray(v);
+      for (const t of [...(this.matTex ?? []), ...(this.scentTex ?? [])]) gl.deleteTexture(t);
+    };
+    free(); this.look = look | 0;
+    try { this.init(); } catch (e) { free(); this.look = old; this.init(); throw e; }
+  }
   /** Terrain for one layer: mat (Uint8, w*h) and dig marks (Uint8, w*h). */
   setTerrain(layer, w, h, mat, dig) {
     const gl = this.gl; if (this.lost) return;

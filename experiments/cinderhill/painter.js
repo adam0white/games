@@ -32,8 +32,9 @@ const qAnts = Number(query.get('ants'));
 // ?colony=1: a colony game (queen, brood, sugar and protein; M1). Without it, the trail painter sandbox as in M0.
 // The ant count buttons and the saved count do not apply to a colony game.
 const colonyMode = query.get('colony') === '1';
-const lookName = pickLook(query.get('look')), LOOK = LOOKS[lookName];
-document.querySelector('meta[name=theme-color]')?.setAttribute('content', LOOK.theme); document.body.style.background = LOOK.theme;
+let lookName = pickLook(query.get('look')), LOOK = LOOKS[lookName];
+const paintTheme = () => { document.querySelector('meta[name=theme-color]')?.setAttribute('content', LOOK.theme); document.body.style.background = LOOK.theme; };
+paintTheme();
 // ?day=<ticks> shortens a colony game's day (tests and the phone check); the game's day is colony.js DAY_TICKS.
 const qDay = Number(query.get('day'));
 let host = colonyMode ? new Host(START.ants, SEED, { colony: true, dayTicks: qDay >= 100 && qDay <= 100000 ? Math.floor(qDay) : undefined }) : new Host(COUNTS.includes(qAnts) ? qAnts : save.ants);
@@ -244,7 +245,21 @@ for (const b of document.querySelectorAll('[data-count]')) b.addEventListener('c
 // A look is a different shader build, so changing it reloads the page with ?look= (the other parameters kept).
 for (const b of document.querySelectorAll('[data-look]')) {
   b.setAttribute('aria-pressed', String(b.dataset.look === lookName));
-  b.addEventListener('click', () => { if (b.dataset.look === lookName) return; const u = new URL(location.href); u.searchParams.set('look', b.dataset.look); location.href = u.href; });
+  b.addEventListener('click', () => setLook(b.dataset.look));
+}
+/** Another look in place: the shaders are built again and the textures uploaded again; the game goes on. The URL
+ *  keeps the look (replaceState), so a reload or a shared link shows the same one. */
+function setLook(name) {
+  name = pickLook(name); if (name === lookName) return;
+  const next = LOOKS[name];
+  if (renderer) {
+    try { renderer.setLook(next.id); } catch (e) { glFailed = String(e.message || e).slice(0, 200); uploadAll(); return; }
+    uploadAll();
+  }
+  lookName = name; LOOK = next; paintTheme();
+  for (const b of document.querySelectorAll('[data-look]')) b.setAttribute('aria-pressed', String(b.dataset.look === lookName));
+  try { const u = new URL(location.href); u.searchParams.set('look', name); history.replaceState(history.state, '', u.href); } catch {}
+  labrec.emit('look', { look: name, tick: host.tick });
 }
 $('antClose').addEventListener('click', () => { selected = -1; $('antCard').classList.remove('on'); });
 onLeave(pauseGame);
@@ -523,7 +538,7 @@ window.painter = {
   camera: () => ({ ...cams[layer] }),
   setCamera: c => { Object.assign(cams[layer], c); clampCam(); },
   setAnts: n => setCount(n),
-  setTool, setLayer,
+  setTool, setLayer, setLook,
   frames: {
     start() { frames.on = true; frames.dt = []; frames.work = []; host.tickMs = []; },
     stop() { frames.on = false; return { frame: summary(frames.dt), work: summary(frames.work), tick: host.tickStats(), ants: host.ants, drawn: drawnAnts, dpr, view: [W, H], gpu: renderer?.gpu ?? null }; },
