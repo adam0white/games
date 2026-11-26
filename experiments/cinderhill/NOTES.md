@@ -139,6 +139,24 @@ A colony game (`?colony=1`) is played in days of 12,000 ticks (ten minutes; `?da
 
 Choices the owner may want to change: the three goals and their targets, +30 a day after day 3, easing by a quarter after a loss, the floor rule and its gift, time stopping at dusk (a room could run straight on), the day length, and keeping the colony behind `?colony=1` rather than making it the page's default.
 
+## The spider and Recall (M1, SIM_VERSION 6, 2026-11-26)
+
+From day 2 a spider comes once a day (02-spec 6.5, feature 12; `sim/spider.js`). It wears ant scent, so ants neither flee nor fight it. The answer is Recall.
+
+| When (a day of T ticks) | What happens | The page |
+| --- | --- | --- |
+| T/4 | It smells the trail with the most living surface ants on or beside its path (ties: the newest). `EVENT.SPIDER` WARN. | Toast, two low notes, HUD line "Spider: coming", a red ring where it will appear (an arrow at the screen edge when that is off screen). |
+| + max(20, T/30) | It appears at the trail's far end. HUNT. | A dark eight-legged body with a red mark, its reach drawn as a box; HUD "Spider: hunting · eaten N". |
+| hunting | One cell each 10 ticks back along the trail toward the nest. It eats the nearest surface ant within one cell, then needs 20 ticks before the next. | |
+| it leaves | At the walk's end after max(40, T/40) ticks with nothing to eat, after T/6 ticks of hunting, at 30 kills, or when its trail is removed or replaced. LEFT. | Toast: what it ate, or "found nobody: send the ants out". |
+
+- The first visit (day 2) is the safe form (02-spec 8): it walks along the map's top edge and eats no one, so the player meets it before it costs anything.
+- Recall now empties the surface and keeps it empty: foragers in the nest stay in (before, they came home and went straight back out, so Recall never cleared the surface), their search timer does not run while they wait, and guards do not go out to a surface alarm.
+- The careful bot turns Recall on at the warning and off when the spider leaves. "Careless" plays the same without Recall. On 12 seeds (`sim/SPIKES.md`, The spider), see the sweep there for what the spider costs.
+- Times shrink for short days (at most an eighth of the day for the warning and the hunger time, half for the hunt), so a visit ends inside its day; `?day=200` on the phone check sees the day-2 visit.
+
+Choices the owner may want to change: from day 2, once a day at a quarter of the day; a harmless first visit; the busiest trail by ants near it now (not loads carried); 30 kills a visit; no way to fight it (bites or majors could hurt it later, 02-spec 6.5 says ants cannot); its look.
+
 ## The lab record: a full replay (2026-11-26)
 
 Every game sends its whole replay to the game lab, so a session can be played again in Node and read minute by minute (`labrec.js`, using only kit/lab.js's `start`, `event`, `end` and its flush when the page is put away).
