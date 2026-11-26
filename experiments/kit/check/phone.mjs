@@ -1148,6 +1148,31 @@ const GAMES = {
     assert.ok(!('meadow' in await saved()) && !('sp' in await saved()), 'the meadow is not in the save');
     await toMenu(); await page.click('#toMeadow'); await page.click('#meadowReset'); assert.match(await page.textContent('#meadowReset'), /Tap again/); assert.equal((await meadowOf()).runs, 10, 'one tap forgets nothing');
     await page.click('#meadowReset'); assert.equal((await meadowOf()).runs, 0, 'the second tap starts the meadow over'); assert.deepEqual((await meadowOf()).sp, {});
+    // The practice meadow (note #261): any of the 51 animals, its skill, nothing saved. From a mid-climb save with a rival, practice as
+    // a Wolf: press the skill, eat, fill the bar, die, change to a Dragon, fire pagehide, leave for the menu. Every key stays byte-identical.
+    await page.click('#meadow .back');
+    const pk = () => page.evaluate(() => Object.fromEntries(['ant-promotion:v1', 'ant-promotion:meadow', 'ant-promotion:cover'].map(k => [k, localStorage.getItem(k)])));
+    await page.evaluate(k => { const F = window.__ant.FORMS, v = JSON.parse(localStorage.getItem(k)); v.stack = [1, 2, 3, 4, 5, 6].map(L => F.findIndex(f => f && f.level === L && f.role !== 'runner' || f.level === 1 && L === 1)); v.xp = 4;
+      v.nem = { gen: 1, persona: { name: 'Old Scar the Dog', title: 'The Patient', colour: '#ff4fd8', lines: { rise: 'a', notice: 'b', escape: 'c', kill: 'd', beaten: 'e' }, knobs: {} }, history: [], sim: { f: F.findIndex(f => f.name === 'Dog'), bonus: 0, kills: 1, escapes: 0, kin: 0, knobs: {} } }; localStorage.setItem(k, JSON.stringify(v)); }, KEY);
+    await page.reload(); await until(page, () => window.__ant, 'game script');
+    const pBefore = await pk(), pMenu = await page.textContent('#continue'); assert.equal(JSON.parse(pBefore[KEY]).stack.length, 6, 'a level-6 save');
+    await page.click('#toPractice'); assert.equal(await mode(), 'practice'); assert.equal(await page.$$eval('#practiceList .practiceOpt', l => l.length), 51, 'every animal with a skill');
+    await page.click('#practiceList [data-name="Wolf"]'); assert.equal(await mode(), 'play');
+    assert.deepEqual(await page.evaluate(() => { const { s, level, me } = window.__ant; return [level(s), me(s).name, !!s.nemesis, s.mobs.some(m => m.old), window.__ant.practice.name]; }), [10, 'Wolf', false, false, 'Wolf'], 'a Wolf at its own level, no rival, no old hunters');
+    assert.match(await page.textContent('#who'), /^Practice · Wolf/);
+    await page.click('#power'); await until(page, () => window.__ant.s.powers > 0, 'the skill is used'); assert.ok(await page.evaluate(() => window.__ant.s.player.cd <= 3), 'skills wait 3 s at most in practice');
+    await page.evaluate(() => { const { s, powerOf, me } = window.__ant, m = s.mobs.find(m => powerOf(m) < me(s).power); m.x = s.player.x; m.y = s.player.y; }); await until(page, () => window.__ant.s.eaten > 0, 'eats in practice');
+    await page.evaluate(() => { window.__ant.s.player.xp = 99; }); await until(page, () => window.__ant.s.player.xp === 0 && !window.__ant.s.choosing && window.__ant.mode === 'play', 'a full bar promotes nobody in practice');
+    await page.evaluate(() => { const { s, FORMS, me } = window.__ant, p = s.player, m = s.mobs.find(m => FORMS[m.f].power > me(s).power); p.safe = 0; p.hideAt = 1e9; p.x = m.x; p.y = m.y; });
+    await until(page, () => window.__ant.mode === 'dying', 'caught in practice'); await until(page, () => window.__ant.mode === 'play' && !window.__ant.s.dead, 'back as the same animal, no death card', 4000);
+    assert.deepEqual(await page.evaluate(() => [window.__ant.me(window.__ant.s).name, !!window.__ant.s.nemesis]), ['Wolf', false], 'still a Wolf, and no new rival');
+    await page.click('#pause'); assert.ok(await page.isVisible('#practiceOther')); await page.click('#practiceOther'); await page.click('#practiceList [data-name="Dragon"]');
+    assert.equal(await page.evaluate(() => window.__ant.level(window.__ant.s)), 18, 'a Dragon at the top');
+    await page.evaluate(() => dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }))); assert.deepEqual(await pk(), pBefore, 'pagehide in practice writes nothing');
+    await toMenu();
+    assert.deepEqual(await pk(), pBefore, 'practice changed no saved key'); assert.equal(await page.textContent('#continue'), pMenu, 'the menu offers the real climb');
+    assert.ok(!await page.isVisible('#practiceOther'), 'no practice button on a real pause');
+    await page.click('#continue'); assert.deepEqual(await page.evaluate(() => [window.__ant.level(window.__ant.s), !!window.__ant.s.nemesis, window.__ant.practice]), [6, true, null], 'the real climb, with its rival'); await toMenu();
     await page.goto(`${base}/ant-promotion/?labRunSource=agent&lang=tr`); await until(page, () => window.__ant, 'game script'); await page.click('#toMeadow'); assert.equal(await page.textContent('#meadow h2'), 'Saha rehberi', 'the field guide in Turkish');
     await page.evaluate(k => { localStorage.removeItem(k); localStorage.removeItem('kit:lang'); }, MK);
   },
