@@ -27,6 +27,12 @@ const homeUrl = () => { const u = new URL(location.href); u.search = ''; u.hash 
 function toast(key, vars) { const el = $('toast'); el.textContent = t(key, vars); el.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove('on'), 1600); }
 
 const rec = lab('small', { lang: W.lang });
+// The layout of "All the small games", a taste call: ?v=deck (the default, one card at a time to swipe) or ?v=grid
+// (every game at once, two to a row, each moving while on screen).
+const V = (() => { try { return new URLSearchParams(location.search).get('v') === 'grid' ? 'grid' : 'deck'; } catch { return 'deck'; } })();
+const grid = V === 'grid';
+document.body.dataset.v = V;
+if (grid) document.querySelector('#all .lead').dataset.i18n = 'allLeadGrid';
 const set = threeFor(today);
 const pick = pickFor(today);
 // The deck starts on today's pick, then the games this player has not tried yet, then the rest, each in catalogue order
@@ -180,13 +186,14 @@ function settle() {
 function show(i, smooth = true) {
   at = Math.max(0, Math.min(order.length - 1, i));
   const card = cards()[at];
+  if (grid) { if (smooth && card) card.scrollIntoView({ block: 'center', behavior: reduced() ? 'auto' : 'smooth' }); sync(); return; }
   if (card) deck.scrollTo({ left: leftOf(card), behavior: smooth && !reduced() ? 'smooth' : 'auto' });
   target = card && smooth ? at : null; if (target !== null) settle();
   sync();
 }
 const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 function sync() {
-  cards().forEach((c, i) => { c.classList.toggle('away', i !== at); c.setAttribute('aria-hidden', String(i !== at)); c.querySelector('.play').tabIndex = i === at ? 0 : -1; });
+  cards().forEach((c, i) => { if (grid) { c.querySelector('.play').tabIndex = 0; return; } c.classList.toggle('away', i !== at); c.setAttribute('aria-hidden', String(i !== at)); c.querySelector('.play').tabIndex = i === at ? 0 : -1; });
   [...$('dots').children].forEach((d, i) => d.classList.toggle('on', i === at));
   [...$('tiles').children].forEach((d, i) => d.classList.toggle('on', i === at));
   if (lastAt !== null && lastAt !== at) sfx.card(at);
@@ -209,7 +216,11 @@ deck.addEventListener('scroll', () => {
 }, { passive: true });
 $('prev').onclick = () => show(at - 1);
 $('next').onclick = () => show(at + 1);
-$('tiles').addEventListener('click', e => { const b = e.target.closest('.tile'); if (!b) return; show(Number(b.dataset.i)); deck.scrollIntoView({ block: 'nearest', behavior: reduced() ? 'auto' : 'smooth' }); });
+$('tiles').addEventListener('click', e => {
+  const b = e.target.closest('.tile'); if (!b) return; show(Number(b.dataset.i));
+  if (!grid) deck.scrollIntoView({ block: 'nearest', behavior: reduced() ? 'auto' : 'smooth' });
+  else { const card = cards()[at]; card.classList.remove('flash'); void card.offsetWidth; card.classList.add('flash'); }
+});
 deck.addEventListener('keydown', e => { if (e.key === 'ArrowRight') { e.preventDefault(); show(at + 1); } if (e.key === 'ArrowLeft') { e.preventDefault(); show(at - 1); } });
 // Surprise me: a game not played yet if there is one, never the card on screen.
 $('surprise').onclick = () => {
@@ -230,9 +241,10 @@ let looping = false;
 const onScreen = el => { const r = el.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth; };
 function liveNow() {
   const list = [];
-  const deckOne = cards()[at]?.querySelector('canvas.live'); if (deckOne) list.push(deckOne);
+  if (grid) list.push(...deck.querySelectorAll('canvas.live'));
+  else { const deckOne = cards()[at]?.querySelector('canvas.live'); if (deckOne) list.push(deckOne); }
   const stop = $('stops').querySelector('li.now canvas.live'); if (stop) list.push(stop);
-  return list.filter(onScreen);
+  return list.filter(onScreen).slice(0, 8);
 }
 function paint(c, now) {
   let l = lives.get(c);
@@ -272,12 +284,12 @@ deck.addEventListener('touchstart', () => { target = null; }, { passive: true })
 let broughtIn = 0;
 deck.addEventListener('pointerup', e => {
   const card = e.target.closest('.card'), i = Number(card?.dataset.i);
-  if (!card || i === at || !down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 12 || Math.abs(deck.scrollLeft - down.left) > 4) return;
+  if (grid || !card || i === at || !down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 12 || Math.abs(deck.scrollLeft - down.left) > 4) return;
   broughtIn = performance.now(); show(i);
 });
 document.addEventListener('click', e => {
   const card = e.target.closest('.card');
-  if (card && (Number(card.dataset.i) !== at || performance.now() - broughtIn < 500)) { e.preventDefault(); return; }
+  if (card && !grid && (Number(card.dataset.i) !== at || performance.now() - broughtIn < 500)) { e.preventDefault(); return; }
   const a = e.target.closest('a[data-slug]'); if (!a) return;
   const pointer = e.detail > 0 && down;
   if (pointer && (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 12 || (card && Math.abs(deck.scrollLeft - down.left) > 4))) { e.preventDefault(); return; }
@@ -326,7 +338,7 @@ noZoom(); draw();
 window.smallPicture = () => new Promise(ok => { const f = picture?.file; if (!f) return ok(null); const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = () => ok(null); r.readAsDataURL(f); });
 window.smallState = () => ({
   lang: W.lang(), today, pick: pick.slug, three: set.map(game => game.slug), kinds: KINDS, signs: signs(set), at,
-  order: order.map(game => game.slug), tried: order.filter(tried).map(game => game.slug), sound: soundOn(),
+  v: V, order: order.map(game => game.slug), tried: order.filter(tried).map(game => game.slug), sound: soundOn(),
   intro: !$('intro').hidden, live: [...document.querySelectorAll('canvas.live.on')].map(c => c.dataset.live), result: !!$('result').firstElementChild, picture: !!picture?.file,
   run: $('run').textContent, links: [...document.querySelectorAll('a[data-slug]')].map(a => ({ slug: a.dataset.slug, where: a.dataset.where, href: a.getAttribute('href') })),
 });
