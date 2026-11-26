@@ -143,7 +143,7 @@ console.log('PASS: 1,600 seeded bot runs; independent behavioral examples; deter
 // The booth (2026-11-24): a ladder of sitters in booth.js. The classic claims above stay as they were; they are the
 // parity run for the unchanged four rounds. `--mutate-part` makes every grab move the head, whatever part it lands on.
 const booth = await import('./booth.js');
-const { createBooth, stepBooth, RUNGS, PARAMS, PART_PARAM, targetNow, portraitVisible, partAt, likeness, errorOf, tolOf, MEMORY_TIME, CUE_SPOT } = booth;
+const { createBooth, stepBooth, RUNGS, PARAMS, PART_PARAM, targetNow, portraitVisible, partAt, likeness, errorOf, tolOf, MEMORY_TIME, CUE_SPOT, swingSide } = booth;
 const mutatePart = process.argv.includes('--mutate-part');
 const bstart = opts => createBooth({ ...opts, ...(mutatePart ? { mutate: 'part' } : {}) });
 const PART_OF = { w: 'head', o: 'head', b: 'brow', m: 'mouth', l: 'eyes', n: 'nose', e: 'ears' };
@@ -215,6 +215,49 @@ const SIGN = { head: 1, brow: -1, mouth: -1, eyes: -1, nose: 1, ears: -1 };
     r1 = stepBooth(r1, input); r2 = stepBooth(r2, input);
   }
   assert.deepEqual(r1, r2, 'repeated booth runs are identical');
+  // Sneeze: holding a match until halfway through the hold jolts one part; the photo needs the face set again.
+  const at = id => RUNGS.findIndex(r => r.id === id);
+  let sn = createBooth({ seed: 5, from: at('sneeze') });
+  const goalNow = st => targetNow(st);
+  const setTo = (st, goalFace) => {
+    // Every part to the goal, one grab each (the bot's own directions).
+    for (const part of ['head', 'brow', 'mouth', 'eyes', 'nose', 'ears']) {
+      const f = st.faces[0];
+      let dx = 0, dy = 0;
+      if (part === 'head') { dx = goalFace.w - f.w; dy = goalFace.o - f.o; } else { const k = PART_PARAM[part]; dy = (goalFace[k] - f[k]) * SIGN[part]; }
+      st = stepBooth(st, { active: true, part, dx: 0, dy: 0 }); st = stepBooth(st, { active: true, part, dx, dy }); st = stepBooth(st, { active: false });
+    }
+    return st;
+  };
+  sn = setTo(sn, goalNow(sn));
+  for (let i = 0; i < 60 && !sn.sneezed; i++) sn = stepBooth(sn, {});
+  assert.equal(sn.sneezed, true, 'a held match makes the sitter sneeze');
+  assert.equal(sn.shots.length, 0, 'the sneeze comes before the photo');
+  assert.ok(errorOf(sn) > tolOf(sn), 'the jolt knocks the face out of a match');
+  for (let i = 0; i < 120; i++) sn = stepBooth(sn, {});
+  assert.equal(sn.shots.length, 0, 'a jolted face takes no photo');
+  sn = setTo(sn, goalNow(sn));
+  for (let i = 0; i < 60 && !sn.shots.length; i++) sn = stepBooth(sn, {});
+  assert.equal(sn.shots.filter(x => !x.missed).length, 1, 'set again, the photo comes, with no second sneeze');
+  // Swing: the mood changes every SWING_TIME; a face that matched the first mood stops matching when it swings.
+  let sw = createBooth({ seed: 5, from: at('swing') });
+  const t0s = sw.targets[0];
+  assert.ok(t0s.pAlt && t0s.nameAlt, 'a swinging sitter has two moods');
+  assert.deepEqual(targetNow(sw), t0s.p);
+  sw = { ...sw, age: booth.SWING_TIME + 0.01 };
+  assert.deepEqual(targetNow(sw), t0s.pAlt, 'after SWING_TIME the other mood shows');
+  sw = { ...sw, age: 2 * booth.SWING_TIME + 0.01 };
+  assert.deepEqual(targetNow(sw), t0s.p, 'and then the first again');
+  // Encore: endless, every part open; it ends once ENCORE_LIVES sitters have left, and only then.
+  let en = createBooth({ mode: 'encore', seed: 11 });
+  assert.deepEqual([...en.open].sort(), [...PARAMS].sort());
+  assert.ok(en.rungs.length >= 40);
+  let frames = 0;
+  while (en.phase !== 'done' && frames < 60 * 60) { en = stepBooth(en, {}); frames++; }
+  assert.equal(en.phase, 'done', 'an idle encore ends');
+  assert.equal(en.missed, booth.ENCORE_LIVES, 'after exactly ENCORE_LIVES sitters leave');
+  assert.equal(en.results.length, 1);
+  assert.deepEqual(createBooth({ mode: 'encore', seed: 11 }).targets, createBooth({ mode: 'encore', seed: 11 }).targets, 'an encore is repeatable by seed');
 }
 
 // Bots. Both know the target (an oracle, as in the classic bots), except as stated: the clumsy bot remembers a
@@ -250,8 +293,9 @@ function boothPolicy(seed, clumsy) {
   }
   return state => {
     const t = state.targets[Math.min(state.index, state.targets.length - 1)];
-    const k = `${state.ri}:${state.index}:${state.phase === 'play'}`;
-    if (k !== key) { key = k; plan = []; step = null; remembered = null; waited = 0; if (state.phase === 'play' && t.mod !== 'laugh') plan = planFor(state); laughT = 0; }
+    // A person sees a swing of mood or a sneeze's jolt at once (the page marks the jolted parts) and starts over.
+    const k = `${state.ri}:${state.index}:${state.phase === 'play'}:${t.mod === 'swing' ? swingSide(state) : ''}:${state.sneezed ? 1 : 0}`;
+    if (k !== key) { const jolt = state.sneezed && key && key.endsWith(':0') && k.startsWith(key.slice(0, -1)); key = k; plan = []; step = null; if (!jolt) remembered = null; waited = 0; if (state.phase === 'play' && t.mod !== 'laugh') plan = jolt ? planFor(state, Object.keys(t.kick)) : planFor(state); laughT = 0; }
     if (state.phase !== 'play') return { active: false };
     if (t.mod === 'laugh') { laughT += DT; const ph = laughT % 0.5; return { active: laughT > 0.4, part: 'head', dx: ph < 0.25 ? 1 : -1, dy: 0 }; }
     if (!step && plan.length) { step = { ...plan.shift(), t: 0, from: null }; }
@@ -338,4 +382,14 @@ for (let i = 0; i < 60; i++) {
   dailyPhotos += climb(i + 1, true, { mode: 'daily', day }).state.results[0].photos;
 }
 console.log({ dailyClumsyPhotoRate: +(100 * dailyPhotos / 300).toFixed(1) });
+// Encore: how far each bot gets before three sitters leave (it is endless; the careful bot only stops at the end of
+// the generated rungs). A clumsy bot should get a good way in, so the encore is a reason to come back, not a wall.
+const encore = [];
+for (let seed = 1; seed <= 60; seed++) {
+  const c = climb(seed, true, { mode: 'encore' });
+  encore.push({ photos: c.state.shots.filter(x => !x.missed).length, seconds: c.wall });
+}
+const encoreMedian = median(encore.map(e => e.photos));
+console.log({ encoreClumsyPhotosMedian: encoreMedian, encoreClumsySecondsMedian: +median(encore.map(e => e.seconds)).toFixed(1) });
+assert.ok(encoreMedian >= 8, 'the clumsy bot takes at least eight encore photos (median)');
 console.log(`PASS: booth, ${SEEDS * 2} seeded climbs of ${RUNGS.length} rungs; 120 dailies; part, mirror, gentle-fail and determinism examples.`);
