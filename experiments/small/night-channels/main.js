@@ -87,7 +87,9 @@ let level = saved.unlocked, day = null, state = create(level), screen = 'play';
 let pointer = null, previous = null, lastSound = -Infinity, line = null;
 let elapsed = 0, carry = 0, lastFrame = null, blooms = 0, clock = 0;
 let touched = false, connected = false, lastCutTick = 0, lastCutAt = -Infinity, hurry = false;
-let wet = new Set(), effects = [], shared = '', status = '';
+let wet = new Set(), effects = [], shared = '', status = '', wonAt = null;
+// A short buzz where the phone has one (Android); silent elsewhere.
+const buzz = pattern => { try { if (!reduced.matches) navigator.vibrate?.(pattern); } catch {} };
 const show = screens(['paused','selection'], name => {
   screen = name;
   const modal = name === 'paused' || name === 'selection';
@@ -102,7 +104,7 @@ const feel = {
   cut(i, y) {
     effects.push({ kind:'cut', i, at:clock });
     const now = performance.now();
-    if (now - lastSound > 65) { audio.noise(.065,.085,760 + y * 45); lastSound = now; }
+    if (now - lastSound > 65) { audio.noise(.065,.085,760 + y * 45); lastSound = now; buzz(6); }
     pulse('cuts');
   },
   refuse(i, why) {
@@ -110,11 +112,14 @@ const feel = {
     const now = performance.now();
     if (now - lastRefuse > 140) { audio.tone(why === 'spent' ? 196 : 130, .11, .05, 'triangle', -40); lastRefuse = now; }
     if (why === 'spent') pulse('cuts', 'shake');
+    if (now - lastRefuse < 1) buzz([12, 40, 12]);
   },
-  wet(i) { effects.push({ kind:'wet', i, at:clock }); audio.tone(988,.14,.03,'sine',180); },
-  bloom(i) { effects.push({ kind:'bloom', i, at:clock }); audio.tone(523,.5,.050,'sine'); audio.tone(784,.62,.034,'sine'); pulse('bloom'); },
+  wet(i) { effects.push({ kind:'wet', i, at:clock }); audio.tone(988,.14,.03,'sine',180); buzz(10); },
+  bloom(i) { effects.push({ kind:'bloom', i, at:clock }); audio.tone(523,.5,.050,'sine'); audio.tone(784,.62,.034,'sine'); pulse('bloom'); buzz([18, 50, 18]); },
   win() {
     effects.push({ kind:'win', i:state.source, at:clock });
+    wonAt = clock;
+    buzz([25, 60, 25, 60, 45]);
     [523, 659, 784, 1046].forEach((f, k) => setTimeout(() => audio.tone(f, .7, .04, 'sine'), 110 * k));
     pulse('result');
   },
@@ -147,7 +152,7 @@ function update() {
   get('sound').setAttribute('aria-pressed', String(saved.sound));
   get('next').hidden = !state.won;
   get('openList').hidden = state.won;
-  get('nextText').textContent = !day && level < GARDENS ? t('nextGarden') : t('gardens');
+  get('nextText').textContent = !day && level < GARDENS ? t('nextNamed', { name: t('t' + (level + 1)) }) : t('gardens');
   get('daily').hidden = Boolean(day);
   get('share').hidden = !(day && state.won);
   get('shareText').textContent = shared || t('share');
@@ -203,7 +208,7 @@ function start(n, date = null) {
   lift();
   level = n; day = date; state = create(n,date); touched = false; blooms = 0;
   elapsed = carry = 0; lastFrame = null; connected = false; lastCutTick = 0; lastCutAt = -Infinity; hurry = false;
-  wet = new Set(); effects = []; shared = '';
+  wet = new Set(); effects = []; shared = ''; wonAt = null;
   connected = state.beds.every(i => wetNetwork(state).has(i));
   show('play'); audio.release(); audio.unlock();
   if (!reduced.matches) { canvas.classList.remove('fresh'); void canvas.offsetWidth; canvas.classList.add('fresh'); }
@@ -408,7 +413,7 @@ const hintControl = hint(canvas, {
 });
 function paint() {
   render(canvas,terrain,state,{
-    time:elapsed, clock, effects, hurry,
+    time:elapsed, clock, effects, hurry, wonAt,
     hint:screen === 'play' && !day && level === 1 && pointer === null && state.remaining > 0 &&
       query.get('hint') !== '0' && !hintControl.shown,
     look, reduced:reduced.matches,
