@@ -96,3 +96,36 @@ test('a record the lab drops for a privacy signal is not queued but is shown', a
   assert.deepEqual(warnings(body), ['Lab not recording: privacy-signal']);
   assert.equal(localStorage.getItem('hf-lab-kit-queue'), null);
 });
+
+test('a privacy signal without the tick says so instead of recording nothing silently; the tick clears it', async () => {
+  const body = page();
+  navigator.globalPrivacyControl = true;
+  const { lab } = await import(`../experiments/kit/lab.js?${Math.random()}`);
+  const lab1 = await server(() => [200]);
+  const rec = lab('cinderhill-battle', { fetch: lab1.fetch });
+  rec.notice(document.createElement('div'));
+  const pause = document.createElement('div');
+  rec.toggle(pause);
+  rec.start({}); rec.end('quit', {});
+  await settle();
+  assert.equal(lab1.seen.length, 0, 'nothing sent without the tick');
+  assert.deepEqual(warnings(body), ['Lab not recording: privacy-signal (tick the switch to record)']);
+  const input = pause.children[0].children[0];
+  input.checked = true; input.listeners.change();
+  assert.deepEqual(warnings(body), []);
+  rec.start({}); rec.end('quit', {});
+  await settle(() => rec.sent === 2);
+  assert.equal(rec.sent, 2);
+  assert.equal(lab1.seen.length, 2, 'each record sent once');
+  assert.ok(lab1.seen.every(r => r.privacyOverride === true));
+});
+
+test('a record is queued before it is sent, so a page closed before the answer keeps it', async () => {
+  page();
+  const { lab } = await import(`../experiments/kit/lab.js?${Math.random()}`);
+  const rec = lab('lantern', { fetch: () => new Promise(() => {}) });
+  rec.notice(document.createElement('div'));
+  rec.start({}); rec.end('dawn', {});
+  await settle(() => JSON.parse(localStorage.getItem('hf-lab-kit-queue') ?? '[]').length === 2);
+  assert.equal(JSON.parse(localStorage.getItem('hf-lab-kit-queue')).length, 2);
+});

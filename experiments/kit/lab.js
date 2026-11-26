@@ -98,11 +98,13 @@ export function lab(game, options = {}) {
   };
   const enqueue = r => { if (JSON.stringify(r).length > QUEUE_BYTES / 4) return; const q = readQueue(); if (!q.some(x => x.r?.id === r.id)) q.push({ r, n: 0 }); writeQueue(q); };
   let draining = false;
+  const inFlight = new Set(); // ids this page is sending now; the queue holds them too, and drain leaves them alone
   async function drain() {
     if (draining || !on()) return; draining = true;
     try {
       for (const item of readQueue()) {
         if (!on()) break;
+        if (inFlight.has(item.r?.id)) continue;
         const answer = await post(item.r);
         const q = readQueue(), i = q.findIndex(x => x.r?.id === item.r.id);
         if (i < 0) continue;
@@ -112,13 +114,22 @@ export function lab(game, options = {}) {
       }
     } finally { draining = false; }
   }
+  const dequeue = id => { const q = readQueue(), i = q.findIndex(x => x.r?.id === id); if (i >= 0) { q.splice(i, 1); writeQueue(q); } };
+  // Queued before sending, so a page closed before the answer arrives (a snapshot sent on page hide) still has it.
   async function deliver(r) {
-    const answer = await post(r);
-    if (answer === 'ok') { clearWarn(); drain().catch(() => {}); return; }
-    if (answer === 'skip') return;
     if (on()) enqueue(r);
-    warn(answer);
+    inFlight.add(r.id);
+    let answer;
+    try { answer = await post(r); } finally { inFlight.delete(r.id); }
+    if (answer === 'ok' || answer === 'skip') dequeue(r.id);
+    if (answer === 'ok') { clearWarn(); drain().catch(() => {}); return; }
+    if (answer !== 'skip') warn(answer);
   }
+  // A browser privacy signal stops recording on this page until the player ticks its switch; say so rather than
+  // record nothing silently. Not shown when the player switched recording off.
+  const signalOnly = () => { try {
+    if (noticed && signal() && !override() && get('localStorage', OFF) !== '1' && get('localStorage', eventsOff) !== '1') warn('privacy-signal (tick the switch to record)');
+  } catch {} };
 
   // One small line at the bottom of the page while the lab is not storing this page's play.
   let line = null;
@@ -158,7 +169,7 @@ export function lab(game, options = {}) {
   self.notice = parent => { try {
     const p = document.createElement('p'); p.className = 'lab-notice'; Object.assign(p.style, { fontSize: '12px', lineHeight: '1.3', margin: '.5em 0 0', opacity: '.8', pointerEvents: 'auto' });
     const a = document.createElement('a'); a.href = PRIVACY; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = 'Privacy'; a.style.color = 'inherit';
-    a.textContent = say('privacy'); p.append(say('notice') + ' ', a); parent.append(p); noticed = p.isConnected; made.notices.push(p); watch(); drain().catch(() => {}); return p;
+    a.textContent = say('privacy'); p.append(say('notice') + ' ', a); parent.append(p); noticed = p.isConnected; made.notices.push(p); watch(); signalOnly(); drain().catch(() => {}); return p;
   } catch { return null; } };
   self.toggle = parent => { try {
     const label = document.createElement('label'), input = document.createElement('input');
@@ -168,7 +179,7 @@ export function lab(game, options = {}) {
     Object.assign(input.style, { width: '22px', height: '22px', margin: '0' });
     const sync = () => { input.checked = get('localStorage', OFF) !== '1' && get('localStorage', eventsOff) !== '1' && (!signal() || override()); };
     input.addEventListener('change', () => {
-      if (input.checked) { set('localStorage', OFF, null); set('localStorage', eventsOff, null); if (signal()) set('localStorage', overrideKey, '1'); }
+      if (input.checked) { set('localStorage', OFF, null); set('localStorage', eventsOff, null); if (signal()) set('localStorage', overrideKey, '1'); clearWarn(); drain().catch(() => {}); }
       else { set('localStorage', OFF, '1'); set('localStorage', PLAYER, null); set('localStorage', overrideKey, null); set('localStorage', QUEUE, null); clearWarn(); }
       sync();
     });
