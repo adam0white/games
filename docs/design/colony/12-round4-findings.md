@@ -57,6 +57,8 @@ The reviewers did not see file 11, so their notes that the owner decisions are m
 
 ## Taste calls for the owner
 
+**The owner answered on 2026-11-26** (in words, since the table's option letters differ from the order the calls were put): A, the bird's cost scales with exposed ants and drops loads. B, free ants gather food on their own "but with some fun and decisions left": built as free ants foraging only the nearest drawn trail at a low rate, so crews still decide where and how fast (02 section 6.2). C, an unlisted free hill beside chapter 1 at R1. D, chapter 1 keeps its scope. E, a failed night bill costs ants and the colony carries on smaller. F, both a chapter score with a best-run replay at release and a persistent free hill with a long-running rival next.
+
 These are new. Calls the owner already has open (session shape, looks, start size, tone, stakes, name) are in 11 and in todo `lab-5w7.32`; where this round added evidence to them it is noted at the end.
 
 | Call | Options | Recommended | Why |
