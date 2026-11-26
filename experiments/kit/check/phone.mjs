@@ -1437,7 +1437,7 @@ GAMES['small tried'] = async page => {
   await page.click('.tile[data-i="1"]'); await until(page, () => window.smallState().at === 1, 'a tile brings its card');
   await page.waitForTimeout(600);
   const slug = st.order[1];
-  await page.click(`.card.${slug} a.play`); await page.waitForURL(url => url.pathname === `/small/${slug}/`);
+  await page.click(`.card.${slug} a.play`); await page.waitForURL(url => url.pathname === `/small/${slug}/`); await page.waitForLoadState("networkidle"); // WebKit counts module requests cut off by an early goBack as failed requests
   await page.goBack(); await until(page, () => window.smallState, 'back on the home');
   await until(page, s => document.querySelector(`.tile[data-slug="${s}"]`)?.classList.contains('lit'), 'its tile lights', 4000, slug);
   assert.equal(await page.textContent('#toast'), 'New one tried · 4 of 12');
