@@ -231,6 +231,16 @@ const smallSeed = {
 const smallState = page => page.evaluate(() => window.smallState());
 async function smallGo(page, until, base, query = `?lang=en&day=${DAY}`) { await page.goto(`${base}/small/${query}`); await until(page, () => window.smallState, 'home script'); }
 export const pageRuns = {
+  // Cinderhill's determinism check: the browser runs a short fixed game and must reach the hash Node computes
+  // (experiments/cinderhill/quick.js). The long cross-engine runs are spike S2, outside CI.
+  async cinderhill(page, { base, until }) {
+    await page.goto(`${base}/cinderhill/`);
+    await page.click('#run');
+    await until(page, () => window.cinderhill?.state().result, 'the determinism check finishes', 60000);
+    const r = await page.evaluate(() => window.cinderhill.state().result);
+    assert.ok(r.same, `this browser's total hash ${r.total} at tick ${r.tick} is not Node's`);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no sideways scroll');
+  },
   async small(page, { base, until }) {
     const gameKeys = () => page.evaluate(() => Object.fromEntries(Object.keys(localStorage).filter(k => !/^(hub:|kit:|hf-lab-)/.test(k)).map(k => [k, localStorage.getItem(k)])));
     await page.goto(`${base}/notes/button.js`);

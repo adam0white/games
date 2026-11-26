@@ -50,6 +50,9 @@ jobs:
           node scripts/affected.mjs "$BASE"
       - name: Root tests
         run: npm test
+      # Cinderhill's sim (experiments/cinderhill/test): determinism, byte flips, lint, scent, flow, a bot run. About 15 s.
+      - name: Cinderhill sim
+        run: node --test experiments/cinderhill/test/
       - run: pnpm install --frozen-lockfile
       - name: Standalone Workers
         run: |
