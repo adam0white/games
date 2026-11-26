@@ -30,3 +30,25 @@ test('the quota opening misses the first birth; brood ten times slower misses th
   const back = play('median', 1, { minutes: 1 });
   assert.deepEqual(back, ok, 'the fixtures put the start values back');
 });
+
+test('a trail delivery on the tick an ant is born still counts as a trip', async () => {
+  const { Observer } = await import('../spikes/replay-lab.mjs');
+  const { G, SLOT } = await import('../sim/sim.js');
+  const N = 8, arr = T => new T(N);
+  const sim = {
+    n: 2, tick: 0, g: new Int32Array(64), pileCell: [], pileAmount: [], brood: { n: 0 }, cfg: { maxAnts: N },
+    carry: arr(Uint8Array), via: arr(Int8Array).fill(-1), mode: arr(Uint8Array), job: arr(Uint8Array), mem: arr(Int16Array), since: arr(Uint16Array), goal: arr(Int8Array), layer: arr(Uint8Array),
+    flow: { live: new Uint8Array(16), seq: new Uint32Array(16) }, crew: new Uint16Array(4), mat: new Uint8Array(1),
+  };
+  const o = new Observer({ sim, lastEvents: [] });
+  sim.flow.live[SLOT.TRAIL0] = 1; sim.flow.seq[SLOT.TRAIL0] = 1;
+  o.trails.push({ slot: SLOT.TRAIL0, seq: 1, step: 0, end: -1, trips: 0, first: -1 });
+  sim.carry[0] = 2; sim.via[0] = SLOT.TRAIL0;
+  o.before();
+  sim.carry[0] = 0; sim.n = 3; sim.g[G.BORN] = 1; sim.g[G.PROTEIN_LOADS] = 1; // home, and a birth the same tick
+  o.after();
+  assert.equal(o.trails[0].trips, 1, 'the delivery counts');
+  assert.equal(o.trails[0].first, 1);
+  assert.equal(o.firstTrailProtein, 1, 'a protein load by trail');
+  assert.deepEqual(o.births, [1]);
+});
