@@ -74,3 +74,16 @@ Seed 5 repeated exactly at both cast sizes for actions, verdicts, lines and food
 A separate 25-minute, 16-villager replay of seed 43 completed under the Node CPU profiler. HF step was on stack for 90.0% of samples and its advance functions for 68.3%. The largest self-time source files were memory validation and bookkeeping (20.1%), body span integration (11.4%) and canonical JSON work (10.8%). Garbage collection was 8.4%. Scope and timings come from the unprofiled runs above. [Step probes](https://github.com/adam0white/human-framework/blob/v4.17.0/packages/human/src/run-step.ts#L247-L293) · [Per-person physiology](https://github.com/adam0white/human-framework/blob/v4.17.0/packages/human/src/run-advance.ts#L310-L355)
 
 The benchmark, intentional determinism mutation and repository lane checks passed. A Node module smoke test loaded the actual bundle from the page script, verified the query gate, and observed bridge registration before the stubbed Unity start. The sandbox denied the phone test's localhost bind, so WebGL and the real browser integration remain unverified.
+
+## In the game (2026-11-26, exile-unity PR 8)
+
+- The host now runs in `hf/worker.mjs`, a module worker; the page exposes `window.exileHFAsync.send/poll` and the
+  Unity build (`Assets/Plugins/WebGL/hf.jslib`, `Assets/Scripts/Hf.cs`) sends a snapshot once a game second and
+  applies answers when they arrive. Nothing on the frame waits for HF.
+- `?hf=1`: HF's act drives every villager. `?hf=2` (hybrid): HF's `idle` hands the villager back to the scripted
+  camp routine. Play records carry version `0.6-hf` or `0.6-hf2`; each run sends `hf` events (step ms, lag,
+  verdicts, act counts) every 30 s and at the end.
+- Headless bot, Knight, speed 4, one run each (n=1, descriptive): scripted reached the Reign at game second 280;
+  hf=2 at 296; hf=1 had not by second 1170 (idle 2136 and rest 1384 of about 4700 samples at 823 steps; wood 173).
+  Step cost in the worker: mean 8 ms, max 36 ms; request to answer 85 to 124 ms. 0 errors. Rally verdicts: 6
+  assented, 0 refused in both runs.

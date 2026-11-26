@@ -358,7 +358,7 @@ function bridge(fn, requiresCamp = true) {
   };
 }
 
-window.exileHF = Object.freeze({
+globalThis.exileHF = Object.freeze({
   init: bridge((options) => {
     const started = performance.now();
     camp = new Camp(options);
