@@ -43,7 +43,7 @@ let roomNext = null, roomInviting = false, roomLag = false, roomLagTimer = 0;
 // Puzzle book: the puzzle in play (index), its misses this visit; effects: the goal burst, the go-again word, a missed tap.
 let puzzle = -1, misses = 0, burst = null, againPop = null, missRing = null, shakeUntil = 0;
 // chain: bounces in a row this turn (2026-11-26); each one rings a step higher and the word counts them.
-let chain = 0;
+let chain = 0, chainSheet = null, chainMover = -1;
 const buzz = ms => { try { navigator.vibrate?.(ms); } catch {} };
 let L = { cell: 40, ox: 0, oy: 0 }, W = innerWidth, H = innerHeight, dpr = 1, safe = { top: 0, bottom: 0 };
 // Play recording for the game lab. One run is a match against the bot, a two-player match, a friend's table match
@@ -249,6 +249,7 @@ function render() {
 // The goal the player to move attacks glows in their ink; on the very first match, chevrons and words point at it
 // until the first goal (2026-11-26: a cold player did not know which way to go).
 function drawAim() {
+  if (mode === 'table') return; // the friend table already marks each seat's own goal in its ink
   const p = s.turn, top = p === 0, gx = s.w / 2 - 1, pulse = 0.5 + 0.5 * Math.sin(clock / 300);
   ctx.save(); orient(ctx);
   const a = at(L, gx, top ? -1 : s.h), b = at(L, gx + 2, top ? 0 : s.h + 1);
@@ -330,6 +331,9 @@ function step() {
 function startSegment(d, dur) {
   if (anim) settle();
   const from = s.ball, player = s.turn, to = target(s, d), wasBounce = bounces(s, to);
+  // A chain belongs to one turn on one sheet: a new sheet (restart, next goal, puzzle) or a new mover starts it again.
+  if (s !== chainSheet || player !== chainMover) chain = 0;
+  chainSheet = s; chainMover = player;
   apply(s, d);
   anim = { from, to, player, start: clock, dur, bounce: wasBounce && s.winner < 0 };
   if (inked !== s.log.length - 1) redrawInk();

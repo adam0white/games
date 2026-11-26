@@ -150,9 +150,10 @@ The recording notice, its Privacy link, the switch and the "‹ Small games" lin
 
 Cold open to first move was already one tap (Play) and the first legal points pulse. What a cold player still lacked was direction and reward:
 
-- The goal the player to move attacks is tinted in their ink, pulsing softly, whenever it is their turn (every mode).
+- The goal the player to move attacks is tinted in their ink, pulsing softly, whenever it is their turn (not at a friend table, where each seat's own goal is already drawn in its ink; follow-up PR).
 - On the very first match only, three chevrons climb toward that goal and the goal says "score here" ("gol buraya"), until the first goal or the 12th segment.
 - Bounce chains: each bounce in a row this turn rings two semitones higher, and the word becomes "again ×2!", "again ×3!" ("yine ×2!"), a little larger each time. A human's bounce gives a short vibration (where `navigator.vibrate` exists: Android, not iOS); a goal against the bot gives a three-pulse buzz.
 - Save format, keys, recording and sim unchanged.
 
 Verified: phone.mjs `small/pitch` and its hint on both engines; `check.mjs chromium` all ok; a WebKit iPhone 13 screenshot of the first match shows the tinted goal, words and chevrons. Not verified: a chain of 2+ bounces was not seen on screen (the code path is shared with the single "again!"); vibration on a real Android phone; whether the chevrons read as "go this way" to a person.
+- Follow-up (same day): the bounce chain restarts on a new sheet or a new mover (before, a bounce, then Restart, made the next bounce read "again ×2!"); no goal tint at a friend table.
