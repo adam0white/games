@@ -248,27 +248,37 @@ The page shows each new thing: a toast and sound for a new pile, the first birth
 
 | Player | Pile distance (cells) | First load after the trail: median / worst | First birth, worst | Longest quiet stretch, worst | Ants at 5 min (median) | Larvae lost (median) |
 | --- | --- | --- | --- | --- | --- | --- |
-| near | 7 to 16 | 8 to 9.5 / 13.0 s | 30 s | 31.5 s | 21 to 22 | 42 to 43 |
-| owner | 7 to 19 | 8.2 to 10.8 / 14.7 s | 30 s | 31.5 s | 29 to 30 | 0 |
+| near | 7 to 16 | 8 to 9.5 / 13.0 s | 15 s | 52.6 s | 21 to 22 | 42 to 43 |
+| owner | 7 to 19 | 8.2 to 10.8 / 14.7 s | 15 s | 52.6 s | 31 to 32 | 0 |
 
-(Two shards of 12 seeds; the ranges are the two shards' medians.) All three hold on every seed. The near player fetches only sugar, so its larvae starve: that is the "larvae are hungry" toast doing its job, not a pace failure. The median first load is below 10 s; the brief's 10 to 15 s was read as "at most 15 s".
+(Two shards of 12 seeds; the ranges are the two shards' medians.) A quiet stretch ends only at something the page announces: a load home (the first), the first birth and every tenth (toasts), a new pile, a pile empty, the spider's warning, a dusk. Lost larvae have no toast and do not count. First load and first birth hold on every seed. The quiet stretch does not: on every seed the last one runs from the first dusk (210 s) to day 2's spider warning (262.5 s). Counting every birth (each has a sound) it was 31.5 s. The near player fetches only sugar, so its larvae starve; the page says "larvae are hungry". The median first load is below 10 s; the brief's 10 to 15 s was read as "at most 15 s".
 
-**Bots** (`bots.mjs`, seeds 3, 8, 5, 11, 2026, three days of 4,200 ticks). Acceptance, kept from sim 6: careful wins every day on every seed, idle loses every day on every seed.
+**Superseded.** The round-3 spec (`docs/design/colony/02-spec.md` section 3, merged after this pass) sets different numbers: 300 ants at the start, walk 3.5 cells a second on a trail, egg to adult in 60 s, no days, and decision events at most 30 s apart. This pass is the interim build the owner can play now; R1 replaces its starting values, and the R0 pace gate measures both against the spec.
 
-| Bot | Day 1 (60 loads) | Day 2 (40 dug) | Day 3 (110 of each, 83 eased) |
+**Bots** (`bots.mjs`, seeds 1 to 12, three days of 4,200 ticks, with day 3 at 110). Acceptance, kept from sim 6: careful wins every day on every seed, idle loses every day on every seed.
+
+| Bot | Day 1 (60 loads) | Day 2 (40 dug) | Day 3 (110 of each; 83 eased) |
 | --- | --- | --- | --- |
-| careful | won 157 to 193 | won 48 | won; narrowest 125 protein (seed 3), 177 sugar (seed 5) |
-| careless (no Recall) | won 171 to 231 | won 48 | won; narrowest 118 protein (seed 3), 120 sugar (2026); spider ate 29 to 30 |
-| greedy (sugar only) | won 149 to 175 | lost 0 | lost |
-| idle | lost 0 | lost 0 | lost; best 77 sugar (seed 3) against 83 eased |
+| careful | won 12 of 12 (160 to 206) | won 12 of 12 (48) | won 11 of 12; seed 1 lost with 93 protein |
+| careless (no Recall) | won 12 of 12 | won 12 of 12 | won 11 of 12; seed 3 lost with 96 protein; the spider ate 28 to 30 a game |
+| greedy (sugar only) | won 12 of 12 | lost 12 of 12 | lost 11 of 12; seed 12 won |
+| idle | lost 12 of 12 | lost 12 of 12 | lost 11 of 12; seed 9 won with 103 sugar and 215 protein, by scent |
 
-Day 3 was 60 at first: idle won it on seed 3 (77 sugar, 166 protein by scent with 100 ants), so it is 110 now. The bots ran with day 3 at 60 and were judged against 110; careful and careless clear 110 on every seed. On a both-foods day the careful bots now take the food with fewer loads since dawn and redraw every 600 ticks (1,500 before).
+Both acceptance lines miss on one seed of twelve, on day 3. Day 3 was 60 at first; idle won it on seed 3 of a five-seed run, so it went to 110, and now careful loses one seed and idle still wins one. The next fix would be to count only loads brought along a trail on day 3, as day 1 does. It is not made: the round-3 spec drops days (above), so tuning them further is spent on code that R1 replaces. On a both-foods day the careful bots now take the food with fewer loads since dawn and redraw every 600 ticks (1,500 before).
 
 `test/pace.test.mjs`: three births within 60 s; new piles at the windfall times, protein first, each with food. Mutations shown to fail: no windfalls; no pupae at the start.
 
 ## Speed (2026-11-26, page only)
 
 A button beside Hold cycles 1x, 2x, 4x. It is a view speed: the host runs 2 or 4 times as many ticks per frame (at most 4, 8 or 16 a frame), so the sim, its hashes and the command log are the same as at 1x. A new game starts at 1x. The lab record gets a `speed` event with the tick and the speed. The `cinderhill speed` phone line checks that 4x runs at least 2.5 times the ticks of 1x and that the log replays in Node to the page's hash. In a shared room a speed would be a room rule, like the hold; it is solo only.
+
+## Combat at a choke: first probe (2026-11-26, not built)
+
+Before the round-3 spec placed the rival colony at R2b, a throwaway copy of the sim tried today's `fight()` on a 64 by 40 arena: 20 majors (team 0) against 60 workers (team 1), in the open and at a 2-cell gap in a stone wall, 3 seeds each, 3,000 ticks. The battle toy's arithmetic (`experiments/lab/cinderhill-battle/NOTES.md`) says the workers should win in the open (square law: 3 squared beats the majors' 6-fold bite times hit points) and the majors at the gap (contact-limited).
+- Today's rules alone: almost no fighting. Ants pass through one another and only bite what they touch on the way.
+- With ants steering at the nearest enemy within 2 cells and standing still while in contact: the majors lost at the gap in about 160 ticks (everyone crowded into the gap), and the open fights did not finish in 3,000 ticks (the armies stood at their goals).
+- Adding a cap of 1 or 2 biters per cell per team (an ant may bite only when fewer of her team in her cell bit within the last 10 ticks) turned the gap around: the majors won all 6 gap runs with 8 to 18 left. The open runs still did not finish, so the square-law half is not shown.
+So geometry alone does not give a frontage cap here; a per-cell contact limit does, which matches the spec's "combat by bounded contact slots" (05-tech, Rebuild plan). The open-field half needs both armies to seek each other out, which is rival behaviour, not a fight rule.
 
 ## The tactical hold (2026-11-26)
 
