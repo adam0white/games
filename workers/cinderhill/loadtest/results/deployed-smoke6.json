@@ -1,0 +1,174 @@
+{
+ "name": "deployed-smoke6",
+ "role": "authority",
+ "ants": 5000,
+ "clients": 4,
+ "seconds": 45,
+ "startedAt": "2026-11-26T01:48:37.133Z",
+ "endedAt": "2026-11-26T01:49:22.742Z",
+ "object": "2e8b98382353f57d2b30476cd9a6997d8d2465ba41dce4f2d289db1a3d41ca16",
+ "version": "e2784777-afad-4b71-9600-b95bc4688384",
+ "ticksPerSecond": [
+  20.104,
+  20.102,
+  20.117,
+  20.136
+ ],
+ "gapSdMs": [
+  16.68,
+  17.05,
+  16.49,
+  17.2
+ ],
+ "gapP99Ms": [
+  82.1,
+  81.2,
+  80.9,
+  81.2
+ ],
+ "gapMaxMs": [
+  232.6,
+  230.1,
+  231.2,
+  230.1
+ ],
+ "gapsOver100": [
+  2,
+  1,
+  1,
+  1
+ ],
+ "bytesInPerSec": [
+  271.3,
+  274.9,
+  273.6,
+  275.2
+ ],
+ "bytesOutPerSec": [
+  95.9,
+  90.2,
+  92,
+  90.2
+ ],
+ "clientLoopDelayP99Ms": [
+  6.9,
+  6.6,
+  6.8,
+  6.6
+ ],
+ "orders": [
+  24,
+  24,
+  24,
+  23
+ ],
+ "dupsSent": [
+  2,
+  2,
+  2,
+  2
+ ],
+ "acks": [
+  24,
+  24,
+  23,
+  22
+ ],
+ "unacked": [
+  0,
+  0,
+  1,
+  1
+ ],
+ "desyncNotices": [
+  0,
+  0,
+  0,
+  0
+ ],
+ "reconnects": [
+  [
+   {
+    "at": 23718.846792,
+    "code": 1006,
+    "reason": "",
+    "tick": 464,
+    "welcomeAfter": 2877.7502920000006,
+    "firstFrameAfter": 2878.047208
+   }
+  ],
+  [
+   {
+    "at": 23561.377459,
+    "code": 1006,
+    "reason": "",
+    "tick": 464,
+    "welcomeAfter": 2876.209833000001,
+    "firstFrameAfter": 2877.928333
+   }
+  ],
+  [
+   {
+    "at": 23416.040333,
+    "code": 1006,
+    "reason": "",
+    "tick": 464,
+    "welcomeAfter": 2876.8041669999984,
+    "firstFrameAfter": 2877.283625
+   }
+  ],
+  [
+   {
+    "at": 23263.296875,
+    "code": 1006,
+    "reason": "",
+    "tick": 464,
+    "welcomeAfter": 2875.7097079999985,
+    "firstFrameAfter": 2877.586207999997
+   }
+  ]
+ ],
+ "versions": [
+  "e2784777-afad-4b71-9600-b95bc4688384"
+ ],
+ "room": {
+  "joins": 4,
+  "refused": 0,
+  "cmds": 45,
+  "dups": 5,
+  "late": 5,
+  "bad": 0,
+  "hashes": 87,
+  "compared": 87,
+  "mismatches": 0,
+  "firstMismatch": null,
+  "slips": 0,
+  "catchUpTicks": 104,
+  "checkpoints": 1,
+  "checkpointBytes": 47599,
+  "restoredFrom": null,
+  "replayed": 485,
+  "markWrites": 44,
+  "cfg": {
+   "seed": 2026,
+   "ants": 5000,
+   "role": "authority"
+  },
+  "sealed": 909,
+  "mark": 924,
+  "boots": 1,
+  "ticking": true,
+  "sockets": 0,
+  "version": "e2784777-afad-4b71-9600-b95bc4688384",
+  "object": "2e8b98382353f57d2b30476cd9a6997d8d2465ba41dce4f2d289db1a3d41ca16"
+ },
+ "offline": {
+  "commands": 94,
+  "uniqueSeatIds": 94,
+  "sealed": 909,
+  "replayedTo": 900,
+  "compared": 179,
+  "differ": 0,
+  "firstDiffer": null
+ }
+}

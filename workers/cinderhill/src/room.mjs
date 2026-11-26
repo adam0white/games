@@ -15,4 +15,5 @@ export class HillRoom extends DurableObject {
   async webSocketError() { this.hill.close(); }
   async stats() { return this.hill.stats(); }
   async log() { return this.hill.log(); }
+  async bench(ants, ticks) { return this.hill.bench(ants, ticks); }
 }

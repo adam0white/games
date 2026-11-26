@@ -245,6 +245,14 @@ export class Hill {
     return { ...this.stat, cfg: this.cfg, sealed: this.sealed, mark: this.mark, boots: this.boots, ticking: !!this.timer, sockets: this.ctx.getWebSockets().length, version: this.env.VERSION?.id ?? 'local', object: this.ctx.id?.toString?.() ?? '' };
   }
 
+  /** Debug only: run a fresh sim for `ticks` ticks inside one call, so the call's CPU time (wrangler tail,
+   *  `cpuTime`) is the deployed cost of that many ticks. The clock does not advance during computation. */
+  bench(ants, ticks) {
+    const sim = new Sim({ seed: 2026, ants: Math.max(0, Math.min(5000, ants | 0)) });
+    for (let k = 0; k < Math.min(2000, ticks | 0); k++) { sim.step(); if (sim.tick % HASH_EVERY === 0) sim.hashes(); sim.drainEvents(); }
+    return { ants: sim.n, ticks: sim.tick };
+  }
+
   /** The whole command log (debug only): for checking a run offline. */
   log() {
     const commands = this.sql.exec(`SELECT body FROM cmds ORDER BY tick, seat, id`).toArray().map(r => Array.from(new Int32Array(new Uint8Array(r.body).slice().buffer)));

@@ -26,6 +26,9 @@ r.cloudflare = {
   outboundPerHour: mins ? tot('outboundWebsocketMsgCount') / mins * 60 : null,
   exceededCpuErrors: all('exceededCpuErrors'), exceededMemoryErrors: all('exceededMemoryErrors'),
 };
+// Hibernatable WebSocket messages read 0 in inboundWebsocketMsgCount (seen 2026-11-25); count them from the room instead.
+const roomIn = (r.room.hashes + r.room.cmds + r.room.dups + r.room.bad) / r.seconds * 3600;
+if (!r.cloudflare.inboundPerHour) r.cloudflare.inboundPerHour = roomIn, r.cloudflare.inboundFrom = 'room counters';
 // Prices: developers.cloudflare.com/durable-objects/platform/pricing/ (read 2026-11-25): duration $12.50 per million GB-s,
 // requests $0.15 per million (incoming WebSocket messages 20:1), rows written $1.00 per million. Beyond the included amounts.
 const c = r.cloudflare;

@@ -58,6 +58,8 @@ jobs:
         run: |
           pnpm --filter games-wai-daily run check
           node --test workers/crumbwar/test/
+          # Cinderhill hill room: protocol tests in Node, then a restart test in workerd (wrangler dev). About 30 s.
+          node --test workers/cinderhill/test/
       - run: node scripts/build.mjs
       - name: Bundle the Worker and validate the exact upload without credentials
         env:
