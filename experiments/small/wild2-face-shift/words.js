@@ -3,7 +3,7 @@ import { words } from '../../kit/i18n.js';
 
 export const { t, lang, setLang, apply, langs } = words({
   en: {
-    tagline: 'Make that face.', play: 'Play', daily: 'Daily face', classic: 'Classic', otherLang: 'Türkçe',
+    tagline: 'Make that face.', coldHow: 'Grab the face and drag to copy the portrait.', play: 'Play', daily: 'Daily face', classic: 'Classic', otherLang: 'Türkçe',
     dailyNone: 'Five sitters, the same for everyone today', dailyBest: 'Today: best {n}',
     paused: 'Hold that face.', resume: 'Resume', restart: 'Restart', soundOn: 'Sound: on', soundOff: 'Sound: off', menu: 'Menu',
     strip: 'Your photo strip', contact: 'Your contact sheet', won: 'Picture perfect.', lost: 'One more take?',
@@ -24,7 +24,7 @@ export const { t, lang, setLang, apply, langs } = words({
     'face.mouse': 'Mouse', 'face.laugh': 'Make me laugh',
   },
   tr: {
-    tagline: 'O yüzü yap.', play: 'Oyna', daily: 'Günün yüzü', classic: 'Klasik', otherLang: 'English',
+    tagline: 'O yüzü yap.', coldHow: 'Yüzü tut ve portreye benzetmek için sürükle.', play: 'Oyna', daily: 'Günün yüzü', classic: 'Klasik', otherLang: 'English',
     dailyNone: 'Beş model, bugün herkes için aynı', dailyBest: 'Bugün: en iyi {n}',
     paused: 'O yüzü tut.', resume: 'Devam', restart: 'Baştan', soundOn: 'Ses: açık', soundOff: 'Ses: kapalı', menu: 'Menü',
     strip: 'Fotoğraf şeridin', contact: 'Fotoğrafların', won: 'Tam kare.', lost: 'Bir çekim daha?',

@@ -87,7 +87,7 @@ async function run(kind,device){
     const context=await browser.newContext({...device}), p=await context.newPage(), errors=[];
     p.on('pageerror',e=>errors.push(String(e)));
     p.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
-    await p.goto(base+'?seed=0');await p.waitForFunction(()=>window.faceShiftState);
+    await p.goto(base+'?seed=0&v=b');await p.waitForFunction(()=>window.faceShiftState);
     await shot(p,kind.name()+'-menu');
     assert.equal(await p.evaluate(()=>document.querySelector('#hero').getContext('2d').getImageData(300,150,1,1).data[3]),255,'Menu portrait canvas must be painted');
     await p.locator('#classic').tap();
