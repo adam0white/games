@@ -20,6 +20,8 @@ export const WORDS = {
     'hook:wild2-face-shift': 'Stretch the face to match.', 'hook:night-channels': 'Dig a path for the water.', 'hook:night-sand': 'Scoop the dune. Find the lamp.',
     'hook:night-splitlight': 'Turn the prism. Light every target.', 'hook:ring': 'Loop the fireflies.', 'hook:pitch': 'Pencil the ball into the goal.',
     'hook:night-saltplate': 'Tune the plate. Watch the salt dance.', 'hook:night-rubbing': 'Rub, and a fossil appears.', 'hook:thankful': 'Say thanks. Grow a flower.',
+    tried: 'You have tried {n} of {of}', triedNone: '{of} games, none tried yet', triedAll: 'You have tried all {of}', triedOne: 'New one tried · {n} of {of}',
+    soundOn: 'Sound on', soundOff: 'Sound off',
     record: 'About recording',
   },
   tr: {
@@ -41,6 +43,8 @@ export const WORDS = {
     'hook:wild2-face-shift': 'Yüzü esnet, modele benzet.', 'hook:night-channels': 'Suya yol kaz.', 'hook:night-sand': 'Kumu kaz, feneri bul.',
     'hook:night-splitlight': 'Prizmayı çevir, her hedefi yak.', 'hook:ring': 'Ateş böceklerini halkaya al.', 'hook:pitch': 'Topu kalemle kaleye çiz.',
     'hook:night-saltplate': 'Levhayı akort et, tuz dans etsin.', 'hook:night-rubbing': 'Ov, fosil ortaya çıksın.', 'hook:thankful': 'Teşekkür et, çiçek büyüt.',
+    tried: '{of} oyunun {n} tanesini denedin', triedNone: '{of} oyun var, henüz hiçbirini denemedin', triedAll: '{of} oyunun hepsini denedin', triedOne: 'Yeni bir oyun denedin · {n} / {of}',
+    soundOn: 'Ses açık', soundOff: 'Ses kapalı',
     record: 'Kayıt hakkında',
   },
 };

@@ -43,9 +43,18 @@ Evidence: on 2026-11-26 the owner's phone opened the home once and then went str
 - The first-visit card's three lines light up in 0.75 s instead of 2.1 s.
 - Check: `small live` in `kit/check/phone.mjs` (runs with `small`). It checks that the preview paints and changes between frames, that the stop shows its hook, that the deck's middle card moves, and that nothing moves under reduced motion. When the loop is switched off, the check fails (tried).
 
+## 2026-11-26: the collection, untried games first, sound
+
+- **The collection** (under "All the small games"): every game as a small tile, grey until tried, in colour with a tick after. "You have tried 3 of 12". A tile brings its card to the middle of the deck. "Tried" means the card's mark is not New (`mark()`), so old saves and opens from the drafts count with no new save format.
+- **Deck order**: today's pick, then the games this player has not tried, then the rest, each in catalogue order from the pick. The order is kept for the session in `hub:small:order` (`{ day, slugs }`), so the deck does not reshuffle when a game is tried during a visit. `pickFor`/`threeFor` are unchanged: tonight's three stay the same for everyone.
+- **A first try is marked**: a game opened from the home while still New is recorded with `fresh: true` in `hub:small:open` (and in the `open` lab event). On the way back its tile pops, a note plays and a toast says "New one tried · 4 of 12".
+- **Sound and buzz**: short notes from `kit/audio.js` when a card comes to the middle (one note of a pentatonic scale per position), when a game opens, on Surprise me and on a first try. A short `navigator.vibrate` goes with them where the browser has it, only after the player has touched the page. One switch (♪ in the header, `hub:small:sound`, '0' is off) covers both. Default on.
+- Check: `small tried` in `kit/check/phone.mjs` (runs with `small`). It covers the order, the count, a tile tap, the first-try note after back, the order kept through the visit, the remembered switch and the Turkish count. With the first-try code switched off, the check fails (tried).
+
 ## Not verified
 
 - How the previews read to a person, and their cost on a slow Android phone (Firefox): only headless Chromium and WebKit ran them.
+- Sound on a real phone. `kit/audio.js` asks iOS for the 'playback' audio session, which plays through the silent switch and pauses other apps' music once the home makes its first note. That is the kit's rule for games; a home page might want the default session (kit change proposed, not made). `navigator.vibrate`: Android Chrome has it; whether Android Firefox buzzes was not checked.
 - A real phone: the checks run headless WebKit (iPhone 13) and Chromium (Pixel 7). The thumb feel (snap, momentum, the edge tap) is checked only as far as a headless tap goes.
 - The share sheet with a picture: `navigator.share` with files was not opened in a check; the PNG itself was made and looked at in both browsers.
 - Back-forward cache: headless back reloads the page, so the check fires `pageshow` with `persisted` itself.

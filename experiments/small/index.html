@@ -11,7 +11,7 @@
 <body>
 <header class="top">
   <span class="brand" data-i18n="title"></span>
-  <button class="lang" id="lang" type="button"></button>
+  <span class="tools"><button class="lang snd" id="sound" type="button" aria-pressed="true">♪</button><button class="lang" id="lang" type="button"></button></span>
 </header>
 <main>
   <section id="tonight" class="wrap" aria-labelledby="tonightTitle">
@@ -27,7 +27,8 @@
     <div id="result"></div>
   </section>
   <section id="all" aria-labelledby="allTitle">
-    <div class="wrap"><h2 id="allTitle" data-i18n="allGames"></h2><p class="lead" data-i18n="allLead"></p></div>
+    <div class="wrap"><h2 id="allTitle" data-i18n="allGames"></h2><p class="lead" data-i18n="allLead"></p>
+      <div class="tried"><p id="triedText"></p><div class="tiles" id="tiles"></div></div></div>
     <div class="deck" id="deck" aria-roledescription="carousel"></div>
     <div class="bar">
       <button class="arrow" id="prev" type="button" data-i18n-aria="prev">‹</button>
