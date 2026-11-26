@@ -435,6 +435,34 @@ export const pageRuns = {
     await page.click('#resume');
     await until(page, () => window.painter.state().drawn > window.__drawn0 + 5, 'frames drawn in the new look');
   },
+  // Crews (CMD.CREW): with a trail drawn, the crew panel shows; a press on + asks one more ant, a hold asks eight,
+  // and the sim takes the size (the trail's number reads on/wanted). A tap on another trail's number picks it.
+  async 'cinderhill crews'(page, { base, until }) {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`${base}/notes/button.js`);
+    await page.evaluate(() => { localStorage.clear(); localStorage.setItem('cinderhill:hint', '1'); });
+    await page.goto(`${base}/cinderhill/?ants=500&lang=en&labRunSource=agent`);
+    await until(page, () => window.painter, 'painter script');
+    await page.click('#play');
+    await until(page, () => window.painter.state().screen === 'play', 'play');
+    assert.equal(await page.isVisible('#crewCtl'), false, 'no panel before a trail');
+    await page.evaluate(() => {
+      const el = document.querySelector('#c'), x = innerWidth / 2, y = innerHeight / 2;
+      for (const [type, dx, dy] of [['pointerdown', 0, 0], ['pointermove', 30, -30], ['pointermove', 60, -60], ['pointermove', 90, -90], ['pointerup', 90, -90]]) el.dispatchEvent(new PointerEvent(type, { pointerId: 1, pointerType: 'touch', isPrimary: true, clientX: x + dx, clientY: y + dy, pressure: type === 'pointerup' ? 0 : 0.5, bubbles: true, cancelable: true }));
+    });
+    await until(page, () => window.painter.stats().trails.length === 1 && window.painter.stats().trails[0].on > 0, 'ants on the trail', 20000);
+    await until(page, () => getComputedStyle(document.querySelector('#crewCtl')).display !== 'none', 'the crew panel');
+    const on = await page.evaluate(() => window.painter.stats().trails[0].on);
+    await page.click('#crewPlus');
+    await until(page, () => window.painter.log().some(o => o.type === 'crew' && o.delta === 1), 'a plus order');
+    await until(page, () => window.painter.stats().trails[0].want !== null, 'the sim takes the crew size');
+    const want1 = await page.evaluate(() => window.painter.stats().trails[0].want);
+    assert.ok(want1 >= on + 1 - 2 && want1 <= on + 1 + 2, `wanted ${want1} from ${on} on it`);
+    const box = await page.locator('#crewMinus').boundingBox();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page.mouse.down(); await page.waitForTimeout(600); await page.mouse.up();
+    await until(page, () => window.painter.log().some(o => o.type === 'crew' && o.delta === -8), 'a held minus asks eight fewer');
+    await until(page, () => /of/.test(document.querySelector('#crewWho').textContent), 'the panel shows on and wanted');
+  },
   async 'cinderhill hud'(page, { base, until }) {
     await page.setViewportSize({ width: 360, height: 640 });
     await page.goto(`${base}/notes/button.js`);

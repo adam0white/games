@@ -9,7 +9,7 @@ export const TICK_MS = 50;
 export const COUNTS = [500, 2000, 5000];
 export const SEED = 2026;
 export { JOB, MODE, CMD, SLOT, SURFACE, NEST, MAT, FIELD, G, MAX_PILES };
-const NAMES = { [CMD.TRAIL]: 'trail', [CMD.DIG]: 'dig', [CMD.ALARM]: 'alarm', [CMD.RECALL]: 'recall' };
+const NAMES = { [CMD.TRAIL]: 'trail', [CMD.DIG]: 'dig', [CMD.ALARM]: 'alarm', [CMD.RECALL]: 'recall', [CMD.CREW]: 'crew' };
 
 export class Host {
   constructor(ants = 2000, seed = SEED, { colony = false, dayTicks } = {}) { this.log = []; this.colony = colony; this.dayTicks = dayTicks; this.reset(ants, seed); }
@@ -147,8 +147,10 @@ export class Host {
     const s = this.sim, n = s.n, slots = new Int32Array(16);
     let surface = 0, carrying = 0, foragers = 0, seeking = 0, late = 0, guards = 0, guardsAt = 0, diggers = 0;
     const newest = s.newestTrail();
+    const onIt = new Int32Array(SLOT.TRAILS);
     for (let i = 0; i < n; i++) {
       if (s.goal[i] >= 0) slots[s.goal[i]]++;
+      if (s.hp[i] > 0 && s.job[i] === JOB.FORAGE && s.via[i] >= SLOT.TRAIL0 && s.via[i] < SLOT.TRAIL0 + SLOT.TRAILS) onIt[s.via[i] - SLOT.TRAIL0]++;
       const out = s.layer[i] === SURFACE;
       if (out) surface++;
       if (s.carry[i]) carrying++;
@@ -164,7 +166,8 @@ export class Host {
       let why = '';
       if (slot !== newest) why = 'older';
       else if (crew === 0) why = seeking === 0 ? 'noSeekers' : late >= seeking ? 'outTooLong' : 'none';
-      trails.push({ slot, x: c % s.L.sw, y: Math.floor(c / s.L.sw), crew, newest: slot === newest, why, seq: F.seq[slot] });
+      const w = s.g[G.WANT0 + k]; // crew size plus one; 0: none
+      trails.push({ slot, x: c % s.L.sw, y: Math.floor(c / s.L.sw), crew, on: onIt[k], want: w ? w - 1 : null, newest: slot === newest, why, seq: F.seq[slot] });
     }
     const alarm = F.live[SLOT.ALARM] ? { cell: F.cell[SLOT.ALARM], coming: slots[SLOT.ALARM], guards, held: s.g[G.ALARM_HOLD] } : null;
     const dig = { marked: s.g[G.DIG_COUNT], crew: s.g[G.DIG_CREW], cap: Math.min(24, 4 * s.g[G.DIG_COUNT]), diggers, dug: s.g[G.DUG] };

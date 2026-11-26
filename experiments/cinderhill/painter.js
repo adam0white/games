@@ -275,6 +275,34 @@ function order(o) {
   labrec.order(o, e);
   return e;
 }
+
+// ---- crews: plus and minus on one trail (CMD.CREW). A tap on a trail's number picks it; the newest is the default.
+// A press moves one ant; holding 400 ms moves eight, and eight more each 400 ms after that. ----
+let crewSeq = -1;
+const crewTrail = () => stats.trails.find(tr => tr.seq === crewSeq) ?? stats.trails.find(tr => tr.newest) ?? null;
+function crewStep(delta) {
+  const tr = crewTrail(); if (!tr || screen !== 'play') return;
+  order({ type: CMD.CREW, seq: tr.seq, delta });
+  snd.tone(delta > 0 ? 700 : 500, 0.08, 0.04, 'triangle', delta > 0 ? 120 : -120);
+  setTimeout(hud, 80);
+}
+for (const [id, sign] of [['crewPlus', 1], ['crewMinus', -1]]) {
+  const b = $(id); let timer = 0, held = false;
+  const stop = () => { clearInterval(timer); clearTimeout(timer); timer = 0; };
+  b.addEventListener('pointerdown', e => {
+    e.preventDefault(); held = false; stop();
+    timer = setTimeout(() => { held = true; crewStep(8 * sign); timer = setInterval(() => crewStep(8 * sign), 400); }, 400);
+  });
+  b.addEventListener('pointerup', () => { if (timer && !held) crewStep(sign); stop(); });
+  for (const ev of ['pointercancel', 'pointerleave']) b.addEventListener(ev, stop);
+  b.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); crewStep(sign); } });
+}
+/** A tap near a trail's number picks that trail for plus and minus. */
+function pickTrailAt(sx, sy) {
+  if (layer !== SURFACE) return false;
+  for (const tr of stats.trails) { const p = toScreen(tr.x + 0.5, tr.y + 0.5); if ((p.x - sx) ** 2 + (p.y - sy) ** 2 < 22 * 22) { crewSeq = tr.seq; hud(); return true; } }
+  return false;
+}
 const cellOf = (sx, sy) => { const w = toWorld(sx, sy); return [Math.floor(w.x), Math.floor(w.y)]; };
 function trailPoints(screenPts) {
   const pts = [];
@@ -329,6 +357,7 @@ function act(a) {
         if (points) { order({ type: CMD.TRAIL, layer: SURFACE, points }); pulses.push({ pts: points, at: performance.now() }); snd.tone(620, 0.14, 0.06, 'triangle', -180); }
         break;
       }
+      if (pickTrailAt(a.x, a.y)) break;
       inspectAt(a.x, a.y);
       break;
     }
@@ -376,10 +405,12 @@ function drawOverlay(now) {
     for (const tr of stats.trails) {
       const p = toScreen(tr.x + 0.5, tr.y + 0.5);
       if (p.x < -40 || p.y < -40 || p.x > W + 40 || p.y > H + 40) continue;
+      const label = tr.want === null ? String(tr.on) : `${tr.on}/${tr.want}`, r = label.length > 3 ? 18 : 13;
       ctx.fillStyle = tr.newest ? LOOK.bubble : LOOK.bubbleOld; ctx.strokeStyle = LOOK.bubbleRim; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(p.x, p.y, 13, 0, 7); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, 7); ctx.fill(); ctx.stroke();
+      if (tr === crewTrail()) { ctx.strokeStyle = LOOK.select; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(p.x, p.y, r + 4, 0, 7); ctx.stroke(); }
       ctx.fillStyle = LOOK.bubbleText; ctx.font = '600 11px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(String(tr.crew), p.x, p.y + 0.5);
+      ctx.fillText(label, p.x, p.y + 0.5);
     }
     for (const pu of pulses) {
       const k = (now - pu.at) / 900; if (k > 1) continue;
@@ -462,7 +493,7 @@ function hud() {
   stats.trails.slice().sort((a, b) => b.seq - a.seq).forEach((tr, k) => {
     if (k > 1) return;
     const why = tr.why ? t('why_' + tr.why) : '';
-    lines.push(`${t('trailCrew', { n: stats.trails.length - k, crew: tr.crew })}${why ? ` <small>· ${why}</small>` : ''}`);
+    lines.push(`${t('trailCrew', { n: stats.trails.length - k, crew: tr.on })}${why ? ` <small>· ${why}</small>` : ''}`);
   });
   const food = stats.piles.reduce((a, p) => a + p.crew, 0);
   if (food) lines.push(t('foodCrew', { crew: food }));
@@ -472,6 +503,9 @@ function hud() {
   if (sp === SPIDER.WARN || sp === SPIDER.HUNT) lines.unshift(`<b class="spider">${t('spiderHud', { what: t(sp === SPIDER.WARN ? 'spiderComing' : 'spiderHunting'), kills: host.sim.g[GI.SP_KILLS] })}</b>`);
   if (lines.length && newest) lines.push(`<small>${t('noWanted')}</small>`);
   $('crew').innerHTML = lines.join('<br>');
+  const ct = layer === SURFACE ? crewTrail() : null;
+  $('crewCtl').classList.toggle('on', !!ct);
+  if (ct) { const n = stats.trails.slice().sort((a, b) => a.seq - b.seq).indexOf(ct) + 1; $('crewWho').innerHTML = t(ct.want === null ? 'crewWho' : 'crewWhoWant', { n, on: ct.on, want: ct.want }); }
   const d = host.day();
   $('goal').hidden = !d;
   if (d) { const s = Math.ceil(d.left / 20), time = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; $('goal').textContent = t('hudDay', { day: d.day, goal: goalHud(d), time }); $('goal').classList.toggle('done', d.won); }

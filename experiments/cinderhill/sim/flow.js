@@ -53,6 +53,7 @@ export function setGoal(sim, slot, kind, cell = -1) {
 
 export function dropGoal(sim, slot) {
   const F = sim.flow, n = sim.L.n;
+  if (isTrailSlot(slot)) sim.g[G.WANT0 + slot - SLOT.TRAIL0] = 0;
   F.kind[slot] = GOAL.NONE; F.live[slot] = 0; F.dirty[slot] = 0; F.cell[slot] = -1; F.seq[slot] = 0;
   F.dist.fill(INF, slot * n, slot * n + n);
 }
@@ -68,7 +69,9 @@ export const G = { TICK: 0, STORES: 1, RECALL: 2, ALARM_HOLD: 3, GOAL_SEQ: 4, DI
   // its walk, ticks since it last ate, kills this visit, ants eaten ever, visits so far, its walk's length, and the
   // trail's creation number (a trail replaced in that slot ends the visit).
   SP: 27, SP_X: 28, SP_Y: 29, SP_T: 30, SP_SLOT: 31, SP_I: 32, SP_HUNGRY: 33, SP_KILLS: 34, SP_EATEN: 35, SP_VISITS: 36, SP_LEN: 37, SP_SEQ: 38,
-  SIZE: 40 };
+  // Crews (CMD.CREW): the ants each trail slot wants, plus one; 0 is "as many as come" (the newest trail recruits).
+  WANT0: 40,
+  SIZE: 44 };
 
 /** Push the goal's source cells (distance 0) in ascending cell order. */
 function sources(sim, slot, push) {
