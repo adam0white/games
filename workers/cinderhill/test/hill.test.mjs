@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { Hill, LEASE } from '../src/hill.mjs';
 import { PROTO, decodeSealed } from '../src/protocol.mjs';
-import { Sim, SIM_VERSION } from '../../../experiments/cinderhill/sim/sim.js';
+import { G, Sim, SIM_VERSION } from '../../../experiments/cinderhill/sim/sim.js';
 
 function world() {
   const db = new DatabaseSync(':memory:');
@@ -161,7 +161,7 @@ test('restart: the room resumes from SQLite, players catch up, each command is a
 test('authority: a client with a different state is reported', () => {
   const w = world(), hill = room(w), a = player(hill, w, { role: 'authority', ants: 200 });
   advance(w, 1100);
-  a.sim.x[0] ^= 1; // one flipped bit in the client
+  a.sim.g[G.STORES] += 1; // a client state the room never had. (A flipped low bit of a position can die out: at this seed it did within 10 ticks after the eight-direction change.)
   advance(w, 1100);
   a.hash();
   assert.ok(hill.stats().mismatches >= 1);

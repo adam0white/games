@@ -402,7 +402,7 @@ export class Sim {
     // again; repeat every KICK_EVERY ticks while still stuck. Steering again between kicks lets an ant that a
     // crowd pushed back find its way once the crowd thins (a kick every tick was a random walk for good).
     let h = this.heading[i];
-    const st = ++this.stall[i], phase = st > STALL_KICK ? (st - STALL_KICK - 1) % KICK_EVERY : -1;
+    const st = this.stall[i] < 65535 ? ++this.stall[i] : 65535, phase = st > STALL_KICK ? (st - STALL_KICK - 1) % KICK_EVERY : -1;
     if (phase === 0) h = (h + 64 + below(r, A, 128)) & 255;
     else if (phase > 0 && phase < KICK_FOR) h = (h + below(r, A, 17) - 8) & 255;
     else if (want >= 0) {
@@ -427,8 +427,10 @@ export class Sim {
         if (adx >= SEP_R || ady >= SEP_R) continue;
         if (dx === 0 && dy === 0) { px += j < i ? 8 : -8; continue; } // same spot: split by index
         // Away from the other ant along the line between them (any direction, not only the axes): the push is
-        // SEP_R less the larger axis gap, shared between the axes in proportion to the gaps.
-        const far = adx > ady ? adx : ady, k = SEP_R - far;
+        // SEP_R less the distance, shared between the axes in proportion to the gaps. The distance is the
+        // integer estimate max + 3/8 min (within 3% of the true distance at 45 degrees, exact on an axis).
+        const far = adx > ady ? adx + ((ady * 3) >> 3) : ady + ((adx * 3) >> 3), k = SEP_R - far;
+        if (k <= 0) continue;
         px += Math.trunc((dx * k) / far); py += Math.trunc((dy * k) / far);
       }
     }

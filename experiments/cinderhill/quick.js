@@ -3,7 +3,7 @@
 import { replay, script } from './sim/replay.js';
 
 export const QUICK = { cfg: { seed: 2026, sw: 128, sh: 128, nw: 96, nh: 64, ants: 300 }, ticks: 600 };
-export const EXPECTED = { tick: 600, total: 3792710572 };
+export const EXPECTED = { tick: 600, total: 2922091129 };
 
 export function quick() {
   const { cfg, ticks } = QUICK;
@@ -13,4 +13,4 @@ export function quick() {
 // The long check on the page: spike S2's run (seed 2026, 2,000 ants, 10 minutes of play, the scripted orders).
 // Too slow for the test suite (about 23 s in Node); spikes/s2.mjs fails when Node's final total is not this one.
 export const LONG = { cfg: { seed: 2026, ants: 2000 }, ticks: 12000 };
-export const EXPECTED_LONG = { tick: 12000, total: 380203276 };
+export const EXPECTED_LONG = { tick: 12000, total: 3889048384 };

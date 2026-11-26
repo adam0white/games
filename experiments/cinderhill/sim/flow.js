@@ -276,17 +276,30 @@ function isSourceCell(sim, slot, c) {
 export function nextCell(sim, slot, c) {
   const { L, mat, link, flow: F } = sim, base = slot * L.n, d = F.dist, nb = L.nb, here = d[base + c];
   if (here === INF || here === 0) return -1;
+  // A trail's values on its path are path steps, not walking cost. On the path, the next cell is the one that
+  // holds one less (as backCell takes one more), so a bend that comes back beside itself is still walked.
+  // Off the path, every path cell counts as TRAIL_OFF, so an ant joins the trail at the nearest path cell, not
+  // at the one nearest the trail's end.
+  const trail = isTrailSlot(slot);
+  if (trail && here < TRAIL_OFF) {
+    const want = here - 1;
+    for (let k = 0; k < 4; k++) { const m = nb[c * 4 + k]; if (m >= 0 && mat[m] === MAT.OPEN && d[base + m] === want) return m; }
+    for (let k = 0; k < 4; k++) { const m = diagOpen(L, mat, c, k); if (m >= 0 && d[base + m] === want) return m; }
+  }
+  const floor = trail && here >= TRAIL_OFF ? TRAIL_OFF : 0;
   let best = INF + DIAG, to = -1;
   for (let k = 0; k < 4; k++) {
     const m = nb[c * 4 + k];
     if (m < 0 || mat[m] !== MAT.OPEN) continue;
-    const v = d[base + m];
+    let v = d[base + m];
+    if (v < floor) v = floor;
     if (v < here && v + STEP < best) { best = v + STEP; to = m; }
   }
   for (let k = 0; k < 4; k++) {
     const m = diagOpen(L, mat, c, k);
     if (m < 0) continue;
-    const v = d[base + m];
+    let v = d[base + m];
+    if (v < floor) v = floor;
     if (v < here && v + DIAG < best) { best = v + DIAG; to = m; }
   }
   const m = link[c];

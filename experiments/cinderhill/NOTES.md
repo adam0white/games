@@ -9,17 +9,17 @@ Working name for the ant colony game specified in `docs/design/colony/`. This di
 | `sim/` | The pure sim: plain ES modules, no dependencies, no build. Runs unchanged in Node, browsers and workerd |
 | `sim/sim.js` | `Sim`: the tick (20 a second), ants as typed arrays, commands, events, `hashes()` |
 | `sim/grid.js` | Both layers as one cell index space; materials; entrance links |
-| `sim/flow.js` | Flow fields: breadth-first search per live goal (16 slots), rebuilt only when a change touches them |
+| `sim/flow.js` | Flow fields: octile shortest distances per live goal (16 slots; orthogonal step 5, diagonal 7, entrance link 5) by a bucket queue, rebuilt only when a change touches them |
 | `sim/scent.js` | Three scent fields (trail, food, alarm): mass-conserving spread, 24-bit decay with a set half-life |
 | `sim/math.js`, `sim/rng.js`, `sim/hash.js` | Table trig and integer `angleOf`; mulberry32 streams; 32-bit hashes |
-| `sim/snapshot.js` | `snapshot(sim)` to bytes with a version header, `restore(bytes)`; format 2 models each value and range-codes it (S4: 55 KB at 5,000 ants, 24,000 ticks) |
+| `sim/snapshot.js` | `snapshot(sim)` to bytes with a version header, `restore(bytes)`; format 3 models each value and range-codes it (S4: 61.8 KB at 5,000 ants, 24,000 ticks) |
 | `sim/rangecoder.js` | The binary range coder the snapshot uses: adaptive probabilities, integers only, one walk for both directions |
 | `sim/replay.js` | `script(cfg, ticks)` (scripted orders), `replay(...)`, `firstDivergence(a, b)` |
 | `sim/world.js` | Seeded terrain: surface with stones, a pond and four food piles; nest with soil bands, shaft and chamber |
 | `sim/SPIKES.md` | Spike results S1, S2, S3 and S4 with numbers |
 | `test/` | `node --test` suites; CI runs them in the `changes` job (step "Cinderhill sim") |
 | `spikes/` | S1, S2, S3, S4, the trail-shape cases (`trail-shape.mjs`) and the workerd harness; the planted fault `mutant.js` |
-| `check.html`, `check.js`, `quick.js` | The determinism check page; the phone check runs it in WebKit and Chromium (`cinderhill check`) |
+| `check.html`, `check.js`, `quick.js` | The determinism check page; the phone check runs it in WebKit and Chromium (`cinderhill check`). `quick.js` holds the short check (`EXPECTED`) and the long one (`LONG`, `EXPECTED_LONG`: S2's 12,000 ticks of 2,000 ants), which the page runs in slices and reports as one copyable line |
 | `index.html`, `painter.js` | The trail painter page: menu, pause card, tool strip, HUD, the ant card, the frame sampler (`?fps=1`) |
 | `host.js` | Runs the sim for the page: 20 ticks a second from the frame clock (at most 4 a frame), the command log, crews and the "why" for one ant |
 | `gestures.js` | The touch rules as a pure reducer (pointer events in, preview, order, alarm, pan and zoom actions out); `test/gestures.test.mjs` |
@@ -71,6 +71,19 @@ Decisions:
 
 - Sim change (`SIM_VERSION` 2): trails keep their drawn shape. The stroke becomes an ordered path, and the trail's field leads along it in order. Carriers walk their trail back, and a forager keeps her trail as her route. Before, ants walked the straight line to a trail's end. Numbers are in `sim/SPIKES.md`, "Trail shape", and the cases are in `spikes/trail-shape.mjs`.
 
+- Sim change (`SIM_VERSION` 3, 2026-11-26): ants move in eight directions. Owner feedback: guards could not move diagonally. Numbers are in `sim/SPIKES.md`, "Eight directions". The rules:
+  - Fields are octile distances: an orthogonal step costs 5, a diagonal 7, an entrance link 5. The constants are `STEP` and `DIAG` in `flow.js`. Thresholds that compared a distance to a cell count now multiply by `STEP` (`FAR`, the guard's reach).
+  - A field takes a diagonal only when the target and both side cells are open (`grid.js` `diagOpen`), so a path never cuts a wall's corner.
+  - Movement is more lenient: a step across a cell corner is refused only when both side cells are closed (two walls touching at a corner). With the strict rule, crowds jammed at the chamber and shaft mouths (bot run: 27 ants stuck for good, longest stall 2,983 ticks).
+  - Opening a cell repairs each field in place (lower the cell and its eight neighbours, then settle). Closing a cell marks touched fields for a full rebuild, as before.
+  - Trail paths are 8-connected. On the path the field holds path steps (one a step, not 5 or 7). An ant on the path goes to the path cell holding one less, so a bend that comes back beside an earlier cell is still walked in order. Off the path the field is 4,096 plus the octile distance to the path, and an ant joins at the nearest path cell.
+  - Distances are `Uint16`, so a field covers at most 13,106 straight steps of one winding corridor. The maps here are far below that; it is a limit, not a guard.
+  - Separation pushes along the line between two ants, with the distance estimated as the larger gap plus 3/8 of the smaller one.
+  - A stuck ant (no progress for 50 ticks) turns a random way once every 30 ticks and wanders for 8 of them, then steers again. Before, it drew a new random heading every tick.
+  - Unchanged: scent spreads to 4 neighbours; the three scent sensors already sample any angle.
+  - Snapshot format 3 codes an ant's last cell among the 8 neighbours and the link. Version 2 snapshots are refused, as the rule for a sim version change says.
+- The page: the `?fps=1` sampler sits in the HUD column, so it no longer covers the status and crew lines on a phone (`cinderhill hud` in the phone check, 360 x 640 in Turkish at 5,000 ants). Ants hold an idle pose when they did not move since the last tick, with a small antenna twitch; all ants hold still while paused.
+
 Not built: undo (the sim has no erase order), the small view of the other layer, an "ants wanted" number.
 
 When a sim change alters play, `test/page.test.mjs` fails and prints the new hash to put in `quick.js`.
@@ -79,6 +92,6 @@ When a sim change alters play, `test/page.test.mjs` fails and prints the new has
 
 - Diggers dig the nearest marked cell, not the painted order, and carry no spoil. A dig crew is capped (4 per marked cell, 24 in all).
 - Foragers seek in this order: the trail that led them out last (their route), the pile they last took from, the newest trail, the three scent sensors, a random walk. After a minute with nothing found they go home. The scripted orders do not give good foraging; that is tuning work.
-- A field rebuild is a whole-field search (0.7 ms on the full map). Regional rebuilds and a per-tick rebuild budget are not built.
+- A field rebuild is a whole-field search (about 1.3 ms on the full map with octile costs, 0.7 ms before). Rebuilding all 9 live fields in one tick now takes about 12 ms, over the 10 ms tick budget. Regional rebuilds and a per-tick rebuild budget are not built.
 - Ants in a crowd pass through one another. Separation bends a path but never cancels the step.
 - No duplicate-command check in the sim; the room drops duplicates (05-tech, room protocol).

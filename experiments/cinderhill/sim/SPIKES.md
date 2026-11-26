@@ -217,3 +217,49 @@ All 200 ants made 2 or more round trips in every case after the change. Food sto
 
 **Painter.** Driven once in WebKit (iPhone 13, deviceScaleFactor 2, 2,000 ants): an L from the entrance east 41 cells, then north 48. After 35 s the ants were on both legs and none on the diagonal.
 
+
+## Eight directions (SIM_VERSION 3, 2026-11-26)
+
+The change: ants move in eight directions, fields are octile distances (5 and 7), and a field never cuts a wall's corner (`../NOTES.md` has the rules). All numbers below were measured on an M4 Mac mini that was running other work, so tick times are noisy.
+
+**Tests.** `node --test experiments/cinderhill/test/`: 55 pass. The flow test compares every field with a separately written Dijkstra over 8 directions with the same corner rule. Two planted faults each fail it: dropping the neighbour lowering from the in-place repair, and a corner rule that checks one side cell only. `test/diagonal.test.mjs`: a guard sent 40 cells diagonally to an alarm arrives before tick 470 and strays under 2.5 cells (the 4-direction sim arrives at tick 556 and fails); an ant cannot squeeze between two stones touching at a corner, and can once one is gone.
+
+**Independent review.** Codex (`gpt-6.2-astra`, read-only) reviewed the sim diff. It found no lost bucket-queue entries, no repair that differs from a full rebuild, and no diagonal a field allows that movement refuses; Node and Bun (JavaScriptCore) gave the same hashes and snapshot bytes over 600 ticks. Its findings and what was done:
+- Fixed: on a trail's path, `nextCell` scored path steps as walking cost, so where a bend came back beside an earlier cell an ant jumped across to the later one. It now takes the path cell holding one less (`test/trail.test.mjs` fails on the old code). Off the path it joined the path cell nearest the trail's end; it now joins the nearest.
+- Fixed: separation used a square range and the larger axis gap; it now uses a distance estimate (max plus 3/8 min). The stall counter saturates instead of wrapping after 65,535 ticks.
+- Kept, written down: `Uint16` distances end at 13,106 straight steps of one corridor; the stroke-gap bridge still searches four neighbours (the bridge is walkable, sometimes a few steps longer than the octile shortest).
+
+**S1** (`spikes/s1.mjs 2000 5000 --ticks=3000`, interleaved with `origin/main`'s sim exported to a temp folder; the quietest pair):
+
+| Sim | 2,000 ants mean / p95 / max | 5,000 ants mean / p95 / max | All 9 live fields rebuilt at once |
+| --- | --- | --- | --- |
+| Before (4 directions) | 2.27 / 3.64 / 18.90 ms | 2.26 / 3.78 / 12.47 ms | 6.54 ms (0.73 a field) |
+| After (8 directions) | 1.68 / 1.87 / 7.58 ms | 1.98 / 2.16 / 8.05 ms | 11.76 ms (1.31 a field) |
+
+These two runs predate the review fixes below. After them, at a load average near 19, two interleaved pairs gave 2,000 ants mean 1.90 and 2.61 ms before, 3.00 and 2.20 after; 5,000 ants 2.42 and 3.02 before, 3.10 and 2.70 after; all fields at once 7.4 and 8.8 ms before, 25.5 and 15.3 after. The tick means differ by less than the noise between runs. Still a pass on the mean. The per-field rebuild costs about 1.8 times what it did (the bucket queue does more work per cell than the breadth-first search). Rebuilding every field in one tick is now over 10 ms; it happens only on restore and when one surface change touches every field. A per-tick rebuild budget is the fix if it shows in play. In local workerd (`spikes/workerd.mjs`, 20-tick requests, after the fixes, loaded machine): 2,000 ants mean 2.09 ms, p95 3.55; 5,000 ants mean 2.90 ms, p95 4.09.
+
+**S2.** The 41-order script (command log sha256 begins `78ba8e6cf74058e6`), 12,000 ticks of 2,000 ants, hashes every 20 ticks: Node, workerd, Chromium 156 and WebKit 27.2 agree on all 600 records (final total 3889048384, after the review fixes; the run before them also agreed everywhere). The planted mutant diverges at tick 20 in `ants` in Node, Chromium and WebKit. Firefox did not run: Playwright's Firefox is not installed here. For a real phone, `/cinderhill/check.html` now runs the same 12,000 ticks (`quick.js` `LONG`) and shows one line to copy: sim version, short and long result, engine and user agent. A Firefox result from a phone is still owed (feature 1's done line names Firefox).
+
+**S4** (5,000 ants, gzip; before is the trail-shape re-run above):
+
+| Played ticks | gzip before / after | Scent after | Ants part after | Ants on the surface after |
+| --- | --- | --- | --- | --- |
+| 3,000 | 47.6 / 45.5 KB | 20.0 KB | 23.7 KB | 2,394 |
+| 8,000 | 60.5 / 58.1 KB | 30.8 KB | 25.3 KB | 2,443 |
+| 24,000 | 61.8 / 60.7 KB | 31.7 KB | 26.6 KB | 2,350 |
+
+Each restores to the same hash. The margin under 64 KB is 5.9 KB at 8,000 ticks (the CI assertion) and 3.3 KB at 24,000; todo lab-5w7.19 stays open.
+
+**Trail shape** (`spikes/trail-shape.mjs`, same cases as above, after the review fixes; deviation is still measured in 4-connected steps to the Bresenham line):
+
+| Stroke | Outbound mean / max | Homeward mean / max | Loads in order |
+| --- | --- | --- | --- |
+| Dog-leg | 0.13 / 2 | 0.12 / 1 | 800 of 800 |
+| U | 0.15 / 1 | 0.13 / 1 | 589 of 589 |
+| Tight U | 0.16 / 1 | 0.15 / 1 | 912 of 912 |
+| Self-crossing | 0.20 / 2 | 0.15 / 1 | 1,383 of 1,383 |
+| Dog-leg through a 7 x 7 stone | 0.75 / 5 | 0.70 / 5 | 769 of 769 |
+
+All 200 ants made 2 or more round trips in every case.
+
+**Bots** (`test/bots.test.mjs`): 800 ants, 3,000 ticks: longest stall 30, 29, 28 and 32 ticks on seeds 3, 8, 5 and 11 (the test's line is 100). A strict movement corner rule (both side cells must be open) gave 97 to 199 at every stall-kick period tried, and 2,983 with the old kick, so movement uses the lenient rule.

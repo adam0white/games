@@ -77,3 +77,19 @@ test('a rejected stroke leaves the four live trails as they were, and restore st
   const back = restore(snapshot(s)), a = s.hashes(), b = back.hashes();
   for (const k of SUBSYSTEMS) assert.equal(b[k], a[k], k);
 });
+
+test('on its path a trail leads to the next path cell, even where a bend comes back beside an earlier cell; off it, to the nearest path cell', async () => {
+  const { nextCell, backCell } = await import('../sim/flow.js');
+  const s = new Sim({ seed: 1, sw: 32, sh: 32, nw: 16, nh: 16, ants: 0, blank: true });
+  s.home = { x: 0, y: 0, w: 1, h: 1 };
+  s.mat[s.L.nestBase] = MAT.OPEN; s.link[cellAt(s.L, SURFACE, 10, 11)] = s.L.nestBase; s.link[s.L.nestBase] = cellAt(s.L, SURFACE, 10, 11);
+  s.startGoals(); s.step();
+  // (11,11) up to (11,10), right to (13,10), down to (13,12), left to (12,12): the end is diagonal to the start.
+  s.queueCommand({ tick: s.tick, type: CMD.TRAIL, layer: SURFACE, points: [11, 11, 11, 10, 13, 10, 13, 12, 12, 12] });
+  s.step();
+  const at = (x, y) => cellAt(s.L, SURFACE, x, y);
+  assert.equal(nextCell(s, SLOT.TRAIL0, at(11, 11)), at(11, 10), 'from the start: up the drawn bend, not across to the end');
+  assert.equal(backCell(s, SLOT.TRAIL0, at(12, 12)), at(13, 12), 'walking back from the end: the cell before it');
+  // (11,12) is next to the start (11,11) and diagonal to the end (12,12): it joins at the start, the nearest.
+  assert.equal(nextCell(s, SLOT.TRAIL0, at(10, 12)), at(11, 11), 'off the path: onto the nearest path cell');
+});
