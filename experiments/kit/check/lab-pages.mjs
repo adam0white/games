@@ -154,6 +154,18 @@ async function rubPlate(page, { until, knob }) {
   }, 'stroke transfers pigment', 8000, { coverage, distance });
 }
 
+async function drawBattleTrail(page, { until }) {
+  const [start, end] = await page.evaluate(() => {
+    const { point } = window.battleState();
+    return [point(7, 18), point(2, 11)];
+  });
+  await pointerDrag(page, start, end);
+  await until(page, () => {
+    const s = window.battleState();
+    return s.trail.length >= 2 && s.marching > 0;
+  }, 'a stroke dispatches ants along its trail');
+}
+
 const splitlightLegacy = { 'night-splitlight:plate': '2', 'night-splitlight:sound': 'on' };
 
 export const labPages = {
@@ -270,4 +282,27 @@ export const labPages = {
       await until(page, () => { const m = window.tournamentState().me; return m.out + m.edge === 0; }, 'Hold calls them back', 4000);
     },
   },
+  'lab/cinderhill-battle': pageEntry('cinderhill-battle:save', { v: 1, foe: 'jarkeepers', played: 2, sound: true }, 'cinderhill-battle:hint', {
+    sound: '#sound', menu: '#quit',
+    state: () => { const s = window.battleState?.(); return s && { screen: s.screen, t: s.t, paused: s.paused }; },
+    verify: () => {
+      const { foe, played, sound } = window.battleState();
+      return { foe, played, sound, picked: document.querySelector('#foes [aria-pressed=true]')?.dataset.foe };
+    },
+    expect: { foe: 'jarkeepers', played: 2, sound: true, picked: 'jarkeepers' },
+    touch: async (page, checks) => {
+      await drawBattleTrail(page, checks);
+      await page.tap('#alarm');
+      const spot = await page.evaluate(() => window.battleState().point(7, 13));
+      await pointerDrag(page, spot, spot, {
+        beforeMove: () => checks.until(page, () => window.battleState().alarm >= 0, 'holding an Alarm spot calls guards'),
+      });
+      await page.tap('#recall');
+      await checks.until(page, () => {
+        const s = window.battleState();
+        return s.trail.length === 0 && s.alarm < 0 && s.marching === 0;
+      }, 'recall clears attack and Alarm orders');
+    },
+    hint: { timing: { start: '#play' }, input: drawBattleTrail },
+  }),
 };
