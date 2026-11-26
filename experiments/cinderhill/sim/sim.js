@@ -13,14 +13,15 @@
 import { ANGLES, COS, SIN, angleOf, turnTo } from './math.js';
 import { HARDNESS, MAT, NEST, SUB, SURFACE, baseOf, cellAt, cellXY, heightOf, makeLayout, widthOf } from './grid.js';
 import { STREAM, STREAMS, below, seedStreams } from './rng.js';
-import { G, GOAL, INF, MAX_GOALS, PATH_MAX, SLOT, TRAIL_OFF, backCell, backDist, distAt, dropGoal, isTrailSlot, makeFlow, nextCell, rebuild, rebuildDirty, setGoal, terrainChanged } from './flow.js';
+import { DIAG, G, GOAL, INF, MAX_GOALS, PATH_MAX, SLOT, STEP, TRAIL_OFF, backCell, backDist, distAt, dropGoal, isTrailSlot, makeFlow, nextCell, rebuild, rebuildDirty, setGoal, terrainChanged } from './flow.js';
 import { FIELD, FIELDS, deposit, makeScent, smell, stepScent } from './scent.js';
 import { SUBSYSTEMS, finish, hashArray, hashInt } from './hash.js';
 import { generate } from './world.js';
+import { BROOD_MAX, CASTE, CASTE_HP, FOOD, LOAD, STAGE, addBrood, fight, makeBrood, stepColony } from './colony.js';
 
-export const SIM_VERSION = 2; // 2: trails keep their drawn shape (a path per trail, `via` per ant)
+export const SIM_VERSION = 4; // 2: trails keep their drawn shape (a path per trail, `via` per ant); 3: eight directions; 4: the colony (colony.js)
 export const TICK_HZ = 20;
-export { G, GOAL, SLOT, INF, FIELD, MAT, SURFACE, NEST, SUB, SUBSYSTEMS };
+export { G, GOAL, SLOT, INF, STEP, DIAG, FIELD, MAT, SURFACE, NEST, SUB, SUBSYSTEMS, CASTE, CASTE_HP, FOOD, LOAD, STAGE, BROOD_MAX };
 
 export const JOB = { FORAGE: 0, DIG: 1, GUARD: 2 };
 export const MODE = { SEEK: 0, RETURN: 1, WORK: 2, REST: 3 };
@@ -35,6 +36,9 @@ export const DEFAULTS = {
   // Trail: a third of a ten-minute day (02-spec section 10).
   spread: [6, 40, 48], halfLife: [4000, 60, 200],
   blank: false, // true: an empty map for tests (surface open, nest all clay); no world generation
+  // A colony game: a queen, brood and the colony's meals (colony.js). `ants` workers start in the chamber
+  // with `sugar` units and one larva per `larvae`. Off (0): the sandbox, adults only, as in M0.
+  colony: 0, sugar: 0, larvae: 0,
 };
 
 const WALK = 24, RUN = 36; // sub-cell units per tick: about 1.9 and 2.8 cells a second
@@ -42,14 +46,15 @@ const TURN = 32; // most a heading turns in one tick when steering toward a targ
 const SEP_R = 160; // separation radius in sub-cell units
 const SENSE_AT = 2 * SUB, SENSE_SIDE = 28, SENSE_MIN = 2000;
 const TRAIL_LAY = 60000, TRAIL_STROKE = 400000, FOOD_EMIT = 200000, ALARM_EMIT = 600000, ALARM_FADE = 5000;
-const FAR = 150; // a seeking forager this many steps from home goes back
-const STALL_KICK = 50;
+const FAR = 150 * STEP; // a seeking forager this far from home (150 straight steps) goes back
+const STALL_KICK = 50, KICK_EVERY = 30, KICK_FOR = 8;
 const SEEK_GIVE_UP = 1200; // a forager that finds nothing in a minute goes home
 const BRIDGE_MARGIN = 12; // a stroke blocked by a closed cell is routed around inside this many cells of the gap first
 
 export class Sim {
   constructor(options = {}) {
     const cfg = { ...DEFAULTS, ...options };
+    cfg.spread = cfg.spread.slice(); cfg.halfLife = cfg.halfLife.slice(); // the sim's own copies: hashed and snapshotted
     this.cfg = cfg;
     const L = (this.L = makeLayout(cfg)), n = L.n, A = cfg.maxAnts;
     this.mat = new Uint8Array(n);
@@ -58,6 +63,7 @@ export class Sim {
     this.link = new Int32Array(n).fill(-1);
     this.pileCell = new Int32Array(MAX_PILES).fill(-1);
     this.pileAmount = new Int32Array(MAX_PILES);
+    this.pileKind = new Uint8Array(MAX_PILES); // FOOD.SUGAR or FOOD.PROTEIN
     this.home = { x: 0, y: 0, w: 1, h: 1 };
     this.g = new Int32Array(G.SIZE);
     this.rng = seedStreams(cfg.seed);
@@ -75,6 +81,12 @@ export class Sim {
     this.since = new Uint16Array(A); // ticks in the current mode (saturates)
     this.lastCell = new Int32Array(A);
     this.via = new Int8Array(A); // trail slot that led this forager out (her route), or -1
+    this.caste = new Uint8Array(A); // CASTE (colony.js): worker or major
+    this.hp = new Uint8Array(A); // hit points; 0 is removed at the end of the tick
+    this.team = new Uint8Array(A); // 0 the player's colony; others for fights to come
+    this.cool = new Uint8Array(A); // ticks until this ant can bite again (colony.js fight)
+    this.brood = makeBrood();
+    this.anyDead = false; // an ant is at 0 hit points: removed at the end of the tick (restore recomputes it)
     // Spatial hash (rebuilt every tick from positions; not state).
     this.head = new Int32Array(n); this.nextAnt = new Int32Array(A);
     // Scratch for building a trail's path (not state).
@@ -88,6 +100,10 @@ export class Sim {
     else { this.mat.fill(MAT.OPEN, 0, L.nestBase); this.mat.fill(MAT.CLAY, L.nestBase); }
     this.startGoals();
     for (let i = 0; i < cfg.ants; i++) this.spawn(i % 20 < 12 ? JOB.FORAGE : i % 20 < 17 ? JOB.DIG : JOB.GUARD);
+    if (cfg.colony) {
+      this.g[G.QUEEN] = 1; this.g[G.SUGAR] = cfg.sugar;
+      for (let k = 0; k < cfg.larvae; k++) addBrood(this, STAGE.LARVA);
+    }
     rebuildDirty(this);
   }
 
@@ -97,14 +113,22 @@ export class Sim {
     for (let p = 0; p < MAX_PILES; p++) if (this.pileAmount[p] > 0) setGoal(this, SLOT.FOOD0 + p, GOAL.FOOD, this.pileCell[p]);
   }
 
-  /** A new ant in the home chamber. Returns its index or -1 at the cap. */
-  spawn(job) {
+  /** A new ant in the home chamber, or in nest cell `cell` (a hatching pupa). Returns its index or -1 at the cap. */
+  spawn(job, caste = CASTE.WORKER, team = 0, cell = -1) {
     if (this.n >= this.cfg.maxAnts) return -1;
     const i = this.n++, h = this.home, r = this.rng, A = STREAM.ants;
-    this.layer[i] = NEST;
-    this.x[i] = (h.x + below(r, A, h.w)) * SUB + 128;
-    this.y[i] = (h.y + below(r, A, h.h)) * SUB + 128;
+    if (cell >= 0) {
+      const [layer, cx, cy] = cellXY(this.L, cell);
+      this.layer[i] = layer; this.x[i] = cx * SUB + 128; this.y[i] = cy * SUB + 128;
+    } else {
+      this.layer[i] = NEST;
+      // Inside the nest even where the chamber runs past its edge (same draws either way).
+      const cx = h.x + below(r, A, h.w), cy = h.y + below(r, A, h.h), L = this.L;
+      this.x[i] = (cx < 0 ? 0 : cx >= L.nw ? L.nw - 1 : cx) * SUB + 128;
+      this.y[i] = (cy < 0 ? 0 : cy >= L.nh ? L.nh - 1 : cy) * SUB + 128;
+    }
     this.heading[i] = below(r, A, ANGLES);
+    this.caste[i] = caste; this.hp[i] = CASTE_HP[caste & 1]; this.team[i] = team; this.cool[i] = 0;
     this.job[i] = job; this.mode[i] = MODE.SEEK; this.carry[i] = 0; this.mem[i] = -1; this.goal[i] = -1; this.via[i] = -1;
     this.best[i] = INF; this.stall[i] = 0; this.since[i] = 0; this.lastCell[i] = this.cellOfAnt(i);
     return i;
@@ -148,7 +172,8 @@ export class Sim {
       F.path.set(this.pathBuf, k * PATH_MAX);
       F.pathLen[k] = len;
       for (let j = 0; j < len; j++) deposit(this, FIELD.TRAIL, F.path[k * PATH_MAX + j], TRAIL_STROKE);
-      for (let i = 0; i < this.n; i++) if (this.via[i] === slot) this.via[i] = -1; // a route on the replaced trail is gone
+      // A route on the replaced trail is gone, and so is progress on it: `best` starts again on the new path.
+      for (let i = 0; i < this.n; i++) { if (this.via[i] === slot) this.via[i] = -1; if (this.goal[i] === slot) this.goal[i] = -1; }
       setGoal(this, slot, GOAL.TRAIL, F.path[k * PATH_MAX + len - 1]);
     } else if (type === CMD.DIG) {
       // [count, x0, y0, ...]: nest cells to dig.
@@ -173,8 +198,8 @@ export class Sim {
   }
 
   /** The stroke in command `e` as an ordered path of open surface cells, written to out[at ..]; returns its
-   *  length (0: nothing walkable). Steps are 4-connected (a diagonal step goes through an open side cell),
-   *  as ants and fields move. Stroke cells that are closed, or that no ant can reach from home, are left
+   *  length (0: nothing walkable). Steps are 8-connected with the corner rule (a diagonal step whose side
+   *  cells are not both open goes through an open side cell), as ants and fields move. Stroke cells that are closed, or that no ant can reach from home, are left
    *  out, and the gap they leave is bridged by the shortest way around: first inside a box of
    *  BRIDGE_MARGIN cells around the gap, then over the whole surface; a cell no bridge reaches is skipped.
    *  Where the path comes back to a cell it already holds, the loop is cut out (loop erasure), so each
@@ -200,7 +225,11 @@ export class Sim {
       const adx = x > lx ? x - lx : lx - x, ady = y > ly ? y - ly : ly - y;
       if (adx + ady === 1) { append(c); return; }
       if (adx === 1 && ady === 1) {
-        const side = walkable(x, ly) >= 0 ? walkable(x, ly) : walkable(lx, y);
+        // A diagonal step is taken as one step when both side cells are open (the corner rule ants and fields
+        // keep); with one side closed it goes through the open side; with both closed it is bridged.
+        const s1 = walkable(x, ly), s2 = walkable(lx, y);
+        if (s1 >= 0 && s2 >= 0 && this.mat[s1] === MAT.OPEN && this.mat[s2] === MAT.OPEN) { append(c); return; }
+        const side = s1 >= 0 ? s1 : s2;
         if (side >= 0) { append(side); append(c); return; }
       }
       this.bridge(last, c, append) || this.bridge(last, c, append, true);
@@ -257,8 +286,11 @@ export class Sim {
     while (this.queue.length && this.queue[0][0] === g[G.TICK]) this.applyCommand(this.queue.shift());
     this.rebuildFields();
     this.stepWorld();
+    if (this.cfg.colony) stepColony(this);
     this.buildBuckets();
     for (let i = 0; i < this.n; i++) this.stepAnt(i);
+    fight(this);
+    if (this.anyDead) this.removeDead();
     stepScent(this);
     this.rebuildFields();
     g[G.TICK]++;
@@ -296,7 +328,25 @@ export class Sim {
 
   setMode(i, mode) { this.mode[i] = mode; this.since[i] = 0; }
 
+  /** Every per-ant array, in hash order. */
+  antArrays() {
+    return [this.x, this.y, this.layer, this.heading, this.job, this.mode, this.carry, this.mem, this.goal, this.best, this.stall, this.since, this.lastCell, this.via, this.caste, this.hp, this.team, this.cool];
+  }
+
+  /** Remove the ants at 0 hit points, keeping the others in index order (a stable compaction). */
+  removeDead() {
+    const arrays = this.antArrays();
+    let w = 0;
+    for (let i = 0; i < this.n; i++) {
+      if (this.hp[i] === 0) { if (this.job[i] === JOB.DIG && this.mode[i] === MODE.WORK) this.g[G.DIG_CREW]--; continue; } // her place in the dig crew frees up
+      if (w !== i) for (const a of arrays) a[w] = a[i];
+      w++;
+    }
+    this.n = w; this.anyDead = false;
+  }
+
   stepAnt(i) {
+    if (this.hp[i] === 0) return; // bitten to death this tick; removed at its end
     if (this.since[i] < 0xFFFF) this.since[i]++;
     const L = this.L, c = this.cellOfAnt(i), layer = this.layer[i], r = this.rng, A = STREAM.ants;
     let follow = -1, want = -1, speed = WALK, still = false, wander = false, back = false;
@@ -306,7 +356,12 @@ export class Sim {
     else if (this.job[i] === JOB.FORAGE) {
       if (this.mode[i] === MODE.RETURN) {
         if (atHome) {
-          if (this.carry[i]) { this.g[G.STORES]++; this.carry[i] = 0; }
+          if (this.carry[i]) {
+            this.g[G.STORES]++;
+            const kind = this.carry[i] === 2 ? FOOD.PROTEIN : FOOD.SUGAR;
+            this.g[kind === FOOD.PROTEIN ? G.PROTEIN : G.SUGAR] += LOAD[kind];
+            this.carry[i] = 0;
+          }
           this.setMode(i, MODE.SEEK); this.heading[i] = (this.heading[i] + 128) & 255;
           still = true;
         } else {
@@ -324,7 +379,7 @@ export class Sim {
       else {
         const p = this.pileAt(c);
         if (p >= 0) {
-          this.carry[i] = 1; this.mem[i] = SLOT.FOOD0 + p; this.setMode(i, MODE.RETURN); // `via` stays: her route
+          this.carry[i] = this.cfg.colony && this.pileKind[p] === FOOD.PROTEIN ? 2 : 1; /* the sandbox carries one kind */ this.mem[i] = SLOT.FOOD0 + p; this.setMode(i, MODE.RETURN); // `via` stays: her route
           this.heading[i] = (this.heading[i] + 128) & 255; this.g[G.PICKED]++;
           if (--this.pileAmount[p] === 0) { dropGoal(this, SLOT.FOOD0 + p); this.event(EVENT.PILE_EMPTY, p, 0); }
           still = true;
@@ -360,7 +415,7 @@ export class Sim {
       else still = true;
     } else { // guard
       const d = this.flow.live[SLOT.ALARM] ? distAt(this, SLOT.ALARM, c) : INF;
-      if (d !== INF && d > 2) { follow = SLOT.ALARM; speed = RUN; }
+      if (d !== INF && d > 2 * STEP) { follow = SLOT.ALARM; speed = RUN; }
       else if (d !== INF) still = true; // at the call: hold the spot
       else if (layer === SURFACE) follow = SLOT.HOME;
       else still = true;
@@ -382,7 +437,10 @@ export class Sim {
       if (n1 < 0) { if (isTrailSlot(follow) && d !== 0) wander = true; else still = true; }
       else if (this.link[c] === n1) { this.moveTo(i, n1); return; }
       else {
-        // Aim two steps ahead when both are on this layer: ants then cut staircase corners on diagonals.
+        // Aim two steps ahead when both are on this layer: ants then cut staircase corners on diagonals. On a
+        // drawn bend that doubles back within one cell this cuts the bend too (measured: a lone ant passes 1.04
+        // cells from the bend cell's centre). Aiming one step there cost 4 KB of S4 snapshot at 24,000 ticks
+        // (60.6 to 64.9 KB, over the 64 KB line), so it is not done (sim/SPIKES.md, "Eight directions").
         const n2 = back ? backCell(this, follow, n1) : nextCell(this, follow, n1), aim = n2 >= 0 && this.link[n1] !== n2 ? n2 : n1;
         const [, ax, ay] = cellXY(L, aim);
         want = angleOf(ax * SUB + 128 - this.x[i], ay * SUB + 128 - this.y[i]);
@@ -394,13 +452,18 @@ export class Sim {
     }
     if (still) { this.stall[i] = 0; this.lastCell[i] = c; return; }
 
+    // Stuck (no progress for STALL_KICK ticks): turn a random way and wander for KICK_FOR ticks, then steer
+    // again; repeat every KICK_EVERY ticks while still stuck. Steering again between kicks lets an ant that a
+    // crowd pushed back find its way once the crowd thins (a kick every tick was a random walk for good).
     let h = this.heading[i];
-    if (want >= 0) {
+    const st = this.stall[i] < 65535 ? ++this.stall[i] : (this.stall[i] = STALL_KICK + 1), phase = st > STALL_KICK ? (st - STALL_KICK - 1) % KICK_EVERY : -1;
+    if (phase === 0) h = (h + 64 + below(r, A, 128)) & 255;
+    else if (phase > 0 && phase < KICK_FOR) h = (h + below(r, A, 17) - 8) & 255;
+    else if (want >= 0) {
       const t = turnTo(h, want);
       h = (h + (t > TURN ? TURN : t < -TURN ? -TURN : t) + below(r, A, 5) - 2) & 255;
     } else if (wander) h = (h + below(r, A, 17) - 8) & 255;
-    if (++this.stall[i] > STALL_KICK) h = (h + 64 + below(r, A, 128)) & 255; // stuck: try another way
-    if (this.stall[i] > this.maxStall) this.maxStall = this.stall[i];
+    if (st > this.maxStall) this.maxStall = st;
     this.heading[i] = h;
 
     // Separation from ants within SEP_R in this and the neighbouring cells, capped at half the speed per
@@ -417,7 +480,12 @@ export class Sim {
         const adx = dx < 0 ? -dx : dx, ady = dy < 0 ? -dy : dy;
         if (adx >= SEP_R || ady >= SEP_R) continue;
         if (dx === 0 && dy === 0) { px += j < i ? 8 : -8; continue; } // same spot: split by index
-        if (adx >= ady) px += dx > 0 ? SEP_R - adx : adx - SEP_R; else py += dy > 0 ? SEP_R - ady : ady - SEP_R;
+        // Away from the other ant along the line between them (any direction, not only the axes): the push is
+        // SEP_R less the distance, shared between the axes in proportion to the gaps. The distance is the
+        // integer estimate max + 3/8 min (within 3% of the true distance at 45 degrees, exact on an axis).
+        const far = adx > ady ? adx + ((ady * 3) >> 3) : ady + ((adx * 3) >> 3), k = SEP_R - far;
+        if (k <= 0) continue;
+        px += Math.trunc((dx * k) / far); py += Math.trunc((dy * k) / far);
       }
     }
     const cap = speed >> 1;
@@ -436,8 +504,13 @@ export class Sim {
     const layer = this.layer[i], w = widthOf(this.L, layer) * SUB, h = heightOf(this.L, layer) * SUB;
     const nx = this.x[i] + dx, ny = this.y[i] + dy;
     if (nx < 0 || ny < 0 || nx >= w || ny >= h) return false;
-    const c = baseOf(this.L, layer) + (ny >> 8) * widthOf(this.L, layer) + (nx >> 8);
+    const base = baseOf(this.L, layer), lw = widthOf(this.L, layer), ox = this.x[i] >> 8, oy = this.y[i] >> 8;
+    const c = base + (ny >> 8) * lw + (nx >> 8);
     if (this.mat[c] !== MAT.OPEN) return false;
+    // Crossing straight into a diagonal cell passes the shared corner point. With both side cells closed that
+    // is squeezing between two walls that touch at a corner, which no ant may do. With one side open, the
+    // step only grazes a wall's corner and is allowed (forbidding it jams crowds at tunnel mouths).
+    if ((nx >> 8) !== ox && (ny >> 8) !== oy && this.mat[base + oy * lw + (nx >> 8)] !== MAT.OPEN && this.mat[base + (ny >> 8) * lw + ox] !== MAT.OPEN) return false;
     this.x[i] = nx; this.y[i] = ny;
     return true;
   }
@@ -509,13 +582,16 @@ export class Sim {
     let h;
     const out = {};
     h = hashInt(0x1A, n);
-    for (const a of [this.x, this.y, this.layer, this.heading, this.job, this.mode, this.carry, this.mem, this.goal, this.best, this.stall, this.since, this.lastCell, this.via]) h = hashArray(h, a, n);
+    for (const a of this.antArrays()) h = hashArray(h, a, n);
+    const B = this.brood;
+    h = hashInt(h, B.n);
+    for (const a of [B.stage, B.age, B.fed, B.hunger, B.cell]) h = hashArray(h, a, B.n);
     out.ants = finish(h);
     h = 0x5C;
     for (let f = 0; f < FIELDS; f++) h = hashArray(h, S.cur[f]);
     out.scent = finish(h);
     h = 0x7E;
-    for (const a of [this.mat, this.dig, this.digWork, this.link, this.pileCell, this.pileAmount]) h = hashArray(h, a);
+    for (const a of [this.mat, this.dig, this.digWork, this.link, this.pileCell, this.pileAmount, this.pileKind]) h = hashArray(h, a);
     for (const v of [this.home.x, this.home.y, this.home.w, this.home.h]) h = hashInt(h, v);
     out.terrain = finish(h);
     h = 0xF1;
@@ -529,7 +605,9 @@ export class Sim {
     for (const e of this.queue) h = hashArray(h, e);
     h = hashArray(h, Int32Array.from(this.events));
     out.events = finish(h);
-    out.globals = finish(hashArray(0x61, this.g));
+    // Globals, and the settings that steer later ticks (layer sizes, the population cap, colony mode, scent).
+    const c = this.cfg;
+    out.globals = finish(hashArray(hashArray(0x61, this.g), Int32Array.from([c.sw, c.sh, c.nw, c.nh, c.maxAnts, c.colony ? 1 : 0, ...c.spread, ...c.halfLife])));
     h = 0;
     for (const k of SUBSYSTEMS) h = hashInt(h, out[k]);
     out.total = finish(h);

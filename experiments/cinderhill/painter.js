@@ -1,6 +1,8 @@
 // Cinderhill's trail painter (04-roadmap S3, 03-features "trail painter toy"): the deterministic sim at 20 ticks a
 // second, drawn with WebGL2, and the touch rules of 02-spec section 6.4. No goals; draw trails and watch the ants.
-import { Host, CMD, SURFACE, NEST, FIELD, COUNTS, TICK_MS, G as GI } from './host.js';
+import { Host, CMD, SURFACE, NEST, FIELD, COUNTS, TICK_MS, SEED, G as GI } from './host.js';
+import { START, STAGE } from './sim/colony.js';
+import { cellXY } from './sim/grid.js';
 import { makeGestures } from './gestures.js';
 import { Renderer } from './render.js';
 import { WORDS } from './words.js';
@@ -23,8 +25,15 @@ const persist = () => writeJson(SAVE, save);
 const query = new URLSearchParams(location.search);
 const qAnts = Number(query.get('ants'));
 
-let host = new Host(COUNTS.includes(qAnts) ? qAnts : save.ants);
+// ?colony=1: a colony game (queen, brood, sugar and protein; M1). Without it, the trail painter sandbox as in M0.
+// The ant count buttons and the saved count do not apply to a colony game.
+const colonyMode = query.get('colony') === '1';
+let host = colonyMode ? new Host(START.ants, SEED, { colony: true }) : new Host(COUNTS.includes(qAnts) ? qAnts : save.ants);
+if (colonyMode) for (const el of document.querySelectorAll('.counts')) el.hidden = true;
 let screen = 'menu', tool = 'trail', layer = SURFACE;
+// The tactical hold: time stops but the game stays on screen and takes orders; they apply on the first tick
+// after Go (an order is queued for the current tick, which has not run yet, so it is never late).
+let held = false;
 const G = makeGestures();
 const snd = sound({ on: () => save.sound });
 const rec = lab('cinderhill', { lang });
@@ -71,7 +80,7 @@ function uploadAnts() {
   let k = 0;
   for (let i = 0; i < n; i++) {
     if (s.layer[i] !== layer) continue;
-    const jump = host.pl[i] !== s.layer[i];
+    const jump = i >= host.pn || host.pl[i] !== s.layer[i]; // a newborn has no last position
     const x = s.x[i] / 256, y = s.y[i] / 256;
     inst[k] = jump ? x : host.px[i] / 256; inst[k + 1] = jump ? y : host.py[i] / 256; inst[k + 2] = x; inst[k + 3] = y;
     inst[k + 4] = s.heading[i] * (Math.PI / 128); inst[k + 5] = s.job[i]; inst[k + 6] = s.carry[i]; inst[k + 7] = (i * 0.618034) % 1;
@@ -104,6 +113,8 @@ function retext() {
   $('layer').textContent = layer === SURFACE ? t('nest') : t('surface');
   $('recall').textContent = host.sim.g[GI.RECALL] ? t('sendOut') : t('recall');
   $('recall').setAttribute('aria-pressed', String(!!host.sim.g[GI.RECALL]));
+  $('hold').textContent = held ? t('go') : t('hold');
+  $('hold').setAttribute('aria-pressed', String(held));
   $('sound').textContent = save.sound ? t('soundOn') : t('soundOff');
   $('tapTrail').textContent = save.tapTrail ? t('tapTrailOn') : t('tapTrailOff');
   for (const b of document.querySelectorAll('[data-tool]')) b.setAttribute('aria-pressed', String(b.dataset.tool === tool));
@@ -136,7 +147,7 @@ function toMenu() {
   setScreen('menu'); snd.hold();
 }
 function setCount(n) {
-  if (!COUNTS.includes(n) || n === host.ants) return;
+  if (colonyMode || !COUNTS.includes(n) || n === host.ants) return;
   run(G.reset('count'));
   host = new Host(n); save.ants = n; persist();
   selected = -1; tapStart = null; stats = host.stats();
@@ -155,6 +166,8 @@ $('toMenu').addEventListener('click', toMenu);
 $('layer').addEventListener('click', () => setLayer(layer === SURFACE ? NEST : SURFACE));
 $('zin').addEventListener('click', () => { cams[layer].z *= 1.4; clampCam(); });
 $('zout').addEventListener('click', () => { cams[layer].z /= 1.4; clampCam(); });
+function setHold(on) { if (on === held) return; held = on; host.last = null; retext(); if (held) toast('held'); }
+$('hold').addEventListener('click', () => setHold(!held));
 $('recall').addEventListener('click', () => { const on = !host.sim.g[GI.RECALL]; order({ type: CMD.RECALL, on: on ? 1 : 0 }); setTimeout(retext, 80); });
 $('sound').addEventListener('click', () => { save.sound = !save.sound; persist(); if (!save.sound) snd.hold(); retext(); });
 $('tapTrail').addEventListener('click', () => { save.tapTrail = !save.tapTrail; persist(); retext(); });
@@ -288,6 +301,8 @@ function drawOverlay(now) {
     }
     pulses = pulses.filter(pu => now - pu.at < 900);
   }
+  if (layer === NEST && colonyMode) drawBrood();
+  if (held) { ctx.strokeStyle = '#2f5b8acc'; ctx.lineWidth = 6; ctx.strokeRect(3, 3, W - 6, H - 6); } // time is held
   if (preview && preview.points.length) {
     ctx.strokeStyle = preview.tool === 'dig' ? '#f2d25a' : '#2b1d12'; ctx.lineWidth = preview.tool === 'dig' ? Math.max(6, 3 * cams[layer].z) : 4;
     ctx.setLineDash(preview.tool === 'dig' ? [] : [2, 8]);
@@ -309,10 +324,34 @@ function drawOverlay(now) {
   }
 }
 
+// The queen and the brood, in the nest view: the queen in the middle of her chamber, each egg, larva and pupa
+// in its cell (several in one cell spread a little by their index). Placeholder shapes until the ant look work.
+const BROOD_LOOK = [[2, '#fbf7ec'], [3.5, '#f1e3b8'], [4, '#c9a46a']]; // radius in cells/10, colour: egg, larva, pupa
+function drawBrood() {
+  const s = host.sim, B = s.brood, z = cams[NEST].z;
+  ctx.strokeStyle = '#2b1d12'; ctx.lineWidth = 1;
+  for (let k = 0; k < B.n; k++) {
+    const [, cx, cy] = cellXY(s.L, B.cell[k]), [r, col] = BROOD_LOOK[B.stage[k]];
+    const p = toScreen(cx + 0.25 + ((k * 0.618034) % 1) * 0.5, cy + 0.25 + ((k * 0.381966) % 1) * 0.5);
+    if (p.x < -20 || p.y < -20 || p.x > W + 20 || p.y > H + 20) continue;
+    ctx.fillStyle = col; ctx.beginPath();
+    if (B.stage[k] === STAGE.EGG) ctx.arc(p.x, p.y, Math.max(1.5, z * r / 10), 0, 7);
+    else ctx.ellipse(p.x, p.y, Math.max(2, z * r / 10), Math.max(1.5, z * r / 14), 0.6, 0, 7);
+    ctx.fill(); if (z > 6) ctx.stroke();
+  }
+  if (!s.g[GI.QUEEN]) return;
+  const h = s.home, q = toScreen(h.x + h.w / 2, h.y + h.h / 2), u = Math.max(4, z * 0.9);
+  ctx.fillStyle = '#5a2e14'; ctx.strokeStyle = '#f4ecdc'; ctx.lineWidth = 1.5;
+  for (const [dx, rr] of [[-1.1, 0.75], [0, 0.45], [0.7, 0.35]]) { ctx.beginPath(); ctx.ellipse(q.x + dx * u, q.y, rr * u, rr * u * 0.75, 0, 0, 7); ctx.fill(); ctx.stroke(); }
+}
+
 // ---- the HUD (a few times a second) ----
 function hud() {
   stats = host.stats();
-  $('stats').textContent = t('hud', { out: stats.surface.toLocaleString(lang()), carrying: stats.carrying.toLocaleString(lang()), home: stats.stores.toLocaleString(lang()) });
+  const num = v => v.toLocaleString(lang()), c = stats.colony;
+  $('stats').textContent = c
+    ? t('hudColony', { ants: num(stats.ants), sugar: num(c.sugar), protein: num(c.protein), eggs: num(c.eggs), larvae: num(c.larvae), pupae: num(c.pupae) })
+    : t('hud', { out: num(stats.surface), carrying: num(stats.carrying), home: num(stats.stores) });
   const lines = [];
   const newest = stats.trails.find(tr => tr.newest);
   stats.trails.slice().sort((a, b) => b.seq - a.seq).forEach((tr, k) => {
@@ -339,7 +378,8 @@ function frame(now) {
   requestAnimationFrame(frame);
   const t0 = performance.now();
   run(G.tick(t0));
-  const stepped = host.advance(now, screen !== 'play');
+  const stepped = host.advance(now, screen !== 'play' || held);
+  if (host.shifted) { host.shifted = false; selected = -1; $('antCard').classList.remove('on'); } // a death renumbered the ants
   if (stepped) {
     uploadAnts(); uploadScent();
     if (host.terrainVersion !== uploadedTerrain) uploadTerrain();
@@ -348,7 +388,7 @@ function frame(now) {
   }
   const L = host.sim.L, ent = { x: L.sw / 2 + 1, y: L.sh / 2 + 0.5 };
   const alarmLive = stats.alarm && alarmAt && alarmAt.layer === layer ? alarmAt : null;
-  if (renderer && renderer.draw({ layer, cam: cams[layer], alpha: screen === 'play' ? host.alpha : 1, time: now / 1000, piles: layer === SURFACE ? stats.piles : [], entrance: layer === SURFACE ? ent : null, alarm: alarmLive })) frames.drawn++;
+  if (renderer && renderer.draw({ layer, cam: cams[layer], alpha: screen === 'play' ? host.alpha : 1, running: screen === 'play', time: now / 1000, piles: layer === SURFACE ? stats.piles : [], entrance: layer === SURFACE ? ent : null, alarm: alarmLive })) frames.drawn++;
   drawOverlay(now);
   if (now - lastHud > 250) { lastHud = now; if (screen !== 'menu') hud(); }
   const work = performance.now() - t0;
@@ -365,9 +405,10 @@ requestAnimationFrame(frame);
 
 // ---- hooks for the phone check and the S3 script ----
 window.painter = {
-  state: () => ({ screen: screen === 'paused' ? 'paused' : screen, t: host.tick, paused: screen === 'paused', ants: host.ants, sound: save.sound, tapTrail: save.tapTrail, tool, layer, preview: preview ? preview.points.length : 0, orders: host.log.length, gl: !!renderer && !renderer.lost, glLosses: renderer?.losses ?? 0, glRestored: renderer?.restored ?? 0, glFailed, drawn: frames.drawn, selected, help: help.shown }),
+  state: () => ({ screen: screen === 'paused' ? 'paused' : screen, held, t: host.tick, paused: screen === 'paused', ants: host.ants, sound: save.sound, tapTrail: save.tapTrail, tool, layer, preview: preview ? preview.points.length : 0, orders: host.log.length, gl: !!renderer && !renderer.lost, glLosses: renderer?.losses ?? 0, glRestored: renderer?.restored ?? 0, glFailed, drawn: frames.drawn, selected, help: help.shown }),
   log: () => JSON.parse(JSON.stringify(host.log)),
   stats: () => host.stats(),
+  brood: () => Array.from({ length: host.sim.brood.n }, (_, k) => [...cellXY(host.sim.L, host.sim.brood.cell[k]).slice(1), host.sim.brood.stage[k]]),
   inspect: i => host.inspect(i),
   toScreen: (x, y, l) => toScreen(x, y, l),
   camera: () => ({ ...cams[layer] }),

@@ -158,6 +158,19 @@ async function cinderhillOrders(page, { base, until }) {
   expected.push('dig'); await same('a dig stroke');
   await page.click('#layer'); await until(page, () => window.painter.state().layer === 0, 'back on the surface');
   await page.click('[data-tool="trail"]');
+  // Hold: time stops, a stroke still gives an order, queued for the tick that has not run; Go applies it (not late).
+  await page.click('#hold'); await until(page, () => window.painter.state().held, 'hold');
+  const t0 = await page.evaluate(() => window.painter.state().t);
+  await ptr([['pointerdown', 1, cx, cy], ...stroke(1, cx, cy, -30, -100), ['pointerup', 1, cx - 30, cy - 100]]);
+  expected.push('trail'); await same('a stroke while time is held');
+  await page.waitForTimeout(500);
+  const heldOrder = await page.evaluate(() => ({ t: window.painter.state().t, o: window.painter.log().at(-1) }));
+  assert.equal(heldOrder.t, t0, 'no tick runs while held');
+  assert.equal(heldOrder.o.state, 'queued');
+  assert.equal(heldOrder.o.tick, t0);
+  await page.evaluate(t0 => { window.__t0 = t0; }, t0);
+  await page.click('#hold'); await until(page, () => !window.painter.state().held && window.painter.state().t > window.__t0 + 1, 'Go: time runs again');
+  assert.equal(await page.evaluate(() => window.painter.log().at(-1).state), 'applied', 'the held order applied, not late');
   // Real touches (Chromium only): a pinch mid-stroke, then a clean stroke.
   if (page.context().browser().browserType().name() === 'chromium') {
     const cdp = await page.context().newCDPSession(page);
@@ -360,19 +373,86 @@ const smallState = page => page.evaluate(() => window.smallState());
 async function smallGo(page, until, base, query = `?lang=en&day=${DAY}`) { await page.goto(`${base}/small/${query}`); await until(page, () => window.smallState, 'home script'); }
 export const pageRuns = {
   // Cinderhill's determinism check: the browser runs a short fixed game and must reach the hash Node computes
-  // (experiments/cinderhill/quick.js). The long cross-engine runs are spike S2, outside CI.
+  // (experiments/cinderhill/quick.js). Then the long run a phone player sends as one line (S2's 12,000 ticks).
   async 'cinderhill check'(page, { base, until }) {
     await page.goto(`${base}/cinderhill/check.html`);
     await page.click('#run');
     await until(page, () => window.cinderhill?.state().result, 'the determinism check finishes', 60000);
     const r = await page.evaluate(() => window.cinderhill.state().result);
     assert.ok(r.same, `this browser's total hash ${r.total} at tick ${r.tick} is not Node's`);
+    await page.click('#long');
+    await until(page, () => window.cinderhill.state().long, 'the long check finishes', 180000);
+    const l = await page.evaluate(() => window.cinderhill.state().long);
+    assert.ok(l.same, `the long run's total ${l.total} at tick ${l.tick} is not Node's`);
+    assert.match(await page.textContent('#report'), /long SAME/);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no sideways scroll');
   },
   // The trail painter's touch rules (02-spec 6.4): a stroke is a local preview and becomes one order when the finger
   // lifts; a second finger, a pointercancel, a layer switch or a pause ends it with no order. Every gesture below that
   // should give no order is followed by a check that the command log did not grow. Then a WebGL context loss and restore.
   'cinderhill orders': cinderhillOrders,
+  // The painter's HUD on a narrow phone in Turkish with 5,000 ants and the frame sampler on (?fps=1): no two of the
+  // stats line, the crew line, the sampler, the top buttons and the tool strip overlap (owner feedback, 2026-11-26:
+  // the sampler covered the other panes on an Android phone).
+  async 'cinderhill hud'(page, { base, until }) {
+    await page.setViewportSize({ width: 360, height: 640 });
+    await page.goto(`${base}/notes/button.js`);
+    await page.evaluate(() => { localStorage.clear(); localStorage.setItem('cinderhill:hint', '1'); });
+    await page.goto(`${base}/cinderhill/?fps=1&ants=5000&lang=tr`);
+    await until(page, () => window.painter, 'painter script');
+    await page.click('#play');
+    await until(page, () => window.painter.state().screen === 'play', 'play');
+    // A trail from the middle of the screen, so the crew line has something to say.
+    await page.evaluate(() => {
+      const el = document.querySelector('#c'), x = innerWidth / 2, y = innerHeight / 2;
+      for (const [type, dx, dy] of [['pointerdown', 0, 0], ['pointermove', 20, -20], ['pointermove', 40, -40], ['pointermove', 60, -60], ['pointerup', 60, -60]]) el.dispatchEvent(new PointerEvent(type, { pointerId: 1, pointerType: 'touch', isPrimary: true, clientX: x + dx, clientY: y + dy, pressure: type === 'pointerup' ? 0 : 0.5, bubbles: true, cancelable: true }));
+    });
+    await until(page, () => document.querySelector('#fps').textContent.includes('fps') && document.querySelector('#crew').textContent.length > 0, 'the sampler and the crew line show', 20000);
+    const boxes = await page.evaluate(() => ['#stats', '#crew', '#fps', '#top', '#tools'].map(sel => {
+      const r = document.querySelector(sel).getBoundingClientRect();
+      return { sel, x0: r.left, y0: r.top, x1: r.right, y1: r.bottom, w: r.width };
+    }));
+    for (const b of boxes) assert.ok(b.w > 0, `${b.sel} shows`);
+    for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+      const a = boxes[i], b = boxes[j], over = Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0) > 0.5 && Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0) > 0.5;
+      assert.ok(!over, `${a.sel} overlaps ${b.sel}: ${JSON.stringify([a, b])}`);
+    }
+  },
+  // ?colony=1: a colony game. The HUD shows sugar, protein and brood in Turkish; the count buttons are hidden and
+  // the saved ant count is left alone; the nest view draws the queen and brood (the overlay is not blank there).
+  async 'cinderhill colony'(page, { base, until }) {
+    await page.setViewportSize({ width: 360, height: 640 });
+    await page.goto(`${base}/notes/button.js`);
+    await page.evaluate(() => { localStorage.clear(); localStorage.setItem('cinderhill:hint', '1'); localStorage.setItem('cinderhill:save', JSON.stringify({ v: 1, sound: true, ants: 500, tapTrail: false })); });
+    await page.goto(`${base}/cinderhill/?colony=1&lang=tr`);
+    await until(page, () => window.painter, 'painter script');
+    assert.ok(await page.evaluate(() => [...document.querySelectorAll('.counts')].every(el => el.hidden)), 'no ant count buttons');
+    await page.click('#play');
+    await until(page, () => window.painter.state().screen === 'play', 'play');
+    await until(page, () => /şeker/.test(document.querySelector('#stats').textContent), 'the colony line', 10000);
+    const st = await page.evaluate(() => window.painter.stats());
+    assert.equal(st.ants, 20);
+    assert.equal(st.colony.queen, 1);
+    assert.equal(st.colony.larvae, 4);
+    assert.match(await page.textContent('#stats'), /20 karınca · \d+ şeker · 0 protein · yavrular: \d+ yumurta, 4 larva, 0 pupa/);
+    await page.evaluate(() => window.painter.setLayer(1));
+    await until(page, () => window.painter.state().layer === 1, 'nest view');
+    // Each brood item is drawn inside its own cell: some overlay pixel in that cell's square is painted.
+    const missing = await page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(() => {
+      const c = document.querySelector('#c'), g = c.getContext('2d'), k = c.width / innerWidth, out = [];
+      for (const [x, y] of window.painter.brood()) {
+        const a = window.painter.toScreen(x, y), b = window.painter.toScreen(x + 1, y + 1);
+        const w = Math.max(1, Math.round((b.x - a.x) * k)), h = Math.max(1, Math.round((b.y - a.y) * k));
+        const d = g.getImageData(Math.round(a.x * k), Math.round(a.y * k), w, h).data;
+        let any = false; for (let i = 3; i < d.length; i += 4) if (d[i]) { any = true; break; }
+        if (!any) out.push([x, y]);
+      }
+      done(out);
+    }))));
+    assert.ok((await page.evaluate(() => window.painter.brood().length)) >= 4, 'the four larvae are there');
+    assert.deepEqual(missing, [], 'every brood item is drawn in its cell');
+    assert.deepEqual(JSON.parse(await page.evaluate(() => localStorage.getItem('cinderhill:save'))).ants, 500, 'the saved count is untouched');
+  },
   async small(page, { base, until }) {
     const gameKeys = () => page.evaluate(() => Object.fromEntries(Object.keys(localStorage).filter(k => !/^(hub:|kit:|hf-lab-)/.test(k)).map(k => [k, localStorage.getItem(k)])));
     await page.goto(`${base}/notes/button.js`);

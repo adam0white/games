@@ -12,7 +12,10 @@
 //   rec.event('buy', { pack });    a choice, a purchase; outside a run it is sent at once as its own record
 //   rec.end('dawn', { embers });   the run ends with an outcome and a small summary; this sends it
 //
-// Every call returns at once and never throws. Nothing is retried: a failed send is dropped.
+// Every call returns at once and never throws. A record the lab refuses (any answer but 200), or that cannot be sent,
+// goes into a small queue in localStorage (QUEUE_MAX records, QUEUE_BYTES of JSON, QUEUE_DAYS old at most) and a small
+// line on the page says "Lab not recording: <reason>". The queue is sent again when a lab page opens and after the next
+// record the lab accepts, so play is kept if the lab is fixed later. Switching recording off empties the queue.
 // Storage keys are the lab client's own on this origin, so the off switch is the same switch other lab
 // games on play.adamwhite.work use, and the player id is the one they use.
 export const ENDPOINT = 'https://human.adamwhite.work/lab/api/linked';
@@ -25,8 +28,9 @@ export const WORDS = {
 };
 export const NOTICE = WORDS.en.notice;
 export const PRIVACY = 'https://human.adamwhite.work/lab/privacy/';
-const PLAYER = 'hf-lab-player', OFF = 'hf-lab-recording-off';
+const PLAYER = 'hf-lab-player', OFF = 'hf-lab-recording-off', QUEUE = 'hf-lab-kit-queue';
 const MAX_EVENTS = 300, MAX_BYTES = 96 * 1024;
+export const QUEUE_MAX = 60, QUEUE_BYTES = 400 * 1024, QUEUE_DAYS = 30, QUEUE_TRIES = 20;
 
 const get = (area, k) => { try { return globalThis[area].getItem(k); } catch { return null; } };
 const set = (area, k, v) => { try { v === null ? globalThis[area].removeItem(k) : globalThis[area].setItem(k, v); } catch {} };
@@ -66,24 +70,94 @@ export function lab(game, options = {}) {
   };
   const viewport = () => { const w = innerWidth; return w < 600 ? 'phone' : w < 1024 ? 'tablet' : 'desktop'; };
 
+  // Answers: 'ok' (stored), 'skip' (never retried: too large, or the lab dropped it for a privacy signal), or a reason code.
   async function post(record) {
-    if (typeof CompressionStream !== 'function') return;
+    if (typeof CompressionStream !== 'function') return 'skip';
     // Bytes go straight into the compressor. A Blob's stream is read through a blob address, and WebKit raises
     // a page error ("Cannot load blob ... due to access control checks") when the page leaves mid-read.
     const gz = new CompressionStream('gzip'), w = gz.writable.getWriter();
     w.write(new TextEncoder().encode(JSON.stringify(record))).catch(() => {}); w.close().catch(() => {});
     const body = await new Response(gz.readable).arrayBuffer();
-    if (body.byteLength > 250 * 1024) return;
-    const res = await send(endpoint, { method: 'POST', body, headers: { 'Content-Type': 'application/gzip' }, credentials: 'omit', referrerPolicy: 'no-referrer', mode: 'cors', keepalive: body.byteLength < 60000 });
-    if (res && res.status === 200) self.sent++;
+    if (body.byteLength > 250 * 1024) return 'skip';
+    let res;
+    try { res = await send(endpoint, { method: 'POST', body, headers: { 'Content-Type': 'application/gzip' }, credentials: 'omit', referrerPolicy: 'no-referrer', mode: 'cors', keepalive: body.byteLength < 60000 }); }
+    catch { return 'network'; }
+    if (res && res.status === 200) { self.sent++; return 'ok'; }
+    if (res && res.status === 204) { warn('privacy-signal'); return 'skip'; }
+    let code = '';
+    try { const j = await res.json(); if (typeof j?.error === 'string') code = j.error; } catch {}
+    return (code || `http ${res?.status ?? 'none'}`).replace(/[^\w .:-]/g, '').slice(0, 40);
   }
+
+  // The queue: records the lab did not store, oldest first, shared by every kit page on this origin.
+  // Expired or worn-out items are dropped on every read, so none is sent before it is removed.
+  const fresh = x => x && x.r && Number.isFinite(x.r.at) && Date.now() - x.r.at < QUEUE_DAYS * 86400000 && (x.n ?? 0) < QUEUE_TRIES;
+  const readQueue = () => { try { const q = JSON.parse(get('localStorage', QUEUE) ?? '[]'); return Array.isArray(q) ? q.filter(fresh) : []; } catch { return []; } };
+  // A queued record may come from another game. It is sent only while recording is on for that game now:
+  // not switched off, its events not switched off, and under a privacy signal only with that game's own tick.
+  const allowedFor = g => typeof g === 'string' && /^[a-z0-9-]{1,40}$/.test(g) && get('localStorage', OFF) !== '1' &&
+    get('localStorage', `hf-lab-events-off:${g}`) !== '1' && (!signal() || get('localStorage', `hf-lab-privacy-override:${g}`) === '1');
+  const writeQueue = q => {
+    const kept = q.filter(x => fresh(x) && allowedFor(x.r.game));
+    while (kept.length > QUEUE_MAX || (kept.length && JSON.stringify(kept).length > QUEUE_BYTES)) kept.shift();
+    set('localStorage', QUEUE, kept.length ? JSON.stringify(kept) : null);
+  };
+  const enqueue = r => { if (JSON.stringify(r).length > QUEUE_BYTES / 4) return; const q = readQueue(); if (!q.some(x => x.r?.id === r.id)) q.push({ r, n: 0 }); writeQueue(q); };
+  let draining = false;
+  const inFlight = new Set(); // ids this page is sending now; the queue holds them too, and drain leaves them alone
+  async function drain() {
+    if (draining || !on()) return; draining = true;
+    try {
+      for (const item of readQueue()) {
+        if (!on()) break;
+        if (inFlight.has(item.r?.id)) continue;
+        if (!fresh(item) || !allowedFor(item.r.game)) { dequeue(item.r.id); continue; }
+        // The privacy flag says what holds now, not what held when the record was made.
+        const out = { ...item.r }; delete out.privacyOverride; if (signal()) out.privacyOverride = true;
+        const answer = await post(out);
+        const q = readQueue(), i = q.findIndex(x => x.r?.id === item.r.id);
+        if (i < 0) continue;
+        if (answer === 'ok' || answer === 'skip') q.splice(i, 1); else q[i].n = (q[i].n ?? 0) + 1;
+        writeQueue(q);
+        if (answer !== 'ok' && answer !== 'skip') { warn(answer); break; }
+      }
+    } finally { draining = false; }
+  }
+  const dequeue = id => { const q = readQueue(), i = q.findIndex(x => x.r?.id === id); if (i >= 0) { q.splice(i, 1); writeQueue(q); } };
+  // Queued before sending, so a page closed before the answer arrives (a snapshot sent on page hide) still has it.
+  async function deliver(r) {
+    if (on()) enqueue(r);
+    inFlight.add(r.id);
+    let answer;
+    try { answer = await post(r); } finally { inFlight.delete(r.id); }
+    if (answer === 'ok' || answer === 'skip') dequeue(r.id);
+    if (answer === 'ok') { clearWarn(); drain().catch(() => {}); return; }
+    if (answer !== 'skip') warn(answer);
+  }
+  // A browser privacy signal stops recording on this page until the player ticks its switch; say so rather than
+  // record nothing silently. Not shown when the player switched recording off.
+  const signalOnly = () => { try {
+    if (noticed && signal() && !override() && get('localStorage', OFF) !== '1' && get('localStorage', eventsOff) !== '1') warn('privacy-signal (tick the switch to record)');
+  } catch {} };
+
+  // One small line at the bottom of the page while the lab is not storing this page's play.
+  let line = null;
+  function warn(code) { try {
+    if (!line) {
+      line = document.createElement('div'); line.className = 'lab-warning'; line.setAttribute('role', 'status');
+      Object.assign(line.style, { position: 'fixed', left: '6px', bottom: '6px', zIndex: '2147483647', font: '11px/1.3 system-ui, sans-serif', padding: '2px 6px', borderRadius: '4px', background: 'rgba(0,0,0,.55)', color: '#fff', opacity: '.75', pointerEvents: 'none', maxWidth: '70vw' });
+      document.body.append(line);
+    }
+    line.textContent = `Lab not recording: ${code}`;
+  } catch {} }
+  function clearWarn() { try { line?.remove(); line = null; } catch {} }
   function record(kind, runId, data) {
     const id = player(); if (!id) return;
     const { sid } = session();
     const r = { v: 2, id: hex(), player: id, session: sid, runId, game, kind, at: Date.now(), build, data };
     if (agent) r.runSource = 'agent';
     if (signal() && override()) r.privacyOverride = true;
-    post(r).catch(() => {});
+    deliver(r).catch(() => {});
   }
   function flush(final) {
     if (!run || !on()) return;
@@ -104,7 +178,7 @@ export function lab(game, options = {}) {
   self.notice = parent => { try {
     const p = document.createElement('p'); p.className = 'lab-notice'; Object.assign(p.style, { fontSize: '12px', lineHeight: '1.3', margin: '.5em 0 0', opacity: '.8', pointerEvents: 'auto' });
     const a = document.createElement('a'); a.href = PRIVACY; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = 'Privacy'; a.style.color = 'inherit';
-    a.textContent = say('privacy'); p.append(say('notice') + ' ', a); parent.append(p); noticed = p.isConnected; made.notices.push(p); watch(); return p;
+    a.textContent = say('privacy'); p.append(say('notice') + ' ', a); parent.append(p); noticed = p.isConnected; made.notices.push(p); watch(); signalOnly(); drain().catch(() => {}); return p;
   } catch { return null; } };
   self.toggle = parent => { try {
     const label = document.createElement('label'), input = document.createElement('input');
@@ -114,8 +188,8 @@ export function lab(game, options = {}) {
     Object.assign(input.style, { width: '22px', height: '22px', margin: '0' });
     const sync = () => { input.checked = get('localStorage', OFF) !== '1' && get('localStorage', eventsOff) !== '1' && (!signal() || override()); };
     input.addEventListener('change', () => {
-      if (input.checked) { set('localStorage', OFF, null); set('localStorage', eventsOff, null); if (signal()) set('localStorage', overrideKey, '1'); }
-      else { set('localStorage', OFF, '1'); set('localStorage', PLAYER, null); set('localStorage', overrideKey, null); }
+      if (input.checked) { set('localStorage', OFF, null); set('localStorage', eventsOff, null); if (signal()) set('localStorage', overrideKey, '1'); clearWarn(); drain().catch(() => {}); }
+      else { set('localStorage', OFF, '1'); set('localStorage', PLAYER, null); set('localStorage', overrideKey, null); set('localStorage', QUEUE, null); clearWarn(); }
       sync();
     });
     addEventListener('storage', sync); sync(); // another tab or game may change the switch

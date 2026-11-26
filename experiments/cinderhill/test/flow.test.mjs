@@ -1,26 +1,37 @@
-// Flow fields against a plain breadth-first search written here, separately, on tiny maps with walls,
-// a diagonal corner and an entrance link. Also: following the field takes exactly the shortest number of
-// steps, each to an open 4-neighbour or through the link; and a field updated after terrain changes equals
-// one built from scratch.
+// Flow fields against a plain Dijkstra written here, separately, on tiny maps with walls, a diagonal corner and
+// an entrance link. Steps: 4 orthogonal (cost 5), 4 diagonal (cost 7, only with the target and both side cells
+// open) and the link (cost 5). Also: following the field takes a shortest way, each step to an open neighbour
+// allowed by that rule or through the link; and a field updated after terrain changes equals one built from
+// scratch.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { GOAL, MAT, NEST, SURFACE, SLOT, Sim } from '../sim/sim.js';
 import { INF, nextCell, setGoal, distAt } from '../sim/flow.js';
 import { cellAt } from '../sim/grid.js';
 
-// Reference: its own grid walk from (layer, x, y) coordinates, its own queue, no shared tables.
+// Reference: its own grid walk from (layer, x, y) coordinates, an array scan for the next cell (no buckets),
+// no shared tables.
 function referenceBfs(s, goalCells) {
   const W = { [SURFACE]: s.cfg.sw, [NEST]: s.cfg.nw }, H = { [SURFACE]: s.cfg.sh, [NEST]: s.cfg.nh };
   const key = (l, x, y) => `${l},${x},${y}`, open = (l, x, y) => x >= 0 && y >= 0 && x < W[l] && y < H[l] && s.mat[cellAt(s.L, l, x, y)] === MAT.OPEN;
   const links = new Map();
   for (let c = 0; c < s.L.n; c++) if (s.link[c] >= 0) { const [l, x, y] = coord(s, c), [l2, x2, y2] = coord(s, s.link[c]); links.set(key(l, x, y), [l2, x2, y2]); }
-  const dist = new Map(), todo = [];
+  const dist = new Map(), done = new Set(), todo = [];
   for (const c of goalCells) { const p = coord(s, c); if (open(...p)) { dist.set(key(...p), 0); todo.push(p); } }
   while (todo.length) {
-    const [l, x, y] = todo.shift(), d = dist.get(key(l, x, y));
-    const nbs = [[l, x, y - 1], [l, x + 1, y], [l, x, y + 1], [l, x - 1, y]];
-    if (links.has(key(l, x, y))) nbs.push(links.get(key(l, x, y)));
-    for (const p of nbs) if (open(...p) && !dist.has(key(...p))) { dist.set(key(...p), d + 1); todo.push(p); }
+    let bi = 0;
+    for (let i = 1; i < todo.length; i++) if (dist.get(key(...todo[i])) < dist.get(key(...todo[bi]))) bi = i;
+    const [l, x, y] = todo.splice(bi, 1)[0], d = dist.get(key(l, x, y));
+    if (done.has(key(l, x, y))) continue;
+    done.add(key(l, x, y));
+    const steps = [[l, x, y - 1, 5], [l, x + 1, y, 5], [l, x, y + 1, 5], [l, x - 1, y, 5]];
+    for (const [ddx, ddy] of [[1, -1], [1, 1], [-1, 1], [-1, -1]]) if (open(l, x + ddx, y) && open(l, x, y + ddy)) steps.push([l, x + ddx, y + ddy, 7]);
+    if (links.has(key(l, x, y))) steps.push([...links.get(key(l, x, y)), 5]);
+    for (const [l2, x2, y2, w] of steps) {
+      if (!open(l2, x2, y2)) continue;
+      const k = key(l2, x2, y2);
+      if (!dist.has(k) || dist.get(k) > d + w) { dist.set(k, d + w); todo.push([l2, x2, y2]); }
+    }
   }
   return (c) => dist.get(key(...coord(s, c))) ?? INF;
 }
@@ -54,16 +65,25 @@ function check(s, slot, goalCells) {
     assert.equal(got, want, `cell ${coord(s, c)}: field ${got}, reference ${want}`);
     if (want === INF || want === 0) continue;
     reached++;
-    // Walk the field: every step goes to an open 4-neighbour or through the link, and the walk is shortest.
-    let at = c, steps = 0;
+    // Walk the field: every step goes to an open neighbour (a diagonal only past two open side cells) or
+    // through the link, and the walk's cost is the shortest.
+    let at = c, cost = 0;
     while (distAt(s, slot, at) > 0) {
       const to = nextCell(s, slot, at), [l1, x1, y1] = coord(s, at), [l2, x2, y2] = coord(s, to);
       assert.ok(to >= 0, 'a reachable cell has a next step');
       assert.equal(s.mat[to], MAT.OPEN);
-      assert.ok(s.link[at] === to || (l1 === l2 && Math.abs(x1 - x2) + Math.abs(y1 - y2) === 1), `step ${[l1, x1, y1]} to ${[l2, x2, y2]}`);
-      at = to; steps++;
+      const ax = Math.abs(x1 - x2), ay = Math.abs(y1 - y2);
+      if (s.link[at] === to) cost += 5;
+      else if (l1 === l2 && ax + ay === 1) cost += 5;
+      else {
+        assert.ok(l1 === l2 && ax === 1 && ay === 1, `step ${[l1, x1, y1]} to ${[l2, x2, y2]}`);
+        assert.equal(s.mat[cellAt(s.L, l1, x2, y1)], MAT.OPEN, `diagonal ${[l1, x1, y1]} to ${[x2, y2]} cuts a corner`);
+        assert.equal(s.mat[cellAt(s.L, l1, x1, y2)], MAT.OPEN, `diagonal ${[l1, x1, y1]} to ${[x2, y2]} cuts a corner`);
+        cost += 7;
+      }
+      at = to;
     }
-    assert.equal(steps, want, `walk from ${coord(s, c)}`);
+    assert.equal(cost, want, `walk from ${coord(s, c)}`);
   }
   return reached;
 }
@@ -76,7 +96,7 @@ for (const seed of [1, 2, 3, 4, 5, 6]) {
     s.rebuildFields();
     const reached = check(s, SLOT.ALARM, [goal]);
     assert.ok(reached > 20, `reached ${reached} cells`);
-    assert.equal(distAt(s, SLOT.ALARM, cellAt(s.L, SURFACE, 2, 2)), distAt(s, SLOT.ALARM, cellAt(s.L, NEST, 3, 0)) + 1, 'the link costs one step');
+    assert.equal(distAt(s, SLOT.ALARM, cellAt(s.L, SURFACE, 2, 2)), distAt(s, SLOT.ALARM, cellAt(s.L, NEST, 3, 0)) + 5, 'the link costs one straight step');
   });
 }
 

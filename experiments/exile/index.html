@@ -34,7 +34,7 @@
   // A Unity WebGL build (source outside this repo; see NOTES.md). The files are gzip with Unity's own
   // unpacking, so they need no content-encoding header from the server.
   const canvas = document.getElementById('game'), card = document.getElementById('card'), status = document.getElementById('status');
-  createUnityInstance(canvas, {
+  const startUnity = () => createUnityInstance(canvas, {
     dataUrl: 'Build/webgl.data.unityweb',
     frameworkUrl: 'Build/webgl.framework.js.unityweb',
     codeUrl: 'Build/webgl.wasm.unityweb',
@@ -44,6 +44,18 @@
   }, p => { document.getElementById('fill').style.width = Math.round(p * 100) + '%'; })
     .then(() => { card.style.display = 'none'; canvas.focus(); window.exileEvent?.('loaded', JSON.stringify({ s: Math.round(performance.now() / 1000) })); })
     .catch(err => { status.textContent = 'Could not start: ' + err; window.exileEvent?.('loadFailed', JSON.stringify({ msg: String(err).slice(0, 200) })); });
+  // ?hf=1: villagers decide with Human Framework, in a worker. The game posts requests through exileHFAsync.send
+  // and collects answers with exileHFAsync.poll, a frame or more later; it never waits on HF.
+  if (new URLSearchParams(location.search).get('hf') === '1' || new URLSearchParams(location.search).get('hf') === '2') {
+    try {
+      const worker = new Worker('hf/worker.mjs', { type: 'module' });
+      const inbox = [];
+      worker.onmessage = e => inbox.push(JSON.stringify(e.data));
+      worker.onerror = e => inbox.push(JSON.stringify({ id: -1, op: 'error', out: JSON.stringify({ ok: false, error: String(e.message || e) }) }));
+      window.exileHFAsync = { send: (id, op, arg) => worker.postMessage({ id, op, arg }), poll: () => inbox.shift() ?? '' };
+    } catch (err) { console.warn('HF worker failed', err); }
+  }
+  startUnity();
   addEventListener('pointerdown', () => canvas.focus());
   // A phone must not zoom or scroll the page under the game's own touch controls.
   for (const type of ['gesturestart', 'gesturechange', 'dblclick']) addEventListener(type, e => e.preventDefault(), { passive: false });
@@ -59,7 +71,7 @@
   const q = new URLSearchParams(location.search), box = document.getElementById('rec');
   if (q.get('autoplay') === '1' && q.get('labRunSource') !== 'agent') box.remove();
   else {
-    const rec = lab('exile', { version: '0.4' });
+    const rec = lab('exile', { version: q.get('hf') === '1' ? '0.6-hf' : q.get('hf') === '2' ? '0.6-hf2' : '0.6' });
     rec.notice(box); rec.toggle(box);
     let errors = 0;
     window.exileEvent = (name, json) => {

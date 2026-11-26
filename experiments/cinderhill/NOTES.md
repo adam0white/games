@@ -9,22 +9,24 @@ Working name for the ant colony game specified in `docs/design/colony/`. This di
 | `sim/` | The pure sim: plain ES modules, no dependencies, no build. Runs unchanged in Node, browsers and workerd |
 | `sim/sim.js` | `Sim`: the tick (20 a second), ants as typed arrays, commands, events, `hashes()` |
 | `sim/grid.js` | Both layers as one cell index space; materials; entrance links |
-| `sim/flow.js` | Flow fields: breadth-first search per live goal (16 slots), rebuilt only when a change touches them |
+| `sim/flow.js` | Flow fields: octile shortest distances per live goal (16 slots; orthogonal step 5, diagonal 7, entrance link 5) by a bucket queue, rebuilt only when a change touches them |
 | `sim/scent.js` | Three scent fields (trail, food, alarm): mass-conserving spread, 24-bit decay with a set half-life |
 | `sim/math.js`, `sim/rng.js`, `sim/hash.js` | Table trig and integer `angleOf`; mulberry32 streams; 32-bit hashes |
-| `sim/snapshot.js` | `snapshot(sim)` to bytes with a version header, `restore(bytes)`; format 2 models each value and range-codes it (S4: 55 KB at 5,000 ants, 24,000 ticks) |
+| `sim/snapshot.js` | `snapshot(sim)` to bytes with a version header, `restore(bytes)`; format 4 models each value and range-codes it (S4: 60.7 KB at 5,000 ants, 24,000 ticks) |
 | `sim/rangecoder.js` | The binary range coder the snapshot uses: adaptive probabilities, integers only, one walk for both directions |
 | `sim/replay.js` | `script(cfg, ticks)` (scripted orders), `replay(...)`, `firstDivergence(a, b)` |
 | `sim/world.js` | Seeded terrain: surface with stones, a pond and four food piles; nest with soil bands, shaft and chamber |
 | `sim/SPIKES.md` | Spike results S1, S2, S3 and S4 with numbers |
 | `test/` | `node --test` suites; CI runs them in the `changes` job (step "Cinderhill sim") |
 | `spikes/` | S1, S2, S3, S4, the trail-shape cases (`trail-shape.mjs`) and the workerd harness; the planted fault `mutant.js` |
-| `check.html`, `check.js`, `quick.js` | The determinism check page; the phone check runs it in WebKit and Chromium (`cinderhill check`) |
+| `check.html`, `check.js`, `quick.js` | The determinism check page; the phone check runs the short and the long check in WebKit and Chromium (`cinderhill check`), and `test/page.test.mjs` checks both expected totals in Node. `quick.js` holds the short check (`EXPECTED`) and the long one (`LONG`, `EXPECTED_LONG`: S2's 12,000 ticks of 2,000 ants), which the page runs in slices and reports as one copyable line |
 | `index.html`, `painter.js` | The trail painter page: menu, pause card, tool strip, HUD, the ant card, the frame sampler (`?fps=1`) |
 | `host.js` | Runs the sim for the page: 20 ticks a second from the frame clock (at most 4 a frame), the command log, crews and the "why" for one ant |
 | `gestures.js` | The touch rules as a pure reducer (pointer events in, preview, order, alarm, pan and zoom actions out); `test/gestures.test.mjs` |
 | `render.js` | WebGL2: the ground as one full-screen pass (terrain and scent as textures), ants as one instanced draw with a procedural body, interpolated between ticks; context loss and restore |
 | `words.js` | English and Turkish words (the Turkish is not checked by a native speaker) |
+| `sim/colony.js` | The colony: queen, brood, sugar and protein, castes, hit points, teams and the fight hook (section below) |
+| `bots.mjs` | Three ways to play a colony game for three days (careful, greedy, idle): `node experiments/cinderhill/bots.mjs [seeds] [ticks]` |
 
 ## Rules the sim keeps
 
@@ -46,7 +48,7 @@ PLAYWRIGHT=<dir> node experiments/kit/check/phone.mjs cinderhill # both pages in
 PLAYWRIGHT=<dir> node experiments/cinderhill/spikes/s3.mjs        # S3 frame times in emulated phones
 ```
 
-The painter takes `?ants=500|2000|5000` and `?fps=1` (frame, work and sim tick times on screen, for a real phone).
+The painter takes `?ants=500|2000|5000`, `?colony=1` (a colony game) and `?fps=1` (frame, work and sim tick times on screen, for a real phone).
 
 ## The trail painter (2026-11-25)
 
@@ -71,14 +73,58 @@ Decisions:
 
 - Sim change (`SIM_VERSION` 2): trails keep their drawn shape. The stroke becomes an ordered path, and the trail's field leads along it in order. Carriers walk their trail back, and a forager keeps her trail as her route. Before, ants walked the straight line to a trail's end. Numbers are in `sim/SPIKES.md`, "Trail shape", and the cases are in `spikes/trail-shape.mjs`.
 
+- Sim change (`SIM_VERSION` 3, 2026-11-26): ants move in eight directions. Owner feedback: guards could not move diagonally. Numbers are in `sim/SPIKES.md`, "Eight directions". The rules:
+  - Fields are octile distances: an orthogonal step costs 5, a diagonal 7, an entrance link 5. The constants are `STEP` and `DIAG` in `flow.js`. Thresholds that compared a distance to a cell count now multiply by `STEP` (`FAR`, the guard's reach).
+  - A field takes a diagonal only when the target and both side cells are open (`grid.js` `diagOpen`), so a path never cuts a wall's corner.
+  - Movement is more lenient: a step across a cell corner is refused only when both side cells are closed (two walls touching at a corner). With the strict rule, crowds jammed at the chamber and shaft mouths (bot run: 27 ants stuck for good, longest stall 2,983 ticks).
+  - Opening a cell repairs each field in place (lower the cell and its eight neighbours, then settle). Closing a cell marks touched fields for a full rebuild, as before.
+  - Trail paths are 8-connected. On the path the field holds path steps (one a step, not 5 or 7). An ant on the path goes to the path cell holding one less, so a bend that comes back beside an earlier cell is still walked in order. Off the path the field is 4,096 plus the octile distance to the path, and an ant joins at the nearest path cell.
+  - Distances are `Uint16`, so a field covers at most 13,106 straight steps of one winding corridor. The maps here are far below that; it is a limit, not a guard.
+  - Separation pushes along the line between two ants, with the distance estimated as the larger gap plus 3/8 of the smaller one.
+  - A stuck ant (no progress for 50 ticks) turns a random way once every 30 ticks and wanders for 8 of them, then steers again. Before, it drew a new random heading every tick.
+  - Unchanged: scent spreads to 4 neighbours; the three scent sensors already sample any angle.
+  - Snapshot format 3 codes an ant's last cell among the 8 neighbours and the link. Version 2 snapshots are refused, as the rule for a sim version change says.
+- The page: the `?fps=1` sampler sits in the HUD column, so it no longer covers the status and crew lines on a phone (`cinderhill hud` in the phone check, 360 x 640 in Turkish at 5,000 ants). Ants hold an idle pose when they did not move since the last tick, with a small antenna twitch; all ants hold still while paused.
+
 Not built: undo (the sim has no erase order), the small view of the other layer, an "ants wanted" number.
 
 When a sim change alters play, `test/page.test.mjs` fails and prints the new hash to put in `quick.js`.
+
+## The colony (M1, SIM_VERSION 4, 2026-11-26)
+
+`sim/colony.js` adds the queen, brood, two foods, castes and a fight hook. It runs only when `cfg.colony` is set: `/cinderhill/?colony=1` on the page, `bots.mjs`, `test/colony.test.mjs`. Without it the page is the trail painter sandbox as before (`?ants=`, the count buttons, the saved count); only the hashes changed, because they now cover the new fields.
+
+Rules (numbers are first guesses, tuned with `bots.mjs`; constants in `colony.js` `C`):
+
+- Piles alternate: even piles are sugar, odd piles protein (`world.js`). A load home adds 4 sugar or 2 protein to its store. `G.STORES` still counts loads.
+- The queen lays one egg per unit of sugar every 240 ticks; every 120 at 50 sugar in store, every 60 at 200. At a flat 240, laying capped growth at 50 eggs a day and a careful player grew no faster than an idle one on a map where wandering finds both foods.
+- Egg 3,000 ticks; larva eats one protein every 1,200 ticks and pupates after 3 meals, or after 5 meals (a major) when 20 protein is in store; a larva with no meal for 6,000 ticks dies; pupa 4,800 ticks. Egg to worker is 11,400 ticks, about one day.
+- Adults are born where the pupa lay. Jobs go by birth order: 7 in 10 forage, 2 dig, 1 guards.
+- Adults eat one sugar per 10 ants every 1,200 ticks. A missed meal is counted (`G.HUNGRY`); no adult starves yet.
+- A colony game starts with 20 workers in the chamber, 40 sugar and 4 larvae (`colony.js` `START`).
+
+Battles are not built. The sim is ready for them: every ant has a caste (worker 12 hit points, bite 2; major 30 and 5), hit points, a team and a bite cooldown. `fight()` runs once a tick after all ants have moved. Each ant whose cooldown is over bites the first enemy within 160 sub-cell units on her layer, then waits 10 ticks. An ant at 0 is removed at the end of the tick and the rest keep their order (`removeDead`). A digger who dies frees her place in the dig crew. With one team on the map the pass only counts cooldowns down.
+
+Two independent reviews (Codex, gpt-6.2-astra, read-only) of earlier versions found, and this version fixes: a death pending at a snapshot was lost on restore; the hash did not cover the population cap (which decides whether the queen lays); a chamber left of a narrow nest restored to the wrong place (the header is unsigned); bites reached past the touching distance and across the entrance, standing ants never bit, and a death gave the next ant two bites in a row (the bite beat came from the array index); the sandbox carried protein; a larva starved one tick late; the page drew the ants after a dead one from the wrong place. The second review added: the hash missed the layer sizes; a caller could change the scent settings after the sim was made; starting ants could spawn outside a narrow nest; a queen with no open cell lost her laying turn; diagonal bites reached past the touching distance; the page kept a stale ant card after a death. The dig-crew leak was found before the reviews. `test/colony.test.mjs` covers each sim fix and the host's renumbering; the pending-death, dig-crew and sandbox-carry tests were checked to fail without their fix. The page's ant card has no automated test.
+
+Snapshot format 4 codes pile kinds, caste, hit points (as damage taken), team, and the brood (stage, age, meals, hunger, cell as a step from the last one).
+
+Choices the owner may want to change: the start (20/40/4), sugar and protein per load, faster laying on rich sugar, adults never starving, majors from protein surplus rather than a caste dial (02-spec 6.3 names a dial), jobs by birth order, piles alternating by index.
+
+Bots after three days (`sim/SPIKES.md`): careful 130 to 153 ants, greedy (sugar only) 20, idle 20 to 94. Idle play does not lose on every map: adults never starve and there is no goal yet. Acceptance for the days PR: idle fails the day goal on every seed and careful passes.
+
+Foraging two foods needs crews split between trails. Seekers take the newest trail and keep their route, so the careful bot redraws to the scarcer food every 1,500 ticks. The spec's crew plus and minus (02-spec 6.4) is the real answer and is not built.
+
+The page draws the queen and brood as placeholder shapes in the nest view; the HUD shows ants, sugar, protein and the brood by stage. A newborn ant is drawn without interpolation on her first tick. When an ant dies the later ants move down one index, so that tick is drawn without interpolation and the selected ant is let go.
+
+## The tactical hold (2026-11-26)
+
+The Hold button (Durdur in Turkish) stops time on the page: the host stops advancing ticks, so the sim, scent and ants stand still. Orders still work while held. A trail or dig drawn while held is queued at the current tick (the page state says queued); the first tick after Go applies it. A blue frame marks the held screen. The hold lives in the page (`painter.js` `held`, `host.advance(now, ... || held)`), not in the sim, so it changes no hash and needs nothing from the room. In a shared room a hold would have to be a room rule (who may stop time for everyone); that is open. Trail, dig and Recall all go through the same `order()` path to `host.order`; the Recall button shows its new state only once Go applies it (it follows the sim). The `cinderhill orders` phone line checks that no tick runs while held, that a trail stroke queues, and that Go applies it; it fails when the hold does not stop time. Dig and Recall while held are not checked on their own. The kit's `pause.js` is the full pause (pause card, page hidden) and Cinderhill uses it; a hold that takes orders has one user, so it stays in the game until a second game needs it (kit rule 1).
 
 ## Simplifications to revisit in M1
 
 - Diggers dig the nearest marked cell, not the painted order, and carry no spoil. A dig crew is capped (4 per marked cell, 24 in all).
 - Foragers seek in this order: the trail that led them out last (their route), the pile they last took from, the newest trail, the three scent sensors, a random walk. After a minute with nothing found they go home. The scripted orders do not give good foraging; that is tuning work.
-- A field rebuild is a whole-field search (0.7 ms on the full map). Regional rebuilds and a per-tick rebuild budget are not built.
+- A field rebuild is a whole-field search (about 1.3 ms on the full map with octile costs, 0.7 ms before). Rebuilding all 9 live fields in one tick now takes about 12 ms, over the 10 ms tick budget. Regional rebuilds and a per-tick rebuild budget are not built.
 - Ants in a crowd pass through one another. Separation bends a path but never cancels the step.
 - No duplicate-command check in the sim; the room drops duplicates (05-tech, room protocol).

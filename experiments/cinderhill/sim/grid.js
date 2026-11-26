@@ -29,7 +29,22 @@ export function makeLayout(cfg) {
   };
   fill(0, sw, sh);
   fill(nestBase, nw, nh);
-  return { sw, sh, nw, nh, nestBase, n, nb };
+  // dg[c*4 + k]: the k-th diagonal neighbour (k: 0 up-right, 1 down-right, 2 down-left, 3 up-left), or -1.
+  // Diagonal k lies between orthogonal neighbours k and (k + 1) & 3, its two side cells. A step along a
+  // diagonal is allowed only when the target and both side cells are open (no cutting a wall's corner):
+  // see `diagOpen`.
+  const dg = new Int32Array(n * 4).fill(-1);
+  for (let c = 0; c < n; c++) for (let k = 0; k < 4; k++) {
+    const a = nb[c * 4 + k], b = nb[c * 4 + ((k + 1) & 3)];
+    if (a >= 0 && b >= 0) dg[c * 4 + k] = nb[a * 4 + ((k + 1) & 3)];
+  }
+  return { sw, sh, nw, nh, nestBase, n, nb, dg };
+}
+
+/** Diagonal k of cell c, or -1 when it is missing or the step would cut a corner (target or a side closed). */
+export function diagOpen(L, mat, c, k) {
+  const m = L.dg[c * 4 + k];
+  return m >= 0 && mat[m] === MAT.OPEN && mat[L.nb[c * 4 + k]] === MAT.OPEN && mat[L.nb[c * 4 + ((k + 1) & 3)]] === MAT.OPEN ? m : -1;
 }
 
 export const layerOf = (L, c) => (c >= L.nestBase ? NEST : SURFACE);

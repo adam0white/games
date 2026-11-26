@@ -34,6 +34,11 @@ its switch sit in the bottom left corner while the build loads, on the title scr
   where unfinished runs stopped, falls by place, stranger and stat choices, camera time, combat counts and frame rate,
   and one row per run. `--agents` includes agent runs; `--csv=FILE` writes the rows.
 
+## Resumed (2026-11-26)
+
+Build 0.6 is live: regions (Greyspine, cave, Darkwood), barred gate, `hf=1|2` villager arms, and `look=a|b|c|d` /
+`fx=a|b|c` variants for the owner's pick. The source repository's README "Resumed" section has the details and results.
+
 ## On hold (2026-11-25)
 
 The owner put Exile on hold on 2026-11-25. The page stays up on build 0.4. The source repository's `main` holds an

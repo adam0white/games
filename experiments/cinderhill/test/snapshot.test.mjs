@@ -2,7 +2,7 @@
 // that play produces), old versions and damaged payloads are refused, and the S4 size pass line holds.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { G, SUBSYSTEMS, Sim } from '../sim/sim.js';
+import { G, SIM_VERSION, SUBSYSTEMS, Sim } from '../sim/sim.js';
 import { FIELDS } from '../sim/scent.js';
 import { MAX_GOALS } from '../sim/flow.js';
 import { next, seedStreams } from '../sim/rng.js';
@@ -57,6 +57,11 @@ test('any state round-trips: values no play produces still restore exactly', () 
   for (let k = 0; k < sim.flow.pathLen.length; k++) sim.flow.pathLen[k] = rand(3000);
   some(40, () => { sim.flow.path[rand(sim.flow.path.length)] = [int32(), -1, 0x7FFFFFFF, -0x80000000][rand(4)]; });
   some(50, () => { sim.via[rand(A)] = rand(256) - 128; });
+  // Castes, hit points and teams of any byte; pile kinds; brood of any stage, age and cell.
+  some(50, () => { const i = rand(A); sim.caste[i] = rand(256); sim.hp[i] = rand(256); sim.team[i] = rand(256); });
+  some(4, () => { sim.pileKind[rand(sim.pileKind.length)] = rand(256); });
+  const B = sim.brood; B.n = 40;
+  for (let k = 0; k < B.n; k++) { B.stage[k] = rand(256); B.age[k] = rand(65536); B.fed[k] = rand(256); B.hunger[k] = rand(65536); B.cell[k] = [int32(), -1, 0x7FFFFFFF, -0x80000000][k & 3]; }
   sim.queue.push(Int32Array.from([int32(), int32(), 0x7FFFFFFF, -0x80000000]), new Int32Array(0));
   sim.events.push(int32(), -1, 0x7FFFFFFF);
   const want = sim.hashes(), bytes = snapshot(sim);
@@ -77,7 +82,9 @@ test('old versions and damaged snapshots are refused', () => {
   const bytes = snapshot(new Sim({ ...cfg, ants: 20 }));
   assert.equal(bytes[4] | (bytes[5] << 8), SNAPSHOT_VERSION);
   const v1 = bytes.slice(); v1[4] = 1; v1[5] = 0;
-  assert.throws(() => restore(v1), /snapshot 1\/2, this sim reads 2\/2/, 'version 1 (raw arrays) is refused by number');
+  assert.throws(() => restore(v1), new RegExp(`snapshot 1/${SIM_VERSION}, this sim reads ${SNAPSHOT_VERSION}/${SIM_VERSION}`), 'version 1 (raw arrays) is refused by number');
+  const v2 = bytes.slice(); v2[4] = 2; v2[5] = 0;
+  assert.throws(() => restore(v2), /snapshot 2\//, 'version 2 (lastCell without diagonals) is refused by number');
   const sim2 = bytes.slice(); sim2[6] ^= 0xFF;
   assert.throws(() => restore(sim2), /this sim reads/);
   assert.throws(() => restore(bytes.subarray(0, bytes.length - 3)), /truncated/);
