@@ -32,7 +32,7 @@ if (!Array.isArray(nights.best)) nights.best = [0, 0, 0];
 const persistNights = () => writeJson(NKEY, nights);
 const practiceNight = Math.max(0, Math.min(NIGHTN, Number(query.get('night')) | 0)) - 1;
 // The page plays with fair moths (a moth hovers a moment before it chases) and relight (a full jar relights one wick).
-const RULES = { fair: true, relight: true };
+const RULES = { fair: true, relight: true, lift: true };
 const snd = sound({ on: () => save.sound });
 const { fx, bump, log: fxLog } = feedback({ canSound: () => save.sound, size: 1000 });
 
@@ -269,6 +269,12 @@ function handle() {
         for (let k = 0; k < threadCopyN; k += 8) burst(threadCopy[k], threadCopy[k + 1], 1, 4, 30, 0.4);
         effects.push({ type: 'thorn', x: e.x, y: e.y, t: 0, dur: 0.5 });
       });
+    } else if (e.type === 'miss') {
+      // A lift that closed nothing: a dotted line back to where the thread starts says where to lift, or the thread burnt.
+      fx('miss', () => snd.tone(330, 0.14, 0.025, 'sine', -60), () => {
+        effects.push({ type: 'miss', x: e.x, y: e.y, sx: e.sx, sy: e.sy, burnt: e.burnt, t: 0, dur: 1.1 });
+        if (misses++ < 4 || e.burnt) pops.push({ x: Math.max(100, Math.min(260, e.x)), y: Math.max(90, e.y - 18), t: -0.1, text: t(e.burnt ? 'missBurnt' : 'missOpen') });
+      });
     } else if (e.type === 'eat') {
       fx('eat', () => snd.tone(180, 0.1, 0.06, 'square', -80), () => burst(ox + e.x * sc, oy + e.y * sc, 10, e.color, 70, 0.5));
     } else if (e.type === 'fade') {
@@ -287,7 +293,7 @@ function handle() {
     } else if (e.type === 'over') fx('over', null, () => { mode = 'ending'; endAt = performance.now() + 1400; show('ending'); });
   }
 }
-let callPulse = 0, relightPulse = 0;
+let callPulse = 0, relightPulse = 0, misses = 0;
 function tick() {
   const hx = finger.down ? toFieldX(finger.x) : NaN, hy = finger.down ? toFieldY(finger.y) : NaN;
   step(s, hx, hy);
@@ -588,6 +594,13 @@ function drawEffects(dt) {
       if (s.kind[e.i] !== MOTH) { effects.splice(i, 1); continue; }
       const x = X(s.x[e.i]), y = Y(s.y[e.i]), r = (calm ? 16 : 30 - 16 * a) * Math.max(0.8, sc);
       g.strokeStyle = '#ff6a5a'; g.globalAlpha = 0.85 - 0.4 * a; g.lineWidth = 2; g.beginPath(); g.arc(x, y, r, 0, 6.283); g.stroke();
+      g.globalAlpha = 1; continue;
+    }
+    if (e.type === 'miss') {
+      g.globalAlpha = 0.8 * (1 - a); g.strokeStyle = e.burnt ? '#ffb09a' : '#fff4d6'; g.lineWidth = 2;
+      if (!e.burnt) { g.setLineDash([3, 7]); g.beginPath(); g.moveTo(X(e.x), Y(e.y)); g.lineTo(X(e.sx), Y(e.sy)); g.stroke(); g.setLineDash([]); }
+      const r = 34 * sc * (calm ? 1 : 0.6 + 0.4 * ease(Math.min(1, a * 3)));
+      g.beginPath(); g.arc(X(e.burnt ? e.x : e.sx), Y(e.burnt ? e.y : e.sy), r, 0, 6.283); g.stroke();
       g.globalAlpha = 1; continue;
     }
     if (e.type === 'thorn') {
