@@ -11,7 +11,7 @@ const TICKS = 2600;
 const commands = script(cfg, TICKS);
 
 test('the script has every kind of order', () => {
-  assert.deepEqual([...new Set(commands.map(c => c.type))].sort((a, b) => a - b), [1, 2, 3, 4]);
+  assert.deepEqual([...new Set(commands.map(c => c.type))].sort((a, b) => a - b), [1, 2, 3, 4, 5]);
 });
 
 test('same seed and commands: same hashes, twice', () => {
