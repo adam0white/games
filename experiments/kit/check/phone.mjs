@@ -1224,6 +1224,13 @@ const GAMES = {
     await page.click('#coachOk'); assert.equal(await page.evaluate(() => window.alibiState().step), 1);
     await page.click('#pause'); await page.click('#toMenu'); assert.equal(await page.evaluate(() => window.alibiState().step), null, 'leaving ends practice');
     assert.equal(await page.evaluate(() => localStorage.getItem('alibi-save')), kept, 'practice saves nothing');
+    // Cases 1 to 7 show the guide line in words; case 8 keeps it for screen readers only (note #268).
+    for (const [level, shown] of [[1, true], [7, true], [8, false]]) {
+      await page.goto(`${base}/alibi/?level=${level}&labRunSource=agent&lang=en`); await until(page, () => window.alibiState, 'game script');
+      await page.locator('#play').evaluate(b => b.click()); await until(page, () => window.alibiState().screen === 'play', 'a case starts');
+      await until(page, () => document.getElementById('playGuide').textContent, 'the guide line');
+      assert.equal(await page.isVisible('#playGuide') && await page.evaluate(() => document.getElementById('playGuide').getBoundingClientRect().width > 100), shown, `case ${level}: guide line in words ${shown ? 'shown' : 'hidden'}`);
+    }
   },
   nightshift: page => started(page, 'nightshift', 'nightshiftState', '#toMenu'),
   // Small games (/small/<name>/, until 2026-11-25 /lab/<name>/): an old save survives, a finger steers, pause stops time, one audio context after the first tap.
