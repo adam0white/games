@@ -174,7 +174,7 @@ function finish() {
   $('replay').hidden = !s.won || !strikes.length; $('share').hidden = !isDaily;
   $('tuneLine').hidden = !s.won || !strikes.length; $('tuneText').textContent = t('tune');
   $('toast').hidden = true;
-  if (s.won) { chime(-1); playTune(); }
+  if (s.won) { chime(-1); playTune(); buzz([25, 50, 25, 50, 60]); } else buzz([70, 50, 70]);
   if (isDaily) makePicture().then(p => { picture = p; });
 }
 function bellVoice(f, vol = 1) { snd.tone(f, .85, .075 * vol); snd.tone(f * 2.01, .32, .025 * vol); snd.tone(f * 3, .18, .009 * vol); }
@@ -300,6 +300,10 @@ function spark(i, rankK) {
   const p = positions[i]; if (!p || reduced) { pops[Math.max(0, Math.min(87, rankK))] = .5; return; }
   fx.push({ kind: 'spark', x: p.x, y: p.y, k: Math.max(0, Math.min(87, rankK)), t: 0, life: .55, c: palette.bells[i] });
 }
+// Haptics where the phone has them (Android browsers; iOS Safari ignores it). Off with the sound switch.
+const buzz = pattern => { if (!reduced && save.sound) try { navigator.vibrate?.(pattern); } catch {} };
+// How well a strike was timed, said above the bell: quality is 1 at the very top of the swing, 0 at the window's edge (no word there).
+const grade = q => q >= .7 ? 'perfect' : q >= .35 ? 'good' : 'edge';
 function litShare() { return s.endless ? Math.min(1, s.score / 50) : Math.min(1, s.lights / Math.max(1, s.target)); }
 function update() {
   step(s, queue.splice(0, 1));
@@ -308,8 +312,11 @@ function update() {
       voice = 'silent'; const f = chime(e.index); strikes.push({ i: e.index, t: s.t, f, voice });
       const p = positions[e.index]; if (p && !reduced) fx.push({ kind: 'ring', x: p.x, y: p.y, t: 0, life: .8, c: palette.bells[e.index] });
       spark(e.index, Math.round(litShare() * 88) - 1); ringTime = s.t;
-    } else if (e.type === 'harmony' || e.type === 'chord' || e.type === 'woke') { burst = 1; chime(-1); }
-    else if (e.type === 'miss') { if (save.sound) snd.tone(130, .08, .015, 'triangle', -45); song?.miss(); }
+      const word = grade(e.quality);
+      if (p && word !== 'edge') fx.push({ kind: 'word', x: p.x, y: p.y - 34, t: 0, life: .7, c: palette.bells[e.index], text: t(word) + (s.combo >= 3 ? ' ×' + s.combo : '') });
+      buzz(word === 'perfect' ? 14 : 8);
+    } else if (e.type === 'harmony' || e.type === 'chord' || e.type === 'woke') { burst = 1; chime(-1); buzz([18, 40, 18]); }
+    else if (e.type === 'miss') { if (save.sound) snd.tone(130, .08, .015, 'triangle', -45); song?.miss(); buzz(35); }
     else if (e.type === 'rope' || e.type === 'gust') ropeFlash = 1.2;
   }
   if (s.endless && s.score > save.best) { save.best = Math.floor(s.score); store(); }
@@ -373,9 +380,9 @@ function tower() {
     const theta = v.angle, x = cx + Math.sin(theta) * len, y = py + Math.cos(theta) * len;
     positions.push({ x, y, hitRadius: Math.max(24, size * .65), lowest: py + len + size * .65 });
     const peak = s.amp * Math.sqrt(Math.max(.015, v.energy));
-    g.save(); g.setLineDash([2, 6]); g.strokeStyle = color + '40'; g.lineWidth = 1; g.beginPath(); g.arc(cx, py, len, Math.PI / 2 - peak, Math.PI / 2 + peak); g.stroke(); g.restore();
+    if (mode !== 'menu') { g.save(); g.setLineDash([2, 6]); g.strokeStyle = color + '40'; g.lineWidth = 1; g.beginPath(); g.arc(cx, py, len, Math.PI / 2 - peak, Math.PI / 2 + peak); g.stroke(); g.restore(); }
     // The top of each swing: a small ring, only on a side where this bell may ring.
-    if (!b.free) for (const side of [1, -1]) {
+    if (!b.free && mode !== 'menu') for (const side of [1, -1]) {
       if (v.side >= 0 && (side === 1 ? 0 : 1) !== v.side) continue;
       const ax = cx + Math.sin(peak * side) * len, ay = py + Math.cos(peak) * len, r = size * .34;
       markers.push({ i, x: ax, y: ay, r });
@@ -475,6 +482,7 @@ function draw() {
   }
   for (const f of fx) {
     const p = f.t / f.life;
+    if (f.kind === 'word') { g.save(); g.globalAlpha = Math.max(0, 1 - p * p); g.textAlign = 'center'; g.font = 'bold 15px Georgia'; const wy = f.y - (reduced ? 0 : p * 22); g.lineWidth = 4; g.lineJoin = 'round'; g.strokeStyle = '#0b1622c0'; g.strokeText(f.text, f.x, wy); g.fillStyle = f.c; g.fillText(f.text, f.x, wy); g.restore(); continue; }
     if (f.kind === 'ring') { g.globalAlpha = Math.max(0, 1 - p); circle(f.x, f.y, 24 + f.t * 90, null, f.c, 2); g.globalAlpha = 1; }
     else { const to = winPos[f.k]; if (!to) continue; const e = p * p * (3 - 2 * p), x = f.x + (to[0] - f.x) * e, y = f.y + (to[1] - f.y) * e - Math.sin(p * Math.PI) * 40; circle(x, y, 3.5, f.c); g.globalAlpha = .35; circle(x, y, 8, f.c); g.globalAlpha = 1; }
   }
