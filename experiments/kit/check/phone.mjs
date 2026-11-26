@@ -1410,6 +1410,7 @@ const [onlyGame, onlyPhone] = process.argv.slice(2).filter(a => a !== '--mutate'
 // The first argument is 'all' or a comma list of experiments. An experiment's name picks its own check, its
 // first-time help check, and for Lantern the three checks below that play Lantern.
 const WITH = { lantern: ['old links', 'lab down', 'leaving mid-run', 'lantern ripples'], duel: ['duel friend'], cinderhill: ['cinderhill check', 'cinderhill orders', 'cinderhill hud', 'cinderhill colony', 'cinderhill days'] };
+const LEFT_MID_SEND = /^request failed: https:\/\/human\.adamwhite\.work\/lab\/api\/linked \((cancelled|net::ERR_ABORTED)\)$/;
 const picked = game => !onlyGame || onlyGame === 'all' || onlyGame.split(',').some(only => game === only || game === `hint ${only}` || game.startsWith(`hint ${only} `) || WITH[only]?.includes(game));
 // A check that never answers becomes a FAIL line naming it, not a job that runs until its time limit.
 const within = (p, ms, what) => { let t; return Promise.race([p, new Promise((_, no) => { t = setTimeout(() => no(new Error(`no answer in ${ms / 1000}s: ${what}`)), ms); })]).finally(() => clearTimeout(t)); };
@@ -1450,9 +1451,12 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
       };
     });
     page.on('pageerror', e => errors.push(String(e))); page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
-    page.on('requestfailed', r => errors.push(`request failed: ${r.url()}`)); page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
+    // A lab send the page leaves behind (a part sent as the page is hidden, then the page navigates away) is cancelled by
+    // the browser; kit/lab.js keeps it queued and sends it on the next visit, so it is not a page error. Since 2026-11-26
+    // the hide part is sent on every hide during a run, because it carries the input trace.
+    page.on('requestfailed', r => errors.push(`request failed: ${r.url()} (${r.failure()?.errorText ?? ''})`)); page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
     // Lantern's check is the longest: its seven ability showings (note #123) took it past 150 s on WebKit.
-    try { await within(run(page), game === 'lantern' ? 240000 : 150000, 'the whole check'); assert.deepEqual(errors.filter(e => !(context.labDown && /human\.adamwhite\.work|Load failed|Failed to fetch|ERR_CONNECTION_REFUSED/.test(e))).filter(e => !(context.boardBad && /\/lab-api\/board\/|status of 401/.test(e))).filter(e => !(context.badFrame && /lab check: one bad frame/.test(e))).filter(e => !(context.viewBad && /view3d\.js|ripples(-gl)?\.js|net::ERR_FAILED|Failed to load resource|Importing a module/.test(e))), [], 'page errors'); console.log(`ok   ${game} on ${phone}`); }
+    try { await within(run(page), game === 'lantern' ? 240000 : 150000, 'the whole check'); assert.deepEqual(errors.filter(e => !LEFT_MID_SEND.test(e)).filter(e => !(context.labDown && /human\.adamwhite\.work|Load failed|Failed to fetch|ERR_CONNECTION_REFUSED/.test(e))).filter(e => !(context.boardBad && /\/lab-api\/board\/|status of 401/.test(e))).filter(e => !(context.badFrame && /lab check: one bad frame/.test(e))).filter(e => !(context.viewBad && /view3d\.js|ripples(-gl)?\.js|net::ERR_FAILED|Failed to load resource|Importing a module/.test(e))), [], 'page errors'); console.log(`ok   ${game} on ${phone}`); }
     catch (e) { failed++; console.log(`FAIL ${game} on ${phone}: ${e.message}`); if (process.env.CHECK_STACK) console.log(e.stack); if (errors.length) console.log('     ' + errors.join('\n     ')); await shot(page, 'failure').catch(() => {}); }
     try { await within(context.close(), 15000, 'closing the page'); }
     catch (e) { console.log(`     ${e.message}; starting the browser again`); browser.close().catch(() => {}); browser = await engine.launch(); }
