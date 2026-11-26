@@ -12,9 +12,9 @@ import { fileURLToPath } from 'node:url';
 const W = 96, ENTRANCE = [48, 48];
 // Strokes start at the entrance (02-spec 6.4: a trail is drawn from the nest).
 export const CASES = {
-  // East 30, then north 33: the straight line to the end cuts the corner by about 22 cells.
+  // East 31, then north 33: the straight line to the end cuts the corner by about 22 cells.
   dogleg: { points: [49, 49, 80, 49, 80, 16], stones: [] },
-  // North, east, then back south: the end is 22 cells from the start, the stroke 90 long.
+  // North, east, then back south: the end is 23 cells from the start, the stroke 87 long.
   ushape: { points: [49, 49, 49, 15, 72, 15, 72, 45], stones: [] },
   // A tight U: arms three cells apart. A shortcut between the arms would show as skipped corners.
   tightU: { points: [49, 49, 49, 20, 52, 20, 52, 45], stones: [] },
