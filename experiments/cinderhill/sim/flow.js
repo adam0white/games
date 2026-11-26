@@ -64,7 +64,11 @@ export const G = { TICK: 0, STORES: 1, RECALL: 2, ALARM_HOLD: 3, GOAL_SEQ: 4, DI
   // Days (colony.js): the day number, the goal's counters at dawn, days won, the last dusk, an eased goal, and
   // loads brought home along a trail, of sugar and of protein (ever).
   DAY: 18, BASE_A: 19, BASE_B: 20, DAYS_WON: 21, DAY_LAST: 22, EASED: 23, TRAIL_LOADS: 24, SUGAR_LOADS: 25, PROTEIN_LOADS: 26,
-  SIZE: 32 };
+  // The spider (spider.js): state, cell, ticks in state, the trail slot it walks (-1: the edge walk), where it is on
+  // its walk, ticks since it last ate, kills this visit, ants eaten ever, visits so far, its walk's length, and the
+  // trail's creation number (a trail replaced in that slot ends the visit).
+  SP: 27, SP_X: 28, SP_Y: 29, SP_T: 30, SP_SLOT: 31, SP_I: 32, SP_HUNGRY: 33, SP_KILLS: 34, SP_EATEN: 35, SP_VISITS: 36, SP_LEN: 37, SP_SEQ: 38,
+  SIZE: 40 };
 
 /** Push the goal's source cells (distance 0) in ascending cell order. */
 function sources(sim, slot, push) {

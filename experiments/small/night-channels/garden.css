@@ -52,7 +52,9 @@ footer { border-top:1px solid var(--line) }
 .calendar-icon::after { content:"";position:absolute;left:3px;right:3px;height:4px;top:-3px;border-inline:1.5px solid currentColor }
 .primary { padding:10px 18px;color:#24352a;background:#f0ca91;border:1px solid #f8dcac;border-radius:24px;font-weight:650 }
 .primary span { margin-left:5px }
-.next { font-size:13px }
+.next { font-size:13px;display:flex;align-items:center;min-width:0;white-space:nowrap }
+#nextText { overflow:hidden;text-overflow:ellipsis }
+.text-button { white-space:nowrap }
 #saveStatus:not(:empty),#dailyBest { display:block;color:var(--muted);font-size:12px;letter-spacing:0;margin:4px 0 }
 [hidden] { display:none!important }
 .screen { position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:12px;background:#091810b8;z-index:5 }

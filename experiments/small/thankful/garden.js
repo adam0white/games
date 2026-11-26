@@ -132,3 +132,57 @@ export function flower(g, name, x, y, box, time = 0, phase = 1.3) {
   const [shape, hue, sat, li] = SPECIES[name] || SPECIES.starflower, f = fit(name), k = box * 0.9 / f.span, s = 20 * k;
   g.save(); g.translate(x - f.dx * k, y - f.dy * k); head(g, shape, s, hue, sat, li, time, phase); g.restore();
 }
+
+// Today's bed (2026-11-26): until the day's three thanks are given, the place where they will grow is dug and waiting,
+// with a seed glowing for each thanks still to come, so even an empty garden shows where a thanks goes.
+// root: {x, y} of today's root; seeds: the number still to come (1 to 3); r: the day's cluster radius; z: zoom.
+export function bed(g, root, seeds, time, r, z, still) {
+  const w = r * 1.7, h = r * 0.5, pulse = still ? 0.6 : 0.5 + 0.5 * Math.sin(time / 520);
+  const soil = g.createRadialGradient(root.x, root.y, 0, root.x, root.y, w); soil.addColorStop(0, 'rgba(58,40,26,.95)'); soil.addColorStop(0.75, 'rgba(46,32,22,.8)'); soil.addColorStop(1, 'rgba(46,32,22,0)');
+  g.fillStyle = soil; g.beginPath(); g.ellipse(root.x, root.y + 1, w, h, 0, 0, TAU); g.fill();
+  g.strokeStyle = 'rgba(120,92,62,.45)'; g.lineWidth = Math.max(1, z * 0.8);
+  for (let i = -1; i <= 1; i++) { g.beginPath(); g.ellipse(root.x, root.y + i * h * 0.32, w * (0.72 - Math.abs(i) * 0.18), h * 0.12, 0, Math.PI * 0.1, Math.PI * 0.9); g.stroke(); }
+  g.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < seeds; i++) {
+    const x = root.x + (i - (seeds - 1) / 2) * r * 0.72, y = root.y - h * 0.05 + (i % 2) * h * 0.18, a = 0.45 + 0.4 * (still ? 0.6 : 0.5 + 0.5 * Math.sin(time / 520 + i * 1.7));
+    const R = (4.5 + 3 * pulse) * Math.sqrt(z), glow = g.createRadialGradient(x, y, 0, x, y, R * 2.2); glow.addColorStop(0, `rgba(255,236,170,${a})`); glow.addColorStop(1, 'rgba(255,236,170,0)');
+    g.fillStyle = glow; g.beginPath(); g.arc(x, y, R * 2.2, 0, TAU); g.fill();
+    g.fillStyle = `rgba(255,246,214,${0.6 + 0.4 * a})`; g.beginPath(); g.ellipse(x, y, 2.2 * Math.sqrt(z), 1.5 * Math.sqrt(z), -0.4, 0, TAU); g.fill();
+  }
+  g.globalCompositeOperation = 'source-over';
+}
+
+// Petals thrown up when a flower opens: {x, y, hue, start}; drawn for 1.1 s.
+export function burst(g, b, time) {
+  const u = (time - b.start) / 1100; if (u < 0 || u > 1) return u <= 1;
+  for (let i = 0; i < 12; i++) {
+    const a = i * TAU / 12 + b.start % 1, v = 34 + (i % 3) * 14, x = b.x + Math.cos(a) * v * u * b.z, y = b.y + (Math.sin(a) * v * u + 36 * u * u) * b.z;
+    g.save(); g.translate(x, y); g.rotate(a + u * 4); g.fillStyle = col(b.hue + (i % 3) * 8, 80, 76, (1 - u) * 0.9); petal(g, 6 * b.z, 2.6 * b.z, 0.5); g.restore();
+  }
+  return true;
+}
+
+// Visitors (2026-11-26): a butterfly for each completed day, up to seven, flying between the flowers on screen.
+// The newest one flies in from the edge when the day is completed (arrive: the time it set off; 0 for none).
+const WINGS = [[38, 92, 62], [200, 80, 66], [330, 70, 72], [52, 96, 60], [276, 60, 74], [16, 86, 60], [170, 60, 62]];
+export function visitors(g, n, time, heads, w, h, arrive, still, z = 1) {
+  if (!n || !heads.length) return;
+  for (let i = 0; i < n; i++) {
+    const [hue, sat, li] = WINGS[i % WINGS.length], hop = 4200 + i * 700, k = Math.floor((time + i * 1900) / hop), u = ((time + i * 1900) % hop) / hop;
+    const from = heads[(k * 5 + i * 3) % heads.length], to = heads[((k + 1) * 5 + i * 3) % heads.length];
+    // Rest on a flower for the first half of each hop, then fly to the next on a bowed path.
+    const f = still ? 0 : Math.max(0, (u - 0.5) * 2), e = f * f * (3 - 2 * f);
+    let x = from.x + (to.x - from.x) * e + Math.sin(f * Math.PI) * 26 * (i % 2 ? 1 : -1), y = from.y - 8 + (to.y - from.y) * e - Math.sin(f * Math.PI) * 46;
+    if (arrive && i === n - 1) { const v = Math.min(1, (time - arrive) / 3000), ve = 1 - (1 - v) ** 3; x = w + 30 + (x - w - 30) * ve; y = h * 0.15 + (y - h * 0.15) * ve - Math.sin(v * Math.PI) * 30; }
+    const flap = still ? 0.7 : f > 0 || (arrive && i === n - 1 && time - arrive < 3000) ? Math.abs(Math.sin(time / 70 + i)) : 0.55 + 0.35 * Math.abs(Math.sin(time / 600 + i)), s = 6.5 * Math.sqrt(z);
+    g.save(); g.translate(x, y); g.rotate(Math.sin(time / 400 + i) * 0.15);
+    for (const side of [-1, 1]) {
+      g.save(); g.scale(side * (0.25 + 0.75 * flap), 1);
+      g.fillStyle = col(hue, sat, li, 0.95); g.beginPath(); g.ellipse(s * 0.9, -s * 0.5, s, s * 0.75, -0.5, 0, TAU); g.fill();
+      g.fillStyle = col(hue + 20, sat, li - 12, 0.95); g.beginPath(); g.ellipse(s * 0.7, s * 0.55, s * 0.6, s * 0.45, 0.4, 0, TAU); g.fill();
+      g.restore();
+    }
+    g.strokeStyle = 'rgba(30,24,20,.9)'; g.lineWidth = 1.4; g.beginPath(); g.moveTo(0, -s * 0.8); g.lineTo(0, s * 0.8); g.stroke();
+    g.restore();
+  }
+}

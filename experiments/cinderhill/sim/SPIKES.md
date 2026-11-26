@@ -350,3 +350,50 @@ Kept, written down (`../NOTES.md`, Days): later days ask for more food than a ma
 
 **Mutations shown to fail** (`test/days.test.mjs`, 19 tests): judging a day won only when progress is over the target (`done > target`) fails "progress counts from dawn"; counting trail loads without the `via` check fails "trail loads"; reverting any of the review fixes above fails its test (checked one by one), except the restored delivered count, which no test catches. Restore was checked mid-day, on the tick before dusk and across a dusk: each continues to the same hashes as the run that was not saved.
 
+
+## The spider (SIM_VERSION 6, snapshot format 6, 2026-11-26)
+
+The spider (`../NOTES.md`, The spider and Recall; `spider.js`) adds 12 globals (`G` slots 27 to 38, `G.SIZE` 40) and steps after `fight()`. Recall changed too: foragers in the nest stay in under it (their search timer held at 0), and guards in the nest do not go out to a surface alarm. New totals: `EXPECTED` 1966277143 (600 ticks: no Recall yet, so only the globals' size changed it), `EXPECTED_LONG` 1788171951, `EXPECTED_COLONY` 27967529 (its 3,000 ticks see four visits; the third eats four ants).
+
+| Measure | Before (SIM_VERSION 5) | After |
+| --- | --- | --- |
+| S2 sandbox: Node, workerd, Chromium 156.0.8078.4, WebKit 27.2 on all 600 records | agree | agree (final total 1788171951) |
+| S2 colony (`--colony`, days of 1,200 ticks) | agree (3029667849) | agree (final total 2360211181) |
+| S2 planted fault | tick 20 (Chromium colony: 40), `ants` | the same |
+| S2 Firefox | not run | not run (Playwright's Firefox is not installed here) |
+| S1 Node, 2,000 ants, mean / p95 / max | 1.63 / 1.68 / 3.54 ms | 1.66 / 1.74 / 4.54 ms (load average 13 from other work on the machine) |
+| S1 Node, 5,000 ants | 1.94 / 2.05 / 3.65 ms | 2.02 / 2.16 / 5.22 ms (same load) |
+| S1 all 9 fields at once | 11.27 ms | 11.56 ms |
+| S1 workerd, 2,000 / 5,000 ants, mean | 1.56 / 1.90 ms | 1.89 / 2.12 ms (same load; round trip with no ticks 1.53 / 1.68 ms) |
+| S4, 5,000 ants, 3,000 / 8,000 / 24,000 ticks | 45.6 / 58.2 / 60.7 KB | 47.6 / 56.7 / 59.9 KB (margin 7.3 and 4.1 KB to 64 KB) |
+
+The sandbox has no spider; its S1 numbers moved within the noise of a loaded machine. Every S4 snapshot restores to the same hash.
+
+**Bots** (`bots.mjs`, 12 seeds, three days). Careful turns Recall on at the spider's warning and off when it leaves; careless plays careful's orders without Recall. Day 3 shows sugar and protein loads since dawn, "eaten" the ants the spider ate that day, ants alive at dusk of day 3:
+
+| Seed | careful day 1 / 2 / 3, eaten, ants | careless day 3, eaten, ants | idle day 1 / 2 / 3 | greedy day 1 / 2 / 3, eaten |
+| --- | --- | --- | --- | --- |
+| 1 | 155 / 47 / 204s 313p, 0, 112 | won 125s 212p, 30, 100 | 0 / 0 / 18s 244p of 45 | won / 0 / 84s 0p, 4 |
+| 2 | 143 / 48 / 170s 299p, 0, 110 | won 80s 241p, 30, 94 | 0 / 0 / 0s 338p | won / 0 / 36s 0p, 10 |
+| 3 | 84 / 46 / 227s 195p, 0, 129 | won 91s 178p, 30, 103 | 0 / 0 / 143s 0p | won / 0 / 64s 0p, 10 |
+| 4 | 144 / 48 / 182s 217p, 0, 110 | won 110s 163p, 30, 98 | 0 / 0 / 0s 309p | won / 0 / 78s 0p, 3 |
+| 5 | 133 / 48 / 206s 299p, 0, 116 | won 100s 254p, 30, 146 | 0 / 0 / 202s 32p | won / 0 / 85s 0p, 5 |
+| 6 | 72 / 48 / 140s 180p, 0, 116 | won 91s 135p, 28, 104 | 0 / 0 / 99s 7p | won / 0 / 78s 0p, 5 |
+| 7 | 144 / 48 / 164s 228p, 0, 109 | won 97s 193p, 30, 92 | 0 / 0 / 0s 77p | won / 0 / 96s 0p, 0 |
+| 8 | 105 / 48 / 141s 241p, 0, 139 | won 79s 186p, 30, 114 | 0 / 0 / 8s 217p | won / 0 / 90s 0p, 1 |
+| 9 | 144 / 48 / 176s 306p, 0, 110 | won 116s 204p, 30, 95 | 0 / 0 / 0s 218p | won / 0 / 96s 0p, 0 |
+| 10 | 84 / 48 / 215s 236p, 0, 121 | won 98s 191p, 30, 99 | 0 / 0 / 144s 0p | won / 0 / 64s 0p, 10 |
+| 11 | 108 / 48 / 192s 273p, 0, 153 | won 106s 228p, 30, 124 | 0 / 0 / 204s 22p | won / 0 / 85s 0p, 5 |
+| 12 | 132 / 48 / 164s 291p, 0, 109 | won 109s 173p, 30, 128 | 0 / 0 / 0s 254p | won / 0 / 64s 0p, 4 |
+
+Acceptance, written before tuning: careful (with Recall) wins days 1 to 3 on every seed, and idle loses every day on every seed. Both hold. Careful's day 3 is still far over 60 (narrowest: seed 6, 140 sugar). Careless also wins day 3 everywhere but loses 28 to 30 ants and about 40 per cent of its day-3 loads to the spider; that gap is what Recall is worth. Days 1 and 2 are the same for careful and careless: day 2's visit walks the edge and eats no one. Idle draws no trail, so its spider walks the edge every day and eats no one. The careless sweep ran before the review fixes below (it eats on arrival now, so it can only eat more); careful, idle and greedy ran after.
+
+**Independent review** (Codex, `gpt-6.2-astra`, read-only). Fixed:
+- Recall let a waiting forager's search time run, so one let out after a long Recall gave up at once; and guards in the nest still went out to a surface alarm, where the spider could eat them. Both tested.
+- The first visit could eat ants on a trail that ran along the edge row: it now eats no one. Tested with a trail that ends on that row.
+- The busiest trail let a later trail overwrite an ant's cell beside two trails; an ant now counts for every trail it is beside, and dying ants are not counted. Tested.
+- A one-cell trail was skipped; the spider's first meal waited 20 ticks after it arrived; a narrow or short map put it outside the map; a trail number at 2^31 or more read as replaced; very short days (`dayTicks` 8) let a visit run into later days. All fixed: times are now at most an eighth (the hunt half) of the day.
+- Page: the warning said "Recall now" when Recall was already on, and the hunt toast named a trail on an edge visit; the ant card said "climbing out" for a forager waiting under Recall; an off-screen warning could show neither ring nor arrow; the phone line read the HUD before it refreshed.
+- Two tests were weak: removing the kill (`hurt`) or reversing the walk left them green. Both now fail.
+
+**Mutations shown to fail** (`test/spider.test.mjs`, 8 tests): foragers going out under Recall; the search timer running under Recall; guards going out under Recall; a first visit that eats; a spider that eats without killing; the walk reversed; an ant beside two trails counting for one. Restore was checked at every tick of a visit (165 ticks, through meals): each continues to the same hashes as the run that was not saved.

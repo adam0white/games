@@ -137,5 +137,52 @@ async function extras(name,engine,device,base){
   await page.screenshot({path:join(shots,`${name}-320-${lang}.png`)});await context.close();}
  assert.deepEqual(errors,[],'no browser exceptions');console.log(`ok thankful extras ${name}: sounds ${Object.keys(sounds).length}/${Object.keys(sounds).length} actions, mean work ${work.mean.toFixed(2)} ms, max ${work.max.toFixed(1)} ms over ${work.n} frames`);
  }finally{await browser.close();}}
+// The first minute (2026-11-26): what a first-time visitor who has not tapped yet sees, in variant a (the default) and b (as before).
+async function firstMinute(name,engine,device,base){
+ const browser=await engine.launch();
+ try{const context=await browser.newContext({...device});const page=await context.newPage();const errors=[];
+ page.on('pageerror',e=>errors.push(String(e)));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
+ await context.route('**/*',route=>new URL(route.request().url()).origin!==base?route.abort():route.continue());
+ const T=()=>page.evaluate(()=>{const t=window.__thankful;return {bed:t.bed,visitors:t.visitors,lineTop:t.lineTop,variant:t.variant};});
+ const fresh=async q=>{await page.goto(`${base}/small/thankful/?day=2026-11-26${q}`);await page.waitForFunction(()=>!!window.__thankful);await page.evaluate(()=>localStorage.clear());await page.reload();await page.waitForFunction(()=>!!window.__thankful&&window.__thankful.lineTop>0);await page.waitForTimeout(300);};
+ const hinted=()=>page.evaluate(()=>!!document.querySelector('.kit-hint.on'));
+ // a: a cold open shows where a thanks goes, says what to do, and the tray breathes.
+ await fresh('');let s=await T();
+ assert.equal(s.variant,'a','a is the default');
+ assert.ok(s.bed&&s.bed.seeds===3,'an empty garden shows today\'s bed with three seeds');assert.ok(s.bed.y<s.lineTop,'the bed is above the words');
+ assert.equal(await page.textContent('#info'),'Tap something you are thankful for.','a first visit says what to do');
+ assert.equal(await page.evaluate(()=>document.querySelector('#tray').classList.contains('invite')),true,'the tray invites a tap');
+ const t0=Date.now();await page.waitForFunction(()=>!!document.querySelector('.kit-hint.on'),null,{timeout:9000}).catch(()=>{});assert.equal(await hinted(),true,'a visitor who does not tap is shown the tap');assert.ok(Date.now()-t0>2500,'not before about 3.5 s of idle');
+ await page.screenshot({path:join(shots,`${name}-first-hint.png`)});
+ await page.locator('[data-kind="bread"]').tap();await page.waitForTimeout(200);
+ assert.equal(await hinted(),false,'the hint goes on the first thanks');assert.equal(await page.evaluate(()=>localStorage.getItem('thankful:hint')),'1','and is remembered');
+ assert.equal(await page.evaluate(()=>document.querySelector('#tray').classList.contains('invite')),false,'the tray stops breathing after the first thanks');
+ assert.equal((await T()).bed.seeds,2,'one seed fewer');assert.equal(await page.textContent('#info'),'','the first-visit line goes once a thanks is given');
+ await page.waitForTimeout(1300);await page.screenshot({path:join(shots,`${name}-first-one.png`)});
+ await page.locator('[data-kind="friend"]').tap();await page.locator('[data-kind="spark"]').tap();await page.fill('#word','the sea');await page.locator('#wordForm [type=submit]').tap();
+ await page.waitForFunction(()=>window.__thankful.visitors===1,null,{timeout:4000});s=await T();
+ assert.equal(s.bed,null,'a full day has no bed');
+ const want=await page.evaluate(async()=>{const m=await import('./sim.js'),w=await import('./words.js');return ['bread','friend','spark'].map(k=>w.t(m.species('2026-11-27',k)));});
+ assert.equal(await page.isVisible('#tomorrow'),true,'tomorrow shows under a finished day');
+ assert.deepEqual(await page.$$eval('#tomorrow i',els=>els.map(e=>e.textContent)),want,'tomorrow names the flowers today\'s kinds grow tomorrow');
+ assert.deepEqual(Object.keys(JSON.parse(await page.evaluate(()=>localStorage.getItem('thankful:v1')))).sort(),['days','look','sound','v'],'the save format is unchanged');
+ await page.waitForTimeout(2600);await page.screenshot({path:join(shots,`${name}-first-done.png`)});
+ // A returning visitor gets no first-visit line and no hint.
+ await page.evaluate(()=>{const s=JSON.parse(localStorage.getItem('thankful:v1'));s.days={'2026-11-20':[{k:'bread'}]};localStorage.setItem('thankful:v1',JSON.stringify(s));localStorage.removeItem('thankful:hint');});
+ await page.reload();await page.waitForFunction(()=>!!window.__thankful);await page.waitForTimeout(4200);
+ assert.equal(await page.textContent('#info'),'','no first-visit line for a garden with days');assert.equal(await hinted(),false,'no hint for a player with a save');
+ assert.equal((await T()).bed?.seeds,3,'the bed shows every day until the first thanks');
+ // b: the page as it was before.
+ await fresh('&v=b');s=await T();
+ assert.equal(s.variant,'b');assert.equal(s.bed,null,'b: no bed');assert.equal(await page.textContent('#info'),'','b: no first-visit line');
+ assert.equal(await page.evaluate(()=>document.querySelector('#tray').classList.contains('invite')),false,'b: the tray is still');
+ await page.waitForTimeout(4200);assert.equal(await hinted(),false,'b: no hint');
+ for(const k of ['bread','water','home'])await page.locator(`[data-kind="${k}"]`).tap();await page.waitForTimeout(400);
+ assert.equal(await page.isVisible('#tomorrow'),false,'b: no tomorrow');assert.equal((await T()).visitors,0,'b: no butterflies');
+ // A short screen: the bed never sits on the words.
+ await page.setViewportSize({width:320,height:568});
+ for(const l of ['en','tr']){await fresh(`&lang=${l}`);s=await T();assert.ok(!s.bed||s.bed.y<s.lineTop,`320x568 ${l}: the bed is clear of the words`);await page.screenshot({path:join(shots,`${name}-first-320-${l}.png`)});}
+ assert.deepEqual(errors,[],'no browser exceptions');console.log(`ok thankful first minute ${name}`);
+ }finally{await browser.close();}}
 await new Promise(done=>server.listen(0,'127.0.0.1',done));const base=`http://127.0.0.1:${server.address().port}`;
-try{const failures=[];for(const [name,engine,device] of [['iphone13',webkit,devices['iPhone 13']],['pixel7',chromium,devices['Pixel 7']]]){try{await run(name,engine,device,base);await recording(name,engine,device,base);await extras(name,engine,device,base);}catch(error){console.error(`${name}: ${error.stack || error}`);failures.push(error);}}if(failures.length)throw new AggregateError(failures,'Phone checks failed');console.log(`Screenshots: ${shots}`);}finally{await new Promise(done=>server.close(done));}
+try{const failures=[];for(const [name,engine,device] of [['iphone13',webkit,devices['iPhone 13']],['pixel7',chromium,devices['Pixel 7']]]){try{await run(name,engine,device,base);await recording(name,engine,device,base);await extras(name,engine,device,base);await firstMinute(name,engine,device,base);}catch(error){console.error(`${name}: ${error.stack || error}`);failures.push(error);}}if(failures.length)throw new AggregateError(failures,'Phone checks failed');console.log(`Screenshots: ${shots}`);}finally{await new Promise(done=>server.close(done));}

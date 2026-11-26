@@ -1,5 +1,17 @@
 # Night Channels
 
+## 2026-11-26 — the garden greens over
+
+Played cold first (iPhone 13 WebKit): garden 1 is open to bloom in about 3 s with one drag, so the first minute was already fine. The weak moment was the win: one small flower at the end of a bare trench, then a button.
+
+- On a win the banks green over. Grass and small flowers spread out from the spring along every wet cell and onto the soil beside it, nearest first (0.07 s per cell of distance), and stay while the finished garden is on screen. A longer, branching channel makes a bigger meadow. Reduced motion shows it grown at once. Drawn in `render.js` (`verge`), after the water and before the beds; nothing in the rules changed.
+- Haptics where the phone has them (`navigator.vibrate`, Android; silent elsewhere and under reduced motion): a tick per cut, a double tap on a refused cut, a tap when water reaches a bed, a pattern on a bed blooming and on the whole garden.
+- The win button names the next garden: "Next: The bend" ("Sıradaki: Dönemeç"). It stays on one line; a long name is cut with an ellipsis on a narrow phone. The text buttons in the row no longer wrap ("Günün bahçesi" did at 320 px).
+
+Verified: `check.mjs` on WebKit iPhone 13 and Chromium Pixel 7 (all 30 gardens by real drags, first bloom 3.2 / 3.4 s wall, frame work p95 1 ms, fit at 320x568 in English and Turkish, 0 errors); `bots.mjs` unchanged (same pars, same clumsy-bot rates); `phone.mjs small/night-channels`. Render cost with a won garden-30-sized meadow: median 1 ms / p95 2 ms (WebKit), 0.4 / 0.8 ms (Chromium), against 1 / 1 and 0.3 / 0.5 without it. Screenshots of the meadow and the Turkish row at 320 px looked at.
+
+Not judged by a person: whether the meadow feels like a reward, the buzz strength on a real Android phone, and whether naming the next garden pulls anyone on.
+
 ## 2026-11-24 — hillside irrigation
 
 Open `/lab/night-channels/` to play. Garden 1 opens directly on a spring, a wet furrow and one seedbed. A moving mark traces the three dry cells between them. Digging lowers the land under the thumb immediately. A player can pause, replant or switch to the daily garden at any point. A win leaves the water and flowers on screen.

@@ -136,3 +136,63 @@ No adjacent drop is above 15 points; the lowest is 81.8% (spoon). Difficulty ris
 ## 2026-11-25 — the way back to the small games home
 
 Opened from `/small/` (`?from=small`), the page shows "‹ Small games" ("‹ Küçük oyunlar" in Turkish) on the menu and end cards, through `kit/home.js`; every booth or daily run and a won classic run is reported to the home as a win (the game records them as `won`). The home counts booth runs too. The recording notice and switch are now in the page's language. `check.mjs` asserts the two links in Turkish. The shared phone check pins this page's `Date` (`kit/check/clock.mjs`) for its daily line. Same keys, same records.
+
+## 2026-11-26 — cold open: the page opens on the first sitter
+
+**Why.** On 2026-11-26 the lab records showed Adam opening Face Shift twice on an Android phone with no run recorded. A run started only at Play on the menu, so an open that never reached Play left nothing behind. `kit/lab.js` already sends an unfinished run when the page is hidden (`visibilitychange`), so the menu tap was the only gap.
+
+**What changed.**
+- By default the page opens straight onto the booth's first sitter. A strip at the bottom shows the name, one line of how to play ("Grab the face and drag to copy the portrait.") and the lab recording notice. The strip goes away at the first photo.
+- The sitter waits for you. In `booth.js`, `createBooth({ wait: true })` keeps the clock and patience at zero until the first input. After that it runs as before, even with the finger lifted. The bot claim in `bots.mjs` covers this.
+- The run starts on the first touch on the face. The record is `rec.start({ mode: 'booth', seed, rung, cold: true })`, plus a new event, `first-photo` (`{ age }`).
+- No sound before that touch. Nothing is sent before it.
+- The menu (Daily face, Classic, language) is on the pause card as before.
+- `?v=b` keeps the old menu-first opening, so the two can be compared.
+
+**First minute, cold open with empty storage** (scripted drag; headless WebKit iPhone 13 and Chromium Pixel 7):
+
+| | Before (main) | After |
+| --- | --- | --- |
+| Screen at open | menu | first sitter, in play |
+| Taps before the run can start | 1 (Play) | 0 |
+| When the run record starts | at the Play tap | at the first drag on the face |
+| Open to a playable face | 50–105 ms (+ reading the menu) | 64–77 ms |
+| First drag to first photo | 0.6–1.0 s | 0.5–0.8 s |
+| Unfinished run sent when the page is hidden | yes, if Play was tapped | yes, after one drag |
+
+**Checks.**
+- `check.mjs` has a new cold-open block. It runs on iPhone 13 WebKit, Pixel 7 Chromium and 360×640.
+- That block asserts:
+  - the page opens in play with the notice inside the first screen, below the face;
+  - the strip does not reach the pause button;
+  - the clock stands at 0 for 0.9 s;
+  - nothing is sent and no audio context exists before the touch;
+  - the first photo comes within 0.5–0.8 s of the drag;
+  - the strip goes away;
+  - a page hidden mid-run sends the run with `cold: true` and `first-photo`;
+  - the menu is reachable through the pause card.
+- `check.mjs --cold` runs only that block.
+- The older classic and booth flows in `check.mjs` and `review.mjs` load `?v=b` and are otherwise unchanged.
+- The kit phone entry (`kit/check/lab-pages.mjs`, this game's block only) is now `startsOnBoard`, with the hint timed from the board. Both pass on both engines.
+
+**Not verified.** A real phone. Whether a first-time player reads the strip or simply drags. Firefox on Android, which is what Adam uses; the checks run WebKit and Chromium only.
+
+## 2026-11-26 — variety: sitters with looks, sneeze and mood-swing rungs, an endless encore
+
+**Why.** Adam (2026-11-24): "face shift but improve as it needs more variety and gameplay". Every sitter was the same blob in one of four colours, and the ladder ended at the laugh.
+
+**What changed (player-visible).**
+- **Each sitter has a look** (drawing only; the rules never see it): a bowler, beanie, cap, top hat, nightcap or beret; curls, a bun, a bob, spikes, clown puffs; round glasses or a monocle; a moustache, a bow, a flower; whiskers, frog spots, a dog's eye patch, a pig's snout, stubble, warts; and animal skins. Your face wears the sitter's look while you copy it, from the first sitter on. Nothing covers a part you must read: glasses are rims, hats and hair sit above the highest brow, whiskers stay off the mouth. The strip and the end card's photos wear them too.
+- **Four new sitters**: Frog, Grumpy, Baby, Goblin (from the memory rung on). The daily picks from the 23 sitters it had, so a day's five never change: checked equal to main for 400 days.
+- **Two new rungs** before Quick (the ladder is 17 rungs): *Sneeze* — halfway through a good hold the sitter winds up ("ah… AH…") and sneezes; one part of your face jolts and the hold starts over; the jolted part is marked at once. *Mood swings* — the sitter swings between two faces every 4.5 s; the other mood peeks out behind the portrait, a small ring counts down to the swing, either mood counts while it shows.
+- **Encore**: after the ladder, the end card offers an endless run: every part open, a twist on every rung (memory, moving, mirror, spoon, sneeze, swing, twins or none), a little stricter and less patient each rung, three hearts; it ends when three sitters have left. The menu offers it after one booth run. Best encore score is kept as `encore` in `wild2-face-shift:booth` (added only once there is one; old saves load unchanged). Recorded as `rec.start({mode:'encore', seed})`, ended `won` with summary `mode: 'encore'`.
+- **A drawing bug fixed**: since the booth was added, `face()` read its options from the wrong argument, so the pupils following the finger, the rubber bulge of a pulled part and the laugh blush never showed in the booth. They do now.
+- Haptics: a short buzz on a photo, a longer one on a sneeze, a pattern when a sitter leaves (`navigator.vibrate`, off with sound off or reduced motion).
+- New recorded event: `sneeze` (`{rung}`).
+
+**Verified.**
+- `bots.mjs`: careful 100% on all 17 rungs; clumsy photo rate sneeze 79%, swing 90.8%, quick 81% (was 86.9% at rung 14 of 15, now rung 16 of 17 with a stricter tolerance); no adjacent drop over 15 points; first photo ≤1.73 s. New examples: a held match makes the sitter sneeze before the photo, the jolt breaks the match, set again the photo comes with no second sneeze; a swinging sitter alternates moods; an idle encore ends after exactly three sitters leave; an encore is repeatable by seed. Clumsy bot in the encore: median 23 photos, 169 s. The bot reacts to a swing or a sneeze at once and re-aims only the jolted part, because the page marks it; whether people do is not known. Mutations: removing the `sneezed` flag fails "a held match makes the sitter sneeze"; never ending the encore fails "an idle encore ends".
+- `check.mjs --booth` (WebKit iPhone 13 full ladder, Chromium last three rungs): 34 photos on WebKit; sneeze rung sneezes then photographs with real drags on both engines; the end card offers Encore; the encore opens every part and takes photos; the menu then offers Encore. Cold-open block unchanged and passing. `phone.mjs small/wild2-face-shift` passes on both engines.
+- Screenshots looked at: cold open, every new look on several rungs, sneeze, swing, twins, encore, end card.
+
+**Not verified.** A real phone; Firefox on Android; how the sneeze and the swing feel to a person; whether three hearts is the right encore length; the haptics on a device.

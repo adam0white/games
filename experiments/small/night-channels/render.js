@@ -476,9 +476,68 @@ function effect(ctx, s, f, clock, reduced) {
   ctx.restore();
 }
 
+// On a win the watered banks green over: grass and small flowers spread out from the spring along
+// the wet cells and onto the banks beside them, nearest first, and stay while the finished garden is on screen.
+const verges = new WeakMap();
+function vergeOrder(s) {
+  const known = verges.get(s);
+  if (known) return known;
+  const wetCell = i => { const c = s.cells[i]; return c.kind !== 'rock' && (c.dug || c.water > .01 || c.moisture > .03); };
+  const dist = new Map(), queue = [...(s.sources || [s.source])];
+  const near = (i, f) => {
+    const x = i % s.cols, y = Math.floor(i / s.cols);
+    for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+      const nx = x + dx, ny = y + dy;
+      if (nx >= 0 && ny >= 0 && nx < s.cols && ny < s.rows) f(ny * s.cols + nx);
+    }
+  };
+  for (const i of queue) dist.set(i, 0);
+  for (let k = 0; k < queue.length; k++) {
+    const i = queue[k];
+    near(i, j => { if (!dist.has(j) && wetCell(j)) { dist.set(j, dist.get(i) + 1); queue.push(j); } });
+  }
+  const order = [];
+  const banks = new Map();
+  for (const [i, d] of dist) {
+    const kind = s.cells[i].kind;
+    if (kind !== 'spring' && kind !== 'bed') order.push([i, d, false]);
+    near(i, j => {
+      const c = s.cells[j];
+      if (!dist.has(j) && (c.kind === 'soil' || c.kind === 'sand')) banks.set(j, Math.min(banks.get(j) ?? Infinity, d + 1));
+    });
+  }
+  for (const [j, d] of banks) order.push([j, d, true]);
+  verges.set(s, order);
+  return order;
+}
+const PETALS = ['#f4c77d', '#eb9c78', '#fff1ba', '#d8a6e0', '#f7a8a0'];
+function verge(ctx, s, since, reduced) {
+  for (const [i, d, bank] of vergeOrder(s)) {
+    const u = reduced ? 1 : Math.max(0, Math.min(1, (since - .15 - d * .07) / .45));
+    if (!u) continue;
+    const grow = 1 - (1 - u) * (1 - u), cx = i % s.cols + .5, cy = Math.floor(i / s.cols) + .5;
+    const inner = !bank && s.cells[i].dug;
+    if (bank) { ctx.globalAlpha = .28 * grow; ellipse(ctx, cx, cy, .5, .46, '#5f8f4a'); ctx.globalAlpha = 1; }
+    const blades = bank ? 7 : 9;
+    for (let j = 0; j < blades; j++) {
+      const a = hash(i, j + 300) * TAU, r = inner ? .34 + hash(i, j + 320) * .14 : hash(i, j + 320) * .42;
+      const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
+      const h = (.16 + hash(i, j + 340) * .12) * grow, lean = (hash(i, j + 360) - .5) * .14;
+      line(ctx, x, y, x + lean - .04, y - h, .04, '#5f8f4a');
+      line(ctx, x, y, x + lean + .05, y - h * .85, .034, '#86b866');
+      line(ctx, x, y, x + lean, y - h * 1.1, .03, '#a7d27f');
+    }
+    const flowers = bank ? (hash(i, 380) < .55 ? 1 : 0) : 1 + (hash(i, 381) < .6 ? 1 : 0);
+    for (let k = 0; k < flowers; k++) {
+      const a = hash(i, 390 + k) * TAU, r = inner ? .38 : .1 + hash(i, 395 + k) * .28;
+      flower(ctx, cx + Math.cos(a) * r, cy + Math.sin(a) * r - .06, .13 * grow, PETALS[Math.floor(hash(i, 397 + k) * 5)], grow, a);
+    }
+  }
+}
+
 const landscapes = new WeakMap();
 
-export function render(canvas, terrain, s, {time=0, clock=0, effects=[], hint=false, look='moon', reduced=false}={}) {
+export function render(canvas, terrain, s, {time=0, clock=0, effects=[], hint=false, look='moon', reduced=false, wonAt=null}={}) {
   if (reduced) time=1.5;
   const g=geometry(canvas,s);
   if (!(g.size>0)) return;
@@ -501,6 +560,7 @@ export function render(canvas, terrain, s, {time=0, clock=0, effects=[], hint=fa
   ctx.lineCap='round';ctx.lineJoin='round';
   channels(ctx,s,p);
   water(ctx,s,time,p);
+  if (s.won && wonAt !== null) verge(ctx,s,clock-wonAt,reduced);
   for (const i of s.beds) thirst(ctx,s.cells[i],i%s.cols+.5,Math.floor(i/s.cols)+.5,p);
   for (const i of s.beds) seedbed(ctx,s.cells[i],i%s.cols+.5,Math.floor(i/s.cols)+.5,time,i,p);
   for (const f of effects) effect(ctx,s,f,clock,reduced);

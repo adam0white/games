@@ -3,7 +3,7 @@ import { words } from '../../kit/i18n.js';
 
 export const { t, lang, setLang, apply, langs } = words({
   en: {
-    tagline: 'Make that face.', play: 'Play', daily: 'Daily face', classic: 'Classic', otherLang: 'Türkçe',
+    tagline: 'Make that face.', coldHow: 'Grab the face and drag to copy the portrait.', play: 'Play', daily: 'Daily face', classic: 'Classic', otherLang: 'Türkçe',
     dailyNone: 'Five sitters, the same for everyone today', dailyBest: 'Today: best {n}',
     paused: 'Hold that face.', resume: 'Resume', restart: 'Restart', soundOn: 'Sound: on', soundOff: 'Sound: off', menu: 'Menu',
     strip: 'Your photo strip', contact: 'Your contact sheet', won: 'Picture perfect.', lost: 'One more take?',
@@ -22,9 +22,13 @@ export const { t, lang, setLang, apply, langs } = words({
     'face.sour': 'Sour', 'face.sleepy': 'Sleepy', 'face.startled': 'Startled', 'face.clown': 'Clown', 'face.snooty': 'Snooty',
     'face.smug': 'Smug', 'face.cat': 'Cat', 'face.dog': 'Dog', 'face.bunny': 'Bunny', 'face.pig': 'Pig', 'face.owl': 'Owl',
     'face.mouse': 'Mouse', 'face.laugh': 'Make me laugh',
+    'face.frog': 'Frog', 'face.grumpy': 'Grumpy', 'face.baby': 'Baby', 'face.goblin': 'Goblin',
+    'rung.sneeze': 'Bless you! Hold on through the sneeze', 'rung.swing': 'Mood swings', ah: 'ah…', ahAh: 'ah… AH…', achoo: 'ACHOO!',
+    encore: 'Encore', encoreAgain: 'Encore again', boothAgain: 'Play the booth', encoreDone: 'The encore is over.', encoreHud: 'ENCORE {n}',
+    encorePlain: 'Every part, no tricks', statsEncore: '{n} photos before three sitters left · Best {b}',
   },
   tr: {
-    tagline: 'O yüzü yap.', play: 'Oyna', daily: 'Günün yüzü', classic: 'Klasik', otherLang: 'English',
+    tagline: 'O yüzü yap.', coldHow: 'Yüzü tut ve portreye benzetmek için sürükle.', play: 'Oyna', daily: 'Günün yüzü', classic: 'Klasik', otherLang: 'English',
     dailyNone: 'Beş model, bugün herkes için aynı', dailyBest: 'Bugün: en iyi {n}',
     paused: 'O yüzü tut.', resume: 'Devam', restart: 'Baştan', soundOn: 'Ses: açık', soundOff: 'Ses: kapalı', menu: 'Menü',
     strip: 'Fotoğraf şeridin', contact: 'Fotoğrafların', won: 'Tam kare.', lost: 'Bir çekim daha?',
@@ -43,5 +47,9 @@ export const { t, lang, setLang, apply, langs } = words({
     'face.sour': 'Ekşi', 'face.sleepy': 'Uykulu', 'face.startled': 'Ürkmüş', 'face.clown': 'Palyaço', 'face.snooty': 'Burnu havada',
     'face.smug': 'Kendini beğenmiş', 'face.cat': 'Kedi', 'face.dog': 'Köpek', 'face.bunny': 'Tavşan', 'face.pig': 'Domuz', 'face.owl': 'Baykuş',
     'face.mouse': 'Fare', 'face.laugh': 'Güldür beni',
+    'face.frog': 'Kurbağa', 'face.grumpy': 'Huysuz', 'face.baby': 'Bebek', 'face.goblin': 'Cin',
+    'rung.sneeze': 'Çok yaşa! Hapşırığa rağmen tut', 'rung.swing': 'Duygu değişimi', ah: 'ha…', ahAh: 'ha… HA…', achoo: 'HAPŞU!',
+    encore: 'Bis', encoreAgain: 'Yine bis', boothAgain: 'Kabini oyna', encoreDone: 'Bis bitti.', encoreHud: 'BİS {n}',
+    encorePlain: 'Her yer açık, hile yok', statsEncore: 'Üç model gidene kadar {n} fotoğraf · En iyi {b}',
   },
 });

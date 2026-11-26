@@ -394,6 +394,39 @@ export const pageRuns = {
   // The painter's HUD on a narrow phone in Turkish with 5,000 ants and the frame sampler on (?fps=1): no two of the
   // stats line, the crew line, the sampler, the top buttons and the tool strip overlap (owner feedback, 2026-11-26:
   // the sampler covered the other panes on an Android phone).
+  // ?look= (looks.js): each look is its own shader build. Each compiles and draws, survives a lost context, and
+  // an unknown name falls back to ink. The pause card's look buttons reload with the new look and keep ?colony=1.
+  async 'cinderhill looks'(page, { base, until }) {
+    await page.setViewportSize({ width: 360, height: 640 });
+    await page.goto(`${base}/notes/button.js`);
+    await page.evaluate(() => { localStorage.clear(); localStorage.setItem('cinderhill:hint', '1'); });
+    for (const [q, want] of [['ember', 'ember'], ['field', 'field'], ['nope', 'ink']]) {
+      await page.goto(`${base}/cinderhill/?ants=500&look=${q}&labRunSource=agent`);
+      await until(page, () => window.painter, 'painter script');
+      await page.click('#play');
+      await until(page, () => window.painter.state().screen === 'play' && window.painter.state().drawn > 5, `${q}: frames drawn`);
+      const st = await page.evaluate(() => window.painter.state());
+      assert.equal(st.look, want); assert.equal(st.glFailed, '', `${q}: shaders compile`); assert.ok(st.gl, `${q}: WebGL2 draws`);
+      await page.evaluate(() => window.painter.loseContext());
+      await until(page, () => window.painter.state().glLosses === 1, `${q}: context lost`);
+      await page.evaluate(() => window.painter.restoreContext());
+      await until(page, () => window.painter.state().gl && window.painter.state().glRestored === 1, `${q}: context restored`);
+      assert.equal(await page.evaluate(() => window.painter.state().glFailed), '', `${q}: shaders compile again`);
+    }
+    await page.goto(`${base}/cinderhill/?colony=1&look=ember&labRunSource=agent`);
+    await until(page, () => window.painter, 'painter script');
+    assert.equal(await page.getAttribute('[data-look="ember"]', 'aria-pressed'), 'true');
+    await page.click('#play');
+    await until(page, () => window.painter.state().dayCard === 'dawn', 'the dawn card');
+    await page.click('#dayGo');
+    await until(page, () => window.painter.state().screen === 'play', 'play');
+    await page.click('#pause');
+    await until(page, () => window.painter.state().paused, 'paused');
+    await Promise.all([page.waitForURL(/look=field/), page.click('[data-look="field"]')]);
+    const u = new URL(page.url());
+    assert.equal(u.searchParams.get('colony'), '1', 'the colony game is kept');
+    await until(page, () => window.painter && window.painter.state().look === 'field', 'the field look after the reload');
+  },
   async 'cinderhill hud'(page, { base, until }) {
     await page.setViewportSize({ width: 360, height: 640 });
     await page.goto(`${base}/notes/button.js`);
@@ -492,6 +525,17 @@ export const pageRuns = {
     await page.click('#dayGo');
     await until(page, () => window.painter.state().screen === 'play' && window.painter.day().day === 2, 'day 2 in play');
     assert.deepEqual(await page.evaluate(() => window.painter.dawns()), [2], 'yesterday\'s dawn is let go');
+    // Day 2's spider (sim/spider.js): a warning at a quarter of the day, the hunt (the safe form: the top edge, no meals), then it leaves.
+    await until(page, () => window.painter.state().spider === 1, 'the spider\'s warning', 30000);
+    assert.match(await page.textContent('#toast'), /spider is prowling the edge/);
+    await until(page, () => /Spider: coming/.test(document.querySelector('#crew').textContent), 'the coming line');
+    await until(page, () => window.painter.state().spider === 2, 'the spider hunting', 30000);
+    await until(page, () => /Spider: hunting/.test(document.querySelector('#crew').textContent), 'the hunting line');
+    await until(page, () => window.painter.state().spider === 0 && window.painter.state().spiderVisits === 1, 'the spider gone', 30000);
+    const rooms = await page.evaluate(() => window.painter.rooms());
+    assert.ok(rooms.length >= 1 && rooms[0].queen, 'the nest view finds the queen\'s chamber');
+    const labState = await page.evaluate(() => window.painter.lab());
+    assert.equal(labState.open, true, 'the lab replay record is open'); assert.equal(labState.part, 1);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no sideways scroll');
   },
   async small(page, { base, until }) {

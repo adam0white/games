@@ -102,6 +102,8 @@ export const tables = {
     idea_slowLamp: 'Wait longer between rings',
     idea_gale: 'Strong, frequent gusts',
     hintLabel: 'Hold your finger down and move it slowly',
+    missOpen: 'Lift where you started',
+    missBurnt: 'Too big: the thread burnt away',
   },
   tr: {
     title: 'Ateş Böceği Halkası',
@@ -204,6 +206,8 @@ export const tables = {
     idea_slowLamp: 'Halkalar arasında daha uzun bekle',
     idea_gale: 'Sık ve sert esintiler',
     hintLabel: 'Parmağını bas ve yavaşça sürükle',
+    missOpen: 'Başladığın yerde bırak',
+    missBurnt: 'Çok büyük: iplik yanıp bitti',
   },
 };
 

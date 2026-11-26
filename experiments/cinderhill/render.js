@@ -28,8 +28,18 @@ float noise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * 
 float fbm(vec2 p) { return 0.55 * noise(p) + 0.3 * noise(p * 2.03 + 7.1) + 0.15 * noise(p * 4.1 + 3.7); }
 uint matAt(ivec2 c) { c = clamp(c, ivec2(0), ivec2(uSize) - 1); return texelFetch(uMat, c, 0).r; }
 float solid(ivec2 c) { if (c.x < 0 || c.y < 0 || c.x >= int(uSize.x) || c.y >= int(uSize.y)) return 1.0; return matAt(c) == 0u ? 0.0 : 1.0; }
+#if LOOK == 1
+const vec3 INK = vec3(0.95, 0.50, 0.18);
+#elif LOOK == 2
+const vec3 INK = vec3(0.10, 0.08, 0.12);
+#else
+const vec3 INK = vec3(0.13, 0.11, 0.10);
+#endif
 vec3 matColor(uint m, vec2 w) {
   float n = fbm(w * 0.35);
+#if LOOK == 2
+  n = floor(n * 3.0) / 2.0;                                  // flat stepped tones, as printed
+#endif
   if (uNest == 0) {
     if (m == 4u) return mix(vec3(0.33, 0.31, 0.30), vec3(0.45, 0.43, 0.41), n);  // stone
     if (m == 6u) return mix(vec3(0.42, 0.52, 0.58), vec3(0.55, 0.64, 0.68), n);  // water
@@ -48,28 +58,61 @@ void main() {
   vec2 w = uCam.xy + (px - uView * 0.5) / uCam.z;           // cells
   float ppc = uCam.z;
   // Paper: warm off-white wash on the surface, pale tunnel cream in the nest.
+#if LOOK == 1
+  vec3 paper = uNest == 0 ? mix(vec3(0.07, 0.06, 0.06), vec3(0.16, 0.12, 0.10), fbm(w * 0.06)) : mix(vec3(0.22, 0.12, 0.07), vec3(0.32, 0.18, 0.10), fbm(w * 0.1));
+  paper *= 0.85 + 0.15 * noise(w * 3.1);
+#elif LOOK == 2
+  vec3 paper = uNest == 0 ? mix(vec3(0.94, 0.88, 0.63), vec3(0.96, 0.90, 0.66), step(0.5, fbm(w * 0.06))) : mix(vec3(0.99, 0.91, 0.74), vec3(1.0, 0.95, 0.82), step(0.5, fbm(w * 0.1)));
+#else
   vec3 paper = uNest == 0 ? mix(vec3(0.80, 0.77, 0.71), vec3(0.88, 0.85, 0.79), fbm(w * 0.06)) : mix(vec3(0.86, 0.80, 0.68), vec3(0.92, 0.87, 0.76), fbm(w * 0.1));
   paper *= 0.94 + 0.06 * noise(w * 3.1);
+#endif
   if (w.x < 0.0 || w.y < 0.0 || w.x >= uSize.x || w.y >= uSize.y) { outColor = vec4(paper * 0.55, 1.0); return; }
   // Smooth contour of closed cells: bilinear over the four nearest cell centres, so edges are curves not stairs.
   vec2 g = w - 0.5; ivec2 b = ivec2(floor(g)); vec2 f = fract(g);
   float s = mix(mix(solid(b), solid(b + ivec2(1, 0)), f.x), mix(solid(b + ivec2(0, 1)), solid(b + ivec2(1, 1)), f.x), f.y);
+#if LOOK == 2
+  s += (fbm(w * 1.7) - 0.5) * 0.06;                          // a clean printed edge
+#else
   s += (fbm(w * 1.7) - 0.5) * 0.25;                          // a wobbly hand-drawn edge
+#endif
   float aa = 1.2 / ppc + 0.02;
   float inside = smoothstep(0.5 - aa, 0.5 + aa, s);
   ivec2 cell = ivec2(floor(w));
   uint m = matAt(cell);
   if (m == 0u) { m = max(max(matAt(b), matAt(b + ivec2(1, 0))), max(matAt(b + ivec2(0, 1)), matAt(b + ivec2(1, 1)))); }
-  vec3 col = mix(paper, matColor(m, w), inside);
-  float ink = 1.0 - smoothstep(0.0, 0.09 + 1.4 / ppc, abs(s - 0.5));
-  col = mix(col, vec3(0.13, 0.11, 0.10), ink * 0.85);
-  // Ember specks in the ash (surface): a few cells glow and flicker.
+  vec3 mc = matColor(m, w);
+#if LOOK == 1
+  mc = mc * vec3(0.52, 0.42, 0.38);                          // rock and soil in the dark, a little red
+#elif LOOK == 2
+  { float dots = smoothstep(0.32, 0.22, length(fract(w * 2.5) - 0.5)) * step(0.45, fbm(w * 0.5 + 3.0));
+    mc *= 1.0 - 0.18 * dots; }                                // halftone shading on solid ground
+#endif
+  vec3 col = mix(paper, mc, inside);
+#if LOOK == 1
+  { float edge = abs(s - 0.5);
+    float ink = 1.0 - smoothstep(0.0, 0.06 + 1.2 / ppc, edge), glow = 1.0 - smoothstep(0.0, 0.7, edge);
+    float beat = 0.6 + 0.4 * sin(uTime * 1.3 + fbm(w * 0.7) * 9.0);
+    col += INK * (ink * 0.75 + glow * 0.12) * beat; }        // edges glow like cooling coals
+#elif LOOK == 2
+  { float ink = 1.0 - smoothstep(0.0, 0.14 + 2.0 / ppc, abs(s - 0.5)); col = mix(col, INK, ink); }
+#else
+  { float ink = 1.0 - smoothstep(0.0, 0.09 + 1.4 / ppc, abs(s - 0.5)); col = mix(col, INK, ink * 0.85); }
+#endif
+  // Ember specks in the ash (surface): a few cells glow and flicker (many more by night; none in daylight).
+#if LOOK != 2
   if (uNest == 0 && inside < 0.5) {
     float h = hash(vec2(cell) * 0.731);
+#if LOOK == 1
+    if (h > 0.955) { vec2 d = fract(w) - 0.5; float e = smoothstep(0.3, 0.0, length(d)) * (0.5 + 0.5 * sin(uTime * 3.0 + h * 40.0));
+      col += vec3(1.0, 0.42, 0.10) * e * 0.9; }
+#else
     if (h > 0.985) { vec2 d = fract(w) - 0.5; float e = smoothstep(0.22, 0.0, length(d)) * (0.6 + 0.4 * sin(uTime * 3.0 + h * 40.0));
       col = mix(col, vec3(0.95, 0.45, 0.15), e * 0.8); }
+#endif
     col *= 0.92 + 0.08 * fbm(w * 0.5 + 11.0);
   }
+#endif
   // Dig marks: ink hatching on marked cells.
   if (texelFetch(uMat, clamp(cell, ivec2(0), ivec2(uSize) - 1), 0).g > 0u) {
     float hl = abs(fract((w.x + w.y) * 1.5) - 0.5);
@@ -78,9 +121,21 @@ void main() {
   // Scent as watercolour washes: trail amber, food green, alarm red.
   vec3 sc = texture(uScent, w / uSize).rgb;
   float wash = 0.85 + 0.3 * fbm(w * 0.8);
+#if LOOK == 1
+  col += vec3(1.0, 0.62, 0.18) * clamp(sc.r * 0.95 * wash, 0.0, 0.9);   // scent as light
+  col += vec3(0.35, 0.95, 0.40) * clamp(sc.g * 0.5 * wash, 0.0, 0.45);
+  col += vec3(1.0, 0.12, 0.08) * clamp(sc.b * 0.9 * wash, 0.0, 0.9);
+#elif LOOK == 2
+  { float stripe = step(0.5, fract((w.x - w.y) * 0.9 - uTime * 0.5));  // marching stripes
+    float dot_ = smoothstep(0.3, 0.2, length(fract(w * 1.5) - 0.5));
+    col = mix(col, vec3(0.98, 0.58, 0.05), clamp(sc.r * 1.6, 0.0, 0.9) * (0.45 + 0.55 * stripe));
+    col = mix(col, vec3(0.20, 0.66, 0.30), clamp(sc.g * 1.2, 0.0, 0.85) * dot_);
+    col = mix(col, vec3(0.88, 0.10, 0.22), clamp(sc.b * 1.2, 0.0, 0.85)); }
+#else
   col = mix(col, vec3(0.86, 0.55, 0.16), clamp(sc.r * 0.75 * wash, 0.0, 0.75));
   col = mix(col, vec3(0.36, 0.62, 0.25), clamp(sc.g * 0.55 * wash, 0.0, 0.5));
   col = mix(col, vec3(0.85, 0.18, 0.12), clamp(sc.b * 0.8 * wash, 0.0, 0.8));
+#endif
   // Food piles: seed heaps drawn as clustered dots with an ink rim.
   for (int k = 0; k < 8; k++) {
     vec4 p = uPile[k]; if (p.z <= 0.0) continue;
@@ -92,22 +147,31 @@ void main() {
       float body = smoothstep(r, r - 0.4, dist);
       col = mix(col, vec3(0.93, 0.83, 0.48), body * 0.85);
       col = mix(col, vec3(0.62, 0.45, 0.16), body * seed * 0.8);
-      col = mix(col, vec3(0.16, 0.12, 0.08), (smoothstep(r - 0.25, r, dist) - smoothstep(r, r + 0.25, dist)) * 0.9);
+      col = mix(col, INK, (smoothstep(r - 0.25, r, dist) - smoothstep(r, r + 0.25, dist)) * 0.9);
     }
   }
   // The entrance: a dark hole in a small mound with an ink ring.
   if (uEntrance.w > 0.0) {
     float d = length(w - uEntrance.xy);
+#if LOOK == 1
+    col = mix(col, vec3(0.28, 0.17, 0.10), smoothstep(3.2, 1.8, d) * 0.6);
+    col = mix(col, vec3(1.0, 0.55, 0.2), smoothstep(1.6, 1.0, d) * 0.5);  // warm light from inside the hill
+    col = mix(col, vec3(0.02, 0.01, 0.01), smoothstep(1.1, 0.8, d));
+#else
     col = mix(col, vec3(0.55, 0.47, 0.38), smoothstep(3.2, 1.8, d) * 0.6);
     col = mix(col, vec3(0.08, 0.06, 0.05), smoothstep(1.3, 0.9, d));
-    col = mix(col, vec3(0.13, 0.11, 0.10), (smoothstep(2.9, 3.1, d) - smoothstep(3.1, 3.35, d)) * 0.7);
+#endif
+    col = mix(col, INK, (smoothstep(2.9, 3.1, d) - smoothstep(3.1, 3.35, d)) * 0.7);
   }
   if (uAlarm.w > 0.0) {
     float d = length(w - uAlarm.xy), ring = fract(uTime * 0.8);
     float rr = 1.5 + ring * 8.0;
     col = mix(col, vec3(0.8, 0.1, 0.08), (smoothstep(rr - 0.5, rr, d) - smoothstep(rr, rr + 0.5, d)) * (1.0 - ring) * 0.9);
   }
-  outColor = vec4(col, 1.0);
+#if LOOK == 1
+  { vec2 v = vUv - 0.5; col *= 1.0 - 0.55 * dot(v, v) * 2.0; }  // a vignette: the night closes in at the edges
+#endif
+  outColor = vec4(min(col, vec3(1.0)), 1.0);
 }`;
 
 const ANT_VS = `#version 300 es
@@ -120,7 +184,10 @@ out vec2 vLocal; flat out vec4 vInfo; out float vPx; flat out float vMove;
 void main() {
   vec2 p = mix(aPos.xy, aPos.zw, uAlpha);
   float big = aInfo.y > 1.5 ? 1.25 : 1.0;
-  float half_ = max(0.62 * big, 3.0 / uCam.z);              // half size in cells; never under 3 device px
+#if LOOK == 2
+  big *= 1.3;                                               // the field-guide plate draws ants larger
+#endif
+  float half_ = max(0.62 * big, 3.0 / uCam.z);             // half size in cells; never under 3 device px
   float c = cos(aInfo.x), s = sin(aInfo.x);
   vec2 o = aCorner * half_;
   vec2 r = vec2(o.x * c - o.y * s, o.x * s + o.y * c);
@@ -139,11 +206,26 @@ float seg(vec2 p, vec2 a, vec2 b) { vec2 pa = p - a, ba = b - a; float h = clamp
 void main() {
   vec2 p = vLocal;                                              // x along the body (head at +x), -1..1
   float aa = 1.5 / max(vPx, 1.0);
+#if LOOK == 1
+  vec3 body = vInfo.y < 0.5 ? vec3(0.04, 0.03, 0.03) : vInfo.y < 1.5 ? vec3(0.12, 0.06, 0.03) : vec3(0.22, 0.03, 0.03);
+  const vec3 RIM = vec3(1.0, 0.55, 0.18); const float RIM_A = 0.85, RIM_W = 0.04;
+#elif LOOK == 2
+  vec3 body = vInfo.y < 0.5 ? vec3(0.12, 0.10, 0.14) : vInfo.y < 1.5 ? vec3(0.85, 0.42, 0.10) : vec3(0.80, 0.12, 0.16);
+  const vec3 RIM = vec3(1.0, 0.99, 0.94); const float RIM_A = 1.0, RIM_W = 0.07;
+#else
   vec3 body = vInfo.y < 0.5 ? vec3(0.16, 0.10, 0.07) : vInfo.y < 1.5 ? vec3(0.45, 0.22, 0.10) : vec3(0.30, 0.05, 0.06);
+  const vec3 RIM = vec3(0.0); const float RIM_A = 0.0, RIM_W = 0.0;
+#endif
   if (vPx < 6.0) {                                              // far away: one inked oval with a two-frame wiggle
     float d = ell(p, vec2(0.0, 0.0), vec2(0.85, 0.45));
     float a = 1.0 - smoothstep(-aa, aa, d);
+#if LOOK == 1
+    body = mix(vec3(1.0, 0.62, 0.25), body, 0.15);             // by night a far ant is a spark
+#endif
     if (vInfo.z > 0.5) { float f = length(p - vec2(0.7, 0.0)) - 0.4; a = max(a, 1.0 - smoothstep(-aa, aa, f)); if (f < 0.0) body = vec3(0.95, 0.85, 0.45); }
+#if LOOK == 2
+    { float r = 1.0 - smoothstep(-aa, aa, d - 0.25); body = mix(RIM, body, a); a = max(a, r); }
+#endif
     if (a < 0.02) discard;
     outColor = vec4(body, a); return;
   }
@@ -171,6 +253,11 @@ void main() {
     col = mix(col, mix(vec3(0.95, 0.86, 0.5), vec3(0.2, 0.15, 0.1), smoothstep(-0.04, 0.0, f)), fa);
     a = max(a, fa);
   }
+  if (RIM_A > 0.0) {                                            // an outline round body and legs: a hot rim by night, white on the plate
+    float shape = min(d, legs - lw), rw = max(RIM_W, 1.0 / vPx);
+    float rim = (1.0 - smoothstep(rw - aa, rw + aa, shape)) * RIM_A;
+    col = mix(RIM, col, a); a = max(a, rim);
+  }
   if (a < 0.02) discard;
   outColor = vec4(col, a);
 }`;
@@ -192,12 +279,13 @@ function program(gl, vs, fs) {
 
 export class Renderer {
   /** Returns null when the browser has no WebGL2. */
-  static create(canvas, hooks = {}) {
+  /** look: 0 ink, 1 ember, 2 field (looks.js); each is its own shader variant. */
+  static create(canvas, hooks = {}, look = 0) {
     const gl = canvas.getContext('webgl2', { antialias: false, alpha: false, preserveDrawingBuffer: false, powerPreference: 'high-performance' });
-    return gl ? new Renderer(canvas, gl, hooks) : null;
+    return gl ? new Renderer(canvas, gl, hooks, look) : null;
   }
-  constructor(canvas, gl, hooks) {
-    this.canvas = canvas; this.gl = gl; this.hooks = hooks; this.lost = false; this.restored = 0; this.losses = 0;
+  constructor(canvas, gl, hooks, look = 0) {
+    this.canvas = canvas; this.gl = gl; this.hooks = hooks; this.look = look | 0; this.lost = false; this.restored = 0; this.losses = 0;
     this.layers = [null, null]; this.antCount = 0;
     canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); this.lost = true; this.losses++; hooks.lost?.(); });
     canvas.addEventListener('webglcontextrestored', () => { this.lost = false; this.restored++; this.init(); hooks.restored?.(); });
@@ -205,8 +293,9 @@ export class Renderer {
   }
   init() {
     const gl = this.gl;
-    this.ground = program(gl, GROUND_VS, GROUND_FS);
-    this.ant = program(gl, ANT_VS, ANT_FS);
+    const v = src => src.replace('#version 300 es\n', `#version 300 es\n#define LOOK ${this.look}\n`);
+    this.ground = program(gl, GROUND_VS, v(GROUND_FS));
+    this.ant = program(gl, v(ANT_VS), v(ANT_FS));
     this.quad = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, this.quad); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
     this.gvao = gl.createVertexArray(); gl.bindVertexArray(this.gvao);

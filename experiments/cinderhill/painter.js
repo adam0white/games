@@ -1,10 +1,12 @@
 // Cinderhill's trail painter (04-roadmap S3, 03-features "trail painter toy"): the deterministic sim at 20 ticks a
 // second, drawn with WebGL2, and the touch rules of 02-spec section 6.4. No goals; draw trails and watch the ants.
 import { Host, CMD, SURFACE, NEST, FIELD, COUNTS, TICK_MS, SEED, G as GI } from './host.js';
-import { START, STAGE, GOAL_KIND } from './sim/colony.js';
+import { START, GOAL_KIND } from './sim/colony.js';
+import { SPIDER } from './sim/spider.js';
 import { cellXY } from './sim/grid.js';
 import { makeGestures } from './gestures.js';
 import { Renderer } from './render.js';
+import { LOOKS, pickLook } from './looks.js';
 import { WORDS } from './words.js';
 import { line } from './sim/sim.js';
 import { noZoom } from '../kit/zoom.js';
@@ -12,6 +14,8 @@ import { onLeave, isPauseKey } from '../kit/pause.js';
 import { sound } from '../kit/audio.js';
 import { hint } from '../kit/hint.js';
 import { lab } from '../kit/lab.js';
+import { LabRecord } from './labrec.js';
+import { findRooms, drawNest } from './nestview.js';
 import { readJson, writeJson } from '../kit/save.js';
 
 noZoom();
@@ -28,6 +32,8 @@ const qAnts = Number(query.get('ants'));
 // ?colony=1: a colony game (queen, brood, sugar and protein; M1). Without it, the trail painter sandbox as in M0.
 // The ant count buttons and the saved count do not apply to a colony game.
 const colonyMode = query.get('colony') === '1';
+const lookName = pickLook(query.get('look')), LOOK = LOOKS[lookName];
+document.querySelector('meta[name=theme-color]')?.setAttribute('content', LOOK.theme); document.body.style.background = LOOK.theme;
 // ?day=<ticks> shortens a colony game's day (tests and the phone check); the game's day is colony.js DAY_TICKS.
 const qDay = Number(query.get('day'));
 let host = colonyMode ? new Host(START.ants, SEED, { colony: true, dayTicks: qDay >= 100 && qDay <= 100000 ? Math.floor(qDay) : undefined }) : new Host(COUNTS.includes(qAnts) ? qAnts : save.ants);
@@ -41,6 +47,12 @@ const G = makeGestures();
 const snd = sound({ on: () => save.sound });
 const rec = lab('cinderhill', { lang });
 rec.notice($('menuCard')); rec.toggle($('pauseCard'));
+// The full replay of each game and what only the page sees (labrec.js; spikes/replay-lab.mjs reads it back).
+const labrec = new LabRecord(rec);
+const startRecord = () => labrec.start(host, { mode: colonyMode ? 'colony' : 'sandbox', look: lookName, viewport: [innerWidth, innerHeight, Math.round(devicePixelRatio * 100) / 100] });
+addEventListener('error', e => labrec.error(e.message ?? 'error'));
+addEventListener('unhandledrejection', e => labrec.error(`rejection: ${e.reason?.message ?? e.reason}`));
+document.addEventListener('visibilitychange', () => labrec.visible(document.visibilityState === 'visible')); // on document: before the kit's own flush on window
 let running = false; // a lab run is open
 
 // ---- canvases, camera ----
@@ -48,7 +60,7 @@ const glCanvas = $('gl'), ui = $('c'), ctx = ui.getContext('2d');
 const DPR_CAP = 2;
 let W = innerWidth, H = innerHeight, dpr = Math.min(DPR_CAP, devicePixelRatio || 1);
 let renderer = null, glFailed = '';
-try { renderer = Renderer.create(glCanvas, { lost: () => {}, restored: () => { uploadAll(); } }); } catch (e) { glFailed = String(e.message || e).slice(0, 200); renderer = null; }
+try { renderer = Renderer.create(glCanvas, { lost: () => {}, restored: () => { uploadAll(); } }, LOOK.id); } catch (e) { glFailed = String(e.message || e).slice(0, 200); renderer = null; }
 if (!renderer) $('nogl').classList.add('on');
 const dims = l => (l === SURFACE ? { w: host.sim.L.sw, h: host.sim.L.sh, base: 0 } : { w: host.sim.L.nw, h: host.sim.L.nh, base: host.sim.L.nestBase });
 const cams = [null, null];
@@ -125,7 +137,7 @@ function retext() {
 }
 retext();
 let toastTimer = 0;
-function toast(key) { const el = $('toast'); el.textContent = t(key); el.classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('on'), 1800); }
+function toast(key, params) { const el = $('toast'); el.textContent = t(key, params); el.classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('on'), 1800); }
 
 function setScreen(s) {
   screen = s;
@@ -137,7 +149,7 @@ function setScreen(s) {
 function play() {
   snd.unlock();
   if (saved0 === null && readJson(SAVE) === null) persist();
-  if (!running) { rec.start({ ants: host.ants, colony: colonyMode ? 1 : 0 }); running = true; }
+  if (!running) { startRecord(); running = true; }
   if (colonyMode && !dawnSeen) { showDawn(); return; }
   setScreen('play'); host.last = null; snd.release();
 }
@@ -168,21 +180,22 @@ function showDusk() {
   $('dayNote').textContent = `${t('nextGoal', { goal: goalText(k.next) })}${k.next.eased ? ' ' + t('eased') : ''}`;
   $('dayGo').textContent = t('startDay', { day: k.day + 1 });
   $('dayRestart').textContent = t('restartDay', { day: k.day }); $('dayRestart').hidden = false;
-  rec.event('dusk', { day: k.day, won: k.won ? 1 : 0, ants: k.ants });
+  labrec.event('dusk', { day: k.day, won: k.won ? 1 : 0, kind: k.goal.kind, done: k.goal.done, target: k.goal.target, ants: k.ants, sugar: k.sugar, protein: k.protein, born: k.born, lost: k.lost });
   run(G.reset('pause')); tapStart = null;
   setScreen('day'); snd.hold();
   if (k.won) snd.tone(523, 0.2, 0.06, 'triangle', 260); else snd.tone(330, 0.3, 0.05, 'triangle', -120);
 }
 function dayGo() {
-  if (dayCard?.kind === 'dusk') { host.goOn(); rec.event('dawn', { day: host.day().day }); dayCard = null; showDawn(); return; }
+  if (dayCard?.kind === 'dusk') { host.goOn(); labrec.goOn(); labrec.event('dawn', { day: host.day().day }); dayCard = null; showDawn(); return; }
   dawnSeen = true; dayCard = null;
   setScreen('play'); host.last = null; snd.release();
 }
 function dayRestart() {
   if (dayCard?.kind !== 'dusk') return;
   const day = dayCard.day;
+  const before = host.tick;
   if (!host.restartDay(day)) return;
-  rec.event('restart', { day });
+  labrec.restart(day, before); labrec.event('restart', { day });
   selected = -1; $('antCard').classList.remove('on'); alarmAt = null; pulses = [];
   stats = host.stats(); uploadAll(); retext();
   dayCard = null; showDawn();
@@ -194,13 +207,14 @@ function pauseGame() {
 }
 function resume() { setScreen('play'); host.last = null; snd.release(); }
 function toMenu() {
-  if (running) { rec.end('left', { ticks: host.tick, orders: host.log.length, delivered: host.delivered, ants: host.ants }); running = false; }
+  if (running) { labrec.end('left'); running = false; }
   setScreen('menu'); snd.hold();
 }
 function setCount(n) {
   if (colonyMode || !COUNTS.includes(n) || n === host.ants) return;
   run(G.reset('count'));
   host = new Host(n); save.ants = n; persist();
+  if (running) startRecord(); // a new game: its own replay
   selected = -1; tapStart = null; stats = host.stats();
   uploadAll(); retext();
 }
@@ -219,7 +233,7 @@ $('toMenu').addEventListener('click', toMenu);
 $('layer').addEventListener('click', () => setLayer(layer === SURFACE ? NEST : SURFACE));
 $('zin').addEventListener('click', () => { cams[layer].z *= 1.4; clampCam(); });
 $('zout').addEventListener('click', () => { cams[layer].z /= 1.4; clampCam(); });
-function setHold(on) { if (on === held) return; held = on; host.last = null; retext(); if (held) toast('held'); }
+function setHold(on) { if (on === held) return; held = on; labrec.hold(on, performance.now()); host.last = null; retext(); if (held) toast('held'); }
 $('hold').addEventListener('click', () => setHold(!held));
 $('recall').addEventListener('click', () => { const on = !host.sim.g[GI.RECALL]; order({ type: CMD.RECALL, on: on ? 1 : 0 }); setTimeout(retext, 80); });
 $('sound').addEventListener('click', () => { save.sound = !save.sound; persist(); if (!save.sound) snd.hold(); retext(); });
@@ -227,6 +241,11 @@ $('tapTrail').addEventListener('click', () => { save.tapTrail = !save.tapTrail; 
 for (const id of ['langMenu', 'langPause']) $(id).addEventListener('click', () => { setLang(lang() === 'en' ? 'tr' : 'en'); rec.retext?.(); retext(); });
 for (const b of document.querySelectorAll('[data-tool]')) b.addEventListener('click', () => setTool(b.dataset.tool));
 for (const b of document.querySelectorAll('[data-count]')) b.addEventListener('click', () => setCount(Number(b.dataset.count)));
+// A look is a different shader build, so changing it reloads the page with ?look= (the other parameters kept).
+for (const b of document.querySelectorAll('[data-look]')) {
+  b.setAttribute('aria-pressed', String(b.dataset.look === lookName));
+  b.addEventListener('click', () => { if (b.dataset.look === lookName) return; const u = new URL(location.href); u.searchParams.set('look', b.dataset.look); location.href = u.href; });
+}
 $('antClose').addEventListener('click', () => { selected = -1; $('antCard').classList.remove('on'); });
 onLeave(pauseGame);
 addEventListener('keydown', e => {
@@ -238,7 +257,7 @@ const help = hint(ui, { kind: 'path', key: HINT, when: () => screen === 'play' &
 let preview = null, tapStart = null, selected = -1, alarmAt = null, pulses = [], stats = host.stats();
 function order(o) {
   const e = host.order(o);
-  rec.event('order', { type: e.type });
+  labrec.order(o, e);
   return e;
 }
 const cellOf = (sx, sy) => { const w = toWorld(sx, sy); return [Math.floor(w.x), Math.floor(w.y)]; };
@@ -342,22 +361,23 @@ function drawOverlay(now) {
     for (const tr of stats.trails) {
       const p = toScreen(tr.x + 0.5, tr.y + 0.5);
       if (p.x < -40 || p.y < -40 || p.x > W + 40 || p.y > H + 40) continue;
-      ctx.fillStyle = tr.newest ? '#2b1d12' : '#2b1d1288'; ctx.strokeStyle = '#f4ecdc'; ctx.lineWidth = 2;
+      ctx.fillStyle = tr.newest ? LOOK.bubble : LOOK.bubbleOld; ctx.strokeStyle = LOOK.bubbleRim; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(p.x, p.y, 13, 0, 7); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = '#f4ecdc'; ctx.font = '600 11px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = LOOK.bubbleText; ctx.font = '600 11px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(String(tr.crew), p.x, p.y + 0.5);
     }
     for (const pu of pulses) {
       const k = (now - pu.at) / 900; if (k > 1) continue;
-      ctx.strokeStyle = `rgba(255, 240, 200, ${1 - k})`; ctx.lineWidth = 3 + 6 * k;
+      ctx.strokeStyle = `rgba(${LOOK.pulse}, ${1 - k})`; ctx.lineWidth = 3 + 6 * k;
       ctx.beginPath(); for (let i = 0; i < pu.pts.length; i += 2) { const p = toScreen(pu.pts[i] + 0.5, pu.pts[i + 1] + 0.5); i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); } ctx.stroke();
     }
     pulses = pulses.filter(pu => now - pu.at < 900);
+    drawSpider(now);
   }
   if (layer === NEST && colonyMode) drawBrood();
   if (held) { ctx.strokeStyle = '#2f5b8acc'; ctx.lineWidth = 6; ctx.strokeRect(3, 3, W - 6, H - 6); } // time is held
   if (preview && preview.points.length) {
-    ctx.strokeStyle = preview.tool === 'dig' ? '#f2d25a' : '#2b1d12'; ctx.lineWidth = preview.tool === 'dig' ? Math.max(6, 3 * cams[layer].z) : 4;
+    ctx.strokeStyle = preview.tool === 'dig' ? '#f2d25a' : LOOK.stroke; ctx.lineWidth = preview.tool === 'dig' ? Math.max(6, 3 * cams[layer].z) : 4;
     ctx.setLineDash(preview.tool === 'dig' ? [] : [2, 8]);
     ctx.beginPath(); preview.points.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke();
     ctx.setLineDash([]);
@@ -367,36 +387,53 @@ function drawOverlay(now) {
     const k = Math.min(1, (now - st.t0) / 300);
     ctx.strokeStyle = '#b8432f'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(st.x0, st.y0, 26, -Math.PI / 2, -Math.PI / 2 + k * 2 * Math.PI); ctx.stroke();
   }
-  if (tapStart) { const p = toScreen(tapStart.x, tapStart.y); ctx.fillStyle = '#2b1d12'; ctx.beginPath(); ctx.arc(p.x, p.y, 7, 0, 7); ctx.fill(); }
+  if (tapStart) { const p = toScreen(tapStart.x, tapStart.y); ctx.fillStyle = LOOK.stroke; ctx.beginPath(); ctx.arc(p.x, p.y, 7, 0, 7); ctx.fill(); }
   if (selected >= 0 && host.sim.layer[selected] === layer) {
     const s = host.sim, a = host.alpha, j = host.pl[selected] !== s.layer[selected];
     const x = j ? s.x[selected] / 256 : (host.px[selected] + (s.x[selected] - host.px[selected]) * a) / 256;
     const y = j ? s.y[selected] / 256 : (host.py[selected] + (s.y[selected] - host.py[selected]) * a) / 256;
     const p = toScreen(x, y);
-    ctx.strokeStyle = '#e2913a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(10, cams[layer].z * 1.2), 0, 7); ctx.stroke();
+    ctx.strokeStyle = LOOK.select; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(10, cams[layer].z * 1.2), 0, 7); ctx.stroke();
   }
 }
 
-// The queen and the brood, in the nest view: the queen in the middle of her chamber, each egg, larva and pupa
-// in its cell (several in one cell spread a little by their index). Placeholder shapes until the ant look work.
-const BROOD_LOOK = [[2, '#fbf7ec'], [3.5, '#f1e3b8'], [4, '#c9a46a']]; // radius in cells/10, colour: egg, larva, pupa
-function drawBrood() {
-  const s = host.sim, B = s.brood, z = cams[NEST].z;
-  ctx.strokeStyle = '#2b1d12'; ctx.lineWidth = 1;
-  for (let k = 0; k < B.n; k++) {
-    const [, cx, cy] = cellXY(s.L, B.cell[k]), [r, col] = BROOD_LOOK[B.stage[k]];
-    const p = toScreen(cx + 0.25 + ((k * 0.618034) % 1) * 0.5, cy + 0.25 + ((k * 0.381966) % 1) * 0.5);
-    if (p.x < -20 || p.y < -20 || p.x > W + 20 || p.y > H + 20) continue;
-    ctx.fillStyle = col; ctx.beginPath();
-    if (B.stage[k] === STAGE.EGG) ctx.arc(p.x, p.y, Math.max(1.5, z * r / 10), 0, 7);
-    else ctx.ellipse(p.x, p.y, Math.max(2, z * r / 10), Math.max(1.5, z * r / 14), 0.6, 0, 7);
-    ctx.fill(); if (z > 6) ctx.stroke();
+// The spider (sim/spider.js): while it is coming, a red ring where it will appear; while it hunts, a dark body
+// with eight legs that step, and the cell it reaches into. Colours from the look (looks.js).
+function drawSpider(now) {
+  const g = host.sim.g, st = g[GI.SP];
+  if (st !== SPIDER.WARN && st !== SPIDER.HUNT) return;
+  const z = cams[SURFACE].z, p = toScreen(g[GI.SP_X] + 0.5, g[GI.SP_Y] + 0.5), u = Math.max(7, z * 1.4);
+  if (p.x < 0 || p.y < 0 || p.x > W || p.y > H) { drawSpiderArrow(p); return; }
+  if (st === SPIDER.WARN) {
+    const k = (now % 1000) / 1000;
+    ctx.strokeStyle = `rgba(${LOOK.danger}, ${1 - k})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(p.x, p.y, u * (1 + 2 * k), 0, 7); ctx.stroke();
+    return;
   }
-  if (!s.g[GI.QUEEN]) return;
-  const h = s.home, q = toScreen(h.x + h.w / 2, h.y + h.h / 2), u = Math.max(4, z * 0.9);
-  ctx.fillStyle = '#5a2e14'; ctx.strokeStyle = '#f4ecdc'; ctx.lineWidth = 1.5;
-  for (const [dx, rr] of [[-1.1, 0.75], [0, 0.45], [0.7, 0.35]]) { ctx.beginPath(); ctx.ellipse(q.x + dx * u, q.y, rr * u, rr * u * 0.75, 0, 0, 7); ctx.fill(); ctx.stroke(); }
+  ctx.strokeStyle = `rgba(${LOOK.danger}, 0.35)`; ctx.lineWidth = 2; ctx.strokeRect(p.x - 1.5 * z, p.y - 1.5 * z, 3 * z, 3 * z); // its reach: one cell around
+  ctx.strokeStyle = LOOK.spider; ctx.lineWidth = Math.max(1.5, u * 0.16); ctx.lineCap = 'round';
+  const step = Math.sin(now / 90);
+  for (let side = -1; side <= 1; side += 2) for (let l = 0; l < 4; l++) {
+    const a = (l - 1.5) * 0.5 + (l & 1 ? step : -step) * 0.18, dx = side * Math.cos(a), dy = Math.sin(a);
+    ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x + dx * u * 1.1, p.y + dy * u * 1.1 - u * 0.4); ctx.lineTo(p.x + dx * u * 1.9, p.y + dy * u * 1.9 + u * 0.3); ctx.stroke();
+  }
+  ctx.fillStyle = LOOK.spider; ctx.beginPath(); ctx.ellipse(p.x, p.y + u * 0.45, u * 0.7, u * 0.8, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(p.x, p.y - u * 0.45, u * 0.42, 0, 7); ctx.fill();
+  ctx.fillStyle = LOOK.spiderMark; ctx.beginPath(); ctx.arc(p.x, p.y + u * 0.45, u * 0.22, 0, 7); ctx.fill(); // the red mark
 }
+/** The spider is off screen: an arrow at the edge, pointing to it. */
+function drawSpiderArrow(p) {
+  const cx = W / 2, cy = H / 2, a = Math.atan2(p.y - cy, p.x - cx), m = 28; // where the ray to it meets the edge, inset
+  const k = Math.min(Math.abs(Math.cos(a)) > 1e-6 ? (W / 2 - m) / Math.abs(Math.cos(a)) : Infinity, Math.abs(Math.sin(a)) > 1e-6 ? (H / 2 - m) / Math.abs(Math.sin(a)) : Infinity);
+  const x = cx + Math.cos(a) * k, y = cy + Math.sin(a) * k;
+  ctx.fillStyle = `rgb(${LOOK.danger})`; ctx.beginPath();
+  ctx.moveTo(x + Math.cos(a) * 14, y + Math.sin(a) * 14); ctx.lineTo(x + Math.cos(a + 2.5) * 12, y + Math.sin(a + 2.5) * 12); ctx.lineTo(x + Math.cos(a - 2.5) * 12, y + Math.sin(a - 2.5) * 12);
+  ctx.fill();
+}
+
+// The nest view (nestview.js): chambers, stores, brood by growth, the queen. Rooms are found again when the terrain changes.
+let rooms = [], roomsAt = -1;
+function nestRooms() { if (roomsAt !== host.terrainVersion || rooms.host !== host) { rooms = findRooms(host.sim); rooms.host = host; roomsAt = host.terrainVersion; } return rooms; }
+function drawBrood() { drawNest({ ctx, sim: host.sim, g: GI, toScreen: (x, y) => toScreen(x, y, NEST), z: cams[NEST].z, W, H, now: performance.now(), rooms: nestRooms(), t, look: LOOK }); }
 
 // ---- the HUD (a few times a second) ----
 function hud() {
@@ -416,6 +453,8 @@ function hud() {
   if (food) lines.push(t('foodCrew', { crew: food }));
   if (stats.dig.marked) lines.push(`${t('digCrew', stats.dig)}${stats.dig.crew >= stats.dig.cap ? ` <small>· ${t('digFull')}</small>` : ''}`);
   if (stats.alarm) lines.push(t('alarmCrew', stats.alarm));
+  const sp = host.sim.g[GI.SP];
+  if (sp === SPIDER.WARN || sp === SPIDER.HUNT) lines.unshift(`<b class="spider">${t('spiderHud', { what: t(sp === SPIDER.WARN ? 'spiderComing' : 'spiderHunting'), kills: host.sim.g[GI.SP_KILLS] })}</b>`);
   if (lines.length && newest) lines.push(`<small>${t('noWanted')}</small>`);
   $('crew').innerHTML = lines.join('<br>');
   const d = host.day();
@@ -423,6 +462,14 @@ function hud() {
   if (d) { const s = Math.ceil(d.left / 20), time = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; $('goal').textContent = t('hudDay', { day: d.day, goal: goalHud(d), time }); $('goal').classList.toggle('done', d.won); }
   showAnt();
   if ($('recall').getAttribute('aria-pressed') !== String(stats.recall)) retext();
+}
+
+// The spider's events: a toast and a sound each, and a lab event (the replay has them too; these say what the page showed).
+function spiderNews(e) {
+  labrec.event('spider', { at: e.tick, s: e.state, a: e.arg, recall: host.sim.g[GI.RECALL] });
+  if (e.state === SPIDER.WARN) { toast(e.arg < 0 ? 'spiderEdge' : host.sim.g[GI.RECALL] ? 'spiderHold' : 'spiderWarn'); if (save.sound) { snd.tone(220, 0.25, 0.05, 'sawtooth'); setTimeout(() => snd.tone(196, 0.3, 0.05, 'sawtooth'), 260); } }
+  else if (e.state === SPIDER.HUNT) { if (e.arg >= 0) toast(host.sim.g[GI.RECALL] ? 'spiderHold' : 'spiderHunt'); if (save.sound) snd.tone(147, 0.4, 0.06, 'sawtooth'); }
+  else if (e.state === SPIDER.LEFT) { toast(e.arg ? 'spiderLeft' : host.sim.g[GI.RECALL] ? 'spiderLeftNone' : 'spiderGone', { kills: e.arg }); if (save.sound) snd.tone(660, 0.12, 0.03, 'triangle'); }
 }
 
 // ---- frame loop, with a frame-time sampler (S3) ----
@@ -435,6 +482,8 @@ function frame(now) {
   const t0 = performance.now();
   run(G.tick(t0));
   const stepped = host.advance(now, screen !== 'play' || held);
+  if (screen === 'play') { labrec.tick(); labrec.camera(layer, cams[layer], now); if (frames.last) labrec.frame(now - frames.last); }
+  for (const e of host.spiderNews.splice(0)) spiderNews(e);
   if (host.dusk && screen === 'play') showDusk(); // the day is over: time stops on the dusk card
   if (host.shifted) { host.shifted = false; selected = -1; $('antCard').classList.remove('on'); } // a death renumbered the ants
   if (stepped) {
@@ -462,10 +511,12 @@ requestAnimationFrame(frame);
 
 // ---- hooks for the phone check and the S3 script ----
 window.painter = {
+  rooms: () => nestRooms().map(r => ({ size: r.size, queen: r.queen })),
   day: () => host.day(), dusk: () => host.dusk, dawns: () => [...host.dawns.keys()], hashes: () => host.sim.hashes(),
-  state: () => ({ screen: screen === 'paused' ? 'paused' : screen, dayCard: dayCard?.kind ?? null, held, t: host.tick, paused: screen === 'paused', ants: host.ants, sound: save.sound, tapTrail: save.tapTrail, tool, layer, preview: preview ? preview.points.length : 0, orders: host.log.length, gl: !!renderer && !renderer.lost, glLosses: renderer?.losses ?? 0, glRestored: renderer?.restored ?? 0, glFailed, drawn: frames.drawn, selected, help: help.shown }),
+  state: () => ({ screen: screen === 'paused' ? 'paused' : screen, look: lookName, dayCard: dayCard?.kind ?? null, spider: host.sim.g[GI.SP], spiderVisits: host.sim.g[GI.SP_VISITS], held, t: host.tick, paused: screen === 'paused', ants: host.ants, sound: save.sound, tapTrail: save.tapTrail, tool, layer, preview: preview ? preview.points.length : 0, orders: host.log.length, gl: !!renderer && !renderer.lost, glLosses: renderer?.losses ?? 0, glRestored: renderer?.restored ?? 0, glFailed, drawn: frames.drawn, selected, help: help.shown }),
   log: () => JSON.parse(JSON.stringify(host.log)),
   stats: () => host.stats(),
+  lab: () => ({ open: labrec.open, part: labrec.part, chain: labrec.chain, pending: labrec.buf?.length ?? 0, orders: { ...labrec.byType } }),
   brood: () => Array.from({ length: host.sim.brood.n }, (_, k) => [...cellXY(host.sim.L, host.sim.brood.cell[k]).slice(1), host.sim.brood.stage[k]]),
   inspect: i => host.inspect(i),
   toScreen: (x, y, l) => toScreen(x, y, l),

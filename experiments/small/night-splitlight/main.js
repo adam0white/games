@@ -8,7 +8,7 @@ import { shareLink } from '../../kit/room.js';
 import { read, readJson, readNumber, write, writeJson } from '../../kit/save.js';
 import { screens } from '../../kit/screens.js';
 import { noZoom } from '../../kit/zoom.js';
-import { bandColour, draw } from './art.js';
+import { bandColour, draw, effects, receiverPoint } from './art.js';
 import { controlsOf, denseLights, expose, fed, makeBench, setValue, trace } from './bench.js';
 import { current, dailyLevel, today } from './daily.js';
 const pastDay = today !== current;
@@ -35,6 +35,26 @@ const PITCH = [261.63, 293.66, 329.63, 392, 440, 523.25];
 // White sounds as an open C major triad on the same pitches as the colours, so it never beats against red.
 const WHITE = [261.63, 392, 523.25];
 const litCount = () => state.targets.filter(target => target.lit || target.fed).length;
+// Sparks, rings and the flash of an exposure, in canvas units (art.js effects). Haptics where the browser has them.
+const fx = { sparks: [], rings: [], flash: 0 };
+const buzz = pattern => { try { if (audible && !reducedMotion.matches && navigator.vibrate) navigator.vibrate(pattern); } catch {} };
+function spark(target, n, speed) {
+  if (reducedMotion.matches) return;
+  const [x, y] = receiverPoint(target, state.elapsed);
+  fx.rings.push({ x, y, age: 0, band: target.band });
+  for (let i = 0; i < n; i++) {
+    const a = i * 2.399 + target.band, v = speed * (.45 + ((i * 37) % 11) / 11 * .55);
+    fx.sparks.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: .6 + ((i * 13) % 7) / 14, band: target.band < 0 ? i % 6 : target.band });
+  }
+}
+function stepFx(dt) {
+  fx.flash = Math.max(0, fx.flash - dt * 2.2);
+  for (const r of fx.rings) r.age += dt;
+  fx.rings = fx.rings.filter(r => r.age < .7);
+  for (const p of fx.sparks) { p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= .96; p.vy = p.vy * .96 + 40 * dt; }
+  fx.sparks = fx.sparks.filter(p => p.life > 0);
+}
+const fxLive = () => fx.flash > 0 || fx.rings.length || fx.sparks.length;
 const best = () => { const b = readJson(key + 'best', {}); return b && typeof b === 'object' ? b : {}; };
 
 const show = screens(['paused', 'result'], name => {
@@ -151,6 +171,7 @@ function open(next, nextMode = 'plates') {
   mode = nextMode;
   level = mode === 'daily' ? dailyLevel(today) : LEVELS[next - 1];
   state = makeBench(level);
+  fx.sparks = []; fx.rings = []; fx.flash = 0;
   parInfo = parOf(level, state.targets, state.start, level.answer);
   retrace();
   reveal = 0;
@@ -187,6 +208,7 @@ function setControl(i, position) {
       const was = target.fed;
       if (fedNow(target, rules) && !was && !fedNow(target, before)) {
         tone(target.band, .35, .04);
+        spark(target, 7, 55); buzz(8);
         nextTickSound = now + 90;
         break;
       }
@@ -321,10 +343,11 @@ function paint(time) {
   ctx.setTransform(w / 360, 0, 0, h / 400, 0, 0);
   const selectedPart = controlsOf(level).length > 1 ? controlsOf(level)[state.selected][0] : -1;
   draw(ctx, state, rules, dense, reducedMotion.matches ? 0 : time, look, selectedPart);
+  if (fxLive()) effects(ctx, fx);
   redraw = false;
 }
 const moving = () => state.targets.some(target => target.swing) && state.started && !state.won;
-const glowing = () => state.won || state.targets.some(target => target.fed) || level.parts.some(p => p.kind === 'grating');
+const glowing = () => fxLive() || state.won || state.targets.some(target => target.fed) || level.parts.some(p => p.kind === 'grating');
 
 // ---------- results and sharing ----------
 const turnWords = n => t(n === 1 ? 'turn1' : 'turnN', { n });
@@ -355,6 +378,10 @@ function finishPlate() {
   if (!saved) parts.push(t('savedSession'));
   el('result-line').textContent = parts.join(' ');
   chord();
+  for (const target of state.targets) spark(target, 30, 120);
+  if (!reducedMotion.matches) fx.flash = 1;
+  buzz([20, 50, 35]);
+  pips();
   const finale = mode === 'plates' && state.id === COUNT;
   el('result-title').textContent = mode === 'daily' ? t('dailyExposed') : finale ? t('complete') : t('exposed');
   el('next').textContent = mode === 'daily' ? t('plates') : finale ? t('fromStart') : t('next');
@@ -362,6 +389,25 @@ function finishPlate() {
   el('again').hidden = mode === 'daily';
   slider.disabled = true;
   document.body.classList.remove('guide');
+}
+// The plates as a row of pips on the result card: lit when exposed, gold at par, ringed for the one just played.
+function pips() {
+  const row = el('pips');
+  if (mode === 'daily') { row.hidden = true; return; }
+  const b = best();
+  row.hidden = false; row.textContent = '';
+  let lit = 0, gold = 0;
+  LEVELS.forEach((plate, i) => {
+    const n = i + 1, turns = b[n], at = Number.isFinite(turns) && turns <= controlsOf(plate).length;
+    const done = Number.isFinite(turns) || n < high;
+    if (done) lit++; if (at) gold++;
+    const pip = document.createElement('i');
+    pip.className = (at ? 'gold' : done ? 'lit' : '') + (n === state.id ? ' now' : '');
+    row.append(pip);
+  });
+  row.setAttribute('aria-label', t('pips', { n: lit, of: COUNT, p: gold }));
+  const next = LEVELS[state.id];
+  el('teaser').textContent = next && state.id < COUNT ? t('teaser', { name: t(next.key) }) : '';
 }
 function shareLine() {
   const d = dailySave();
@@ -416,7 +462,9 @@ function advance(now) {
   if (before !== state.targets.map(target => target.fed).join() + state.charge) { redraw = true; readout(); }
   if (state.won) finishPlate();
 }
+let fxLast = performance.now();
 function frame(now) {
+  stepFx(Math.min(.05, Math.max(0, (now - fxLast) / 1000))); fxLast = now;
   advance(now);
   if (redraw || moving() || glowing()) paint(now / 1000);
   requestAnimationFrame(frame);

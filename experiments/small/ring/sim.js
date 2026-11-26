@@ -92,7 +92,7 @@ export function levelDef(seed, i, night = 0) {
 
 export function create(seed, opts = {}) {
   const s = {
-    seed: seed >>> 0, r: (seed ^ 0x9E3779B9) | 0, opts: { mode: 'night', start: 0, mixedScores: false, night: 0, relight: false, fair: false, ...opts },
+    seed: seed >>> 0, r: (seed ^ 0x9E3779B9) | 0, opts: { mode: 'night', start: 0, mixedScores: false, night: 0, relight: false, fair: false, lift: false, ...opts },
     phase: 'play', wait: 0, tick: 0, levelTick: 0, level: 0, round: 0, def: null,
     dawn: 0, dawnMax: 1, light: 0, target: 1, score: 0, wicks: 3, bestRing: 0,
     results: new Float64Array(NIGHT), cleared: 0, reason: '', lastBonus: 0,
@@ -141,7 +141,7 @@ function startLevel(s, i) {
   s.ev.push({ type: 'level', level: s.level, round: s.round });
 }
 
-function clearThread(s) { s.t0 = 0; s.t1 = 0; s.tlen = 0; }
+function clearThread(s) { s.t0 = 0; s.t1 = 0; s.tlen = 0; s.burnt = false; }
 // The finger was taken away without lifting (a pause, a cancelled touch): the thread goes without closing a ring.
 export const dropThread = clearThread;
 function pushPoint(s, x, y) {
@@ -188,6 +188,20 @@ function input(s, hx, hy) {
       s.pn = 0;
       for (let k = s.t0; k < s.t1; k++) { s.poly[2 * s.pn] = s.tx[k]; s.poly[2 * s.pn + 1] = s.ty[k]; s.pn++; }
       ring(s);
+    } else if (s.opts.lift && n >= 3 && s.tlen >= MIN_RING) {
+      // lift (2026-11-26): a finger lifted near any earlier part of its own thread closes the ring from there, not only
+      // near the tail; the earliest such point makes the largest ring. Otherwise the lift is a miss, and the page says why.
+      const hx2 = s.tx[s.t1 - 1], hy2 = s.ty[s.t1 - 1];
+      let back = 0, from = -1;
+      for (let k = s.t1 - 2; k >= s.t0; k--) {
+        back += Math.hypot(s.tx[k + 1] - s.tx[k], s.ty[k + 1] - s.ty[k]);
+        if (back >= MIN_RING && Math.hypot(hx2 - s.tx[k], hy2 - s.ty[k]) < CLOSE) from = k;
+      }
+      if (from >= 0) {
+        s.pn = 0;
+        for (let k = from; k < s.t1; k++) { s.poly[2 * s.pn] = s.tx[k]; s.poly[2 * s.pn + 1] = s.ty[k]; s.pn++; }
+        ring(s);
+      } else s.ev.push({ type: 'miss', burnt: !!s.burnt, x: hx2, y: hy2, sx: s.tx[s.t0], sy: s.ty[s.t0], gap: Math.round(Math.hypot(hx2 - s.tx[s.t0], hy2 - s.ty[s.t0])) });
     }
     clearThread(s);
     return;
@@ -211,7 +225,7 @@ function input(s, hx, hy) {
   // The thread burns from the tail: it never holds more than THREAD units.
   while (s.tlen > s.def.thread && s.t1 - s.t0 > 2) {
     s.tlen -= Math.hypot(s.tx[s.t0 + 1] - s.tx[s.t0], s.ty[s.t0 + 1] - s.ty[s.t0]);
-    s.t0++;
+    s.t0++; s.burnt = true;
   }
 }
 

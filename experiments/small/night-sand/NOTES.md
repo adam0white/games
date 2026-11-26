@@ -168,3 +168,24 @@ The hub's entry for this page (`lab/hub-a/hub.js`) now has `tr: true` and the Tu
 ## 2026-11-25 — the way back to the small games home
 
 Opened from `/small/` (`?from=small`), the page shows "‹ Small games" ("‹ Küçük oyunlar" in Turkish) on the pause card and the result card, through `kit/home.js`; a cleared bed is reported to the home as a win. The recording notice and switch are now in the page's language. `check.mjs` asserts the two links in Turkish. Same keys, same records.
+
+## 2026-11-26 — sand feel: gravity, grain texture, grain sound, the instruction in the sky
+
+Adam said the sand needs a lot of improvement. This round changes how grains fall, how they look and sound, and how a bed says what to do.
+
+- **Gravity.** A falling grain speeds up: one cell on its first tick, then up to `MAX_FALL` (4) cells a tick. Per-cell speed lives in `vel` (new, not saved). A diagonal slip keeps a quarter of the speed. Grains crossing a mesh still mark it. `?v=b` keeps the old constant one-cell fall.
+- **Texture and light.** The live raster is drawn at 3× (each cell is 3×3 sub-pixels with a fixed per-grain speckle). The surface row is lit, the outer corner of each slope step is rounded off, slopes facing the moon are lighter and slopes away are darker, falling grains are single bright specks with a short trail, and a few surface grains glint.
+- **Sound.** A looped buffer of sparse short clicks (grains) sits under the old hiss; its gain and high-pass both follow the moving-grain count. The hiss is quieter.
+- **Haptics.** A short buzz when a scoop takes more than 20 grains, a pattern on a win (`navigator.vibrate`, only with sound on; iOS Safari has no vibrate).
+- **Goal.** The bed's instruction (`act1`…`act10`, before only in the aria-label) shows in the sky above the bed until the first touch.
+
+| Measurement (check.mjs, empty storage) | Before (main 0b86bac) | After |
+| --- | --- | --- |
+| Bed 1, first touch to win, iPhone 13 WebKit | 10.54 s | 8.81 s |
+| Bed 1, first touch to win, Pixel 7 Chromium | 11.55 s | 10.34 s |
+| Touch to first moved grain | 0–0.2 ms | 0.2–1 ms |
+| Taps before the run starts | 0 (opens on bed 1) | 0 |
+
+Bots: all ten beds win 6/6; clumsy bed 1 15/15, median 8.5 s; gravity fixture: one grain drops 153 cells in 45 ticks (153 ticks without), no grain lost or doubled; pile fixtures unchanged; the three `--mutate` runs still fail as intended. Screenshots looked at on iPhone 13 WebKit and Pixel 7 Chromium.
+
+Not verified: a real phone, Firefox Android, haptics on a device, whether the grain clicks sound like sand to a person. The kit phone check has no Night Sand entry, so `phone.mjs small/night-sand` runs nothing; the game's own `check.mjs` is the browser evidence.

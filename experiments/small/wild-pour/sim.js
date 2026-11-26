@@ -324,6 +324,15 @@ function count(s) {
   s.inGlass = inG; s.spilled = sp; s.flying = fly;
 }
 
+// Where a glass is heading: what is in it, plus the drops in the air above it, plus what the jug will still let go
+// while the flow dies down (the liquid's lag and the jug standing up). The page draws it as a faint line so a player
+// can lift in time; reading the state only, it changes nothing.
+export function forecast(s, g = s.glass) {
+  let n = g.n;
+  for (const q of s.p) if (q.st === 1 && q.air && q.x > g.x - g.w - 2 && q.x < g.x + g.w + 2) n++;
+  if (g === s.glass) n += s.flow * s.liq.lag * 0.35; // measured: the jug stands up fast, so little more leaves
+  return n;
+}
 export function band(s) { return [s.L.target - s.L.band, s.L.target + s.L.band]; }
 // Where a glass's liquid surface for `n` drops sits, in world y (for drawing the line and the liquid).
 export function levelY(s, n, g = s.glass) { return g.bottom - n * AREA / (2 * g.w); }

@@ -204,3 +204,13 @@ The careful timing bot clears every night on all 32 seeds (7.72–15.38 s). Dela
 ## 2026-11-25 — the way back to the small games home
 
 Already wired to the home. The way back and the recording notice and switch now follow the page's language when it changes (`lang` passed to `kit/home.js` and `kit/lab.js`). The home shows this game's progress out of the count in `experiments/small/catalog.js`, which `scripts/small-catalog.test.mjs` keeps equal to the game's own.
+
+## 2026-11-26 — feel: timing words, haptics, a quieter menu
+
+- **Timing words.** A strike near the top of the swing says "Perfect" (quality ≥ 0.7) or "Good" (≥ 0.35) above the bell, in the bell's colour with a dark outline, rising and fading over 0.7 s; from a combo of 3 it adds "×n". A strike at the window's edge says nothing. Quality is the sim's own `hit.quality`; the rules did not change. Under reduced motion the word stays still. Turkish: "Tam vaktinde", "İyi".
+- **Haptics** through `navigator.vibrate` where the browser has it (Android; iOS Safari ignores it): a short tick per strike (longer for Perfect), a double pulse on together/chord/wake, a thud on a miss, a pattern on a won or lost night. Off with the sound switch and under reduced motion.
+- **The menu.** The dashed swing arcs and apex rings are drawn only in play; behind the menu they cluttered the title and buttons.
+
+Checks: `bots.mjs` 0 failed (rules untouched). `check.mjs` PASS on WebKit iPhone 13 and Chromium Pixel 7. A probe on Pixel 7 tapped the pad 260 ms into the ready window and captured "Perfect" above the bell. First minute (Pixel 7, empty storage): menu ready at ~0.1 s, one tap (Play) to the run start, night 1 in about 16 s of play; unchanged by this pass.
+
+Not verified: how the vibration feels on a real Android phone (headless browsers have no motor); whether "Tam vaktinde" reads well to a native speaker.

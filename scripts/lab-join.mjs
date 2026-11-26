@@ -2,7 +2,8 @@
 //
 // Two shapes arrive under format 'kit-lab/1':
 //   parts (since 2026-11-26): every record of a run has data.part (0, 1, ...); the last has final: true and parts: n.
-//     Each part holds only the game events and trace since the one before, so a run is all its parts in order.
+//     Each part holds only the trace (and, past the old event limits, the game events) since the one before, so a run
+//     is all its parts in order. Only the last names the run's start.
 //   one record per run (before): the run record when it ended, and sometimes an earlier copy sent when the page was
 //     hidden (outcome null). The latest copy with an outcome wins, else the latest copy.
 // joinRuns(records) takes any linked records (other kinds and other formats are ignored) and returns one record per

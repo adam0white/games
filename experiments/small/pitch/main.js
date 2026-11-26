@@ -42,6 +42,9 @@ let room = null, roomSeat = null, roomSeats = [], roomGame = 0, roomSeed = 0, ro
 let roomNext = null, roomInviting = false, roomLag = false, roomLagTimer = 0;
 // Puzzle book: the puzzle in play (index), its misses this visit; effects: the goal burst, the go-again word, a missed tap.
 let puzzle = -1, misses = 0, burst = null, againPop = null, missRing = null, shakeUntil = 0;
+// chain: bounces in a row this turn (2026-11-26); each one rings a step higher and the word counts them.
+let chain = 0, chainSheet = null, chainMover = -1;
+const buzz = ms => { try { navigator.vibrate?.(ms); } catch {} };
 let L = { cell: 40, ox: 0, oy: 0 }, W = innerWidth, H = innerHeight, dpr = 1, safe = { top: 0, bottom: 0 };
 // Play recording for the game lab. One run is a match against the bot, a two-player match, a friend's table match
 // or today's pitch. The data holds modes, levels and results only: never a name, a typed word or a table code.
@@ -218,6 +221,7 @@ function render() {
     ball = viewPoint(wobbly(ctx, pxy(L, s, anim.from), pxy(L, s, anim.to), L.cell, INK[anim.player], ease));
     ctx.restore();
   }
+  if (canTap() && !anim) drawAim();
   if (canTap() && !anim) {
     const color = INK[s.turn], pulse = 0.5 + 0.5 * Math.sin(clock / 260);
     let aim = -1;
@@ -242,14 +246,36 @@ function render() {
   drawEffects(ball);
   drawBall(ctx, ball, L.cell);
 }
+// The goal the player to move attacks glows in their ink; on the very first match, chevrons and words point at it
+// until the first goal (2026-11-26: a cold player did not know which way to go).
+function drawAim() {
+  if (mode === 'table') return; // the friend table already marks each seat's own goal in its ink
+  const p = s.turn, top = p === 0, gx = s.w / 2 - 1, pulse = 0.5 + 0.5 * Math.sin(clock / 300);
+  ctx.save(); orient(ctx);
+  const a = at(L, gx, top ? -1 : s.h), b = at(L, gx + 2, top ? 0 : s.h + 1);
+  ctx.globalAlpha = 0.07 + 0.07 * pulse; ctx.fillStyle = INK[p]; ctx.fillRect(a.x, a.y, b.x - a.x, b.y - a.y);
+  ctx.globalAlpha = 1; ctx.restore();
+  if (!(first && score[0] + score[1] === 0 && s.log.length < 12)) return;
+  const mouth = viewPoint(at(L, s.w / 2, top ? 0 : s.h)), dir = viewPoint(at(L, s.w / 2, top ? 1 : s.h - 1)).y > mouth.y ? 1 : -1;
+  ctx.strokeStyle = INK[p]; ctx.lineWidth = Math.max(2, L.cell / 18); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  for (let i = 0; i < 3; i++) {
+    const k = ((clock / 900 + i / 3) % 1), y = mouth.y + dir * L.cell * (1.6 - 1.2 * k), w = L.cell * 0.28;
+    ctx.globalAlpha = Math.sin(k * Math.PI) * 0.7;
+    ctx.beginPath(); ctx.moveTo(mouth.x - w, y + dir * w * 0.7); ctx.lineTo(mouth.x, y); ctx.lineTo(mouth.x + w, y + dir * w * 0.7); ctx.stroke();
+  }
+  ctx.globalAlpha = 0.85; ctx.fillStyle = INK[p]; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = `700 ${Math.round(L.cell * 0.42)}px ${handFont()}`;
+  ctx.fillText(t('scoreHere'), mouth.x, mouth.y - dir * L.cell * 0.55 - (dir < 0 ? 0 : 0));
+  ctx.globalAlpha = 1;
+}
 // Motion that answers every action: a goal bursts pencil strokes from the ball and shakes the paper, a bounce says
 // "again!", and a tap that hits no point leaves a ring where the finger was.
 function drawEffects(ball) {
   if (againPop && clock - againPop.t < 700) {
     const k = (clock - againPop.t) / 700;
     ctx.globalAlpha = 1 - k * k; ctx.fillStyle = againPop.color; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.font = `700 ${Math.round(L.cell * 0.5)}px ${handFont()}`;
-    ctx.fillText(t('again'), againPop.p.x, againPop.p.y - L.cell * (0.45 + 0.6 * k));
+    ctx.font = `700 ${Math.round(L.cell * (0.5 + 0.06 * Math.min(4, againPop.n - 1)))}px ${handFont()}`;
+    ctx.fillText(againPop.n > 1 ? t('againN', { n: againPop.n }) : t('again'), againPop.p.x, againPop.p.y - L.cell * (0.45 + 0.6 * k));
     ctx.globalAlpha = 1;
   }
   if (missRing && clock - missRing.t < 380) {
@@ -305,6 +331,9 @@ function step() {
 function startSegment(d, dur) {
   if (anim) settle();
   const from = s.ball, player = s.turn, to = target(s, d), wasBounce = bounces(s, to);
+  // A chain belongs to one turn on one sheet: a new sheet (restart, next goal, puzzle) or a new mover starts it again.
+  if (s !== chainSheet || player !== chainMover) chain = 0;
+  chainSheet = s; chainMover = player;
   apply(s, d);
   anim = { from, to, player, start: clock, dur, bounce: wasBounce && s.winner < 0 };
   if (inked !== s.log.length - 1) redrawInk();
@@ -320,9 +349,11 @@ function settle() {
   if (a.bounce) {
     pop = { p: viewBall(a.to), t: clock, color: INK[a.player] };
     // Go again: the word rises from the ball with two rising notes, so a bounce is never missed.
-    againPop = { p: viewBall(a.to), t: clock, color: INK[a.player] };
-    fx('again', () => { snd.tone(480, 0.14, 0.05, 'triangle', 420); setTimeout(() => snd.tone(720, 0.12, 0.04, 'triangle', 300), 90); });
-  }
+    chain++;
+    againPop = { p: viewBall(a.to), t: clock, color: INK[a.player], n: chain };
+    const up = 2 ** (Math.min(chain - 1, 7) * 2 / 12);
+    fx('again', () => { snd.tone(480 * up, 0.14, 0.05, 'triangle', 420); setTimeout(() => snd.tone(720 * up, 0.12, 0.04, 'triangle', 300), 90); }, () => { if (!isBot(a.player)) buzz(8 + 4 * Math.min(chain, 5)); });
+  } else chain = 0;
   if (s.winner >= 0) { againPop = null; return gameOver(); }
   if ((mode === 'daily' || mode === 'puzzle') && s.turn !== 0) return mode === 'daily' ? dailyMiss() : puzzleMiss();
   if (!a.bounce && canTap()) fx('yourTurn', () => snd.tone(880, 0.06, 0.035, 'sine'), () => bump('#turn'));
@@ -362,7 +393,7 @@ function gameOver() {
   rec.event('goal', { by: mode === 'table' ? (scorer === roomSeat ? 'you' : 'friend') : scorer, how });
   if (how === 'stuck') fx('stuck', () => snd.tone(196, 0.4, 0.08, 'sine', -60), () => bump('#c'));
   else if (how === 'own') fx('ownGoal', () => { snd.tone(392, 0.3, 0.08, 'sawtooth', -120); snd.noise(0.25, 0.05, 900); });
-  else fx('goal', cheer);
+  else fx('goal', cheer, () => { if (mode === 'bot' && scorer === 0) buzz([40, 50, 90]); });
   toast(t(how === 'stuck' ? 'stuck' : how === 'own' ? 'ownGoal' : 'goal'), INK[scorer]);
   updateHud();
   later(1200, () => {

@@ -3,6 +3,8 @@
 //   protein), and a new trail when that pile runs out.
 // - greedy: trails to sugar only (sugar lays eggs; with no protein the larvae starve).
 // - idle: no orders; foragers find food only by wandering.
+// - careless: careful, but it ignores the spider (spider.js). Careful turns Recall on at the spider's warning and
+//   off when it leaves, so the spider finds the surface empty.
 // The careful bot should grow the colony toward 100 ants in three days, and idle should do clearly worse.
 // Each day has a goal (colony.js, Days). The careful bot also works toward it: on a digging day it marks a
 // nursery beside the queen's chamber at dawn. Acceptance (Days PR): idle fails every day's goal on every seed,
@@ -12,6 +14,7 @@
 import { CMD, FOOD, G, STAGE, SURFACE, Sim } from './sim/sim.js';
 import { GOAL_KIND, START, goalOf } from './sim/colony.js';
 import { EVENT } from './sim/sim.js';
+import { SPIDER } from './sim/spider.js';
 const DAY = 12000;
 
 function piles(sim, kind) {
@@ -29,8 +32,10 @@ const BOTS = {
   careful: [FOOD.SUGAR, FOOD.PROTEIN],
   greedy: [FOOD.SUGAR],
   idle: [],
+  careless: [FOOD.SUGAR, FOOD.PROTEIN],
 };
-const DIGS = { careful: true, greedy: false, idle: false };
+const DIGS = { careful: true, greedy: false, idle: false, careless: true };
+const RECALLS = { careful: true };
 
 /** A nursery of 8 x 6 cells beside the queen's chamber (the side with more soil). */
 function nursery(sim) {
@@ -43,7 +48,7 @@ export function play(bot, seed, ticks = 3 * DAY, extra = {}) {
   const sim = new Sim({ seed, ...START, colony: 1, ...extra });
   const L = sim.L, ex = L.sw >> 1, ey = L.sh >> 1, kinds = BOTS[bot], T = sim.cfg.dayTicks;
   const days = [];
-  let id = 0, last = -1, lastPile = -1;
+  let id = 0, last = -1, lastPile = -1, recall = -1, eaten = 0;
   for (let t = 0; t < ticks; t++) {
     // At dawn: a digging day's goal needs a room dug.
     if (DIGS[bot] && t % T === 0 && goalOf(sim.g[G.DAY]).kind === GOAL_KIND.DUG) sim.queueCommand({ tick: sim.tick, id: ++id, seat: 0, type: CMD.DIG, cells: nursery(sim) });
@@ -59,9 +64,13 @@ export function play(bot, seed, ticks = 3 * DAY, extra = {}) {
         last = kind; lastPile = near.p;
       }
     }
+    if (recall >= 0) { sim.queueCommand({ tick: sim.tick, id: ++id, seat: 0, type: CMD.RECALL, on: recall === 1 }); recall = -1; }
     sim.step();
     const ev = sim.drainEvents();
-    for (let k = 0; k < ev.length; k += 3) if (ev[k] === EVENT.DUSK) days.push({ day: ev[k + 1], won: ev[k + 2], goal: sim.lastDusk, ...count(sim) });
+    for (let k = 0; k < ev.length; k += 3) {
+      if (ev[k] === EVENT.DUSK) { days.push({ day: ev[k + 1], won: ev[k + 2], goal: sim.lastDusk, eaten: sim.g[G.SP_EATEN] - eaten, ...count(sim) }); eaten = sim.g[G.SP_EATEN]; }
+      if (ev[k] === EVENT.SPIDER && RECALLS[bot] && ev[k + 1] !== SPIDER.HUNT) recall = ev[k + 1] === SPIDER.WARN ? 1 : 0;
+    }
   }
   return days;
 }
@@ -83,6 +92,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const bots = process.argv[4] ? process.argv[4].split(',') : Object.keys(BOTS);
   for (const bot of bots) for (const seed of seeds) {
     const t0 = performance.now(), days = play(bot, seed, ticks);
-    console.log(`${bot.padEnd(7)} seed ${String(seed).padStart(2)}: ` + days.map((d, k) => `day ${k + 1} ${d.won ? 'WON' : 'lost'} ${d.goal.kind === GOAL_KIND.BOTH_FOODS ? `${d.goal.a}s/${d.goal.b}p` : d.goal.a}/${d.goal.target} ants ${d.ants} brood ${d.brood} (born ${d.born}, lost ${d.lost}, hungry ${d.hungry}, sugar ${d.sugar}, protein ${d.protein})`).join(' | ') + `  ${((performance.now() - t0) / 1000).toFixed(1)} s`);
+    console.log(`${bot.padEnd(7)} seed ${String(seed).padStart(2)}: ` + days.map((d, k) => `day ${k + 1} ${d.won ? 'WON' : 'lost'} ${d.goal.kind === GOAL_KIND.BOTH_FOODS ? `${d.goal.a}s/${d.goal.b}p` : d.goal.a}/${d.goal.target} eaten ${d.eaten} ants ${d.ants} brood ${d.brood} (born ${d.born}, lost ${d.lost}, hungry ${d.hungry}, sugar ${d.sugar}, protein ${d.protein})`).join(' | ') + `  ${((performance.now() - t0) / 1000).toFixed(1)} s`);
   }
 }

@@ -210,3 +210,16 @@ Below 760 px of height the menu is tighter (smaller title, 44 px buttons, small 
 ## 2026-11-25 — the small games home
 
 The recording notice, its Privacy link, the switch and the "‹ Small games" link now follow the page's language when it changes (`lang` passed to `kit/lab.js` and `kit/home.js`). The small games' card line now says there are three nights. The home keeps counting nights played, with no "n / of": a night has many levels and the save does not record a night as finished. Same keys, same records.
+
+## 2026-11-26 — lift closes a ring, and a miss says why
+
+Cold play showed the most common failed gesture: a finger draws most of a circle (or a "6") and lifts a little away from where it started. Main counted that as nothing, silently.
+
+- Page rules add `lift` (sim.js option, off by default, so main's parity digests hold): on lift, the ring closes from the earliest point of the thread that lies within 34 units of the finger and at least 90 units of thread back. A "6" (a stem, then once round) now catches; before, it caught nothing.
+- A lift that closes nothing sends a `miss` event. The page draws a dotted line from the finger back to where the thread starts, with a circle there, and says "Lift where you started" (the first four times). If the thread had burnt from its tail (a ring bigger than the 600-unit thread), it rings the finger in red and says "Too big: the thread burnt away" every time. A low soft tone plays; fx name `miss`.
+- Turkish: "Başladığın yerde bırak", "Çok büyük: iplik yanıp bitti" (AI-written, not read by a native speaker).
+
+Verified: `node bots.mjs` all pass, including a constructed test (with lift a "6" scores 16, without it 0; a 110-radius circle is one burnt miss) and the main parity digests. phone.mjs `small/ring` and its hint, both engines. A Pixel 7 Chromium screenshot of an open arc showed the dotted line, circle and words, fx log `button level penDown miss`, no console errors.
+
+Not verified: whether the dotted line reads clearly to a person; the burnt-miss words on a real screen; the ladder numbers above were not re-measured with lift (the bot hands close by crossing, so lift should not change them).
+- Variant for the owner to compare: `?v=b` plays without lift (the old closing rule); the default is lift on. The miss cue shows in both.

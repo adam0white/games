@@ -139,6 +139,77 @@ A colony game (`?colony=1`) is played in days of 12,000 ticks (ten minutes; `?da
 
 Choices the owner may want to change: the three goals and their targets, +30 a day after day 3, easing by a quarter after a loss, the floor rule and its gift, time stopping at dusk (a room could run straight on), the day length, and keeping the colony behind `?colony=1` rather than making it the page's default.
 
+## The spider and Recall (M1, SIM_VERSION 6, 2026-11-26)
+
+From day 2 a spider comes once a day (02-spec 6.5, feature 12; `sim/spider.js`). It wears ant scent, so ants neither flee nor fight it. The answer is Recall.
+
+| When (a day of T ticks) | What happens | The page |
+| --- | --- | --- |
+| T/4 | It smells the trail with the most living surface ants on or beside its path (ties: the newest). `EVENT.SPIDER` WARN. | Toast, two low notes, HUD line "Spider: coming", a red ring where it will appear (an arrow at the screen edge when that is off screen). |
+| + max(20, T/30) | It appears at the trail's far end. HUNT. | A dark eight-legged body with a red mark, its reach drawn as a box; HUD "Spider: hunting · eaten N". |
+| hunting | One cell each 10 ticks back along the trail toward the nest. It eats the nearest surface ant within one cell, then needs 20 ticks before the next. | |
+| it leaves | At the walk's end after max(40, T/40) ticks with nothing to eat, after T/6 ticks of hunting, at 30 kills, or when its trail is removed or replaced. LEFT. | Toast: what it ate, or "found nobody: send the ants out". |
+
+- The first visit (day 2) is the safe form (02-spec 8): it walks along the map's top edge and eats no one, so the player meets it before it costs anything.
+- Recall now empties the surface and keeps it empty: foragers in the nest stay in (before, they came home and went straight back out, so Recall never cleared the surface), their search timer does not run while they wait, and guards do not go out to a surface alarm.
+- The careful bot turns Recall on at the warning and off when the spider leaves. "Careless" plays the same without Recall. On 12 seeds (`sim/SPIKES.md`, The spider), see the sweep there for what the spider costs.
+- Times shrink for short days (at most an eighth of the day for the warning and the hunger time, half for the hunt), so a visit ends inside its day; `?day=200` on the phone check sees the day-2 visit.
+
+Choices the owner may want to change: from day 2, once a day at a quarter of the day; a harmless first visit; the busiest trail by ants near it now (not loads carried); 30 kills a visit; no way to fight it (bites or majors could hurt it later, 02-spec 6.5 says ants cannot); its look.
+
+## The nest view (2026-11-26, page only)
+
+The nest layer (`nestview.js`) now shows:
+- Each dug chamber, tinted and labelled with its size. The queen's chamber is the one around the middle of `sim.home`. A chamber is open cells grown by one cell from a core at least three cells wide and two high, six cells or more, so shafts and tunnels are not chambers. Rooms are found again only when the terrain changes.
+- Sugar and protein in store as heaps on the two sides of the queen's chamber (one grain per 4 units, 60 at most).
+- Brood by growth. Eggs swell with age. Larvae get bigger and close their curl with each meal; a hungry one is pale with a red spot. Pupae darken toward hatching.
+- The queen: three body parts, six legs, antennae, and an abdomen that pulses and swells before she lays.
+
+The sim is not touched (no hash change). Rooms with purposes (02-spec 6.2: nursery, granary, worth) are not built: they need sim rules, and brood still lies in the queen's chamber. Its colours follow the look (see Looks).
+
+## Looks (2026-11-26, page only)
+
+Three looks of the same scene, for the owner to pick one (04-roadmap M1 item 4). Open the page with `?look=ink`, `?look=ember` or `?look=field`, or use the Look row on the pause card. The row reloads the page with the new look and keeps the other parameters, such as `colony=1`. The game in progress is lost on that reload, because there is no autosave yet.
+
+| Look | Ground | Edges | Scent | Ants |
+|---|---|---|---|---|
+| `ink` (the default) | Paper ash, a soft wash, a few embers | Wobbly hand-inked lines | Watercolour washes | Small inked bodies |
+| `ember` | Night: dark ash with many embers and a vignette; warm light from the entrance | Rock edges glow and beat like cooling coals | Light added to the ground | Dark bodies with a hot rim; far away they are sparks |
+| `field` | A field-guide plate in daylight: flat stepped tones and halftone dots on solid ground | Thick, clean outlines | Marching stripes for trails, dots for food | 1.3 times bigger, coloured by job (black forager, orange digger, red guard), with a white outline |
+
+- `looks.js` holds the names and one palette per look for the Canvas 2D overlay: crews, the stroke preview, the selected ant, the spider and its arrow, room tints and labels, stores, brood and the queen. `index.html`'s page background and theme colour follow the look.
+- Each look is its own shader build: `render.js` adds `#define LOOK n` after `#version`, and the context-restore path builds the same variant.
+- An unknown name falls back to `ink`. The lab record's start carries the resolved name, not the raw query.
+- The sim and its hashes do not change.
+- The phone line `cinderhill looks` checks the following in WebKit and Chromium. `ember`, `field` and an unknown name each compile and draw, and each survives a lost context. The pause card keeps `colony=1` when it switches looks. A syntax error in the `field` shader made this line fail (`timed out waiting for: field: frames drawn`). Every other cinderhill line still passed, because a shader that does not compile leaves the page running with no WebGL.
+- S3 per look, run with `spikes/s3.mjs --only=webkit --look=<name>`: WebKit 27.2 with the iPhone 13 profile, on the Mac's GPU, with the machine's load average at about 13. These numbers are not from a phone: every look holds the display's frame rate here.
+
+| Look | Ants | Frame mean / p95 ms | fps | Page work mean / p95 ms |
+|---|---|---|---|---|
+| ink | 2,000 | 13.89 / 15 | 72 | 0.78 / 3 |
+| ink | 5,000 | 13.93 / 15 | 71.8 | 0.79 / 3 |
+| ember | 2,000 | 14.07 / 15 | 71.1 | 0.64 / 2 |
+| ember | 5,000 | 13.89 / 15 | 72 | 0.80 / 3 |
+| field | 2,000 | 14.00 / 15 | 71.4 | 0.71 / 3 |
+| field | 5,000 | 14.23 / 15 | 70.3 | 0.84 / 3 |
+
+  Feature 10's bar is 30 fps with 2,000 ants on an iPhone 13 class phone. That bar is not yet checked on a real phone for any look: open `/cinderhill/?fps=1&look=<name>` on one.
+
+Choices the owner may want to change: which look to keep (or parts of each), the field look's bigger ants, and whether to reload or switch looks in place.
+
+## The lab record: a full replay (2026-11-26)
+
+Every game sends its whole replay to the game lab, so a session can be played again in Node and read minute by minute (`labrec.js`, using only kit/lab.js's `start`, `event`, `end` and its flush when the page is put away).
+
+- Start: format `cinderhill-replay/1`, a chain id and part, mode, look, ants, seed, `SIM_VERSION`, snapshot format, the day length, the viewport.
+- `log` events: the replay stream, in order: every order exactly as `host.order` got it with its tick, go-on after a dusk, and a day restarted. Batched to about 3 KB an event.
+- `sample` every 30 s of play: tick and the sim's total hash, ants by caste, sugar, protein, brood by stage, loads home, frames a second (p50 and the p95 slow frame), ms held, the camera. The log up to a sample is sent before it, so the hash checks the stream.
+- `cam` (settled camera, at most one each 5 s), `hold` with its length, `hide` and `show`, `error` (10 at most), `dusk` with the goal's result, `dawn`, `restart`.
+- Summary: totals, orders by type, holds, the longest play with no order, the final tick and hash.
+- The kit keeps a run to 300 events and 96 KB. Near 270 events or 80 KB the part ends as `continued` and the next part starts where it stopped; parts share the chain id. A 10-minute bot game is about 6 KB and 57 events.
+
+`spikes/replay-lab.mjs <record.json> [...]` makes the game again with `host.js`, replays the stream, checks every hash (part starts, samples, the final one) and writes a report: deliveries by food per minute, working and idle ants, each trail (ants on it, trips, time to the first delivery, how it ended), digs and what they opened, alarms and recalls with their effect, brood and castes, deaths, stalls of 60 s with nothing happening, days and restarts, and the page's frame rate, holds and errors. Trips are not attributed on ticks where an ant died. A record from another sim version will not match; the report says so. `test/labrec.test.mjs` plays a bot game through a Host as the page does, checks the kit's limits, replays it, and shows that one changed order is caught at the next sample.
+
 ## The tactical hold (2026-11-26)
 
 The Hold button (Durdur in Turkish) stops time on the page: the host stops advancing ticks, so the sim, scent and ants stand still. Orders still work while held. A trail or dig drawn while held is queued at the current tick (the page state says queued); the first tick after Go applies it. A blue frame marks the held screen. The hold lives in the page (`painter.js` `held`, `host.advance(now, ... || held)`), not in the sim, so it changes no hash and needs nothing from the room. In a shared room a hold would have to be a room rule (who may stop time for everyone); that is open. Trail, dig and Recall all go through the same `order()` path to `host.order`; the Recall button shows its new state only once Go applies it (it follows the sim). The `cinderhill orders` phone line checks that no tick runs while held, that a trail stroke queues, and that Go applies it; it fails when the hold does not stop time. Dig and Recall while held are not checked on their own. The kit's `pause.js` is the full pause (pause card, page hidden) and Cinderhill uses it; a hold that takes orders has one user, so it stays in the game until a second game needs it (kit rule 1).

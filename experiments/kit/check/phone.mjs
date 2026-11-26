@@ -1404,17 +1404,76 @@ for (const [slug, g] of Object.entries({ ...pages, ...labPages })) {
 }
 
 for (const [slug, run] of Object.entries(pageRuns)) GAMES[slug] = page => run(page, { base, until }); // pages that are not games: the small games' home
+// The small games' home, beyond its run in pages.mjs (both run for 'small'): the moving previews paint and move, and
+// stay still under reduced motion.
+GAMES['small live'] = async page => {
+  await page.goto(`${base}/notes/button.js`); await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('hf-lab-send-localhost', '1'); });
+  await page.goto(`${base}/small/?lang=en&day=2026-11-24`); await until(page, () => window.smallState, 'home script');
+  await until(page, () => window.smallState().live.length >= 1, 'tonight’s next stop moves');
+  const frame = () => page.evaluate(() => { const c = document.querySelector('li.now canvas.live.on'); return c ? c.toDataURL() : ''; });
+  const a = await frame(); await sleep(400); const b = await frame();
+  assert.ok(a.length > 2000 && a !== b, 'the preview paints, and moves');
+  assert.ok(await page.evaluate(() => document.querySelector('li.now .hook').textContent.length > 5), 'the stop shows its hook');
+  await page.evaluate(() => document.getElementById('deck').scrollIntoView({ block: 'center' }));
+  await until(page, () => window.smallState().live.includes(window.smallState().pick), 'the deck’s middle card moves');
+  await page.emulateMedia({ reducedMotion: 'reduce' }); await page.reload(); await until(page, () => window.smallState, 'home script again'); await sleep(500);
+  assert.deepEqual((await page.evaluate(() => window.smallState())).live, [], 'nothing moves under reduced motion');
+};
+// The collection: the deck puts untried games right after the pick and keeps that order through a visit; a game tried
+// for the first time lights its tile with a note when the player comes back; the sound switch is remembered.
+GAMES['small tried'] = async page => {
+  await page.goto(`${base}/notes/button.js`);
+  await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('hf-lab-send-localhost', '1'); localStorage.setItem('hub:small:intro', '1');
+    localStorage.setItem('hub:opened', JSON.stringify({ 'night-saltplate': '2026-11-20', 'wild-pour': '2026-11-24' }));
+    localStorage.setItem('night-bells:save', JSON.stringify({ v: 1, stars: [2, 0, 0, 0, 0, 0, 0, 0], best: 0, sound: true, tries: 1, look: 'amber' })); });
+  await page.goto(`${base}/small/?lang=en&day=2026-11-24`); await until(page, () => window.smallState, 'home script');
+  let st = await page.evaluate(() => window.smallState());
+  assert.equal(st.order[0], st.pick, 'the deck starts on the pick');
+  assert.deepEqual(st.tried.sort(), ['night-bells', 'night-saltplate', 'wild-pour'], 'played and opened games count as tried');
+  assert.deepEqual(st.order.slice(-3).sort(), ['night-bells', 'night-saltplate', 'wild-pour'], 'tried games come last');
+  assert.equal(await page.textContent('#triedText'), 'You have tried 3 of 12');
+  assert.equal(await page.locator('.tile.lit').count(), 3);
+  // A tile brings its card to the middle; that card's game, new until now, is opened and the player comes back.
+  await page.click('.tile[data-i="1"]'); await until(page, () => window.smallState().at === 1, 'a tile brings its card');
+  await page.waitForTimeout(600);
+  const slug = st.order[1];
+  await page.click(`.card.${slug} a.play`); await page.waitForURL(url => url.pathname === `/small/${slug}/`); await page.waitForLoadState("networkidle"); // WebKit counts module requests cut off by an early goBack as failed requests
+  await page.goBack(); await until(page, () => window.smallState, 'back on the home');
+  await until(page, s => document.querySelector(`.tile[data-slug="${s}"]`)?.classList.contains('lit'), 'its tile lights', 4000, slug);
+  assert.equal(await page.textContent('#toast'), 'New one tried · 4 of 12');
+  assert.deepEqual((await page.evaluate(() => window.smallState())).order, st.order, 'the deck keeps its order through the visit');
+  await page.click('#sound'); assert.equal(await page.evaluate(() => localStorage.getItem('hub:small:sound')), '0');
+  await page.reload(); await until(page, () => window.smallState, 'home script again');
+  assert.equal((await page.evaluate(() => window.smallState())).sound, false, 'sound off is remembered');
+  await page.click('#lang'); await until(page, () => document.documentElement.lang === 'tr', 'Turkish');
+  assert.equal(await page.textContent('#triedText'), '12 oyunun 4 tanesini denedin');
+};
+// ?v=grid: every game at once. Any card's Play opens its game, the previews on screen move, no sideways scroll.
+GAMES['small grid'] = async page => {
+  await page.goto(`${base}/notes/button.js`); await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('hf-lab-send-localhost', '1'); localStorage.setItem('hub:small:intro', '1'); });
+  await page.goto(`${base}/small/?lang=en&day=2026-11-24&v=grid`); await until(page, () => window.smallState, 'home script');
+  assert.equal((await page.evaluate(() => window.smallState())).v, 'grid');
+  assert.equal(await page.locator('.card.away').count(), 0, 'no card is set aside');
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no sideways scroll');
+  await page.evaluate(() => document.getElementById('deck').scrollIntoView());
+  await until(page, () => window.smallState().live.length >= 4, 'the previews on screen move');
+  const slug = (await page.evaluate(() => window.smallState())).order[3];
+  await page.click(`.card.${slug} a.play`); await page.waitForURL(url => url.pathname === `/small/${slug}/`);
+  await page.goBack(); await until(page, () => window.smallState, 'back on the home');
+  await page.click('#lang'); await until(page, () => document.documentElement.lang === 'tr', 'Turkish');
+  assert.equal(await page.textContent('#all .lead'), 'Hepsi burada, oynuyor. Başlamak için birine dokun.');
+};
 
 const MUTATE = process.argv.includes('--mutate'); // only 'lantern ripples' reads it: its check must then fail
 const [onlyGame, onlyPhone] = process.argv.slice(2).filter(a => a !== '--mutate');
 // The first argument is 'all' or a comma list of experiments. An experiment's name picks its own check, its
 // first-time help check, and for Lantern the three checks below that play Lantern.
-const WITH = { lantern: ['old links', 'lab down', 'leaving mid-run', 'lantern ripples'], duel: ['duel friend'], cinderhill: ['cinderhill check', 'cinderhill orders', 'cinderhill hud', 'cinderhill colony', 'cinderhill days'] };
-const LEFT_MID_SEND = /^request failed: https:\/\/human\.adamwhite\.work\/lab\/api\/linked \((cancelled|net::ERR_ABORTED)\)$/;
+const WITH = { lantern: ['old links', 'lab down', 'leaving mid-run', 'lantern ripples'], duel: ['duel friend'], cinderhill: ['cinderhill check', 'cinderhill orders', 'cinderhill hud', 'cinderhill colony', 'cinderhill days', 'cinderhill looks'] };
 const picked = game => !onlyGame || onlyGame === 'all' || onlyGame.split(',').some(only => game === only || game === `hint ${only}` || game.startsWith(`hint ${only} `) || WITH[only]?.includes(game));
 // A check that never answers becomes a FAIL line naming it, not a job that runs until its time limit.
 const within = (p, ms, what) => { let t; return Promise.race([p, new Promise((_, no) => { t = setTimeout(() => no(new Error(`no answer in ${ms / 1000}s: ${what}`)), ms); })]).finally(() => clearTimeout(t)); };
 let failed = 0;
+WITH.small = ['small live', 'small tried', 'small grid']; // the small games' home: its extra checks run with 'small'
 for (const [phone, [engine, device]] of Object.entries(PHONES)) {
   if (onlyPhone && onlyPhone !== phone) continue;
   // Headless macOS WebKit still needs a display link to schedule animation frames.
@@ -1451,12 +1510,9 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
       };
     });
     page.on('pageerror', e => errors.push(String(e))); page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
-    // A lab send the page leaves behind (a part sent as the page is hidden, then the page navigates away) is cancelled by
-    // the browser; kit/lab.js keeps it queued and sends it on the next visit, so it is not a page error. Since 2026-11-26
-    // the hide part is sent on every hide during a run, because it carries the input trace.
     page.on('requestfailed', r => errors.push(`request failed: ${r.url()} (${r.failure()?.errorText ?? ''})`)); page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
     // Lantern's check is the longest: its seven ability showings (note #123) took it past 150 s on WebKit.
-    try { await within(run(page), game === 'lantern' ? 240000 : 150000, 'the whole check'); assert.deepEqual(errors.filter(e => !LEFT_MID_SEND.test(e)).filter(e => !(context.labDown && /human\.adamwhite\.work|Load failed|Failed to fetch|ERR_CONNECTION_REFUSED/.test(e))).filter(e => !(context.boardBad && /\/lab-api\/board\/|status of 401/.test(e))).filter(e => !(context.badFrame && /lab check: one bad frame/.test(e))).filter(e => !(context.viewBad && /view3d\.js|ripples(-gl)?\.js|net::ERR_FAILED|Failed to load resource|Importing a module/.test(e))), [], 'page errors'); console.log(`ok   ${game} on ${phone}`); }
+    try { await within(run(page), game === 'lantern' ? 240000 : 150000, 'the whole check'); assert.deepEqual(errors.filter(e => !(context.labDown && /human\.adamwhite\.work|Load failed|Failed to fetch|ERR_CONNECTION_REFUSED/.test(e))).filter(e => !(context.boardBad && /\/lab-api\/board\/|status of 401/.test(e))).filter(e => !(context.badFrame && /lab check: one bad frame/.test(e))).filter(e => !(context.viewBad && /view3d\.js|ripples(-gl)?\.js|net::ERR_FAILED|Failed to load resource|Importing a module/.test(e))), [], 'page errors'); console.log(`ok   ${game} on ${phone}`); }
     catch (e) { failed++; console.log(`FAIL ${game} on ${phone}: ${e.message}`); if (process.env.CHECK_STACK) console.log(e.stack); if (errors.length) console.log('     ' + errors.join('\n     ')); await shot(page, 'failure').catch(() => {}); }
     try { await within(context.close(), 15000, 'closing the page'); }
     catch (e) { console.log(`     ${e.message}; starting the browser again`); browser.close().catch(() => {}); browser = await engine.launch(); }

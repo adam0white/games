@@ -54,6 +54,18 @@ assert.equal(below.filter(g => g > 0 && g < 5).length, 0, 'the mesh retains ever
 assert.equal(below.filter(g => g >= 5).length, 300, 'all fine grains pass the mesh');
 assert.equal(count(tray.cells), 600);
 console.log('Horizontal mesh: 300/300 fine through, 0/300 coarse through');
+// Gravity (2026-11-26): one grain dropped 150 cells lands in well under 150 ticks and speeds up on the way;
+// without gravity it falls one cell a tick. Mass is kept either way.
+function dropTicks(gravity) {
+  const t = emptyTray(); t.gravity = gravity; t.cells[5 * W + 60] = 1; const ys = [];
+  let n = 0; while (!t.cells[(H - 2) * W + 60] && n < 400) { step(t); n++; ys.push(t.cells.findIndex(g => g) / W | 0); }
+  assert.equal(count(t.cells), 1, 'a falling grain is never lost or doubled');
+  return { n, first: ys[0] - 5, top: Math.max(...ys.slice(1).map((y, k) => y - ys[k])) };
+}
+const fast = dropTicks(true), slow = dropTicks(false);
+assert.equal(slow.n, H - 2 - 5, 'without gravity a grain falls one cell a tick');
+assert.ok(fast.n < slow.n * 0.4 && fast.first === 1 && fast.top === sim.MAX_FALL, `with gravity it speeds up: ${fast.n} ticks against ${slow.n}`);
+console.log(`Gravity: a grain falls ${H - 7} cells in ${fast.n} ticks (${slow.n} without)`);
 
 function pile(colour) {
   const s = emptyTray();

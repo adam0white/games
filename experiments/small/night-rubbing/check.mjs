@@ -176,7 +176,7 @@ async function recording({ name, device }, browser) {
   const page = await context.newPage();
   page.setDefaultTimeout(8000);
   try {
-    await page.goto(withAgent(origin + path));
+    await page.goto(withAgent(origin + path + '?v=classic'));
     await screen(page, 'play');
     await assertNotice(page);
     assert.equal(lab.sent.length, 0, 'nothing is sent before a plate is rubbed');
@@ -271,7 +271,7 @@ async function deeper({ name, device }, browser) {
   const day = '2026-11-25';
   const out = {};
   try {
-    await page.goto(withAgent(origin + path) + '&date=' + day);
+    await page.goto(withAgent(origin + path + '?v=classic') + '&date=' + day);
     await screen(page, 'play');
     let s = await state(page);
     assert.equal(s.level, 6, 'the old save opens on its plate');
@@ -377,7 +377,7 @@ async function deeper({ name, device }, browser) {
     await input.close();
 
     // Turkish: every string on the board and the pause card.
-    await page.goto(withAgent(origin + path) + '&date=' + day + '&lang=tr');
+    await page.goto(withAgent(origin + path + '?v=classic') + '&date=' + day + '&lang=tr');
     await screen(page, 'play');
     assert.equal((await state(page)).lang, 'tr');
     assert.equal(await page.locator('[data-i18n=eyebrow]').textContent(), 'Fosil frotajları');
@@ -441,7 +441,7 @@ async function run({ name, engine, device }) {
     const rotate = () => page.setViewportSize({ width: portrait.height, height: portrait.width });
     const restorePortrait = () => page.setViewportSize(portrait);
 
-    await page.goto(withAgent(origin + path));
+    await page.goto(withAgent(origin + path + '?v=classic'));
     await screen(page, 'play');
     const fresh = await state(page);
     assert.equal(fresh.level, 1);

@@ -11,6 +11,9 @@ h1, h2 { font-weight: normal; color: var(--gold); margin: 0; line-height: 1.15; 
 
 .top { display: flex; align-items: center; justify-content: space-between; padding: calc(.6em + env(safe-area-inset-top)) 16px .2em; max-width: 40em; margin: 0 auto; }
 .brand { font: 11px/1 -apple-system, system-ui, sans-serif; letter-spacing: .16em; text-transform: uppercase; color: var(--dim); }
+.tools { display: flex; gap: 8px; }
+.snd { font-size: 15px !important; letter-spacing: 0 !important; min-width: 40px !important; }
+.snd.off { opacity: .45; text-decoration: line-through; }
 .lang { height: 32px; min-width: 46px; border: 1px solid var(--line); border-radius: 16px; background: none; font: 12px/1 -apple-system, system-ui, sans-serif; letter-spacing: .08em; cursor: pointer; }
 
 /* tonight */
@@ -25,9 +28,9 @@ h1, h2 { font-weight: normal; color: var(--gold); margin: 0; line-height: 1.15; 
 .intro { margin: 1em 0 0; padding: .9em 1em 1em; border-radius: 16px; background: #ffd9a00d; border: 1px solid #ffd9a055; }
 .intro ol { margin: 0; padding: 0; list-style: none; display: grid; gap: .45em; }
 .intro li { display: flex; align-items: center; gap: .7em; opacity: 0; animation: lightUp .5s ease-out forwards; }
-.intro li:nth-child(2) { animation-delay: .7s; } .intro li:nth-child(3) { animation-delay: 1.4s; }
+.intro li:nth-child(2) { animation-delay: .25s; } .intro li:nth-child(3) { animation-delay: .5s; }
 .intro li i { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font: 600 12px/1 -apple-system, system-ui, sans-serif; font-style: normal; background: var(--gold); color: var(--bg); box-shadow: 0 0 12px #ffd9a088; flex: none; }
-.intro p { margin: .7em 0 0; display: flex; align-items: center; justify-content: space-between; gap: .8em; opacity: 0; animation: lightUp .5s 2.1s ease-out forwards; }
+.intro p { margin: .7em 0 0; display: flex; align-items: center; justify-content: space-between; gap: .8em; opacity: 0; animation: lightUp .5s .75s ease-out forwards; }
 .intro button { min-height: 40px; padding: 0 1.2em; border-radius: 20px; border: 0; background: var(--gold); color: var(--bg); cursor: pointer; }
 @keyframes lightUp { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 
@@ -69,6 +72,19 @@ li.opened .stop .pic, li.moved .stop .pic, li.won .stop .pic { opacity: .75; }
 .result .dim { color: var(--dim); font-size: .86em; }
 .result button { margin-top: .7em; min-height: 46px; padding: 0 1.4em; border-radius: 23px; border: 0; background: var(--gold); color: var(--bg); cursor: pointer; font-size: 1em; }
 
+/* the collection: every game as a tile, grey until tried */
+.tried { margin-top: .8em; }
+.tried p { margin: 0 0 .5em; font: 13px/1.3 -apple-system, system-ui, sans-serif; color: var(--gold); }
+.tiles { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.tile { position: relative; aspect-ratio: 4 / 3; border-radius: 9px; overflow: hidden; padding: 0; border: 1px solid var(--line); background: #151823; cursor: pointer; }
+.tile .art { position: absolute; inset: 0; width: 100%; height: 100%; filter: grayscale(1) brightness(.65); transition: filter .4s; }
+.tile .art * { animation: none !important; }
+.tile.lit .art { filter: none; }
+.tile.lit::after { content: '✓'; position: absolute; right: 3px; bottom: 2px; font: 700 10px/1 -apple-system, system-ui, sans-serif; color: var(--bg); background: var(--gold); border-radius: 6px; padding: 2px 3px; }
+.tile.on { outline: 2px solid var(--gold); outline-offset: 1px; }
+.tile.pop { animation: pop .7s ease-out; }
+@keyframes pop { 0% { transform: scale(1); } 35% { transform: scale(1.35); box-shadow: 0 0 18px var(--gold); } 100% { transform: scale(1); } }
+
 /* all the small games: the deck */
 #all { margin-top: 2.4em; padding-bottom: 1em; }
 #all h2 { font-size: 1.35em; }
@@ -105,11 +121,35 @@ li.opened .stop .pic, li.moved .stop .pic, li.won .stop .pic { opacity: .75; }
 .more button { min-height: 44px; padding: 0 1.1em; border-radius: 22px; border: 1px solid var(--gold); background: none; color: var(--gold); cursor: pointer; }
 .more button.quiet { border-color: var(--line); color: var(--ink); }
 
+/* ?v=grid: every game at once, two to a row */
+body[data-v=grid] .deck { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; overflow: visible; scroll-snap-type: none; padding: 14px 16px 6px; max-width: 40em; margin: 0 auto; }
+body[data-v=grid] .card { height: auto; border-radius: 16px; box-shadow: 0 6px 16px #0007; }
+body[data-v=grid] .card.away { transform: none; opacity: 1; cursor: auto; }
+body[data-v=grid] .card.away .play { pointer-events: auto; }
+body[data-v=grid] .card .pic { flex: none; aspect-ratio: 4 / 3.4; }
+body[data-v=grid] .card .body { padding: 9px 10px 10px; gap: 3px; flex: 1; }
+body[data-v=grid] .card b { font-size: 1.08em; }
+body[data-v=grid] .card .line { display: none; }
+body[data-v=grid] .card small { font-size: 11px; }
+body[data-v=grid] .card .play { margin-top: auto; padding: .45em; font-size: .98em; border-radius: 11px; }
+body[data-v=grid] .pic .hook { font-size: 11.5px; padding: 1em 8px 6px; }
+body[data-v=grid] .badge { top: 7px; left: 7px; right: 7px; }
+body[data-v=grid] .pickTag { font-size: 9px; padding: .45em .6em; }
+body[data-v=grid] .mark { font-size: 10px; }
+body[data-v=grid] .bar { display: none; }
+
 footer { max-width: 40em; margin: 2em auto 0; padding: 1em 16px calc(2em + env(safe-area-inset-bottom)); border-top: 1px solid #ffd9a01a; color: var(--dim); font-size: 13px; }
 footer .lab-toggle { font-size: 13px; }
 .toast { position: fixed; left: 50%; bottom: calc(28px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: var(--gold); color: var(--bg); padding: .5em 1em; border-radius: 99px; font-size: .9em; opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 5; }
 .toast.on { opacity: 1; }
-@media (prefers-reduced-motion: reduce) { .intro li, .intro p, .result { animation: none; opacity: 1; } .card { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .intro li, .intro p, .result, .tile.pop { animation: none; opacity: 1; } .card { transition: none; } }
+
+/* the live previews: a canvas over the drawing, shown once its first frame is painted; the hook along the bottom */
+.pic canvas.live { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; transition: opacity .35s; pointer-events: none; }
+.pic canvas.live.on { opacity: 1; }
+.pic .hook { position: absolute; left: 0; right: 0; bottom: 0; padding: 1.2em 14px 9px; font: 600 14px/1.25 -apple-system, system-ui, sans-serif; letter-spacing: .01em; color: #fff; text-shadow: 0 1px 3px #000a; background: linear-gradient(transparent, #0b0d1499 55%); pointer-events: none; }
+li.now .stop .pic .hook { font-size: 13px; padding-bottom: 8px; }
+@media (prefers-reduced-motion: reduce) { .pic canvas.live { display: none; } }
 
 /* the previews move a little; never under reduced motion */
 @keyframes swing { 0%, 100% { transform: rotate(-12deg); } 50% { transform: rotate(12deg); } }

@@ -39,9 +39,12 @@ export const WORDS = {
 export const NOTICE = WORDS.en.notice;
 export const PRIVACY = 'https://human.adamwhite.work/lab/privacy/';
 const PLAYER = 'hf-lab-player', OFF = 'hf-lab-recording-off', QUEUE = 'hf-lab-kit-queue';
-// A part is sent once its events and trace pass PART_BYTES of JSON; a run sends at most MAX_PARTS parts (about 7 MB),
-// then keeps only its game events. PRE_ITEMS bounds input kept from outside a run. FINAL_BYTES keeps the last part
-// well under the lab's 512 KB inflated limit.
+// A run's game events stay together in its last record while they are within MAX_EVENTS and MAX_BYTES (a game such as
+// Cinderhill keeps its own records under these and reads them back whole). A run that goes past them carries its game
+// events in its parts from then on, so none is lost. The trace goes in a part once what is waiting passes PART_BYTES of
+// JSON; a run sends at most MAX_PARTS parts (about 7 MB), then keeps only its game events. PRE_ITEMS bounds input kept
+// from outside a run. FINAL_BYTES keeps the last part well under the lab's 512 KB inflated limit.
+export const MAX_EVENTS = 300, MAX_BYTES = 96 * 1024;
 export const PART_BYTES = 64 * 1024, MAX_PARTS = 120, PRE_ITEMS = 600, MAX_GAME_EVENTS = 20000, FINAL_BYTES = 384 * 1024;
 export const QUEUE_MAX = 60, QUEUE_BYTES = 1024 * 1024, QUEUE_DAYS = 30, QUEUE_TRIES = 20;
 
@@ -137,13 +140,18 @@ export function lab(game, options = {}) {
     } finally { draining = false; }
   }
   const dequeue = id => { const q = readQueue(), i = q.findIndex(x => x.r?.id === id); if (i >= 0) { q.splice(i, 1); writeQueue(q); } };
-  // Queued before sending, so a page closed before the answer arrives (a part sent on page hide) still has it.
-  // Sent one at a time, in order: the lab updates its daily index by compare-and-swap, and parts of one run arrive in order.
-  let chain = Promise.resolve();
-  function deliver(r) {
-    if (on()) enqueue(r);
+  // Queued before sending, so a page closed before the answer arrives still has it. The parts of one run are sent one
+  // at a time, in order; other records go at once, as before parts, so a record is not left waiting behind another when
+  // the player leaves the page. A record made while holding (the page is being put away) is only queued; the page's show
+  // posts it, in order, once the page is back. If the page never comes back, the next kit page's drain sends it.
+  const chains = new Map(); let holding = false, held = [];
+  function deliver(r, again = false) {
+    if (!again && on()) enqueue(r);
+    if (holding) { held.push(r); return Promise.resolve(); }
+    if (again && !readQueue().some(x => x.r?.id === r.id)) return Promise.resolve(); // a drain sent it meanwhile, or it was dropped
     inFlight.add(r.id);
-    chain = chain.then(async () => {
+    const key = `${r.kind}:${r.runId}`;
+    const next = (chains.get(key) ?? Promise.resolve()).then(async () => {
       let answer;
       // A send that hangs gives way after 30 s, so the parts behind it still go (the record stays in the queue).
       let timer;
@@ -153,7 +161,9 @@ export function lab(game, options = {}) {
       if (answer === 'ok') { clearWarn(); drain().catch(() => {}); return; }
       if (answer !== 'skip') warn(answer);
     }).catch(() => {});
-    return chain;
+    chains.set(key, next);
+    next.then(() => { if (chains.get(key) === next) chains.delete(key); });
+    return next;
   }
   // A browser privacy signal stops recording on this page until the player ticks its switch; say so rather than
   // record nothing silently. Not shown when the player switched recording off.
@@ -181,15 +191,16 @@ export function lab(game, options = {}) {
     deliver(r);
   }
   const size = v => { try { return JSON.stringify(v).length + 1; } catch { return 64; } };
-  // One part of the open run: the game events and trace since the last part. Times in the trace are ms from the run's
-  // start (negative for input made before it).
+  // One part of the open run: the trace since the last part, and the game events once the run has gone past MAX_EVENTS or
+  // MAX_BYTES. Only the last part names the run's start, so a reader that takes each record with a start as a whole run
+  // still finds one per run. Times in the trace are ms from the run's start (negative for input made before it).
   function part(final) {
     if (!run || !on()) return;
-    if (!final && run.part >= MAX_PARTS - 1) { run.capped = true; run.dropped.trace += run.trace.length; run.trace = []; run.bytes = size(run.events); return; }
+    if (!final && run.part >= MAX_PARTS - 1) { run.capped = true; run.dropped.trace += run.trace.length; run.trace = []; run.traceBytes = 0; return; }
     const ended = Date.now(), at = run.started;
     let trace = run.trace.map(x => [x[0] - at, ...x.slice(1)]);
     let data = { format: 'kit-lab/1', part: run.part, started: at, ended, outcome: final ? run.outcome : null, summary: final ? run.summary : null,
-      start: run.info, events: run.events, trace, env: env() };
+      start: final ? run.info : null, events: final || run.spill ? run.events : [], trace, env: env() };
     if (final) { data.final = true; data.parts = run.part + 1; }
     if (run.capped || run.dropped.events || run.dropped.trace) data.truncated = true;
     if (run.dropped.events || run.dropped.trace) data.dropped = { ...run.dropped };
@@ -198,7 +209,8 @@ export function lab(game, options = {}) {
       if (size(data) > FINAL_BYTES) { data = { ...data, events: [], truncated: true }; }
     } catch { return; }
     record('run', run.id, data);
-    run.part++; run.events = []; run.trace = []; run.bytes = 0;
+    run.part++; run.trace = []; run.traceBytes = 0;
+    if (final || run.spill) { run.events = []; run.eventBytes = 0; }
     if (final) {
       const t = Math.max(0, ended - at), e = [['start', 0], ['ms', 0, 'run started']];
       if (run.outcome !== 'left') e.push(['ms', t, 'ending reached']);
@@ -210,18 +222,21 @@ export function lab(game, options = {}) {
   // Adds to the open run, or to the bounded buffer of input made outside a run. A full part is sent at once.
   function add(item, isEvent) {
     if (open()) {
-      if (isEvent) { if (run.eventCount >= MAX_GAME_EVENTS) { run.dropped.events++; return; } run.eventCount++; run.events.push(item); }
-      else if (run.capped) { run.dropped.trace++; return; } else run.trace.push(item);
-      run.bytes += size(item);
-      if (run.bytes > PART_BYTES && !run.capped) part(false);
-      else if (run.capped && run.bytes > PART_BYTES * 4) { run.dropped.events += run.events.length; run.events = []; run.bytes = 0; }
+      if (isEvent) {
+        if (run.eventCount >= MAX_GAME_EVENTS) { run.dropped.events++; return; }
+        run.eventCount++; run.events.push(item); run.eventBytes += size(item);
+        if (run.eventCount > MAX_EVENTS || run.eventBytes > MAX_BYTES) run.spill = true;
+      } else if (run.capped) { run.dropped.trace++; return; } else { run.trace.push(item); run.traceBytes += size(item); }
+      const waiting = run.traceBytes + (run.spill ? run.eventBytes : 0);
+      if (waiting > PART_BYTES && !run.capped) part(false);
+      else if (run.capped && run.spill && run.eventBytes > PART_BYTES * 4) { run.dropped.events += run.events.length; run.events = []; run.eventBytes = 0; }
       return;
     }
     if (isEvent) return;
     pre.push(item); if (pre.length > PRE_ITEMS) { pre.shift(); preDropped++; }
   }
   let pre = [], preDropped = 0;
-  const forget = () => { pre = []; preDropped = 0; if (run) { run.events = []; run.trace = []; run.bytes = 0; } };
+  const forget = () => { pre = []; preDropped = 0; if (run) { run.events = []; run.trace = []; run.eventBytes = 0; run.traceBytes = 0; } };
 
   // The trace. Listeners go on when the notice is on the page; nothing is kept while recording is off.
   const X = v => Math.round(Math.min(1, Math.max(0, v / Math.max(1, innerWidth))) * 1000);
@@ -291,8 +306,10 @@ export function lab(game, options = {}) {
     document.addEventListener?.('visibilitychange', () => { try {
       const hidden = document.visibilityState === 'hidden';
       put(hidden ? 'hide' : 'show');
-      // A run still open when the page is put away sends what it has so far as a part.
-      if (hidden && open() && (run.events.length || run.trace.length)) part(false);
+      // A run still open when the page is put away keeps what it has so far as a part in the queue. It is posted when the
+      // page is shown again, or by the next kit page: a post made as the page goes away is cancelled when it unloads.
+      if (hidden && open() && (run.trace.length || (run.spill && run.events.length))) { holding = true; try { part(false); } finally { holding = false; } }
+      if (!hidden) { const back = held; held = []; back.forEach(r => deliver(r, true)); }
     } catch {} });
     // Frame times while a run is open and the page is visible: every 10 s, the median, the 95th percentile and the worst.
     // The frame loop runs only while a run is open (frames() starts it from start()), so a menu gets no extra frames.
@@ -356,9 +373,9 @@ export function lab(game, options = {}) {
   } catch {} }
   self.start = (info) => { try {
     if (open()) { run.outcome = 'left'; part(true); }
-    run = { id: hex(), started: Date.now(), info: clean(info), events: [], trace: pre, bytes: size(pre), part: 0, eventCount: 0, outcome: null, summary: null, capped: false, dropped: { events: 0, trace: preDropped } };
+    run = { id: hex(), started: Date.now(), info: clean(info), events: [], trace: pre, eventBytes: 0, traceBytes: size(pre), spill: false, part: 0, eventCount: 0, outcome: null, summary: null, capped: false, dropped: { events: 0, trace: preDropped } };
     pre = []; preDropped = 0;
-    if (run.bytes > PART_BYTES) part(false);
+    if (run.traceBytes > PART_BYTES) part(false);
     frames();
   } catch {} };
   self.event = (type, data) => { try {

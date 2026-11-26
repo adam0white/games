@@ -36,7 +36,10 @@ const reduce = matchMedia('(prefers-reduced-motion: reduce)');
 
 let bed, screen, fromBook, pointer = null, keyboard = false, keyboardFocus = false, started, previousTime, debt = 0;
 let elapsed, endAt, releasedAt, lastPaint, lastMeter, mouseStart, mouseGate, frameCost = 0, wonAt = null;
-let inkFlow = 0, soundAt = 0, crunchAt = 0, lastLifted = 0, noiseGain, noiseFilter;
+let inkFlow = 0, soundAt = 0, crunchAt = 0, lastLifted = 0, noiseGain, noiseFilter, gritGain, gritFilter;
+// ?v=b keeps the old constant one-cell-a-tick fall; the default lets grains speed up as they drop.
+const GRAVITY = new URLSearchParams(location.search).get('v') !== 'b';
+const buzz = ms => { try { if (save.sound) navigator.vibrate?.(ms); } catch {} };
 const audio = sound({ on: () => save.sound, setup(ctx) {
   const noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
   const samples = noise.getChannelData(0);
@@ -51,6 +54,24 @@ const audio = sound({ on: () => save.sound, setup(ctx) {
   noiseFilter.Q.value = .68;
   source.connect(noiseFilter).connect(noiseGain).connect(ctx.destination);
   source.start();
+  // Grains: sparse short clicks of varied loudness, looped, under the hiss.
+  const grit = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+  const g = grit.getChannelData(0);
+  for (let at = 0; at < g.length - 64;) {
+    const loud = .25 + .75 * Math.random() ** 2, len = 6 + (Math.random() * 26 | 0);
+    for (let k = 0; k < len; k++) g[at + k] += loud * (2 * Math.random() - 1) * (1 - k / len) ** 2;
+    at += 40 + (Math.random() * Math.random() * 900 | 0);
+  }
+  const gritSource = ctx.createBufferSource();
+  gritSource.buffer = grit;
+  gritSource.loop = true;
+  gritFilter = ctx.createBiquadFilter();
+  gritFilter.type = 'highpass';
+  gritFilter.frequency.value = 1400;
+  gritGain = ctx.createGain();
+  gritGain.gain.value = 0;
+  gritSource.connect(gritFilter).connect(gritGain).connect(ctx.destination);
+  gritSource.start();
 } });
 function hush() {
   inkFlow = 0;
@@ -58,6 +79,8 @@ function hush() {
     const now = audio.ctx.currentTime;
     noiseGain.gain.cancelScheduledValues(now);
     noiseGain.gain.setValueAtTime(0, now);
+    gritGain.gain.cancelScheduledValues(now);
+    gritGain.gain.setValueAtTime(0, now);
   }
 }
 // The hiss follows the grains in motion; a handful taken from the bed crunches.
@@ -68,12 +91,15 @@ function updateSound(now) {
   if (taken > 0 && now >= crunchAt) {
     crunchAt = now + 70;
     audio.noise(.07, Math.min(.16, .03 + taken / 500), 2600 + Math.random() * 900);
+    if (taken > 20) buzz(8);
   }
   if (now < soundAt) return;
   soundAt = now + 55;
   const level = Math.min(1, Math.sqrt(inkFlow / 1200));
   const t0 = audio.ctx.currentTime;
-  noiseGain.gain.setTargetAtTime(.19 * level, t0, .04);
+  noiseGain.gain.setTargetAtTime(.13 * level, t0, .04);
+  gritGain.gain.setTargetAtTime(.5 * Math.min(1, level * 1.4), t0, .03);
+  gritFilter.frequency.setTargetAtTime(1100 + 1800 * level, t0, .06);
   noiseFilter.frequency.setTargetAtTime(720 + 2750 * level, t0, .06);
 }
 const label = () => bed.level ? t('bed', { n: String(bed.level).padStart(2,'0') }) : t('garden');
@@ -100,6 +126,7 @@ function describe() {
   setText('pause-level', label());
   setText('restart', t(bed.level ? 'restart' : 'smooth'));
   setText('objective', t('goal' + bed.level));
+  setText('act', t('act' + bed.level));
   field.setAttribute('aria-label', t('act' + bed.level) + ' ' + t('keys'));
   document.querySelector('.meter').setAttribute('aria-label', t(bed.level ? 'progress' : 'symmetry'));
   if (!bed.level) setText('garden-best', t('gardenBest', { n: save.best }));
@@ -151,7 +178,7 @@ function start(level) {
   runEnd('quit');
   drop();
   hush();
-  bed = create(level, level ? 553 + level * 971 : crypto.getRandomValues(new Uint32Array(1))[0]);
+  bed = create(level, level ? 553 + level * 971 : crypto.getRandomValues(new Uint32Array(1))[0], { gravity: GRAVITY });
   started = false;
   keyboardFocus = false;
   elapsed = 0;
@@ -163,6 +190,7 @@ function start(level) {
   lastMeter = null;
   el('garden-best').hidden = !!level;
   el('goal-icon').setAttribute('href', '#i-' + icon(bed));
+  el('act').classList.remove('gone');
   describe();
   masthead();
   Object.assign(bed.hand,{x:bed.hint.x,y:bed.hint.y});
@@ -306,6 +334,7 @@ field.addEventListener('pointerdown', e => {
   if (field.setPointerCapture && e.isTrusted) field.setPointerCapture(pointer);
   const {x,y} = locationInBed(e);
   started = true;
+  el('act').classList.add('gone');
   runBegin();
   audio.unlock();
   if (grips(bed, x, y)) {
@@ -383,6 +412,7 @@ function frame(now) {
       hush();
       if (bed.status === 'won') {
         wonAt = elapsed;
+        buzz([20, 60, 30]);
         if (save.sound) { audio.tone(523,.38,.055,'sine',140); setTimeout(() => audio.tone(784,.5,.045,'sine',60), 140); }
       }
     }

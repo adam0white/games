@@ -77,7 +77,7 @@ async function thirtyMinutes(source) {
   }
   p.fire('pointerup', { clientX: 200, clientY: 400 });
   rec.end('dawn', { embers: 7 });
-  await settle(() => seen.some(r => r.kind === 'events'));
+  await settle(() => seen.some(r => r.kind === 'events') && seen.some(r => r.data?.final));
   return { seen, bodies, events, taps, moves: MS / 50 };
 }
 
@@ -116,8 +116,71 @@ test('known bad case: a lab.js that skips a part number fails the whole-and-in-o
 });
 
 test('known bad case: the old one-record run (at most 300 events) fails it too', async () => {
-  const broken = mutate('if (run.bytes > PART_BYTES && !run.capped) part(false);', 'if (run.events.length > 300) run.events.length = 300;');
+  const broken = mutate('if (waiting > PART_BYTES && !run.capped) part(false);', 'if (run.events.length > 300) run.events.length = 300;');
   await assert.rejects(async () => assertWhole(await thirtyMinutes(broken)));
+});
+
+// A page put away mid-run: its part is queued, not posted (a post made as the page unloads is cancelled), and is posted
+// when the page is shown again.
+async function hideAndShow(source) {
+  const p = page();
+  const { mod, seen, fetch } = await lab(source);
+  const rec = mod.lab('lantern', { fetch });
+  rec.notice(p.el('DIV'));
+  rec.start({ night: 1 });
+  for (let i = 0; i < 20; i++) { clock += 60; p.fire('pointermove', { clientX: 100 + i, clientY: 300 }); }
+  p.document.visibilityState = 'hidden'; p.fireDoc('visibilitychange');
+  await settle(() => true);
+  const queued = JSON.parse(globalThis.localStorage.getItem('hf-lab-kit-queue') ?? '[]');
+  const whileHidden = seen.length;
+  p.document.visibilityState = 'visible'; p.fireDoc('visibilitychange');
+  await settle(() => seen.length > whileHidden);
+  return { queued, whileHidden, seen };
+}
+
+test('a part made as the page is hidden is queued, and posted only when the page is back', async () => {
+  const { queued, whileHidden, seen } = await hideAndShow();
+  assert.equal(whileHidden, 0, 'nothing is posted while the page is going away');
+  assert.equal(queued.length, 1, 'the part is in the queue'); assert.equal(queued[0].r.data.part, 0);
+  assert.deepEqual(seen.map(r => [r.kind, r.data.part]), [['run', 0]], 'posted once the page is shown');
+  assert.equal(globalThis.localStorage.getItem('hf-lab-kit-queue'), null, 'and taken off the queue');
+});
+
+test('known bad case: a lab.js that posts the part as the page is hidden fails it', async () => {
+  const broken = mutate('if (holding) { held.push(r); return Promise.resolve(); }', '');
+  await assert.rejects(async () => { const { queued, whileHidden, seen } = await hideAndShow(broken); assert.equal(whileHidden, 0, 'nothing is posted while the page is going away'); }, /going away/);
+});
+
+// A game that keeps its own records within MAX_EVENTS and MAX_BYTES (Cinderhill's replay record, labrec.js) gets its
+// events whole in the run's last record, and that is the only record of the run naming its start; the trace goes in parts.
+async function withinLimits(source) {
+  const p = page();
+  const { mod, seen, fetch } = await lab(source);
+  const rec = mod.lab('cinderhill', { fetch });
+  rec.notice(p.el('DIV'));
+  rec.start({ format: 'cinderhill-replay/1', chain: 'c1', part: 1 });
+  for (let t = 0, n = 0; t < 10 * 60 * 1000; t += 25) {
+    clock += 25; p.fire('pointermove', { clientX: 200 + (t % 97), clientY: 400 });
+    if (t % 2400 === 0 && n < 250) rec.event('log', { e: [['o', n, 'x'.repeat(200)]] }), n++;
+  }
+  rec.end('continued', { tick: 1 });
+  await settle(() => seen.some(r => r.kind === 'events') && seen.some(r => r.data?.final));
+  return seen.filter(r => r.kind === 'run');
+}
+
+test('a run within the event limits keeps its events whole in its last record, the only one naming its start', async () => {
+  const runs = await withinLimits();
+  assert.ok(runs.length > 1, `the trace went in parts: ${runs.length}`);
+  const withStart = runs.filter(r => r.data.start?.format === 'cinderhill-replay/1');
+  assert.equal(withStart.length, 1, 'one record of the run names its start');
+  assert.equal(withStart[0].data.final, true); assert.equal(withStart[0].data.events.length, 250, 'every event in it');
+  assert.ok(runs.filter(r => !r.data.final).every(r => r.data.events.length === 0), 'the other parts carry only trace');
+  assert.equal(joinRuns(runs)[0].data.start.chain, 'c1', 'joined, the run has its start');
+});
+
+test('known bad case: a lab.js that names the start in every part fails it', async () => {
+  const broken = mutate('start: final ? run.info : null', 'start: run.info');
+  await assert.rejects(async () => { const runs = await withinLimits(broken); assert.equal(runs.filter(r => r.data.start?.format === 'cinderhill-replay/1').length, 1, 'one record of the run names its start'); }, /names its start/);
 });
 
 // Typing in a name field, a text area and an editable line, then tapping a button whose words repeat the name.

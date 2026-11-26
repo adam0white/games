@@ -33,6 +33,8 @@ export const { t, lang, apply } = words({
     'idea-honey-sway': 'Honey in a moving glass',
     'idea-two': 'Two glasses, one jug',
     'idea-small': 'A small glass',
+    forecastHint: 'The dashed line is where it will settle. Lift when it reaches the line.',
+    forecastBack: 'The dashed line is back: lift when it reaches the line.',
   },
   tr: {
     tagline: 'Çizgiye kadar doldur.',
@@ -65,5 +67,7 @@ export const { t, lang, apply } = words({
     'idea-honey-sway': 'Kayan bardağa bal',
     'idea-two': 'İki bardak, tek sürahi',
     'idea-small': 'Küçük bir bardak',
+    forecastHint: 'Kesikli çizgi sıvının duracağı yeri gösterir. Çizgiye gelince kaldır.',
+    forecastBack: 'Kesikli çizgi geri geldi: çizgiye gelince kaldır.',
   },
 });

@@ -1,4 +1,4 @@
-import { create, grab, pull, release, tick, cancel, fret, heldShape, pitchOf, partials, daily, TICK, plates, PARS, MAX_PULL, COUNT } from './sim.js';
+import { create, grab, pull, release, tick, cancel, fret, heldShape, pitchOf, partials, daily, podX, TICK, plates, PARS, MAX_PULL, COUNT } from './sim.js';
 import { draw, backdrop, PEG_Y, PEG_REACH } from './art.js';
 import { parSteps } from './solve.js';
 import { t, lang, setLang, apply, plantName, roman, dateLabel } from './words.js';
@@ -45,6 +45,15 @@ document.documentElement.dataset.look = look;
 document.querySelector('meta[name="theme-color"]').content = look === 'blueprint' ? '#15374b' : '#f5efde';
 const reduced = matchMedia('(prefers-reduced-motion: reduce)');
 let state, screen, mode = 'plates', pointer = null, last = 0, carry = 0, knownOpened = 0, winTime = null;
+// Feel, drawn and felt only (the wire's rules never see it): a short freeze when a pod bursts, slow motion as the
+// last pod goes, a small shake, a ring where the husk split, and haptics where the phone has them (Android browsers;
+// iOS Safari ignores vibrate). Reduced motion turns off the freeze, slow motion, shake and buzz; the sound switch turns off the buzz.
+let freeze = 0, slow = 0, shake = 0, bursts = [], pullStep = 0;
+// Two strengths for a pick: ?v=a (default) has all of it; ?v=b keeps the ring and the buzz, without freeze, slow motion or shake.
+const strong = query.get('v') !== 'b';
+// Chrome ignores (and logs) vibrate before the page's first completed tap; skip it until then.
+const buzz = pattern => { if (!reduced.matches && save.sound && navigator.userActivation?.hasBeenActive !== false) try { navigator.vibrate?.(pattern); } catch {} };
+const burstInk = look === 'blueprint' ? '#f3d9a0' : '#b0612f';
 let lastPluck = -Infinity, trail = [], frameCount = 0, parJob = null, dayPar = null;
 const show = screens(['paused', 'won'], name => {
   screen = name;
@@ -134,7 +143,7 @@ function start(level, which = 'plates') {
     parJob = null;
   }
   pointer = null; last = 0; carry = 0; knownOpened = 0; winTime = null;
-  lastPluck = -Infinity; trail = [];
+  lastPluck = -Infinity; trail = []; freeze = slow = shake = 0; bursts = [];
   backdrop(state, look); // draw the paper now so the first frame stays light
   updateHeading();
   audio.release(); show('play'); updateFooter();
@@ -215,10 +224,16 @@ board.addEventListener('pointerdown', e => {
     return;
   }
   if (!grab(state, x, y)) return;
+  pullStep = 0; buzz(6);
   pointer = e.pointerId; board.setPointerCapture(pointer); audio.unlock();
 });
 board.addEventListener('pointermove', e => {
-  if (e.pointerId === pointer) pull(state, world(e).y);
+  if (e.pointerId !== pointer) return;
+  pull(state, world(e).y);
+  // The wire creaks under the finger: one small tick for every 20 units of pull.
+  const step = Math.floor((state.grip?.depth || 0) / 20);
+  if (step > pullStep) buzz(4);
+  pullStep = step;
 });
 // The pluck sounds like the string it is: pitch from the plucked span's length and tension,
 // and the mix of harmonics from where along it the finger let go.
@@ -248,6 +263,7 @@ board.addEventListener('pointerup', e => {
   if (release(state)) {
     lastPluck = state.time;
     pluckSound(index, depth);
+    buzz(Math.round(10 + depth / MAX_PULL * 22));
   }
 });
 for (const event of ['lostpointercapture', 'pointercancel']) {
@@ -291,17 +307,28 @@ function won() {
 function frame(now) {
   const began = performance.now();
   if (screen !== 'paused') {
-    carry += last ? Math.min(.1, (now - last) / 1000) : 0;
+    const dt = last ? Math.min(.1, (now - last) / 1000) : 0;
+    if (freeze > 0) freeze -= dt;
+    else { carry += slow > 0 ? dt * .3 : dt; slow -= dt; }
     while (carry >= TICK) { tick(state); carry -= TICK; }
+    shake = Math.max(0, shake - dt * 6);
+    for (const b of bursts) b.age += dt;
+    bursts = bursts.filter(b => b.age < .5);
     const opened = state.pods.filter(pod => pod.open);
     if (opened.length > knownOpened) {
       knownOpened = opened.length;
-      popSound(opened.at(-1), knownOpened);
+      const pod = opened.at(-1), final = opened.length === state.pods.length;
+      popSound(pod, knownOpened);
+      if (!reduced.matches) {
+        if (strong) { freeze = final ? .11 : .06; slow = final ? .5 : 0; shake = final ? 1 : .6; }
+        bursts.push({ x: podX(state, pod), y: 250 - (pod.type === 'tuned' ? 66 : pod.height) - 26, age: 0, big: final }); // the husk's middle (art.js hang + half a pod)
+      }
+      buzz(final ? [30, 40, 70] : 24);
       updateFooter();
     }
     if (!running && winTime === null && state.plucks > 0 && screen === 'play') {
       running = true;
-      rec.start({ plate: state.level, pods: state.pods.length, mode });
+      rec.start({ plate: state.level, pods: state.pods.length, mode, v: strong ? 'a' : 'b' });
     }
     if (state.won && winTime === null) won();
     if (state.won && screen === 'play' && state.time - winTime >= .65) {
@@ -322,8 +349,19 @@ function frame(now) {
   const w = Math.max(1, Math.round(board.clientWidth * resolution));
   const h = Math.max(1, Math.round(board.clientHeight * resolution));
   if (board.width !== w || board.height !== h) { board.width = w; board.height = h; }
-  ctx.setTransform(w / 360, 0, 0, h / 380, 0, 0);
+  const jolt = shake * shake * 3 * w / 360;
+  ctx.setTransform(w / 360, 0, 0, h / 380, jolt * Math.sin(now * .09), jolt * Math.cos(now * .113));
   draw(ctx, state, { look, cue: inWorldCue(), reduced: reduced.matches, wire: heldShape(state), trail });
+  for (const b of bursts) {
+    const k = b.age / .5, r = (b.big ? 12 : 8) + k * (b.big ? 90 : 55);
+    ctx.save(); ctx.globalAlpha = (1 - k) * (1 - k); ctx.strokeStyle = burstInk; ctx.lineWidth = b.big ? 3 : 2;
+    ctx.beginPath(); ctx.arc(b.x, b.y, r, 0, Math.PI * 2); ctx.stroke();
+    for (let i = 0; i < 8; i++) {
+      const a = i * Math.PI / 4 + .2;
+      ctx.beginPath(); ctx.moveTo(b.x + Math.cos(a) * r * .55, b.y + Math.sin(a) * r * .55); ctx.lineTo(b.x + Math.cos(a) * r * .8, b.y + Math.sin(a) * r * .8); ctx.stroke();
+    }
+    ctx.restore();
+  }
   // Today's par is worked out by the look-ahead player a little at a time, inside what is left of the frame.
   if (parJob) {
     let r;

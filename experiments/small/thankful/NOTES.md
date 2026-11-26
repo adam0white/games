@@ -80,3 +80,22 @@ Not verified: a real phone, how the sounds feel (they were counted, not heard), 
 ## 2026-11-25 — the way back to the small games home
 
 Already wired to the home. The way back and the recording notice and switch now follow the page's language when it changes (`lang` passed to `kit/home.js` and `kit/lab.js`). The home shows this game's progress out of the count in `experiments/small/catalog.js`, which `scripts/small-catalog.test.mjs` keeps equal to the game's own.
+
+## 2026-11-26 — the first minute
+
+Evidence from the lab records: the owner opened this page twice on an Android phone (Firefox) and no run was recorded. A run starts on the first thanks, and an unfinished run is sent when the page is hidden (checked in a harness: one thanks, then hide, sends a run record), so no thanks was given on either visit. The cold open was an empty field of grass above a tray of twelve buttons, with nothing to show where a thanks goes or what it does. A scripted player needs one tap and about 1 s from a cold open to the run start, before and after this change (1.0 s WebKit iPhone 13, 1.1 s Chromium Pixel 7, 0.8 s of that is the script's look before tapping); that number cannot move. The work is aimed at the visitor who does not tap.
+
+Variant a (the default; `?v=b` is the page as it was, for comparing):
+
+- **Today's bed.** Until the day's third thanks, the place where today's flowers will grow is dug soil with a glowing seed for each thanks still to come, so an empty garden has a place to look. Garden look only. It is left out where it would sit on the words (a short screen such as 320 x 568 leaves the garden little room).
+- **The tray invites.** On a day with no thanks yet the buttons breathe in a slow wave. A first visit (no saved days) says "Tap something you are thankful for." under the line.
+- **A first-time hint.** After 3.5 s on a first visit without a tap, the kit's tap hint (`kit/hint.js`, key `thankful:hint`) shows a finger on the tray. It goes on the first thanks and never comes back; a player with a save never sees it.
+- **Each thanks answers.** The flower's name and the kind (or the player's own words) rise above it as it opens, petals burst from it, and the phone gives a short buzz (`navigator.vibrate` where the browser has it; three pulses on the third thanks).
+- **Butterflies.** Each completed day brings a butterfly, up to seven, resting on flowers and flying between them; the new one flies in when the day is completed. They are worked out from the save (completed days), so nothing new is stored. They are in the kept picture too.
+- **Tomorrow.** Under a finished day, the flowers today's kinds will grow tomorrow, drawn small with their names: a reason to come back.
+
+No storage key or save format changed (the check reads the save's keys). Recording is unchanged.
+
+Checks: `check.mjs` adds a first-minute section on both engines: the bed with three seeds above the words, the first-visit line, the breathing tray, the hint after idle and gone (and remembered) after the first thanks, one seed fewer per thanks, no bed on a full day, tomorrow naming the flowers `sim.js` says today's kinds grow tomorrow, one butterfly after day one, no line or hint for a returning player, everything absent in `?v=b`, and the bed clear of the words at 320 x 568 in English and Turkish. Variant b asserts the opposite of each, so each claim has a failing case. `bots.mjs`, `kit/check/phone.mjs small/thankful` and `npm run check:lane` pass. Screenshots of each step were looked at on both profiles.
+
+Not verified: a real phone, Firefox (the evidence came from Firefox on Android; checks run WebKit and Chromium only), how the buzz feels, the Turkish line by a native speaker, and whether a first-time visitor now taps. On the iPhone 13 check size (390 x 664) day one's flowers are still drawn small; the known trade-off above is unchanged.

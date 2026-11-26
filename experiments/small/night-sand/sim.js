@@ -173,12 +173,15 @@ function garden(s) {
   s.hint = { x: 25, y: 81, toX: 38, toY: 122 };
 }
 
-export function create(level = 1, seed = 1) {
+// gravity: grains in free fall speed up (1 cell a tick, then 2, 3, up to 4), as sand does (2026-11-26). The page's
+// ?v=b passes false for the old constant fall, one cell a tick.
+export const MAX_FALL = 4;
+export function create(level = 1, seed = 1, { gravity = true } = {}) {
   if (!Number.isInteger(level) || level < 0 || level > 10) level = 1;
   const bed = BEDS[level];
   const s = { level, seed, rng: seed >>> 0 || 0x2aa50f3, kind: kinds[level], status: 'play', ticks: 0,
     cells: new Uint8Array(N), walls: new Uint8Array(N), provenance: new Uint8Array(N), marks: new Uint8Array(N),
-    poured: new Uint16Array(N),
+    poured: new Uint16Array(N), vel: new Uint8Array(N), gravity: !!gravity,
     hand: { down: false, x: 0, y: 0, load: 0, board: false, travel: 0 }, scoop: [], spill: [],
     gate: null, progress: 0, score: 0, flow: 0, lifted: 0, started: false, sleeping: false, stable: 0 };
   for (let x = 0; x < W; x++) { wall(s, x, 0); wall(s, x, H - 1); }
@@ -301,6 +304,7 @@ function spout(s, grains, x, y, rate, below) {
       s.cells[i] = particle % 16;
       s.provenance[i] = particle >> 4;
       s.poured[i] = s.ticks || 1;
+      s.vel[i] = 0;
       placed++;
     }
     if (row < y - 24) break;
@@ -365,7 +369,7 @@ function runout(s, i, dir) {
 }
 
 function fall(s) {
-  const { cells, walls, provenance, poured, gate } = s;
+  const { cells, walls, provenance, poured, gate, vel } = s;
   const gateRow = gate ? gate.y * W : -W;
   const gateLeft = gate ? gateRow + Math.round(gate.x) - gate.half : -1;
   const gateRight = gate ? gateRow + Math.round(gate.x) + gate.half : -1;
@@ -382,7 +386,20 @@ function fall(s) {
       const solid = grain < 5 ? 0 : 2;
       const below = i + W;
       let dest = below;
-      if (cells[dest] || (walls[dest] && walls[dest] !== solid) || (dest >= gateLeft && dest <= gateRight)) {
+      const blocked = d => cells[d] || (walls[d] && walls[d] !== solid) || (d >= gateLeft && d <= gateRight);
+      if (!blocked(dest)) {
+        // Free fall: a grain that keeps falling gains a cell a tick every few ticks, up to MAX_FALL.
+        let v = 0;
+        if (s.gravity) {
+          const want = Math.min(MAX_FALL, 1 + (vel[i] >> 2));
+          for (let n = 1; n < want && dest + W < N && !blocked(dest + W); n++) {
+            if (walls[dest] === 2 && grain >= 5) provenance[i] = 1;
+            dest += W;
+          }
+          v = Math.min(255, vel[i] + 1);
+        }
+        vel[dest] = v;
+      } else {
         if (s.kind === 'sieve' && grain < 5 && walls[below] === 2) provenance[i] = 1;
         const dir = (i + reversed + s.ticks) & 1 ? 1 : -1;
         dest = below + dir;
@@ -391,11 +408,13 @@ function fall(s) {
           dest = below - dir;
           if (cells[i - dir] || (walls[i - dir] && walls[i - dir] !== solid) || cells[dest]
             || (walls[dest] && walls[dest] !== solid) || (dest >= gateLeft && dest <= gateRight)) {
-            if (s.kind !== 'sieve' || grain < 5 || (cells[i - 1] && cells[i + 1])) continue;
+            if (s.kind !== 'sieve' || grain < 5 || (cells[i - 1] && cells[i + 1])) { vel[i] = 0; continue; }
             dest = runout(s, i, dir);
-            if (dest < 0) continue;
+            if (dest < 0) { vel[i] = 0; continue; }
           }
         }
+        // A grain that lands or slips loses most of its speed.
+        vel[dest] = vel[i] >> 2;
       }
       cells[dest] = grain;
       cells[i] = 0;
@@ -403,6 +422,7 @@ function fall(s) {
       provenance[i] = 0;
       poured[dest] = poured[i];
       poured[i] = 0;
+      if (dest !== i) vel[i] = 0;
       moved++;
     }
   }
