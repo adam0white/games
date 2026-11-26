@@ -154,6 +154,14 @@ async function rubPlate(page, { until, knob }) {
   }, 'stroke transfers pigment', 8000, { coverage, distance });
 }
 
+// On Linux Chromium the first touch tap after a scripted touch drag can arrive without its click (reproduced in the
+// Playwright image: the same tap lands when repeated). Tap again once if the control did not respond; two silent
+// taps still fail the check.
+async function tapUntil(page, selector, done, what, until) {
+  await page.tap(selector);
+  try { await until(page, done, what, 1500); } catch { await page.tap(selector); await until(page, done, what); }
+}
+
 async function drawBattleTrail(page, { until }) {
   const [start, end] = await page.evaluate(() => {
     const { point } = window.battleState();
@@ -292,16 +300,15 @@ export const labPages = {
     expect: { foe: 'jarkeepers', played: 2, sound: true, picked: 'jarkeepers' },
     touch: async (page, checks) => {
       await drawBattleTrail(page, checks);
-      await page.tap('#alarm');
+      await tapUntil(page, '#alarm', () => document.querySelector('#alarm').getAttribute('aria-pressed') === 'true', 'Alarm is the chosen order', checks.until);
       const spot = await page.evaluate(() => window.battleState().point(7, 13));
       await pointerDrag(page, spot, spot, {
         beforeMove: () => checks.until(page, () => window.battleState().alarm >= 0, 'holding an Alarm spot calls guards'),
       });
-      await page.tap('#recall');
-      await checks.until(page, () => {
+      await tapUntil(page, '#recall', () => {
         const s = window.battleState();
         return s.trail.length === 0 && s.alarm < 0 && s.marching === 0;
-      }, 'recall clears attack and Alarm orders');
+      }, 'recall clears attack and Alarm orders', checks.until);
     },
     hint: { timing: { start: '#play' }, input: drawBattleTrail },
   }),
