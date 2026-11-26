@@ -3,7 +3,7 @@
 Round 3, 2026-11-26. Ranked by what the rebuild needs, in build order inside each tier. Section numbers point to [02-spec.md](02-spec.md); numbers and pace lines are in 02 section 3 only. "Old" gives the round-2 feature number where one exists.
 
 - **R1: chapter 1.** The first five minutes of 02 section 4, playable on a phone, passing the pace budget. Nothing else is judged until this passes.
-- **R2: Spring.** Six chapters, free hill, daily hill. The first release for outside players.
+- **R2: Spring.** Six chapters, free hill, daily founding run. The first release for outside players.
 - **R3: friends.** In the order of 02 section 9.
 - **Later.** After Spring proves the game.
 
@@ -21,7 +21,7 @@ Round 3, 2026-11-26. Ranked by what the rebuild needs, in build order inside eac
 | 8 | Nest cutaway that opens in place over the entrance | 6.7 | 2 | Births and stores are visible without leaving the surface |
 | 9 | Saves: IndexedDB checkpoint every 20 s and at chapter start, previous good save kept, one tab owns a game | 05 | 8 | Kill the tab before, during and after a save; reload loses at most 20 s and matches uninterrupted play |
 | 10 | Navigation goal manager: goals beyond 16, incremental rebuilds, no `Uint16` saturation | 05 | 3 | 64 goals live at 2,000 ants inside the tick budget |
-| 11 | Chapter card at dusk, Field into Ember, with a look at tomorrow's hill | 4, 12 | 8 | The card shows stores, ants, sprouts, losses, tomorrow's hill and a continue button |
+| 11 | Chapter card at dusk, Field into Ember, with the colony ledger and a look at tomorrow's hill | 4, 5, 12 | 8 | The card shows stores, ants, sprouts, losses, the ledger (route records, weather marks), tomorrow's hill, the chapter score and a continue button |
 | 12 | Wordless first-minute teaching with `kit/hint.js`; the funded birth marked from load to larva to adult | 4 | 11 | 4 of 5 fresh phone players finish chapter 1 without help, each giving at least 5 orders (finishing by waiting does not count) |
 | 13 | Lab recording with full replays, sound in code, English and Turkish | 12 | 13 | A record arrives in the lab and replays to the same hash |
 | 14 | Phone check section for Cinderhill | 05 | 25 | `phone.mjs` passes before and after |
@@ -40,10 +40,10 @@ Round 3, 2026-11-26. Ranked by what the rebuild needs, in build order inside eac
 | 22 | Neighbour colony: AI on the player's verbs and rules; shared scent; raids | 6.4 | new |
 | 23 | Chapters 2 to 6 with their ends; stakes, retry from checkpoint, floor; Gentle, Standard, Hard | 8 | 22 |
 | 24 | Free hill (200 to 5,000 ants, toggles) | 8.3 | 42 |
-| 25 | Daily hill, 5 min, lab board, replay link to the best run | 8.3 | 24 |
+| 25 | Daily founding run, about 20 min, one queen, same seed for everyone, bloom carried to the next run; lab board, replay link to the best run (owner choice: 11 decision 1 C) | 8.3 | 24 |
 | 26 | Share picture of the bloom map (`kit/share.js`) | 6.6 | 50 |
 | 27 | Accessibility: spider toggle, colour-blind palettes, one-finger camera, zoom buttons, undo, tap trails, reduced motion | 12 | 26 |
-| 28 | Help "?" on every thing (one line, words only if decision 4 allows) | 5 | 23 |
+| 28 | Help "?" on every thing (one line on what a control does; no biology notes, 11 decision 4) | 5 | 23 |
 | 29 | Name and trademark check, listing page | 2 | new |
 
 ## R3: friends
@@ -51,7 +51,7 @@ Round 3, 2026-11-26. Ranked by what the rebuild needs, in build order inside eac
 | # | Feature | Spec | Old |
 | --- | --- | --- | --- |
 | 30 | Same-seed challenge by link | 9 | new |
-| 31 | Ghost trails on the daily hill | 9 | new |
+| 31 | Ghost trails on the daily run | 9 | new |
 | 32 | One shared colony, 2 to 4 players, relay room lockstep | 9, 05 | 27, 28 |
 | 33 | Versus on one hill | 9 | 27 |
 
@@ -63,7 +63,7 @@ Seasons after Spring (old 31, 32, 39), the invading supercolony and allies (32, 
 
 | Toy | Tests | Pass line |
 | --- | --- | --- |
-| Founding runs | A 20-min roguelite run per queen, bloom kept between runs, against chapters (decision 1) | The owner plays two runs and says whether they would rather have this than chapters |
+| Founding runs | Now the daily mode (owner choice: 11 decision 1 C). The toy prototypes it beside R1 and R2: one queen, a 20-min run, bloom kept between runs | The owner plays two runs and says what to change before it becomes feature 25 |
 | Fluid colony | Far ants as a density field moved by the flow fields, near ants as individuals, Ember look, 50,000 ants | 30 frames a second on a real phone at 50,000, and the owner keeps it open for five minutes |
 | Ghost trails | Shared fading scent from past runs on one seed | Testers say the ghosts changed a route they drew |
 | Bridge crew | Ants that lock into a span cannot work | Kept from round 2 |
