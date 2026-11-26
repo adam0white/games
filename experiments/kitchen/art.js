@@ -8,6 +8,7 @@ import { clone as cloneSkinned } from './vendor/SkeletonUtils.js';
 export { THREE };
 const FS = 2.2;            // furniture kit to world
 export const TOP = 1.0;    // counter top height
+export const PAN = { x: -1.9, z: 0.05 };   // the burner under the pan's bowl
 export const LANE = { y0: 1.22, h: 1.42, z: 0.62, s: 1 };   // catch lane to world: x*s, y0 + y*h
 
 // ---------- looks: 2-4 variants for the owner to pick
@@ -154,9 +155,37 @@ export async function createView(canvas, lookId) {
 
   // Stations on the counter.
   const board = item('cutting-board', 0.9); board.rotation.y = Math.PI / 2; board.position.set(0, TOP, 0.1); world.add(board);
-  const knife = item('cooking-knife', 0.62); knife.position.set(0.55, TOP + 0.02, 0.32); knife.rotation.y = -0.4; world.add(knife);
-  const pan = item('frying-pan', 0.75); pan.position.set(-1.9, TOP + 0.02, 0.1); pan.rotation.y = Math.PI * 0.75; world.add(pan);
-  const panGlow = new THREE.Mesh(new THREE.CircleGeometry(0.2, 24), new THREE.MeshBasicMaterial({ color: '#ff5a1f', transparent: true, opacity: 0 })); panGlow.rotation.x = -Math.PI / 2; panGlow.position.set(-1.9, TOP + 0.03, 0.05); world.add(panGlow);
+  // The knife, held by the handle. knife (aim and rest) > knifeLift (the chop stroke, pivots at the grip) > the blade on its
+  // edge, pointing away from the camera. The model's handle is its +x end (brown in the colormap).
+  const knife = new THREE.Group(), knifeLift = new THREE.Group(), bladeG = new THREE.Group(); knife.add(knifeLift); knifeLift.add(bladeG);
+  { const kb = item('cooking-knife', 0.62); kb.rotation.y = -Math.PI / 2; bladeG.add(kb); bladeG.rotation.z = Math.PI / 2;
+    bladeG.position.z = -0.21; bladeG.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(bladeG); bladeG.position.y -= b.min.y; }
+  // A cartoon glove around the handle.
+  const glove = new THREE.Group(), gm = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.6 });
+  { const fist = new THREE.Mesh(new THREE.SphereGeometry(0.05, 16, 12), gm); fist.scale.set(1.15, 0.95, 1.25); glove.add(fist);
+    const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.05, 0.05, 16), gm); cuff.rotation.x = Math.PI / 2; cuff.position.set(0.0, 0.01, 0.065); glove.add(cuff);
+    glove.position.set(0, 0.035, 0.02); glove.traverse(o => { if (o.isMesh) o.castShadow = true; }); knifeLift.add(glove); }
+  knife.userData.glove = glove;
+  // Rest: lying flat beside the board, no glove.
+  knife.rest = () => { knife.position.set(0.55, TOP + 0.03, 0.42); knife.rotation.set(0, 0.5, 0); knifeLift.rotation.set(0, 0, -Math.PI / 2); knifeLift.position.set(0, 0.0, 0); glove.visible = false; };
+  knife.rest(); world.add(knife);
+  const pan = item('frying-pan', 0.75); pan.rotation.y = Math.PI * 0.75; world.add(pan);
+  // Put the pan's bowl, not the middle of bowl and handle, over the burner at PAN. Measured unrotated: the long axis runs
+  // from handle to bowl, and the bowl is the end where the model is wider.
+  const panR = (() => {
+    const ry = pan.rotation.y; pan.rotation.y = 0; pan.position.set(0, 0, 0); pan.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(pan), d = box.getSize(new THREE.Vector3());
+    const ax = d.x >= d.z ? 'x' : 'z', other = ax === 'x' ? 'z' : 'x', lo = box.min[ax], hi = box.max[ax], len = hi - lo;
+    const span = { lo: [Infinity, -Infinity], hi: [Infinity, -Infinity] }, v = new THREE.Vector3();
+    pan.traverse(m => { if (!m.isMesh || m.userData.outline) return; const pos = m.geometry.attributes.position;
+      for (let i = 0; i < pos.count; i++) { v.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld); const end = v[ax] < lo + len * 0.2 ? span.lo : v[ax] > hi - len * 0.2 ? span.hi : null; if (end) { end[0] = Math.min(end[0], v[other]); end[1] = Math.max(end[1], v[other]); } } });
+    const wide = (span.hi[1] - span.hi[0]) >= (span.lo[1] - span.lo[0]) ? 'hi' : 'lo', r = d[other] / 2;
+    const bowl = new THREE.Vector3(); bowl[ax] = wide === 'hi' ? hi - r : lo + r; bowl[other] = (box.min[other] + box.max[other]) / 2;
+    bowl.applyAxisAngle(new THREE.Vector3(0, 1, 0), ry); pan.rotation.y = ry;
+    pan.position.set(PAN.x - bowl.x, TOP + 0.02, PAN.z - bowl.z);
+    return r * 0.8;
+  })();
+  const panGlow = new THREE.Mesh(new THREE.CircleGeometry(0.2, 24), new THREE.MeshBasicMaterial({ color: '#ff5a1f', transparent: true, opacity: 0 })); panGlow.rotation.x = -Math.PI / 2; panGlow.position.set(PAN.x, TOP + 0.03, PAN.z); world.add(panGlow);
   const micro = furniture('kitchenMicrowave', 2.6); micro.position.set(1.05, TOP, -0.12); world.add(micro);
   const microLight = new THREE.PointLight('#ffe08a', 0, 1.2); microLight.position.set(1.05, TOP + 0.25, 0.2); world.add(microLight);
   const microGlass = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.3), new THREE.MeshBasicMaterial({ color: '#ffe08a', transparent: true, opacity: 0 })); microGlass.position.set(0.98, TOP + 0.24, 0.195); world.add(microGlass);
@@ -364,7 +393,7 @@ export async function createView(canvas, lookId) {
 
   resize(); view('menu', true);
   return {
-    THREE, scene, camera, renderer, world, food, item, furniture, tray, register, board, knife, pan, panGlow, micro, microLight, microGlass, blender, sign,
+    THREE, scene, camera, renderer, world, food, item, furniture, tray, register, board, knife, knifeLift, pan, panR, panGlow, micro, microLight, microGlass, blender, sign,
     guest, walkTo, guests, view, cam, frame, resize, burst, steam, toScreen, toPlane, toY, setLook, setRestaurant, thumb, popIn,
     get look() { return look; }, peopleReady,
     shake(n = 1) { cam.shake = Math.max(cam.shake, n); },
