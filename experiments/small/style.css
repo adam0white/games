@@ -25,9 +25,9 @@ h1, h2 { font-weight: normal; color: var(--gold); margin: 0; line-height: 1.15; 
 .intro { margin: 1em 0 0; padding: .9em 1em 1em; border-radius: 16px; background: #ffd9a00d; border: 1px solid #ffd9a055; }
 .intro ol { margin: 0; padding: 0; list-style: none; display: grid; gap: .45em; }
 .intro li { display: flex; align-items: center; gap: .7em; opacity: 0; animation: lightUp .5s ease-out forwards; }
-.intro li:nth-child(2) { animation-delay: .7s; } .intro li:nth-child(3) { animation-delay: 1.4s; }
+.intro li:nth-child(2) { animation-delay: .25s; } .intro li:nth-child(3) { animation-delay: .5s; }
 .intro li i { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font: 600 12px/1 -apple-system, system-ui, sans-serif; font-style: normal; background: var(--gold); color: var(--bg); box-shadow: 0 0 12px #ffd9a088; flex: none; }
-.intro p { margin: .7em 0 0; display: flex; align-items: center; justify-content: space-between; gap: .8em; opacity: 0; animation: lightUp .5s 2.1s ease-out forwards; }
+.intro p { margin: .7em 0 0; display: flex; align-items: center; justify-content: space-between; gap: .8em; opacity: 0; animation: lightUp .5s .75s ease-out forwards; }
 .intro button { min-height: 40px; padding: 0 1.2em; border-radius: 20px; border: 0; background: var(--gold); color: var(--bg); cursor: pointer; }
 @keyframes lightUp { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 
@@ -110,6 +110,13 @@ footer .lab-toggle { font-size: 13px; }
 .toast { position: fixed; left: 50%; bottom: calc(28px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: var(--gold); color: var(--bg); padding: .5em 1em; border-radius: 99px; font-size: .9em; opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 5; }
 .toast.on { opacity: 1; }
 @media (prefers-reduced-motion: reduce) { .intro li, .intro p, .result { animation: none; opacity: 1; } .card { transition: none; } }
+
+/* the live previews: a canvas over the drawing, shown once its first frame is painted; the hook along the bottom */
+.pic canvas.live { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; transition: opacity .35s; pointer-events: none; }
+.pic canvas.live.on { opacity: 1; }
+.pic .hook { position: absolute; left: 0; right: 0; bottom: 0; padding: 1.2em 14px 9px; font: 600 14px/1.25 -apple-system, system-ui, sans-serif; letter-spacing: .01em; color: #fff; text-shadow: 0 1px 3px #000a; background: linear-gradient(transparent, #0b0d1499 55%); pointer-events: none; }
+li.now .stop .pic .hook { font-size: 13px; padding-bottom: 8px; }
+@media (prefers-reduced-motion: reduce) { .pic canvas.live { display: none; } }
 
 /* the previews move a little; never under reduced motion */
 @keyframes swing { 0%, 100% { transform: rotate(-12deg); } 50% { transform: rotate(12deg); } }

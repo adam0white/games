@@ -33,8 +33,19 @@ Every small game now has the way back (`kit/home.js`); Paper Pitch and Firefly R
 
 After that merge, Pitch and Ring got the language hook, and new card lines: Pitch names its three ways to play (the computer, a friend, a puzzle), Ring its three nights. Both stay without `of`: Pitch's eighteen puzzles are one part of a game whose matches have no end, and a Ring night has many levels with no finished mark in the save, so their cards keep saying played or finished (`UNCOUNTED` in the test).
 
+## 2026-11-26: moving previews and hooks
+
+Evidence: on 2026-11-26 the owner's phone opened the home once and then went straight to Carbon Cabinet; nine of the twelve games had no opens. On a cold open the first screen showed one game (iPhone 13) or two (Pixel 7), each as a still drawing with a long line of text.
+
+- **Live previews** (`art.js`, `LIVE`): each game has a few seconds of its own play on a canvas, looping: a ghost finger does the game's gesture and the scene answers (the bell's ring closes and it peals, drops arc into the glass, the wire snaps and the pod bursts, salt settles into the plate's nodal figure, and so on). Drawn in the 160 × 120 box of the drawings and in the same colours, checked against screenshots of each live game on 2026-11-26. The whole scene fits above the hook; the margin is the drawing's ground colour (`groundOf`).
+- **Which ones run** (`main.js`): one `requestAnimationFrame` loop paints the deck's middle card and tonight's next stop, only while on screen and the page is visible. A preview starts from its beginning each time it comes into view. The canvas shows only after its first frame, so a browser that runs no frame keeps the drawing; nothing on the page waits for a frame. Reduced motion: none run.
+- **Hooks** (`words.js`, `hook:<slug>`): a few words over each moving preview that name the gesture and what it does. They are the home's own words, not `catalog.js` lines, so a game's builder can change its line without touching the hook.
+- The first-visit card's three lines light up in 0.75 s instead of 2.1 s.
+- Check: `small live` in `kit/check/phone.mjs` (runs with `small`). It checks that the preview paints and changes between frames, that the stop shows its hook, that the deck's middle card moves, and that nothing moves under reduced motion. When the loop is switched off, the check fails (tried).
+
 ## Not verified
 
+- How the previews read to a person, and their cost on a slow Android phone (Firefox): only headless Chromium and WebKit ran them.
 - A real phone: the checks run headless WebKit (iPhone 13) and Chromium (Pixel 7). The thumb feel (snap, momentum, the edge tap) is checked only as far as a headless tap goes.
 - The share sheet with a picture: `navigator.share` with files was not opened in a check; the PNG itself was made and looked at in both browsers.
 - Back-forward cache: headless back reloads the page, so the check fires `pageshow` with `persisted` itself.

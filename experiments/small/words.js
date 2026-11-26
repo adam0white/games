@@ -15,6 +15,11 @@ export const WORDS = {
     english: 'In English',
     minLevel: '{n} min a level', minRound: '{n} min a round', minMatch: '{n} min a match', minDay: '{n} min a day',
     pictureTitle: 'Three tonight', pictureUrl: 'play.adamwhite.work/small',
+    // The hook over each game's moving preview: the gesture and what it does, in a few words.
+    'hook:night-bells': 'Tap as the ring glows.', 'hook:wild-pour': 'Tip the jug. Stop at the line.', 'hook:night-podwire': 'Pull the wire. Pop the pod.',
+    'hook:wild2-face-shift': 'Stretch the face to match.', 'hook:night-channels': 'Dig a path for the water.', 'hook:night-sand': 'Scoop the dune. Find the lamp.',
+    'hook:night-splitlight': 'Turn the prism. Light every target.', 'hook:ring': 'Loop the fireflies.', 'hook:pitch': 'Pencil the ball into the goal.',
+    'hook:night-saltplate': 'Tune the plate. Watch the salt dance.', 'hook:night-rubbing': 'Rub, and a fossil appears.', 'hook:thankful': 'Say thanks. Grow a flower.',
     record: 'About recording',
   },
   tr: {
@@ -32,6 +37,10 @@ export const WORDS = {
     english: 'İngilizce',
     minLevel: 'Bölümü {n} dk', minRound: 'Turu {n} dk', minMatch: 'Maçı {n} dk', minDay: 'Günde {n} dk',
     pictureTitle: 'Bu gece üç', pictureUrl: 'play.adamwhite.work/small',
+    'hook:night-bells': 'Halka parlayınca dokun.', 'hook:wild-pour': 'Sürahiyi eğ, çizgide dur.', 'hook:night-podwire': 'Teli çek, keseyi patlat.',
+    'hook:wild2-face-shift': 'Yüzü esnet, modele benzet.', 'hook:night-channels': 'Suya yol kaz.', 'hook:night-sand': 'Kumu kaz, feneri bul.',
+    'hook:night-splitlight': 'Prizmayı çevir, her hedefi yak.', 'hook:ring': 'Ateş böceklerini halkaya al.', 'hook:pitch': 'Topu kalemle kaleye çiz.',
+    'hook:night-saltplate': 'Levhayı akort et, tuz dans etsin.', 'hook:night-rubbing': 'Ov, fosil ortaya çıksın.', 'hook:thankful': 'Teşekkür et, çiçek büyüt.',
     record: 'Kayıt hakkında',
   },
 };
