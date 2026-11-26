@@ -85,11 +85,16 @@ test('on its path a trail leads to the next path cell, even where a bend comes b
   s.mat[s.L.nestBase] = MAT.OPEN; s.link[cellAt(s.L, SURFACE, 10, 11)] = s.L.nestBase; s.link[s.L.nestBase] = cellAt(s.L, SURFACE, 10, 11);
   s.startGoals(); s.step();
   // (11,11) up to (11,10), right to (13,10), down to (13,12), left to (12,12): the end is diagonal to the start.
-  s.queueCommand({ tick: s.tick, type: CMD.TRAIL, layer: SURFACE, points: [11, 11, 11, 10, 13, 10, 13, 12, 12, 12] });
+  s.queueCommand({ tick: s.tick, type: CMD.TRAIL, layer: SURFACE, points: [11, 11, 11, 10, 13, 10, 13, 13, 12, 13] });
   s.step();
   const at = (x, y) => cellAt(s.L, SURFACE, x, y);
   assert.equal(nextCell(s, SLOT.TRAIL0, at(11, 11)), at(11, 10), 'from the start: up the drawn bend, not across to the end');
-  assert.equal(backCell(s, SLOT.TRAIL0, at(12, 12)), at(13, 12), 'walking back from the end: the cell before it');
-  // (11,12) is next to the start (11,11) and diagonal to the end (12,12): it joins at the start, the nearest.
-  assert.equal(nextCell(s, SLOT.TRAIL0, at(10, 12)), at(11, 11), 'off the path: onto the nearest path cell');
+  assert.equal(backCell(s, SLOT.TRAIL0, at(12, 13)), at(13, 13), 'walking back from the end: the cell before it');
+  // (11,12) is next to the start (11,11) and diagonal to the end (12,13): it joins at the start, the nearest.
+  assert.equal(nextCell(s, SLOT.TRAIL0, at(11, 12)), at(11, 11), 'off the path: onto the nearest path cell');
+  // A bend whose end comes back diagonal to its start: the old scoring (path steps plus walking cost) jumped to the end.
+  s.queueCommand({ tick: s.tick, type: CMD.TRAIL, layer: SURFACE, points: [11, 11, 11, 10, 13, 10, 13, 12, 12, 12] });
+  s.step();
+  const slot = s.newestTrail();
+  assert.equal(nextCell(s, slot, at(11, 11)), at(11, 10), 'from the start of the second stroke: up the bend, not across to its end');
 });

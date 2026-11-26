@@ -161,7 +161,7 @@ test('restart: the room resumes from SQLite, players catch up, each command is a
 test('authority: a client with a different state is reported', () => {
   const w = world(), hill = room(w), a = player(hill, w, { role: 'authority', ants: 200 });
   advance(w, 1100);
-  a.sim.g[G.STORES] += 1; // a client state the room never had. (A flipped low bit of a position can die out: at this seed it did within 10 ticks after the eight-direction change.)
+  a.sim.g[G.STORES] += 1; // a client state the room never had. (A flipped low bit of a position can die out: at this seed it did 8 ticks later while the ant walked freely with the same heading, most likely because the integer separation push from a neighbour moved by one unit the other way.)
   advance(w, 1100);
   a.hash();
   assert.ok(hill.stats().mismatches >= 1);

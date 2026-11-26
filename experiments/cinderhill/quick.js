@@ -11,6 +11,6 @@ export function quick() {
 }
 
 // The long check on the page: spike S2's run (seed 2026, 2,000 ants, 10 minutes of play, the scripted orders).
-// Too slow for the test suite (about 23 s in Node); spikes/s2.mjs fails when Node's final total is not this one.
+// Checked by test/page.test.mjs (about 22 s in Node) and by spikes/s2.mjs.
 export const LONG = { cfg: { seed: 2026, ants: 2000 }, ticks: 12000 };
 export const EXPECTED_LONG = { tick: 12000, total: 3889048384 };

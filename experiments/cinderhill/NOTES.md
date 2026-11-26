@@ -12,14 +12,14 @@ Working name for the ant colony game specified in `docs/design/colony/`. This di
 | `sim/flow.js` | Flow fields: octile shortest distances per live goal (16 slots; orthogonal step 5, diagonal 7, entrance link 5) by a bucket queue, rebuilt only when a change touches them |
 | `sim/scent.js` | Three scent fields (trail, food, alarm): mass-conserving spread, 24-bit decay with a set half-life |
 | `sim/math.js`, `sim/rng.js`, `sim/hash.js` | Table trig and integer `angleOf`; mulberry32 streams; 32-bit hashes |
-| `sim/snapshot.js` | `snapshot(sim)` to bytes with a version header, `restore(bytes)`; format 3 models each value and range-codes it (S4: 61.8 KB at 5,000 ants, 24,000 ticks) |
+| `sim/snapshot.js` | `snapshot(sim)` to bytes with a version header, `restore(bytes)`; format 3 models each value and range-codes it (S4: 60.6 KB at 5,000 ants, 24,000 ticks) |
 | `sim/rangecoder.js` | The binary range coder the snapshot uses: adaptive probabilities, integers only, one walk for both directions |
 | `sim/replay.js` | `script(cfg, ticks)` (scripted orders), `replay(...)`, `firstDivergence(a, b)` |
 | `sim/world.js` | Seeded terrain: surface with stones, a pond and four food piles; nest with soil bands, shaft and chamber |
 | `sim/SPIKES.md` | Spike results S1, S2, S3 and S4 with numbers |
 | `test/` | `node --test` suites; CI runs them in the `changes` job (step "Cinderhill sim") |
 | `spikes/` | S1, S2, S3, S4, the trail-shape cases (`trail-shape.mjs`) and the workerd harness; the planted fault `mutant.js` |
-| `check.html`, `check.js`, `quick.js` | The determinism check page; the phone check runs it in WebKit and Chromium (`cinderhill check`). `quick.js` holds the short check (`EXPECTED`) and the long one (`LONG`, `EXPECTED_LONG`: S2's 12,000 ticks of 2,000 ants), which the page runs in slices and reports as one copyable line |
+| `check.html`, `check.js`, `quick.js` | The determinism check page; the phone check runs the short and the long check in WebKit and Chromium (`cinderhill check`), and `test/page.test.mjs` checks both expected totals in Node. `quick.js` holds the short check (`EXPECTED`) and the long one (`LONG`, `EXPECTED_LONG`: S2's 12,000 ticks of 2,000 ants), which the page runs in slices and reports as one copyable line |
 | `index.html`, `painter.js` | The trail painter page: menu, pause card, tool strip, HUD, the ant card, the frame sampler (`?fps=1`) |
 | `host.js` | Runs the sim for the page: 20 ticks a second from the frame clock (at most 4 a frame), the command log, crews and the "why" for one ant |
 | `gestures.js` | The touch rules as a pure reducer (pointer events in, preview, order, alarm, pan and zoom actions out); `test/gestures.test.mjs` |

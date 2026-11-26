@@ -227,6 +227,7 @@ The change: ants move in eight directions, fields are octile distances (5 and 7)
 **Independent review.** Codex (`gpt-6.2-astra`, read-only) reviewed the sim diff. It found no lost bucket-queue entries, no repair that differs from a full rebuild, and no diagonal a field allows that movement refuses; Node and Bun (JavaScriptCore) gave the same hashes and snapshot bytes over 600 ticks. Its findings and what was done:
 - Fixed: on a trail's path, `nextCell` scored path steps as walking cost, so where a bend came back beside an earlier cell an ant jumped across to the later one. It now takes the path cell holding one less (`test/trail.test.mjs` fails on the old code). Off the path it joined the path cell nearest the trail's end; it now joins the nearest.
 - Fixed: separation used a square range and the larger axis gap; it now uses a distance estimate (max plus 3/8 min). The stall counter saturates instead of wrapping after 65,535 ticks.
+- A second review of those fixes found: the ant aims two path cells ahead and so still cuts a bend that doubles back within one cell (a lone ant passes 1.04 cells from the bend cell's centre). Aiming one cell ahead on such a bend brought that to 0.61 cells, but moved S4 at 24,000 ticks from 60.6 to 64.9 KB (more ants stayed in the nest at that tick; why is not established), so it was not kept. A one-cell bend is below what a finger draws on purpose; a saturated stall counter stopped the kicks (it now wraps back into the kick cycle); replacing a trail kept an ant's progress `best` from the old path (it is now reset). The off-path test was made one that the old scoring fails.
 - Kept, written down: `Uint16` distances end at 13,106 straight steps of one corridor; the stroke-gap bridge still searches four neighbours (the bridge is walkable, sometimes a few steps longer than the octile shortest).
 
 **S1** (`spikes/s1.mjs 2000 5000 --ticks=3000`, interleaved with `origin/main`'s sim exported to a temp folder; the quietest pair):
@@ -238,7 +239,7 @@ The change: ants move in eight directions, fields are octile distances (5 and 7)
 
 These two runs predate the review fixes below. After them, at a load average near 19, two interleaved pairs gave 2,000 ants mean 1.90 and 2.61 ms before, 3.00 and 2.20 after; 5,000 ants 2.42 and 3.02 before, 3.10 and 2.70 after; all fields at once 7.4 and 8.8 ms before, 25.5 and 15.3 after. The tick means differ by less than the noise between runs. Still a pass on the mean. The per-field rebuild costs about 1.8 times what it did (the bucket queue does more work per cell than the breadth-first search). Rebuilding every field in one tick is now over 10 ms; it happens only on restore and when one surface change touches every field. A per-tick rebuild budget is the fix if it shows in play. In local workerd (`spikes/workerd.mjs`, 20-tick requests, after the fixes, loaded machine): 2,000 ants mean 2.09 ms, p95 3.55; 5,000 ants mean 2.90 ms, p95 4.09.
 
-**S2.** The 41-order script (command log sha256 begins `78ba8e6cf74058e6`), 12,000 ticks of 2,000 ants, hashes every 20 ticks: Node, workerd, Chromium 156 and WebKit 27.2 agree on all 600 records (final total 3889048384, after the review fixes; the run before them also agreed everywhere). The planted mutant diverges at tick 20 in `ants` in Node, Chromium and WebKit. Firefox did not run: Playwright's Firefox is not installed here. For a real phone, `/cinderhill/check.html` now runs the same 12,000 ticks (`quick.js` `LONG`) and shows one line to copy: sim version, short and long result, engine and user agent. A Firefox result from a phone is still owed (feature 1's done line names Firefox).
+**S2.** The 41-order script (command log sha256 begins `78ba8e6cf74058e6`), 12,000 ticks of 2,000 ants, hashes every 20 ticks: Node, workerd, Chromium 156 and WebKit 27.2 agree on all 600 records (final total 3889048384, after the review fixes; the run before them also agreed everywhere). workerd agreed on both runs too. The planted mutant diverges at tick 20 in `ants` in Node, Chromium and WebKit. Firefox did not run: Playwright's Firefox is not installed here. For a real phone, `/cinderhill/check.html` now runs the same 12,000 ticks (`quick.js` `LONG`) and shows one line to copy: sim version, short and long result, engine and user agent. A Firefox result from a phone is still owed (feature 1's done line names Firefox).
 
 **S4** (5,000 ants, gzip; before is the trail-shape re-run above):
 
@@ -246,9 +247,9 @@ These two runs predate the review fixes below. After them, at a load average nea
 | --- | --- | --- | --- | --- |
 | 3,000 | 47.6 / 45.5 KB | 20.0 KB | 23.7 KB | 2,394 |
 | 8,000 | 60.5 / 58.1 KB | 30.8 KB | 25.3 KB | 2,443 |
-| 24,000 | 61.8 / 60.7 KB | 31.7 KB | 26.6 KB | 2,350 |
+| 24,000 | 61.8 / 60.6 KB | 31.9 KB | 26.3 KB | 2,321 |
 
-Each restores to the same hash. The margin under 64 KB is 5.9 KB at 8,000 ticks (the CI assertion) and 3.3 KB at 24,000; todo lab-5w7.19 stays open.
+Each restores to the same hash. The margin under 64 KB is 5.9 KB at 8,000 ticks (the CI assertion) and 3.4 KB at 24,000; todo lab-5w7.19 stays open.
 
 **Trail shape** (`spikes/trail-shape.mjs`, same cases as above, after the review fixes; deviation is still measured in 4-connected steps to the Bresenham line):
 

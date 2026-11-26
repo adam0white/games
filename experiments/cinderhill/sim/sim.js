@@ -148,7 +148,8 @@ export class Sim {
       F.path.set(this.pathBuf, k * PATH_MAX);
       F.pathLen[k] = len;
       for (let j = 0; j < len; j++) deposit(this, FIELD.TRAIL, F.path[k * PATH_MAX + j], TRAIL_STROKE);
-      for (let i = 0; i < this.n; i++) if (this.via[i] === slot) this.via[i] = -1; // a route on the replaced trail is gone
+      // A route on the replaced trail is gone, and so is progress on it: `best` starts again on the new path.
+      for (let i = 0; i < this.n; i++) { if (this.via[i] === slot) this.via[i] = -1; if (this.goal[i] === slot) this.goal[i] = -1; }
       setGoal(this, slot, GOAL.TRAIL, F.path[k * PATH_MAX + len - 1]);
     } else if (type === CMD.DIG) {
       // [count, x0, y0, ...]: nest cells to dig.
@@ -386,7 +387,10 @@ export class Sim {
       if (n1 < 0) { if (isTrailSlot(follow) && d !== 0) wander = true; else still = true; }
       else if (this.link[c] === n1) { this.moveTo(i, n1); return; }
       else {
-        // Aim two steps ahead when both are on this layer: ants then cut staircase corners on diagonals.
+        // Aim two steps ahead when both are on this layer: ants then cut staircase corners on diagonals. On a
+        // drawn bend that doubles back within one cell this cuts the bend too (measured: a lone ant passes 1.04
+        // cells from the bend cell's centre). Aiming one step there cost 4 KB of S4 snapshot at 24,000 ticks
+        // (60.6 to 64.9 KB, over the 64 KB line), so it is not done (sim/SPIKES.md, "Eight directions").
         const n2 = back ? backCell(this, follow, n1) : nextCell(this, follow, n1), aim = n2 >= 0 && this.link[n1] !== n2 ? n2 : n1;
         const [, ax, ay] = cellXY(L, aim);
         want = angleOf(ax * SUB + 128 - this.x[i], ay * SUB + 128 - this.y[i]);
@@ -402,7 +406,7 @@ export class Sim {
     // again; repeat every KICK_EVERY ticks while still stuck. Steering again between kicks lets an ant that a
     // crowd pushed back find its way once the crowd thins (a kick every tick was a random walk for good).
     let h = this.heading[i];
-    const st = this.stall[i] < 65535 ? ++this.stall[i] : 65535, phase = st > STALL_KICK ? (st - STALL_KICK - 1) % KICK_EVERY : -1;
+    const st = this.stall[i] < 65535 ? ++this.stall[i] : (this.stall[i] = STALL_KICK + 1), phase = st > STALL_KICK ? (st - STALL_KICK - 1) % KICK_EVERY : -1;
     if (phase === 0) h = (h + 64 + below(r, A, 128)) & 255;
     else if (phase > 0 && phase < KICK_FOR) h = (h + below(r, A, 17) - 8) & 255;
     else if (want >= 0) {

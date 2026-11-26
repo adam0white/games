@@ -360,13 +360,18 @@ const smallState = page => page.evaluate(() => window.smallState());
 async function smallGo(page, until, base, query = `?lang=en&day=${DAY}`) { await page.goto(`${base}/small/${query}`); await until(page, () => window.smallState, 'home script'); }
 export const pageRuns = {
   // Cinderhill's determinism check: the browser runs a short fixed game and must reach the hash Node computes
-  // (experiments/cinderhill/quick.js). The long cross-engine runs are spike S2, outside CI.
+  // (experiments/cinderhill/quick.js). Then the long run a phone player sends as one line (S2's 12,000 ticks).
   async 'cinderhill check'(page, { base, until }) {
     await page.goto(`${base}/cinderhill/check.html`);
     await page.click('#run');
     await until(page, () => window.cinderhill?.state().result, 'the determinism check finishes', 60000);
     const r = await page.evaluate(() => window.cinderhill.state().result);
     assert.ok(r.same, `this browser's total hash ${r.total} at tick ${r.tick} is not Node's`);
+    await page.click('#long');
+    await until(page, () => window.cinderhill.state().long, 'the long check finishes', 180000);
+    const l = await page.evaluate(() => window.cinderhill.state().long);
+    assert.ok(l.same, `the long run's total ${l.total} at tick ${l.tick} is not Node's`);
+    assert.match(await page.textContent('#report'), /long SAME/);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no sideways scroll');
   },
   // The trail painter's touch rules (02-spec 6.4): a stroke is a local preview and becomes one order when the finger
