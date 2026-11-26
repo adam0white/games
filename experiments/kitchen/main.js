@@ -76,7 +76,7 @@ let art = null, ready = null;
 $('play').disabled = true; $('play').classList.add('loading');
 let day = null;        // { plan, i, served, earned, tips, stars[], seed }
 let g = null;          // the guest being served: { recipe, model, phase, catch, q[], wait, ... }
-let skipCatch = false, peopleIn = false, phase = 'idle', trayX = 0, trayTarget = 0, finger = null, keys = new Set(), touched = false;
+let goldenNext = false, skipCatch = false, peopleIn = false, phase = 'idle', trayX = 0, trayTarget = 0, finger = null, keys = new Set(), touched = false;
 const meshes = new Map();  // falling item n -> mesh
 
 const show = screens(['menu', 'paused', 'extra', 'dayEnd', 'shop'], name => {
@@ -139,6 +139,10 @@ async function nextGuest() {
   if (day.i >= day.plan.length) return endDay();
   const p = day.plan[day.i], r = RECIPES[p.recipe];
   g = { recipe: p.recipe, q: [], steps: r.steps.slice(), step: -1, wait: 0, extras: 0, restarts: 0, paid: 0, model: null, tut: !save.tutorial ? day.i : -1 };
+  // A golden recipe: rare, more ingredients, a harder catch, and triple pay if every step is clean.
+  g.golden = goldenNext || (save.tutorial && save.tier >= 1 && day.i > 0 && sim.rng(day.seed * 7 + day.i * 131)() < sim.TUNE.golden);
+  goldenNext = false;
+  g.need = g.golden ? Object.fromEntries(Object.entries(r.need).map(([k, n]) => [k, n + Math.max(1, Math.round(n * 0.6))])) : { ...r.need };
   const me = g;
   phase = 'enter'; art.view('serve');
   $('ticket').style.display = 'none';
@@ -165,9 +169,9 @@ const itemModel = id => (ING[id] ?? JUNK[id]).model;
 function startCatch() {
   phase = 'catch'; art.view('catch');
   const tutorial = g.tut === 0 ? 'first' : g.tut >= 1 ? true : false;
-  g.catch = sim.newCatch({ need: RECIPES[g.recipe].need, hard: sim.hardness(save), trayLevel: save.built.tray, seed: day.seed + day.i * 101 + g.restarts * 7, tutorial });
+  g.catch = sim.newCatch({ need: g.need, hard: sim.hardness(save) + (g.golden ? 2.5 : 0), trayLevel: save.built.tray, seed: day.seed + day.i * 101 + g.restarts * 7, tutorial });
   g.catchT0 = clock;
-  banner(t('catch'));
+  banner(g.golden ? t('golden') : t('catch'), g.golden ? t('goldenSub') : '');
   if (g.tut === 0) coach(t('t2'), 4); else if (g.tut === 1) coach(t('t6'), 6); else coach(null);
   ticket();
 }
@@ -201,7 +205,7 @@ function stepCatch(dt) {
       later(500, () => { if (g?.catch === c && c.extra) extraCard(); });
     } else if (e.type === 'missed') {
       const m = meshes.get(e.it.n); meshes.delete(e.it.n); if (m) art.world.remove(m);
-      if (!sim.isJunk(e.it.id) && RECIPES[g.recipe].need[e.it.id]) { SFX.miss(); song?.miss(); }
+      if (!sim.isJunk(e.it.id) && g.need[e.it.id]) { SFX.miss(); song?.miss(); }
     } else if (e.type === 'done') {
       g.wait = clock - g.catchT0;
       g.q.push(g.extras ? 0.85 : 1);
@@ -218,9 +222,9 @@ function stepCatch(dt) {
   // Falling items: make the new ones, move them all.
   if (!c.done) for (const it of c.items) {
     let m = meshes.get(it.n);
-    if (!m) { m = art.item(itemModel(it.id), 0.27); m.userData.spin = (it.spin % 1) * 4 - 2; art.world.add(m); meshes.set(it.n, m); }
+    if (!m) { m = art.item(itemModel(it.id), 0.27); m.userData.spin = (it.spin % 1) * 1.4 - 0.7; art.world.add(m); meshes.set(it.n, m); }
     m.position.set(it.x * LANE.s, LANE.y0 + it.y * LANE.h - 0.12, LANE.z);
-    m.rotation.z += m.userData.spin * dt; m.rotation.y += dt * 1.3;
+    m.rotation.z += m.userData.spin * dt; m.rotation.y += dt * 0.5;
   }
 }
 function landOnTray(m, it) {
@@ -267,8 +271,9 @@ const flying = [];
 function ticket(bumped = null) {
   if (!g) return;
   const r = RECIPES[g.recipe], c = g.catch;
-  $('ticketHead').innerHTML = `<img alt="" src="${art.thumb(dishModel(g.recipe))}"><span>${t('r_' + g.recipe)}</span>`;
-  $('ticketRows').innerHTML = Object.entries(r.need).map(([id, n]) => {
+  $('ticket').classList.toggle('gold', !!g.golden);
+  $('ticketHead').innerHTML = `${g.golden ? `<b class="goldTag">${t('golden')}</b>` : ''}<img alt="" src="${art.thumb(dishModel(g.recipe))}"><span>${t('r_' + g.recipe)}</span>`;
+  $('ticketRows').innerHTML = Object.entries(g.need).map(([id, n]) => {
     const got = Math.min(n, c?.got[id] ?? 0);
     return `<div class="trow${got >= n ? ' done' : ''}${bumped === id ? ' bump' : ''}"><img alt="" src="${art.thumb(itemModel(id))}"><span class="n">${c ? `${got}/${n}` : n}</span><span>${many(id, n).replace(/^\d+ /, '')}</span></div>`;
   }).join('');
@@ -287,15 +292,15 @@ function nextStep() {
 let cook = null;
 function startChop() {
   phase = 'chop'; art.view('chop');
-  const need = RECIPES[g.recipe].need, ids = Object.entries(need).flatMap(([id, n]) => Array(n).fill(id));
+  const need = g.need, ids = Object.entries(need).flatMap(([id, n]) => Array(n).fill(id));
   const n = ids.length, span = Math.min(0.72, n * 0.17);
   const pieces = ids.map((id, i) => {
     const m = lie(art.item(itemModel(id), 0.24)); const x = n === 1 ? 0 : -span / 2 + span * i / (n - 1);
     m.position.set(x, TOP + 0.045, 0.12 + (i % 2 ? 0.07 : -0.05)); m.rotation.y = (Math.random() - 0.5) * 0.6; art.world.add(m);
     art.popIn(m, false);
-    return { id, m, cuts: 0, x };
+    return { id, m, cuts: 0, x, z0: m.position.z, ph: Math.random() * 6.28 };
   });
-  cook = { kind: 'chop', pieces, t0: clock, cuts: sim.chopCuts(save), bits: [] };
+  cook = { kind: 'chop', pieces, t0: clock, cuts: sim.chopCuts(save), slide: sim.chopSlide(save), bits: [] };
   banner(t('chop'), t('chopSub'));
   if (g.tut === 0) { coach(t('t3')); fingerSwipe(); }
   gauge(null);
@@ -341,11 +346,15 @@ function swipeTo(x, y) {
     // Distance from the piece to the finger's segment.
     const k = Math.max(0, Math.min(1, ((s.x - swipe.x) * dx + (s.y - swipe.y) * dy) / (L * L)));
     const d = Math.hypot(swipe.x + dx * k - s.x, swipe.y + dy * k - s.y);
-    if (d < reach() && (swipe.len + L) > 24) { p.hitBy = swipe.id; cutAt(p); if (cook?.over) break; }
+    if (d < reach() && (swipe.len + L) > 24) { p.hitBy = swipe.id; swipe.hits = (swipe.hits ?? 0) + 1; if (swipe.hits >= 2) combo(swipe.hits, s); cutAt(p); if (cook?.over) break; }
   }
   swipe.len += L; swipe.x = x; swipe.y = y;
 }
+function combo(n, s) { floater({ x: s.x, y: s.y - 40 }, t('combo', { n }), 'gold'); SFX.coin(); g.combo = Math.max(g.combo ?? 0, n); }
 const reach = () => Math.max(34, Math.min(innerWidth, innerHeight) * 0.09);
+function stepChop() {
+  for (const p of cook.pieces) if (!p.done) { p.m.position.x = p.x + Math.sin(clock * (1.3 + cook.slide * 5) + p.ph) * cook.slide * 0.7; p.m.position.z = p.z0 + Math.cos(clock * 1.1 + p.ph) * cook.slide * 0.15; }
+}
 function cutNext() { const p = cook?.pieces?.find(q => !q.done); if (p) cutAt(p); }
 
 // Fry: hold to heat, let go in the green.
@@ -358,7 +367,7 @@ function startFry() {
   if (g.tut >= 0 && !save.tutorial) coach(t('frySub'));
 }
 function cookItems(x, y, z, span) {
-  const need = RECIPES[g.recipe].need, ids = Object.entries(need).flatMap(([id, n]) => Array(n).fill(id));
+  const need = g.need, ids = Object.entries(need).flatMap(([id, n]) => Array(n).fill(id));
   return ids.map((id, i) => {
     const half = ING[id]?.chop, m = art.item(half ?? itemModel(id), 0.13);
     const a = i / ids.length * Math.PI * 2, r = ids.length > 1 ? span * 0.3 : 0;
@@ -454,9 +463,14 @@ function serve() {
   slide = { from: dish.position.clone(), to: new art.THREE.Vector3(2.9, TOP, 0.42), t: 0 };
   const q = g.q.reduce((a, b) => a + b, 0) / g.q.length;
   g.bill = sim.bill(save, g.recipe, q, g.wait);
+  if (g.golden) {
+    g.goldenWon = g.extras === 0 && g.paid === 0 && g.q.every(x => x >= 0.75);
+    if (g.goldenWon) { g.bill.price *= 3; g.bill.tip *= 3; g.bill.total = g.bill.price + g.bill.tip; }
+  }
   wait(0.6, () => {
     g.model?.play('emote-yes', true); g.model?.bubble.show(null, 'happy'); SFX.happy();
     floater(worldPx(3.25, 1.9, 0.95), '★'.repeat(g.bill.stars), 'gold');
+    if (g.golden) { banner(t(g.goldenWon ? 'goldenWon' : 'goldenLost')); if (g.goldenWon) { flash(); SFX.star(); } }
     art.register.display(String(g.bill.total));
     wait(0.8, ringUp);
   });
@@ -484,7 +498,7 @@ function openRegister() {
   save.served++; day.served++; day.earned += b.price; day.tips += b.tip; day.stars.push(b.stars);
   setTimeout(() => { if (given < b.total) { save.coins += b.total - given; given = b.total; hud(); } store(); }, 140 + n * 70 + 900);
   rec.event('serve', { recipe: g.recipe, stars: b.stars, coins: b.total });
-  wait(0.9, () => { phase = 'close'; banner(t('ring'), t('closeSub')); if (g.tut === 0) coach(t('t5')); if (g.tut === 0 || save.day <= 2) fingerTap(art.register.drawerWorld()); });
+  wait(0.75, () => { phase = 'close'; closeRegister(); });
 }
 function closeRegister() {
   if (phase !== 'close') return;
@@ -539,14 +553,19 @@ function shop(fresh = null) {
   else {
     const c = sim.canStar(save);
     const needs = Object.entries(next.needs).map(([k, v]) => `<span class="${save.built[k] >= v ? 'ok' : ''}">${t('b_' + k)} ${t('lv', { n: v })}${save.built[k] >= v ? ' ✓' : ''}</span>`).join('');
-    $('starBox').innerHTML = `<div class="title">${starText(save.tier + 1)} ${t('starUp', { rank: rankName(save.tier + 1) })}</div><div class="need">${needs}</div><button id="starGo" class="main" ${c.ok ? '' : 'disabled'}><i class="coin"></i> ${next.cost}</button>`;
+    // One clear next step: the cheapest building the next rank still needs, else the coins to save, else the rank itself.
+    const missing = Object.entries(next.needs).filter(([k, v]) => save.built[k] < v).map(([k]) => ({ k, cost: sim.canBuild(save, k).cost ?? 1e9 })).sort((a, b) => a.cost - b.cost);
+    const step = c.ok ? t('rankReady') : missing.length ? t('nextUp', { what: `${t('b_' + missing[0].k)} ${t('lv', { n: save.built[missing[0].k] + 1 })}` }) : t('saveFor', { n: next.cost - save.coins });
+    $('starBox').innerHTML = `<div class="title">${starText(save.tier + 1)} ${t('starUp', { rank: rankName(save.tier + 1) })}</div><div class="need">${needs}</div><div class="nextStep">➜ ${step}</div><button id="starGo" class="main${c.ok ? ' ready' : ''}" ${c.ok ? '' : 'disabled'}><i class="coin"></i> ${next.cost}</button>`;
     $('starGo').addEventListener('click', starUp);
   }
-  $('builds').innerHTML = BUILDING_IDS.map(id => {
+  const goal = id => TIERS[save.tier + 1] && save.built[id] < (TIERS[save.tier + 1].needs[id] ?? 0);
+  const order = BUILDING_IDS.slice().sort((a, b) => goal(b) - goal(a));
+  $('builds').innerHTML = order.map(id => {
     const lv = save.built[id], c = sim.canBuild(save, id);
     const label = c.why === 'max' || (c.why === 'star' && BUILDINGS[id].max.at(-1) <= lv) ? t('maxed') : c.why === 'star' ? t('needStar', { stars: t('rank_' + TIERS[BUILDINGS[id].max.findIndex(m => m > lv)].name) }) : `<i class="coin"></i>${c.cost}`;
     const pic = art ? `<img alt="" src="${art.thumb(THUMB[id], 64)}">` : '';
-    return `<div class="bld${fresh === id ? ' new' : ''}">${pic}<div class="name">${t('b_' + id)}</div><div class="lv">${lv ? t('lv', { n: lv }) : t('notBuilt')}</div><div class="what">${t('w_' + id)}</div><button data-b="${id}" ${c.ok ? '' : 'disabled'}>${lv ? '' : t('build') + ' '}${label}</button></div>`;
+    return `<div class="bld${fresh === id ? ' new' : ''}${goal(id) ? ' goal' : ''}">${pic}<div class="name">${t('b_' + id)}${goal(id) ? ` <small class="for">${t('forRank', { rank: rankName(save.tier + 1) })}</small>` : ''}</div><div class="lv">${lv ? t('lv', { n: lv }) : t('notBuilt')}</div><div class="what">${t('w_' + id)}</div><button data-b="${id}" ${c.ok ? '' : 'disabled'}>${lv ? '' : t('build') + ' '}${label}</button></div>`;
   }).join('');
   for (const b of $('builds').querySelectorAll('button[data-b]')) b.addEventListener('click', () => buildIt(b.dataset.b));
 }
@@ -706,13 +725,14 @@ function frame(now) {
     // The tray: keys move the target; the tray follows it quickly.
     const kx = (keys.has('ArrowRight') || keys.has('d') || keys.has('D') ? 1 : 0) - (keys.has('ArrowLeft') || keys.has('a') || keys.has('A') ? 1 : 0);
     if (kx) trayTarget = Math.max(-1, Math.min(1, trayTarget + kx * 2.4 * dt));
-    trayX += (trayTarget - trayX) * (1 - Math.exp(-dt * 22));
+    trayX += (trayTarget - trayX) * (1 - Math.exp(-dt * 45));
     { const lim = trayEdge(); trayX = Math.max(-lim, Math.min(lim, trayX)); }
     art.tray.setX(trayX);
     art.tray.group.visible = phase === 'catch' || phase === 'caught' || phase === 'order' || phase === 'enter';
     if (phase === 'catch' && g?.catch) stepCatch(dt);
     else if (phase === 'fry' && cook) stepFry(dt);
     else if (phase === 'micro' && cook) stepMicro(dt);
+    else if (phase === 'chop' && cook?.slide) stepChop(dt);
     else if (phase === 'blend' && cook) stepBlend(dt);
     if (!(g && phase === 'catch')) { const bar = $('patience').firstElementChild; bar.style.transform = ''; bar.style.background = ''; }
     if (g && phase === 'catch') { const w = (clock - g.catchT0) / TUNE.patience; $('patience').firstElementChild.style.transform = `scaleX(${Math.max(0, 1 - w)})`; $('patience').firstElementChild.style.background = w > 0.75 ? '#ff6b6b' : w > 0.5 ? '#ffb347' : ''; }
@@ -750,5 +770,6 @@ window.kitchenMusic = () => song && { ...song.melody, on: song.state.on, step: s
 // Keeps a catch going for checks that wait on the hint: nothing is caught or finished while it runs.
 // Checks only: finish the current catch at once, to reach the cooking steps of any dish.
 window.kitchenSkipCatch = () => { skipCatch = true; };
+window.kitchenGolden = () => { goldenNext = true; };
 window.kitchenAlive = () => { if (g?.catch) { g.catch.got = {}; g.catch.tray = []; g.catch.done = false; } };
 window.kitchenScreen = (x, y, z) => art && art.toScreen(new art.THREE.Vector3(x, y, z));

@@ -152,13 +152,15 @@ export const TUNE = {
   size: 0.15,           // an item's half width, in lane units
   trayHalf: [0, 0.27, 0.31, 0.35, 0.39, 0.43, 0.47],   // by tray level
   traySpeed: 3.2,       // lane units a second a bot may move the tray (a finger is faster)
-  fall: { base: 0.26, perHard: 0.045, max: 0.62 },     // lane heights a second
-  every: { base: 1.35, perHard: -0.1, min: 0.5 },      // seconds between items
-  extra: { base: 0.18, perHard: 0.07, max: 0.6 },      // share of items nobody ordered
+  fall: { base: 0.42, perHard: 0.035, max: 0.75 },       // lane heights a second
+  every: { base: 1.0, perHard: -0.05, min: 0.55 },      // seconds between items
+  extra: { base: 0.2, perHard: 0.06, max: 0.5 },      // share of items nobody ordered
   junkFrom: 2,          // hardness at which junk starts to fall
   drift: { from: 4, amp: 0.12 },                       // sideways sway from this hardness
   pairsFrom: 5,         // two items at once from this hardness
   payBase: 2, payPerTier: 3,                           // coins to toss an extra and keep going
+  catchY: 0.085,        // an item lands on the tray when its bottom reaches the tray top (drawn 0.12 world units low)
+  golden: 0.07,         // chance a guest (after the first, from the diner on) orders a golden recipe
   patience: 40,         // seconds a guest waits happily for the catch; then the tip shrinks
 };
 export const hardness = save => save.tier * 1.6 + Math.min(4, (save.dayAtTier ?? 0) * 0.4);
@@ -216,7 +218,7 @@ export function stepCatch(c, trayX, dt = DT) {
     const prevY = it.y;
     it.y -= it.vy * dt;
     if (it.drift) it.x = Math.max(-TUNE.lane + TUNE.size, Math.min(TUNE.lane - TUNE.size, it.x0 + it.drift * Math.sin(c.t * 2.2 + it.phase)));
-    if (prevY > 0 && it.y <= 0) {
+    if (prevY > TUNE.catchY && it.y <= TUNE.catchY) {
       if (Math.abs(it.x - c.x) <= c.half + TUNE.size * 0.5) {
         const wanted = !isJunk(it.id) && (c.got[it.id] ?? 0) < (c.need[it.id] ?? 0);
         it.state = 'caught'; it.dx = it.x - c.x; c.caught++;
@@ -245,8 +247,10 @@ export function restartCatch(c) {
 
 // ---------- cooking: each step gives a quality from 0 to 1
 // Chop: each piece needs `cuts` swipes; quality falls with time over a par.
-export const chopCuts = save => (save.tier >= 3 ? 2 : 1);
-export function chopQuality(seconds, pieces, knife) { const par = pieces * (1.6 - 0.15 * knife) + 1; return seconds <= par ? 1 : Math.max(0.4, 1 - (seconds - par) / (par * 1.5)); }
+export const chopCuts = save => (save.tier >= 2 ? 3 : save.tier >= 1 ? 2 : 1);
+// From the diner on, pieces slide on the board (lane units a second); faster at higher ranks.
+export const chopSlide = save => (save.tier >= 1 ? 0.12 + 0.05 * save.tier : 0);
+export function chopQuality(seconds, pieces, knife) { const par = pieces * (1.1 - 0.1 * knife) + 0.6; return seconds <= par ? 1 : Math.max(0.4, 1 - (seconds - par) / (par * 1.5)); }
 // Fry: hold to heat; doneness grows while held; let go inside the golden band.
 export function fryBand(stove, tier) { const w = 0.14 + 0.04 * stove - 0.015 * tier; return [0.62 - w / 2, 0.62 + w / 2]; }
 export const FRY_RATE = 0.42; // doneness a second while held
