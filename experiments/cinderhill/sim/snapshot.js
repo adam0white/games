@@ -29,6 +29,7 @@ import { Decoder, Encoder, intModel, probs, sint, tree, uint } from './rangecode
 
 export const SNAPSHOT_VERSION = 2;
 const SCTX = 24; // scent contexts per field
+const LIST_MAX = 1 << 20; // a longer command queue, command or event list is a corrupt payload, not an allocation
 const RANK_BITS = 12; // measured: 6, 8, 10, 12, 14 bits; 12 is near the best (ants share cells, so a fine model pays)
 const MAGIC = [0x43, 0x48, 0x53, 0x4D]; // "CHSM"
 
@@ -185,15 +186,18 @@ function walk(sim, io, mark = () => {}) {
 
   // ---- queued commands and undrained events ----
   const qn = uint(io, M, 12, sim.queue.length);
+  if (qn > LIST_MAX) throw new Error('snapshot payload is corrupt');
   if (io.decoding) sim.queue = [];
   for (let k = 0; k < qn; k++) {
     const e = io.decoding ? null : sim.queue[k];
     const len = uint(io, M, 13, e ? e.length : 0);
+    if (len > LIST_MAX) throw new Error('snapshot payload is corrupt');
     const out = io.decoding ? new Int32Array(len) : e;
     for (let j = 0; j < len; j++) out[j] = sint(io, M, 14, out[j]);
     if (io.decoding) sim.queue.push(out);
   }
   const en = uint(io, M, 12, sim.events.length);
+  if (en > LIST_MAX) throw new Error('snapshot payload is corrupt');
   if (io.decoding) sim.events = new Array(en).fill(0);
   for (let k = 0; k < en; k++) sim.events[k] = sint(io, M, 15, sim.events[k]);
   mark('commands');

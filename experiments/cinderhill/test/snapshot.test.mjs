@@ -21,8 +21,9 @@ test('restore at random ticks: same hash in every subsystem, same bytes, and the
   const ref = replay({ cfg, commands, ticks: end, every: 1 }).records;
   for (const t of at) {
     const sim = replay({ cfg, commands, ticks: t, every: t }).sim;
-    const bytes = snapshot(sim), back = restore(bytes);
-    assert.deepEqual(subsystems(back.hashes()), subsystems(sim.hashes()), `tick ${t}: every subsystem hashes the same`);
+    const before = subsystems(sim.hashes()), bytes = snapshot(sim), back = restore(bytes);
+    assert.deepEqual(subsystems(sim.hashes()), before, `tick ${t}: writing a snapshot leaves the sim as it was`);
+    assert.deepEqual(subsystems(back.hashes()), before, `tick ${t}: every subsystem hashes the same`);
     assert.deepEqual(snapshot(back), bytes, `tick ${t}: the restored sim writes the same bytes`);
     // The restored sim already holds the queued commands.
     const rest = replay({ cfg, commands: [], ticks: t + FOLLOW, every: 1, sim: back }).records;
@@ -54,7 +55,9 @@ test('any state round-trips: values no play produces still restore exactly', () 
   });
   sim.queue.push(Int32Array.from([int32(), int32(), 0x7FFFFFFF, -0x80000000]), new Int32Array(0));
   sim.events.push(int32(), -1, 0x7FFFFFFF);
-  const bytes = snapshot(sim), back = restore(bytes), want = sim.hashes(), got = back.hashes();
+  const want = sim.hashes(), bytes = snapshot(sim);
+  assert.deepEqual(sim.hashes(), want, 'writing a snapshot leaves the sim as it was');
+  const back = restore(bytes), got = back.hashes();
   // Flow distances are rebuilt from the (now inconsistent) terrain, so only the flow hash may differ;
   // the flow state that is written must match exactly.
   for (const k of SUBSYSTEMS.filter(k => k !== 'flow')) assert.equal(got[k], want[k], k);
@@ -75,9 +78,9 @@ test('old versions and damaged snapshots are refused', () => {
   assert.throws(() => restore(magic), /not a Cinderhill snapshot/);
 });
 
-test('S4 pass line: a dug nest with 5,000 ants after 3,000 ticks is under 64 KB gzip-compressed', async () => {
-  // spikes/s4.mjs measures 8,000 and 24,000 ticks too (SPIKES.md); this run keeps CI short.
-  const sim = s4World(5000, 3000), bytes = snapshot(sim);
+test('S4 pass line: a dug nest with 5,000 ants after 8,000 ticks is under 64 KB gzip-compressed', async () => {
+  // 8,000 ticks is where format 1 failed (74.6 KB); spikes/s4.mjs also measures 3,000 and 24,000 (SPIKES.md).
+  const sim = s4World(5000, 8000), bytes = snapshot(sim);
   const gz = new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer());
   assert.ok(bytes.length < 64 * 1024, `coded ${bytes.length} bytes`);
   assert.ok(gz.length < 64 * 1024, `gzip ${gz.length} bytes`);

@@ -32,7 +32,7 @@ Working name for the ant colony game specified in `docs/design/colony/`. This di
 ## How to run
 
 ```
-node --test experiments/cinderhill/test/                         # all tests, about 15 s (the S4 size test plays 3,000 ticks of 5,000 ants)
+node --test experiments/cinderhill/test/                         # all tests, about 20 s (the S4 size test plays 8,000 ticks of 5,000 ants)
 node experiments/cinderhill/spikes/s1.mjs 2000 5000              # S1 tick cost in Node
 PLAYWRIGHT=<dir with playwright> node experiments/cinderhill/spikes/s2.mjs   # S2 Node and browsers
 node experiments/cinderhill/spikes/s4.mjs [--ants=5000] [--ticks=8000]   # S4 snapshot size
