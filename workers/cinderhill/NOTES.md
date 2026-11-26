@@ -48,7 +48,21 @@ Deploys are by hand with wrangler, as Crumbwar's; nothing deploys this Worker au
 
 ## Measured
 
-See `experiments/cinderhill/sim/SPIKES.md`, "S1 deployed" and "S2 soak".
+Full tables, method and caveats: `experiments/cinderhill/sim/SPIKES.md`, "S1 deployed" and "S2 soak". In short (2026-11-26, 4 scripted players on one Mac, 10 minutes each):
+
+| Room | Ticks/s (pass 20.0) | DO CPU | Bytes/s per player in / out | Cost per room-hour, current schema |
+| --- | --- | --- | --- | --- |
+| Relay | 20.00 pass | 3.7 ms/s | 265 / 93 | $0.020 |
+| Authority, 2,000 ants | 20.01 pass | 91 ms/s | 266 / 94 | $0.020 |
+| Authority, 5,000 ants | 19.98 fail (a 3.2 s reset) | 91 ms/s | 265 / 93 | $0.020 (measured at 2,000 ants; duration and rows do not depend on ants) |
+
+- Cost is from https://developers.cloudflare.com/durable-objects/platform/pricing/ (read 2026-11-25): duration (wall time, 128 MB) $0.0058 a room-hour, rows written $0.014, requests $0.0002. CPU is not billed, so the roles cost the same. The first schema wrote 37,000 rows an hour ($0.043 a room-hour); the current one 14,300 (about 3,400 of those are not explained by the room's own counts).
+- Hashes: 0 differences in every deployed run, in the room and in an offline Node replay of each room's log.
+- A deploy reaches an occupied room up to 300 s later (Cloudflare holds the old version while sockets are open); the players were back on the new version 2.6 s after the cut, at the same tick, with each order stored once.
+- Unexplained: 8 of 11 authority rooms lost their sockets once, 25 to 71 s after first starting, same version, no exception; recovery 2.0 to 3.3 s with no hash difference. No relay room did.
+- **Recommendation: relay.** Same cost, 25 times less CPU, no replay on restart, no reset seen. Authority stays behind `DEBUG_ROLES` until join snapshots for an empty room or refusing a forged state need a server copy.
+- **Idle:** deployed with `DEBUG_ROLES` "0" (version 09286256, 2026-11-26). An empty room stops its clock after 5 s and is evicted, so no duration is billed while idle. What remains is SQLite storage of the test rooms (command logs and checkpoints, well under 1 MB in all), inside the 5 GB included; $0.20 per GB-month beyond it.
+- 60-minute determinism soak (offline replay of a fixed log): Node, Chromium 156 and 159, WebKit 27.2 and local workerd agree at all 3,600 records. Firefox not run (not installed).
 
 ## Open
 
