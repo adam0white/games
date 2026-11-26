@@ -435,9 +435,7 @@ export const pageRuns = {
     await page.goto(`${base}/cinderhill/?colony=1&look=ember&labRunSource=agent`);
     await until(page, () => window.painter, 'painter script');
     assert.equal(await page.getAttribute('[data-look="ember"]', 'aria-pressed'), 'true');
-    await page.click('#play');
-    await until(page, () => window.painter.state().dayCard === 'dawn', 'the dawn card');
-    await page.click('#dayGo');
+    await page.click('#play'); // no days in a colony game (sim 8): no dawn card
     await until(page, () => window.painter.state().screen === 'play', 'play');
     await until(page, () => window.painter.state().t > 40, 'time runs');
     await page.click('#pause');
@@ -492,9 +490,7 @@ export const pageRuns = {
     await page.evaluate(() => { localStorage.clear(); localStorage.setItem('cinderhill:hint', '1'); });
     await page.goto(`${base}/cinderhill/?colony=1&lang=en&labRunSource=agent`);
     await until(page, () => window.painter, 'painter script');
-    await page.click('#play');
-    await until(page, () => window.painter.state().dayCard === 'dawn', 'the dawn card');
-    await page.click('#dayGo');
+    await page.click('#play'); // no days in a colony game (sim 8): no dawn card
     await until(page, () => window.painter.state().screen === 'play', 'play');
     await page.evaluate(() => {
       const el = document.querySelector('#c'), x = innerWidth / 2, y = innerHeight / 2;
@@ -553,16 +549,14 @@ export const pageRuns = {
     await page.goto(`${base}/cinderhill/?colony=1&lang=tr`);
     await until(page, () => window.painter, 'painter script');
     assert.ok(await page.evaluate(() => [...document.querySelectorAll('.counts')].every(el => el.hidden)), 'no ant count buttons');
-    await page.click('#play');
-    await until(page, () => window.painter.state().dayCard === 'dawn', 'the dawn card');
-    await page.click('#dayGo');
+    await page.click('#play'); // no days in a colony game (sim 8): no dawn card
     await until(page, () => window.painter.state().screen === 'play', 'play');
     await until(page, () => /şeker/.test(document.querySelector('#stats').textContent), 'the colony line', 10000);
     const st = await page.evaluate(() => window.painter.stats());
-    assert.ok(st.ants >= 20 && st.ants <= 23, `${st.ants} ants (20, and the three starting pupae hatch from 15 s)`);
+    assert.ok(st.ants >= 30, `${st.ants} ants (30, and births from 8 s)`);
     assert.equal(st.colony.queen, 1);
-    assert.equal(st.colony.larvae, 4);
-    assert.match(await page.textContent('#stats'), /2\d karınca · \d+ şeker · 0 protein · yavrular: \d+ yumurta, 4 larva, [0-3] pupa/);
+    assert.ok(st.colony.larvae > 0, `${st.colony.larvae} larvae`);
+    assert.match(await page.textContent('#stats'), /\d+ karınca · \d+ şeker · \d+ protein · yavrular: \d+ yumurta, \d+ larva, \d+ pupa/);
     await page.evaluate(() => window.painter.setLayer(1));
     await until(page, () => window.painter.state().layer === 1, 'nest view');
     // Each brood item is drawn inside its own cell: some overlay pixel in that cell's square is painted.
@@ -577,7 +571,7 @@ export const pageRuns = {
       }
       done(out);
     }))));
-    assert.ok((await page.evaluate(() => window.painter.brood().length)) >= 4, 'the four larvae are there');
+    assert.ok((await page.evaluate(() => window.painter.brood().length)) >= 4, 'the brood is there');
     assert.deepEqual(missing, [], 'every brood item is drawn in its cell');
     assert.deepEqual(JSON.parse(await page.evaluate(() => localStorage.getItem('cinderhill:save'))).ants, 500, 'the saved count is untouched');
   },

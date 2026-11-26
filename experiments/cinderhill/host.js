@@ -19,8 +19,9 @@ export class Host {
    *  the nest together and gives up together. This is page setup; the sim's rules are untouched. */
   reset(ants, seed = this.seed ?? SEED) {
     this.seed = seed; this.ants = ants;
-    // A colony game (?colony=1): the queen, START's workers in her chamber, sugar and larvae; it grows by births.
-    const sim = (this.sim = this.colony ? new Sim({ seed, ...START, colony: 1, maxAnts: 5000, ...(this.dayTicks ? { dayTicks: this.dayTicks } : {}) }) : new Sim({ seed, ants: 0, maxAnts: Math.max(5000, ants) }));
+    // A colony game (?colony=1): sim 8's start (colony.js START, 02-spec 3.2) in a 192 by 64 nest, with no days unless
+    // the page asks for them (?day=, dayTicks): the chapters that replace days are not built.
+    const sim = (this.sim = this.colony ? new Sim({ seed, ...START, colony: 1, maxAnts: 5000, nh: 64, dayTicks: this.dayTicks || 0 }) : new Sim({ seed, ants: 0, maxAnts: Math.max(5000, ants) }));
     if (this.colony) ants = 0;
     let r = (seed * 2654435761) >>> 0 || 1;
     const rand = n => { r = (Math.imul(r, 1664525) + 1013904223) >>> 0; return (r >>> 8) % n; };
@@ -61,7 +62,7 @@ export class Host {
   saveDawn() { this.dawns.set(this.sim.g[G.DAY], { bytes: snapshot(this.sim), log: this.log.length, delivered: this.delivered }); }
 
   /** Today's goal and progress (colony.js dayState), or null in the sandbox. */
-  day() { return this.colony ? dayState(this.sim) : null; }
+  day() { return this.colony && this.sim.cfg.dayTicks > 0 ? dayState(this.sim) : null; }
 
   /** Back to the dawn of `day` (02-spec 6.9: the dawn save is always kept). Orders given since are gone from the
    *  sim; the log keeps them, marked. Returns false when that dawn is not kept. */

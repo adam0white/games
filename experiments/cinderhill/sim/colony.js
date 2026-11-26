@@ -2,23 +2,20 @@
 // Pure and integer-only, like the rest of sim/. Runs only when cfg.colony is set; the sandbox (the trail
 // painter's ?ants= page and the spikes) spawns adults at the start and has no queen or brood.
 //
-// The rules (02-spec 6.3; numbers to tune by bots and play, 02-spec section 10):
-// - A forager carries one load: sugar from a sugar pile, protein from a protein pile. A load brought home
-//   adds LOAD[kind] units to that store.
-// - The queen lays an egg every LAY_EVERY ticks while the colony has a unit of sugar for it, and faster when
-//   sugar is plentiful: every LAY_EVERY/2 ticks at LAY_RICH units in store, LAY_EVERY/4 at 4*LAY_RICH. So a
-//   colony that brings in more sugar than it eats turns it into eggs; without this, laying capped growth at
-//   50 eggs a day and a colony that played well grew no faster than one left alone (bots.mjs).
-// - An egg hatches into a larva after EGG_TICKS. A larva eats one unit of protein every FEED_EVERY ticks while
-//   there is protein. After LARVA_FEEDS meals it pupates; if protein is plentiful (MAJOR_PROTEIN units in
-//   store) it is fed on to MAJOR_FEEDS meals and becomes a major (well-fed larvae become majors, as in real
-//   colonies). A larva with no meal for LARVA_STARVE ticks dies.
-// - A pupa becomes an adult after PUPA_TICKS, in the cell where it lay. Jobs go round by birth order.
-// - Adults eat: every ADULT_EAT_EVERY ticks, one unit of sugar per ADULTS_PER_SUGAR ants (rounded up). When
-//   there is not enough, the store empties and G.HUNGRY counts the missed meal. No adult starves yet (the
-//   starvation guard is feature 17, P1).
-// Egg to adult is EGG_TICKS + LARVA_FEEDS * FEED_EVERY + PUPA_TICKS = 2,400 ticks, 2 minutes: under one day of
-// play (sim 7, the pace pass: a day is 3.5 minutes and the first births come in the first minute).
+// The rules (sim 8: the starting values of 02-spec 3.2; numbers to tune by bots and play):
+// - A forager carries one load: sugar from a sugar pile, protein from a protein pile. A load brought home (to the
+//   porch store, 3 cells under the entrance) adds one unit to that store (LOAD).
+// - The queen lays an egg every LAY_EVERY ticks (1 a second) while there is sugar in store, at most one brood per
+//   nursery cell (64). Eggs are free.
+// - An egg hatches into a larva after EGG_TICKS (15 s). A larva eats one load of protein as soon as there is one
+//   (one larva a tick, oldest first in brood order) and pupates LARVA_TICKS (25 s) after hatching once fed; with
+//   MAJOR_PROTEIN or more in store it is fed on to MAJOR_FEEDS loads and becomes a major. A larva with no meal for
+//   LARVA_STARVE ticks (60 s) dies.
+// - A pupa becomes an adult after PUPA_TICKS (20 s), in the cell where it lay. Jobs go round by birth order.
+//   Egg to adult: 60 s.
+// - Adults eat: every ADULT_EAT_EVERY ticks (a minute), one load of sugar per ADULTS_PER_SUGAR ants (rounded up).
+//   When there is not enough, the store empties and G.HUNGRY counts the missed meal. No adult starves yet (the
+//   spec's starvation rules are not built).
 //
 // Fights (for the battle work to come, 02-spec 6.5): every ant has a caste, hit points, a team and a bite
 // cooldown. fight() runs once a tick after every ant has moved: each ant whose cooldown is over bites the first
@@ -28,7 +25,7 @@
 
 import { G } from './flow.js';
 import { STREAM, below } from './rng.js';
-import { MAT, NEST, cellAt } from './grid.js';
+import { MAT, NEST, SURFACE, cellAt } from './grid.js';
 
 export const CASTE = { WORKER: 0, MAJOR: 1 };
 export const CASTE_HP = [12, 30];
@@ -37,14 +34,15 @@ export const BITE_EVERY = 10; // ticks between one ant's bites
 export const BITE_R = 160; // sub-cell units, by the separation's distance estimate: ants that touch can bite
 export const STAGE = { EGG: 0, LARVA: 1, PUPA: 2 };
 export const FOOD = { SUGAR: 0, PROTEIN: 1 };
-export const LOAD = [4, 2]; // store units per load brought home: sugar, protein
+export const LOAD = [1, 1]; // store units per load brought home: sugar, protein (02-spec 3.2: 1 load = 1 unit)
 export const BROOD_MAX = 512;
-// How a colony game starts (the page's ?colony=1 and bots.mjs): 20 workers, 40 sugar, 4 larvae.
-// Sim 7 (the pace pass): also 3 pupae that hatch 30, 45 and 60 s in, so the first births come in the first minute.
-export const START = { ants: 20, sugar: 40, larvae: 4, pupae: 3 };
+// How a colony game starts (02-spec 3.2, owner choice 11 decision 6 B): 30 adults, 20 foragers on the surface around
+// the entrance and 10 nurses; 10 sugar and 5 protein in the porch store; 20 eggs aged 0 to 10 s, 20 larvae aged 0 to
+// 20 s, and 12 brood due from 8 s, one every 3 s (startColony).
+export const START = { ants: 30, surface: 20, sugar: 10, protein: 5, eggs: 20, larvae: 20, pupae: 12 };
 export const C = {
-  LAY_EVERY: 240, LAY_RICH: 50, EGG_TICKS: 600, FEED_EVERY: 300, LARVA_FEEDS: 3, MAJOR_FEEDS: 5, MAJOR_PROTEIN: 20,
-  LARVA_STARVE: 2400, PUPA_TICKS: 900, ADULT_EAT_EVERY: 600, ADULTS_PER_SUGAR: 10,
+  LAY_EVERY: 20, EGG_TICKS: 300, LARVA_TICKS: 500, MAJOR_FEEDS: 3, MAJOR_PROTEIN: 20,
+  LARVA_STARVE: 1200, PUPA_TICKS: 400, ADULT_EAT_EVERY: 1200, ADULTS_PER_SUGAR: 10, NURSERY: 64,
 };
 // Jobs by birth order, out of ten: 7 forage, 2 dig, 1 guard (JOB values from sim.js: 0 forage, 1 dig, 2 guard).
 const JOB_ROUND = [0, 0, 1, 0, 0, 2, 0, 0, 1, 0];
@@ -53,9 +51,13 @@ export function makeBrood() {
   return { n: 0, stage: new Uint8Array(BROOD_MAX), age: new Uint16Array(BROOD_MAX), fed: new Uint8Array(BROOD_MAX), hunger: new Uint16Array(BROOD_MAX), cell: new Int32Array(BROOD_MAX) };
 }
 
-/** A random open cell of the queen's chamber (the home rectangle), from the spare stream. */
+/** The nursery: in a generated colony game a 16 by 4 room 12 cells down (world.js, 02-spec 3.2); otherwise (the
+ *  sandbox, test maps) the home chamber. */
+export const nursery = sim => sim.nursery ?? sim.home;
+
+/** A random open cell of the nursery, from the spare stream. */
 function chamberCell(sim) {
-  const h = sim.home, r = sim.rng, S = STREAM.spare;
+  const h = nursery(sim), r = sim.rng, S = STREAM.spare;
   for (let tries = 0; tries < 8; tries++) {
     const c = cellAt(sim.L, NEST, h.x + below(r, S, h.w), h.y + below(r, S, h.h));
     if (c >= 0 && sim.mat[c] === MAT.OPEN) return c;
@@ -66,6 +68,31 @@ function chamberCell(sim) {
     if (c >= 0 && sim.mat[c] === MAT.OPEN) return c;
   }
   return -1;
+}
+
+/** A colony game's start (sim 8, 02-spec 3.2): adults, stores and brood from cfg. The first `surface` adults are
+ *  foragers on the surface within 3 cells of the entrance, the rest nurses in the nursery. Brood ages: eggs
+ *  0 to 10 s, larvae 0 to 20 s (unfed), and `pupae` brood due from 8 s, one every 3 s: the ones due within a pupa
+ *  stage are pupae, the later ones fed larvae (a 20 s pupa cannot be due at 41 s). Their times are fractions of
+ *  PUPA_TICKS, so a slower brood (the pace gate's plant) delays them too. */
+export function startColony(sim) {
+  const cfg = sim.cfg, g = sim.g, L = sim.L, r = sim.rng, A = STREAM.ants, ex = L.sw >> 1, ey = L.sh >> 1;
+  for (let k = 0; k < cfg.ants; k++) {
+    if (k < cfg.surface) {
+      let cell = -1;
+      for (let t = 0; t < 16 && cell < 0; t++) { const c = cellAt(L, SURFACE, ex - 3 + below(r, A, 7), ey - 3 + below(r, A, 7)); if (c >= 0 && sim.mat[c] === MAT.OPEN) cell = c; }
+      sim.spawn(0 /* JOB.FORAGE */, CASTE.WORKER, 0, cell >= 0 ? cell : cellAt(L, SURFACE, ex, ey));
+    } else sim.spawn(3 /* JOB.NURSE */, CASTE.WORKER, 0, chamberCell(sim));
+  }
+  g[G.QUEEN] = 1; g[G.SUGAR] = cfg.sugar; g[G.PROTEIN] = cfg.protein;
+  const B = sim.brood;
+  for (let k = 0; k < cfg.pupae; k++) {
+    const due = Math.floor((C.PUPA_TICKS * (8 + 3 * k)) / 20); // 8 s, 11 s, ... with a 20 s pupa
+    if (due <= C.PUPA_TICKS) { if (addBrood(sim, STAGE.PUPA)) B.age[B.n - 1] = C.PUPA_TICKS - due; }
+    else if (addBrood(sim, STAGE.LARVA)) { B.age[B.n - 1] = Math.max(0, C.LARVA_TICKS - (due - C.PUPA_TICKS)); B.fed[B.n - 1] = 1; }
+  }
+  for (let k = 0; k < cfg.larvae; k++) if (addBrood(sim, STAGE.LARVA)) B.age[B.n - 1] = Math.floor((400 * k) / Math.max(1, cfg.larvae));
+  for (let k = 0; k < cfg.eggs; k++) if (addBrood(sim, STAGE.EGG)) B.age[B.n - 1] = Math.floor((200 * k) / Math.max(1, cfg.eggs));
 }
 
 /** Add one brood item; false when the brood is full. */
@@ -80,7 +107,7 @@ export function addBrood(sim, stage, cell = chamberCell(sim)) {
 /** The colony's tick: laying, brood, adults' meals. Called once a tick before the ants move. */
 export function stepColony(sim) {
   const g = sim.g, B = sim.brood;
-  let w = 0;
+  let w = 0, fedThisTick = false;
   for (let k = 0; k < B.n; k++) {
     let keep = true, stage = B.stage[k];
     if (B.age[k] < 0xFFFF) B.age[k]++;
@@ -88,10 +115,12 @@ export function stepColony(sim) {
     if (stage === STAGE.EGG) {
       if (age >= C.EGG_TICKS) { stage = STAGE.LARVA; B.age[k] = 0; }
     } else if (stage === STAGE.LARVA) {
-      if (B.hunger[k] < 0xFFFF) B.hunger[k]++;
-      if (age % C.FEED_EVERY === 0 && g[G.PROTEIN] > 0) { g[G.PROTEIN]--; B.fed[k]++; B.hunger[k] = 0; }
+      // One meal a tick for the whole brood, in brood order: protein goes to the larvae that came first.
+      const wants = B.fed[k] === 0 || (B.fed[k] < C.MAJOR_FEEDS && g[G.PROTEIN] >= C.MAJOR_PROTEIN);
+      if (wants && !fedThisTick && g[G.PROTEIN] > 0) { g[G.PROTEIN]--; B.fed[k]++; B.hunger[k] = 0; fedThisTick = true; }
+      else if (B.fed[k] === 0 && B.hunger[k] < 0xFFFF) B.hunger[k]++;
       if (B.hunger[k] >= C.LARVA_STARVE) { keep = false; g[G.BROOD_LOST]++; }
-      else if (B.fed[k] >= C.MAJOR_FEEDS || (B.fed[k] >= C.LARVA_FEEDS && g[G.PROTEIN] < C.MAJOR_PROTEIN)) { stage = STAGE.PUPA; B.age[k] = 0; }
+      else if (B.fed[k] > 0 && age >= C.LARVA_TICKS && !(wants && g[G.PROTEIN] > 0)) { stage = STAGE.PUPA; B.age[k] = 0; }
     } else if (age >= C.PUPA_TICKS) {
       // An adult, if there is room: at the cap the pupa waits.
       const job = JOB_ROUND[g[G.BORN] % 10], caste = B.fed[k] >= C.MAJOR_FEEDS ? CASTE.MAJOR : CASTE.WORKER;
@@ -107,12 +136,8 @@ export function stepColony(sim) {
   // Laying comes after the brood's tick, so an egg is EGG_TICKS old when it hatches, counted from the tick it was laid.
   if (g[G.QUEEN]) {
     if (g[G.LAY] > 0) g[G.LAY]--;
-    if (g[G.LAY] === 0 && g[G.SUGAR] > 0 && B.n < BROOD_MAX && sim.n + B.n < sim.cfg.maxAnts) {
-      const sugar = g[G.SUGAR];
-      if (addBrood(sim, STAGE.EGG)) { // no open cell in the chamber: she tries again next tick
-        g[G.SUGAR]--;
-        g[G.LAY] = sugar >= 4 * C.LAY_RICH ? C.LAY_EVERY >> 2 : sugar >= C.LAY_RICH ? C.LAY_EVERY >> 1 : C.LAY_EVERY;
-      }
+    if (g[G.LAY] === 0 && g[G.SUGAR] > 0 && B.n < Math.min(BROOD_MAX, C.NURSERY) && sim.n + B.n < sim.cfg.maxAnts) {
+      if (addBrood(sim, STAGE.EGG)) g[G.LAY] = C.LAY_EVERY; // no open cell in the nursery: she tries again next tick
     }
   }
   if (g[G.TICK] % C.ADULT_EAT_EVERY === C.ADULT_EAT_EVERY - 1 && sim.n > 0) {

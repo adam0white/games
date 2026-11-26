@@ -151,7 +151,7 @@ function play() {
   snd.unlock();
   if (saved0 === null && readJson(SAVE) === null) persist();
   if (!running) { startRecord(); running = true; }
-  if (colonyMode && !dawnSeen) { showDawn(); return; }
+  if (colonyMode && !dawnSeen && host.day()) { showDawn(); return; } // no days (sim 8): straight into play
   setScreen('play'); host.last = null; snd.release();
 }
 

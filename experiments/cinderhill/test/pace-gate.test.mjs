@@ -7,20 +7,20 @@ import { LINES, blocks, play, ratchet, slack } from '../spikes/pace-gate.mjs';
 test('the ratchet on blocking lines: a pass that fails, a fail that gets worse by a twentieth or never happens, unrecorded progress and an unread line all fail', () => {
   const base = Object.fromEntries(LINES.map(l => [l.id, { status: 'not built', value: null }]));
   Object.assign(base, { 'first-birth': { status: 'pass', value: 15 }, 'first-delivery': { status: 'fail', value: 16 }, 'first-delivery-passive': { status: 'fail', value: 13 }, 'minute-1-deliveries': { status: 'pass', value: 39 } });
-  const now = JSON.parse(JSON.stringify(base));
-  assert.deepEqual(ratchet(now, base), []);
-  assert.equal(ratchet({ ...now, 'first-birth': { status: 'fail', value: 40 } }, base).length, 1, 'a passing line fails');
-  assert.equal(ratchet({ ...now, 'first-delivery': { status: 'fail', value: 17.2 } }, base).length, 1, 'worse by more than a twentieth');
-  assert.deepEqual(ratchet({ ...now, 'first-delivery': { status: 'fail', value: 17 } }, base), [], 'within a twentieth');
-  assert.equal(ratchet({ ...now, 'first-delivery': { status: 'fail', value: null } }, base).length, 1, 'never happens');
-  assert.equal(ratchet({ ...now, 'first-delivery': { status: 'pass', value: 9 } }, base).length, 1, 'progress must be recorded');
-  assert.equal(ratchet({ ...now, 'first-birth': { status: 'not read', value: null } }, base).length, 1, 'a blocking line must be read');
-  assert.deepEqual(ratchet({ ...now, 'gap-0-10': { status: 'fail', value: 999 } }, base), [], 'a line that does not block yet is only reported');
+  const now = JSON.parse(JSON.stringify(base)), r0 = (x, y) => ratchet(x, y, undefined, false); // R0: failing lines held by the baseline
+  assert.deepEqual(r0(now, base), []);
+  assert.equal(r0({ ...now, 'first-birth': { status: 'fail', value: 40 } }, base).length, 1, 'a passing line fails');
+  assert.equal(r0({ ...now, 'first-delivery': { status: 'fail', value: 17.2 } }, base).length, 1, 'worse by more than a twentieth');
+  assert.deepEqual(r0({ ...now, 'first-delivery': { status: 'fail', value: 17 } }, base), [], 'within a twentieth');
+  assert.equal(r0({ ...now, 'first-delivery': { status: 'fail', value: null } }, base).length, 1, 'never happens');
+  assert.equal(r0({ ...now, 'first-delivery': { status: 'pass', value: 9 } }, base).length, 1, 'progress must be recorded');
+  assert.equal(r0({ ...now, 'first-birth': { status: 'not read', value: null } }, base).length, 1, 'a blocking line must be read');
+  assert.deepEqual(r0({ ...now, 'gap-0-10': { status: 'fail', value: 999 } }, base), [], 'a line that does not block yet is only reported');
   assert.equal(ratchet(now, base, undefined, true).length, 2, 'from R1 step 2 a failing blocking line fails whatever its baseline');
   assert.deepEqual(slack({ ...now, 'first-delivery': { status: 'pass', value: 9 } }, base), [], 'a recorded improvement is fine');
   assert.equal(slack({ ...now, 'first-delivery': { status: 'fail', value: 30 } }, base).length, 1, 'a recorded regression is not');
   assert.equal(slack({ ...now, 'first-birth': { status: 'fail', value: 16 } }, base).length, 1, 'nor a recorded pass turned fail');
-  assert.deepEqual(LINES.filter(l => blocks(l)).map(l => l.id), ['first-delivery', 'first-delivery-passive', 'minute-1-deliveries', 'first-birth'], 'R0 blocks on these (02 section 3.1)');
+  assert.deepEqual(LINES.filter(l => blocks(l)).map(l => l.id), ['first-delivery', 'first-delivery-passive', 'minute-1-deliveries', 'first-birth'], 'R0 and R1 step 2 block on these (02 section 3.1)');
 });
 
 test('the quota opening misses the first birth; brood ten times slower misses the first birth', () => {

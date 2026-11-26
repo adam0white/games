@@ -13,6 +13,10 @@ function disc(sim, layer, cx, cy, r, m, keep) {
   }
 }
 
+/** A colony game's nursery (sim 8, 02-spec 3.2: 10 to 16 cells down, 64 cells): 16 by 4, 12 cells down, under the
+ *  shaft. Fixed by the nest's width, so a snapshot needs no field for it. */
+export const nurseryRect = L => ({ x: (L.nw >> 1) - 8, y: 12, w: 16, h: 4 });
+
 export function generate(sim) {
   const { L, rng } = sim, ex = L.sw >> 1, ey = L.sh >> 1, sx = L.nw >> 1;
   const nearEntrance = (x, y) => Math.abs(x - ex) < 12 && Math.abs(y - ey) < 12;
@@ -28,9 +32,12 @@ export function generate(sim) {
     const m = y < 8 ? MAT.ASH : y < 40 ? MAT.TOPSOIL : MAT.CLAY;
     sim.mat.fill(m, L.nestBase + y * L.nw, L.nestBase + (y + 1) * L.nw);
   }
-  // The queen's chamber is 10 cells down (24 before sim 7): a load reaches the stores seconds after the entrance.
-  const home = { x: sx - 8, y: 10, w: 16, h: 6 };
-  const nearShaft = (x, y) => Math.abs(x - sx) < 14 && y < home.y + 10;
+  // The sandbox's chamber is 10 cells down (24 before sim 7). A colony game (sim 8, 02-spec 3.2) has a porch store
+  // 3 cells under the entrance, which is home for loads, and the nursery and queen 12 cells down.
+  const colony = !!sim.cfg.colony;
+  const home = colony ? { x: sx - 2, y: 3, w: 6, h: 2 } : { x: sx - 8, y: 10, w: 16, h: 6 };
+  const room = colony ? nurseryRect(L) : home;
+  const nearShaft = (x, y) => Math.abs(x - sx) < 14 && y < room.y + 10;
   for (let i = 0; i < 30; i++) disc(sim, NEST, below(rng, W, L.nw), 10 + below(rng, W, L.nh - 10), 1 + below(rng, W, 3), MAT.STONE, nearShaft);
   for (let i = 0; i < 20; i++) {
     let x = below(rng, W, L.nw), y = below(rng, W, 20);
@@ -41,9 +48,10 @@ export function generate(sim) {
       y++; x += below(rng, W, 3) - 1;
     }
   }
-  for (let y = 0; y < home.y; y++) for (let x = sx; x <= sx + 1; x++) sim.mat[cellAt(L, NEST, x, y)] = MAT.OPEN;
-  for (let y = home.y; y < home.y + home.h; y++) for (let x = home.x; x < home.x + home.w; x++) sim.mat[cellAt(L, NEST, x, y)] = MAT.OPEN;
+  for (let y = 0; y < room.y; y++) for (let x = sx; x <= sx + 1; x++) sim.mat[cellAt(L, NEST, x, y)] = MAT.OPEN;
+  for (const r of colony ? [home, room] : [home]) for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) sim.mat[cellAt(L, NEST, x, y)] = MAT.OPEN;
   sim.home = home;
+  if (colony) sim.nursery = room;
 
   // Two entrance links: surface (ex, ey) and (ex+1, ey) to the top of the shaft.
   for (let k = 0; k < 2; k++) {
@@ -51,6 +59,8 @@ export function generate(sim) {
     sim.mat[a] = MAT.OPEN;
     sim.link[a] = b; sim.link[b] = a;
   }
+
+  if (colony) { firstFood(sim); return; }
 
   // Food piles, each with a clear patch around it. Sim 7 (the pace pass): the first two (a sugar and a protein) are
   // small and near, about 12 to 15 cells from the entrance (plus a jitter), so the first trail brings food home in seconds; the other two
@@ -66,6 +76,45 @@ export function generate(sim) {
     sim.pileCell[p] = cellAt(L, SURFACE, px, py);
     sim.pileAmount[p] = p < 2 ? 120 + below(rng, W, 60) : 400 + below(rng, W, 400);
     sim.pileKind[p] = p & 1; // even piles sugar (nectar), odd protein (insects): FOOD in colony.js
+  }
+}
+
+// A colony game's first food (sim 8, 02-spec 3.2): a seed head of 30 sugar loads and a beetle of 20 protein loads,
+// 8 to 12 cells from the entrance in two different compass directions (a straight step of d, a diagonal of 7d/10,
+// then a jitter of a cell), each with a clear patch, visible from the start.
+// The late find ("a third pile of 120 loads, mixed, past a stone at 2:00"): a pile holds one kind, so it is two
+// piles of 60, side by side 25 to 35 cells out, behind a stone that stands between them and the entrance. The stone
+// and the clearing are made here, so the terrain does not change mid-game; slots 2 and 3 keep the cells with no food
+// until LATE_FIND_AT (lateFind). Further slots stay empty.
+const DIRS = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]];
+function firstFood(sim) {
+  const { L, rng } = sim, ex = L.sw >> 1, ey = L.sh >> 1, q0 = below(rng, W, 8);
+  for (let p = 0; p < 2; p++) {
+    const d = 8 + below(rng, W, 5), [dx, dy] = DIRS[(q0 + p * (3 + below(rng, W, 3))) & 7], k = dx && dy ? 7 : 10;
+    const px = ex + Math.trunc((dx * d * k) / 10) + below(rng, W, 3) - 1, py = ey + Math.trunc((dy * d * k) / 10) + below(rng, W, 3) - 1;
+    disc(sim, SURFACE, px, py, 2, MAT.OPEN, () => false);
+    sim.pileCell[p] = cellAt(L, SURFACE, px, py); sim.pileAmount[p] = p === 0 ? 30 : 20; sim.pileKind[p] = p; // 0 sugar, 1 protein
+  }
+  const d = 25 + below(rng, W, 11), [dx, dy] = DIRS[below(rng, W, 8)], k = dx && dy ? 7 : 10;
+  const px = Math.max(4, Math.min(L.sw - 5, ex + Math.trunc((dx * d * k) / 10))), py = Math.max(4, Math.min(L.sh - 5, ey + Math.trunc((dy * d * k) / 10)));
+  disc(sim, SURFACE, px - Math.trunc((dx * 6 * k) / 10), py - Math.trunc((dy * 6 * k) / 10), 2, MAT.STONE, (x, y) => Math.abs(x - ex) < 3 && Math.abs(y - ey) < 3);
+  disc(sim, SURFACE, px, py, 2, MAT.OPEN, () => false);
+  for (let p = 2; p < sim.pileCell.length; p++) { sim.pileCell[p] = -1; sim.pileAmount[p] = 0; sim.pileKind[p] = 0; }
+  if (sim.pileCell.length >= 4) for (let j = 0; j < 2; j++) {
+    sim.pileCell[2 + j] = cellAt(L, SURFACE, px + (j ? 1 : -1) * (dy ? 1 : 0), py + (j ? 1 : -1) * (dy ? 0 : 1)); sim.pileKind[2 + j] = j;
+  }
+}
+
+export const LATE_FIND_AT = 2400; // 2:00
+/** The late find appears: slots 2 and 3 get 60 loads each (firstFood placed them). */
+export function lateFind(sim, setGoal, slot0, goalFood, event) {
+  for (let p = 2; p < 4 && p < sim.pileCell.length; p++) {
+    const c = sim.pileCell[p];
+    if (c < 0 || sim.pileAmount[p] > 0) continue;
+    for (let i = 0; i < sim.n; i++) if (sim.mem[i] === slot0 + p) sim.mem[i] = -1;
+    sim.pileAmount[p] = 60;
+    setGoal(sim, slot0 + p, goalFood, c);
+    event(p, sim.pileKind[p]);
   }
 }
 

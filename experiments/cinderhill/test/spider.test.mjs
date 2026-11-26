@@ -43,7 +43,7 @@ test('under Recall the surface empties and stays empty: foragers in the nest do 
   assert.equal(surface(s), 0, 'all home after 200 ticks');
   until(s, 450);
   assert.equal(surface(s), 0, 'and none go out again');
-  order(s, { type: CMD.RECALL, on: false }); until(s, 650);
+  order(s, { type: CMD.RECALL, on: false }); until(s, 900);
   assert.ok(surface(s) > 0, 'they go out once Recall is off');
 });
 

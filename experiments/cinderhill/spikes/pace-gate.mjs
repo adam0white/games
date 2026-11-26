@@ -34,7 +34,7 @@ const BASELINE = new URL('./pace-baseline.json', import.meta.url);
 
 /** Where the build is on the roadmap, and the order of the stages lines block from. */
 export const STAGES = ['R0', 'R1.2', 'R1.3', 'R1.5', 'R1', 'R2a', 'R2b'];
-export const STAGE = 'R0';
+export const STAGE = 'R1.2';
 export const blocks = (line, stage = STAGE) => STAGES.indexOf(line.stage) <= STAGES.indexOf(stage);
 /** At R0 the roadmap says the build fails the gate: a failing blocking line is allowed by its baseline and may not
  *  get worse. From R1 step 2 (new starting values) every blocking line must pass. */
@@ -48,13 +48,15 @@ export const LINES = [
   { id: 'first-delivery-passive', stage: 'R0', horizon: 60, text: 'First delivery from the passive bot\'s trail, s', target: '<= 10', bot: 'passive', get: r => r.firstDelivery, ok: v => v <= 10, up: true },
   { id: 'minute-1-deliveries', stage: 'R0', horizon: 60, text: 'Deliveries in minute 1', target: '>= 25', bot: 'median', get: r => r.minute1, ok: v => v >= 25, up: false },
   { id: 'first-birth', stage: 'R0', horizon: 60, text: 'First birth, s', target: '<= 15', bot: 'median', get: r => r.firstBirth, ok: v => v <= 15, up: true },
-  { id: 'first-funded-birth', stage: 'R1', horizon: 120, text: 'First birth after the starting pupae and after a protein load home by trail (stands in for the first player-funded birth), s', target: '<= 90', bot: 'median', get: r => r.fundedBirth, ok: v => v <= 90, up: true },
+  { id: 'first-funded-birth', stage: 'R1', horizon: 120, text: 'First birth beyond what the starting brood and protein fund, after a protein load home by trail (stands in for the first player-funded birth), s', target: '<= 90', bot: 'median', get: r => r.fundedBirth, ok: v => v <= 90, up: true },
   { id: 'quiet-2-min', stage: 'R1', horizon: 120, text: 'Longest stretch of the first 2 min with no delivery, birth, new source or threat change, s', target: '<= 15', bot: 'median', get: r => r.quiet, ok: v => v <= 15, up: true },
   { id: 'first-choice', stage: 'R1.5', text: 'First real choice, s', target: '<= 30', bot: 'median', get: () => null },
   { id: 'choice-consequence', stage: 'R1.5', text: 'Its consequence visible, s', target: '<= 60', bot: 'median', get: () => null },
   { id: 'consequential-choices', stage: 'R1.5', text: 'Orders that change dusk by 5% in a paired replay, per chapter', target: '>= 4', bot: 'median', get: () => null },
-  { id: 'threat-telegraphed', stage: 'R1.5', horizon: 120, text: 'First threat telegraphed, s', target: '<= 60', bot: 'median', get: r => r.threat, ok: v => v <= 60, up: true },
-  { id: 'threat-resolved', stage: 'R1.5', horizon: 180, text: 'First threat resolved, s', target: '<= 180', bot: 'median', get: r => r.resolved, ok: v => v <= 180, up: true },
+  // The threat lines read the spider, which comes only with days (sim 8's colony game has none); the bird of R1 step 5
+  // replaces it. Not built until then.
+  { id: 'threat-telegraphed', stage: 'R1.5', text: 'First threat telegraphed, s', target: '<= 60', bot: 'median', get: () => null },
+  { id: 'threat-resolved', stage: 'R1.5', text: 'First threat resolved, s', target: '<= 180', bot: 'median', get: () => null },
   { id: 'gap-0-10', stage: 'R1', horizon: 600, text: 'Longest gap between decision events, minutes 0 to 10, s', target: '<= 30', bot: 'median', get: r => r.gapEarly, ok: v => v <= 30, up: true },
   { id: 'gap-after-10', stage: 'R1', horizon: 720, text: 'Same gap after minute 10, s', target: '<= 45', bot: 'median', get: r => r.gapLate, ok: v => v <= 45, up: true },
   { id: 'idle-share', stage: 'R1.3', horizon: 720, text: 'Wasted labour: largest share of adults idle 10 s while a job has a gap', target: '<= 0.15', bot: 'median', get: r => r.idleMax, ok: v => v <= 0.15, up: true },
@@ -101,8 +103,8 @@ export function withFixture(fixture, fn) {
   if (!fixture) return fn({});
   const keep = { start: { ...START }, goal: DAY_GOALS[0].slice(), c: { ...C } };
   try {
-    if (fixture === 'quota') { Object.assign(START, { ants: 20, sugar: 40, larvae: 4, pupae: 0 }); DAY_GOALS[0] = [GOAL_KIND.TRAIL_LOADS, 40]; return fn({ dayTicks: 12000 }); }
-    if (fixture === 'brood10') { for (const k of ['EGG_TICKS', 'FEED_EVERY', 'LARVA_STARVE', 'PUPA_TICKS']) C[k] *= 10; return fn({}); }
+    if (fixture === 'quota') { Object.assign(START, { ants: 20, surface: 20, sugar: 40, protein: 0, eggs: 0, larvae: 4, pupae: 0 }); DAY_GOALS[0] = [GOAL_KIND.TRAIL_LOADS, 40]; return fn({ dayTicks: 12000 }); }
+    if (fixture === 'brood10') { for (const k of ['EGG_TICKS', 'LARVA_TICKS', 'LARVA_STARVE', 'PUPA_TICKS']) C[k] *= 10; return fn({}); }
     throw new Error(`no fixture ${fixture}`);
   } finally { Object.assign(START, keep.start); DAY_GOALS[0] = keep.goal; Object.assign(C, keep.c); }
 }
@@ -155,7 +157,7 @@ export function measure(st, ticks = st.steps) {
     minute1: st.minutes[0] ? st.minutes[0].sugar + st.minutes[0].protein : null,
     firstBirth: st.births.length ? st.births[0] / HZ : null,
     // The first birth after the starting pupae that comes after a protein load home by a drawn trail.
-    fundedBirth: (() => { if (st.firstTrailProtein < 0) return null; const b = st.births.slice(START.pupae).find(t => t > st.firstTrailProtein); return b === undefined ? null : b / HZ; })(),
+    fundedBirth: (() => { if (st.firstTrailProtein < 0) return null; const b = st.births.slice(START.pupae + START.protein).find(t => t > st.firstTrailProtein); return b === undefined ? null : b / HZ; })(),
     threat: at('threat telegraphed'), resolved: at('threat resolved'),
     gapEarly: gap(0, Math.min(ticks, ten)), gapLate: ticks > ten + 60 * HZ ? gap(ten, ticks) : null,
     idleMax: Math.round(st.idleMax * 1000) / 1000,

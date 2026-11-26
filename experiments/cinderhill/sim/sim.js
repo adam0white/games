@@ -16,15 +16,15 @@ import { STREAM, STREAMS, below, seedStreams } from './rng.js';
 import { DIAG, G, GOAL, INF, MAX_GOALS, PATH_MAX, SLOT, STEP, TRAIL_OFF, backCell, backDist, distAt, dropGoal, isTrailSlot, makeFlow, nextCell, rebuild, rebuildDirty, setGoal, terrainChanged } from './flow.js';
 import { FIELD, FIELDS, deposit, makeScent, smell, stepScent } from './scent.js';
 import { SUBSYSTEMS, finish, hashArray, hashInt } from './hash.js';
-import { WINDFALL_AT, generate, windfall } from './world.js';
+import { LATE_FIND_AT, WINDFALL_AT, generate, lateFind, windfall } from './world.js';
 import { stepSpider } from './spider.js';
-import { BROOD_MAX, C, CASTE, CASTE_HP, DAY_TICKS, FOOD, LOAD, STAGE, addBrood, fight, makeBrood, startDays, stepColony, stepDay } from './colony.js';
+import { BROOD_MAX, C, CASTE, CASTE_HP, DAY_TICKS, FOOD, LOAD, STAGE, addBrood, fight, makeBrood, startColony, startDays, stepColony, stepDay } from './colony.js';
 
-export const SIM_VERSION = 7; // 2: trails keep their drawn shape (a path per trail, `via` per ant); 3: eight directions; 4: the colony (colony.js); 5: days; 6: the spider, and foragers stay in under Recall; 7: crews (CMD.CREW)
+export const SIM_VERSION = 8; // 2: trails keep their drawn shape (a path per trail, `via` per ant); 3: eight directions; 4: the colony (colony.js); 5: days; 6: the spider, and foragers stay in under Recall; 7: crews (CMD.CREW); 8: the spec's starting values (02-spec 3.2): a porch store, a 64-cell nursery, 30 ants, fast brood, no days
 export const TICK_HZ = 20;
 export { G, GOAL, SLOT, INF, STEP, DIAG, FIELD, MAT, SURFACE, NEST, SUB, SUBSYSTEMS, CASTE, CASTE_HP, FOOD, LOAD, STAGE, BROOD_MAX };
 
-export const JOB = { FORAGE: 0, DIG: 1, GUARD: 2 };
+export const JOB = { FORAGE: 0, DIG: 1, GUARD: 2, NURSE: 3 }; // NURSE (sim 8): stays in the nursery
 export const MODE = { SEEK: 0, RETURN: 1, WORK: 2, REST: 3 };
 export const CMD = { TRAIL: 1, DIG: 2, ALARM: 3, RECALL: 4, CREW: 5 };
 export const EVENT = { DUG: 1, PILE_EMPTY: 2, REJECTED: 3, LATE: 4, DUSK: 5, SPIDER: 6, PILE_NEW: 7 }; // DUSK: (day, won); SPIDER: (spider.js SPIDER state, slot or kills); PILE_NEW: (pile, kind)
@@ -34,16 +34,17 @@ const EVENT_CAP = 1024; // events kept until the host drains them; older ones ar
 export const DEFAULTS = {
   seed: 1, sw: 256, sh: 256, nw: 192, nh: 128, ants: 500, maxAnts: 5000,
   // Per scent field (trail, food, alarm): spread D/256 per neighbour per tick, and half-life in ticks.
-  // Trail: a third of a 3.5-minute day (02-spec section 10).
-  spread: [6, 40, 48], halfLife: [1400, 60, 200],
+  // Trail: about 60 s unused (02-spec 3.2).
+  spread: [6, 40, 48], halfLife: [1200, 60, 200],
   blank: false, // true: an empty map for tests (surface open, nest all clay); no world generation
-  // A colony game: a queen, brood and the colony's meals (colony.js). `ants` workers start in the chamber
-  // with `sugar` units and one larva per `larvae`. Off (0): the sandbox, adults only, as in M0.
-  colony: 0, sugar: 0, larvae: 0, pupae: 0,
-  dayTicks: DAY_TICKS, // a colony game's day length (colony.js, Days)
+  // A colony game: a queen, brood and the colony's meals (colony.js). `ants` adults, `surface` of them foragers
+  // around the entrance and the rest nurses; `sugar` and `protein` loads in the porch store; `eggs`, `larvae` and
+  // `pupae` brood (colony.js START says how they are aged). Off (0): the sandbox, adults only, as in M0.
+  colony: 0, sugar: 0, protein: 0, eggs: 0, larvae: 0, pupae: 0, surface: 0,
+  dayTicks: DAY_TICKS, // a colony game's day length (colony.js, Days); 0: no days (sim 8's colony game)
 };
 
-const WALK = 48, RUN = 72; // sub-cell units per tick: about 3.75 and 5.6 cells a second (sim 7: twice as fast, the pace pass)
+const WALK = 45, WALK_OFF = 32, RUN = 64; // sub-cell units per tick (02-spec 3.2): 3.5 cells a second on a trail (and in the nest), 2.5 off one on the surface, 5 running
 const TURN = 32; // most a heading turns in one tick when steering toward a target
 const SEP_R = 160; // separation radius in sub-cell units
 const SENSE_AT = 2 * SUB, SENSE_SIDE = 28, SENSE_MIN = 2000;
@@ -57,7 +58,7 @@ export class Sim {
   constructor(options = {}) {
     const cfg = { ...DEFAULTS, ...options };
     // The day length is hashed and snapshotted as a 32-bit integer: anything else would restore as another value.
-    if (!Number.isInteger(cfg.dayTicks) || cfg.dayTicks < 1 || cfg.dayTicks > 0x7fffffff) throw new RangeError(`dayTicks must be an integer from 1 to 2^31 - 1, not ${cfg.dayTicks}`);
+    if (!Number.isInteger(cfg.dayTicks) || cfg.dayTicks < 0 || cfg.dayTicks > 0x7fffffff) throw new RangeError(`dayTicks must be an integer from 0 (no days) to 2^31 - 1, not ${cfg.dayTicks}`);
     cfg.spread = cfg.spread.slice(); cfg.halfLife = cfg.halfLife.slice(); // the sim's own copies: hashed and snapshotted
     this.cfg = cfg;
     const L = (this.L = makeLayout(cfg)), n = L.n, A = cfg.maxAnts;
@@ -69,6 +70,7 @@ export class Sim {
     this.pileAmount = new Int32Array(MAX_PILES);
     this.pileKind = new Uint8Array(MAX_PILES); // FOOD.SUGAR or FOOD.PROTEIN
     this.home = { x: 0, y: 0, w: 1, h: 1 };
+    this.nursery = null; // where brood lies and nurses stay (colony.js nursery); null: the home chamber
     this.g = new Int32Array(G.SIZE);
     this.rng = seedStreams(cfg.seed);
     this.flow = makeFlow(n);
@@ -104,13 +106,10 @@ export class Sim {
     if (!cfg.blank) generate(this);
     else { this.mat.fill(MAT.OPEN, 0, L.nestBase); this.mat.fill(MAT.CLAY, L.nestBase); }
     this.startGoals();
-    for (let i = 0; i < cfg.ants; i++) this.spawn(i % 20 < 12 ? JOB.FORAGE : i % 20 < 17 ? JOB.DIG : JOB.GUARD);
-    if (cfg.colony) {
-      this.g[G.QUEEN] = 1; this.g[G.SUGAR] = cfg.sugar;
-      for (let k = 0; k < cfg.larvae; k++) addBrood(this, STAGE.LARVA);
-      // Pupae near hatching (sim 7): the first births 30, 45 and 60 s in.
-      for (let k = 0; k < cfg.pupae; k++) if (addBrood(this, STAGE.PUPA)) this.brood.age[this.brood.n - 1] = Math.max(0, C.PUPA_TICKS - Math.floor(C.PUPA_TICKS / 3) * (k + 1)); // a third of the stage apart: 15, 30 and 45 s with PUPA_TICKS 900 (the same ages as sim 7's 300-tick steps, so the same hashes; a slower pupa stage now delays them too, which the pace gate's brood x10 plant relies on)
-      startDays(this);
+    if (!cfg.colony) for (let i = 0; i < cfg.ants; i++) this.spawn(i % 20 < 12 ? JOB.FORAGE : i % 20 < 17 ? JOB.DIG : JOB.GUARD);
+    else {
+      startColony(this);
+      if (cfg.dayTicks > 0) startDays(this);
     }
     rebuildDirty(this);
   }
@@ -306,8 +305,9 @@ export class Sim {
     const g = this.g;
     while (this.queue.length && this.queue[0][0] === g[G.TICK]) this.applyCommand(this.queue.shift());
     if (this.cfg.colony) {
-      const T = this.cfg.dayTicks, inDay = g[G.TICK] % T;
-      for (const k of WINDFALL_AT) if (inDay === Math.floor((T * k) / 20) && T >= 20) windfall(this, G, setGoal, SLOT.FOOD0, GOAL.FOOD, (p, kind) => this.event(EVENT.PILE_NEW, p, kind));
+      const T = this.cfg.dayTicks, news = (p, kind) => this.event(EVENT.PILE_NEW, p, kind);
+      if (T > 0) { const inDay = g[G.TICK] % T; for (const k of WINDFALL_AT) if (inDay === Math.floor((T * k) / 20) && T >= 20) windfall(this, G, setGoal, SLOT.FOOD0, GOAL.FOOD, news); }
+      else if (g[G.TICK] === LATE_FIND_AT) lateFind(this, setGoal, SLOT.FOOD0, GOAL.FOOD, news); // the third pile at 2:00 (02-spec 3.2)
     }
     this.rebuildFields();
     this.stepWorld();
@@ -317,11 +317,11 @@ export class Sim {
     for (let i = 0; i < this.n; i++) if (this.hp[i] > 0 && this.job[i] === JOB.FORAGE && isTrailSlot(this.via[i])) this.crew[this.via[i] - SLOT.TRAIL0]++;
     for (let i = 0; i < this.n; i++) this.stepAnt(i);
     fight(this);
-    if (this.cfg.colony) stepSpider(this, EVENT.SPIDER);
+    if (this.cfg.colony && this.cfg.dayTicks > 0) stepSpider(this, EVENT.SPIDER); // the spider comes by day (chapter 3 in the spec)
     if (this.anyDead) this.removeDead();
     stepScent(this);
     this.rebuildFields();
-    if (this.cfg.colony) stepDay(this, EVENT.DUSK);
+    if (this.cfg.colony && this.cfg.dayTicks > 0) stepDay(this, EVENT.DUSK);
     g[G.TICK]++;
   }
 
@@ -457,6 +457,9 @@ export class Sim {
           }
         }
       }
+    } else if (this.job[i] === JOB.NURSE) {
+      // Nurses (sim 8) stay with the brood. Feeding is the colony's store (colony.js); they are not drawn carrying.
+      if (layer === SURFACE) follow = SLOT.HOME; else still = true;
     } else if (this.job[i] === JOB.DIG) {
       // A dig crew: at most 4 diggers per marked cell, and 24 in all, so a dig front does not jam the
       // tunnel to it. The rest wait at rest (in a game, the crew count shows why). Index order decides who
@@ -509,6 +512,7 @@ export class Sim {
       else if (c !== this.lastCell[i]) this.stall[i] = 0;
     }
     if (still) { this.stall[i] = 0; this.lastCell[i] = c; return; }
+    if (layer === SURFACE && speed === WALK && !isTrailSlot(follow)) speed = WALK_OFF; // off a trail on the surface: 2.5 cells a second
 
     // Stuck (no progress for STALL_KICK ticks): turn a random way and wander for KICK_FOR ticks, then steer
     // again; repeat every KICK_EVERY ticks while still stuck. Steering again between kicks lets an ant that a
@@ -650,7 +654,8 @@ export class Sim {
     out.scent = finish(h);
     h = 0x7E;
     for (const a of [this.mat, this.dig, this.digWork, this.link, this.pileCell, this.pileAmount, this.pileKind]) h = hashArray(h, a);
-    for (const v of [this.home.x, this.home.y, this.home.w, this.home.h]) h = hashInt(h, v);
+    const r = this.nursery ?? this.home;
+    for (const v of [this.home.x, this.home.y, this.home.w, this.home.h, r.x, r.y, r.w, r.h]) h = hashInt(h, v);
     out.terrain = finish(h);
     h = 0xF1;
     for (const a of [F.kind, F.live, F.dirty, F.cell, F.seq]) h = hashArray(h, a);

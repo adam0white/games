@@ -21,31 +21,42 @@ function colony({ larvae = 0, ...opts } = {}) {
   return s;
 }
 
-test('the queen lays one egg per sugar unit, every LAY_EVERY ticks, and stops when sugar runs out', () => {
+test('the queen lays an egg every LAY_EVERY ticks while there is sugar; eggs cost none; she stops with no sugar', () => {
   const s = colony();
   s.g[G.SUGAR] = 3;
-  for (let t = 0; t < 2 * C.LAY_EVERY + 40; t++) s.step(); // three eggs, before they hatch (EGG_TICKS) and before the adults' meal
-  assert.equal(s.brood.n, 3);
-  assert.equal(s.g[G.SUGAR], 0);
-  for (let k = 0; k < 3; k++) assert.equal(s.brood.stage[k], STAGE.EGG);
-  // Every egg lies in an open cell of the chamber.
-  for (let k = 0; k < 3; k++) assert.equal(s.mat[s.brood.cell[k]], MAT.OPEN);
+  for (let t = 0; t < 5 * C.LAY_EVERY; t++) s.step(); // before the eggs hatch (EGG_TICKS) and before the adults' meal
+  assert.equal(s.brood.n, 5);
+  assert.equal(s.g[G.SUGAR], 3, 'eggs are free (02-spec 3.2)');
+  for (let k = 0; k < 5; k++) { assert.equal(s.brood.stage[k], STAGE.EGG); assert.equal(s.mat[s.brood.cell[k]], MAT.OPEN, 'in an open cell of the nursery'); }
+  s.g[G.SUGAR] = 0;
+  for (let t = 0; t < 3 * C.LAY_EVERY; t++) s.step();
+  assert.equal(s.brood.n, 5, 'no sugar, no eggs');
 });
 
-test('egg to adult takes EGG_TICKS + LARVA_FEEDS meals + PUPA_TICKS, eating protein', () => {
+test('the nursery holds at most C.NURSERY brood', () => {
+  const s = colony({ nw: 48, nh: 40 });
+  s.home = { x: 4, y: 10, w: 40, h: 4 };
+  for (let y = 10; y < 14; y++) for (let x = 4; x < 44; x++) s.mat[cellAt(s.L, NEST, x, y)] = MAT.OPEN; // 160 open cells
+  s.g[G.SUGAR] = 5;
+  for (let t = 0; t < 100 * C.LAY_EVERY && s.brood.n < C.NURSERY + 1; t++) { s.step(); s.g[G.PROTEIN] = 0; if (s.brood.n >= C.NURSERY) for (let k = 0; k < s.brood.n; k++) s.brood.hunger[k] = 0; }
+  assert.equal(s.brood.n, C.NURSERY);
+});
+
+test('egg to adult takes EGG_TICKS + LARVA_TICKS + PUPA_TICKS (60 s), the larva eating one protein', () => {
   const s = colony();
-  s.g[G.SUGAR] = 1; s.g[G.PROTEIN] = C.LARVA_FEEDS;
+  s.g[G.SUGAR] = 1; s.g[G.PROTEIN] = 1;
   let laid = -1, larva = -1, pupa = -1, adult = -1;
   for (let t = 0; t < 14000 && adult < 0; t++) {
     s.step();
     const B = s.brood;
-    if (laid < 0 && B.n === 1) laid = s.tick;
+    if (laid < 0 && B.n === 1) { laid = s.tick; s.g[G.SUGAR] = 0; }
     if (larva < 0 && B.n && B.stage[0] === STAGE.LARVA) larva = s.tick;
     if (pupa < 0 && B.n && B.stage[0] === STAGE.PUPA) pupa = s.tick;
     if (adult < 0 && s.n === 1) adult = s.tick;
   }
   assert.equal(larva - laid, C.EGG_TICKS);
-  assert.equal(pupa - larva, C.LARVA_FEEDS * C.FEED_EVERY);
+  assert.equal(pupa - larva, C.LARVA_TICKS);
+  assert.equal(adult - laid, 1200, 'a minute');
   assert.equal(adult - pupa, C.PUPA_TICKS);
   assert.equal(s.g[G.PROTEIN], 0);
   assert.equal(s.caste[0], CASTE.WORKER);
@@ -63,7 +74,7 @@ test('a larva with no protein dies after LARVA_STARVE ticks; one with plenty bec
   assert.equal(a.g[G.BROOD_LOST], 1);
   const b = colony({ larvae: 1 });
   b.g[G.PROTEIN] = 100;
-  for (let t = 0; t < C.MAJOR_FEEDS * C.FEED_EVERY + C.PUPA_TICKS + 10 && b.n === 0; t++) b.step();
+  for (let t = 0; t < C.LARVA_TICKS + C.PUPA_TICKS + 10 && b.n === 0; t++) b.step();
   assert.equal(b.n, 1);
   assert.equal(b.caste[0], CASTE.MAJOR);
   assert.equal(b.g[G.PROTEIN], 100 - C.MAJOR_FEEDS);
@@ -151,7 +162,7 @@ test('the hash covers the settings that steer later ticks; the sim keeps its own
   assert.equal(s.cfg.spread[0], 6);
 });
 
-test('a queen with no open cell keeps her sugar and lays as soon as there is room', () => {
+test('a queen with no open cell lays as soon as there is room', () => {
   const s = colony();
   for (let y = 10; y < 14; y++) for (let x = 10; x < 18; x++) s.mat[cellAt(s.L, NEST, x, y)] = MAT.CLAY;
   s.g[G.SUGAR] = 1;
@@ -159,13 +170,13 @@ test('a queen with no open cell keeps her sugar and lays as soon as there is roo
   assert.equal(s.brood.n, 0); assert.equal(s.g[G.SUGAR], 1);
   s.mat[cellAt(s.L, NEST, 12, 11)] = MAT.OPEN;
   s.step();
-  assert.equal(s.brood.n, 1); assert.equal(s.g[G.SUGAR], 0);
+  assert.equal(s.brood.n, 1); assert.equal(s.g[G.SUGAR], 1);
 });
 
 test('a colony game round-trips through a snapshot with brood in every stage', () => {
   const s = colony({ larvae: 2, sugar: 30 });
   s.g[G.PROTEIN] = 6;
-  for (let t = 0; t < 7000; t++) s.step();
+  for (let t = 0; t < 700; t++) s.step(); // the two larvae pupated at 25 s; eggs and new larvae since
   const stages = new Set(Array.from(s.brood.stage.subarray(0, s.brood.n)));
   assert.ok(stages.has(STAGE.EGG) && stages.has(STAGE.LARVA) && stages.has(STAGE.PUPA), `stages ${[...stages]}`);
   const bytes = snapshot(s), back = restore(bytes);
@@ -176,13 +187,13 @@ test('a colony game round-trips through a snapshot with brood in every stage', (
 
 test('the page host runs a colony game: births get new indices, stats count the brood', { skip: LONG }, async () => {
   const { Host } = await import('../host.js');
-  const h = new Host(20, 2026, { colony: true });
-  assert.equal(h.sim.n, 20);
-  assert.equal(h.stats().colony.larvae, 4);
-  h.sim.g[G.PROTEIN] = 40;
-  for (let t = 0; t < C.MAJOR_FEEDS * C.FEED_EVERY + C.PUPA_TICKS + 2; t++) h.step(); // 40 protein: all four are fed to majors
+  const h = new Host(30, 2026, { colony: true });
+  assert.equal(h.sim.n, 30);
+  const c0 = h.stats().colony; // 02-spec 3.2: 20 eggs, 20 larvae, and 12 due from 8 s: 5 pupae and 7 fed larvae
+  assert.deepEqual([c0.eggs, c0.larvae, c0.pupae], [20, 27, 5]);
+  for (let t = 0; t < C.LARVA_TICKS + C.PUPA_TICKS + 2; t++) h.step();
   const st = h.stats();
-  assert.ok(st.colony.born >= 4 && h.sim.n === 20 + st.colony.born, `born ${st.colony.born}, n ${h.sim.n}`);
+  assert.ok(st.colony.born >= 12 && h.sim.n === 30 + st.colony.born, `born ${st.colony.born}, n ${h.sim.n}`);
   assert.equal(st.colony.eggs + st.colony.larvae + st.colony.pupae, h.sim.brood.n);
   assert.equal(h.pn, h.sim.n);
   // A death pending before a step (hurt between ticks) still renumbers: that tick is drawn without interpolation.
@@ -205,19 +216,12 @@ test('a digger at work who dies leaves the dig crew', () => {
   assert.equal(s.g[G.DIG_CREW], 0);
 });
 
-test('the queen lays faster when sugar is plentiful', () => {
-  const lays = sugar => { const s = colony(); s.g[G.SUGAR] = sugar; for (let t = 0; t < 4 * C.LAY_EVERY; t++) s.step(); return s.brood.n; };
-  assert.equal(lays(C.LAY_RICH - 10), 4);
-  assert.equal(lays(C.LAY_RICH + 10), 8); // ticks 0, 120, ..., 840
-  assert.equal(lays(4 * C.LAY_RICH + 100), 16);
-});
-
-test('a chamber that starts left of a narrow nest restores to the same place', () => {
+test('a nursery that starts left of a narrow nest restores to the same place', () => {
   const s = new Sim({ seed: 1, sw: 48, sh: 48, nw: 12, nh: 36, ants: 5, colony: 1, sugar: 5 });
-  assert.ok(s.home.x < 0, `home.x ${s.home.x}`);
+  assert.ok(s.nursery.x < 0, `nursery.x ${s.nursery.x}`);
   for (let i = 0; i < s.n; i++) assert.ok(s.cellOfAnt(i) >= 0, `ant ${i} starts inside the nest`);
   const b = restore(snapshot(s));
-  assert.equal(b.home.x, s.home.x);
+  assert.deepEqual(b.nursery, s.nursery);
   for (let t = 0; t < 300; t++) { s.step(); b.step(); }
   assert.equal(b.hashes().total, s.hashes().total);
 });
