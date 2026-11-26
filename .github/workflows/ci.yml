@@ -53,6 +53,15 @@ jobs:
       # Cinderhill's sim (experiments/cinderhill/test): determinism, byte flips, lint, scent, flow, a bot run. About 15 s.
       - name: Cinderhill sim
         run: node --test experiments/cinderhill/test/
+      # Cinderhill's pace gate (docs/design/colony/02-spec.md section 3.1, roadmap R0): scripted players on 20 seeds,
+      # a ratchet on spikes/pace-baseline.json, the quota opening and a brood x10 plant must fail. Runs when
+      # experiments/cinderhill changes. 3-minute games: about 1.5 minutes on four cores. A 12-minute run (no flag) reads every line.
+      - name: Cinderhill pace gate
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [ -n "$BASE" ] && git cat-file -e "$BASE^{commit}" 2>/dev/null && git diff --quiet "$BASE" HEAD -- experiments/cinderhill; then echo "No Cinderhill change: pace gate skipped"; exit 0; fi
+          node experiments/cinderhill/spikes/pace-gate.mjs --quiet --minutes=3
       - run: pnpm install --frozen-lockfile
       - name: Standalone Workers
         run: |

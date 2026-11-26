@@ -1,0 +1,74 @@
+{
+ "first-delivery": {
+  "status": "fail",
+  "value": 16.2
+ },
+ "first-delivery-passive": {
+  "status": "fail",
+  "value": 13.25
+ },
+ "minute-1-deliveries": {
+  "status": "pass",
+  "value": 39
+ },
+ "first-birth": {
+  "status": "pass",
+  "value": 15
+ },
+ "first-funded-birth": {
+  "status": "fail",
+  "value": 135
+ },
+ "quiet-2-min": {
+  "status": "fail",
+  "value": 21
+ },
+ "first-choice": {
+  "status": "not built",
+  "value": null
+ },
+ "choice-consequence": {
+  "status": "not built",
+  "value": null
+ },
+ "consequential-choices": {
+  "status": "not built",
+  "value": null
+ },
+ "threat-telegraphed": {
+  "status": "pass",
+  "value": 52.55
+ },
+ "threat-resolved": {
+  "status": "pass",
+  "value": 94.55
+ },
+ "gap-0-10": {
+  "status": "fail",
+  "value": 157.5
+ },
+ "gap-after-10": {
+  "status": "fail",
+  "value": 82.55
+ },
+ "idle-share": {
+  "status": "fail",
+  "value": 0.525
+ },
+ "queued-at-doors": {
+  "status": "not built",
+  "value": null
+ },
+ "chapter-1-length": {
+  "status": "not built",
+  "value": null
+ },
+ "passive-finishes": {
+  "status": "not built",
+  "value": null
+ },
+ "idle-loses": {
+  "status": "not built",
+  "value": null
+ }
+}
