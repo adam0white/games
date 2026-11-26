@@ -44,8 +44,9 @@ export class Hill {
     this.stopEvery = deps.clearInterval ?? (h => clearInterval(h));
     this.sql = ctx.storage.sql;
     this.sql.exec(`CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v)`);
-    this.sql.exec(`CREATE TABLE IF NOT EXISTS cmds (seat INTEGER, id INTEGER, tick INTEGER, body BLOB, PRIMARY KEY (seat, id))`);
-    this.sql.exec(`CREATE INDEX IF NOT EXISTS cmds_tick ON cmds (tick)`);
+    // One row written per command: the key is the order the sim applies them in, with no second index.
+    // Repeats are found in memory (`stored`, loaded here), so (seat, id) needs no index of its own.
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS orders (tick INTEGER, seat INTEGER, id INTEGER, body BLOB, PRIMARY KEY (tick, seat, id)) WITHOUT ROWID`);
     this.sql.exec(`CREATE TABLE IF NOT EXISTS seats (seat INTEGER PRIMARY KEY, token TEXT)`);
     this.sql.exec(`CREATE TABLE IF NOT EXISTS checkpoint (one INTEGER PRIMARY KEY, tick INTEGER, sim INTEGER, bytes BLOB)`);
     const meta = Object.fromEntries(this.sql.exec(`SELECT k, v FROM meta`).toArray().map(r => [r.k, r.v]));
@@ -54,6 +55,7 @@ export class Hill {
     this.sealed = this.mark; // the last tick broadcast (after a restart, the mark)
     this.boots = (meta.boots ?? 0) + (this.cfg ? 1 : 0);
     if (this.cfg) this.sql.exec(`INSERT OR REPLACE INTO meta VALUES ('boots', ?)`, this.boots);
+    this.stored = new Map(this.sql.exec(`SELECT seat, id, tick FROM orders`).toArray().map(r => [`${r.seat}:${r.id}`, r.tick]));
     this.pending = []; // [tick, encoded command, socket]
     this.pendingKeys = new Set();
     this.timer = null; this.emptySince = 0;
@@ -99,7 +101,7 @@ export class Hill {
     // Catch-up: everything sealed from the client's next tick on.
     const have = Math.max(0, Number(q.get('have')) | 0);
     if (this.sealed >= have) {
-      const rows = this.sql.exec(`SELECT body FROM cmds WHERE tick >= ? AND tick <= ? ORDER BY tick, seat, id`, have, this.sealed).toArray();
+      const rows = this.sql.exec(`SELECT body FROM orders WHERE tick >= ? AND tick <= ? ORDER BY tick, seat, id`, have, this.sealed).toArray();
       server.send(encodeSealed(this.sealed, rows.map(r => new Int32Array(new Uint8Array(r.body).slice().buffer))));
       this.stat.catchUpTicks += this.sealed - have + 1;
     }
@@ -140,13 +142,16 @@ export class Hill {
     for (const p of this.pending) (p[0] <= t ? mine : keep).push(p);
     this.pending = keep;
     const cmds = mine.map(([, c]) => { c[0] = t; return c; }).sort((a, b) => a[1] - b[1] || a[2] - b[2]);
+    // The mark is written only when it must move; a command in a tick the mark already covers commits alone.
     if (cmds.length || t > this.mark) {
-      const mark = Math.max(this.mark, t + LEASE);
+      const mark = t > this.mark ? t + LEASE : this.mark;
       this.ctx.storage.transactionSync(() => {
-        for (const c of cmds) this.sql.exec(`INSERT INTO cmds VALUES (?, ?, ?, ?)`, c[1], c[2], t, new Uint8Array(c.buffer, c.byteOffset, c.byteLength));
-        this.sql.exec(`INSERT OR REPLACE INTO meta VALUES ('mark', ?)`, mark);
+        for (const c of cmds) this.sql.exec(`INSERT INTO orders VALUES (?, ?, ?, ?)`, t, c[1], c[2], new Uint8Array(c.buffer, c.byteOffset, c.byteLength));
+        if (mark !== this.mark) this.sql.exec(`INSERT OR REPLACE INTO meta VALUES ('mark', ?)`, mark);
       });
-      this.mark = mark; this.stat.markWrites++;
+      for (const c of cmds) this.stored.set(`${c[1]}:${c[2]}`, t);
+      if (mark !== this.mark) this.stat.markWrites++;
+      this.mark = mark;
     }
     this.sealed = t;
     for (const [, c, ws] of mine) { this.pendingKeys.delete(`${c[1]}:${c[2]}`); this.send(ws, JSON.stringify({ t: 'ack', id: c[2], tick: t })); }
@@ -175,8 +180,8 @@ export class Hill {
     if (id === null || id < 1) { this.stat.bad++; return; }
     const key = `${seat}:${id}`;
     if (this.pendingKeys.has(key)) { this.stat.dups++; return; } // acked when its tick seals
-    const stored = this.sql.exec(`SELECT tick FROM cmds WHERE seat = ? AND id = ?`, seat, id).toArray()[0];
-    if (stored) { this.stat.dups++; return this.send(ws, JSON.stringify({ t: 'ack', id, tick: stored.tick, dup: true })); }
+    const stored = this.stored.get(key);
+    if (stored !== undefined) { this.stat.dups++; return this.send(ws, JSON.stringify({ t: 'ack', id, tick: stored, dup: true })); }
     let tick = int(m.tick) ?? 0;
     if (tick <= this.sealed) { tick = this.sealed + 1; this.stat.late++; }
     if (tick > this.sealed + AHEAD) { this.stat.bad++; return; }
@@ -214,7 +219,7 @@ export class Hill {
     let sim = null;
     if (cp && cp.sim === SIM_VERSION) { try { sim = restore(new Uint8Array(cp.bytes)); this.stat.restoredFrom = cp.tick; } catch (e) { console.error(e); } }
     sim ??= new Sim({ seed: this.cfg.seed, ants: this.cfg.ants });
-    const rows = this.sql.exec(`SELECT body FROM cmds WHERE tick >= ? AND tick <= ? ORDER BY tick, seat, id`, sim.tick, this.sealed).toArray();
+    const rows = this.sql.exec(`SELECT body FROM orders WHERE tick >= ? AND tick <= ? ORDER BY tick, seat, id`, sim.tick, this.sealed).toArray();
     const cmds = rows.map(r => new Int32Array(new Uint8Array(r.body).slice().buffer));
     let at = 0;
     // Each tick's commands are queued just before that tick, as live: the pending queue is part of the hash.
@@ -255,7 +260,7 @@ export class Hill {
 
   /** The whole command log (debug only): for checking a run offline. */
   log() {
-    const commands = this.sql.exec(`SELECT body FROM cmds ORDER BY tick, seat, id`).toArray().map(r => Array.from(new Int32Array(new Uint8Array(r.body).slice().buffer)));
+    const commands = this.sql.exec(`SELECT body FROM orders ORDER BY tick, seat, id`).toArray().map(r => Array.from(new Int32Array(new Uint8Array(r.body).slice().buffer)));
     return { cfg: this.cfg, sealed: this.sealed, commands };
   }
 }

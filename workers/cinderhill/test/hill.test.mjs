@@ -82,7 +82,7 @@ test('a repeated command id is applied once and acknowledged again', () => {
   advance(w, 500);
   p.say(msg); // a copy after it is stored
   advance(w, 100);
-  const rows = w.db.prepare('SELECT seat, id, tick FROM cmds').all();
+  const rows = w.db.prepare('SELECT seat, id, tick FROM orders').all();
   assert.equal(rows.length, 1);
   assert.equal(p.acks.length, 2);
   assert.equal(p.acks[1].dup, true);
@@ -107,7 +107,7 @@ test('durable before acknowledged: the row and a covering mark exist when the ac
   p.onFrame = f => {
     const mark = w.db.prepare(`SELECT v FROM meta WHERE k = 'mark'`).get()?.v ?? -1;
     checks.push(mark >= f.through);
-    for (const c of f.commands) checks.push(!!w.db.prepare('SELECT 1 FROM cmds WHERE seat = ? AND id = ?').get(c[1], c[2]));
+    for (const c of f.commands) checks.push(!!w.db.prepare('SELECT 1 FROM orders WHERE seat = ? AND id = ?').get(c[1], c[2]));
   };
   advance(w, 300);
   for (let k = 1; k <= 20; k++) { p.say({ t: 'cmd', id: k, tick: hill.sealed + 1 + (k % 3), cmd: trail(k) }); advance(w, 150); }
@@ -140,7 +140,7 @@ test('restart: the room resumes from SQLite, players catch up, each command is a
   a2.say({ t: 'cmd', id: 13, tick: 0, cmd: trail(13) }); // resent
   a2.say({ t: 'cmd', id: 5, tick: 0, cmd: trail(5) }); // already stored before the crash: dropped
   advance(w, 3000);
-  const ids = w.db.prepare('SELECT seat, id FROM cmds').all().map(r => `${r.seat}:${r.id}`);
+  const ids = w.db.prepare('SELECT seat, id FROM orders').all().map(r => `${r.seat}:${r.id}`);
   assert.equal(new Set(ids).size, ids.length);
   assert.equal(ids.length, 25);
   assert.ok(a2.acks.some(x => x.id === 5 && x.dup));
@@ -150,7 +150,7 @@ test('restart: the room resumes from SQLite, players catch up, each command is a
   assert.ok(hill.stats().compared > 0);
   assert.equal(hill.stats().mismatches, 0);
   // An independent replay of the stored log reaches the same state as both players.
-  const ref = new Sim({ seed: 2026, ants: 300 }), log = w.db.prepare('SELECT body FROM cmds ORDER BY tick, seat, id').all().map(r => new Int32Array(new Uint8Array(r.body).slice().buffer));
+  const ref = new Sim({ seed: 2026, ants: 300 }), log = w.db.prepare('SELECT body FROM orders ORDER BY tick, seat, id').all().map(r => new Int32Array(new Uint8Array(r.body).slice().buffer));
   let at = 0;
   while (ref.tick < a.sim.tick) { while (at < log.length && log[at][0] === ref.tick) ref.queueCommand(log[at++]); ref.step(); ref.drainEvents(); }
   assert.equal(ref.hashes().total, a.sim.hashes().total);

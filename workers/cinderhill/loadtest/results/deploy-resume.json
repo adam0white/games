@@ -216,16 +216,16 @@
   ],
   "durationGbSecondsPerHour": 386.61848255999996,
   "rowsWrittenPerHour": 31320,
-  "inboundPerHour": 4020,
+  "inboundPerHour": 22560,
   "outboundPerHour": 247875,
   "exceededCpuErrors": 0,
   "exceededMemoryErrors": 0,
-  "inboundFrom": "room counters",
+  "inboundFrom": "client counts",
   "costPerRoomHour": {
    "duration": 0.004832731032,
-   "requests": 0.000030149999999999998,
+   "requests": 0.0001692,
    "rowsWritten": 0.03132,
-   "total": 0.036182881032
+   "total": 0.036321931032
   }
  }
 }
