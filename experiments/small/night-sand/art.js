@@ -280,9 +280,14 @@ function strataMap() {
   }
   return result;
 }
-function grains(pixels,s,lut,strata,surface) {
+function grains(pixels,s,lut,strata,surface,top,lit) {
   const cells=s.cells;
   const garden=s.kind==='garden';
+  // Moonlight from the upper right (2026-11-26): a slope that falls away to the right faces the moon and is lit; the
+  // lee side is in shade. The light fades over the first few grains under the surface.
+  top.fill(H);
+  for(let x=1;x<W-1;x++)for(let y=1;y<H-1;y++)if(cells[y*W+x]){top[x]=y;break;}
+  for(let x=1;x<W-1;x++){const a=top[Math.max(1,x-2)],b=top[Math.min(W-2,x+2)];lit[x]=garden?0:Math.max(-24,Math.min(20,(b-a)*6));}
   surface.fill(-1000);
   for(let i=0;i<cells.length;i++) {
     const tone=cells[i];
@@ -290,12 +295,33 @@ function grains(pixels,s,lut,strata,surface) {
     const x=i%W, y=(i/W)|0;
     if(!cells[i-W])surface[x]=y;
     const depth=y-surface[x];
-    const light=depth===0?29:depth===1?15:3-Math.min(26,depth*.6);
+    const light=(depth===0?29:depth===1?15:3-Math.min(26,depth*.6))+(depth<6?lit[x]*(1-depth/6):0);
     const shade=Math.max(0,Math.min(95,(58+light+strata[i]*(garden?.26:1))|0));
     pixels[i]=lut[tone][shade];
   }
 }
 
+// Each cell is drawn as S x S sub-pixels with its own speckle, so the bed reads as grains rather than blocks. The top
+// row of a surface grain catches the rim light; a grain in free fall is a single bright speck; a few surface grains
+// glint in the moonlight.
+export const S=3;
+const adj=(c,d)=>{const r=Math.max(0,Math.min(255,(c&255)+d)),g=Math.max(0,Math.min(255,((c>>8)&255)+d)),b=Math.max(0,Math.min(255,((c>>16)&255)+d));return (255<<24)|(b<<16)|(g<<8)|r;};
+const SPECKLE=Uint8Array.from({length:8*S*S},(_,k)=>{const n=Math.imul(k+17,2654435761)>>>27;return n<9?0:n<25?1:2;});
+function expand(low,hi,s,time){
+  const {cells,vel}=s, WS=W*S, glintTick=Math.floor(time*4);
+  hi.fill(0);
+  for(let i=W;i<W*(H-1);i++){
+    const c=low[i]; if(!c||!cells[i])continue;
+    const x=i%W, y=(i/W)|0, o=y*S*WS+x*S, h=Math.imul(i,2246822519)>>>0;
+    if(vel&&vel[i]>1&&!cells[i+W]){ // falling: one speck with a faint trail above it
+      const sp=o+((h>>4)%S)+(((h>>8)%S))*WS; hi[sp]=adj(c,22); if(sp>=WS)hi[sp-WS]=adj(c,-18)&0x80ffffff; continue; }
+    const shades=[adj(c,-20),c,adj(c,14)], t=(h&7)*S*S, rim=!cells[i-W];
+    for(let r=0;r<S;r++)for(let q=0;q<S;q++)hi[o+r*WS+q]=rim&&r===0?adj(c,18):shades[SPECKLE[t+r*S+q]];
+    // Round the steps of a slope: the outer top corner of a step is left empty.
+    if(rim){if(!cells[i-1]&&cells[i-1+W])hi[o]=0;if(!cells[i+1]&&cells[i+1+W])hi[o+S-1]=0;}
+    if(rim&&((h^Math.imul(glintTick,40503))&1023)<3)hi[o+(h%S)]=adj(c,70);
+  }
+}
 // Shade both edges of each groove; unmarked grains on its lip catch the light.
 function carve(pixels,s,p){
   const dark=packed(p.sand[0],-43), shadow=packed(p.sand[0],-30);
@@ -504,9 +530,9 @@ function tool(c,s,p,focused){
 
 export function renderer(canvas) {
   const ctx=canvas.getContext('2d',{alpha:false});
-  const layer=canvasOf(W,H), grit=layer.getContext('2d');
-  const image=grit.createImageData(W,H), pixels=new Uint32Array(image.data.buffer);
-  const strata=strataMap(), surface=new Int16Array(W);
+  const layer=canvasOf(W*S,H*S), grit=layer.getContext('2d');
+  const image=grit.createImageData(W*S,H*S), pixels=new Uint32Array(image.data.buffer), low=new Uint32Array(W*H);
+  const strata=strataMap(), surface=new Int16Array(W), top=new Int16Array(W), lit=new Float32Array(W);
   let cached=null, previousState, previousPalette, lut;
   function size(){
     const box=canvas.getBoundingClientRect();
@@ -531,11 +557,12 @@ export function renderer(canvas) {
     ctx.setTransform(canvas.width/W,0,0,canvas.height/H,0,0);
     ctx.drawImage(cached,0,0,W,H);
     if(s.kind==='lamp') lamp(ctx,s.goal.x,s.goal.y,p,s.progress,time);
-    grains(pixels,s,lut,strata,surface);
-    if(s.kind==='garden')carve(pixels,s,p);
+    grains(low,s,lut,strata,surface,top,lit);
+    if(s.kind==='garden')carve(low,s,p);
+    expand(low,pixels,s,time);
     grit.putImageData(image,0,0);
     ctx.imageSmoothingEnabled=false;
-    ctx.drawImage(layer,0,0);
+    ctx.drawImage(layer,0,0,W,H);
     ctx.imageSmoothingEnabled=true;
     goalMarks(ctx,s,p,time);
     if(intro&&s.status==='play'&&!s.hand.down)ghost(ctx,s,p,time);
