@@ -124,7 +124,15 @@ Measured and dropped: the median (MED) predictor, a least-squares predictor over
 
 The roadmap's fallback, "terrain as a seed plus a dig log", does not help: terrain is 1.4 KB.
 
-**Re-run after the trail-shape change (2026-11-25).** 5,000 ants: 47.6, 60.5 and 61.8 KB gzip at 3,000, 8,000 and 24,000 ticks (was 36.8, 44.4 and 57.9 KB). Still a pass, each restoring to the same hash, but the margin at 24,000 ticks is now 2.2 KB. The growth is in the ants and scent parts, not in the new state: the scripted run now has many more ants on the surface at the sampled ticks (2,365 against 259 at 3,000 ticks), because foragers walk the drawn trails, which are longer than the straight line, and keep their trail as their route. The new values (trail paths, one `via` byte per ant) are coded as steps and small integers. The open risk above (scent growing with the area walked) is closer now.
+**Re-run after the trail-shape change (2026-11-25).** 5,000 ants, compared with `origin/main`'s sim on the same day and script (the table above predates the painter PR):
+
+| Played ticks | gzip before / after | Scent before / after | Ants part before / after | Ants on the surface before / after |
+| --- | --- | --- | --- | --- |
+| 3,000 | 36.7 / 47.6 KB | 19.6 / 20.7 KB | 15.4 / 25.1 KB | 150 / 2,365 |
+| 8,000 | 44.3 / 60.5 KB | 24.6 / 32.6 KB | 17.9 / 25.9 KB | 72 / 2,400 |
+| 24,000 | 57.8 / 61.8 KB | 31.9 / 35.6 KB | 23.7 / 23.8 KB | 2,846 / 2,274 |
+
+Still a pass, each restoring to the same hash, but the margin is now 3.5 KB at 8,000 ticks (the CI assertion) and 2.2 KB at 24,000. At 3,000 and 8,000 ticks the ants part grew with the number of ants on the surface; at 8,000 and 24,000 the scent part grew. Why more ants are out at those ticks, and why scent grew, is not established: the scripted colony runs in waves, and the change shifts them (at 2,000 ticks fewer ants were out than before: 597 against about 2,790). A likely factor is that ants now walk the drawn strokes, which are longer than the straight line, and lay carrier scent along them; that is not measured. The new state itself is small: trail paths are coded as steps (in `globals`, 0.2 to 0.3 KB with everything else there) and `via` is one small integer per ant. Predicting a homeward carrier's `best` from her steps along the trail was tried and saved nothing measurable, so it was dropped. The open risk above (scent growing with the area walked) is closer now.
 
 ## Trail shape (2026-11-25)
 

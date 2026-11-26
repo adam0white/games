@@ -4,7 +4,8 @@
 // no loaded ant had passed its corner (sim/SPIKES.md, "Trail shape").
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { CMD, MAT, SURFACE, Sim } from '../sim/sim.js';
+import { CMD, EVENT, MAT, SUBSYSTEMS, SURFACE, Sim } from '../sim/sim.js';
+import { restore, snapshot } from '../sim/snapshot.js';
 import { PATH_MAX, SLOT, TRAIL_OFF } from '../sim/flow.js';
 import { cellAt } from '../sim/grid.js';
 import { trailShape } from '../spikes/trail-shape.mjs';
@@ -49,4 +50,24 @@ test('the path is open, 4-connected, holds each cell once, and goes round a ston
   const d = j => F.dist[SLOT.TRAIL0 * s.L.n + path[j]];
   for (let j = 0; j < len; j++) assert.equal(d(j), len - 1 - j);
   assert.equal(F.dist[SLOT.TRAIL0 * s.L.n + cellAt(s.L, SURFACE, 5, 19)], TRAIL_OFF + 2);
+});
+
+test('a rejected stroke leaves the four live trails as they were, and restore still matches', () => {
+  const s = new Sim({ seed: 2, sw: 64, sh: 64, nw: 16, nh: 16, ants: 30, blank: true });
+  s.home = { x: 0, y: 0, w: 1, h: 1 };
+  s.mat[s.L.nestBase] = MAT.OPEN; s.link[cellAt(s.L, SURFACE, 2, 2)] = s.L.nestBase; s.link[s.L.nestBase] = cellAt(s.L, SURFACE, 2, 2);
+  s.startGoals();
+  for (let y = 40; y < 50; y++) for (let x = 40; x < 50; x++) s.setCell(cellAt(s.L, SURFACE, x, y), MAT.STONE);
+  for (let k = 0; k < 4; k++) s.queueCommand({ tick: 1 + k, id: k + 1, type: CMD.TRAIL, layer: SURFACE, points: [2, 3, 10 + 8 * k, 3, 10 + 8 * k, 30] });
+  for (let t = 0; t < 10; t++) s.step();
+  const F = s.flow, paths = F.path.slice(), lens = F.pathLen.slice(), seq = F.seq.slice();
+  s.drainEvents();
+  s.queueCommand({ tick: s.tick, id: 9, type: CMD.TRAIL, layer: SURFACE, points: [41, 41, 48, 48] }); // wholly on stone
+  s.step();
+  assert.deepEqual(Array.from(s.drainEvents().slice(0, 3)), [EVENT.REJECTED, 0, 9]);
+  assert.deepEqual(F.path, paths, 'paths unchanged');
+  assert.deepEqual(F.pathLen, lens, 'lengths unchanged');
+  assert.deepEqual(F.seq, seq, 'no slot replaced');
+  const back = restore(snapshot(s)), a = s.hashes(), b = back.hashes();
+  for (const k of SUBSYSTEMS) assert.equal(b[k], a[k], k);
 });

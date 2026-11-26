@@ -95,7 +95,11 @@ function walk(sim, io, mark = () => {}) {
   putAll(F.pathLen, 16);
   for (let k = 0; k < SLOT.TRAILS; k++) {
     const at = k * PATH_MAX, len = Math.min(F.pathLen[k], PATH_MAX);
-    for (let j = 0; j < len; j++) { const pred = j ? F.path[at + j - 1] : 0; F.path[at + j] = sint(io, M, j ? 18 : 17, F.path[at + j] - pred) + pred; }
+    for (let j = 0; j < len; j++) {
+      // The prediction is kept to a cell index, so the residual of any int32 fits the coder's 32 bits.
+      const p = j ? F.path[at + j - 1] : 0, pred = p >= 0 && p < n ? p : 0;
+      F.path[at + j] = sint(io, M, j ? 18 : 17, F.path[at + j] - pred) + pred;
+    }
   }
   // Distances rebuilt from the terrain and goals just coded, the same on both sides whatever the sim's own
   // distances hold. The decoder installs them (as before: the sim's fields equal a rebuild at a tick

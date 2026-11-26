@@ -79,7 +79,7 @@ export class Sim {
     this.head = new Int32Array(n); this.nextAnt = new Int32Array(A);
     // Scratch for building a trail's path (not state).
     this.pathAt = new Int32Array(L.nestBase).fill(-1); this.seen = new Int32Array(L.nestBase); this.prev = new Int32Array(L.nestBase);
-    this.seenMark = 0;
+    this.seenMark = 0; this.pathBuf = new Int32Array(PATH_MAX);
     this.queue = []; // pending commands, each an Int32Array [tick, seat, id, type, ...payload], sorted
     this.events = []; // [type, a, b] triples not yet drained
     this.maxStall = 0; // a counter for tests and bots; not state
@@ -142,8 +142,10 @@ export class Sim {
         slot = SLOT.TRAIL0;
         for (let s = SLOT.TRAIL0 + 1; s < SLOT.TRAIL0 + SLOT.TRAILS; s++) if (this.flow.seq[s] < this.flow.seq[slot]) slot = s;
       }
-      const F = this.flow, k = slot - SLOT.TRAIL0, len = this.trailPath(e, count, F.path, k * PATH_MAX);
+      // Built in scratch first: a rejected stroke must leave the trail in that slot as it was.
+      const F = this.flow, k = slot - SLOT.TRAIL0, len = this.trailPath(e, count, this.pathBuf, 0);
       if (len < 1) return this.event(EVENT.REJECTED, e[1], e[2]);
+      F.path.set(this.pathBuf, k * PATH_MAX);
       F.pathLen[k] = len;
       for (let j = 0; j < len; j++) deposit(this, FIELD.TRAIL, F.path[k * PATH_MAX + j], TRAIL_STROKE);
       for (let i = 0; i < this.n; i++) if (this.via[i] === slot) this.via[i] = -1; // a route on the replaced trail is gone
