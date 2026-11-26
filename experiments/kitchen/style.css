@@ -131,9 +131,14 @@ button.small { min-width: 0; font-size: 15px; }
 #storyBtns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px; flex-wrap: wrap; }
 #storyBtns button { min-height: 44px; padding: .25em 1em; font-size: 16px; }
 /* Mission chip under the rank pill */
-#mission { position: fixed; left: calc(10px + env(safe-area-inset-left)); top: calc(96px + env(safe-area-inset-top)); max-width: min(62vw, 300px); display: none; font-size: 12px; font-weight: 700; background: #fffdf5e8; border: 2px solid var(--ink); border-radius: 12px; padding: 3px 8px; pointer-events: none; }
+#mission { position: fixed; right: calc(10px + env(safe-area-inset-right)); bottom: calc(142px + env(safe-area-inset-bottom)); max-width: min(56vw, 300px); display: none; font-size: 12px; font-weight: 700; background: #fffdf5e8; border: 2px solid var(--ink); border-radius: 12px; padding: 3px 8px; pointer-events: none; }
 #mission div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #dayMissions { text-align: left; font-size: 14px; margin: 4px 0; padding-left: 1.2em; }
 #dayMissions:empty { display: none; }
 #dayMissions { list-style: none; padding: 0; }
 #dayMissions li.won { color: var(--green); font-weight: 800; }
+
+/* The Chop button on touch screens: big, bottom right, clear of the ticket. */
+#chopBtn { position: fixed; right: calc(16px + env(safe-area-inset-right)); bottom: calc(22px + env(safe-area-inset-bottom)); width: 104px; height: 104px; border-radius: 50%; border: 3px solid var(--ink); background: #ffcf4a; box-shadow: 0 6px 0 var(--shade); display: none; flex-direction: column; align-items: center; justify-content: center; gap: 0; font: 900 17px/1 inherit; color: var(--ink); touch-action: none; z-index: 6; }
+#chopBtn svg { width: 50px; height: 50px; }
+#chopBtn:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--shade); }
