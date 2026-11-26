@@ -7,6 +7,7 @@ import { readFileSync } from 'node:fs';
 import { Host, CMD, SURFACE, NEST } from '../host.js';
 import { LabRecord, LIMITS, FORMAT } from '../labrec.js';
 import { parts, replayChain } from '../spikes/replay-lab.mjs';
+const LONG = process.env.CINDERHILL_LONG === '1' ? false : 'over 15 s: runs nightly (CINDERHILL_LONG=1)';
 
 /** A stand-in for kit/lab.js: the run records it would send, in its data shape. */
 function fakeLab() {
@@ -77,7 +78,7 @@ test('a 10-minute game makes a record under the kit\'s limits, with the replay s
   console.log(`record: ${json.length} bytes, ${r.events.length} events`);
 });
 
-test('the replay reaches every hash in the record and reports the game', () => {
+test('the replay reaches every hash in the record and reports the game', { skip: LONG }, () => {
   const [chain] = parts(game.runs);
   const out = replayChain(chain);
   assert.equal(out.divergence, null);
@@ -92,7 +93,7 @@ test('the replay reaches every hash in the record and reports the game', () => {
   assert.match(out.report, /restart day 1/);
 });
 
-test('a record with one order changed diverges, and the replay names where', () => {
+test('a record with one order changed diverges, and the replay names where', { skip: LONG }, () => {
   const runs = JSON.parse(JSON.stringify(game.runs));
   const log = runs[0].events.find(e => e.type === 'log' && e.data.e.some(x => x[0] === 'o' && x[2].type === CMD.TRAIL));
   const o = log.data.e.find(x => x[0] === 'o' && x[2].type === CMD.TRAIL)[2];
@@ -103,7 +104,7 @@ test('a record with one order changed diverges, and the replay names where', () 
   assert.match(out.report, /Replay diverged/);
 });
 
-test('a long game rolls over into parts that replay as one', () => {
+test('a long game rolls over into parts that replay as one', { skip: LONG }, () => {
   const small = play({ ticks: 4000, roll: { rollEvents: 6, rollBytes: 4000, batch: 400 } });
   assert.ok(small.runs.length >= 3, `${small.runs.length} parts`);
   assert.ok(small.runs.slice(0, -1).every(r => r.outcome === 'continued'));

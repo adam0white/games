@@ -4,8 +4,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { play } from '../bots.mjs';
+const LONG = process.env.CINDERHILL_LONG === '1' ? false : 'over 15 s: runs nightly (CINDERHILL_LONG=1)';
 
-test('the careful bot wins days 1 to 3 on seed 6 (its narrowest margin in the sweep)', () => {
+test('the careful bot wins days 1 to 3 on seed 6 (its narrowest margin in the sweep)', { skip: LONG }, () => {
   const days = play('careful', 6);
   assert.deepEqual(days.map(d => d.won), [1, 1, 1], JSON.stringify(days.map(d => d.goal)));
 });

@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { EXPECTED, EXPECTED_COLONY, quick, quickColony } from '../quick.js';
+const LONG = process.env.CINDERHILL_LONG === '1' ? false : 'over 15 s: runs nightly (CINDERHILL_LONG=1)';
 
 test('the page expects the hash Node computes for the quick run', () => {
   const h = quick();
@@ -19,7 +20,7 @@ test('the page expects the hash Node computes for the colony run (days, brood)',
 // The check page's long run (check.js, the Firefox route for spike S2) steps the same way: a fresh Sim, every
 // scripted order queued up front, no events drained. Its expected total must be Node's, or a phone would report
 // a false DIFFERENT. Plays 12,000 ticks of 2,000 ants (about half a minute).
-test('the page expects the hash Node computes for the long run', async () => {
+test('the page expects the hash Node computes for the long run', { skip: LONG }, async () => {
   const { LONG, EXPECTED_LONG } = await import('../quick.js');
   const { Sim, encodeCommand } = await import('../sim/sim.js');
   const { script } = await import('../sim/replay.js');

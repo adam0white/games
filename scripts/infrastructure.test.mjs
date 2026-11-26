@@ -5,7 +5,7 @@ import { validateGame } from './game.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { validateRegistry, affectedGames, phoneCheckNeeded, checkResults, phoneChecks, manifest, assertFrameworkGraph, scopedHeaders, scopedRedirects, checkRelease, checkMainCI } from './lib.mjs';
+import { validateRegistry, affectedGames, phoneCheckNeeded, checkResults, phoneChecks, PHONE_SMOKE, manifest, assertFrameworkGraph, scopedHeaders, scopedRedirects, checkRelease, checkMainCI } from './lib.mjs';
 const game = { slug: 'rope', source: { repository: 'https://github.com/adam0white/rope', commit: 'a'.repeat(40) }, saveSchema: 'v1' };
 const registry = { hfVersion: '4.17.0', games: [game] };
 test('interactive cloud suites honor one shared configured lock without a home checkout', () => {
@@ -52,7 +52,11 @@ test('a change inside one experiment runs only that experiment\'s phone checks',
   assert.equal(phoneChecks(['experiments/small/night-sand/main.js', 'experiments/small/pitch/sim.js']), 'small/night-sand,small/pitch');
   assert.equal(phoneChecks(['experiments/small/catalog.js', 'experiments/small/index.html']), 'small');
   assert.equal(phoneChecks(['experiments/small/thankful/a/b.js', 'experiments/small/marks.js']), 'small,small/thankful');
-  for (const path of ['experiments/kit/save.js', 'experiments/kit/check/phone.mjs', 'prototypes/x/index.html', 'workers/feedback/public/notes/button.js', 'src/worker.mjs', 'scripts/experiments.mjs', '.github/workflows/ci.yml']) assert.equal(phoneChecks(['experiments/lantern/index.html', path]), 'all', path);
+  // Shared code picks the quick smoke set on a pull request, never every check (that runs nightly).
+  for (const path of ['experiments/kit/save.js', 'prototypes/x/index.html', 'workers/feedback/public/notes/button.js', 'src/worker.mjs', 'scripts/experiments.mjs', '.github/workflows/ci.yml']) assert.equal(phoneChecks(['experiments/lantern/index.html', path]), [...PHONE_SMOKE, 'lantern'].sort().join(), path);
+  // The check code and the catalogue ride along with the game they register.
+  assert.equal(phoneChecks(['experiments/kitchen/index.html', 'experiments/kit/check/phone.mjs', 'experiments/kit/check/pages.mjs', 'experiments/kit/games.json']), 'kitchen');
+  assert.equal(phoneChecks(['experiments/kit/check/phone.mjs']), '');
   for (const paths of [[], ['games/rope/src/main.ts'], ['experiments/NOTES.md', 'experiments/lantern/README.md'], ['experiments/lab/index.html']]) assert.equal(phoneChecks(paths), '', paths.join());
 });
 test('the ci gate requires the phone check exactly when its paths changed', () => {
