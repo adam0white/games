@@ -137,3 +137,16 @@ Saves: `night-saltplate:save` keeps `{v:1, cleared, look, sound}` exactly; `clea
 ## 2026-11-25 — the way back to the small games home
 
 Opened from `/small/` (`?from=small`), the page shows "‹ Small games" ("‹ Küçük oyunlar" in Turkish) on the pause card and under the result's buttons, through `kit/home.js`; a printed plate or daily figure is reported to the home as a win. The recording notice and switch are now in the page's language. `check.mjs` asserts the two links in Turkish. Same keys, same records.
+
+## 2026-11-26 — warmth on the tuner
+
+A cold sweep of plate 2 (Diagonal) at a steady thumb pace passed the right pitch (impression 0.89) without holding it long enough to print, and nothing on screen said where it had been. Changes:
+
+- **Brass mark on the rail.** The tuner's scale keeps a gold mark where the impression was highest so far on this plate (shown once it passes 0.3; brighter as it rises; slides to a better place). A player who slides past the figure can go back to it. Not shown in the instrument. Reset on every plate.
+- **Haptics** (where `navigator.vibrate` exists: Android, not iOS): a small tick for each tenth of impression gained above 0.25, a 25 ms pulse when the print starts to take hold, and a five-pulse pattern at the print.
+- No new words, keys, sim or recording change.
+- `check.mjs`: since `kit/lab.js` queues every record under `hf-lab-kit-queue` before sending (kit change, 2026-11-25/26), the check failed on main with "no lab storage writes". Writes to that key are now allowed; the end-of-run key list (which must be empty, so the queue must drain) is unchanged.
+
+Verified: `check.mjs` exit 0 on WebKit iPhone 13 and Chromium Pixel 7 (all 18 plates, Turkish, sizes). It failed on main before the check fix. A Playwright sweep of plate 2 at 6 px per 260 ms: the mark settled at 11.9 % of the rail (the Diagonal's pitch), 26 ticks were requested from a stubbed `navigator.vibrate`, no console errors.
+
+Not verified: real vibration on an Android phone, whether 26 ticks in a slow sweep feel like too many, whether a person notices the gold mark.

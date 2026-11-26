@@ -180,7 +180,7 @@ async function attachAudit(context, page) {
     const setItem = Storage.prototype.setItem;
     window.saltplateCheck = { writes: [], touches: [] };
     Storage.prototype.setItem = function (key, value) {
-      if (/^(hf-lab-|night-saltplate:lab)/.test(key) && !/^hf-lab-(send-localhost|player|session:night-saltplate)$/.test(key)) window.saltplateCheck.writes.push(key);
+      if (/^(hf-lab-|night-saltplate:lab)/.test(key) && !/^hf-lab-(send-localhost|player|session:night-saltplate|kit-queue)$/.test(key)) window.saltplateCheck.writes.push(key);
       return setItem.call(this, key, value);
     };
     document.addEventListener('pointerdown', event => {
@@ -194,6 +194,8 @@ async function attachAudit(context, page) {
 
 // The page records play (kit/lab.js), so the lab client's own player id and session keys are expected.
 // Changed deliberately on 2026-11-24 from "no hf-lab- keys at all"; any other lab key still fails.
+// 2026-11-26: kit/lab.js now queues every record under hf-lab-kit-queue before sending it; writes to it are allowed,
+// but the key must be gone (drained) by the end, which the keys list below still asserts.
 const recordingKey = key => key === 'hf-lab-send-localhost' || key === 'hf-lab-player' || key === 'hf-lab-session:night-saltplate';
 async function checkLabStorage(page) {
   const lab = await page.evaluate(() => ({
