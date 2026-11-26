@@ -1,0 +1,138 @@
+{
+ "name": "deployed-smoke5",
+ "role": "authority",
+ "ants": 2000,
+ "clients": 4,
+ "seconds": 120,
+ "startedAt": "2026-11-26T01:44:55.388Z",
+ "endedAt": "2026-11-26T01:46:56.026Z",
+ "object": "908759dd9251378648b5e16cd2272d1d697c3f8753c5780183dfc009377dee1a",
+ "version": "29837472-c611-4503-8d74-07398c587d69",
+ "ticksPerSecond": [
+  19.999,
+  19.998,
+  20.005,
+  20.001
+ ],
+ "gapSdMs": [
+  44.5,
+  44.43,
+  44.43,
+  44.44
+ ],
+ "gapP99Ms": [
+  131.2,
+  129.3,
+  131.3,
+  131.2
+ ],
+ "gapMaxMs": [
+  1911.6,
+  1911,
+  1911.9,
+  1911.6
+ ],
+ "gapsOver100": [
+  94,
+  95,
+  94,
+  93
+ ],
+ "bytesInPerSec": [
+  265.4,
+  266,
+  266.3,
+  265.9
+ ],
+ "bytesOutPerSec": [
+  92.6,
+  90.3,
+  90.1,
+  95.3
+ ],
+ "clientLoopDelayP99Ms": [
+  11.5,
+  11.5,
+  11.2,
+  11.3
+ ],
+ "orders": [
+  62,
+  62,
+  62,
+  62
+ ],
+ "dupsSent": [
+  6,
+  6,
+  6,
+  6
+ ],
+ "acks": [
+  62,
+  62,
+  62,
+  61
+ ],
+ "unacked": [
+  0,
+  0,
+  0,
+  1
+ ],
+ "desyncNotices": [
+  0,
+  0,
+  0,
+  0
+ ],
+ "reconnects": [
+  [],
+  [],
+  [],
+  []
+ ],
+ "versions": [
+  "29837472-c611-4503-8d74-07398c587d69"
+ ],
+ "room": {
+  "joins": 4,
+  "refused": 0,
+  "cmds": 248,
+  "dups": 24,
+  "late": 3,
+  "bad": 0,
+  "hashes": 477,
+  "compared": 477,
+  "mismatches": 0,
+  "firstMismatch": null,
+  "slips": 0,
+  "catchUpTicks": 6,
+  "checkpoints": 4,
+  "checkpointBytes": 39203,
+  "restoredFrom": null,
+  "replayed": 0,
+  "markWrites": 248,
+  "cfg": {
+   "seed": 2026,
+   "ants": 2000,
+   "role": "authority"
+  },
+  "sealed": 2403,
+  "mark": 2420,
+  "boots": 0,
+  "ticking": true,
+  "sockets": 0,
+  "version": "29837472-c611-4503-8d74-07398c587d69",
+  "object": "908759dd9251378648b5e16cd2272d1d697c3f8753c5780183dfc009377dee1a"
+ },
+ "offline": {
+  "commands": 248,
+  "uniqueSeatIds": 248,
+  "sealed": 2404,
+  "replayedTo": 2400,
+  "compared": 477,
+  "differ": 0,
+  "firstDiffer": null
+ }
+}

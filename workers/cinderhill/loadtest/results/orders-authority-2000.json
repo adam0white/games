@@ -1,0 +1,162 @@
+{
+ "name": "orders-authority-2000",
+ "role": "authority",
+ "ants": 2000,
+ "clients": 4,
+ "seconds": 300,
+ "startedAt": "2026-11-26T02:32:26.463Z",
+ "endedAt": "2026-11-26T02:37:27.103Z",
+ "object": "05ab7bbf196d18fc643913e2b869e14d850de89816ac38bdfc0f78777b8c91a3",
+ "version": "42ee31d6-a2b3-4ccf-9c23-f9e254bdfc45",
+ "ticksPerSecond": [
+  20,
+  20.001,
+  20.002,
+  20.002
+ ],
+ "gapSdMs": [
+  14.76,
+  14.72,
+  14.81,
+  14.86
+ ],
+ "gapP99Ms": [
+  79.3,
+  79.1,
+  79.1,
+  78.8
+ ],
+ "gapMaxMs": [
+  219.6,
+  220.4,
+  220.6,
+  220.4
+ ],
+ "gapsOver100": [
+  14,
+  14,
+  15,
+  16
+ ],
+ "bytesInPerSec": [
+  264.4,
+  264.7,
+  264.8,
+  264.6
+ ],
+ "bytesOutPerSec": [
+  93.5,
+  91.1,
+  91,
+  94.2
+ ],
+ "clientLoopDelayP99Ms": [
+  10,
+  9.7,
+  10.2,
+  9.8
+ ],
+ "orders": [
+  156,
+  155,
+  155,
+  155
+ ],
+ "dupsSent": [
+  15,
+  15,
+  15,
+  15
+ ],
+ "acks": [
+  155,
+  155,
+  155,
+  154
+ ],
+ "unacked": [
+  1,
+  0,
+  0,
+  1
+ ],
+ "desyncNotices": [
+  0,
+  0,
+  0,
+  0
+ ],
+ "reconnects": [
+  [],
+  [],
+  [],
+  []
+ ],
+ "versions": [
+  "42ee31d6-a2b3-4ccf-9c23-f9e254bdfc45"
+ ],
+ "room": {
+  "joins": 4,
+  "refused": 0,
+  "cmds": 621,
+  "dups": 60,
+  "late": 0,
+  "bad": 0,
+  "hashes": 1197,
+  "compared": 1197,
+  "mismatches": 0,
+  "firstMismatch": null,
+  "slips": 0,
+  "catchUpTicks": 4,
+  "checkpoints": 10,
+  "checkpointBytes": 45969,
+  "restoredFrom": null,
+  "replayed": 0,
+  "markWrites": 286,
+  "cfg": {
+   "seed": 2026,
+   "ants": 2000,
+   "role": "authority"
+  },
+  "sealed": 6004,
+  "mark": 6005,
+  "boots": 0,
+  "ticking": true,
+  "sockets": 0,
+  "version": "42ee31d6-a2b3-4ccf-9c23-f9e254bdfc45",
+  "object": "05ab7bbf196d18fc643913e2b869e14d850de89816ac38bdfc0f78777b8c91a3"
+ },
+ "offline": {
+  "commands": 621,
+  "uniqueSeatIds": 621,
+  "sealed": 6005,
+  "replayedTo": 6000,
+  "compared": 1197,
+  "differ": 0,
+  "firstDiffer": null
+ },
+ "cloudflare": {
+  "minutes": 6,
+  "fullMinutes": 4,
+  "cpuMsPerSecond": 84.75025000000001,
+  "cpuMsPerSecondByMinute": [
+   83.26,
+   79.24,
+   89.91,
+   86.58
+  ],
+  "durationGbSecondsPerHour": 460.80030528000003,
+  "rowsWrittenPerHour": 14430,
+  "inboundPerHour": 22572,
+  "outboundPerHour": 295365,
+  "exceededCpuErrors": 0,
+  "exceededMemoryErrors": 0,
+  "inboundFrom": "client counts",
+  "costPerRoomHour": {
+   "duration": 0.005760003816000001,
+   "requests": 0.00016928999999999997,
+   "rowsWritten": 0.01443,
+   "total": 0.020359293816
+  }
+ }
+}

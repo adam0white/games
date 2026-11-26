@@ -1,0 +1,203 @@
+{
+ "name": "s1-authority-2000",
+ "role": "authority",
+ "ants": 2000,
+ "clients": 4,
+ "seconds": 600,
+ "startedAt": "2026-11-26T02:10:47.400Z",
+ "endedAt": "2026-11-26T02:20:48.032Z",
+ "object": "9d16b4da2a664cf8e917d0cc3286393cce1d239f17ac98c1fbe2215665f4641a",
+ "version": "591301fd-6892-4d69-9866-9555b0885049",
+ "ticksPerSecond": [
+  20.012,
+  20.012,
+  20.014,
+  20.016
+ ],
+ "gapSdMs": [
+  13.1,
+  13.15,
+  13.16,
+  13.05
+ ],
+ "gapP99Ms": [
+  79.9,
+  79.9,
+  80.1,
+  79.9
+ ],
+ "gapMaxMs": [
+  231.5,
+  241.4,
+  232.4,
+  231.5
+ ],
+ "gapsOver100": [
+  41,
+  37,
+  38,
+  36
+ ],
+ "bytesInPerSec": [
+  265.3,
+  266.1,
+  266.1,
+  266
+ ],
+ "bytesOutPerSec": [
+  93.9,
+  94.5,
+  92.1,
+  93.5
+ ],
+ "clientLoopDelayP99Ms": [
+  10.6,
+  10.5,
+  10.7,
+  10.8
+ ],
+ "orders": [
+  312,
+  311,
+  311,
+  310
+ ],
+ "dupsSent": [
+  31,
+  31,
+  31,
+  31
+ ],
+ "acks": [
+  311,
+  311,
+  311,
+  310
+ ],
+ "unacked": [
+  1,
+  0,
+  0,
+  0
+ ],
+ "desyncNotices": [
+  0,
+  0,
+  0,
+  0
+ ],
+ "reconnects": [
+  [
+   {
+    "at": 26904.231499999998,
+    "code": 1006,
+    "reason": "",
+    "tick": 530,
+    "welcomeAfter": 2875.9162080000024,
+    "firstFrameAfter": 2879.458625000003
+   }
+  ],
+  [
+   {
+    "at": 26748.560625,
+    "code": 1006,
+    "reason": "",
+    "tick": 530,
+    "welcomeAfter": 2873.4360830000005,
+    "firstFrameAfter": 2875.4915830000027
+   }
+  ],
+  [
+   {
+    "at": 26593.904542,
+    "code": 1006,
+    "reason": "",
+    "tick": 530,
+    "welcomeAfter": 2872.7300829999986,
+    "firstFrameAfter": 2874.6777079999993
+   }
+  ],
+  [
+   {
+    "at": 26447.598291000002,
+    "code": 1006,
+    "reason": "",
+    "tick": 530,
+    "welcomeAfter": 2873.168125,
+    "firstFrameAfter": 2874.8115
+   }
+  ]
+ ],
+ "versions": [
+  "591301fd-6892-4d69-9866-9555b0885049"
+ ],
+ "room": {
+  "joins": 4,
+  "refused": 0,
+  "cmds": 1188,
+  "dups": 121,
+  "late": 5,
+  "bad": 0,
+  "hashes": 2296,
+  "compared": 2296,
+  "mismatches": 0,
+  "firstMismatch": null,
+  "slips": 0,
+  "catchUpTicks": 92,
+  "checkpoints": 20,
+  "checkpointBytes": 52396,
+  "restoredFrom": null,
+  "replayed": 551,
+  "markWrites": 1185,
+  "cfg": {
+   "seed": 2026,
+   "ants": 2000,
+   "role": "authority"
+  },
+  "sealed": 12015,
+  "mark": 12030,
+  "boots": 1,
+  "ticking": true,
+  "sockets": 0,
+  "version": "591301fd-6892-4d69-9866-9555b0885049",
+  "object": "9d16b4da2a664cf8e917d0cc3286393cce1d239f17ac98c1fbe2215665f4641a"
+ },
+ "offline": {
+  "commands": 1244,
+  "uniqueSeatIds": 1244,
+  "sealed": 12015,
+  "replayedTo": 12000,
+  "compared": 2400,
+  "differ": 0,
+  "firstDiffer": null
+ },
+ "cloudflare": {
+  "minutes": 11,
+  "fullMinutes": 9,
+  "cpuMsPerSecond": 91.02036851851852,
+  "cpuMsPerSecondByMinute": [
+   136.54,
+   94.05,
+   97.05,
+   84.75,
+   83.5,
+   75.89,
+   82.71,
+   83.77,
+   80.92
+  ],
+  "durationGbSecondsPerHour": 460.80173909333325,
+  "rowsWrittenPerHour": 37406.666666666664,
+  "inboundPerHour": 22608,
+  "outboundPerHour": 295413.3333333333,
+  "exceededCpuErrors": 0,
+  "exceededMemoryErrors": 0,
+  "inboundFrom": "client counts",
+  "costPerRoomHour": {
+   "duration": 0.005760021738666666,
+   "requests": 0.00016956,
+   "rowsWritten": 0.037406666666666664,
+   "total": 0.04333624840533333
+  }
+ }
+}

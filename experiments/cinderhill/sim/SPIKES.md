@@ -29,7 +29,39 @@ The 5,000-ant row spans three runs. The maximum moved between 4 and 17 ms from r
 
 The request round trip is included in these numbers. Clocks do not advance during computation in workerd, so the room cannot time itself.
 
-**Not done:** a deployed Durable Object. So there is no measurement of 20.0 ticks a second deployed for 10 minutes, and no CPU per second or cost per room-hour for either room role (relay only or authority). The local numbers suggest the authority role costs about 2 ms of CPU per tick, 40 ms a second. That is an extrapolation and has not been measured on Cloudflare.
+## S1 deployed
+
+Pass line: 20.0 ticks a second deployed for 10 minutes; the room role's CPU and cost written down.
+
+The room is `workers/cinderhill/` (Worker `games-cinderhill`, one SQLite Durable Object per room code); its NOTES.md says how it works and how to run the load test. Each run: 4 scripted Node players on one Mac, each running the sim in lockstep at 20 Hz, sending about 31 orders a minute (every 10th sent twice) and a hash every second. Worker version 591301fd, 2026-11-26 02:00 to 02:31 UTC. The room ran `SIM_VERSION` 1, the sim before the trail painter and trail-shape changes (the re-runs under S2); the CPU numbers predate those changes, which by the Node re-run above did not change the tick cost. Ticks a second and jitter are measured at the players, because a deployed Durable Object's clock does not advance during computation. CPU, duration and rows written are Cloudflare's own Durable Object analytics (`durableObjectsPeriodicGroups`, full minutes only).
+
+| Run (10 min, 4 players) | Ticks/s | Gap sd / p99 / max | DO CPU | Bytes/s per player (in / out) | Resets | Hash check | Verdict |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Relay (players at 5,000 ants) | 20.00 | 12 / 78 / 175 ms | 3.7 ms/s | 265 / 93 | 0 | 1,798 room compares, 0 differ; offline replay 2,398, 0 differ | **Pass** |
+| Authority, 2,000 ants | 20.01 | 13 / 80 / 241 ms | 91 ms/s (76 to 137 by minute) | 266 / 94 | 1 at 27 s, back in 2.9 s | 2,296 room compares, 0 differ; offline 2,400, 0 differ | **Pass** |
+| Authority, 5,000 ants | 19.98 to 19.99 | 16 / 81 / 504 ms | 91 ms/s (85 to 97 by minute, 7 minutes) | 265 / 93 | 1 at 25 s, back in 3.2 s | 2,300 room compares, 0 differ; offline 2,396, 0 differ | **Fail by 0.02**: the 3.2 s reset |
+
+- "Gap" is the time between live sealed frames at a player; 50 ms is on time. "Bytes" are WebSocket payloads, not counting framing or TLS.
+- No exceeded-CPU or exceeded-memory errors in any run. No clock slips (the room never had to skip a tick). Every order was stored once: (seat, id) unique in every log, and every planted repeat was dropped (120 to 124 a run).
+- The authority room's CPU did not grow with ants as the bench predicted (5.7 ms a tick at 5,000 would be 114 ms/s). Both counts land near 90 ms/s. Scent over the full map is the fixed part of the tick (S1 above), which may explain it; not established.
+- **Cost per room-hour**, from https://developers.cloudflare.com/durable-objects/platform/pricing/ (read 2026-11-25; page dated 2026-11-13), above the monthly included amounts: duration $12.50 per million GB-s, billed on wall time at 128 MB per object whatever the role; requests $0.15 per million, incoming WebSocket messages counted 20 to 1; SQLite rows written $1.00 per million. The page bills no CPU time for Durable Objects.
+
+| Role | Duration | Requests | Rows written | Total per room-hour |
+| --- | --- | --- | --- | --- |
+| Relay (first schema) | 460.8 GB-s: $0.0058 | 22,600 in, 1,130 billed: $0.0002 | 37,240: $0.0372 | **$0.043** |
+| Authority 2,000 (first schema) | 460.8 GB-s: $0.0058 | $0.0002 | 37,407: $0.0374 | **$0.043** |
+| Authority 5,000 (first schema) | 460.8 GB-s: $0.0058 | $0.0002 | 37,329: $0.0373 | **$0.043** |
+| Relay, 2,000 ants (orders table, 5 min) | 460.8 GB-s: $0.0058 | $0.0002 | 14,280: $0.0143 | **$0.020** |
+| Authority 2,000 (orders table, 5 min) | 460.8 GB-s: $0.0058 | $0.0002 | 14,430: $0.0144 | **$0.020** |
+
+- The roles cost the same: duration is wall time, and CPU is not billed. Rows written were most of the bill under the first schema (a second index on the command table, and the sealed mark rewritten on every tick with a command). The current schema (version 42ee31d6; one row per order keyed by tick, the mark written once a second) halves that. Its two 5-minute checks ran at the same time in two rooms, 02:32 to 02:37 UTC: both 20.00 ticks a second, gap sd 12 and 15 ms, 0 hash differences (898 and 1,197 room compares; 1,198 and 1,197 offline), no resets, authority CPU 85 ms/s against relay 3.4 ms/s. The room counted about 7,450 orders and 3,440 mark writes an hour; Cloudflare reports 14,300 rows written. The other 3,400 or so are not explained.
+- **Idle cost:** none per hour that was found on the pricing page. An empty room stops its clock after 5 s and is then evicted; duration is billed only while the object is in memory. What stays is SQLite storage, $0.20 per GB-month above 5 GB included: a room holds its command log (about 7,500 orders an hour of play at this load, under 100 bytes each) and, for an authority room, one checkpoint (52 KB at 2,000 ants, 67 KB at 5,000). The Worker itself costs nothing while unused.
+- **Unexplained reset.** Eight of eleven authority rooms (all five 5,000-ant smoke runs, four of them with result files in `loadtest/results/`; both 10-minute runs; `resume1`) lost all their sockets once with close code 1006 about 25 to 30 s after it first started, or later in one case (71 s). The new instance ran the same version id, so it was not a deploy; tail showed no exception; `limits.cpu_ms` set to 300,000 did not change it; a 5,000-ant sim is about 7 MB. The three that did not: the 70 s smoke run at 300 ants, the 120 s smoke run at 2,000 ants, and the 5-minute check on the current schema at 2,000 ants. No relay room has reset (3 rooms, 16 minutes). Recovery each time: the players reconnected, the room restored its checkpoint and replayed to its mark, with 0 hash differences after, in 2.0 to 3.3 s. A guess, not checked: the platform moves or restarts a new object that uses much CPU.
+- **Deploy-then-resume** (authority, 2,000 ants, 8 minutes, room `resume1`, `loadtest/results/deploy-resume.json`): a new version was deployed 90 s into the run (01:53:14 to 01:53:18 UTC). The room kept running the old version with its sockets open for 300 s more. At 01:58:18, 300 s after the deploy, all four sockets closed with 1006 at tick 7,869. The players had a welcome from the new version 2.60 s later and their next frame at the same moment. The room restored its checkpoint at tick 7,800 and replayed 85 ticks; 0 hash differences in 342 compares after, 0 in 1,914 offline. Each order was stored once (991; 16 repeats dropped). This run also had the unexplained reset at 71 s (2.0 s). So a deploy cuts an occupied room off for about 2.6 s, up to 5 minutes after the deploy, and play resumes where it was; the 5-minute wait is Cloudflare's, not the room's.
+
+**Recommendation: relay.** Both roles hold 20.0 ticks a second apart from the reset, and both cost the same, $0.020 a room-hour with the current schema ($0.043 with the first), because Durable Objects bill wall time, not CPU. The relay uses 3.7 ms of CPU a second against 91 ms; it has the larger margin under the per-request CPU limit, restarts faster (nothing to replay), and has not shown the reset (8 of 11 authority rooms did). Desync detection works in both: the relay compares the players with each other. What the relay gives up is a server copy of the state, which is needed for join snapshots in a room whose players are all gone and for refusing a forged state. Keep authority behind the debug switch until one of those is needed, and look at the reset before using it.
+
+**Not done:** a room soak longer than 10 minutes; more than one machine's players (all four players shared one Mac, so their network paths were the same); players on phones.
 
 ## S2: determinism across engines
 
@@ -45,14 +77,14 @@ Seed 2026, 2,000 ants, 12,000 ticks (10 minutes), 41 orders. Every engine got th
 | workerd (Durable Object, local) | wrangler 4.168.0 | yes | same at all 600 records | not run | 19.9 s |
 | Firefox | - | - | **not run** | - | - |
 
-**Verdict: pass for Node, Chromium, WebKit and workerd over 10 minutes. Firefox and the 60-minute soak are open.**
+**Verdict: pass for Node, Chromium, WebKit and workerd over 10 minutes. Firefox is open. The 60-minute soak is in "S2 soak" below.**
 
 - **Lint** (`test/lint.test.mjs`): the sim files pass. A list of known-bad lines (`Math.sin`, `Math.random`, `**`, `Date`, `performance.now`, `toLocaleString`, `localeCompare`, `Intl`, `.sort()` and others) each fails.
 - **Flipped byte** (`test/byteflip.test.mjs`): one byte flipped at tick 60, in each of the seven subsystems in turn. Each time, `firstDivergence` names tick 60 and only that subsystem.
 - **Planted mutation** (`spikes/mutant.js`): after each ant step, the last mantissa bit of `Math.sin(...)` turns the ant one angle unit. The spike also compared the raw bits of `Math.sin` for the 20,000 arguments the first 20 ticks use. Chromium 156 differed from Node 26.13 on 631 of them and WebKit on 891. So the divergence comes from the engines, not from the harness. With the mutation, both browsers diverge from Node at the first comparison (tick 20), and the check names `ants`. Without it, both match for all 12,000 ticks.
 - A surprise: Chromium and Node do not share `Math.sin` bits, though both run V8. The two V8 versions differ. "Node agrees with Chromium" is therefore no evidence that floating-point code is safe.
 - **Firefox: not run.** Playwright's Firefox build is not installed on this machine. It was not installed for this spike, as the instructions asked.
-- **60-minute bot soak: not done.** The longest run is the 10-minute replay above.
+- **60-minute bot soak:** see "S2 soak" below.
 - **In CI:** the phone check now runs the page's short replay (600 ticks, 300 ants) in WebKit (iPhone 13) and Chromium (Pixel 7) and fails if the hash differs from Node's. It failed as expected with a wrong expected hash.
 
 **Re-run after a sim change (2026-11-25, trail painter PR).** Foragers now keep following the newest trail while they are on it, instead of dropping it 30 seconds into their trip (`sim.js`, the trail rule in the forager step). That changes play, so every hash above changed. S2 was run again with the same script: Node's final total is now 471678023, and Chromium 156 and WebKit 27.2 again match Node at all 600 records; the planted mutation still diverges at tick 20 in `ants`. workerd was not re-run. S4 at 5,000 ants was re-run too: 36.8, 44.4 and 57.9 KB at 3,000, 8,000 and 24,000 ticks (was 37.6, 43.8 and 54.8 KB), still under 64 KB and restoring to the same hash. The S1 numbers predate the change.
@@ -60,6 +92,27 @@ Seed 2026, 2,000 ants, 12,000 ticks (10 minutes), 41 orders. Every engine got th
 **Re-run after the trail-shape change (2026-11-25, `SIM_VERSION` 2).** Trails now keep their drawn shape (section "Trail shape" below). That changes play, so every hash changed again. S2 with the same script: Node's final total is now 158760334; Chromium 156.0.8078.4 and WebKit 27.2 match Node at all 600 records, and the planted mutation still diverges at tick 20 in `ants`. workerd and Firefox were not run. The phone check (`cinderhill`, `check` and `orders` in WebKit and Chromium) passes with the new `quick.js` hash.
 
 S1 re-run, Node 26.13.1, 5,400 timed ticks after 600 warm-up: 2,000 ants mean 1.61 ms, p95 1.68 ms, max 3.38 ms; 5,000 ants mean 1.87 ms, p95 2.00 ms, max 2.73 ms; 34 ticks with a flow rebuild (mean 2.32 and 2.47 ms). Rebuilding all 9 live fields at once: 6.15 ms (0.68 ms a field). Within the earlier numbers: a trail's field costs what a plain field cost, and the per-ant work added is one comparison.
+
+## S2 soak
+
+Pass line: the same hash everywhere over a 60-minute bot soak.
+
+Seed 2026, 2,000 ants, 72,000 ticks (60 minutes of play), 249 scripted orders from `script()`; command log SHA-256 begins `f3d5489486deeeb5`, checked by every engine. Hashes of all seven subsystems were compared every 20 ticks: 3,600 records per engine. Run with `spikes/s2.mjs --ticks=72000` and `spikes/workerd.mjs --ticks=72000`, first on `SIM_VERSION` 1 (2026-11-25) and again on `SIM_VERSION` 2, the trail-shape sim (2026-11-26).
+
+| Engine | Version | Sim 2: clean run vs Node | Sim 2: wall time | Sim 1: clean run vs Node | Planted mutation vs Node (both) |
+| --- | --- | --- | --- | --- | --- |
+| Node | 26.13.1 | (reference) final total 1035232780 | 118 s | (reference) final total 87767665 | diverges at tick 20, `ants` |
+| Chromium | 156.0.8078.4 (Playwright 1.64.1) | same at all 3,600 records | 121 s | same at all 3,600 records | diverges at tick 20, `ants` |
+| Chromium | 159.0.8154.6 (Playwright 1.66 alpha) | not run | - | same at all 3,600 records | diverges at tick 20, `ants` (sim 1) |
+| WebKit | 27.2 (Playwright 1.64.1) | same at all 3,600 records | 94 s | same at all 3,600 records | diverges at tick 20, `ants` |
+| workerd (Durable Object, local) | wrangler 4.168.0 | same at all 3,600 records | 117 s | same at all 3,600 records | not run |
+| Firefox | - | **not run** | - | **not run** | - |
+
+**Verdict: pass for Node, Chromium, WebKit and workerd over 60 minutes, on both sim versions. Firefox is open:** Playwright's Firefox build is not installed on this machine (neither firefox-1578 nor firefox-1555), and it was not installed for this run.
+
+- The planted mutation again came from the engines: `Math.sin` bits differed from Node on 631 of 20,000 arguments in Chromium and 891 in WebKit.
+- Deployed workerd was also compared with Node, by a different route (sim 1): in every S1 room above, an offline Node replay of the room's stored command log matched every hash the players sent (2,400 records a room), and in the authority rooms the deployed Durable Object's own sim agreed with the players at every compare. The longest of these is 10 minutes, not 60.
+- Not done: a 60-minute soak through a live room (the soak above is a replay of a fixed command log in each engine, not players sending orders over the network).
 
 ## S3: phone frames
 

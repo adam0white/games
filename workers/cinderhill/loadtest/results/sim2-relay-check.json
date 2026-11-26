@@ -1,0 +1,102 @@
+{
+ "name": "sim2-relay-check",
+ "role": "relay",
+ "ants": 2000,
+ "clients": 2,
+ "seconds": 30,
+ "startedAt": "2026-11-26T03:10:15.699Z",
+ "endedAt": "2026-11-26T03:10:46.015Z",
+ "object": "ba648155a65d1987766ed449aef7822497a2905ff933ee35533ccda3a2cc3060",
+ "version": "68d70086-6772-4298-87f7-37eed7bd79d2",
+ "ticksPerSecond": [
+  20.023,
+  20.034
+ ],
+ "gapSdMs": [
+  9.25,
+  9.44
+ ],
+ "gapP99Ms": [
+  71.9,
+  72.1
+ ],
+ "gapMaxMs": [
+  72.7,
+  86.5
+ ],
+ "gapsOver100": [
+  0,
+  0
+ ],
+ "bytesInPerSec": [
+  230.1,
+  229.7
+ ],
+ "bytesOutPerSec": [
+  100.8,
+  88.3
+ ],
+ "clientLoopDelayP99Ms": [
+  11.1,
+  11
+ ],
+ "orders": [
+  17,
+  16
+ ],
+ "dupsSent": [
+  1,
+  1
+ ],
+ "acks": [
+  17,
+  16
+ ],
+ "unacked": [
+  0,
+  0
+ ],
+ "desyncNotices": [
+  0,
+  0
+ ],
+ "reconnects": [
+  [],
+  []
+ ],
+ "versions": [
+  "68d70086-6772-4298-87f7-37eed7bd79d2"
+ ],
+ "room": {
+  "joins": 2,
+  "refused": 0,
+  "cmds": 33,
+  "dups": 2,
+  "late": 0,
+  "bad": 0,
+  "hashes": 58,
+  "compared": 29,
+  "mismatches": 0,
+  "firstMismatch": null,
+  "slips": 0,
+  "catchUpTicks": 1,
+  "checkpoints": 0,
+  "checkpointBytes": 0,
+  "restoredFrom": null,
+  "replayed": 0,
+  "markWrites": 29,
+  "cfg": {
+   "seed": 2026,
+   "ants": 2000,
+   "role": "relay"
+  },
+  "sealed": 602,
+  "mark": 608,
+  "boots": 0,
+  "ticking": true,
+  "sockets": 0,
+  "version": "68d70086-6772-4298-87f7-37eed7bd79d2",
+  "object": "ba648155a65d1987766ed449aef7822497a2905ff933ee35533ccda3a2cc3060"
+ },
+ "offline": null
+}

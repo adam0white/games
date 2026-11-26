@@ -1,0 +1,29 @@
+{
+  // Cinderhill friends' hill room: spike S1 deployed (docs/design/colony/04-roadmap.md). Unlisted.
+  // On workers.dev, not play.adamwhite.work: /cinderhill/ is an experiment page there, and a route would need
+  // a new reserved path. Cost of that choice: the zone's WAF probe rule does not cover workers.dev (NOTES.md).
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "games-cinderhill",
+  "account_id": "a20259cba74e506296745f9c67c1f3bc",
+  "main": "./src/index.mjs",
+  "compatibility_date": "2026-11-05",
+  "workers_dev": true,
+  "preview_urls": false,
+  "durable_objects": { "bindings": [{ "name": "ROOM", "class_name": "HillRoom" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["HillRoom"] }],
+  // Joins per address: 60 a minute, counted in each Cloudflare location, as Crumbwar.
+  "ratelimits": [{ "name": "JOIN_LIMIT", "namespace_id": "7002", "simple": { "limit": 60, "period": 60 } }],
+  "version_metadata": { "binding": "VERSION" },
+  // "1" lets a room's first join pick the role (relay or authority), ant count and seed. Measurement only;
+  // deployed with "0" after the spike, so every new room is a relay (it runs no sim).
+  "vars": { "DEBUG_ROLES": "0" },
+  // Logs, traces and Issues: see workers/OBSERVABILITY.md. Nothing is logged per tick; room codes and commands are never logged.
+  "upload_source_maps": true,
+  "observability": {
+    "enabled": true,
+    "redact_query_string": true,
+    "logs": { "enabled": true, "invocation_logs": true, "head_sampling_rate": 1 },
+    "traces": { "enabled": true, "head_sampling_rate": 1 },
+    "issues": { "enabled": true }
+  }
+}
