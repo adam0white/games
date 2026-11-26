@@ -43,7 +43,7 @@ export class Host {
     // Days (colony.js): the dawn save of each day still open to a restart (today's, and yesterday's until the
     // player picks at dusk), and the dusk that has just happened, until the page has shown it. A dawn save is
     // { bytes, log: the order log's length then, delivered }.
-    this.dawns = new Map(); this.dusk = null;
+    this.dawns = new Map(); this.dusk = null; this.spiderNews = []; // spider.js events for the page: { state, arg, tick }
     if (this.colony) this.saveDawn();
   }
 
@@ -72,7 +72,7 @@ export class Host {
     for (const [d] of this.dawns) if (d > day) this.dawns.delete(d);
     // Orders given after the save are gone; orders in the save still waiting for their tick run again.
     this.log.forEach((e, k) => { if (k >= save.log) e.state = 'undone'; else if (e.tick >= this.sim.tick) e.state = 'queued'; });
-    this.attach(); this.delivered = save.delivered; this.dusk = null; this.shifted = true; this.terrainVersion++; this.acc = 0; this.last = null;
+    this.attach(); this.delivered = save.delivered; this.dusk = null; this.spiderNews = []; this.shifted = true; this.terrainVersion++; this.acc = 0; this.last = null;
     return true;
   }
 
@@ -114,6 +114,7 @@ export class Host {
     for (let k = 0; k < ev.length; k += 3) {
       const type = ev[k];
       if (type === EVENT.DUG) this.terrainVersion++;
+      else if (type === EVENT.SPIDER) this.spiderNews.push({ state: ev[k + 1], arg: ev[k + 2], tick: this.sim.tick });
       else if (type === EVENT.DUSK) {
         // The sim is now at the next dawn: what the page shows on the dusk card (its save is taken at goOn).
         const s = this.sim, d = ev[k + 1];

@@ -17,16 +17,17 @@ import { DIAG, G, GOAL, INF, MAX_GOALS, PATH_MAX, SLOT, STEP, TRAIL_OFF, backCel
 import { FIELD, FIELDS, deposit, makeScent, smell, stepScent } from './scent.js';
 import { SUBSYSTEMS, finish, hashArray, hashInt } from './hash.js';
 import { generate } from './world.js';
+import { stepSpider } from './spider.js';
 import { BROOD_MAX, CASTE, CASTE_HP, DAY_TICKS, FOOD, LOAD, STAGE, addBrood, fight, makeBrood, startDays, stepColony, stepDay } from './colony.js';
 
-export const SIM_VERSION = 5; // 2: trails keep their drawn shape (a path per trail, `via` per ant); 3: eight directions; 4: the colony (colony.js); 5: days
+export const SIM_VERSION = 6; // 2: trails keep their drawn shape (a path per trail, `via` per ant); 3: eight directions; 4: the colony (colony.js); 5: days; 6: the spider, and foragers stay in under Recall
 export const TICK_HZ = 20;
 export { G, GOAL, SLOT, INF, STEP, DIAG, FIELD, MAT, SURFACE, NEST, SUB, SUBSYSTEMS, CASTE, CASTE_HP, FOOD, LOAD, STAGE, BROOD_MAX };
 
 export const JOB = { FORAGE: 0, DIG: 1, GUARD: 2 };
 export const MODE = { SEEK: 0, RETURN: 1, WORK: 2, REST: 3 };
 export const CMD = { TRAIL: 1, DIG: 2, ALARM: 3, RECALL: 4 };
-export const EVENT = { DUG: 1, PILE_EMPTY: 2, REJECTED: 3, LATE: 4, DUSK: 5 }; // DUSK: (day, won)
+export const EVENT = { DUG: 1, PILE_EMPTY: 2, REJECTED: 3, LATE: 4, DUSK: 5, SPIDER: 6 }; // DUSK: (day, won); SPIDER: (spider.js SPIDER state, slot or kills)
 export const MAX_PILES = 8;
 const EVENT_CAP = 1024; // events kept until the host drains them; older ones are dropped (counted in globals)
 
@@ -294,6 +295,7 @@ export class Sim {
     this.buildBuckets();
     for (let i = 0; i < this.n; i++) this.stepAnt(i);
     fight(this);
+    if (this.cfg.colony) stepSpider(this, EVENT.SPIDER);
     if (this.anyDead) this.removeDead();
     stepScent(this);
     this.rebuildFields();
@@ -383,7 +385,7 @@ export class Sim {
           }
           if (this.carry[i] && layer === SURFACE) deposit(this, FIELD.TRAIL, c, TRAIL_LAY);
         }
-      } else if (layer === NEST) follow = SLOT.EXIT;
+      } else if (layer === NEST) { if (this.g[G.RECALL]) still = true; else follow = SLOT.EXIT; } // under Recall foragers stay in
       else {
         const p = this.pileAt(c);
         if (p >= 0) {
