@@ -126,7 +126,7 @@ export function lab(game, options = {}) {
     try {
       for (const item of readQueue()) {
         if (!on()) break;
-        if (inFlight.has(item.r?.id)) continue;
+        if (inFlight.has(item.r?.id) || held.some(h => h.id === item.r?.id)) continue; // held: posted when the page is back
         if (!fresh(item) || !allowedFor(item.r.game)) { dequeue(item.r.id); continue; }
         // The privacy flag says what holds now, not what held when the record was made.
         const out = { ...item.r }; delete out.privacyOverride; if (signal()) out.privacyOverride = true;
@@ -147,7 +147,8 @@ export function lab(game, options = {}) {
   const chains = new Map(); let holding = false, held = [];
   function deliver(r, again = false) {
     if (!again && on()) enqueue(r);
-    if (holding) { held.push(r); return Promise.resolve(); }
+    // A later part of a run whose earlier part is held waits with it, so parts still arrive in order.
+    if (holding || (!again && held.some(h => h.kind === r.kind && h.runId === r.runId))) { held.push(r); return Promise.resolve(); }
     if (again && !readQueue().some(x => x.r?.id === r.id)) return Promise.resolve(); // a drain sent it meanwhile, or it was dropped
     inFlight.add(r.id);
     const key = `${r.kind}:${r.runId}`;
