@@ -182,7 +182,18 @@ Three looks of the same scene, for the owner to pick one (04-roadmap M1 item 4).
 - An unknown name falls back to `ink`. The lab record's start carries the resolved name, not the raw query.
 - The sim and its hashes do not change.
 - The phone line `cinderhill looks` checks the following in WebKit and Chromium. `ember`, `field` and an unknown name each compile and draw, and each survives a lost context. The pause card keeps `colony=1` when it switches looks. A syntax error in the `field` shader made this line fail (`timed out waiting for: field: frames drawn`). Every other cinderhill line still passed, because a shader that does not compile leaves the page running with no WebGL.
-- S3 per look: see the table below.
+- S3 per look, run with `spikes/s3.mjs --only=webkit --look=<name>`: WebKit 27.2 with the iPhone 13 profile, on the Mac's GPU, with the machine's load average at about 13. These numbers are not from a phone: every look holds the display's frame rate here.
+
+| Look | Ants | Frame mean / p95 ms | fps | Page work mean / p95 ms |
+|---|---|---|---|---|
+| ink | 2,000 | 13.89 / 15 | 72 | 0.78 / 3 |
+| ink | 5,000 | 13.93 / 15 | 71.8 | 0.79 / 3 |
+| ember | 2,000 | 14.07 / 15 | 71.1 | 0.64 / 2 |
+| ember | 5,000 | 13.89 / 15 | 72 | 0.80 / 3 |
+| field | 2,000 | 14.00 / 15 | 71.4 | 0.71 / 3 |
+| field | 5,000 | 14.23 / 15 | 70.3 | 0.84 / 3 |
+
+  Feature 10's bar is 30 fps with 2,000 ants on an iPhone 13 class phone. That bar is not yet checked on a real phone for any look: open `/cinderhill/?fps=1&look=<name>` on one.
 
 Choices the owner may want to change: which look to keep (or parts of each), the field look's bigger ants, and whether to reload or switch looks in place.
 
