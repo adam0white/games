@@ -49,8 +49,6 @@ let state, screen, mode = 'plates', pointer = null, last = 0, carry = 0, knownOp
 // last pod goes, a small shake, a ring where the husk split, and haptics where the phone has them (Android browsers;
 // iOS Safari ignores vibrate). Reduced motion turns off the freeze, slow motion, shake and buzz; the sound switch turns off the buzz.
 let freeze = 0, slow = 0, shake = 0, bursts = [], pullStep = 0;
-// Two strengths for a pick: ?v=a (default) has all of it; ?v=b keeps the ring and the buzz, without freeze, slow motion or shake.
-const strong = query.get('v') !== 'b';
 // Chrome ignores (and logs) vibrate before the page's first completed tap; skip it until then.
 const buzz = pattern => { if (!reduced.matches && save.sound && navigator.userActivation?.hasBeenActive !== false) try { navigator.vibrate?.(pattern); } catch {} };
 const burstInk = look === 'blueprint' ? '#f3d9a0' : '#b0612f';
@@ -320,7 +318,7 @@ function frame(now) {
       const pod = opened.at(-1), final = opened.length === state.pods.length;
       popSound(pod, knownOpened);
       if (!reduced.matches) {
-        if (strong) { freeze = final ? .11 : .06; slow = final ? .5 : 0; shake = final ? 1 : .6; }
+        freeze = final ? .11 : .06; slow = final ? .5 : 0; shake = final ? 1 : .6;
         bursts.push({ x: podX(state, pod), y: 250 - (pod.type === 'tuned' ? 66 : pod.height) - 26, age: 0, big: final }); // the husk's middle (art.js hang + half a pod)
       }
       buzz(final ? [30, 40, 70] : 24);
@@ -328,7 +326,7 @@ function frame(now) {
     }
     if (!running && winTime === null && state.plucks > 0 && screen === 'play') {
       running = true;
-      rec.start({ plate: state.level, pods: state.pods.length, mode, v: strong ? 'a' : 'b' });
+      rec.start({ plate: state.level, pods: state.pods.length, mode, v: 'a' });
     }
     if (state.won && winTime === null) won();
     if (state.won && screen === 'play' && state.time - winTime >= .65) {

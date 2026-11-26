@@ -254,7 +254,7 @@ Page only (`main.js`); `sim.js`, the plates, pars and saves are unchanged, so th
 - **Haptics** through `navigator.vibrate` (Android; iOS Safari ignores it): a tap when the finger takes the wire, a tick for each 20 units of pull (the wire creaks), a release thump scaled by depth, a pulse per pod and a pattern on the last one. Off with the sound switch.
 - Reduced motion turns off hit-stop, slow motion, shake, rings and vibration.
 - Vibration waits for the page's first completed tap (`navigator.userActivation.hasBeenActive`): Chrome ignores and logs it before then, and Podwire has no start card, so the first grab and creak ticks of the very first drag stay silent.
-- **Two strengths, for a pick:** `?v=a` (default) has all of it; `?v=b` keeps the ring and the buzz without hit-stop, slow motion or shake. The run start records `v`.
+- **Full burst (the owner picked this on 2026-11-26; the milder `?v=b` was removed):** hit-stop, slow motion, shake, ring and buzz. Run starts record `v: 'a'`.
 
 Checks: `check.mjs` PASS on WebKit iPhone 13 and Chromium Pixel 7 (page work p95 0.2 ms, max 4.8 ms on Chromium at 390×844). `kit/check/phone.mjs small/night-podwire` ok on both. A Pixel 7 probe pulled the centre of plate I and captured the ring on the husk 90 ms after the burst, with no page errors.
 
