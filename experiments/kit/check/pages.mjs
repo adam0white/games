@@ -325,6 +325,25 @@ export const pages = {
     music: { button: '#music', key: 'night-vine:music', on: 'Music on', off: 'Music off', hook: () => window.vineMusic?.() },
     hint: { key: 'night-vine:hint', delay: 3100, play: '#field', timing: { board: true }, input: moveVineLamp, legacy: { 'night-vine:save': '{"v":1,"unlocked":3,"level":2,"best":7,"sound":true,"look":"cobalt"}' } },
   },
+  // Sky Kitchen: the tray follows one finger during the catch.
+  kitchen: {
+    seeds: saved('kitchen-save', { v: 1, coins: 140, tier: 1, day: 4, served: 9, best: 60, tutorial: true, sound: true, dayAtTier: 1, built: { tray: 2, knife: 1, stove: 1, micro: 0, blender: 0, tables: 1, decor: 1 } }, 'kitchen:hint'),
+    saveKey: 'kitchen-save', sound: '#sound2', menu: '#quit',
+    state: () => window.kitchenState?.(),
+    verify: () => { const s = window.kitchenState(); return [s.tier, s.day, s.built, s.sound, s.tutorial]; },
+    expect: [1, 4, { tray: 2, knife: 1, stove: 1, micro: 0, blender: 0, tables: 1, decor: 1 }, true, true],
+    async touch(page, { finger, until }) {
+      // The tray shows from the guest's walk-in; CI's software WebGL runs the game slowly, so only the tray is awaited.
+      const before = await page.evaluate(() => window.kitchenState().tray);
+      const { w, h } = await page.evaluate(() => ({ w: innerWidth, h: innerHeight }));
+      const x = before > 0 ? w * 0.2 : w * 0.8;
+      await finger(page, '#c', [['pointerdown', w / 2, h * 0.6], ['pointermove', x, h * 0.6]]);
+      await until(page, t => Math.abs(window.kitchenState().tray - t) > 0.1, 'the tray follows the finger', 20000, before);
+      await finger(page, '#c', [['pointerup', x, h * 0.6]]);
+    },
+    hint: { key: 'kitchen:hint', delay: 1500, moved: () => window.kitchenState().touched, alive: () => window.kitchenAlive(), legacy: { 'kitchen-save': '{"v":1,"tutorial":true}' } },
+    music: { button: '#music2', key: 'kitchen-music', on: 'Music: on', off: 'Music: off', hook: () => window.kitchenMusic?.() },
+  },
   // Cinderhill's trail painter: one finger on the canvas draws a trail; it becomes an order when the finger lifts.
   cinderhill: {
     seeds: saved('cinderhill:save', { v: 1, sound: true, ants: 500, tapTrail: false }, 'cinderhill:hint'),
