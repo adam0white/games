@@ -21,7 +21,13 @@ export const LOOK_IDS = Object.keys(LOOKS);
 
 const loader = new GLTFLoader();
 const cache = new Map();
-function load(path) { if (!cache.has(path)) cache.set(path, loader.loadAsync(path).catch(() => null)); return cache.get(path); }
+// At most sixteen model fetches at a time: a phone (or a slow test browser) given ~90 at once can drop some.
+let busy = 0; const queue = [];
+function slot() { return new Promise(go => { if (busy < 16) { busy++; go(); } else queue.push(go); }); }
+function free() { const next = queue.shift(); if (next) next(); else busy--; }
+async function get(path) { const r = await fetch(path); if (!r.ok) throw new Error(r.status); return loader.parseAsync(await r.arrayBuffer(), path.slice(0, path.lastIndexOf('/') + 1)); }
+async function fetchModel(path) { await slot(); try { return await get(path); } catch { try { return await get(path); } catch { return null; } } finally { free(); } }
+function load(path) { if (!cache.has(path)) cache.set(path, fetchModel(path)); return cache.get(path); }
 
 // Scale so the largest side (or a named axis) is `size`, centre on x and z, rest on y = 0.
 export function fit(obj, size, axis = 'max') {

@@ -72,6 +72,8 @@ rec.toggle($('paused').firstElementChild);
 // ---------- run state
 let screen = 'menu', paused = false, before = 'play', clock = 0, last = performance.now();
 let art = null, ready = null;
+// Play waits for the models, so nothing starts in a half-built kitchen.
+$('play').disabled = true; $('play').classList.add('loading');
 let day = null;        // { plan, i, served, earned, tips, stars[], seed }
 let g = null;          // the guest being served: { recipe, model, phase, catch, q[], wait, ... }
 let peopleIn = false, phase = 'idle', trayX = 0, trayTarget = 0, finger = null, keys = new Set(), touched = false;
@@ -112,7 +114,7 @@ const canvas = $('c');
 ready = createView(canvas, lookId).then(v => {
   art = v; art.setRestaurant(save); art.view('menu', true);
   // A guest at the counter on the menu: the restaurant is open.
-  art.peopleReady.then(() => { peopleIn = true; });
+  art.peopleReady.then(() => { peopleIn = true; $('play').disabled = false; $('play').classList.remove('loading'); });
   art.peopleReady.then(async () => { if (screen === 'menu' && !g) { const m = await art.guest(2); if (m) { m.g.position.set(1.6, 0, 1.7); m.play('idle'); m.face = 0.3; menuGuest = m; } } });
   return v;
 }).catch(e => { console.error(e); });
