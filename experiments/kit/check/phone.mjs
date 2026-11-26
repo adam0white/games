@@ -1404,6 +1404,21 @@ for (const [slug, g] of Object.entries({ ...pages, ...labPages })) {
 }
 
 for (const [slug, run] of Object.entries(pageRuns)) GAMES[slug] = page => run(page, { base, until }); // pages that are not games: the small games' home
+// The small games' home, beyond its run in pages.mjs (both run for 'small'): the moving previews paint and move, and
+// stay still under reduced motion.
+GAMES['small live'] = async page => {
+  await page.goto(`${base}/notes/button.js`); await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('hf-lab-send-localhost', '1'); });
+  await page.goto(`${base}/small/?lang=en&day=2026-11-24`); await until(page, () => window.smallState, 'home script');
+  await until(page, () => window.smallState().live.length >= 1, 'tonight’s next stop moves');
+  const frame = () => page.evaluate(() => { const c = document.querySelector('li.now canvas.live.on'); return c ? c.toDataURL() : ''; });
+  const a = await frame(); await sleep(400); const b = await frame();
+  assert.ok(a.length > 2000 && a !== b, 'the preview paints, and moves');
+  assert.ok(await page.evaluate(() => document.querySelector('li.now .hook').textContent.length > 5), 'the stop shows its hook');
+  await page.evaluate(() => document.getElementById('deck').scrollIntoView({ block: 'center' }));
+  await until(page, () => window.smallState().live.includes(window.smallState().pick), 'the deck’s middle card moves');
+  await page.emulateMedia({ reducedMotion: 'reduce' }); await page.reload(); await until(page, () => window.smallState, 'home script again'); await sleep(500);
+  assert.deepEqual((await page.evaluate(() => window.smallState())).live, [], 'nothing moves under reduced motion');
+};
 
 const MUTATE = process.argv.includes('--mutate'); // only 'lantern ripples' reads it: its check must then fail
 const [onlyGame, onlyPhone] = process.argv.slice(2).filter(a => a !== '--mutate');
@@ -1414,6 +1429,7 @@ const picked = game => !onlyGame || onlyGame === 'all' || onlyGame.split(',').so
 // A check that never answers becomes a FAIL line naming it, not a job that runs until its time limit.
 const within = (p, ms, what) => { let t; return Promise.race([p, new Promise((_, no) => { t = setTimeout(() => no(new Error(`no answer in ${ms / 1000}s: ${what}`)), ms); })]).finally(() => clearTimeout(t)); };
 let failed = 0;
+WITH.small = ['small live']; // the small games' home: its extra checks run with 'small'
 for (const [phone, [engine, device]] of Object.entries(PHONES)) {
   if (onlyPhone && onlyPhone !== phone) continue;
   // Headless macOS WebKit still needs a display link to schedule animation frames.

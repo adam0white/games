@@ -6,7 +6,7 @@ import { shareLink } from '../kit/room.js';
 import { lab } from '../kit/lab.js';
 import { SMALL } from './catalog.js';
 import { WORDS } from './words.js';
-import { artOf, svgOf } from './art.js';
+import { artOf, svgOf, liveOf, groundOf } from './art.js';
 import { today, pickFor, threeFor, KINDS, mark, markOpened, openStop, status, SIGN, signs, streak, introSeen, seeIntro, night } from './marks.js';
 
 const W = words(WORDS), t = W.t;
@@ -19,6 +19,8 @@ const englishOnly = game => W.lang() !== 'en' && !game.tr;
 const hrefOf = game => `${game.href}?from=small`;
 const dayLabel = day => new Date(day + 'T12:00:00Z').toLocaleDateString(W.lang(), { day: 'numeric', month: 'short', timeZone: 'UTC' });
 const LABEL = { quick: 'warm', think: 'think', calm: 'calm' };
+// A preview that moves: the drawing, a canvas the loop below paints over it once it runs, and the game's hook.
+const livePic = game => `${artOf(game.slug)}<canvas class="live" data-live="${game.slug}" aria-hidden="true"></canvas><span class="hook">${esc(t('hook:' + game.slug))}</span>`;
 const homeUrl = () => { const u = new URL(location.href); u.search = ''; u.hash = ''; if (W.lang() !== 'en') u.searchParams.set('lang', W.lang()); return u.href; };
 function toast(key) { const el = $('toast'); el.textContent = t(key); el.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove('on'), 1600); }
 
@@ -43,7 +45,7 @@ function drawTonight() {
     const state = st[i] ? ` · <em>${esc(t(st[i]))}</em>` : '';
     return `<li class="${cls}"><span class="lamp" aria-hidden="true">${st[i] ? SIGN[st[i]] : i + 1}</span>
       <a class="stop ${game.slug}" href="${hrefOf(game)}" data-slug="${game.slug}" data-where="tonight">
-      <div class="pic">${artOf(game.slug)}</div>
+      <div class="pic">${i === now ? livePic(game) : artOf(game.slug)}</div>
       <div class="txt"><span class="kind">${esc(t('stop', { n: i + 1 }))} · ${esc(t(LABEL[game.kind]))}</span><b>${esc(nameOf(game))}</b>
       ${i === now ? `<span class="line">${esc(lineOf(game))}</span>` : ''}
       <small>${esc(timeOf(game))}${englishOnly(game) ? ' · ' + esc(t('english')) : ''}${state}</small>
@@ -117,7 +119,7 @@ function drawDeck() {
   deck.innerHTML = order.map((game, i) => {
     const m = mark(game.slug);
     return `<article class="card ${game.slug}" data-i="${i}" aria-label="${esc(t('nOf', { n: i + 1, of: order.length }))}">
-      <div class="pic">${artOf(game.slug)}<div class="badge">${game === pick ? `<span class="pickTag">${esc(t('pick'))}</span>` : ''}<span class="mark ${m.cls}">${esc(t(m.key, m))}</span></div></div>
+      <div class="pic">${livePic(game)}<div class="badge">${game === pick ? `<span class="pickTag">${esc(t('pick'))}</span>` : ''}<span class="mark ${m.cls}">${esc(t(m.key, m))}</span></div></div>
       <div class="body"><b>${esc(nameOf(game))}</b><span class="line">${esc(lineOf(game))}</span><small>${esc(timeOf(game))}${englishOnly(game) ? ' · ' + esc(t('english')) : ''}</small>
       <a class="play" href="${hrefOf(game)}" data-slug="${game.slug}" data-where="deck">${esc(t('play'))} ›</a></div></article>`;
   }).join('');
@@ -177,6 +179,45 @@ $('surprise').onclick = () => {
 };
 $('shareAll').onclick = async () => { rec.event('share', { what: 'all' }); if (await shareLink(homeUrl(), t('shareAllText')) === 'copied') toast('copied'); };
 
+// ---------- live previews ----------
+// One loop paints the previews a player is looking at: the card in the middle of the deck and tonight's next stop.
+// Each starts from its beginning when it comes into view. The canvas shows only after its first frame, so a browser
+// that never runs a frame keeps the drawing. Nothing on the page waits for a frame. Under reduced motion nothing runs.
+const lives = new WeakMap();
+let looping = false;
+const onScreen = el => { const r = el.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth; };
+function liveNow() {
+  const list = [];
+  const deckOne = cards()[at]?.querySelector('canvas.live'); if (deckOne) list.push(deckOne);
+  const stop = $('stops').querySelector('li.now canvas.live'); if (stop) list.push(stop);
+  return list.filter(onScreen);
+}
+function paint(c, now) {
+  let l = lives.get(c);
+  if (!l) { l = { draw: liveOf(c.dataset.live), t0: now }; lives.set(c, l); }
+  if (!l.draw) return;
+  const w = c.clientWidth, h = c.clientHeight; if (!w || !h) return;
+  const d = Math.min(2, devicePixelRatio || 1), W2 = Math.round(w * d), H2 = Math.round(h * d);
+  if (c.width !== W2 || c.height !== H2) { c.width = W2; c.height = H2; }
+  // The whole scene fits above the hook (nothing the gesture does is cut off); the margin is the scene's ground.
+  const g = c.getContext('2d'), band = (c.nextElementSibling?.offsetHeight || 0) * d * 0.7, room = H2 - band, s = Math.min(W2 / 160, room / 120);
+  g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = l.ground ||= groundOf(c.dataset.live); g.fillRect(0, 0, W2, H2);
+  g.setTransform(s, 0, 0, s, (W2 - 160 * s) / 2, Math.max(0, (room - 120 * s) / 2));
+  g.save(); g.beginPath(); g.rect(0, 0, 160, 120); g.clip();
+  try { l.draw(g, (now - l.t0) / 1000); } catch { l.draw = null; return; } finally { g.restore(); }
+  if (!c.classList.contains('on')) c.classList.add('on');
+}
+const seen = new Set();
+function frameLoop(now) {
+  if (document.visibilityState !== 'visible' || reduced()) { looping = false; return; }
+  const list = liveNow();
+  // A preview that went out of view starts again from the beginning when it comes back.
+  for (const c of seen) if (!list.includes(c)) { lives.delete(c); seen.delete(c); }
+  for (const c of list) { seen.add(c); paint(c, now); }
+  requestAnimationFrame(frameLoop);
+}
+function startLive() { if (looping || reduced() || typeof requestAnimationFrame !== 'function') return; looping = true; requestAnimationFrame(frameLoop); }
+
 // ---------- taps ----------
 // A tap opens a game only when it is a tap: not the end of a drag (the finger or the deck moved between touch and
 // release), and on the deck only the card in the middle. A side card's tap brings it to the middle. A tap that stops
@@ -219,7 +260,7 @@ $('lang').onclick = () => {
 function draw() {
   W.apply(); document.title = t('docTitle');
   $('lang').textContent = t('langOther'); $('lang').setAttribute('aria-label', t('langName'));
-  drawTonight(); drawDeck();
+  drawTonight(); drawDeck(); startLive();
   try { const o = JSON.parse(sessionStorage.getItem('hub:small:open')); sessionStorage.removeItem('hub:small:open'); if (o?.slug) rec.event('open', o); } catch {}
 }
 // Coming back from a game with the back button can restore this page from the back-forward cache, and a game left
@@ -236,6 +277,6 @@ noZoom(); draw();
 window.smallPicture = () => new Promise(ok => { const f = picture?.file; if (!f) return ok(null); const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = () => ok(null); r.readAsDataURL(f); });
 window.smallState = () => ({
   lang: W.lang(), today, pick: pick.slug, three: set.map(game => game.slug), kinds: KINDS, signs: signs(set), at,
-  intro: !$('intro').hidden, result: !!$('result').firstElementChild, picture: !!picture?.file,
+  intro: !$('intro').hidden, live: [...document.querySelectorAll('canvas.live.on')].map(c => c.dataset.live), result: !!$('result').firstElementChild, picture: !!picture?.file,
   run: $('run').textContent, links: [...document.querySelectorAll('a[data-slug]')].map(a => ({ slug: a.dataset.slug, where: a.dataset.where, href: a.getAttribute('href') })),
 });
