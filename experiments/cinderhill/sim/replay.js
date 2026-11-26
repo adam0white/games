@@ -41,6 +41,8 @@ export function script(cfg, ticks) {
     add({ tick: t + 2400, type: CMD.ALARM, layer: NEST, x: h.x + 2, y: h.y + 2, hold: 100 });
   }
   for (let t = 2500; t < ticks; t += 4000) { add({ tick: t, type: CMD.RECALL, on: true }); add({ tick: t + 400, type: CMD.RECALL, on: false }); }
+  // Crews (SIM_VERSION 7): sizes on the newest trail, up and down.
+  for (let t = 900, k = 0; t < ticks; t += 1700, k++) add({ tick: t, type: CMD.CREW, seq: 0, delta: k % 3 === 2 ? -6 : 5 });
   // Stable order: (tick, seat, id). The comparator makes the order the same on every engine.
   out.sort((a, b) => a.tick - b.tick || a.seat - b.seat || a.id - b.id);
   return out.filter(c => c.tick < ticks);

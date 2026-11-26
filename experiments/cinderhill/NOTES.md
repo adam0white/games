@@ -66,7 +66,7 @@ The phone check `cinderhill orders` plays pinches and two-finger pans mid-stroke
 Decisions:
 
 - The sim runs on the main thread (S3: a few ms a tick on an M4 Mac). A Worker waits for a real phone to show long frames.
-- Ant crews are counts only: the sim has no "ants wanted" number, and the page says so.
+- Ant crews were counts only until sim 7; crews (below) add a crew size per trail.
 - The page sets up the colony: 17 in 20 ants forage, 2 dig, 1 guards; seven in ten foragers start on the surface near the entrance with staggered time out. The sim's rules are not changed by this.
 - Sim change: foragers keep following the newest trail while they are on it. Before, a forager dropped any trail 30 s into her trip, so a trail longer than about 30 cells never reached its food (2,000 ants, trail to pile 3: 51 seeds picked by tick 1,600 before, 592 and the pile emptied after). This changed the hashes (`quick.js`, S2 re-run).
 - Saved: `cinderhill:save` `{ v: 1, sound, ants, tapTrail }` and `cinderhill:hint`. Written on a setting change or the first Play.
@@ -113,7 +113,7 @@ Choices the owner may want to change: the start (20/40/4), sugar and protein per
 
 Bots after three days (`sim/SPIKES.md`): careful 130 to 153 ants, greedy (sugar only) 20, idle 20 to 94. Idle play does not lose on every map: adults never starve and there is no goal yet. Days (below) now give idle play a goal it fails.
 
-Foraging two foods needs crews split between trails. Seekers take the newest trail and keep their route, so the careful bot redraws to the scarcer food every 1,500 ticks. The spec's crew plus and minus (02-spec 6.4) is the real answer and is not built.
+Foraging two foods needs crews split between trails. Seekers take the newest trail and keep their route, so the careful bot redraws to the scarcer food every 1,500 ticks. Crews (sim 7, below) are the spec's crew plus and minus (02-spec 6.4).
 
 The page draws the queen and brood as placeholder shapes in the nest view; the HUD shows ants, sugar, protein and the brood by stage. A newborn ant is drawn without interpolation on her first tick. When an ant dies the later ants move down one index, so that tick is drawn without interpolation and the selected ant is let go.
 
@@ -210,6 +210,76 @@ Every game sends its whole replay to the game lab, so a session can be played ag
 
 `spikes/replay-lab.mjs <record.json> [...]` makes the game again with `host.js`, replays the stream, checks every hash (part starts, samples, the final one) and writes a report: deliveries by food per minute, working and idle ants, each trail (ants on it, trips, time to the first delivery, how it ended), digs and what they opened, alarms and recalls with their effect, brood and castes, deaths, stalls of 60 s with nothing happening, days and restarts, and the page's frame rate, holds and errors. Trips are not attributed on ticks where an ant died. A record from another sim version will not match; the report says so. `test/labrec.test.mjs` plays a bot game through a Host as the page does, checks the kit's limits, replays it, and shows that one changed order is caught at the next sample.
 
+## Crews (SIM_VERSION 7, 2026-11-26)
+
+Tap a trail's number, then + or - to set how many ants it wants (`CMD.CREW`, command type 5: trail number and change, the change clamped to -64..64; trail number 0 means the newest trail). The sim keeps a wanted size per trail slot (`G.WANT0` to `WANT0 + 3`, stored as size + 1 so 0 means "no size"); the first order counts the ants on the trail now and adds the change. An ant's crew is her route (`via`), so the count is the ants whose route is that trail.
+
+- Plus takes free ants and ants from trails without a size, never from another crew. A seeker ranks trails short of their size by her distance to the trail and joins the nearest.
+- Minus sends ants over the size home; at home they come out again free. An ant over her crew's size takes no load on the surface.
+- An ant that gives up, or whose trail can no longer be reached, frees her place at once.
+- The newest trail takes every seeker only while it has no size. A new trail in a reused slot starts without one.
+- The room (`workers/cinderhill`) accepts command type 5 and clamps it the same way.
+
+`test/crew.test.mjs` (6 tests). Mutations shown to fail: pickup over the size allowed, a short-crew seeker kept on her old route, the change not clamped (wraps), the room refusing type 5.
+
+## The pace pass (SIM_VERSION 7, 2026-11-26)
+
+The owner's lab records of 20:31 to 20:34 UTC (4 sessions: 12, 69, 82 and 120 s) replay exactly at sim 6 (`spikes/replay-lab.mjs`). In the 120 s one he drew one 47-cell trail to protein at the start; the first load came home 73 s later; no ant was born; nothing else happened. The frame rate was fine (median 120). The first two minutes were empty.
+
+What changed, all in the sim:
+
+| Lever | Sim 6 | Sim 7 |
+| --- | --- | --- |
+| Ant speed (`WALK` / `RUN`, sub-cells a tick) | 24 / 36 | 48 / 72 |
+| Queen's chamber depth below the surface | 24 rows | 10 rows |
+| First two piles (one sugar, one protein) | 30 to 89 cells out, 400 to 799 food | 17 to 21 cells out, 120 to 179 food |
+| New piles during a day | none | at 7, 10, 14 and 18 twentieths of the day (73, 105, 147, 189 s), 24 to 63 cells out, 200 to 400 food, protein first then alternating (`world.js` `windfall`, event `PILE_NEW`) |
+| Day length (`DAY_TICKS`) | 12,000 (10 min) | 4,200 (3.5 min) |
+| Brood: egg / larva meal / starve / pupa / adult meal (ticks) | 3,000 / 1,200 / 6,000 / 4,800 / 1,200 (egg to adult 9.5 min) | 600 / 300 / 2,400 / 900 / 600 (egg to adult 2 min) |
+| Brood at the start | 4 larvae | 4 larvae and 3 pupae that hatch at 15, 30 and 45 s |
+| Spider | from day 2 | day 1 walks the edge at a quarter of the day (52 s) and eats no one; first hunt on day 2 |
+| Seeking gives up after | 60 s | 30 s |
+| Trail scent half-life | 4,000 ticks | 1,400 ticks |
+| Day goals | 40 loads / 40 dug / 60 of each food | 60 loads / 40 dug / 110 of each food |
+
+The page shows each new thing: a toast and sound for a new pile, the first birth and every tenth, and "larvae are hungry" when there are larvae and no protein (lab events `pile` and `hungry`).
+
+**Acceptance** (the coordinator's brief, written before tuning): the first load home 10 to 15 s after the first trail; the first new ant within 60 s; no stretch over 45 s in the first five minutes with nothing new. Measured by `spikes/pace.mjs` on 24 seeds with two passive players like the owner (one trail at 3 s, then nothing): "near" draws to the nearest pile, "owner" to the nearest protein.
+
+| Player | Pile distance (cells) | First load after the trail: median / worst | First birth, worst | Longest quiet stretch, worst | Ants at 5 min (median) | Larvae lost (median) |
+| --- | --- | --- | --- | --- | --- | --- |
+| near | 7 to 16 | 8 to 9.5 / 13.0 s | 15 s | 52.6 s | 21 to 22 | 42 to 43 |
+| owner | 7 to 19 | 8.2 to 10.8 / 14.7 s | 15 s | 52.6 s | 31 to 32 | 0 |
+
+(Two shards of 12 seeds; the ranges are the two shards' medians.) A quiet stretch ends only at something the page announces: a load home (the first), the first birth and every tenth (toasts), a new pile, a pile empty, the spider's warning, a dusk. Lost larvae have no toast and do not count. First load and first birth hold on every seed. The quiet stretch does not: on every seed the last one runs from the first dusk (210 s) to day 2's spider warning (262.5 s). Counting every birth (each has a sound) it was 31.5 s. The near player fetches only sugar, so its larvae starve; the page says "larvae are hungry". The median first load is below 10 s; the brief's 10 to 15 s was read as "at most 15 s".
+
+**Superseded.** The round-3 spec (`docs/design/colony/02-spec.md` section 3, merged after this pass) sets different numbers: 300 ants at the start, walk 3.5 cells a second on a trail, egg to adult in 60 s, no days, and decision events at most 30 s apart. This pass is the interim build the owner can play now; R1 replaces its starting values, and the R0 pace gate measures both against the spec.
+
+**Bots** (`bots.mjs`, seeds 1 to 12, three days of 4,200 ticks, with day 3 at 110). Acceptance, kept from sim 6: careful wins every day on every seed, idle loses every day on every seed.
+
+| Bot | Day 1 (60 loads) | Day 2 (40 dug) | Day 3 (110 of each; 83 eased) |
+| --- | --- | --- | --- |
+| careful | won 12 of 12 (160 to 206) | won 12 of 12 (48) | won 11 of 12; seed 1 lost with 93 protein |
+| careless (no Recall) | won 12 of 12 | won 12 of 12 | won 11 of 12; seed 3 lost with 96 protein; the spider ate 28 to 30 a game |
+| greedy (sugar only) | won 12 of 12 | lost 12 of 12 | lost 11 of 12; seed 12 won |
+| idle | lost 12 of 12 | lost 12 of 12 | lost 11 of 12; seed 9 won with 103 sugar and 215 protein, by scent |
+
+Both acceptance lines miss on one seed of twelve, on day 3. Day 3 was 60 at first; idle won it on seed 3 of a five-seed run, so it went to 110, and now careful loses one seed and idle still wins one. The next fix would be to count only loads brought along a trail on day 3, as day 1 does. It is not made: the round-3 spec drops days (above), so tuning them further is spent on code that R1 replaces. On a both-foods day the careful bots now take the food with fewer loads since dawn and redraw every 600 ticks (1,500 before).
+
+`test/pace.test.mjs`: three births within 60 s; new piles at the windfall times, protein first, each with food. Mutations shown to fail: no windfalls; no pupae at the start.
+
+## Speed (2026-11-26, page only)
+
+A button beside Hold cycles 1x, 2x, 4x. It is a view speed: the host runs 2 or 4 times as many ticks per frame (at most 4, 8 or 16 a frame), so the sim, its hashes and the command log are the same as at 1x. A new game starts at 1x. The lab record gets a `speed` event with the tick and the speed. The `cinderhill speed` phone line checks that 4x runs at least 2.5 times the ticks of 1x and that the log replays in Node to the page's hash. In a shared room a speed would be a room rule, like the hold; it is solo only.
+
+## Combat at a choke: first probe (2026-11-26, not built)
+
+Before the round-3 spec placed the rival colony at R2b, a throwaway copy of the sim tried today's `fight()` on a 64 by 40 arena: 20 majors (team 0) against 60 workers (team 1), in the open and at a 2-cell gap in a stone wall, 3 seeds each, 3,000 ticks. The battle toy's arithmetic (`experiments/lab/cinderhill-battle/NOTES.md`) says the workers should win in the open (square law: 3 squared beats the majors' 6-fold bite times hit points) and the majors at the gap (contact-limited).
+- Today's rules alone: almost no fighting. Ants pass through one another and only bite what they touch on the way.
+- With ants steering at the nearest enemy within 2 cells and standing still while in contact: the majors lost at the gap in about 160 ticks (everyone crowded into the gap), and the open fights did not finish in 3,000 ticks (the armies stood at their goals).
+- Adding a cap of 1 or 2 biters per cell per team (an ant may bite only when fewer of her team in her cell bit within the last 10 ticks) turned the gap around: the majors won all 6 gap runs with 8 to 18 left. The open runs still did not finish, so the square-law half is not shown.
+So geometry alone does not give a frontage cap here; a per-cell contact limit does, which matches the spec's "combat by bounded contact slots" (05-tech, Rebuild plan). The open-field half needs both armies to seek each other out, which is rival behaviour, not a fight rule.
+
 ## The tactical hold (2026-11-26)
 
 The Hold button (Durdur in Turkish) stops time on the page: the host stops advancing ticks, so the sim, scent and ants stand still. Orders still work while held. A trail or dig drawn while held is queued at the current tick (the page state says queued); the first tick after Go applies it. A blue frame marks the held screen. The hold lives in the page (`painter.js` `held`, `host.advance(now, ... || held)`), not in the sim, so it changes no hash and needs nothing from the room. In a shared room a hold would have to be a room rule (who may stop time for everyone); that is open. Trail, dig and Recall all go through the same `order()` path to `host.order`; the Recall button shows its new state only once Go applies it (it follows the sim). The `cinderhill orders` phone line checks that no tick runs while held, that a trail stroke queues, and that Go applies it; it fails when the hold does not stop time. Dig and Recall while held are not checked on their own. The kit's `pause.js` is the full pause (pause card, page hidden) and Cinderhill uses it; a hold that takes orders has one user, so it stays in the game until a second game needs it (kit rule 1).
@@ -217,7 +287,7 @@ The Hold button (Durdur in Turkish) stops time on the page: the host stops advan
 ## Simplifications to revisit in M1
 
 - Diggers dig the nearest marked cell, not the painted order, and carry no spoil. A dig crew is capped (4 per marked cell, 24 in all).
-- Foragers seek in this order: the trail that led them out last (their route), the pile they last took from, the newest trail, the three scent sensors, a random walk. After a minute with nothing found they go home. The scripted orders do not give good foraging; that is tuning work.
+- Foragers seek in this order: the trail that led them out last (their route), a trail short of its crew, the pile they last took from, the newest trail (when it has no crew size), the three scent sensors, a random walk. After 30 s with nothing found they go home. The scripted orders do not give good foraging; that is tuning work.
 - A field rebuild is a whole-field search (about 1.3 ms on the full map with octile costs, 0.7 ms before). Rebuilding all 9 live fields in one tick now takes about 12 ms, over the 10 ms tick budget. Regional rebuilds and a per-tick rebuild budget are not built.
 - Ants in a crowd pass through one another. Separation bends a path but never cancels the step.
 - No duplicate-command check in the sim; the room drops duplicates (05-tech, room protocol).

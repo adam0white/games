@@ -37,11 +37,11 @@ function until(s, tick, onTick) {
 
 test('under Recall the surface empties and stays empty: foragers in the nest do not go out', () => {
   const s = colony();
-  trail(s); until(s, 200);
+  trail(s); until(s, 100);
   assert.ok(surface(s) >= 8, `${surface(s)} on the surface before`);
-  order(s, { type: CMD.RECALL, on: true }); until(s, 400);
+  order(s, { type: CMD.RECALL, on: true }); until(s, 300);
   assert.equal(surface(s), 0, 'all home after 200 ticks');
-  until(s, 550);
+  until(s, 450);
   assert.equal(surface(s), 0, 'and none go out again');
   order(s, { type: CMD.RECALL, on: false }); until(s, 650);
   assert.ok(surface(s) > 0, 'they go out once Recall is off');
@@ -61,11 +61,11 @@ test('under Recall a waiting forager\'s search does not age, and guards stay in 
   assert.ok(waiting >= 8, `${waiting} waiting`);
 });
 
-test('no spider on day 1; on day 2 a warning at a quarter of the day, then it walks the top edge and eats no one (the safe form)', () => {
+test('on day 1 a warning at a quarter of the day, then it walks the top edge and eats no one (the safe form)', () => {
   const s = colony(); trail(s);
   order(s, { type: CMD.TRAIL, layer: SURFACE, points: [25, 25, 9, 6] }); // the newest trail ends on the edge row, where the spider starts
-  const ev = until(s, 2 * T);
-  const warn = T + (T >> 2), hunt = warn + 20;
+  const ev = until(s, T);
+  const warn = T >> 2, hunt = warn + 20;
   assert.deepEqual(ev[0], [warn, SPIDER.WARN, -1]);
   assert.deepEqual(ev[1], [hunt, SPIDER.HUNT, -1]);
   assert.equal(ev[2][1], SPIDER.LEFT);
@@ -113,8 +113,8 @@ test('Recall at the warning, off when it leaves: the spider finds no one', () =>
     if (st === SPIDER.NONE && on) { on = false; order(sim, { type: CMD.RECALL, on: false }); }
   });
   const left = ev.filter(e => e[1] === SPIDER.LEFT);
-  assert.equal(left.length, 2);
-  assert.deepEqual(left.map(e => e[2]), [0, 0], 'nothing eaten on either visit');
+  assert.equal(left.length, 4); // days 1 (the safe walk) to 4
+  assert.deepEqual(left.map(e => e[2]), [0, 0, 0, 0], 'nothing eaten on any visit');
   assert.equal(s.g[G.SP_EATEN], 0);
 });
 

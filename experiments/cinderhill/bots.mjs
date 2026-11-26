@@ -12,10 +12,10 @@
 //
 // Usage: node experiments/cinderhill/bots.mjs [seeds, comma-separated] [ticks] [bots, comma-separated]
 import { CMD, FOOD, G, STAGE, SURFACE, Sim } from './sim/sim.js';
-import { GOAL_KIND, START, goalOf } from './sim/colony.js';
+import { DAY_TICKS, GOAL_KIND, START, dayState, goalOf } from './sim/colony.js';
 import { EVENT } from './sim/sim.js';
 import { SPIDER } from './sim/spider.js';
-const DAY = 12000;
+const DAY = DAY_TICKS;
 
 function piles(sim, kind) {
   const L = sim.L, ex = L.sw >> 1, ey = L.sh >> 1, out = [];
@@ -52,12 +52,14 @@ export function play(bot, seed, ticks = 3 * DAY, extra = {}) {
   for (let t = 0; t < ticks; t++) {
     // At dawn: a digging day's goal needs a room dug.
     if (DIGS[bot] && t % T === 0 && goalOf(sim.g[G.DAY]).kind === GOAL_KIND.DUG) sim.queueCommand({ tick: sim.tick, id: ++id, seat: 0, type: CMD.DIG, cells: nursery(sim) });
-    // Every 1,500 ticks (or when the trail's pile runs out), a trail to the food the colony is shortest of.
+    // Every 1,500 ticks (600 on a both-foods day), or when the trail's pile runs out, a trail to the food the colony is shortest of.
     // Seeking foragers take the newest trail, and a forager keeps the trail that led her out, so redrawing
     // to the scarcer food splits the crew between the two foods over time.
     const empty = lastPile >= 0 && sim.pileAmount[lastPile] <= 0;
-    if (kinds.length && (t % 1500 === 0 || empty)) {
-      const kind = kinds.length === 1 ? kinds[0] : scarcer(sim);
+    if (kinds.length && (t % (goalOf(sim.g[G.DAY]).kind === GOAL_KIND.BOTH_FOODS ? 600 : 1500) === 0 || empty)) {
+      // On a both-foods day the careful bots work toward the goal: the food with fewer loads since dawn.
+      const st = dayState(sim), both = st.kind === GOAL_KIND.BOTH_FOODS && kinds.length > 1;
+      const kind = kinds.length === 1 ? kinds[0] : both ? (st.a <= st.b ? FOOD.SUGAR : FOOD.PROTEIN) : scarcer(sim);
       const near = piles(sim, kind)[0] ?? piles(sim, kind ^ 1)[0];
       if (near && (near.p !== lastPile || kind !== last || empty)) {
         sim.queueCommand({ tick: sim.tick, id: ++id, seat: 0, type: CMD.TRAIL, layer: SURFACE, points: [ex + 1, ey + 1, near.x, near.y] });

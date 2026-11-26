@@ -9,7 +9,7 @@ export const TICK_MS = 50;
 export const COUNTS = [500, 2000, 5000];
 export const SEED = 2026;
 export { JOB, MODE, CMD, SLOT, SURFACE, NEST, MAT, FIELD, G, MAX_PILES };
-const NAMES = { [CMD.TRAIL]: 'trail', [CMD.DIG]: 'dig', [CMD.ALARM]: 'alarm', [CMD.RECALL]: 'recall' };
+const NAMES = { [CMD.TRAIL]: 'trail', [CMD.DIG]: 'dig', [CMD.ALARM]: 'alarm', [CMD.RECALL]: 'recall', [CMD.CREW]: 'crew' };
 
 export class Host {
   constructor(ants = 2000, seed = SEED, { colony = false, dayTicks } = {}) { this.log = []; this.colony = colony; this.dayTicks = dayTicks; this.reset(ants, seed); }
@@ -43,7 +43,7 @@ export class Host {
     // Days (colony.js): the dawn save of each day still open to a restart (today's, and yesterday's until the
     // player picks at dusk), and the dusk that has just happened, until the page has shown it. A dawn save is
     // { bytes, log: the order log's length then, delivered }.
-    this.dawns = new Map(); this.dusk = null; this.spiderNews = []; // spider.js events for the page: { state, arg, tick }
+    this.dawns = new Map(); this.dusk = null; this.spiderNews = []; this.pileNews = []; // spider.js and windfall events for the page: { state, arg, tick }, { pile, kind, tick }
     if (this.colony) this.saveDawn();
   }
 
@@ -72,7 +72,7 @@ export class Host {
     for (const [d] of this.dawns) if (d > day) this.dawns.delete(d);
     // Orders given after the save are gone; orders in the save still waiting for their tick run again.
     this.log.forEach((e, k) => { if (k >= save.log) e.state = 'undone'; else if (e.tick >= this.sim.tick) e.state = 'queued'; });
-    this.attach(); this.delivered = save.delivered; this.dusk = null; this.spiderNews = []; this.shifted = true; this.terrainVersion++; this.acc = 0; this.last = null;
+    this.attach(); this.delivered = save.delivered; this.dusk = null; this.spiderNews = []; this.pileNews = []; this.shifted = true; this.terrainVersion++; this.acc = 0; this.last = null;
     return true;
   }
 
@@ -85,12 +85,15 @@ export class Host {
 
   snap() { const s = this.sim, n = (this.pn = s.n); this.px.set(s.x.subarray(0, n)); this.py.set(s.y.subarray(0, n)); this.pl.set(s.layer.subarray(0, n)); }
 
-  /** Steps the sim for the time since the last call (at most 4 ticks a frame). Returns the ticks run. */
+  /** Steps the sim for the time since the last call (at most 4 ticks a frame, times the view speed). Returns the
+   *  ticks run. `speed` (1, 2 or 4) is the page's view speed: more ticks per second of the same sim, so it changes
+   *  no hash and needs nothing from a room (solo play only). */
   advance(now, paused) {
     if (this.last === null || paused || this.dusk) { this.last = now; return 0; }
-    this.acc += Math.min(now - this.last, 250); this.last = now;
+    const x = this.speed ?? 1;
+    this.acc += Math.min(now - this.last, 250) * x; this.last = now;
     let k = 0;
-    while (this.acc >= TICK_MS && k < 4 && !this.dusk) { this.step(); this.acc -= TICK_MS; k++; }
+    while (this.acc >= TICK_MS && k < 4 * x && !this.dusk) { this.step(); this.acc -= TICK_MS; k++; }
     if (this.dusk) this.acc = 0; // time stops at dusk until the page moves on
     if (this.acc > TICK_MS) this.acc = TICK_MS; // a slow phone drops time rather than spiralling
     return k;
@@ -111,8 +114,11 @@ export class Host {
     this.tickMs.push(ms); if (this.tickMs.length > 2000) this.tickMs.splice(0, 1000);
     this.ticks++;
     const ev = this.sim.drainEvents();
+    this.lastEvents = [];
     for (let k = 0; k < ev.length; k += 3) {
       const type = ev[k];
+      this.lastEvents.push([type, ev[k + 1], ev[k + 2]]);
+      if (type === EVENT.PILE_NEW) this.pileNews.push({ pile: ev[k + 1], kind: ev[k + 2], tick: this.sim.tick });
       if (type === EVENT.DUG) this.terrainVersion++;
       else if (type === EVENT.SPIDER) this.spiderNews.push({ state: ev[k + 1], arg: ev[k + 2], tick: this.sim.tick });
       else if (type === EVENT.DUSK) {
@@ -147,24 +153,26 @@ export class Host {
     const s = this.sim, n = s.n, slots = new Int32Array(16);
     let surface = 0, carrying = 0, foragers = 0, seeking = 0, late = 0, guards = 0, guardsAt = 0, diggers = 0;
     const newest = s.newestTrail();
+    const onIt = new Int32Array(SLOT.TRAILS);
     for (let i = 0; i < n; i++) {
       if (s.goal[i] >= 0) slots[s.goal[i]]++;
+      if (s.hp[i] > 0 && s.job[i] === JOB.FORAGE && s.via[i] >= SLOT.TRAIL0 && s.via[i] < SLOT.TRAIL0 + SLOT.TRAILS) onIt[s.via[i] - SLOT.TRAIL0]++;
       const out = s.layer[i] === SURFACE;
       if (out) surface++;
       if (s.carry[i]) carrying++;
       if (s.job[i] === JOB.FORAGE) {
         foragers++;
-        if (out && s.mode[i] === MODE.SEEK) { seeking++; if (s.since[i] >= 600) late++; }
+        if (out && s.mode[i] === MODE.SEEK) { seeking++; if (s.since[i] >= 300) late++; } // past half of SEEK_GIVE_UP (sim.js): too late to take the newest trail
       } else if (s.job[i] === JOB.GUARD) guards++; else diggers++;
     }
     const F = s.flow, trails = [];
     for (let k = 0; k < SLOT.TRAILS; k++) {
       const slot = SLOT.TRAIL0 + k; if (!F.live[slot]) continue;
-      const c = F.cell[slot], crew = slots[slot];
+      const c = F.cell[slot], crew = slots[slot], w = s.g[G.WANT0 + k]; // w: crew size plus one; 0: none
       let why = '';
-      if (slot !== newest) why = 'older';
+      if (slot !== newest && !w && onIt[k] === 0) why = 'older'; // no crew size and no one on it: free ants go to the newest
       else if (crew === 0) why = seeking === 0 ? 'noSeekers' : late >= seeking ? 'outTooLong' : 'none';
-      trails.push({ slot, x: c % s.L.sw, y: Math.floor(c / s.L.sw), crew, newest: slot === newest, why, seq: F.seq[slot] });
+      trails.push({ slot, x: c % s.L.sw, y: Math.floor(c / s.L.sw), crew, on: onIt[k], want: w ? w - 1 : null, newest: slot === newest, why, seq: F.seq[slot] });
     }
     const alarm = F.live[SLOT.ALARM] ? { cell: F.cell[SLOT.ALARM], coming: slots[SLOT.ALARM], guards, held: s.g[G.ALARM_HOLD] } : null;
     const dig = { marked: s.g[G.DIG_COUNT], crew: s.g[G.DIG_CREW], cap: Math.min(24, 4 * s.g[G.DIG_COUNT]), diggers, dug: s.g[G.DUG] };
@@ -196,7 +204,7 @@ export class Host {
       else if (to === 'trail') why = 'onTrail';
       else if (to === 'food') why = 'remembers';
       else if (s.stall[i] > 20) why = 'stuck';
-      else if (s.newestTrail() >= 0 && s.since[i] >= 600) why = 'tooLongForTrail';
+      else if (s.newestTrail() >= 0 && s.since[i] >= 300) why = 'tooLongForTrail';
       else why = 'searching';
     } else if (s.job[i] === JOB.DIG) {
       if (s.mode[i] === MODE.WORK) why = to === 'dig' ? 'toDig' : 'digging';

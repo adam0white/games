@@ -17,8 +17,8 @@
 // - Adults eat: every ADULT_EAT_EVERY ticks, one unit of sugar per ADULTS_PER_SUGAR ants (rounded up). When
 //   there is not enough, the store empties and G.HUNGRY counts the missed meal. No adult starves yet (the
 //   starvation guard is feature 17, P1).
-// Egg to adult is EGG_TICKS + LARVA_FEEDS * FEED_EVERY + PUPA_TICKS = 11,400 ticks, 9.5 minutes: about one day
-// of play (02-spec section 10: "about 1 day of play").
+// Egg to adult is EGG_TICKS + LARVA_FEEDS * FEED_EVERY + PUPA_TICKS = 2,400 ticks, 2 minutes: under one day of
+// play (sim 7, the pace pass: a day is 3.5 minutes and the first births come in the first minute).
 //
 // Fights (for the battle work to come, 02-spec 6.5): every ant has a caste, hit points, a team and a bite
 // cooldown. fight() runs once a tick after every ant has moved: each ant whose cooldown is over bites the first
@@ -40,10 +40,11 @@ export const FOOD = { SUGAR: 0, PROTEIN: 1 };
 export const LOAD = [4, 2]; // store units per load brought home: sugar, protein
 export const BROOD_MAX = 512;
 // How a colony game starts (the page's ?colony=1 and bots.mjs): 20 workers, 40 sugar, 4 larvae.
-export const START = { ants: 20, sugar: 40, larvae: 4 };
+// Sim 7 (the pace pass): also 3 pupae that hatch 30, 45 and 60 s in, so the first births come in the first minute.
+export const START = { ants: 20, sugar: 40, larvae: 4, pupae: 3 };
 export const C = {
-  LAY_EVERY: 240, LAY_RICH: 50, EGG_TICKS: 3000, FEED_EVERY: 1200, LARVA_FEEDS: 3, MAJOR_FEEDS: 5, MAJOR_PROTEIN: 20,
-  LARVA_STARVE: 6000, PUPA_TICKS: 4800, ADULT_EAT_EVERY: 1200, ADULTS_PER_SUGAR: 10,
+  LAY_EVERY: 240, LAY_RICH: 50, EGG_TICKS: 600, FEED_EVERY: 300, LARVA_FEEDS: 3, MAJOR_FEEDS: 5, MAJOR_PROTEIN: 20,
+  LARVA_STARVE: 2400, PUPA_TICKS: 900, ADULT_EAT_EVERY: 600, ADULTS_PER_SUGAR: 10,
 };
 // Jobs by birth order, out of ten: 7 forage, 2 dig, 1 guard (JOB values from sim.js: 0 forage, 1 dig, 2 guard).
 const JOB_ROUND = [0, 0, 1, 0, 0, 2, 0, 0, 1, 0];
@@ -154,17 +155,17 @@ export function hurt(sim, i, amount) {
 }
 
 // ---- Days (02-spec 6.8, 6.9) ----
-// A day is cfg.dayTicks ticks (12,000: ten minutes). Each day has one goal, checked at dusk: the last tick of the
+// A day is cfg.dayTicks ticks (4,200: 3.5 minutes). Each day has one goal, checked at dusk: the last tick of the
 // day, after everything else in that tick. Goals count from dawn, so a day cannot be won with yesterday's work.
 // Day 1 asks for the trail, day 2 for digging, day 3 for both foods; each needs an order, so a colony left alone
 // fails all three (bots.mjs measures it). Later days repeat day 3 with a larger target.
 // Losing a day: the colony keeps what it has, and the next day's goal is eased by a quarter. At every dawn a colony
 // below the floor (fewer than START.ants ants, or under FLOOR_SUGAR sugar) gets GIFT_SUGAR sugar (02-spec 6.9:
 // "Burr brings seeds"). The page offers a restart from the dawn save; that lives in the page, not here.
-export const DAY_TICKS = 12000;
+export const DAY_TICKS = 4200; // 3.5 minutes (sim 7; 12,000 before)
 export const GOAL_KIND = { TRAIL_LOADS: 1, DUG: 2, BOTH_FOODS: 3 };
 // [kind, target] per day, from day 1.
-export const DAY_GOALS = [[GOAL_KIND.TRAIL_LOADS, 40], [GOAL_KIND.DUG, 40], [GOAL_KIND.BOTH_FOODS, 60]];
+export const DAY_GOALS = [[GOAL_KIND.TRAIL_LOADS, 60], [GOAL_KIND.DUG, 40], [GOAL_KIND.BOTH_FOODS, 110]]; // sim 7: day 1 asks 60 loads (40 before) and day 3 110 of each food (60 before): ants are twice as fast and food is near, and a day-3 colony left alone fetched at least 77 of each by scent (bots.mjs idle, seed 3)
 export const FLOOR_SUGAR = 10, GIFT_SUGAR = 20;
 
 /** The goal of day `day` (1 = the first): { kind, target }, eased by a quarter when `eased`. */

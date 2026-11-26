@@ -397,3 +397,27 @@ Acceptance, written before tuning: careful (with Recall) wins days 1 to 3 on eve
 - Two tests were weak: removing the kill (`hurt`) or reversing the walk left them green. Both now fail.
 
 **Mutations shown to fail** (`test/spider.test.mjs`, 8 tests): foragers going out under Recall; the search timer running under Recall; guards going out under Recall; a first visit that eats; a spider that eats without killing; the walk reversed; an ant beside two trails counting for one. Restore was checked at every tick of a visit (165 ticks, through meals): each continues to the same hashes as the run that was not saved.
+
+## Crews and the pace pass (SIM_VERSION 7, snapshot format 7, 2026-11-26)
+
+Crews (`CMD.CREW`, `G.WANT0` to `WANT3`) and the pace pass (`../NOTES.md`, Crews and The pace pass): walk 48 and run 72 units a tick, a trail half-life of 1,400 ticks, a colony start of 20 ants, 40 sugar, 4 larvae and 3 pupae (hatching at 15, 30 and 45 s), a 4,200-tick day, piles 17 to 21 cells out, new piles (windfalls) 73, 105, 147 and 189 s into each day. New totals: `EXPECTED` 1411691088, `EXPECTED_LONG` 2162690173, `EXPECTED_COLONY` 175470471.
+
+| Measure | Before (SIM_VERSION 6) | After |
+| --- | --- | --- |
+| S2 sandbox: Node, workerd, Chromium 156.0.8078.4, WebKit 27.2 on all 600 records | agree (1788171951) | agree (final total 2162690173) |
+| S2 colony (`--colony`) | agree (2360211181) | agree (final total 3567596222) |
+| S2 planted fault | tick 20, `ants` | the same |
+| S2 Firefox | not run | not run (Playwright's Firefox is not installed here) |
+| S1 Node, 2,000 ants, mean / p95 / max | 1.66 / 1.74 / 4.54 ms | 1.64 / 1.75 / 3.82 ms (load average about 6) |
+| S1 Node, 5,000 ants | 2.02 / 2.16 / 5.22 ms | 1.93 / 2.10 / 3.68 ms |
+| S1 all 9 fields at once | 11.56 ms | 11.94 ms |
+| S1 workerd, 2,000 / 5,000 ants, mean | 1.89 / 2.12 ms | 1.77 / 2.05 ms (colony build: 1.67 / 2.05 ms; round trip with no ticks 1.5 to 2.2 ms) |
+| S4, 5,000 ants, 3,000 / 8,000 / 24,000 ticks | 47.6 / 56.7 / 59.9 KB | 41.1 / 40.1 / 41.1 KB (margin 22.9 KB to 64 KB) |
+
+Every S4 snapshot restores to the same hash. The smaller snapshots most likely come from the shorter trail half-life (less scent left on the map); not checked cell by cell.
+
+**Bots** (`bots.mjs`, 12 seeds): the table is in `../NOTES.md`, The pace pass. Careful loses day 3 on seed 1 and idle wins day 3 on seed 9; the day goals were not tuned further because the revised spec drops days.
+
+**Independent review** (Codex, read-only): eight findings, all fixed and listed in the pull request (an order lost at a recording rollover, overlapping windfalls, a reused pile slot redirecting ants, the starter pupae hatching together, three phone lines on sim 6 outcomes, a zero crew change accepted by the room, a crew test that missed same-tick drift).
+
+**Mutations shown to fail**: no windfalls; the pupae pre-aging removed; the windfall near-pile check removed; the windfall memory clear removed; the room accepting a zero change; the give-up decrement removed (296 mismatches in the crew-count invariant test); pickup over the crew size; a short crew order kept; no clamp on a huge change; the buffered order at rollover (labrec test).

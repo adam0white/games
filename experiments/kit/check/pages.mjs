@@ -454,6 +454,72 @@ export const pageRuns = {
     await page.click('#resume');
     await until(page, () => window.painter.state().drawn > window.__drawn0 + 5, 'frames drawn in the new look');
   },
+  // Crews (CMD.CREW): with a trail drawn, the crew panel shows; a press on + asks one more ant, a hold asks eight,
+  // and the sim takes the size (the trail's number reads on/wanted). A tap on another trail's number picks it.
+  async 'cinderhill crews'(page, { base, until }) {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`${base}/notes/button.js`);
+    await page.evaluate(() => { localStorage.clear(); localStorage.setItem('cinderhill:hint', '1'); });
+    await page.goto(`${base}/cinderhill/?ants=500&lang=en&labRunSource=agent`);
+    await until(page, () => window.painter, 'painter script');
+    await page.click('#play');
+    await until(page, () => window.painter.state().screen === 'play', 'play');
+    assert.equal(await page.isVisible('#crewCtl'), false, 'no panel before a trail');
+    await page.evaluate(() => {
+      const el = document.querySelector('#c'), x = innerWidth / 2, y = innerHeight / 2;
+      for (const [type, dx, dy] of [['pointerdown', 0, 0], ['pointermove', 30, -30], ['pointermove', 60, -60], ['pointermove', 90, -90], ['pointerup', 90, -90]]) el.dispatchEvent(new PointerEvent(type, { pointerId: 1, pointerType: 'touch', isPrimary: true, clientX: x + dx, clientY: y + dy, pressure: type === 'pointerup' ? 0 : 0.5, bubbles: true, cancelable: true }));
+    });
+    await until(page, () => window.painter.stats().trails.length === 1 && window.painter.stats().trails[0].on > 0, 'ants on the trail', 20000);
+    await until(page, () => getComputedStyle(document.querySelector('#crewCtl')).display !== 'none', 'the crew panel');
+    const on = await page.evaluate(() => window.painter.stats().trails[0].on);
+    await page.click('#crewPlus');
+    await until(page, () => window.painter.log().some(o => o.type === 'crew' && o.delta === 1), 'a plus order');
+    await until(page, () => window.painter.stats().trails[0].want !== null, 'the sim takes the crew size');
+    const want1 = await page.evaluate(() => window.painter.stats().trails[0].want);
+    assert.ok(want1 >= on + 1 - 2 && want1 <= on + 1 + 2, `wanted ${want1} from ${on} on it`);
+    const box = await page.locator('#crewMinus').boundingBox();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page.mouse.down();
+    // Held until the first eight goes out: a busy runner can fire the 400 ms timer late.
+    await until(page, () => window.painter.log().some(o => o.type === 'crew' && o.delta === -8), 'a held minus asks eight fewer');
+    await page.mouse.up();
+    await until(page, () => /of/.test(document.querySelector('#crewWho').textContent), 'the panel shows on and wanted');
+  },
+  async 'cinderhill speed'(page, { base, until }) {
+    // 4x view speed runs about four times the ticks a second, and the game it makes is the one a 1x replay of the
+    // same orders makes (Host in Node, here): the speed is the page's, not the sim's.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`${base}/notes/button.js`);
+    await page.evaluate(() => { localStorage.clear(); localStorage.setItem('cinderhill:hint', '1'); });
+    await page.goto(`${base}/cinderhill/?colony=1&lang=en&labRunSource=agent`);
+    await until(page, () => window.painter, 'painter script');
+    await page.click('#play');
+    await until(page, () => window.painter.state().dayCard === 'dawn', 'the dawn card');
+    await page.click('#dayGo');
+    await until(page, () => window.painter.state().screen === 'play', 'play');
+    await page.evaluate(() => {
+      const el = document.querySelector('#c'), x = innerWidth / 2, y = innerHeight / 2;
+      for (const [type, dx, dy] of [['pointerdown', 0, 0], ['pointermove', 30, -30], ['pointermove', 60, -60], ['pointerup', 60, -60]]) el.dispatchEvent(new PointerEvent(type, { pointerId: 1, pointerType: 'touch', isPrimary: true, clientX: x + dx, clientY: y + dy, pressure: type === 'pointerup' ? 0 : 0.5, bubbles: true, cancelable: true }));
+    });
+    await until(page, () => window.painter.log().length === 1, 'a trail order');
+    const t1 = await page.evaluate(() => window.painter.state().t);
+    await page.waitForTimeout(1000);
+    const r1 = (await page.evaluate(() => window.painter.state().t)) - t1;
+    await page.click('#speed'); await page.click('#speed');
+    assert.equal(await page.evaluate(() => window.painter.state().speed), 4);
+    assert.equal(await page.textContent('#speed'), '4×');
+    const t4 = await page.evaluate(() => window.painter.state().t);
+    await page.waitForTimeout(1000);
+    const r4 = (await page.evaluate(() => window.painter.state().t)) - t4;
+    assert.ok(r4 >= 2.5 * Math.max(r1, 10), `4x ran ${r4} ticks in a second, 1x ${r1}`);
+    await page.click('#pause');
+    await until(page, () => window.painter.state().screen === 'paused', 'paused');
+    const { t, total, log } = await page.evaluate(() => ({ t: window.painter.state().t, total: window.painter.hashes().total, log: window.painter.log() }));
+    const { Host } = await import('../../cinderhill/host.js');
+    const h = new Host(0, 2026, { colony: true });
+    for (const o of log) { while (h.tick < o.tick) h.step(); const { id, tick, type, state, ...rest } = o; h.order({ ...rest, type: { trail: 1, dig: 2, alarm: 3, recall: 4, crew: 5 }[type] }); }
+    while (h.tick < t) h.step();
+    assert.equal(h.sim.hashes().total, total, `a 1x replay to tick ${t} makes the same game`);
+  },
   async 'cinderhill hud'(page, { base, until }) {
     await page.setViewportSize({ width: 360, height: 640 });
     await page.goto(`${base}/notes/button.js`);
@@ -493,10 +559,10 @@ export const pageRuns = {
     await until(page, () => window.painter.state().screen === 'play', 'play');
     await until(page, () => /şeker/.test(document.querySelector('#stats').textContent), 'the colony line', 10000);
     const st = await page.evaluate(() => window.painter.stats());
-    assert.equal(st.ants, 20);
+    assert.ok(st.ants >= 20 && st.ants <= 23, `${st.ants} ants (20, and the three starting pupae hatch from 15 s)`);
     assert.equal(st.colony.queen, 1);
     assert.equal(st.colony.larvae, 4);
-    assert.match(await page.textContent('#stats'), /20 karınca · \d+ şeker · 0 protein · yavrular: \d+ yumurta, 4 larva, 0 pupa/);
+    assert.match(await page.textContent('#stats'), /2\d karınca · \d+ şeker · 0 protein · yavrular: \d+ yumurta, 4 larva, [0-3] pupa/);
     await page.evaluate(() => window.painter.setLayer(1));
     await until(page, () => window.painter.state().layer === 1, 'nest view');
     // Each brood item is drawn inside its own cell: some overlay pixel in that cell's square is painted.
@@ -526,11 +592,11 @@ export const pageRuns = {
     const dawnHash = await page.evaluate(() => window.painter.hashes().total);
     await page.click('#play');
     await until(page, () => window.painter.state().dayCard === 'dawn', 'the dawn card');
-    assert.match(await page.textContent('#dayGoal'), /40 loads of food along your trails/);
+    assert.match(await page.textContent('#dayGoal'), /60 loads of food along your trails/);
     assert.equal(await page.evaluate(() => window.painter.state().t), 0, 'no time passes on the dawn card');
     await page.click('#dayGo');
     await until(page, () => window.painter.state().screen === 'play', 'play');
-    await until(page, () => /Day 1 · 0 of 40 loads on your trails · dusk in/.test(document.querySelector('#goal').textContent), 'the goal line');
+    await until(page, () => /Day 1 · 0 of 60 loads on your trails · dusk in/.test(document.querySelector('#goal').textContent), 'the goal line');
     await until(page, () => window.painter.state().dayCard === 'dusk', 'the dusk card', 30000);
     assert.match(await page.textContent('#dayResult'), /Goal missed/);
     assert.match(await page.textContent('#dayNote'), /Tomorrow: Dig 30 cells of soil/);
@@ -558,7 +624,8 @@ export const pageRuns = {
     await until(page, () => /Spider: coming/.test(document.querySelector('#crew').textContent), 'the coming line');
     await until(page, () => window.painter.state().spider === 2, 'the spider hunting', 30000);
     await until(page, () => /Spider: hunting/.test(document.querySelector('#crew').textContent), 'the hunting line');
-    await until(page, () => window.painter.state().spider === 0 && window.painter.state().spiderVisits === 1, 'the spider gone', 30000);
+    await until(page, () => window.painter.state().spider === 0 && window.painter.state().spiderVisits >= 1, 'the spider gone', 30000);
+    assert.equal(await page.evaluate(() => window.painter.state().spiderVisits), 2, 'day 1 had its edge walk (sim 7), day 2 its hunt');
     const rooms = await page.evaluate(() => window.painter.rooms());
     assert.ok(rooms.length >= 1 && rooms[0].queen, 'the nest view finds the queen\'s chamber');
     const labState = await page.evaluate(() => window.painter.lab());

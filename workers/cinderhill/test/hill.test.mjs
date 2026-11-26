@@ -198,3 +198,17 @@ test('the clock stops 5 s after the last socket closes, and starts again on a jo
   advance(w, 1000);
   assert.ok(hill.sealed > sealed);
 });
+
+test('a crew order (type 5) is acknowledged and sealed; a malformed one is refused', () => {
+  const w = world(), hill = room(w), p = player(hill, w, {});
+  advance(w, 500);
+  p.say({ t: 'cmd', id: 1, tick: hill.sealed + 3, cmd: { type: 5, seq: 0, delta: 3 } });
+  p.say({ t: 'cmd', id: 2, tick: hill.sealed + 3, cmd: { type: 5, seq: 0 } }); // no delta
+  p.say({ t: 'cmd', id: 3, tick: hill.sealed + 3, cmd: { type: 5, seq: 0, delta: 0 } }); // the sim rejects a zero change
+  advance(w, 500);
+  assert.equal(p.acks.filter(a => a.id === 1).length, 1);
+  const sealed = p.got.flatMap(f => f.commands);
+  assert.equal(sealed.length, 1);
+  assert.equal(sealed[0][3], 5);
+  assert.equal(hill.stats().bad, 2);
+});

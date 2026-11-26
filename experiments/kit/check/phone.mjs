@@ -1452,7 +1452,7 @@ const MUTATE = process.argv.includes('--mutate'); // only 'lantern ripples' read
 const [onlyGame, onlyPhone] = process.argv.slice(2).filter(a => a !== '--mutate');
 // The first argument is 'all' or a comma list of experiments. An experiment's name picks its own check, its
 // first-time help check, and for Lantern the three checks below that play Lantern.
-const WITH = { lantern: ['old links', 'lab down', 'leaving mid-run', 'lantern ripples'], duel: ['duel friend'], cinderhill: ['cinderhill check', 'cinderhill orders', 'cinderhill hud', 'cinderhill colony', 'cinderhill days', 'cinderhill looks'] };
+const WITH = { lantern: ['old links', 'lab down', 'leaving mid-run', 'lantern ripples'], duel: ['duel friend'], cinderhill: ['cinderhill check', 'cinderhill orders', 'cinderhill hud', 'cinderhill colony', 'cinderhill days', 'cinderhill looks', 'cinderhill crews', 'cinderhill speed'] };
 // PHONE_QUICK=1 (pull requests) runs only each named experiment's own check: no help checks and no WITH extras.
 // Those run nightly and by hand, where the first argument is 'all'.
 const QUICK = process.env.PHONE_QUICK === '1' && onlyGame && onlyGame !== 'all';
