@@ -6,7 +6,7 @@
 // This runs on a Mac. An emulated phone is a desktop browser with a phone-sized window, touch and a user agent: the CPU
 // and GPU are the Mac's (or, for headless Chromium, a software renderer). It is not a phone. On a real phone open
 // /cinderhill/?fps=1 for the same numbers on screen.
-// Usage: PLAYWRIGHT=<dir with playwright> node s3.mjs [--seconds=10] [--warm=4] [--ants=2000,5000] [--only=webkit|chromium|chromium-gpu]
+// Usage: PLAYWRIGHT=<dir with playwright> node s3.mjs [--seconds=10] [--warm=4] [--ants=2000,5000] [--only=webkit|chromium|chromium-gpu] [--look=ink|ember|field]
 import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
 import { readFile } from 'node:fs/promises';
@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 
 const args = process.argv.slice(2), opt = (k, d) => args.find(a => a.startsWith(`--${k}=`))?.split('=')[1] ?? d;
 const SECONDS = Number(opt('seconds', 10)), WARM = Number(opt('warm', 4));
-const COUNTS = opt('ants', '2000,5000').split(',').map(Number), ONLY = opt('only', '');
+const COUNTS = opt('ants', '2000,5000').split(',').map(Number), ONLY = opt('only', ''), LOOK = opt('look', 'ink');
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..'); // experiments/: the page imports ../kit/
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.json': 'application/json' };
@@ -44,7 +44,7 @@ for (const [name, engine, device, launch] of RUNS) {
   for (const ants of COUNTS) {
     const context = await browser.newContext({ ...device }), page = await context.newPage();
     const errors = []; page.on('pageerror', e => errors.push(String(e)));
-    await page.goto(`${base}/cinderhill/?ants=${ants}`);
+    await page.goto(`${base}/cinderhill/?ants=${ants}&look=${LOOK}&labRunSource=agent`);
     await page.evaluate(() => localStorage.setItem('cinderhill:hint', '1')); // no first-time help over the sample
     await page.reload();
     await page.waitForFunction(() => window.painter);

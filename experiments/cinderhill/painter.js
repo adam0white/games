@@ -6,6 +6,7 @@ import { SPIDER } from './sim/spider.js';
 import { cellXY } from './sim/grid.js';
 import { makeGestures } from './gestures.js';
 import { Renderer } from './render.js';
+import { LOOKS, pickLook } from './looks.js';
 import { WORDS } from './words.js';
 import { line } from './sim/sim.js';
 import { noZoom } from '../kit/zoom.js';
@@ -31,6 +32,8 @@ const qAnts = Number(query.get('ants'));
 // ?colony=1: a colony game (queen, brood, sugar and protein; M1). Without it, the trail painter sandbox as in M0.
 // The ant count buttons and the saved count do not apply to a colony game.
 const colonyMode = query.get('colony') === '1';
+const lookName = pickLook(query.get('look')), LOOK = LOOKS[lookName];
+document.querySelector('meta[name=theme-color]')?.setAttribute('content', LOOK.theme); document.body.style.background = LOOK.theme;
 // ?day=<ticks> shortens a colony game's day (tests and the phone check); the game's day is colony.js DAY_TICKS.
 const qDay = Number(query.get('day'));
 let host = colonyMode ? new Host(START.ants, SEED, { colony: true, dayTicks: qDay >= 100 && qDay <= 100000 ? Math.floor(qDay) : undefined }) : new Host(COUNTS.includes(qAnts) ? qAnts : save.ants);
@@ -46,7 +49,7 @@ const rec = lab('cinderhill', { lang });
 rec.notice($('menuCard')); rec.toggle($('pauseCard'));
 // The full replay of each game and what only the page sees (labrec.js; spikes/replay-lab.mjs reads it back).
 const labrec = new LabRecord(rec);
-const startRecord = () => labrec.start(host, { mode: colonyMode ? 'colony' : 'sandbox', look: query.get('look') ?? 'default', viewport: [innerWidth, innerHeight, Math.round(devicePixelRatio * 100) / 100] });
+const startRecord = () => labrec.start(host, { mode: colonyMode ? 'colony' : 'sandbox', look: lookName, viewport: [innerWidth, innerHeight, Math.round(devicePixelRatio * 100) / 100] });
 addEventListener('error', e => labrec.error(e.message ?? 'error'));
 addEventListener('unhandledrejection', e => labrec.error(`rejection: ${e.reason?.message ?? e.reason}`));
 document.addEventListener('visibilitychange', () => labrec.visible(document.visibilityState === 'visible')); // on document: before the kit's own flush on window
@@ -57,7 +60,7 @@ const glCanvas = $('gl'), ui = $('c'), ctx = ui.getContext('2d');
 const DPR_CAP = 2;
 let W = innerWidth, H = innerHeight, dpr = Math.min(DPR_CAP, devicePixelRatio || 1);
 let renderer = null, glFailed = '';
-try { renderer = Renderer.create(glCanvas, { lost: () => {}, restored: () => { uploadAll(); } }); } catch (e) { glFailed = String(e.message || e).slice(0, 200); renderer = null; }
+try { renderer = Renderer.create(glCanvas, { lost: () => {}, restored: () => { uploadAll(); } }, LOOK.id); } catch (e) { glFailed = String(e.message || e).slice(0, 200); renderer = null; }
 if (!renderer) $('nogl').classList.add('on');
 const dims = l => (l === SURFACE ? { w: host.sim.L.sw, h: host.sim.L.sh, base: 0 } : { w: host.sim.L.nw, h: host.sim.L.nh, base: host.sim.L.nestBase });
 const cams = [null, null];
@@ -238,6 +241,11 @@ $('tapTrail').addEventListener('click', () => { save.tapTrail = !save.tapTrail; 
 for (const id of ['langMenu', 'langPause']) $(id).addEventListener('click', () => { setLang(lang() === 'en' ? 'tr' : 'en'); rec.retext?.(); retext(); });
 for (const b of document.querySelectorAll('[data-tool]')) b.addEventListener('click', () => setTool(b.dataset.tool));
 for (const b of document.querySelectorAll('[data-count]')) b.addEventListener('click', () => setCount(Number(b.dataset.count)));
+// A look is a different shader build, so changing it reloads the page with ?look= (the other parameters kept).
+for (const b of document.querySelectorAll('[data-look]')) {
+  b.setAttribute('aria-pressed', String(b.dataset.look === lookName));
+  b.addEventListener('click', () => { if (b.dataset.look === lookName) return; const u = new URL(location.href); u.searchParams.set('look', b.dataset.look); location.href = u.href; });
+}
 $('antClose').addEventListener('click', () => { selected = -1; $('antCard').classList.remove('on'); });
 onLeave(pauseGame);
 addEventListener('keydown', e => {
@@ -353,14 +361,14 @@ function drawOverlay(now) {
     for (const tr of stats.trails) {
       const p = toScreen(tr.x + 0.5, tr.y + 0.5);
       if (p.x < -40 || p.y < -40 || p.x > W + 40 || p.y > H + 40) continue;
-      ctx.fillStyle = tr.newest ? '#2b1d12' : '#2b1d1288'; ctx.strokeStyle = '#f4ecdc'; ctx.lineWidth = 2;
+      ctx.fillStyle = tr.newest ? LOOK.bubble : LOOK.bubbleOld; ctx.strokeStyle = LOOK.bubbleRim; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(p.x, p.y, 13, 0, 7); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = '#f4ecdc'; ctx.font = '600 11px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = LOOK.bubbleText; ctx.font = '600 11px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(String(tr.crew), p.x, p.y + 0.5);
     }
     for (const pu of pulses) {
       const k = (now - pu.at) / 900; if (k > 1) continue;
-      ctx.strokeStyle = `rgba(255, 240, 200, ${1 - k})`; ctx.lineWidth = 3 + 6 * k;
+      ctx.strokeStyle = `rgba(${LOOK.pulse}, ${1 - k})`; ctx.lineWidth = 3 + 6 * k;
       ctx.beginPath(); for (let i = 0; i < pu.pts.length; i += 2) { const p = toScreen(pu.pts[i] + 0.5, pu.pts[i + 1] + 0.5); i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); } ctx.stroke();
     }
     pulses = pulses.filter(pu => now - pu.at < 900);
@@ -369,7 +377,7 @@ function drawOverlay(now) {
   if (layer === NEST && colonyMode) drawBrood();
   if (held) { ctx.strokeStyle = '#2f5b8acc'; ctx.lineWidth = 6; ctx.strokeRect(3, 3, W - 6, H - 6); } // time is held
   if (preview && preview.points.length) {
-    ctx.strokeStyle = preview.tool === 'dig' ? '#f2d25a' : '#2b1d12'; ctx.lineWidth = preview.tool === 'dig' ? Math.max(6, 3 * cams[layer].z) : 4;
+    ctx.strokeStyle = preview.tool === 'dig' ? '#f2d25a' : LOOK.stroke; ctx.lineWidth = preview.tool === 'dig' ? Math.max(6, 3 * cams[layer].z) : 4;
     ctx.setLineDash(preview.tool === 'dig' ? [] : [2, 8]);
     ctx.beginPath(); preview.points.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke();
     ctx.setLineDash([]);
@@ -379,18 +387,18 @@ function drawOverlay(now) {
     const k = Math.min(1, (now - st.t0) / 300);
     ctx.strokeStyle = '#b8432f'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(st.x0, st.y0, 26, -Math.PI / 2, -Math.PI / 2 + k * 2 * Math.PI); ctx.stroke();
   }
-  if (tapStart) { const p = toScreen(tapStart.x, tapStart.y); ctx.fillStyle = '#2b1d12'; ctx.beginPath(); ctx.arc(p.x, p.y, 7, 0, 7); ctx.fill(); }
+  if (tapStart) { const p = toScreen(tapStart.x, tapStart.y); ctx.fillStyle = LOOK.stroke; ctx.beginPath(); ctx.arc(p.x, p.y, 7, 0, 7); ctx.fill(); }
   if (selected >= 0 && host.sim.layer[selected] === layer) {
     const s = host.sim, a = host.alpha, j = host.pl[selected] !== s.layer[selected];
     const x = j ? s.x[selected] / 256 : (host.px[selected] + (s.x[selected] - host.px[selected]) * a) / 256;
     const y = j ? s.y[selected] / 256 : (host.py[selected] + (s.y[selected] - host.py[selected]) * a) / 256;
     const p = toScreen(x, y);
-    ctx.strokeStyle = '#e2913a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(10, cams[layer].z * 1.2), 0, 7); ctx.stroke();
+    ctx.strokeStyle = LOOK.select; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(10, cams[layer].z * 1.2), 0, 7); ctx.stroke();
   }
 }
 
 // The spider (sim/spider.js): while it is coming, a red ring where it will appear; while it hunts, a dark body
-// with eight legs that step, and the cell it reaches into. Placeholder shapes until the look work.
+// with eight legs that step, and the cell it reaches into. Colours from the look (looks.js).
 function drawSpider(now) {
   const g = host.sim.g, st = g[GI.SP];
   if (st !== SPIDER.WARN && st !== SPIDER.HUNT) return;
@@ -398,26 +406,26 @@ function drawSpider(now) {
   if (p.x < 0 || p.y < 0 || p.x > W || p.y > H) { drawSpiderArrow(p); return; }
   if (st === SPIDER.WARN) {
     const k = (now % 1000) / 1000;
-    ctx.strokeStyle = `rgba(184, 67, 47, ${1 - k})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(p.x, p.y, u * (1 + 2 * k), 0, 7); ctx.stroke();
+    ctx.strokeStyle = `rgba(${LOOK.danger}, ${1 - k})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(p.x, p.y, u * (1 + 2 * k), 0, 7); ctx.stroke();
     return;
   }
-  ctx.strokeStyle = '#b8432f55'; ctx.lineWidth = 2; ctx.strokeRect(p.x - 1.5 * z, p.y - 1.5 * z, 3 * z, 3 * z); // its reach: one cell around
-  ctx.strokeStyle = '#1b1210'; ctx.lineWidth = Math.max(1.5, u * 0.16); ctx.lineCap = 'round';
+  ctx.strokeStyle = `rgba(${LOOK.danger}, 0.35)`; ctx.lineWidth = 2; ctx.strokeRect(p.x - 1.5 * z, p.y - 1.5 * z, 3 * z, 3 * z); // its reach: one cell around
+  ctx.strokeStyle = LOOK.spider; ctx.lineWidth = Math.max(1.5, u * 0.16); ctx.lineCap = 'round';
   const step = Math.sin(now / 90);
   for (let side = -1; side <= 1; side += 2) for (let l = 0; l < 4; l++) {
     const a = (l - 1.5) * 0.5 + (l & 1 ? step : -step) * 0.18, dx = side * Math.cos(a), dy = Math.sin(a);
     ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x + dx * u * 1.1, p.y + dy * u * 1.1 - u * 0.4); ctx.lineTo(p.x + dx * u * 1.9, p.y + dy * u * 1.9 + u * 0.3); ctx.stroke();
   }
-  ctx.fillStyle = '#1b1210'; ctx.beginPath(); ctx.ellipse(p.x, p.y + u * 0.45, u * 0.7, u * 0.8, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = LOOK.spider; ctx.beginPath(); ctx.ellipse(p.x, p.y + u * 0.45, u * 0.7, u * 0.8, 0, 0, 7); ctx.fill();
   ctx.beginPath(); ctx.arc(p.x, p.y - u * 0.45, u * 0.42, 0, 7); ctx.fill();
-  ctx.fillStyle = '#b8432f'; ctx.beginPath(); ctx.arc(p.x, p.y + u * 0.45, u * 0.22, 0, 7); ctx.fill(); // the red mark
+  ctx.fillStyle = LOOK.spiderMark; ctx.beginPath(); ctx.arc(p.x, p.y + u * 0.45, u * 0.22, 0, 7); ctx.fill(); // the red mark
 }
 /** The spider is off screen: an arrow at the edge, pointing to it. */
 function drawSpiderArrow(p) {
   const cx = W / 2, cy = H / 2, a = Math.atan2(p.y - cy, p.x - cx), m = 28; // where the ray to it meets the edge, inset
   const k = Math.min(Math.abs(Math.cos(a)) > 1e-6 ? (W / 2 - m) / Math.abs(Math.cos(a)) : Infinity, Math.abs(Math.sin(a)) > 1e-6 ? (H / 2 - m) / Math.abs(Math.sin(a)) : Infinity);
   const x = cx + Math.cos(a) * k, y = cy + Math.sin(a) * k;
-  ctx.fillStyle = '#b8432f'; ctx.beginPath();
+  ctx.fillStyle = `rgb(${LOOK.danger})`; ctx.beginPath();
   ctx.moveTo(x + Math.cos(a) * 14, y + Math.sin(a) * 14); ctx.lineTo(x + Math.cos(a + 2.5) * 12, y + Math.sin(a + 2.5) * 12); ctx.lineTo(x + Math.cos(a - 2.5) * 12, y + Math.sin(a - 2.5) * 12);
   ctx.fill();
 }
@@ -425,7 +433,7 @@ function drawSpiderArrow(p) {
 // The nest view (nestview.js): chambers, stores, brood by growth, the queen. Rooms are found again when the terrain changes.
 let rooms = [], roomsAt = -1;
 function nestRooms() { if (roomsAt !== host.terrainVersion || rooms.host !== host) { rooms = findRooms(host.sim); rooms.host = host; roomsAt = host.terrainVersion; } return rooms; }
-function drawBrood() { drawNest({ ctx, sim: host.sim, g: GI, toScreen: (x, y) => toScreen(x, y, NEST), z: cams[NEST].z, W, H, now: performance.now(), rooms: nestRooms(), t }); }
+function drawBrood() { drawNest({ ctx, sim: host.sim, g: GI, toScreen: (x, y) => toScreen(x, y, NEST), z: cams[NEST].z, W, H, now: performance.now(), rooms: nestRooms(), t, look: LOOK }); }
 
 // ---- the HUD (a few times a second) ----
 function hud() {
@@ -505,7 +513,7 @@ requestAnimationFrame(frame);
 window.painter = {
   rooms: () => nestRooms().map(r => ({ size: r.size, queen: r.queen })),
   day: () => host.day(), dusk: () => host.dusk, dawns: () => [...host.dawns.keys()], hashes: () => host.sim.hashes(),
-  state: () => ({ screen: screen === 'paused' ? 'paused' : screen, dayCard: dayCard?.kind ?? null, spider: host.sim.g[GI.SP], spiderVisits: host.sim.g[GI.SP_VISITS], held, t: host.tick, paused: screen === 'paused', ants: host.ants, sound: save.sound, tapTrail: save.tapTrail, tool, layer, preview: preview ? preview.points.length : 0, orders: host.log.length, gl: !!renderer && !renderer.lost, glLosses: renderer?.losses ?? 0, glRestored: renderer?.restored ?? 0, glFailed, drawn: frames.drawn, selected, help: help.shown }),
+  state: () => ({ screen: screen === 'paused' ? 'paused' : screen, look: lookName, dayCard: dayCard?.kind ?? null, spider: host.sim.g[GI.SP], spiderVisits: host.sim.g[GI.SP_VISITS], held, t: host.tick, paused: screen === 'paused', ants: host.ants, sound: save.sound, tapTrail: save.tapTrail, tool, layer, preview: preview ? preview.points.length : 0, orders: host.log.length, gl: !!renderer && !renderer.lost, glLosses: renderer?.losses ?? 0, glRestored: renderer?.restored ?? 0, glFailed, drawn: frames.drawn, selected, help: help.shown }),
   log: () => JSON.parse(JSON.stringify(host.log)),
   stats: () => host.stats(),
   lab: () => ({ open: labrec.open, part: labrec.part, chain: labrec.chain, pending: labrec.buf?.length ?? 0, orders: { ...labrec.byType } }),
