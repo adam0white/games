@@ -1,88 +1,69 @@
 # Cinderhill: features ranked
 
-Ranked by what the game needs, in order. P0 is the vertical slice. Without it there is no game to judge. P1 is needed for season one to reach outside players. P2 is needed for the full campaign and friends' play. P3 is for later or wildcard. Inside each tier, items are in build order. Section numbers point to [02-spec.md](02-spec.md).
+Round 3, 2026-11-26. Ranked by what the rebuild needs, in build order inside each tier. Section numbers point to [02-spec.md](02-spec.md); numbers and pace lines are in 02 section 3 only. "Old" gives the round-2 feature number where one exists.
 
-"Goal" names the design goal a feature serves (spec section 1, design goals), or "own" for one of our own twists.
+- **R1: chapter 1.** The first five minutes of 02 section 4, playable on a phone, passing the pace budget. Nothing else is judged until this passes.
+- **R2: Spring.** Six chapters, free hill, daily hill. The first release for outside players.
+- **R3: friends.** In the order of 02 section 9.
+- **Later.** After Spring proves the game.
 
-## P0: vertical slice (one colony, three days, solo)
+## R1: chapter 1
 
-| # | Feature | Spec | Goal | Done when |
+| # | Feature | Spec | Old | Done when |
 | --- | --- | --- | --- | --- |
-| 1 | Deterministic integer sim: typed arrays, seeded random numbers, a 20 Hz tick, a state hash | 05-tech | saves | Same seed and commands give the same hash in Node, workerd, Chromium, WebKit and Firefox. The hash covers random-number state and pending events, not only ants. Flipping one known byte at a known tick makes the replay tool name the first subsystem that diverged |
-| 2 | Surface grid and nest grid with entrances between them | 6.1 | | Ants walk between layers |
-| 3 | Flow fields per goal and separation steering | 6.6 | no stuck goals | 2,000 ants reach 10 goals with none stuck for over 5 s in a 10-minute bot run |
-| 4 | Scent field: lay, follow, fade and reinforce | 6.4 | | A trail to food grows stronger without input; an unused trail fades. An isolated trail's half-life is measured and matches the spec within 10% (8-bit decay by multiply-and-round can stall and never fade). Scent is double-buffered and does not leak through walls |
-| 5 | Verbs: Trail, Dig, Recall, Alarm, with the tool strip and two-finger camera | 6.4 | retreat, fast orders | Each order shows a visible effect in under 0.5 s. A stroke commits on release; a second touch cancels it. After pinches, an interruption and a layer switch on real phones, the command log holds zero unintended orders. Crew counts and "why waiting" show on every order |
-| 6 | Queen, eggs, larvae, pupae, adults; sugar and protein | 6.3 | | A colony grows from 1 queen to 100 ants in three days of play |
-| 7 | Rooms by painting, with a worth number | 6.2 | | Each room shows its worth and the reason for it |
-| 8 | Day length, one goal per day, dusk summary, dawn restart, autosave every 30 s and at dusk | 6.8, 6.9 | saves, short days | Kill the tab before, during and after a save; a reload resumes losing at most 30 s and matches uninterrupted play. Saves are versioned checkpoints plus a command suffix with a committed cursor, the previous good save kept. A full quota, an old save under a new build and two open tabs each have a defined, tested outcome |
-| 9 | Tactical pause that takes orders | 6.4 | no active pause | Orders given while paused take effect on resume |
-| 10 | Procedural ants with rig.js (close) and instanced shapes (far); the other-layer inset with alert pips | 9, 6.1 | smooth swarms | 2,000 ants at 30 frames a second on an iPhone 13 class phone |
-| 11 | First-minute teaching with `kit/hint.js`, no reading | 8 | teaching | 4 of 5 first-time testers finish Day 1 with no help |
-| 12 | One threat: the ant-eating spider that walks the trails, with a readable pattern | 6.5 | | Bots survive with Recall and die without it |
-| 13 | Lab recording, English and Turkish, sound in code | 8, 9 | | A play record arrives in the lab |
-| 14 | Bot players for tests (careful, greedy and idle) | 05-tech | | Bots finish the slice; the idle bot loses by Day 3 |
-| 53 | Founding bloom: seed husks, two midden spots, a sprout at dawn that shelters foragers from a bird's shadow (the first part of 29) | 6.8, 8 | a world that changes, own | A new player places the second husk on purpose and predicts the safer route without help |
+| 1 | Pace gate: replay-lab reports births, decision events, idle share and first-delivery times; the median, passive and idle bots; the old quota opening as a failing fixture; runs on every pull request | 3.1 | new | CI fails a pull request that breaks any line of 02 section 3.1, and fails if the quota fixture passes |
+| 2 | Deterministic integer sim kept: typed arrays, seeded random numbers, 20 Hz tick, per-subsystem hashes | 05 | 1 | As round 2: same hash in Node, workerd, Chromium and WebKit; a flipped byte names its subsystem |
+| 3 | New starting values: walk speeds, porch store, shallow nest, start colony with pupae, 60 s brood | 3.2 | 6 | Pace lines for first delivery and first birth pass |
+| 4 | Crews and route cards (Light, Steady, Surge, plus and minus), the who-goes rule, gap reasons | 6.2 | 5 | A bot changes a crew and loads a minute change within 5 s; every card names its gap reason |
+| 5 | Doors with throughput, jam marker, loads a minute on routes | 6.2 | new | 300 ants through one door jam; a second door clears it |
+| 6 | Husk as a placeable object; roof cover; bird with a shadow telegraph | 4, 6.4, 6.5 | 53, 18 | A new player places the husk on purpose and sees the bird's result inside a minute (4 of 5) |
+| 7 | Midden sprouts in 45 to 90 s; bloom map | 6.6 | 29 | A sprout stands by minute 2 in the median bot run |
+| 8 | Nest cutaway that opens in place over the entrance | 6.7 | 2 | Births and stores are visible without leaving the surface |
+| 9 | Saves: IndexedDB checkpoint every 20 s and at chapter start, previous good save kept, one tab owns a game | 05 | 8 | Kill the tab before, during and after a save; reload loses at most 20 s and matches uninterrupted play |
+| 10 | Navigation goal manager: goals beyond 16, incremental rebuilds, no `Uint16` saturation | 05 | 3 | 64 goals live at 2,000 ants inside the tick budget |
+| 11 | Chapter card at dusk, Field into Ember | 4, 12 | 8 | The card shows stores, ants, sprouts, losses and a continue button |
+| 12 | Wordless first-minute teaching with `kit/hint.js` | 4 | 11 | 4 of 5 fresh phone players finish chapter 1 without help |
+| 13 | Lab recording with full replays, sound in code, English and Turkish | 12 | 13 | A record arrives in the lab and replays to the same hash |
+| 14 | Phone check section for Cinderhill | 05 | 25 | `phone.mjs` passes before and after |
 
-## P1: season one for outside players (Spring, 6 days)
+## R2: Spring (first release)
 
-| # | Feature | Spec | Goal |
+| # | Feature | Spec | Old |
 | --- | --- | --- | --- |
-| 15 | Rain and flooding through water cells; mounds and plugs | 6.2, 6.8 | own |
-| 16 | Job sliders with response thresholds and age jobs | 6.3 | less busywork |
-| 17 | Starvation guard: warning with cause and fix; queen's reserve | 6.3 | no starvation spiral |
-| 18 | Birds, shown first as a shadow (a threat that punishes crowds in the open) | 6.5 | swarm does not simply win |
-| 19 | Caste dial (larval feeding decides majors) | 6.3 | |
-| 20 | Burr and the scent-note story scenes for Spring | 4 | own |
-| 21 | Bands: up to three, optional | 6.4 | optional control |
-| 22 | Difficulty: Gentle (rewind 1 minute), Standard, Hard | 1 | even difficulty |
-| 23 | Help "?" on every thing, field guide pages | 8 | teaching |
-| 24 | Daily hill with the lab's shared board | 7 | own |
-| 25 | Phone check lines in `experiments/kit/check/phone.mjs` | 05-tech | |
-| 26 | Spider toggle, colour-blind palettes, reduced motion, one-finger camera, zoom buttons, undo, tap-start/tap-end trails | 9, 6.4 | |
-| 54 | Two strategic-depth test hills: late-campaign saves with the same ants and stores where the same commitment wins on one hill and loses on the other | roadmap | swarm does not simply win | An experienced player inspects the hill, changes plan, and cares about the ground kept |
+| 15 | Water automaton as its own hashed subsystem; rain pulses with telegraphs | 6.5 | 15 |
+| 16 | Structures: span, ramp, roof, plug, channel, mound; marked spots, then free placement | 6.5 | new |
+| 17 | Rooms with painted purpose and a worth number | 6.5 | 7 |
+| 18 | Now-or-later bill at chapter end; starvation warning | 6.1 | 17 |
+| 19 | Caste dial and majors; frontage contact slots in combat | 6.3, 6.4 | 19 |
+| 20 | The scent-wearing spider; Alarm; decoy trails | 6.4 | 12 |
+| 21 | Antlion pits; spoil spots | 6.4 | 31 |
+| 22 | Neighbour colony: AI on the player's verbs and rules; shared scent; raids | 6.4 | new |
+| 23 | Chapters 2 to 6 with their ends; stakes, retry from checkpoint, floor; Gentle, Standard, Hard | 8 | 22 |
+| 24 | Free hill (200 to 5,000 ants, toggles) | 8.3 | 42 |
+| 25 | Daily hill, 5 min, lab board, replay link to the best run | 8.3 | 24 |
+| 26 | Share picture of the bloom map (`kit/share.js`) | 6.6 | 50 |
+| 27 | Accessibility: spider toggle, colour-blind palettes, one-finger camera, zoom buttons, undo, tap trails, reduced motion | 12 | 26 |
+| 28 | Help "?" on every thing (one line, words only if decision 4 allows) | 5 | 23 |
+| 29 | Name and trademark check, listing page | 2 | new |
 
-## P2: full campaign and friends
+## R3: friends
 
-| # | Feature | Spec | Goal |
+| # | Feature | Spec | Old |
 | --- | --- | --- | --- |
-| 27 | Friends' hill by link: server-ordered lockstep through a Durable Object, 2 to 4 players | 7, 05-tech | friends by link |
-| 28 | Co-op campaign: a sister nest on the same hill | 7 | friends by link |
-| 29 | Seeds, middens and bloom; plant growth changes the map | 6.8 | a world that changes, own |
-| 30 | Tournaments: display contests with neighbours, ring capped at 30 a side; alliances | 6.7 | swarm does not simply win, own |
-| 31 | Summer days: heat that closes the midday, antlion pits, the horned lizard | 4, 6.5, 6.8 | swarm does not simply win |
-| 32 | Autumn and Winter days: night raids, the Pale Tide's front that moves each day, diapause | 4, 6.5, 6.8 | own |
-| 33 | Scent disguise: wear a rival's scent to pass its guards | 6.5, bio 2.10 | own |
-| 34 | The Changeling choice | 4 | own |
-| 35 | Aphid herds placed on a chosen plant (route length against exposure); ladybirds ambient | 6.8 | own |
-| 36 | Repletes (Jar-keeper allies) and living storage that can be stolen | 5, bio 1.1 | own |
-| 37 | Head-plug doors (Thornback allies) | 5, bio 1.6 | own |
-| 38 | Colony traits at each season's end | 6.10 | progress without grind |
-| 39 | Autumn and Winter large animals (mole in the nest, shrew at the entrance) | 6.5 | |
-| 40 | Fly parasites over crowds (ambient, never a scripted wave) | 6.5 | swarm does not simply win |
-| 41 | Wedding flight ending, three closing scenes | 4 | |
-| 42 | Skirmish against bots, Sandbox | 7 | |
+| 30 | Same-seed challenge by link | 9 | new |
+| 31 | Ghost trails on the daily hill | 9 | new |
+| 32 | One shared colony, 2 to 4 players, relay room lockstep | 9, 05 | 27, 28 |
+| 33 | Versus on one hill | 9 | 27 |
 
-## P3: later and wildcard
+## Later
 
-| # | Feature | Note |
+Seasons after Spring (old 31, 32, 39), the invading supercolony and allies (32, 36, 37), scent disguise (33), traits (38), wedding flight and New Hill+ (41, 43), more playable species (44), living bridges (45), quorum nest move (46), tournaments as an optional set piece (30), the Changeling (34, kept in 07), guest book (49), the 3D look (48), a many-player public hill (52). Bands stay out (old 21, 47b). Rescue of wounded ants stays out (old 47). Aphid herds return only without ladybirds (old 35).
+
+## Lab toys (one page each under `experiments/lab/`, each with an owner pass line)
+
+| Toy | Tests | Pass line |
 | --- | --- | --- |
-| 43 | New Hill+: daughter colony on a new seeded hill | Replay without grind |
-| 44 | Second and third playable species in Friends' hill (Thornbacks, Jar-keepers, Leafstitchers) | Each needs its castes and a bot |
-| 45 | Living bridges and chains (Leafstitchers) | Bio 2.8; needs pathing over changing cells |
-| 46 | Quorum vote to move the nest (co-op) | Bio 2.7; a speed or accuracy choice |
-| 47b | Bands: named groups with their own orders | Only if crews and job sliders prove too coarse; group selection is close to the reference game's rhythm |
-| 47 | Rescue of wounded ants carried home | Bio 1.14. Another game in the genre has a medic caste built on this behaviour, so keep ours different (any worker can carry, timed window) or drop it |
-| 48 | 3D look via `look3d.js` | Only if the frame gate allows |
-| 49 | Guest book of myrmecophiles (beetles, crickets, caterpillars) | Collection for families |
-| 50 | Share a picture of the bloom map (`kit/share.js`) | Reason to show a friend |
-| 51 | Tide night: a co-op survival event mode | Wildcard |
-| 52 | Many-player public hill on the Crumbwar model | Only if Friends' hill proves the demand |
-
-## Wildcards for the lab (cheap experiments)
-
-- **Bridge crew toy** (from the independent design, 10-fresh-design.md): ants lock together to span a crack, and every ant in the span is an ant not working. Tests whether "how many ants can I spare to stand still" is a decision people enjoy. If it is, it joins feature 45.
-
-- **Trail painter toy:** the scent field and 5,000 ants on one page, no goals. Tests feel and frame rate on phones before the game exists.
-- **Tournament toy (part of M0):** two colonies display in a ring capped at 30 a side while the player paces waves. Tests early whether display contests are fun, and whether freshness and timing beat raw numbers.
-- **Ant mill trap:** a looping trail makes ants circle until they tire (a real behaviour). Could be a hazard the Tide falls into.
+| Founding runs | A 20-min roguelite run per queen, bloom kept between runs, against chapters (decision 1) | The owner plays two runs and says whether they would rather have this than chapters |
+| Fluid colony | Far ants as a density field moved by the flow fields, near ants as individuals, Ember look, 50,000 ants | 30 frames a second on a real phone at 50,000, and the owner keeps it open for five minutes |
+| Ghost trails | Shared fading scent from past runs on one seed | Testers say the ghosts changed a route they drew |
+| Bridge crew | Ants that lock into a span cannot work | Kept from round 2 |

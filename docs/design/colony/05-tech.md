@@ -11,7 +11,7 @@ Decisions for building the game, with reasons. The research behind them, with so
 | Simulation | One pure, deterministic module in `experiments/cinderhill/sim/`: integer positions (1/256 cell), typed arrays per field (structure of arrays), seeded mulberry32, lookup-table trig, stable order, a state hash per subsystem | An ECS library (bitECS is MPL-2.0; miniplex uses one object per entity), a physics engine | Determinism, saves and replays come free. The same file runs in the page, the Durable Object, Node bots and tests |
 | Movement | Flow field per goal (breadth-first fill over the grid, rebuilt only in changed regions), separation from a spatial hash, scent fields that blur and decay each tick, three-sensor steering | A* per ant, navmesh | Cost grows with goals, not ants. Red Blob Games' flow-field notes and the Age of Empires IV GDC talk use this for large crowds |
 | Terrain | Cell grid (material per cell, Terraria-style), drawn smooth with marching squares; only water and loose ash move, in dirty chunks (Noita-style, limited) | 3D voxels | Small to save and send; the same grid drives digging, flow fields and scent |
-| Saves | A new IndexedDB store (not `kit/save.js`, which is localStorage for small settings): versioned checkpoints of the typed arrays and random state, plus an ordered command suffix and an atomic committed cursor. Checkpoint every 20 s (headroom inside the 30 s promise) and at dusk. Keep the previous good checkpoint and the dawn save apart. One tab owns a campaign (Web Locks); a second tab offers to take over. A failed write is shown, not swallowed | Saving only between days | Never lose more than 30 seconds of play, the genre's most common complaint |
+| Saves | A new IndexedDB store (not `kit/save.js`, which is localStorage for small settings): versioned checkpoints of the typed arrays and random state, plus an ordered command suffix and an atomic committed cursor. Checkpoint every 20 s and at each chapter start (02 section 3.2). Keep the previous good checkpoint and the chapter-start save apart. One tab owns a campaign (Web Locks); a second tab offers to take over. A failed write is shown, not swallowed | Saving only between days | Never lose more than 20 seconds of play, the genre's most common complaint |
 | Friends' play | Server-ordered lockstep: one SQLite-backed Durable Object per hill seals ticks on its own clock, orders commands, broadcasts, and compares client hashes; a snapshot on join or mismatch. Whether it also runs the sim is decided by S1 (protocol below) | Per-ant snapshots (Crumbwar model), peer-to-peer, waiting for the slowest phone (`kit/lockstep.js` does) | Bandwidth grows with commands, not ants (below) |
 | Fallback if S2 fails | Coarse server state: per-cell ant counts, scent and terrain changes; phones animate ants locally | | Simpler server, but players do not see the same individual ants |
 | Art | Procedural, in code. Optional CC0 textures (ambientCG) and CC0 sound (Freesound CC0 filter, Kenney) | Paid packs; CC-BY models unless credited | The art budget is $1 a month. Procedural ants recolour per caste and species for free |
@@ -38,7 +38,7 @@ From the round-2 reviews (09-round2-findings.md):
 | Friends' hill room | Durable Objects with SQLite storage, WebSocket hibernation, RPC between Worker and room | `new_sqlite_classes` migration; `getByName` per hill code |
 | Daily hill board | The existing `workers/lab-ai` board (run tickets, game allowlist) | Add `cinderhill` to its allowlist and a scoring rule. Server replay of top scores only, later |
 | Replays and command logs people share | R2 | Free egress; only when someone shares one |
-| Play telemetry in aggregate | Analytics Engine | Sampled, so the Day 1 gate still reads exact lab records |
+| Play telemetry in aggregate | Analytics Engine | Sampled, so the chapter 1 gate still reads exact lab records |
 | Logs and traces | Workers Logs, traces, Cloudflare Issues | As every lab Worker (no exceptions). Keep invite codes and commands out of logs |
 | Abuse without accounts | In-room token bucket; Turnstile (invisible) on score posts if needed | The rate-limiting binding counts per location, approximately |
 | Tests | `@cloudflare/vitest-plugin` | Includes evicting a Durable Object, for the deploy-then-resume test |
@@ -63,6 +63,27 @@ Godot has the same problems: GDScript and C# cannot run in a Worker, and C# cann
 - **Lockstep:** players send commands (a trail is a few points; Age of Empires players issued a command every 1.5 to 2 seconds, from "1500 Archers"). Bandwidth stays at a few hundred bytes a second whatever the ant count.
 - **Costs:** the slowest phone sets the pace; a tab put in the background must catch up or take a snapshot; every phone holds the full state, so hidden information is not secret from a modified client. That is acceptable among friends.
 - **What we already have:** `kit/lockstep.js` runs two phones in lockstep (Thumb Duel), and `kit/samemath.js` gives the same `exp`, `sin`, `cos` and `hypot` on every engine. On 2026-11-24 the lab measured WebKit and Chromium differing from Node on 5 to 37% of 20,000 arguments to `Math` functions. That is why the Cinderhill sim uses integers and tables, not floating-point `Math`.
+
+## Rebuild plan (round 3, 2026-11-26)
+
+The technical review in [round3/tech.md](round3/tech.md) read the M1 code module by module. Its table, which this plan adopts:
+
+| Decision | Modules | What changes |
+| --- | --- | --- |
+| Keep as is | `sim/math.js`, `sim/rng.js`, `sim/hash.js`, `sim/rangecoder.js` | Add random streams and hash subsystems as mechanics arrive (water, crews, rival) |
+| Keep and extend | `sim/grid.js`, `sim/scent.js` | Water depth and per-colony scent on the same grid. Scent stays shared between colonies (02 section 6.4) |
+| Keep the solver, rewrite the goal manager | `sim/flow.js` | Replace the 16 fixed slots (`MAX_GOALS` in `flow.js`) with a navigation budget per hill: shared destination fields, trail paths apart from destination search, batched invalidation with a fixed work quota per tick published at tick boundaries. Fix `Uint16` distance saturation (`INF = 0xFFFF` is also the ceiling) by an authored maximum path cost or wider fields and per-ant progress together. Nine simultaneous rebuilds took 11.56 ms (`sim/SPIKES.md`), so rebuilds must spread across ticks |
+| Keep the data model, rewrite the rules | `sim/sim.js`, `sim/colony.js`, `sim/world.js` | Crews and the who-goes rule (02 section 6.2), per-colony state (nests, stores, jobs), the start state and porch store, combat by bounded contact slots. The reviewer's local probe of today's `fight()` with two teams in one cell reported 13.1 ms at 2,000 ants and 77.3 ms at 5,000 (reported, not re-run here) |
+| Keep and extend | `sim/spider.js`, `sim/replay.js`, `sim/snapshot.js`, `test/`, `spikes/` | Snapshot schema grows; older fixtures stay for version tests. replay-lab gains births, decision events and idle share for the pace gate |
+| Rewrite the host, keep the render path | `host.js`, `painter.js`, `nestview.js`, `render.js` | Sim behind an interface a module Worker can run; saves in IndexedDB (dawn saves live only in memory today, `this.dawns` in `host.js`); viewport culling; rooms drawn from sim records; the cutaway in place |
+| Keep and extend | `workers/cinderhill/` | The relay stays. Browser transport, checkpoints and versioned recovery come with R3 |
+
+New systems and their budgets:
+
+- **Water**: fixed-point depth per cell, active cells in dirty chunks, its own hash subsystem. Depth changes that block a cell are batched before navigation repair.
+- **Combat**: each ant has a fixed number of contact slots; targets come from a bounded, deterministic query. A choke test with allies, enemies and out-of-range ants shows terrain changing the outcome at equal headcount.
+- **Rival colony**: the same command types as the player, issued by an AI on the sim's own clock, so a replay includes it.
+- **Stress fixture**: a late-chapter hill (2,000 ants, a rival, rain, structures) is the frame and tick benchmark, measured on a real phone at the R1 real-phone check.
 
 ## Reuse from this repo
 
@@ -108,8 +129,8 @@ Our own code is written from these descriptions. GPL and non-commercial code is 
 experiments/cinderhill/      page, renderer, input, words, NOTES.md, bots.mjs
 experiments/cinderhill/sim/  pure deterministic sim (runs in Node, page, Worker)
 experiments/kit/             new shared modules (scent field, flow field, turn client)
-workers/lab-ai or workers/cinderhill/   Friends' hill rooms (decided at M3)
+workers/cinderhill/          friends' rooms (relay role)
 docs/design/colony/          this spec
 ```
 
-The page is served at `/cinderhill/`, unlisted until M3. If the owner picks another name, the slug follows it.
+The page is served at `/cinderhill/`, unlisted until R2c. If the owner picks another name, the slug follows it.
