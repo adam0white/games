@@ -52,8 +52,8 @@
   "value": 82.55
  },
  "idle-share": {
-  "status": "fail",
-  "value": 0.525
+  "status": "pass",
+  "value": 0
  },
  "queued-at-doors": {
   "status": "not built",

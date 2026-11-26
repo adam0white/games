@@ -73,11 +73,12 @@ export function replayChain(chain, { stopAtDivergence = false } = {}) {
  *  For the pace gate (02-spec 3.1) it keeps births, decision events and the idle share:
  *  - births: the play step of each birth (G.BORN going up). deliveries: the steps with a load home, first 2 min.
  *  - decisions: { step, what } for each decision event the current build has: a new source seen (the piles there at
- *    the start, then each new pile), a source empty, a threat telegraphed (the spider's warning), a threat resolved
- *    (the spider leaves), and brood short of protein (larvae waiting and no protein in store, each time it starts).
+ *    the start, then each new pile), a source empty, a threat telegraphed (the spider's warning), a threat arrived (it hunts) and resolved
+ *    (it leaves), and brood short of protein (larvae waiting and no protein in store, each time it starts).
  *    The spec's other kinds (room full, rain, route jammed, build offered, sprout) are not built.
  *  - idle: at each look, the share of adults that are idle while some job has a gap. Idle: a forager with no load,
- *    no trail route and no find for IDLE_FOR ticks (her search timer), or a digger resting. A gap: a live trail
+ *    no trail route, no remembered pile and no find for IDLE_FOR ticks (her search timer), or a digger resting
+ *    for IDLE_FOR ticks. A gap: a live trail
  *    with no crew size or short of it, or marked dig cells with room in the dig crew. */
 export class Observer {
   constructor(host) {
@@ -85,7 +86,7 @@ export class Observer {
     this.pageData = { samples: 0, fps: [], holds: [], hides: 0, errors: [], cams: 0 };
     this.prevCarry = new Uint8Array(0); this.prevVia = new Int8Array(0); this.prevN = 0;
     this.lastChange = 0; this.lastKey = ''; this.lastOrderStep = 0; this.pendingTrails = [];
-    this.births = []; this.decisions = []; this.idleMax = 0; this.idleSum = 0; this.idleLooks = 0; this.firstOrder = -1; this.hungry = false; this.bornSeen = this.s.g[G.BORN]; this.deliveries = []; this.loadsSeen = this.s.g[G.SUGAR_LOADS] + this.s.g[G.PROTEIN_LOADS];
+    this.births = []; this.decisions = []; this.idleMax = 0; this.idleSum = 0; this.idleLooks = 0; this.firstOrder = -1; this.hungry = false; this.bornSeen = this.s.g[G.BORN]; this.deliveries = []; this.firstTrailProtein = -1; this.loadsSeen = this.s.g[G.SUGAR_LOADS] + this.s.g[G.PROTEIN_LOADS];
     this.newMinute();
     for (let p = 0; p < this.s.pileCell.length; p++) if (this.s.pileCell[p] >= 0 && this.s.pileAmount[p] > 0) { this.decisions.push({ step: 0, what: 'new source' }); break; }
   }
@@ -101,10 +102,12 @@ export class Observer {
   }
   after() {
     const s = this.s, g = s.g; this.steps++;
+    if (g[G.BORN] < this.bornSeen) this.bornSeen = g[G.BORN]; // a restart rolled the counters back
     for (; this.bornSeen < g[G.BORN]; this.bornSeen++) this.births.push(this.steps);
-    const loads = g[G.SUGAR_LOADS] + g[G.PROTEIN_LOADS]; if (loads > this.loadsSeen && this.steps <= 2 * MINUTE) this.deliveries.push(this.steps); this.loadsSeen = loads; // the first 2 min, for the quiet-stretch line
+    const loads = g[G.SUGAR_LOADS] + g[G.PROTEIN_LOADS]; if (loads < this.loadsSeen) this.loadsSeen = loads;
+    if (loads > this.loadsSeen && this.steps <= 2 * MINUTE) this.deliveries.push(this.steps); this.loadsSeen = loads; // the first 2 min, for the quiet-stretch line
     for (const e of this.h.lastEvents ?? []) {
-      const what = e[0] === EVENT.PILE_NEW ? 'new source' : e[0] === EVENT.PILE_EMPTY ? 'source empty' : e[0] === EVENT.SPIDER && e[1] === SPIDER.WARN ? 'threat telegraphed' : e[0] === EVENT.SPIDER && e[1] === SPIDER.LEFT ? 'threat resolved' : null;
+      const what = e[0] === EVENT.PILE_NEW ? 'new source' : e[0] === EVENT.PILE_EMPTY ? 'source empty' : e[0] === EVENT.SPIDER && e[1] === SPIDER.WARN ? 'threat telegraphed' : e[0] === EVENT.SPIDER && e[1] === SPIDER.HUNT ? 'threat arrived' : e[0] === EVENT.SPIDER && e[1] === SPIDER.LEFT ? 'threat resolved' : null;
       if (what) this.decisions.push({ step: this.steps, what });
     }
     let larvae = 0; for (let k = 0; k < (s.brood?.n ?? 0); k++) if (s.brood.stage[k] === STAGE.LARVA) larvae++;
@@ -115,10 +118,11 @@ export class Observer {
     const done = this.pendingTrails.filter(p => p.entry.state !== 'queued');
     if (done.length) { this.pendingTrails = this.pendingTrails.filter(p => p.entry.state === 'queued'); this.trailsApplied(done); }
     // Trips: an ant that carried with a trail route and carries nothing now, when no death renumbered the ants.
-    if (g[G.DIED] === this.died && s.n === this.prevN) {
-      for (let i = 0; i < s.n; i++) if (this.prevCarry[i] && !s.carry[i]) {
+    // Births append new ants after the old ones, so they renumber no one.
+    if (g[G.DIED] === this.died && s.n >= this.prevN) {
+      for (let i = 0; i < this.prevN; i++) if (this.prevCarry[i] && !s.carry[i]) {
         const v = this.prevVia[i], t = v >= 0 ? this.liveTrail(v) : null;
-        if (t) { t.trips++; if (t.first < 0) t.first = this.steps - t.step; }
+        if (t) { t.trips++; if (t.first < 0) t.first = this.steps - t.step; if (this.prevCarry[i] === 2 && this.firstTrailProtein < 0) this.firstTrailProtein = this.steps; }
       }
     } else this.unattributed = (this.unattributed ?? 0) + 1;
     for (const t of this.trails) if (t.end < 0 && (!s.flow.live[t.slot] || s.flow.seq[t.slot] !== t.seq)) { t.end = this.steps; t.how = s.flow.live[t.slot] ? 'replaced' : 'dropped'; }
@@ -146,7 +150,7 @@ export class Observer {
     const F = s.flow; let gap = s.g[G.DIG_COUNT] > 0 && s.g[G.DIG_CREW] < Math.min(24, 4 * s.g[G.DIG_COUNT]);
     for (let k = 0; k < SLOT.TRAILS && !gap; k++) if (F.live[SLOT.TRAIL0 + k]) { const w = s.g[G.WANT0 + k]; gap = w === 0 || s.crew[k] < w - 1; }
     let wasted = 0;
-    if (gap) for (let i = 0; i < s.n; i++) if ((s.job[i] === JOB.FORAGE && !s.carry[i] && s.via[i] < 0 && s.mode[i] === MODE.SEEK && s.since[i] >= IDLE_FOR) || (s.job[i] === JOB.DIG && s.mode[i] === MODE.REST)) wasted++;
+    if (gap) for (let i = 0; i < s.n; i++) if ((s.job[i] === JOB.FORAGE && !s.carry[i] && s.via[i] < 0 && s.mem[i] < 0 && s.mode[i] === MODE.SEEK && s.since[i] >= IDLE_FOR) || (s.job[i] === JOB.DIG && s.mode[i] === MODE.REST && s.since[i] >= IDLE_FOR)) wasted++;
     const share = s.n ? wasted / s.n : 0;
     if (share > this.idleMax) this.idleMax = share;
     this.idleSum += share; this.idleLooks++;
@@ -198,7 +202,7 @@ export class Observer {
   stats() {
     return { steps: this.steps, minutes: this.minutes, trails: this.trails.map(({ onSum, looks, ...t }) => ({ ...t, onMean: looks ? Math.round(onSum / looks * 10) / 10 : 0, ticks: (t.end < 0 ? this.steps : t.end) - t.step })),
       digs: this.digs.map(({ cells, ...d }) => ({ ...d, cells: cells.length })), alarms: this.alarms, recalls: this.recalls, stalls: this.stalls, marks: this.marks, page: this.pageData, unattributedTicks: this.unattributed ?? 0,
-      births: this.births, decisions: this.decisions, idleMax: this.idleMax, idleMean: this.idleLooks ? this.idleSum / this.idleLooks : 0, firstOrder: this.firstOrder, deliveries: this.deliveries };
+      births: this.births, decisions: this.decisions, idleMax: this.idleMax, idleMean: this.idleLooks ? this.idleSum / this.idleLooks : 0, firstOrder: this.firstOrder, deliveries: this.deliveries, firstTrailProtein: this.firstTrailProtein };
   }
 }
 

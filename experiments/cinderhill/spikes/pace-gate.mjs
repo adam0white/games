@@ -26,14 +26,18 @@ import { CMD, FOOD, G, SURFACE } from '../sim/sim.js';
 import { C, DAY_GOALS, GOAL_KIND, START } from '../sim/colony.js';
 import { SPIDER } from '../sim/spider.js';
 import { Observer, parts, replayChain } from './replay-lab.mjs';
+import { PATH_MAX } from '../sim/flow.js';
 
 const HZ = 20;
 const BASELINE = new URL('./pace-baseline.json', import.meta.url);
 
 /** Where the build is on the roadmap, and the order of the stages lines block from. */
-export const STAGES = ['R0', 'R1.3', 'R1.5', 'R1', 'R2a', 'R2b'];
+export const STAGES = ['R0', 'R1.2', 'R1.3', 'R1.5', 'R1', 'R2a', 'R2b'];
 export const STAGE = 'R0';
 export const blocks = (line, stage = STAGE) => STAGES.indexOf(line.stage) <= STAGES.indexOf(stage);
+/** At R0 the roadmap says the build fails the gate: a failing blocking line is allowed by its baseline and may not
+ *  get worse. From R1 step 2 (new starting values) every blocking line must pass. */
+export const strict = (stage = STAGE) => stage !== 'R0';
 
 /** The pace budget lines the bots read. `get` returns a number (seconds, a count or a share) or null. `ok` says
  *  whether a value meets the target; `up`: a bigger value is worse. `horizon`: seconds of play the line needs.
@@ -43,7 +47,7 @@ export const LINES = [
   { id: 'first-delivery-passive', stage: 'R0', horizon: 60, text: 'First delivery from the passive bot\'s trail, s', target: '<= 10', bot: 'passive', get: r => r.firstDelivery, ok: v => v <= 10, up: true },
   { id: 'minute-1-deliveries', stage: 'R0', horizon: 60, text: 'Deliveries in minute 1', target: '>= 25', bot: 'median', get: r => r.minute1, ok: v => v >= 25, up: false },
   { id: 'first-birth', stage: 'R0', horizon: 60, text: 'First birth, s', target: '<= 15', bot: 'median', get: r => r.firstBirth, ok: v => v <= 15, up: true },
-  { id: 'first-funded-birth', stage: 'R1', horizon: 120, text: 'First birth after the starting pupae (stands in for the first player-funded birth), s', target: '<= 90', bot: 'median', get: r => r.fundedBirth, ok: v => v <= 90, up: true },
+  { id: 'first-funded-birth', stage: 'R1', horizon: 120, text: 'First birth after the starting pupae and after a protein load home by trail (stands in for the first player-funded birth), s', target: '<= 90', bot: 'median', get: r => r.fundedBirth, ok: v => v <= 90, up: true },
   { id: 'quiet-2-min', stage: 'R1', horizon: 120, text: 'Longest stretch of the first 2 min with no delivery, birth, new source or threat change, s', target: '<= 15', bot: 'median', get: r => r.quiet, ok: v => v <= 15, up: true },
   { id: 'first-choice', stage: 'R1.5', text: 'First real choice, s', target: '<= 30', bot: 'median', get: () => null },
   { id: 'choice-consequence', stage: 'R1.5', text: 'Its consequence visible, s', target: '<= 60', bot: 'median', get: () => null },
@@ -76,8 +80,8 @@ function trailTo(sim, c) {
   const F = sim.flow, w = sim.L.sw;
   for (let k = 0; k < 4; k++) {
     const s = 4 + k; if (!F.live[s]) continue;
-    const len = Math.min(F.pathLen[k], 4096); if (len < 1) continue;
-    const e = F.path[k * 4096 + len - 1];
+    const len = Math.min(F.pathLen[k], PATH_MAX); if (len < 1) continue;
+    const e = F.path[k * PATH_MAX + len - 1];
     if (Math.abs(e % w - c % w) <= 2 && Math.abs(Math.floor(e / w) - Math.floor(c / w)) <= 2) return true;
   }
   return false;
@@ -135,15 +139,17 @@ function quiet(st) {
 
 export function measure(st, ticks = st.steps) {
   const first = st.trails.find(t => t.state === 'applied');
-  const decisions = st.decisions.map(d => d.step).sort((a, b) => a - b);
+  // Decision events are the kinds 02 section 3.1 lists (a threat arriving or leaving offers no new choice).
+  const decisions = st.decisions.filter(d => !/arrived|resolved/.test(d.what)).map(d => d.step).sort((a, b) => a - b);
   const gap = (from, to) => { const ts = [from, ...decisions.filter(s => s > from && s < to), to]; let g = 0; for (let k = 1; k < ts.length; k++) g = Math.max(g, ts[k] - ts[k - 1]); return g / HZ; };
   const ten = 10 * 60 * HZ;
   const at = what => { const d = st.decisions.find(x => x.what === what); return d ? d.step / HZ : null; };
   return {
-    firstDelivery: first && first.first >= 0 ? first.first / HZ : null,
+    trailDrawn: !!first, firstDelivery: first && first.first >= 0 ? first.first / HZ : null,
     minute1: st.minutes[0] ? st.minutes[0].sugar + st.minutes[0].protein : null,
     firstBirth: st.births.length ? st.births[0] / HZ : null,
-    fundedBirth: st.births.length > START.pupae ? st.births[START.pupae] / HZ : null,
+    // The first birth after the starting pupae that comes after a protein load home by a drawn trail.
+    fundedBirth: (() => { if (st.firstTrailProtein < 0) return null; const b = st.births.slice(START.pupae).find(t => t > st.firstTrailProtein); return b === undefined ? null : b / HZ; })(),
     threat: at('threat telegraphed'), resolved: at('threat resolved'),
     gapEarly: gap(0, Math.min(ticks, ten)), gapLate: ticks > ten + 60 * HZ ? gap(ten, ticks) : null,
     idleMax: Math.round(st.idleMax * 1000) / 1000,
@@ -188,17 +194,18 @@ export async function gate({ seeds = 20, minutes = 12, fixture = null } = {}) {
 }
 
 /** Compare the blocking lines with the baseline. Returns a list of problems (empty: the gate holds). */
-export function ratchet(now, base, lines = LINES.filter(l => blocks(l))) {
+export function ratchet(now, base, lines = LINES.filter(l => blocks(l)), hard = strict()) {
   const bad = [];
   for (const line of lines) {
     const n = now[line.id], b = base[line.id];
+    if (hard && n.status !== 'pass') { bad.push(`${line.id}: ${n.status} (${n.value} against ${line.target}); it blocks from ${line.stage}`); continue; }
     if (!b) { bad.push(`${line.id}: not in the baseline (run with --update)`); continue; }
     if (n.status === 'not read' || n.status === 'not built') { bad.push(`${line.id}: blocks from ${line.stage} but was ${n.status} in this run`); continue; }
     if (b.status === 'pass' && n.status !== 'pass') bad.push(`${line.id}: passed before, ${n.status} now (${n.value} against ${line.target})`);
     else if (b.status !== 'pass' && n.status === 'pass') bad.push(`${line.id}: passes now (${n.value}): record it with --update`);
     else if (b.status === 'fail' && n.status === 'fail') {
       if (n.value === null && b.value !== null) bad.push(`${line.id}: now never happens on some seed (was ${b.value})`);
-      else if (n.value !== null && b.value !== null && (line.up ? n.value > b.value * 1.1 + 0.5 : n.value < b.value * 0.9 - 0.5)) bad.push(`${line.id}: worse, ${n.value} (baseline ${b.value}, target ${line.target})`);
+      else if (n.value !== null && b.value !== null && (line.up ? n.value > b.value * 1.05 + 0.25 : n.value < b.value * 0.95 - 0.25)) bad.push(`${line.id}: worse, ${n.value} (baseline ${b.value}, target ${line.target}; allowed: a twentieth)`);
     }
   }
   return bad;
@@ -218,9 +225,10 @@ if (isMainThread && import.meta.url === `file://${process.argv[1]}`) {
     const rows = parts(files.map(f => JSON.parse(readFileSync(f, 'utf8')))).map(chain => { const r = replayChain(chain); return { chain: chain[0].start.chain, ok: r.ok, ...measure(r.stats) }; });
     const fo = rows.map(r => r.firstOrder), within = fo.filter(v => v !== null && v <= 10).length;
     const off = rows.filter(r => !r.ok).length; if (off) console.log(`${off} of ${rows.length} sessions did not replay to their hashes (another sim version?): their delivery times are not the session's`);
-    console.log(`${rows.length} sessions; first order within 10 s: ${within} of ${rows.length} (target 80%)`);
-    const fd = rows.map(r => r.firstDelivery).filter(v => v !== null).sort((a, b) => a - b);
-    console.log(`first delivery from the first trail: median ${fd.length ? fd[fd.length >> 1] : '-'} s over ${fd.length} sessions with one (target <= 10 s)`);
+    console.log(`${rows.length} sessions; first order within 10 s: ${within} of ${rows.length} (target 80%; sim seconds, so a session played at 2x or 4x reads later than it was)`);
+    // Sessions that replayed to their hashes and drew a trail; a trail that never delivered counts as never.
+    const fd = rows.filter(r => r.ok && r.trailDrawn).map(r => r.firstDelivery ?? Infinity).sort((a, b) => a - b);
+    console.log(`first delivery from the first trail: median ${fd.length ? (fd[(fd.length - 1) >> 1] === Infinity ? 'never' : fd[(fd.length - 1) >> 1]) : '-'} s over ${fd.length} replayed sessions with a trail, ${fd.filter(v => v === Infinity).length} never delivered (target <= 10 s)`);
     if (opt('json')) writeFileSync(opt('json'), JSON.stringify(rows, null, 1));
   } else {
     const seeds = Number(opt('seeds', 20)), minutes = Number(opt('minutes', 12)), t0 = Date.now();
@@ -242,9 +250,11 @@ if (isMainThread && import.meta.url === `file://${process.argv[1]}`) {
     } else {
       const base = JSON.parse(readFileSync(BASELINE, 'utf8')), problems = ratchet(res, base);
       if (!quotaFails.length) problems.push('the quota opening fails no blocking line the current build passes: the table is too loose');
-      const broodBad = ratchet(brood, base).filter(p => !/passes now/.test(p));
+      const broodBad = ratchet(brood, base).filter(p => !/passes now|in this run/.test(p));
       console.log(`Brood x10 plant: ${broodBad.length ? `caught (${broodBad.join('; ')})` : 'NOT caught'}.`);
       if (!broodBad.length) problems.push('the brood x10 plant passes the gate');
+      const over = block.filter(l => res[l.id].status !== 'pass');
+      console.log(`Pace budget at ${STAGE}: ${over.length ? `FAILS ${over.map(l => `${l.id} ${res[l.id].value}`).join(', ')}${strict() ? '' : ' (allowed by the baseline at R0, may not get worse; from R1 step 2 every blocking line must pass)'}` : 'every blocking line passes'}.`);
       for (const p of problems) console.log(`GATE: ${p}`);
       console.log(`${problems.length ? 'pace gate FAILS' : 'pace gate holds'} (${seeds} seeds, ${minutes} min, ${((Date.now() - t0) / 1000).toFixed(0)} s)`);
       process.exitCode = problems.length ? 1 : 0;
