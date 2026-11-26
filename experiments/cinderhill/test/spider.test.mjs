@@ -3,9 +3,9 @@
 // taken at any tick of a visit plays on the same. Small blank maps with short days, as in days.test.mjs.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { CMD, EVENT, G, MAT, NEST, SURFACE, Sim, FOOD, JOB } from '../sim/sim.js';
-import { SP, SPIDER } from '../sim/spider.js';
-import { SLOT } from '../sim/flow.js';
+import { CMD, EVENT, G, MAT, MODE, NEST, SURFACE, Sim, FOOD, JOB } from '../sim/sim.js';
+import { SP, SPIDER, busiestTrail } from '../sim/spider.js';
+import { SLOT, PATH_MAX } from '../sim/flow.js';
 import { cellAt } from '../sim/grid.js';
 import { restore, snapshot } from '../sim/snapshot.js';
 
@@ -47,8 +47,23 @@ test('under Recall the surface empties and stays empty: foragers in the nest do 
   assert.ok(surface(s) > 0, 'they go out once Recall is off');
 });
 
-test('no spider on day 1; on day 2 a warning at a quarter of the day, then it walks the top edge (the safe form)', () => {
+test('under Recall a waiting forager\'s search does not age, and guards stay in for a surface alarm', () => {
+  const s = colony();
+  for (let k = 0; k < 6; k++) s.spawn(JOB.GUARD);
+  trail(s); until(s, 100);
+  order(s, { type: CMD.RECALL, on: true }); until(s, 300);
+  order(s, { type: CMD.ALARM, layer: SURFACE, x: 30, y: 30, hold: 400 });
+  let out = 0;
+  until(s, 700, sim => { out = Math.max(out, surface(sim)); });
+  assert.equal(out, 0, 'no guard went out to the alarm while it lasted');
+  let waiting = 0;
+  for (let i = 0; i < s.n; i++) if (s.job[i] === JOB.FORAGE && s.layer[i] === NEST && s.mode[i] === MODE.SEEK) { waiting++; assert.equal(s.since[i], 0, `forager ${i}`); }
+  assert.ok(waiting >= 8, `${waiting} waiting`);
+});
+
+test('no spider on day 1; on day 2 a warning at a quarter of the day, then it walks the top edge and eats no one (the safe form)', () => {
   const s = colony(); trail(s);
+  order(s, { type: CMD.TRAIL, layer: SURFACE, points: [25, 25, 9, 6] }); // the newest trail ends on the edge row, where the spider starts
   const ev = until(s, 2 * T);
   const warn = T + (T >> 2), hunt = warn + 20;
   assert.deepEqual(ev[0], [warn, SPIDER.WARN, -1]);
@@ -56,15 +71,37 @@ test('no spider on day 1; on day 2 a warning at a quarter of the day, then it wa
   assert.equal(ev[2][1], SPIDER.LEFT);
   assert.equal(s.g[G.SP_Y], SP.EDGE, 'on the edge row');
   assert.equal(s.g[G.SP_VISITS], 1);
+  assert.equal(ev[2][2], 0, 'no meals'); assert.equal(s.g[G.SP_EATEN], 0);
 });
 
-test('on day 3 it walks the busiest trail from its far end and eats the ants on it', () => {
+test('on day 3 it walks the busiest trail from its far end toward the nest and kills the ants it eats', () => {
   const s = colony(); trail(s);
-  const ev = until(s, 3 * T + 200).filter(e => e[0] >= 2 * T);
-  assert.deepEqual(ev[0].slice(1), [SPIDER.WARN, SLOT.TRAIL0], 'the only trail');
-  assert.equal(ev[2][1], SPIDER.LEFT);
-  assert.ok(ev[2][2] >= 3, `${ev[2][2]} eaten`);
-  assert.ok(s.g[G.SP_EATEN] >= ev[2][2]);
+  const warn = 2 * T + (T >> 2);
+  until(s, warn + 1);
+  assert.equal(s.g[G.SP], SPIDER.WARN); assert.equal(s.g[G.SP_SLOT], SLOT.TRAIL0, 'the only trail');
+  const F = s.flow, len = F.pathLen[0], cell = j => { const c = F.path[j]; return [c % s.L.sw, (c / s.L.sw) | 0]; };
+  assert.deepEqual([s.g[G.SP_X], s.g[G.SP_Y]], cell(len - 1), 'at the far end');
+  until(s, warn + 20 + SP.MOVE + 1);
+  assert.deepEqual([s.g[G.SP_X], s.g[G.SP_Y]], cell(len - 2), 'one cell toward the start');
+  const died = s.g[G.DIED], n = s.n;
+  const ev = until(s, 3 * T + 200);
+  const left = ev.find(e => e[1] === SPIDER.LEFT);
+  assert.ok(left[2] >= 3, `${left[2]} eaten`);
+  assert.ok(s.g[G.DIED] - died >= left[2], 'each meal is a death');
+  assert.ok(s.n <= n - left[2] + s.g[G.BORN], 'and the ants are gone');
+});
+
+test('the busiest trail: ants on or beside its path, an ant beside two trails counting for both; ties go to the newest', () => {
+  const s = colony(0);
+  order(s, { type: CMD.TRAIL, layer: SURFACE, points: [25, 25, 25, 40] }); // slot 4: down
+  order(s, { type: CMD.TRAIL, layer: SURFACE, points: [25, 25, 40, 25] }); // slot 5: right, newer
+  s.step();
+  const put = (x, y) => { const i = s.spawn(JOB.FORAGE) ?? s.n - 1; s.layer[i] = SURFACE; s.x[i] = x * 256 + 128; s.y[i] = y * 256 + 128; };
+  assert.equal(busiestTrail(s), SLOT.TRAIL0 + 1, 'no ants: the newest');
+  put(25, 26); put(26, 26); // beside both
+  assert.equal(busiestTrail(s), SLOT.TRAIL0 + 1, 'a tie: the newest');
+  put(24, 35); // beside the older only
+  assert.equal(busiestTrail(s), SLOT.TRAIL0, 'three on the older, two on the newer');
 });
 
 test('Recall at the warning, off when it leaves: the spider finds no one', () => {

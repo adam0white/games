@@ -385,7 +385,7 @@ export class Sim {
           }
           if (this.carry[i] && layer === SURFACE) deposit(this, FIELD.TRAIL, c, TRAIL_LAY);
         }
-      } else if (layer === NEST) { if (this.g[G.RECALL]) still = true; else follow = SLOT.EXIT; } // under Recall foragers stay in
+      } else if (layer === NEST) { if (this.g[G.RECALL]) { still = true; this.since[i] = 0; } else follow = SLOT.EXIT; } // under Recall foragers stay in, and their search starts when they go out
       else {
         const p = this.pileAt(c);
         if (p >= 0) {
@@ -425,7 +425,8 @@ export class Sim {
       else still = true;
     } else { // guard
       const d = this.flow.live[SLOT.ALARM] ? distAt(this, SLOT.ALARM, c) : INF;
-      if (d !== INF && d > 2 * STEP) { follow = SLOT.ALARM; speed = RUN; }
+      if (d !== INF && this.g[G.RECALL] && layer === NEST && this.flow.cell[SLOT.ALARM] < this.L.nestBase) still = true; // Recall keeps guards in too
+      else if (d !== INF && d > 2 * STEP) { follow = SLOT.ALARM; speed = RUN; }
       else if (d !== INF) still = true; // at the call: hold the spot
       else if (layer === SURFACE) follow = SLOT.HOME;
       else still = true;

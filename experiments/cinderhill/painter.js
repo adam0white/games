@@ -394,7 +394,7 @@ function drawSpider(now) {
   const g = host.sim.g, st = g[GI.SP];
   if (st !== SPIDER.WARN && st !== SPIDER.HUNT) return;
   const z = cams[SURFACE].z, p = toScreen(g[GI.SP_X] + 0.5, g[GI.SP_Y] + 0.5), u = Math.max(7, z * 1.4);
-  if (p.x < -60 || p.y < -60 || p.x > W + 60 || p.y > H + 60) { drawSpiderArrow(p); return; }
+  if (p.x < 0 || p.y < 0 || p.x > W || p.y > H) { drawSpiderArrow(p); return; }
   if (st === SPIDER.WARN) {
     const k = (now % 1000) / 1000;
     ctx.strokeStyle = `rgba(184, 67, 47, ${1 - k})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(p.x, p.y, u * (1 + 2 * k), 0, 7); ctx.stroke();
@@ -413,8 +413,9 @@ function drawSpider(now) {
 }
 /** The spider is off screen: an arrow at the edge, pointing to it. */
 function drawSpiderArrow(p) {
-  const cx = W / 2, cy = H / 2, a = Math.atan2(p.y - cy, p.x - cx), r = Math.min(W, H) / 2 - 28;
-  const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
+  const cx = W / 2, cy = H / 2, a = Math.atan2(p.y - cy, p.x - cx), m = 28; // where the ray to it meets the edge, inset
+  const k = Math.min(Math.abs(Math.cos(a)) > 1e-6 ? (W / 2 - m) / Math.abs(Math.cos(a)) : Infinity, Math.abs(Math.sin(a)) > 1e-6 ? (H / 2 - m) / Math.abs(Math.sin(a)) : Infinity);
+  const x = cx + Math.cos(a) * k, y = cy + Math.sin(a) * k;
   ctx.fillStyle = '#b8432f'; ctx.beginPath();
   ctx.moveTo(x + Math.cos(a) * 14, y + Math.sin(a) * 14); ctx.lineTo(x + Math.cos(a + 2.5) * 12, y + Math.sin(a + 2.5) * 12); ctx.lineTo(x + Math.cos(a - 2.5) * 12, y + Math.sin(a - 2.5) * 12);
   ctx.fill();
@@ -473,9 +474,9 @@ function hud() {
 // The spider's events: a toast and a sound each, and a lab event (the replay has them too; these say what the page showed).
 function spiderNews(e) {
   labrec.event('spider', { at: e.tick, s: e.state, a: e.arg, recall: host.sim.g[GI.RECALL] });
-  if (e.state === SPIDER.WARN) { toast(host.sim.g[GI.RECALL] ? 'spiderNear' : 'spiderWarn'); if (save.sound) { snd.tone(220, 0.25, 0.05, 'sawtooth'); setTimeout(() => snd.tone(196, 0.3, 0.05, 'sawtooth'), 260); } }
-  else if (e.state === SPIDER.HUNT) { toast('spiderHunt'); if (save.sound) snd.tone(147, 0.4, 0.06, 'sawtooth'); }
-  else if (e.state === SPIDER.LEFT) { toast(e.arg ? 'spiderLeft' : 'spiderLeftNone', { kills: e.arg }); if (save.sound) snd.tone(660, 0.12, 0.03, 'triangle'); }
+  if (e.state === SPIDER.WARN) { toast(e.arg < 0 ? 'spiderEdge' : host.sim.g[GI.RECALL] ? 'spiderHold' : 'spiderWarn'); if (save.sound) { snd.tone(220, 0.25, 0.05, 'sawtooth'); setTimeout(() => snd.tone(196, 0.3, 0.05, 'sawtooth'), 260); } }
+  else if (e.state === SPIDER.HUNT) { if (e.arg >= 0) toast(host.sim.g[GI.RECALL] ? 'spiderHold' : 'spiderHunt'); if (save.sound) snd.tone(147, 0.4, 0.06, 'sawtooth'); }
+  else if (e.state === SPIDER.LEFT) { toast(e.arg ? 'spiderLeft' : host.sim.g[GI.RECALL] ? 'spiderLeftNone' : 'spiderGone', { kills: e.arg }); if (save.sound) snd.tone(660, 0.12, 0.03, 'triangle'); }
 }
 
 // ---- frame loop, with a frame-time sampler (S3) ----

@@ -192,7 +192,7 @@ export class Host {
     if (s.g[G.RECALL] && layer === SURFACE) why = 'recalled';
     else if (s.job[i] === JOB.FORAGE) {
       if (s.mode[i] === MODE.RETURN) why = s.carry[i] ? 'carrying' : 'gaveUp';
-      else if (layer === NEST) why = 'goingOut';
+      else if (layer === NEST) why = s.g[G.RECALL] ? 'waitingIn' : 'goingOut';
       else if (to === 'trail') why = 'onTrail';
       else if (to === 'food') why = 'remembers';
       else if (s.stall[i] > 20) why = 'stuck';
