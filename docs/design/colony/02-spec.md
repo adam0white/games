@@ -15,8 +15,10 @@ The game is done for release when outside players finish the first season withou
 | Players who finish season one (Spring, 6 days) | 30% of those who start Day 2 |
 | Lost progress after a crash, reload or closed tab | at most 30 seconds of play, every time |
 | A full day on a mid-range phone (iPhone 13 class, Pixel 7 class) | 30 frames a second or better at 2,000 ants |
-| Friends' hill by link | a second phone joins in under 10 seconds with no account |
+| Friends' hill by link (measured at M4, not before) | a second phone is playable in under 10 seconds with no account, counting download, decode and catch-up |
 | "Would you recommend it?" on the end card | a majority of yes from outside players |
+
+Every rate is reported with its denominator. Players who leave before the end card are counted separately, because an end-card majority samples only those who stayed.
 
 The owner accepts each milestone by playing it (section 12 of the roadmap).
 
@@ -154,7 +156,9 @@ Each playable species has 3 or 4 castes from one shared list of body parts (rig.
 
 ### 6.4 Control: scent, not cursors
 
-A tool strip at the bottom picks the mode: Trail, Dig or Alarm. One finger acts in the chosen mode. Two fingers always pan and zoom, in every mode, so a drawn trail is never a camera move by mistake. A mouse uses the left button to act and the right button or wheel to move the camera. The M0 trail painter tests this scheme before anything else is built.
+A tool strip at the bottom picks the mode: Trail, Dig or Alarm. One finger acts in the chosen mode. Two fingers always pan and zoom, in every mode. The first finger of a pinch looks exactly like the start of a trail, so a stroke is only a preview until the finger lifts: a second touch, or a `pointercancel`, cancels it. A mouse uses the left button to act and the right button or wheel to move the camera.
+
+For one-handed play and accessibility there is also a one-finger camera mode, zoom buttons, an undo for the last order, and a tap-start, tap-end trail. The M0 trail painter tests this scheme before anything else is built. Its pass line: after pinches, a phone call interruption and a layer switch on real phones, the command log holds zero orders the player did not mean.
 
 | Verb | Gesture | What ants do |
 | --- | --- | --- |
@@ -163,9 +167,10 @@ A tool strip at the bottom picks the mode: Trail, Dig or Alarm. One finger acts 
 | **Recall** | One button | Every ant outside heads home on the shortest path at a run. Carriers drop nothing. This is the retreat |
 | **Dig** | Dig mode: paint soil (nest layer) | Workers dig the painted cells in order |
 
-- **Bands.** Up to three named bands (a banner each) for players who want more control. Tap a band, then draw a trail or call an alarm for that band alone. Bands are optional. The game is winnable without them.
+- **Crew on every order.** Each trail, dig and alarm shows its crew: ants on it, ants wanted, and the reason for a gap ("no idle foragers", "path blocked at the east door"). Tap any ant to see her load, destination and why she is waiting. Plus and minus move one ant; hold to move eight. This makes indirect control readable: the player can tell an ant that refused an order from one that cannot reach it.
+- **Bands (later, maybe).** Named groups with their own orders would give more control, but group selection is the reference game's rhythm. Bands stay out unless crews and job sliders prove too coarse in play (03-features, P3).
 - **Tactical pause** (solo, and co-op when all players agree): time stops; trails, alarms, digs and sliders can still be set; they take effect when time resumes.
-- **Feedback:** every order shows its effect within 0.5 seconds: a pulse on the trail, ants turning, a count of ants on their way.
+- **Feedback:** every order shows its effect within 0.5 seconds: a pulse on the trail, ants turning, a count of ants on their way. The measure of good control is not orders per minute. It is whether a player can reroute a forager around danger and say whether it worked.
 
 ### 6.5 Combat and threats
 
@@ -176,7 +181,7 @@ A tool strip at the bottom picks the mode: Trail, Dig or Alarm. One finger acts 
   - **Fly parasites** that hover over dense crowds and pick off ants. They are an ambient hazard that grows with crowding, never a scripted wave. Answer: thin trails and keep crowds underground. Real phorid flies do this.
   - **Spider webs** across gaps. Answer: route around them, or send majors to cut them.
   - **Birds**, shown as a shadow first. Ants on open ash are taken. Answer: Recall, or trails under cover.
-- **One large animal per season**, each a set piece with a readable pattern and no shared class name in the game: an ant-eating spider that wears ant scent and walks the trails (Spring; it teaches scent and is the first hint of disguise), a horned lizard that sits beside trails eating ants one by one (Summer; horned lizards specialise in harvester ants, from memory; answer: move the trail, or plug and wait for the heat), a mole digging through the nest from below (Autumn; a nest-layer fight), a hungry shrew at the frozen entrance (Winter). Each one teaches the next season's skill.
+- **Large animals come because of what the colony did**, not one fixed set piece per season (a fixed seasonal giant reads like a boss tier even without the name). They return across days to what the colony built, so each is a routing problem over several days, not one fight. The cast, with no shared class name in the game: an ant-eating spider that wears ant scent and walks the trails (Spring; it teaches scent and is the first hint of disguise), a horned lizard that comes back each day to the busiest trail and eats ants one by one (Summer; horned lizards specialise in harvester ants, from memory; answer: move the trail, or plug and wait for the heat), a mole digging through the nest from below (Autumn; a nest-layer fight), a hungry shrew at the frozen entrance (Winter). Each one teaches the next season's skill.
 - **The Pale Tide** is not a beast. It advances one front per day on a visible map. It can be slowed by allies, by scent tricks, by plugging and by burning bridges (dropping the leaf-bridges it uses). It is never beaten outright. Winning is holding the top of the hill.
 
 ### 6.6 Movement and pathing
@@ -200,13 +205,13 @@ Real honeypot ants settle borders with displays: workers face off, stand tall an
 - **Day and night:** a day is 8 to 12 minutes of play. Night brings different hunters and slower foraging.
 - **Weather:** rain (water fills low cells and flows down open tunnels; ants carry brood upward), heat (midday surface is deadly in Summer; forage at dawn and dusk), cold (Winter: everything slows; ants cluster).
 - **Bloom:** seeds carried home are eaten for the fatty tip, and the seed is thrown in the midden. Middens near the surface sprout. Real ants spread seeds this way (myrmecochory). Plants grow over days: shade, nectar, aphids, cover from birds, roots that stop cave-ins. The **bloom map** turns black ash green where the colony has been. Bloom is the campaign's score, and the map is the reward a player shows a friend.
-- **Aphid herding:** aphids on regrown plants give honeydew if guarded. Ladybirds eat them. A guarded herd is a farm.
+- **Aphid herding:** the player chooses which regrown plant gets the herd. A plant close to the nest is a short, safe sugar route but shades a trail the birds watch; a far plant is richer but stretches the foragers in the open. Ladybirds are ambient, like the fly parasites: they thin a herd that nobody visits. There is no "defend the herd" fight (that is the decision the reference game advertises).
 
 ### 6.9 A day's goal, losing a day, and catching up
 
 - **One goal per day**, shown on the dawn card (for example "Bring home 20 seeds before dusk" or "Keep the nursery dry through the storm"), plus up to two optional goals. A day is won at dusk when the main goal is met.
 - **Losing a day** means the goal was missed or the queen was in danger at dusk. The colony keeps what it has, and the player chooses: go on to the next day, or **restart the day from dawn** (the dawn save is always kept). No day can be lost in a way that makes a later day impossible: the next day's dawn checks the colony against a floor (ants, stores, a dry queen's chamber) and, below it, Burr brings seeds and the day's goal is eased. The dusk card says so plainly.
-- **A decision floor:** Day 1 asks for at least one meaningful order every 20 seconds; the bots measure orders per minute on every day, and a day where the careful bot needs fewer than two orders a minute gets more to do.
+- **A decision floor:** each day must pose at least one choice the day before could not. Bots still log orders per minute to catch a day that plays itself, but the gate is a person: can they say what they decided today and what it changed tomorrow?
 
 ### 6.10 Progress between days
 
@@ -227,7 +232,9 @@ Real honeypot ants settle borders with displays: workers face off, stand tall an
 
 ## 8. First minute and teaching
 
-- No reading needed. The game opens on Day 1 with the queen sealed in a small chamber and her first eggs. Tally hatches and walks out. The kit's hint shows a finger drawing a line from the entrance to a crumb. Drawing it sends Tally, and the crumb comes home. Day 1 ends when the first larva is fed.
+- No reading needed, and the first minute already teaches the premise (the colony regrows the hill). The game opens on Day 1 with the queen sealed in a small chamber, a hungry larva and an open entrance. Tally hatches and walks out. The kit's hint shows a finger drawing a line from the entrance to a seed. Tally brings it home; the larva eats the fatty tip.
+- The player then chooses where the husk goes: one of two midden spots, one by the open path and one under a charred stalk. At dawn of Day 2 a sprout stands where it went, and a bird's shadow crosses: a forager under the sprout is safe, one in the open runs. A second seed is offered with no hint.
+- Day 1 has one end: dusk, with the larva fed and the first husk placed. The founding gate is whether a new player places the second husk on purpose, predicts which route is safer, and sees whether they were right.
 - Each day adds at most one new verb or threat, first in a safe form: the first rain floods an empty tunnel; the first spider hunts where the player has no trail.
 - Help is always one tap away (a "?" on any thing shows a one-line note with a small moving picture). The hint never comes back once the player has shown the skill.
 - Lab recording logs which help was opened and where players stalled, for the Day 1 gate.
@@ -254,8 +261,10 @@ Real honeypot ants settle borders with displays: workers face off, stand tall an
 
 ## 11. What is not decided
 
-- Name and setting: owner's pick (section 2). Filed in the todo list as `needs-adam`.
-- Net model: server-ordered lockstep is chosen, but it depends on spike S2 (roadmap) proving the sim is deterministic on every engine. If S2 fails, the fallback is coarse server state (05-tech.md).
+- Name and setting: owner's pick (section 2). Work proceeds on A, Cinderhill, which the owner's reply to the spec seemed to accept; it stays open in the todo list until confirmed.
+- Net model: server-ordered lockstep is chosen, but it depends on spike S2 (roadmap) proving the sim is deterministic on every engine. If S2 fails, the fallback is coarse server state (05-tech.md). Whether the room also runs the sim (an authority that checks hashes and makes join snapshots) or only orders commands is decided by spike S1's cost numbers. The protocol rules that hold either way are in 05-tech.md.
+- Whether a living-bridge crew (ants that hold a span and so cannot work) becomes a core verb. The independent design in 10-fresh-design.md built a whole game on that trade; it is a wildcard toy first (03-features).
+- Whether the first two hills of strategic-depth testing (roadmap, depth gate) show that yesterday's choices change today's plan. If they do not, the later seasons wait.
 - Whether the 3D look ships: decided by the frame-rate spike.
 - Whether ants are drawn as individuals at all zoom levels on low-end phones: decided by spike S3.
 - How a person feels about tournaments as the main path to allies: unknown until playtests.
