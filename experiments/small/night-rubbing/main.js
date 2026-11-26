@@ -61,7 +61,9 @@ function runBegin() { if (runOpen || s.done) return; runOpen = true; rec.start({
 function runEnd(outcome) {
   if (!runOpen) return;
   runOpen = false;
-  rec.end(outcome, { level: s.level, coverage: Math.round(s.coverage / s.goal * 100), distance: Math.round(s.distance), unlocked,
+  // coverage is the share of the filing goal reached, as the meter shows it (capped at 100: the last stroke can
+  // carry past the goal, which once read as 101). ink is the share of the fossil's raised cells marked.
+  rec.end(outcome, { level: s.level, coverage: Math.min(100, Math.floor(s.coverage / s.goal * 100)), ink: Math.round(s.coverage * 100), distance: Math.round(s.distance), unlocked,
     kind: kind(), stars: starsOf(s), stick: Math.round(leftOfStick() * 100), smudge: s.smudge, ...dayInfo() });
 }
 const pad = stick(field, { when: () => mode !== 'paused', reach: 32, leash: 60, dead: 0 });
