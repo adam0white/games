@@ -22,6 +22,7 @@
   #tools button[aria-pressed="true"] { background: #2b1d12; color: #f4ecdc; }
   #tools .sep { width: 6px; }
   #recall[aria-pressed="true"] { background: #b8432f; color: #fff; border-color: #5a1a10; }
+  #hold[aria-pressed="true"] { background: #2f5b8a; color: #fff; border-color: #16304d; }
   .playing #top, .playing #tools, .playing #hud { display: flex; }
   #antCard { position: fixed; left: calc(8px + env(safe-area-inset-left)); bottom: calc(70px + env(safe-area-inset-bottom)); max-width: 17em; background: #f4ecdcf0; color: #2b1d12; border: 2px solid #2b1d12; border-radius: 12px; padding: 6px 34px 6px 10px; font-size: 14px; display: none; }
   #antCard.on { display: block; }
@@ -69,6 +70,7 @@
   <button data-tool="alarm" data-i18n="alarm"></button>
   <span class="sep"></span>
   <button id="recall"></button>
+  <button id="hold"></button>
 </div>
 <section id="menu" class="screen on"><div class="card" id="menuCard">
   <h1 data-i18n="title"></h1>

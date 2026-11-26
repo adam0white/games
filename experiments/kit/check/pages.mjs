@@ -158,6 +158,19 @@ async function cinderhillOrders(page, { base, until }) {
   expected.push('dig'); await same('a dig stroke');
   await page.click('#layer'); await until(page, () => window.painter.state().layer === 0, 'back on the surface');
   await page.click('[data-tool="trail"]');
+  // Hold: time stops, a stroke still gives an order, queued for the tick that has not run; Go applies it (not late).
+  await page.click('#hold'); await until(page, () => window.painter.state().held, 'hold');
+  const t0 = await page.evaluate(() => window.painter.state().t);
+  await ptr([['pointerdown', 1, cx, cy], ...stroke(1, cx, cy, -30, -100), ['pointerup', 1, cx - 30, cy - 100]]);
+  expected.push('trail'); await same('a stroke while time is held');
+  await page.waitForTimeout(500);
+  const heldOrder = await page.evaluate(() => ({ t: window.painter.state().t, o: window.painter.log().at(-1) }));
+  assert.equal(heldOrder.t, t0, 'no tick runs while held');
+  assert.equal(heldOrder.o.state, 'queued');
+  assert.equal(heldOrder.o.tick, t0);
+  await page.evaluate(t0 => { window.__t0 = t0; }, t0);
+  await page.click('#hold'); await until(page, () => !window.painter.state().held && window.painter.state().t > window.__t0 + 1, 'Go: time runs again');
+  assert.equal(await page.evaluate(() => window.painter.log().at(-1).state), 'applied', 'the held order applied, not late');
   // Real touches (Chromium only): a pinch mid-stroke, then a clean stroke.
   if (page.context().browser().browserType().name() === 'chromium') {
     const cdp = await page.context().newCDPSession(page);

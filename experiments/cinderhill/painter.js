@@ -31,6 +31,9 @@ const colonyMode = query.get('colony') === '1';
 let host = colonyMode ? new Host(START.ants, SEED, { colony: true }) : new Host(COUNTS.includes(qAnts) ? qAnts : save.ants);
 if (colonyMode) for (const el of document.querySelectorAll('.counts')) el.hidden = true;
 let screen = 'menu', tool = 'trail', layer = SURFACE;
+// The tactical hold: time stops but the game stays on screen and takes orders; they apply on the first tick
+// after Go (an order is queued for the current tick, which has not run yet, so it is never late).
+let held = false;
 const G = makeGestures();
 const snd = sound({ on: () => save.sound });
 const rec = lab('cinderhill', { lang });
@@ -110,6 +113,8 @@ function retext() {
   $('layer').textContent = layer === SURFACE ? t('nest') : t('surface');
   $('recall').textContent = host.sim.g[GI.RECALL] ? t('sendOut') : t('recall');
   $('recall').setAttribute('aria-pressed', String(!!host.sim.g[GI.RECALL]));
+  $('hold').textContent = held ? t('go') : t('hold');
+  $('hold').setAttribute('aria-pressed', String(held));
   $('sound').textContent = save.sound ? t('soundOn') : t('soundOff');
   $('tapTrail').textContent = save.tapTrail ? t('tapTrailOn') : t('tapTrailOff');
   for (const b of document.querySelectorAll('[data-tool]')) b.setAttribute('aria-pressed', String(b.dataset.tool === tool));
@@ -161,6 +166,8 @@ $('toMenu').addEventListener('click', toMenu);
 $('layer').addEventListener('click', () => setLayer(layer === SURFACE ? NEST : SURFACE));
 $('zin').addEventListener('click', () => { cams[layer].z *= 1.4; clampCam(); });
 $('zout').addEventListener('click', () => { cams[layer].z /= 1.4; clampCam(); });
+function setHold(on) { if (on === held) return; held = on; host.last = null; retext(); if (held) toast('held'); }
+$('hold').addEventListener('click', () => setHold(!held));
 $('recall').addEventListener('click', () => { const on = !host.sim.g[GI.RECALL]; order({ type: CMD.RECALL, on: on ? 1 : 0 }); setTimeout(retext, 80); });
 $('sound').addEventListener('click', () => { save.sound = !save.sound; persist(); if (!save.sound) snd.hold(); retext(); });
 $('tapTrail').addEventListener('click', () => { save.tapTrail = !save.tapTrail; persist(); retext(); });
@@ -295,6 +302,7 @@ function drawOverlay(now) {
     pulses = pulses.filter(pu => now - pu.at < 900);
   }
   if (layer === NEST && colonyMode) drawBrood();
+  if (held) { ctx.strokeStyle = '#2f5b8acc'; ctx.lineWidth = 6; ctx.strokeRect(3, 3, W - 6, H - 6); } // time is held
   if (preview && preview.points.length) {
     ctx.strokeStyle = preview.tool === 'dig' ? '#f2d25a' : '#2b1d12'; ctx.lineWidth = preview.tool === 'dig' ? Math.max(6, 3 * cams[layer].z) : 4;
     ctx.setLineDash(preview.tool === 'dig' ? [] : [2, 8]);
@@ -370,7 +378,7 @@ function frame(now) {
   requestAnimationFrame(frame);
   const t0 = performance.now();
   run(G.tick(t0));
-  const stepped = host.advance(now, screen !== 'play');
+  const stepped = host.advance(now, screen !== 'play' || held);
   if (host.shifted) { host.shifted = false; selected = -1; $('antCard').classList.remove('on'); } // a death renumbered the ants
   if (stepped) {
     uploadAnts(); uploadScent();
@@ -397,7 +405,7 @@ requestAnimationFrame(frame);
 
 // ---- hooks for the phone check and the S3 script ----
 window.painter = {
-  state: () => ({ screen: screen === 'paused' ? 'paused' : screen, t: host.tick, paused: screen === 'paused', ants: host.ants, sound: save.sound, tapTrail: save.tapTrail, tool, layer, preview: preview ? preview.points.length : 0, orders: host.log.length, gl: !!renderer && !renderer.lost, glLosses: renderer?.losses ?? 0, glRestored: renderer?.restored ?? 0, glFailed, drawn: frames.drawn, selected, help: help.shown }),
+  state: () => ({ screen: screen === 'paused' ? 'paused' : screen, held, t: host.tick, paused: screen === 'paused', ants: host.ants, sound: save.sound, tapTrail: save.tapTrail, tool, layer, preview: preview ? preview.points.length : 0, orders: host.log.length, gl: !!renderer && !renderer.lost, glLosses: renderer?.losses ?? 0, glRestored: renderer?.restored ?? 0, glFailed, drawn: frames.drawn, selected, help: help.shown }),
   log: () => JSON.parse(JSON.stringify(host.log)),
   stats: () => host.stats(),
   brood: () => Array.from({ length: host.sim.brood.n }, (_, k) => [...cellXY(host.sim.L, host.sim.brood.cell[k]).slice(1), host.sim.brood.stage[k]]),
