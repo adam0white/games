@@ -76,6 +76,10 @@ So the rebuilt spec states pace as numbers with the same force as frame rate and
 | 25 | Now versus later: every load either grows the colony now or goes into stores for the chapter-end bill (a dry spell, a cold night). A greedy colony grows faster until the bill comes | Blind A (winter as the bill), blind C (stores against rain) | Adopted as the chapter-end check from chapter 3 | 02 §6.1, §8.1 |
 | 26 | Pace metrics beyond first events: the longest gap between "decision events" (new source, source empty, threat in view, room full, rain warning, unlock), the share of idle workers, ant count at fixed times for a scripted median bot, and a passive bot that must still finish chapter 1 | Blind A, red team | Adopted into the pace gate | 02 §3.1, 04 R0 |
 
+### Second red-team pass on the revised draft
+
+A fresh reviewer, given 01, the revised 02 to 05 and the evidence but not this file, multiplied the new numbers out. It found that the first draft's door rule jammed in seconds and made Recall useless, that the idle line and starting stores were undefined, that chapter 1's script broke its own 30 s decision line, that growth targets sat at the queen's ceiling, and that a room's worth from its neighbours echoed the reference game's tile adjacency. All were fixed in 02 section 3.2, section 4 and section 8: a 3-cell door with separate lanes, Recall to the nearest cover, defined idle and queued shares, pile sizes and starting stores, a starvation rule, a bird rule, a flood loss for the idle bot, beat skeletons for chapters 2 to 6, lower growth targets with a second laying rate, and worth from a room's own properties only. Remaining findings were minor.
+
 ## Rejected or not taken
 
 | Proposal | Source | Why not |

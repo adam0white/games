@@ -11,7 +11,7 @@ Round 3, 2026-11-26. Ranked by what the rebuild needs, in build order inside eac
 
 | # | Feature | Spec | Old | Done when |
 | --- | --- | --- | --- | --- |
-| 1 | Pace gate: replay-lab reports births, decision events, idle share and first-delivery times; the median, passive and idle bots; the old quota opening as a failing fixture; runs on every pull request | 3.1 | new | CI fails a pull request that breaks any line of 02 section 3.1, and fails if the quota fixture passes |
+| 1 | Pace gate: replay-lab reports births, decision events, idle and queued shares and first-delivery times; the median, passive and idle bots; the old quota opening as a failing fixture; runs on every pull request | 3.1 | new | CI fails a pull request that breaks any line of 02 section 3.1, and fails if the quota fixture passes |
 | 2 | Deterministic integer sim kept: typed arrays, seeded random numbers, 20 Hz tick, per-subsystem hashes | 05 | 1 | As round 2: same hash in Node, workerd, Chromium and WebKit; a flipped byte names its subsystem |
 | 3 | New starting values: walk speeds, porch store, shallow nest, start colony with pupae, 60 s brood | 3.2 | 6 | Pace lines for first delivery and first birth pass |
 | 4 | Crews and route cards (Light, Steady, Surge, plus and minus), the who-goes rule, gap reasons | 6.2 | 5 | A bot changes a crew and loads a minute change within 5 s; every card names its gap reason |
