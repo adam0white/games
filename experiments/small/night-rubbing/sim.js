@@ -2,14 +2,14 @@ import { PLATES } from './plates.js';
 
 export const WIDTH = 240;
 export const HEIGHT = 280;
-const PROOFS = [
+export const PROOFS = [
   { radius: 32, goal: 0.70 }, { radius: 28, goal: 0.76 },
   { radius: 26, goal: 0.80 }, { radius: 25, goal: 0.82 },
   { radius: 23, goal: 0.84 }, { radius: 22, goal: 0.86 },
 ];
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
-const TARGET_HEIGHT = 0.34;
-const DARK_MARK = 0.36;
+export const TARGET_HEIGHT = 0.34;
+export const DARK_MARK = 0.36;
 // Plates 7 on (2026-11-25). A glazed plate is smooth on top: the stick only bites on the flank it climbs, so
 // contact comes from the stroke's direction alone. Stone is grit around the specimen: it takes graphite like a
 // ridge does, and each grit cell that darkens is a smudge. Plates 1 to 6 have neither and no lead limit, and
@@ -18,7 +18,7 @@ const GLAZE_BITE = 2.4;
 const STONE_CLEAR = 2;
 
 // A rounded ridge under the paper, swept along an engraved line.
-function ridge(field, a, b, width, height) {
+export function ridge(field, a, b, width, height) {
   const dx = b[0] - a[0], dy = b[1] - a[1];
   const length2 = dx * dx + dy * dy;
   const radius = width / 2 + 0.45;
@@ -40,7 +40,7 @@ function ridge(field, a, b, width, height) {
 // Grit for a stone plate: short pebbles on a jittered grid, only where the stick can pass the specimen without
 // touching them (more than its radius plus a margin from any part of the fossil). Seeded by the plate, so the
 // stone is the same for every player.
-function stoneField(fossil, radius, seed) {
+export function stoneField(fossil, radius, seed) {
   const cells = WIDTH * HEIGHT, far = 1e6;
   const near = new Float32Array(cells);
   for (let i = 0; i < cells; i++) near[i] = fossil[i] > 0.02 ? 0 : far;
