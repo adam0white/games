@@ -78,3 +78,40 @@ for (let tier = 0; tier < sim.TIERS.length; tier++) {
   assert.ok(seen.size >= Math.min(menu.length, 8), `rank ${tier}: 30 days served only ${seen.size} of ${menu.length} dishes`);
 }
 console.log('bots: ok');
+
+// ---------- the story: beats come in order, missed plot beats catch up, missions count and pay, mission dishes get served
+{
+  const story = await import('./story.js');
+  const { readFileSync } = await import('node:fs');
+  const beats = JSON.parse(readFileSync(new URL('./story/beats.json', import.meta.url)));
+  const specials = JSON.parse(readFileSync(new URL('./story/specials.json', import.meta.url))).specials;
+  for (const b of beats) {
+    for (const l of b.lines) assert.ok(l.length <= 90, `${b.id}: line too long`);
+    if (b.mission?.goal.type === 'dish') assert.ok(sim.RECIPES[b.mission.goal.dish], `${b.id}: unknown dish ${b.mission.goal.dish}`);
+  }
+  const fresh = () => ({ v: 1, coins: 0, tier: 0, day: 1, served: 0, best: 0, tutorial: true, sound: true, dayAtTier: 0, built: { tray: 1, knife: 1, stove: 0, micro: 0, blender: 0, tables: 1, decor: 1 } });
+  const s0 = fresh();
+  const d1 = story.due(s0, beats);
+  assert.equal(d1.cards[0].id, beats[0].id, 'the first card is the opening');
+  assert.ok(d1.cards.every(b => b.rank === 0 && b.day === 1), 'day 1 shows only day-1 beats');
+  // A player who jumps to rank 2 still gets every spine beat, three cards a day at most.
+  const s2 = { ...fresh(), tier: 2, dayAtTier: 0 };
+  const spine = beats.filter(b => b.spine && (b.rank < 2 || (b.rank === 2 && b.day === 1))).map(b => b.id);
+  const shown = [];
+  for (let d = 0; d < 12; d++) { const { cards } = story.due(s2, beats); assert.ok(cards.length <= 3); for (const b of cards) { story.see(s2, b); shown.push(b.id); } }
+  for (const id of spine) assert.ok(shown.includes(id), `spine beat ${id} never shown after a quick rank-up`);
+  // A dish mission counts the right dish only, and pays once.
+  const s3 = fresh(); const m = beats.find(b => b.mission?.goal.type === 'dish'); story.see(s3, m);
+  const coins0 = s3.coins;
+  story.count(s3, { type: 'serve', recipe: '__nope', stars: 3, tip: 1, coins: 5 });
+  assert.equal(s3.story.open.length, 1, 'the wrong dish does not finish it');
+  for (let i = 0; i < m.mission.goal.n; i++) story.count(s3, { type: 'serve', recipe: m.mission.goal.dish, stars: 1, tip: 0, coins: 5 });
+  assert.equal(s3.story.open.length, 0); assert.equal(s3.coins - coins0, m.reward, 'mission pays its reward once');
+  // The day plan serves a mission dish that is on the menu.
+  const plan = story.forceDishes(sim.dayPlan(s0, 5), ['sticks'], sim.menuFor(s0));
+  assert.ok(plan.some(p => p.recipe === 'sticks'));
+  // Specials: one a day, deterministic, countable.
+  const sp = story.pickSpecial(s0, specials, sim.menuFor(s0), 77);
+  assert.ok(sp && story.COUNTABLE.has(sp.goal.type) && sp.pay > 0);
+  console.log('story: ok');
+}

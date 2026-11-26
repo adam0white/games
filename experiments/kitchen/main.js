@@ -9,6 +9,9 @@ import { music } from '../kit/music.js';
 import { onLeave, isPauseKey } from '../kit/pause.js';
 import { screens } from '../kit/screens.js';
 import { lab } from '../kit/lab.js';
+import * as story from './story.js';
+// Story beats and daily specials (data). A failed load just means a day without story.
+const storyData = Promise.all(['beats', 'specials'].map(n => fetch(`./story/${n}.json`).then(r => r.json()).catch(() => null))).then(([beats, sp]) => ({ beats: beats ?? [], specials: sp?.specials ?? [] }));
 import { hint } from '../kit/hint.js';
 import { noZoom } from '../kit/zoom.js'; noZoom();
 
@@ -30,7 +33,10 @@ const save = sim.newSave();
     if (old.built && typeof old.built === 'object') for (const id of BUILDING_IDS) if (Number.isFinite(old.built[id])) save.built[id] = Math.max(0, Math.min(BUILDINGS[id].max.at(-1), Math.floor(old.built[id])));
   }
 }
-const store = () => writeJson(KEY, save);
+// The story's progress lives in its own key so the game save keeps its first shape.
+const STORY_KEY = 'kitchen-story';
+{ const st = readJson(STORY_KEY, null); if (st && typeof st === 'object' && Array.isArray(st.seen)) save.story = st; }
+const store = () => { writeJson(KEY, { ...save, story: undefined }); if (save.story) writeJson(STORY_KEY, save.story); };
 let lookId = LOOK_IDS.includes(query.get('look')) ? query.get('look') : LOOK_IDS.includes(read(LOOK_KEY)) ? read(LOOK_KEY) : 'diner';
 
 // ---------- sound: made in code (kit/audio.js); music from kit/music.js
@@ -84,9 +90,13 @@ const show = screens(['menu', 'paused', 'extra', 'dayEnd', 'shop'], name => {
   const playing = name === 'play' || name === 'extra';
   $('pause').style.display = name === 'play' ? 'grid' : 'none';
   $('hud').style.display = playing || name === 'paused' ? 'flex' : 'none';
-  for (const id of ['ticket', 'gauge', 'coach', 'banner', 'finger']) if (!playing && name !== 'paused') $(id).style.display = 'none';
+  for (const id of ['ticket', 'gauge', 'coach', 'banner', 'finger', 'mission']) if (!playing && name !== 'paused') $(id).style.display = 'none';
   if (playing && g && ['catch', 'chop', 'fry', 'micro', 'blend', 'ring', 'close', 'serve', 'plate'].includes(phase)) $('ticket').style.display = 'block';
   if (name === 'menu') menu();
+  if (name === 'play') missionChip();
+  // A story card waits under the pause and extra cards; leaving for the menu drops it.
+  $('story').style.visibility = name === 'play' ? '' : 'hidden';
+  if (name === 'menu' || name === 'dayEnd' || name === 'shop') $('story').style.display = 'none';
   if (name === 'shop') shop();
   labels(); hud();
 });
@@ -116,7 +126,7 @@ ready = createView(canvas, lookId).then(v => {
   // A guest at the counter on the menu: the restaurant is open.
   art.peopleReady.then(() => { peopleIn = true; $('play').disabled = false; $('play').classList.remove('loading'); });
   art.peopleReady.then(async () => { if (screen === 'menu' && !g) { const m = await art.guest(2); if (m) { m.g.position.set(1.6, 0, 1.7); m.play('idle'); m.face = 0.3; menuGuest = m; } } });
-  return v;
+  return storyData.then(() => v);
 }).catch(e => { console.error(e); });
 let menuGuest = null;
 
@@ -127,10 +137,17 @@ function beginDay() {
   const seed = query.has('seed') ? Number(query.get('seed')) >>> 0 : (Date.now() ^ save.day * 7919) >>> 0;
   let plan = save.tutorial ? sim.dayPlan(save, seed) : sim.TUTORIAL_DAY.slice();
   if (save.tutorial && query.get('recipe') in RECIPES) plan = plan.map(p => ({ ...p, recipe: query.get('recipe') })); // for checks and the owner's tries
-  day = { plan, i: -1, served: 0, earned: 0, tips: 0, stars: [], seed, t0: clock };
+  if (save.tutorial && storyBook) {
+    const menuNow = sim.menuFor(save);
+    story.pickSpecial(save, storyBook.specials, menuNow, seed);
+    plan = story.forceDishes(plan, story.wantedDishes(save), menuNow);
+  }
+  day = { plan, i: -1, served: 0, earned: 0, tips: 0, stars: [], seed, t0: clock, extras: 0 };
   song?.start(seed);
   rec.start({ day: save.day, tier: save.tier, tutorial: !save.tutorial });
   paused = false; snd.release(); show('play'); hud();
+  if (storyBook) { const d = story.due(save, storyBook.beats); storyQueue = d.cards.slice(); storyToasts = d.toasts.slice(); for (const b of d.toasts) story.see(save, b); store(); }
+  nextStory(); missionChip();
   nextGuest();
 }
 async function nextGuest() {
@@ -160,7 +177,7 @@ function order() {
   $('ticket').style.display = 'block'; $('ticket').classList.remove('pop'); void $('ticket').offsetWidth; $('ticket').classList.add('pop');
   SFX.happy();
   if (g.tut === 0) coach(t('t1'));
-  wait(g.tut === 0 ? 2.2 : 1.1, () => startCatch());
+  wait(g.tut === 0 ? 2.2 : 1.1, () => { if (storyOpen()) pendingCatch = g; else startCatch(); });
 }
 function dishModel(id) { const r = RECIPES[id]; if (r.dish) return r.dish; if (r.bowl) return 'bowl'; const first = Object.keys(r.need)[0]; return ING[first]?.chop ?? ING[first]?.model ?? 'carrot'; }
 const itemModel = id => (ING[id] ?? JUNK[id]).model;
@@ -198,7 +215,7 @@ function stepCatch(dt) {
     } else if (e.type === 'extra') {
       const m = meshes.get(e.it.n); meshes.delete(e.it.n);
       if (m) landOnTray(m, e.it);
-      g.extras++; SFX.wrong(); buzz([40, 60, 40]); art.shake(1); art.tray.bump();
+      g.extras++; day.extras++; SFX.wrong(); buzz([40, 60, 40]); art.shake(1); art.tray.bump();
       $('ticket').classList.remove('shake'); void $('ticket').offsetWidth; $('ticket').classList.add('shake');
       floater(worldPx(trayX, LANE.y0 + 0.35), '✗', 'bad');
       song?.hit();
@@ -209,6 +226,7 @@ function stepCatch(dt) {
     } else if (e.type === 'done') {
       g.wait = clock - g.catchT0;
       g.q.push(g.extras ? 0.85 : 1);
+      tally({ type: 'catch', clean: g.extras === 0 && g.restarts === 0 });
       rec.event('catch', { recipe: g.recipe, t: +g.wait.toFixed(1), extras: g.extras, restarts: g.restarts, paid: g.paid });
       // Whatever is still falling puffs away.
       for (const m of meshes.values()) { art.burst(m.position, { n: 6, color: '#ffffff', speed: 0.8, up: 0.6, size: 0.04, life: 0.4, gravity: 0 }); art.world.remove(m); }
@@ -496,6 +514,7 @@ function openRegister() {
   floater(from, `+${b.total}`, 'gold');
   // The coins are the guest's: count them as served now, whatever happens next.
   save.served++; day.served++; day.earned += b.price; day.tips += b.tip; day.stars.push(b.stars);
+  tally({ type: 'serve', recipe: g.recipe, stars: b.stars, tip: b.tip, coins: b.total, quick: g.wait <= TUNE.patience });
   setTimeout(() => { if (given < b.total) { save.coins += b.total - given; given = b.total; hud(); } store(); }, 140 + n * 70 + 900);
   rec.event('serve', { recipe: g.recipe, stars: b.stars, coins: b.total });
   wait(0.75, () => { phase = 'close'; closeRegister(); });
@@ -523,6 +542,7 @@ function flyCoin(from, to, done) {
 function endDay() {
   phase = 'idle'; g = null;
   const first = !save.tutorial;
+  const fin = save.tutorial ? tally({ type: 'dayEnd', extras: day.extras }) ?? [] : [];
   save.tutorial = true; save.day++; save.dayAtTier++;
   save.best = Math.max(save.best, day.earned + day.tips);
   store();
@@ -532,6 +552,7 @@ function endDay() {
   $('dayStars').textContent = '★'.repeat(stars) + '☆'.repeat(3 - stars);
   $('ledger').innerHTML = `<tr><td>${t('served')}</td><td>${day.served}</td></tr><tr><td>${t('earned')}</td><td>${day.earned}</td></tr><tr><td>${t('tips')}</td><td>${day.tips}</td></tr><tr class="total"><td><i class="coin"></i></td><td>${save.coins}</td></tr>`;
   $('dayLine').textContent = first ? t('t7') : '';
+  $('dayMissions').innerHTML = fin.map(o => `<li class="won">✓ ${esc(o.text)} <b>+${o.reward}</b></li>`).join('') + (save.story?.open ?? []).slice(0, 3).map(o => `<li>${esc(o.text)} <b>${story.progress(o)}</b></li>`).join('');
   coach(null); fingerOff(); gauge(null);
   SFX.star(); art.view('room');
   show('dayEnd');
@@ -587,6 +608,48 @@ function starUp() {
   shop(); hud();
   flash();
   if (added.length) floater({ x: innerWidth / 2, y: innerHeight * 0.3 }, t('unlocked', { what: added.join(', ') }), 'gold');
+}
+
+// ---------- the story: cards before the first catch, toasts, missions
+let storyBook = null, storyQueue = [], storyToasts = [], pendingCatch = null;
+storyData.then(d => { storyBook = d; });
+const storyOpen = () => $('story').style.display === 'block';
+function nextStory() {
+  const b = storyQueue.shift();
+  if (!b) { $('story').style.display = 'none'; if (pendingCatch && pendingCatch === g && phase === 'order') { pendingCatch = null; startCatch(); } else pendingCatch = null; toastNext(); return; }
+  const m = story.see(save, b); store();
+  $('storyWho').textContent = b.speaker ?? '';
+  $('story').className = 'k-' + b.kind;
+  $('storyLines').innerHTML = b.lines.map(l => `<p>${esc(l)}</p>`).join('');
+  $('storyMission').innerHTML = m ? `<b>${t('mission')}</b> ${esc(m.text)}${m.reward ? ` <span class="rw"><i class="coin"></i>${m.reward}</span>` : ''}` : '';
+  const btns = $('storyBtns');
+  if (b.choice) {
+    btns.innerHTML = b.choice.map(c => `<button data-c="${c.id}">${esc(c.text)}</button>`).join('');
+    for (const el of btns.querySelectorAll('button')) el.onclick = e => { e.stopPropagation(); SFX.tap(); const c = b.choice.find(x => x.id === el.dataset.c); save.story.choice[b.id] = c.id; store(); rec.event('choice', { beat: b.id, choice: c.id }); storyQueue.unshift({ ...b, id: b.id + ':' + c.id, choice: null, mission: null, lines: c.lines }); nextStory(); };
+  } else { btns.innerHTML = `<button class="main">${t('okBtn')}</button>`; btns.firstChild.onclick = e => { e.stopPropagation(); SFX.tap(); nextStory(); }; }
+  $('story').style.display = 'block';
+  SFX.happy();
+}
+function toastNext() { const b = storyToasts.shift(); if (!b) return; coach(`${b.speaker ? b.speaker + ': ' : ''}${b.lines.join(' ')}`, 5); later(5500, toastNext); }
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+function tally(ev) {
+  if (!storyBook || !save.tutorial) return [];
+  const done = story.count(save, ev);
+  for (const o of done) {
+    if (ev.type !== 'dayEnd') later(400, () => { banner(t(o.special ? 'specialDone' : 'missionDone'), `${o.text}  +${o.reward}`); SFX.star(); hud(); });
+    rec.event('mission', { id: o.id, reward: o.reward });
+  }
+  if (done.length) store();
+  missionChip();
+  return done;
+}
+function missionChip() {
+  const s = save.story, o = s?.open?.[0], sp = s?.special?.day === save.day && !s.special.paid ? s.special : null;
+  const el = $('mission');
+  if (!save.tutorial || (!o && !sp)) { el.style.display = 'none'; return; }
+  const dish = d => t('r_' + d);
+  el.innerHTML = [o && `<div>📜 ${esc(o.text)} <b>${story.progress(o)}</b></div>`, sp && `<div>⭐ ${esc(story.specialText(sp, dish))} <b>${Math.min(sp.got, sp.n)}/${sp.n}</b></div>`].filter(Boolean).join('');
+  el.style.display = screen === 'play' ? 'block' : 'none';
 }
 
 // ---------- small helpers for the page
