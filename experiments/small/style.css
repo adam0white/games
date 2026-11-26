@@ -121,22 +121,6 @@ li.opened .stop .pic, li.moved .stop .pic, li.won .stop .pic { opacity: .75; }
 .more button { min-height: 44px; padding: 0 1.1em; border-radius: 22px; border: 1px solid var(--gold); background: none; color: var(--gold); cursor: pointer; }
 .more button.quiet { border-color: var(--line); color: var(--ink); }
 
-/* ?v=grid: every game at once, two to a row */
-body[data-v=grid] .deck { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; overflow: visible; scroll-snap-type: none; padding: 14px 16px 6px; max-width: 40em; margin: 0 auto; }
-body[data-v=grid] .card { height: auto; border-radius: 16px; box-shadow: 0 6px 16px #0007; }
-body[data-v=grid] .card.away { transform: none; opacity: 1; cursor: auto; }
-body[data-v=grid] .card.away .play { pointer-events: auto; }
-body[data-v=grid] .card .pic { flex: none; aspect-ratio: 4 / 3.4; }
-body[data-v=grid] .card .body { padding: 9px 10px 10px; gap: 3px; flex: 1; }
-body[data-v=grid] .card b { font-size: 1.08em; }
-body[data-v=grid] .card .line { display: none; }
-body[data-v=grid] .card small { font-size: 11px; }
-body[data-v=grid] .card .play { margin-top: auto; padding: .45em; font-size: .98em; border-radius: 11px; }
-body[data-v=grid] .pic .hook { font-size: 11.5px; padding: 1em 8px 6px; }
-body[data-v=grid] .badge { top: 7px; left: 7px; right: 7px; }
-body[data-v=grid] .pickTag { font-size: 9px; padding: .45em .6em; }
-body[data-v=grid] .mark { font-size: 10px; }
-body[data-v=grid] .bar { display: none; }
 
 footer { max-width: 40em; margin: 2em auto 0; padding: 1em 16px calc(2em + env(safe-area-inset-bottom)); border-top: 1px solid #ffd9a01a; color: var(--dim); font-size: 13px; }
 footer .lab-toggle { font-size: 13px; }
