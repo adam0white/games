@@ -28,6 +28,20 @@ export const ING = {
   broccoli: { model: 'broccoli', chop: null },
   pear: { model: 'pear', chop: null },
   avocado: { model: 'avocado', chop: 'advocado-half' },
+  orange: { model: 'orange', chop: null },
+  grapes: { model: 'grapes', chop: null },
+  watermelon: { model: 'watermelon', chop: null },
+  pineapple: { model: 'pineapple', chop: null },
+  cherries: { model: 'cherries', chop: null },
+  coconut: { model: 'coconut', chop: 'coconut-half' },
+  eggplant: { model: 'eggplant', chop: null },
+  beet: { model: 'beet', chop: null },
+  leek: { model: 'leek', chop: null },
+  radish: { model: 'radish', chop: null },
+  pumpkin: { model: 'pumpkin-basic', chop: null },
+  celery: { model: 'celery-stick', chop: null },
+  bacon: { model: 'bacon-raw', chop: null },
+  loaf: { model: 'loaf', chop: null },
 };
 // Things nobody orders. Catching one is an extra like any other.
 export const JUNK = { bones: { model: 'fish-bones' }, can: { model: 'soda-can-crushed' }, shard: { model: 'plate-broken' } };
@@ -49,6 +63,29 @@ export const RECIPES = {
   steak: { tier: 4, price: 30, need: { steak: 1, potato: 2, broccoli: 1 }, steps: ['chop', 'fry', 'micro'], dish: 'meat-cooked' },
   fishplate: { tier: 4, price: 28, need: { fish: 1, lemon: 1, avocado: 1 }, steps: ['chop', 'fry'], dish: 'fish' },
   tasting: { tier: 5, price: 44, need: { pear: 1, cheese: 1, strawberry: 2, avocado: 1 }, steps: ['chop', 'blend', 'micro'], dish: 'cake' },
+  // Added 2026-11-26 so every rank has five or more dishes.
+  sandwich: { tier: 0, price: 8, need: { bread: 1, cheese: 1, tomato: 1 }, steps: ['chop'], dish: 'sandwich' },
+  crudites: { tier: 0, price: 7, need: { celery: 2, radish: 1 }, steps: ['chop'], dish: null, bowl: true },
+  berrybowl: { tier: 0, price: 7, need: { cherries: 1, grapes: 1, orange: 1 }, steps: ['chop'], dish: null, bowl: true },
+  melon: { tier: 0, price: 6, need: { watermelon: 1, lemon: 1 }, steps: ['chop'], dish: null },
+  bacon: { tier: 1, price: 12, need: { bacon: 2, egg: 1 }, steps: ['fry'], dish: 'bacon' },
+  pancakes: { tier: 1, price: 11, need: { egg: 1, banana: 1, strawberry: 1 }, steps: ['chop', 'fry'], dish: 'pancakes' },
+  taco: { tier: 1, price: 12, need: { patty: 1, tomato: 1, cabbage: 1 }, steps: ['chop', 'fry'], dish: 'taco' },
+  eggplant: { tier: 1, price: 10, need: { eggplant: 1, paprika: 1, onion: 1 }, steps: ['chop', 'fry'], dish: 'skewer-vegetables' },
+  pumpkin: { tier: 2, price: 14, need: { pumpkin: 1, onion: 1, leek: 1 }, steps: ['chop', 'micro'], dish: 'bowl-broth' },
+  stew: { tier: 2, price: 16, need: { steak: 1, carrot: 1, potato: 1 }, steps: ['chop', 'micro'], dish: 'pot-stew' },
+  sub: { tier: 2, price: 15, need: { loaf: 1, sausage: 1, cheese: 1 }, steps: ['chop', 'micro'], dish: 'sub' },
+  borscht: { tier: 2, price: 15, need: { beet: 2, cabbage: 1, potato: 1 }, steps: ['chop', 'micro'], dish: 'bowl-soup' },
+  juice: { tier: 3, price: 15, need: { orange: 3 }, steps: ['blend'], dish: 'soda-glass' },
+  tropical: { tier: 3, price: 19, need: { pineapple: 1, coconut: 1, banana: 1 }, steps: ['chop', 'blend'], dish: 'cocktail' },
+  sundae: { tier: 3, price: 18, need: { strawberry: 1, cherries: 1, banana: 1 }, steps: ['blend'], dish: 'sundae' },
+  donut: { tier: 4, price: 24, need: { egg: 2, strawberry: 1, cherries: 1 }, steps: ['fry'], dish: 'donut-sprinkles' },
+  cupcake: { tier: 4, price: 26, need: { egg: 1, banana: 1, lemon: 1, cherries: 1 }, steps: ['blend', 'micro'], dish: 'cupcake' },
+  brunch: { tier: 4, price: 32, need: { bacon: 1, egg: 2, avocado: 1, bread: 1 }, steps: ['chop', 'fry'], dish: 'egg-cooked' },
+  surf: { tier: 5, price: 52, need: { steak: 1, fish: 1, lemon: 1, broccoli: 1 }, steps: ['chop', 'fry', 'micro'], dish: 'plate-dinner' },
+  feast: { tier: 5, price: 48, need: { pumpkin: 1, corn: 1, potato: 2, leek: 1 }, steps: ['chop', 'micro'], dish: 'pot' },
+  croissant: { tier: 5, price: 40, need: { loaf: 1, egg: 1, cheese: 1 }, steps: ['micro'], dish: 'croissant' },
+  rainbow: { tier: 5, price: 46, need: { pineapple: 1, watermelon: 1, grapes: 1, orange: 1, pear: 1 }, steps: ['chop', 'blend'], dish: 'frappe' },
 };
 export const RECIPE_IDS = Object.keys(RECIPES);
 export const chopsFor = r => Object.entries(RECIPES[r].need).reduce((n, [, c]) => n + c, 0);
@@ -235,12 +272,15 @@ export function bill(save, recipeId, quality, waitSeconds) {
 // ---------- a day: which guests come, what they order
 export function dayPlan(save, seed) {
   const r = rng(seed), menu = menuFor(save), guests = TIERS[save.tier].guests + Math.max(0, save.built.tables - 1) % 2;
-  // Newest dishes come up more often so a new star is felt at once.
-  const out = [];
+  // Newer dishes come up a bit more often, but never the same dish twice in a row and never more than half a day.
+  const out = [], cap = Math.ceil(guests / 2);
   for (let i = 0; i < guests; i++) {
-    const weights = menu.map(id => 1 + (RECIPES[id].tier === save.tier ? 1.5 : 0));
-    let pick = r() * weights.reduce((a, b) => a + b, 0), id = menu[0];
-    for (let k = 0; k < menu.length; k++) { if ((pick -= weights[k]) <= 0) { id = menu[k]; break; } }
+    const count = id => out.filter(o => o.recipe === id).length;
+    const ok = menu.filter(id => id !== out.at(-1)?.recipe && count(id) < cap);
+    const from = ok.length ? ok : menu;
+    const weights = from.map(id => (1 + (RECIPES[id].tier === save.tier ? 0.6 : 0)) / (1 + count(id) * 2));
+    let pick = r() * weights.reduce((a, b) => a + b, 0), id = from[0];
+    for (let k = 0; k < from.length; k++) { if ((pick -= weights[k]) <= 0) { id = from[k]; break; } }
     out.push({ recipe: id, look: Math.floor(r() * 8) });
   }
   return out;

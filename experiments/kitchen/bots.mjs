@@ -61,4 +61,20 @@ assert.ok(get('five stars', 'good').clean >= 0.2, 'five stars stays possible for
 assert.ok(get('five stars', 'new').clean < get('cart day 1', 'new').clean - 0.3, 'five stars is clearly harder than day 1');
 assert.ok(get('cart day 1', 'good').seconds < 30, 'a first catch takes under half a minute');
 if (mutate) assert.ok(rows.every(r => r.extras === 0), 'mutation: extras no longer stop a catch');
+// Variety (Adam 2026-11-26: "everybody wanted carrots, then everybody wants hot dogs"): every rank offers at least
+// five dishes, a day never serves the same dish twice in a row, and no dish takes more than half of a day.
+for (let tier = 0; tier < sim.TIERS.length; tier++) {
+  const save = { ...sim.newSave(), tier, built: { tray: 3, knife: 3, stove: 1, micro: 1, blender: 1, tables: 3, decor: 1 } };
+  const menu = sim.menuFor(save);
+  assert.ok(menu.length >= 5, `rank ${sim.TIERS[tier].name} offers ${menu.length} dishes, want 5 or more`);
+  const seen = new Set();
+  for (let d = 0; d < 30; d++) {
+    const plan = sim.dayPlan(save, 77 + d * 131 + tier).map(p => p.recipe);
+    plan.forEach(r => seen.add(r));
+    for (let i = 1; i < plan.length; i++) assert.notEqual(plan[i], plan[i - 1], `rank ${tier} day ${d}: ${plan[i]} twice in a row`);
+    const most = Math.max(...plan.map(r => plan.filter(x => x === r).length));
+    assert.ok(most <= Math.ceil(plan.length / 2), `rank ${tier} day ${d}: one dish takes ${most} of ${plan.length}`);
+  }
+  assert.ok(seen.size >= Math.min(menu.length, 8), `rank ${tier}: 30 days served only ${seen.size} of ${menu.length} dishes`);
+}
 console.log('bots: ok');
