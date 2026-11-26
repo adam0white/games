@@ -102,12 +102,10 @@ const show = screens(['menu', 'paused', 'end'], name => {
   $('pause').style.display = name === 'play' ? 'grid' : 'none';
   $('tilt').style.display = name === 'play' && sensor !== null ? 'grid' : 'none';
 });
-// The forecast line (2026-11-26): a faint line where the glass is heading, counting the drops in the air. Three ways to
-// offer it, for a pick: ?v=a (default) on levels 1 to 3 and the daily pour, and on any level after a lost pour there,
-// until it is won; ?v=b always; ?v=c never (the page as it was).
-const V = ['a', 'b', 'c'].includes(query.get('v')) ? query.get('v') : 'a';
+// The forecast line (2026-11-26): a faint line where the glass is heading, counting the drops in the air. It shows on
+// levels 1 to 3 and the daily pour, and on any level after a lost pour there, until it is won.
 const lostOn = new Set();
-const forecastOn = () => V === 'b' || (V === 'a' && (lvl <= 3 || !!daily || lostOn.has(lvl)));
+const forecastOn = () => lvl <= 3 || !!daily || lostOn.has(lvl);
 const COLORS = { juice: ['#ff8a3d', '#ffc078', '#e8692a'], honey: ['#e39a12', '#ffd36b', '#b86f05'], soda: ['#7a3b1c', '#c98b5e', '#55260f'] };
 
 // Play recording for the game lab (kit/lab.js): one run for each pour, started by Play, Daily pour, Next or Again.
@@ -127,7 +125,7 @@ function start(n, challenge = null) {
   s = create(n, seed); finger = null; keyDown = false; keyTilt = 0; want = 0; fx = []; shake = 0; acc = 0; endAt = 0; lineFlash = 0; overAt = 0; endShownAt = 0;
   waves = s.glasses.map(gl => ({ h: new Float32Array(16), v: new Float32Array(16), x: [gl.x, gl.x] }));
   mode = 'play'; paused = false; show('play'); snd.release(); heading = 'low'; told = false;
-  runOpen = true; rec.start({ level: n, daily: !!daily, v: V, forecast: forecastOn() });
+  runOpen = true; rec.start({ level: n, daily: !!daily, v: 'a', forecast: forecastOn() });
   banner(n === 1 && !daily ? t('tagline') : t('idea-' + s.L.idea));
   tone(520, 0.12, 0.08, 'triangle', 200);
 }
@@ -555,7 +553,7 @@ window.pourState = (details = true) => {
     over: !!s?.over, won: !!s?.won, why: s?.why ?? '', stars: s?.stars ?? 0, inGlass: s?.inGlass ?? 0, spilled: s?.spilled ?? 0,
     inJug: s?.inJug ?? 0, flying: s?.flying ?? 0, angle: s?.angle ?? 0, t: s?.t ?? 0, target: s?.L.target ?? 0, saved: save.stars.slice(),
     sensor: sensor !== null, seed: s?.seed, liquid: s?.L.liquid, idea: s?.L.idea, flow: s?.flow ?? 0, glasses: s ? s.glasses.map(gl => gl.n) : [],
-    foam: s ? Math.max(...s.glasses.map(gl => gl.foam)) : 0, band: s?.L.band ?? 0, v: V, forecast: s && forecastOn() ? forecast(s) : null,
+    foam: s ? Math.max(...s.glasses.map(gl => gl.foam)) : 0, band: s?.L.band ?? 0, v: 'a', forecast: s && forecastOn() ? forecast(s) : null,
     remaining: s ? Math.max(0, s.L.time - s.t) : 30, overAt, endShownAt,
     jugClearance: Y(SPOUT.y - REACH) - (top + 96),
     jug: s ? { x: X(s.pivot.x), y: Y(s.pivot.y) } : null, W, H,

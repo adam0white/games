@@ -104,7 +104,7 @@ From the wildcards lens, ranked by what they test and how cheap they are. Each i
 
 ## Decisions only the owner can make
 
-These are taste or direction calls. Each has a recommendation; work proceeds on it until the owner says otherwise.
+These are taste or direction calls. **The owner answered on 2026-11-26:** 1 C (chapters, with founding runs as the daily mode), 2 A, 3 Cinderhill, 4 A or C (built as wordless with C's colony ledger on the chapter card), 5 A, 6 B (30 workers with fast brood, "probably"). The spec follows these answers.
 
 | # | Decision | Options | Recommended |
 | --- | --- | --- | --- |

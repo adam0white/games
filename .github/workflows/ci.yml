@@ -50,20 +50,25 @@ jobs:
           node scripts/affected.mjs "$BASE"
       - name: Root tests
         run: npm test
-      # Cinderhill's sim (experiments/cinderhill/test): determinism, byte flips, lint, scent, flow, a bot run. About 15 s.
+      # The phone check's own code is otherwise only run when a phone check is picked: a syntax error fails here.
+      - name: Phone check parses
+        run: for f in experiments/kit/check/*.mjs; do node --check "$f"; done
+      # Cinderhill's sim (experiments/cinderhill/test), only when Cinderhill changed. A pull request or merge skips the seven
+      # tests over 15 s (the day 1 to 3 bot sweep alone took 114 s, 2026-11-26); nightly and by hand run all of them.
       - name: Cinderhill sim
-        run: node --test experiments/cinderhill/test/
-      # Cinderhill's pace gate (docs/design/colony/02-spec.md section 3.1, roadmap R0): scripted players on 20 seeds,
-      # a ratchet on spikes/pace-baseline.json, the quota opening and a brood x10 plant must fail. Runs when
-      # experiments/cinderhill, .node-version or this file changes. 3-minute games: about 1.5 minutes on four cores. A 12-minute run (no flag) reads every line.
-      - name: Cinderhill pace gate
+        if: steps.affected.outputs.cinderhill == 'true'
         env:
-          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
-        run: |
-          if [ -n "$BASE" ] && git cat-file -e "$BASE^{commit}" 2>/dev/null && git diff --quiet "$BASE" HEAD -- experiments/cinderhill .node-version .github/workflows/ci.yml; then echo "No Cinderhill change: pace gate skipped"; exit 0; fi
-          node experiments/cinderhill/spikes/pace-gate.mjs --minutes=3
+          SKIP: ${{ (github.event_name == 'pull_request' || github.event_name == 'push') && 'careful bot wins days|replay reaches every hash|hash Node computes for the long run|page host runs a colony game|S4 pass line|long game rolls over|one order changed diverges' || '' }}
+        run: node --test ${SKIP:+--test-skip-pattern="$SKIP"} experiments/cinderhill/test/
+      # Cinderhill's pace gate (docs/design/colony/02-spec.md section 3.1, roadmap R0): scripted players on 20 seeds,
+      # a ratchet on spikes/pace-baseline.json; the quota opening and a brood x10 plant must fail. Runs when Cinderhill
+      # or .node-version changed, and nightly. 3-minute games: about 1.5 minutes on four cores. A 12-minute run (no flag) reads every line.
+      - name: Cinderhill pace gate
+        if: steps.affected.outputs.cinderhill == 'true'
+        run: node experiments/cinderhill/spikes/pace-gate.mjs --minutes=3
       - run: pnpm install --frozen-lockfile
       - name: Standalone Workers
+        if: steps.affected.outputs.workers == 'true'
         run: |
           pnpm --filter games-wai-daily run check
           node --test workers/crumbwar/test/
@@ -75,7 +80,8 @@ jobs:
           CF_SEND_TELEMETRY: 'false'
         run: pnpm run deploy:check
   games:
-    timeout-minutes: 45
+    # Nightly, smallworks took 38 min and warren 26 min (2026-11-25).
+    timeout-minutes: 60
     needs: changes
     if: needs.changes.outputs.count != '0'
     strategy:
@@ -205,6 +211,8 @@ jobs:
     env:
       PLAYWRIGHT_VERSION: 1.64.1
       HOME: /root
+      # A pull request runs each picked experiment's own check only; its help checks and extras run nightly.
+      PHONE_QUICK: ${{ github.event_name == 'pull_request' && '1' || '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020

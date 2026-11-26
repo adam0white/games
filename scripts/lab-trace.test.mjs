@@ -146,8 +146,36 @@ test('a part made as the page is hidden is queued, and posted only when the page
   assert.equal(globalThis.localStorage.getItem('hf-lab-kit-queue'), null, 'and taken off the queue');
 });
 
+// The run ends while the page is hidden: its last part waits behind the held one, so the parts arrive 0 then 1.
+async function endWhileHidden(source) {
+  const p = page();
+  const { mod, seen, fetch } = await lab(source);
+  const rec = mod.lab('lantern', { fetch });
+  rec.notice(p.el('DIV'));
+  rec.start({ night: 1 });
+  clock += 60; p.fire('pointermove', { clientX: 100, clientY: 300 });
+  p.document.visibilityState = 'hidden'; p.fireDoc('visibilitychange');
+  rec.end('bank', {});
+  await settle(() => true);
+  const whileHidden = seen.filter(r => r.kind === 'run').length;
+  p.document.visibilityState = 'visible'; p.fireDoc('visibilitychange');
+  await settle(() => seen.filter(r => r.kind === 'run').length >= 2);
+  return { whileHidden, order: seen.filter(r => r.kind === 'run').map(r => r.data.part) };
+}
+
+test('a run that ends while the page is hidden still sends its parts in order', async () => {
+  const { whileHidden, order } = await endWhileHidden();
+  assert.equal(whileHidden, 0, 'no part is posted while the page is hidden');
+  assert.deepEqual(order, [0, 1], 'parts in order');
+});
+
+test('known bad case: a lab.js that lets the last part pass the held one fails it', async () => {
+  const broken = mutate(' || (!again && held.some(h => h.kind === r.kind && h.runId === r.runId))', '');
+  await assert.rejects(async () => { const { order } = await endWhileHidden(broken); assert.deepEqual(order, [0, 1], 'parts in order'); }, /in order/);
+});
+
 test('known bad case: a lab.js that posts the part as the page is hidden fails it', async () => {
-  const broken = mutate('if (holding) { held.push(r); return Promise.resolve(); }', '');
+  const broken = mutate('if (holding || (!again && held.some(h => h.kind === r.kind && h.runId === r.runId))) { held.push(r); return Promise.resolve(); }', '');
   await assert.rejects(async () => { const { queued, whileHidden, seen } = await hideAndShow(broken); assert.equal(whileHidden, 0, 'nothing is posted while the page is going away'); }, /going away/);
 });
 

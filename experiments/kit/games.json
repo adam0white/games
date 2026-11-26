@@ -20,6 +20,7 @@
     { "slug": "ducklings", "name": "Follow Me", "fresh": true },
     { "slug": "vine", "name": "Night Vine", "fresh": true },
     { "slug": "exile", "name": "Exile", "fresh": true },
-    { "slug": "cinderhill", "name": "Cinderhill: trail painter" }
+    { "slug": "cinderhill", "name": "Cinderhill: trail painter" },
+    { "slug": "kitchen", "name": "Sky Kitchen", "fresh": true }
   ]
 }

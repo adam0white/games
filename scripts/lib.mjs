@@ -35,17 +35,22 @@ const PHONE_PATHS = ['experiments/', 'prototypes/', 'workers/feedback/public/not
 export function phoneCheckNeeded(paths) {
   return paths.some(path => PHONE_PATHS.some(prefix => prefix.endsWith('/') ? path.startsWith(prefix) : path === prefix));
 }
-// Which of the phone check's checks a change needs: 'all', a comma list of experiment slugs ('lantern,small/pitch'),
-// or '' for none. A change inside one experiment's own directory needs only that experiment's checks; anything
-// shared (the kit, the notes button, the Worker, the workflow) needs all of them. Documents need none. A game under
-// lab/ or small/ is named with its parent ('small/pitch'); a file of the small games' home itself is 'small'.
+// Which of the phone check's checks a pull request needs: a comma list of experiment slugs ('lantern,small/pitch'),
+// or '' for none. A change inside one experiment's own directory needs that experiment's checks. The check code
+// itself (experiments/kit/check/) and the catalogue (experiments/kit/games.json) ride along with the game a pull
+// request adds or changes, so they pick nothing on their own. Anything else shared (the kit's modules, the notes
+// button, the Worker, the workflow) picks the quick smoke set PHONE_SMOKE. Every check runs nightly and by hand
+// (scripts/affected.mjs passes 'all' there). A game under lab/ or small/ is named with its parent ('small/pitch');
+// a file of the small games' home itself is 'small'. Documents need none.
+export const PHONE_SMOKE = ['ant-promotion', 'kit', 'small'];
 export function phoneChecks(paths) {
   const slugs = new Set();
   for (const path of paths) {
     if (!phoneCheckNeeded([path]) || path.endsWith('.md')) continue;
+    if (path.startsWith('experiments/kit/check/') || path === 'experiments/kit/games.json') continue;
     const own = /^experiments\/((?:lab|small)\/[^/]+(?=\/.)|(?!kit\/|lab\/)[^/]+(?=\/.))/.exec(path);
     if (own) slugs.add(own[1]);
-    else if (!/^experiments\/(lab\/)?[^/]+$/.test(path)) return 'all';
+    else if (!/^experiments\/(lab\/)?[^/]+$/.test(path)) for (const slug of PHONE_SMOKE) slugs.add(slug);
   }
   return [...slugs].sort().join(',');
 }
