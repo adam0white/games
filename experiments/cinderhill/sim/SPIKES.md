@@ -55,7 +55,7 @@ Seed 2026, 2,000 ants, 12,000 ticks (10 minutes), 41 orders. Every engine got th
 - **60-minute bot soak: not done.** The longest run is the 10-minute replay above.
 - **In CI:** the phone check now runs the page's short replay (600 ticks, 300 ants) in WebKit (iPhone 13) and Chromium (Pixel 7) and fails if the hash differs from Node's. It failed as expected with a wrong expected hash.
 
-**Re-run after a sim change (2026-11-25, trail painter PR).** Foragers now keep following the newest trail while they are on it, instead of dropping it 30 seconds into their trip (`sim.js`, the trail rule in the forager step). That changes play, so every hash above changed. S2 was run again with the same script: Node's final total is now 471678023, and Chromium 156 and WebKit 27.2 again match Node at all 600 records; the planted mutation still diverges at tick 20 in `ants`. workerd was not re-run. The S1 and S4 numbers predate the change.
+**Re-run after a sim change (2026-11-25, trail painter PR).** Foragers now keep following the newest trail while they are on it, instead of dropping it 30 seconds into their trip (`sim.js`, the trail rule in the forager step). That changes play, so every hash above changed. S2 was run again with the same script: Node's final total is now 471678023, and Chromium 156 and WebKit 27.2 again match Node at all 600 records; the planted mutation still diverges at tick 20 in `ants`. workerd was not re-run. S4 at 5,000 ants was re-run too: 36.8, 44.4 and 57.9 KB at 3,000, 8,000 and 24,000 ticks (was 37.6, 43.8 and 54.8 KB), still under 64 KB and restoring to the same hash. The S1 numbers predate the change.
 
 ## S3: phone frames
 
