@@ -9,6 +9,7 @@
   html, body { margin: 0; background: #2b2622; color: #efe6da; font: 16px/1.45 system-ui, sans-serif; }
   main { max-width: 34em; margin: 0 auto; padding: max(16px, env(safe-area-inset-top)) 16px 32px; box-sizing: border-box; }
   h1 { font-size: 1.5em; margin: .3em 0; }
+  h2 { font-size: 1.15em; margin: 1.4em 0 .3em; }
   button { font: inherit; font-weight: 600; min-height: 48px; padding: .4em 1.2em; border-radius: 999px; border: 2px solid #d98b3a; background: #f2a24a; color: #2b1606; }
   button:disabled { opacity: .5; }
   table { border-collapse: collapse; margin-top: 1em; font-variant-numeric: tabular-nums; }
@@ -25,6 +26,16 @@
   <p id="status" aria-live="polite"></p>
   <table id="hashes"></table>
   <p id="verdict"></p>
+  <h2>The long check</h2>
+  <p>Ten minutes of play at 2,000 ants, the run the engines were compared on. It takes about 20 seconds on a laptop and may take a few minutes on a phone. This browser: <b id="engine"></b>.</p>
+  <p><strong>Firefox has not been checked yet.</strong> If you are on Firefox, on a phone or a computer, please run both checks and send the line below.</p>
+  <p><button id="long">Run the long check</button></p>
+  <p id="longStatus" aria-live="polite"></p>
+  <div id="reportBox" hidden>
+    <p>The line to send:</p>
+    <p id="report" style="user-select: text; -webkit-user-select: text; word-break: break-all; background: #3a332d; padding: .6em; border-radius: 8px; font: 13px/1.4 ui-monospace, monospace;"></p>
+    <p><button id="copy">Copy the line</button></p>
+  </div>
   <p><a href="./" style="color:#f2a24a">The trail painter</a></p>
 </main>
 <script type="module" src="check.js"></script>
