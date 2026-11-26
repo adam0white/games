@@ -214,6 +214,7 @@ function start(spec, seed) {
   const level = spec.level;
   byId('notch').hidden = !(mode === 'plates' && level === 1);
   byId('notch').style.left = (spec.target * 100) + '%';
+  warm = { best: 0, at: 0, step: 0 }; byId('warm').hidden = true;
   byId('drone-mark').hidden = spec.drone === undefined;
   if (spec.drone !== undefined) byId('drone-mark').style.left = (spec.droneDrive * 100) + '%';
   tuner.parentElement.style.setProperty('--hint-x',
@@ -283,6 +284,7 @@ function finish() {
   result('print');
   tools();
   printChord(pitch());
+  buzz([30, 40, 30, 40, 80]);
   void spec;
 }
 function shookOff() {
@@ -471,6 +473,18 @@ function resize() {
 }
 new ResizeObserver(resize).observe(plate);
 
+// Warmth (2026-11-26): the tuner rail keeps a brass mark where the print came closest so far, so a player who slides
+// past the pitch can go back to it; and on phones that can, each tenth of impression gained is a small tick in the hand.
+let warm = { best: 0, at: 0, step: 0 };
+const buzz = ms => { try { navigator.vibrate?.(ms); } catch {} };
+function feelWarmth() {
+  const m = state.match, step = Math.floor(m * 10);
+  if (step > warm.step) { if (m > 0.25) buzz(6 + step * 2); warm.step = step; } else if (step < warm.step - 1) warm.step = step;
+  if (mode === 'free' || m < 0.3 || m <= warm.best + 0.01) return;
+  warm.best = m; warm.at = drive;
+  const el = byId('warm');
+  el.hidden = false; el.style.left = (drive * 100) + '%'; el.style.opacity = String(Math.min(1, 0.25 + m));
+}
 // Page work per frame (simulation and drawing), for the frame-time check.
 const perf = { samples: [], last: 0 };
 function frame(now) {
@@ -485,13 +499,14 @@ function frame(now) {
       const was = state.progress;
       tick(state, drive);
       if (was === 0 && state.progress > 0 && state.t - lockRung > 1.5) {
-        lockRung = state.t;
+        lockRung = state.t; buzz(25);
         plateRing(pitch());
       }
       if (state.won) { finish(); break; }
       if (state.failed) { shookOff(); break; }
     }
     byId('match-bar').style.transform = 'scaleX(' + state.match + ')';
+    feelWarmth();
     if (state.spec.shake) {
       byId('salt-bar').style.transform = 'scaleX(' + state.salt + ')';
       // The first grains leaving: the gauge turns red and the plate hisses once.
