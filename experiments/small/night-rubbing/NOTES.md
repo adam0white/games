@@ -163,3 +163,32 @@ fnm exec --using=26.12.0 node experiments/small/night-rubbing/bots.mjs --mutate 
 PLAYWRIGHT=~/code/human-framework/node_modules fnm exec --using=26.12.0 node experiments/small/night-rubbing/check.mjs webkit   # or chromium
 ```
 The older reproduce commands above still name `experiments/lab/night-rubbing/`; the page moved to `experiments/small/night-rubbing/` on 2026-11-25.
+
+## 2026-11-26 — A deeper sheet: one plate is 30-90 s of feel and discovery
+
+**Why.** Played on a phone, plates were won in 5-6 s by scribbling, and the daily plate spoiled on the stick ("lead") at 5.5 s on a first try. The spoil was the stick working as built (about 1,700 units of travel at about 309 units a second; the 2026-11-26 daily is a stone crinoid with lead 1,700), not an input bug. The `coverage: 101` in run summaries was reporting only: `rub()` keeps stepping after filing, and the summary divided by the goal without a cap (fixed in PR 326: capped at 100, raw ink added as `ink`).
+
+**What changed.** The default page is now `deep.js` over `deep-sim.js`; the old page stays at `?v=classic` (`start.js` picks).
+- Pressure comes from stroke speed: slow is heavy, fast skates. Pigment a second peaks at a steady middle pace (about 150-300 sheet units a second); a scribble at 800 barely marks. Heavy strokes muddy the flats (less contrast) and, if they linger, wear the paper through (a tear holds no pigment). Contact is narrower (55% of the classic radius, 65% on glaze). There is no spoiling.
+- Every stroke moves the meter: specimen cells give partial credit below the dark mark.
+- Three small finds are hidden in the matrix of each plate (`finds.js`, twelve in all, each in three plates). Rubbing brings one up at 55% of its raised cells; it chimes, buzzes and goes to the cabinet (`#shelf`).
+- A filed plate waits for the player to lift the sheet; there is no automatic end.
+- Haptics through `navigator.vibrate`: ticks on ridges scaled by pressure, longer on a tear, a find or a wrong name.
+
+Three loops, behind `?v=`, for a pick:
+- `?v=a` (survey, default): file the plate, find all three finds, no tears.
+- `?v=b` (name): the specimen is hidden; rub as little as possible and name it from four. Stars: named; under 25% of the sheet touched; under 12% and first try.
+- `?v=c` (craft): file, crisp (contrast 0.90, 0.84 on glaze), whole (goal + 6 points, no tears).
+
+**Saves.** `night-rubbing:save` and `:more` keep their formats and meaning. New keys, additive: `night-rubbing:deep` (`{v:1, survey, name, craft, finds, daily}`) and `night-rubbing:print:<n>`. A classic proof `night-rubbing:proof:<n>` is written only when absent and the print reaches the classic goal. The recording slug is unchanged; summaries add `v`, `stars`, `finds`, `tears`, `touched`, `wrong`, `ink`.
+
+**Verified.**
+- `node deep-bots.mjs` exits 0 (about 60 s); `--mutate` (pressure ignores speed) fails 6 claims and exits 1. Claims: a scribble at 800 files no plate within 30 s; a careful rubber at 220 files plates 1-12 in 14.3, 19.4, 21.8, 22.0, 20.6, 30.8, 9.7, 26.8, 23.8, 35.3, 37.4, 51.3 s without tearing; a whole-sheet sweep finds every find on every plate (27-190 s); 30 dailies file and give up their finds; lingering tears, six steady passes do not; a classic filed print loads filed.
+- `bots.mjs` (classic) exits 0; `check.mjs webkit` and `chromium` pass against `?v=classic`; `kit/check/phone.mjs small/night-rubbing` passes on both profiles with the deep page as default.
+- Browser play at about 250 units a second, whole-sheet rows: survey filed with all three finds in 42.9 s (WebKit iPhone 13); craft filed, 2 stars, 50.5 s (Chromium Pixel 7); name in Turkish rendered; name end to end with one wrong guess, 1 star (WebKit). No page errors.
+
+**Also fixed.** In landscape on a phone the lab recording notice sat on top of the page heading (classic too); it now sits under the drawer.
+
+**Not verified.** No person has played the deep page; whether pressure-by-speed reads on a real finger, whether 30-90 s feels good rather than slow, and which loop is best are Adam's call. Firefox (Adam's browser) is not in the checks. Tears were seen only from bots. Sound and haptics were not heard or felt.
+
+**Reproduce.** `node experiments/small/night-rubbing/deep-bots.mjs` and `--mutate`; screenshots with the phone check above.

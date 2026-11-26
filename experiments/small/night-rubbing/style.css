@@ -53,6 +53,7 @@ box-shadow:1px 2px 1px #dac8a6,3px 6px #bbb294,3px 7px 0 #6d745e,6px 14px 15px #
   .status-row{grid-area:3/2}
   .meters{grid-area:4/2}
   #collection{grid-area:5/2}
+  .lab-notice{grid-area:6/2;align-self:start}
   .veil{align-items:safe center;overflow:auto}
   .card{padding:clamp(12px,4vh,24px)}
   .card p{margin:8px 0}
@@ -94,3 +95,25 @@ box-shadow:1px 2px 1px #dac8a6,3px 6px #bbb294,3px 7px 0 #6d745e,6px 14px 15px #
 @media (orientation:landscape) and (max-height:500px){.smudge{margin:-4px 0 6px}#collection{grid-auto-rows:44px}#collection button{height:44px}}
 /* The label stays on one line: the sheet canvas covers anything below it. A long taxon is cut short instead. */
 .plate-label{gap:6px}#figure,#kind{flex:none;white-space:nowrap}.plate-label #taxon{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-bottom:2px}
+/* 2026-11-26: the deeper sheet (deep.js): finds, the found card, the cabinet, naming, pressure on the crayon. */
+#shelf-open{position:relative;width:44px;height:44px;border:1px solid #b4c1a666;border-radius:6px;font:20px/1 var(--sans)}
+#shelf-open[hidden]{display:none}
+.finds{display:flex;gap:6px;align-items:center}.finds[hidden]{display:none}
+.finds i{width:22px;height:22px;border:1px dashed #6d745e88;border-radius:50%;display:grid;place-items:center;font:600 11px/1 var(--sans);font-style:normal;color:#6d745e}
+.finds i[data-got=true]{border:1px solid #924b30;background:#924b3018;color:#924b30}
+.finds .silhouette{width:16px;height:16px}
+.found{position:absolute;left:8%;right:8%;top:43%;display:flex;gap:10px;align-items:center;justify-content:center;padding:10px 12px;background:#254439ee;color:#f3ead0;border:1px solid #e9c08a;border-radius:4px;font:600 14px/1.25 var(--sans);opacity:0;transform:translateY(8px) scale(.96);pointer-events:none;transition:opacity .25s,transform .25s;z-index:3;text-align:center}
+.found.on{opacity:1;transform:none}.found .silhouette{width:34px;height:34px;flex:none;color:#ffcf9a}
+@media(prefers-reduced-motion:reduce){.found{transition:none}}
+.tool.skate{opacity:.5}.tool.firm{filter:drop-shadow(0 0 3px #924b3088)}
+#fill.touch{background:#d0a070}
+.choices{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:4px 0 8px}
+.card .choices button{min-height:96px;margin:0;display:grid;justify-items:center;align-content:center;gap:6px;color:#f3ead0;font:600 13px/1.2 var(--sans);padding:8px 4px}
+.choices .silhouette{width:46px;height:46px}.choices button:disabled{opacity:.3;text-decoration:line-through}
+.shelf-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:6px 0 10px}
+.shelf-grid div{display:grid;justify-items:center;gap:4px;padding:8px 2px;border:1px solid #78907955;border-radius:3px;font:600 10px/1.15 var(--sans);text-align:center;color:#9fb09a}
+.shelf-grid .have{border-color:#e9c08a88;color:#f3ead0}.shelf-grid .silhouette{width:34px;height:34px;color:#ffcf9a}
+.mystery{display:grid;place-items:center;width:30px;height:30px;font:600 18px/1 var(--sans);opacity:.75}
+.shelf-grid .mystery{width:34px;height:34px}
+#choose .card,#shelf .card{max-height:calc(100svh - 30px);overflow:auto}
+.plate-label{z-index:1}
