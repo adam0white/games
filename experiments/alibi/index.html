@@ -62,6 +62,8 @@
   #coach { position: absolute; left: 16px; right: 16px; top: 113px; min-height: 52px; display: flex; align-items: center; gap: 8px; padding: 2px 8px 2px 12px; border: 2px solid #f6c17b; border-radius: 13px; background: #2c2337f2; font-size: 14.5px; line-height: 1.17; pointer-events: none; }
   #learn.fresh { border: 2px solid #f6c17b; color: #ffdda1; }
   #coachText { flex: 1; margin: 0; }
+  /* cases 1 to 7 show the guide line in words too (tester t1, note #268); later cases keep it for screen readers only */
+  #playGuide.shown { position: absolute; left: 16px; right: 16px; top: 113px; width: auto; height: auto; overflow: visible; clip-path: none; white-space: normal; margin: 0; padding: 7px 12px; border: 2px solid #f6c17b; border-radius: 13px; background: #2c2337e6; font-size: 14.5px; line-height: 1.17; pointer-events: none; }
   #coachCount { color: #f6c17b; font-size: 11px; }
   #coachOk { pointer-events: auto; padding: 6px 12px; }
   #hardDaily small { display: block; margin-top: 2px; font-size: 12px; }

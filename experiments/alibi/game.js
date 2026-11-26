@@ -208,6 +208,7 @@ const setScreen = next => {
   if (next !== 'play') {
     $('playGuide').textContent = '';
     delete $('playGuide').dataset.cue;
+    $('playGuide').classList.remove('shown');
   }
   screen = next;
   showCards(next);
@@ -1235,6 +1236,8 @@ function teachingCue(frame) {
   return outlineState(frame) ? 'compare' : 'compareSign';
 }
 
+// The guide line in words on screen, in campaign cases 1 to WORDS_UNTIL (tester t1, note #268). Later cases and the Daily keep it for screen readers.
+const WORDS_UNTIL = 7;
 function updateGuide(cue) {
   const key = cue === 'wrong' ? (run.stars === 1 ? 'wrongOneCue' : 'wrongManyCue') : `${cue}Cue`;
   const vars = cue === 'jump' ? { time: formatTime(jumpMark(cast[selected], beatNow()).beat) } : { n: number(run.stars) };
@@ -1242,6 +1245,7 @@ function updateGuide(cue) {
   const guide = $('playGuide');
   if (guide.textContent !== message) guide.textContent = message;
   guide.dataset.cue = cue;
+  guide.classList.toggle('shown', WORDS_UNTIL >= c.level && !daily && !c.practice);
 }
 
 function ghostTap(x, y, pulse) {

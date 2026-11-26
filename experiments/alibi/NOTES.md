@@ -647,3 +647,14 @@ Not verified: a real phone; whether a new player finds the way out of practice w
 
 - A Skip button on the first practice step, if new players want to go straight to case 1.
 
+
+## 2026-11-25: the guide line in words in cases 1 to 7 (tester t1, note #268, answering #267)
+
+The note picked "Show the hints in words in the first cases too". That was the proposal of 2026-11-24 above.
+
+- In campaign cases 1 to 7 (`WORDS_UNTIL` in `game.js`), the guide line that only screen readers got (`#playGuide`) now shows on screen. It sits in a box styled like the practice coach, between the title and the house: "Who lied? Tap a portrait to see its alibi.", "Tap the alibi to jump to 7:10.", and so on. It changes with each move, as before. Case 8 on and the Daily keep it for screen readers only. Practice keeps its own coach. No new key, and the save is unchanged.
+- Checks: new lines in `kit/check/phone.mjs` (`alibi`): the line is visible in cases 1 and 7 and hidden in case 8, ok on WebKit and Chromium. With the toggle removed it fails at "case 1". `check.mjs` passed on all three profiles. Looked at in WebKit at iPhone 13 size, in cases 1, 3, 5 and 7, in English and in Turkish, with and without a suspect chosen. The box does not cover the alibi bubble or the rooms.
+- Not verified: a real phone; whether the longest lines (the sign, floor and trail lines, two or three lines on a 360 px screen) cover the top of the roof in a case that uses them.
+
+### Left as a proposal (2026-11-25)
+- A switch to keep the words on in every case, for players who want them.
