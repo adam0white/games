@@ -119,7 +119,7 @@ The page draws the queen and brood as placeholder shapes in the nest view; the H
 
 ## The tactical hold (2026-11-26)
 
-The Hold button (Durdur in Turkish) stops time on the page: the host stops advancing ticks, so the sim, scent and ants stand still. Orders still work while held. A trail or dig drawn while held is drawn at once but queued at the current tick (the page state says queued); the first tick after Go applies it. A blue frame marks the held screen. The hold lives in the page (`painter.js` `held`, `host.advance(now, ... || held)`), not in the sim, so it changes no hash and needs nothing from the room. In a shared room a hold would have to be a room rule (who may stop time for everyone); that is open. The `cinderhill orders` phone line checks that no tick runs while held, that a stroke queues, and that Go applies it; it fails when the hold does not stop time.
+The Hold button (Durdur in Turkish) stops time on the page: the host stops advancing ticks, so the sim, scent and ants stand still. Orders still work while held. A trail or dig drawn while held is queued at the current tick (the page state says queued); the first tick after Go applies it. A blue frame marks the held screen. The hold lives in the page (`painter.js` `held`, `host.advance(now, ... || held)`), not in the sim, so it changes no hash and needs nothing from the room. In a shared room a hold would have to be a room rule (who may stop time for everyone); that is open. The `cinderhill orders` phone line checks that no tick runs while held, that a stroke queues, and that Go applies it; it fails when the hold does not stop time.
 
 ## Simplifications to revisit in M1
 
