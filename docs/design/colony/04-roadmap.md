@@ -1,63 +1,62 @@
 # Cinderhill: roadmap
 
-From spikes to release. Each milestone ends in something a person can play at `/cinderhill/` (unlisted until M3), and in a gate that only the owner closes by playing. Feature numbers are from [03-features.md](03-features.md). Milestones are ordered by dependency; there are no dates or time estimates. A milestone starts when the one before it passes its gate. Each milestone and spike is filed in the todo list (`docs/todo.md`, epic `lab-5w7`, label `cinderhill`).
+Round 3, 2026-11-26. From the M1 build to the first release. Milestones are ordered by dependency; there are no dates or time estimates. A milestone starts when the one before it passes its gate. Each is filed in the todo list (`docs/todo.md`, epic `lab-5w7`, label `cinderhill`). Feature numbers are from [03-features.md](03-features.md); numbers and pace lines are in [02-spec.md](02-spec.md) section 3.
+
+## What changed from round 2
+
+Round 2 had gates for hashes, frames, snapshots and unintended orders, and none for pace. Its first outside players came at M3, after Summer content. Both are fixed here: **the pace gate runs in CI on every pull request from R1's first step**, and **outside players come at R1**, on chapter 1 alone.
+
+## Already done (kept from M0 and M1)
+
+Spikes S1 to S4 passed (tick cost, determinism on four engines, phone frames emulated, snapshot size; numbers in `experiments/cinderhill/sim/SPIKES.md`). The M1 build has the sim, flow fields, scent, trails, digs, brood, the spider, Recall, the tactical hold, three looks, the lab replay record and `replay-lab.mjs`. The relay room role was chosen (05). The rebuild keeps what 05 marks "keep" and rewrites the rest.
+
+## Milestones
 
 | Milestone | What a player gets | Gate (who closes it) |
 | --- | --- | --- |
-| M0 Spikes | Lab pages: trail painter (also tests the tool strip and two-finger camera), tournament toy, determinism check, phone frame test | Numbers below pass (agent); owner tries the trail painter and tournament toy |
-| M1 Vertical slice | Days 1 to 3 solo: trail, dig, rooms, brood, spider, saves, and the founding bloom that shows the premise from the first minute (features 1 to 14, 53) | Owner plays Day 1 to 3 and says go on, change or stop. Fresh phone players place the second husk on purpose without coaching |
-| M2 Spring | Six days of Spring with rain, threats, jobs, difficulty, help, daily hill (15 to 26) | 5 lab testers: 4 of 5 finish Day 1 unaided (agent reads records); owner plays |
-| Depth gate | Two late-campaign test hills with the same ants and stores (54) | Owner plays both: the land, stores and neighbours make different choices right. If not, fix the systems before writing more seasons |
-| M3 Summer and outside players | Bloom, tournaments, Summer days, the Changeling's adoption, aphids (29, 30, 31, 34, 35) | Name and store check passes first. Then listed on the site. Solo release gates in 02-spec section 0 measured on outside players (the friend-join gate belongs to M4) |
-| M4 Friends | Friends' hill by link: co-op against hunters and weather, tournament versus, fight versus; co-op campaign with a sister nest (27, 28) | Four test clients: one sleeps, one retries an acknowledged order, the room restarts mid-join, a deploy lands mid-match; the rest play on, each order applies once, the returner reaches the room's hash. Then the owner and one friend play a match on two phones |
-| M5 Full campaign | Autumn and Winter, the Tide (also in co-op), allies, scent disguise, the Changeling's payoff, traits, wedding flight (32, 33, 36 to 42) | Owner finishes the campaign |
-| M6 Release | Polish, store-ready page | Owner decides to publish |
+| **R0 Pace harness** | Nothing new to play. replay-lab gains births, decision events and idle share; the median, passive and idle bots; the quota fixture (feature 1) | Agent: CI runs the gate on every pull request. The current build **fails** it, and the quota fixture fails it. A planted slow-down (brood ×10) fails it too |
+| **R1 Chapter 1** | 02 section 4, on a phone: the swarm up from the deep, trails with crews, the husk, the bird, births, the sprout, the door jam, the chapter card (features 2 to 14) | Agent: the pace gate passes on 20 seeds. Five fresh phone players: 4 of 5 finish chapter 1 without help, and 4 of 5 place the husk on purpose. Then the owner plays it and says go on, change or stop |
+| **Real-phone check** | The same build on one real mid-range phone | 30 frames a second at 2,000 ants in the free hill; chapter 1 at full speed. If it fails, lower the cap or draw far ants as density before R2 |
+| **R2a Chapters 2 and 3** | Rain, water, structures, rooms, the spider, majors, the first now-or-later bill (15 to 20) | Pace gate on chapters 2 and 3. Owner plays both |
+| **Depth check** | Two saves of chapter 3 with the same ants and stores, on two hills where a different plan wins | The owner plays both and changes crews or structures on the second for a reason they can name. If not, fix the systems before more chapters |
+| **R2b Chapters 4 to 6** | Antlion slope, the neighbour colony and shared scent, storm night (21 to 23) | Pace gate on all chapters. Owner finishes Spring |
+| **R2c Release** | Free hill, daily hill, share picture, accessibility, help, name check, listing page (24 to 29) | The release gates in 02 section 0 measured on outside players. Owner decides to list |
+| **R3 Friends** | Same-seed challenge, ghost trails, then one shared colony, then versus (30 to 33) | Each step: four test clients (one sleeps, one retries an acknowledged order, the room restarts mid-join, a deploy lands mid-match), then the owner and one friend play on two phones |
+| **After Spring** | Summer onward, re-cut into chapters with the same pace budget | Owner decides after R2c |
 
-## M0: spikes (each has a pass line and a fail plan)
+The lab toys in 03 (founding runs, fluid colony, ghost trails) can run beside R1 and R2. The founding runs toy answers decision 1 before R2b.
 
-| Spike | Measures | Pass | If it fails |
-| --- | --- | --- | --- |
-| S1 Tick cost | Integer sim, 5,000 ants, 3 scent fields at 256 by 256 and flow fields for every live goal (rooms, food, trails, capped), in Node and in a Durable Object (`wrangler dev`, then deployed). Also measures the room in two roles: relay only (orders commands, compares hashes) and authority (runs the sim too) | Under 10 ms a tick locally; 20.0 ticks a second deployed for 10 minutes; the chosen room role's CPU per second and cost per room-hour written down | Cap ants at 2,000, or coarse fields at half resolution; Bevy/WASM sim is the last resort |
-| S2 Determinism | Same seed and 10 minutes of recorded commands in Node, workerd, Chromium, WebKit and Firefox | Same hash everywhere over 10 minutes and a 60-minute bot soak. A lint rejects `Math` functions, `sort` without a comparator and locale calls in `sim/`. A planted mutation that has been shown to diverge, plus a single flipped state byte, must each make the check fail and name the subsystem | Use coarse server state (05-tech option B) for friends' play; solo is not affected |
-| S3 Phone frames | Instanced ants plus terrain and scent overlay at 2,000 and 5,000 ants, Playwright WebKit (iPhone 13) and Chromium (Pixel 7), then a real phone | 30 frames a second at 2,000 | Lower the cap, or draw far ants as density shading |
-| S4 Snapshot size | Late-join snapshot of a dug nest plus 5,000 ants, compressed | Under 64 KB | Send terrain as a seed plus a dig log |
+## R1 in build order
 
-The trail painter (S3's page) is also the first thing the owner can touch: a phone page where you draw trails and watch thousands of ants find food.
+Each step is a pull request with bots, the pace gate and a phone check.
 
-## M1: vertical slice, in build order
-
-1. `experiments/cinderhill/sim/` core: grids, ants as typed arrays, tick, hash, seeded random numbers, command log (feature 1).
-2. Layers, flow fields, scent field (2 to 4). Bot harness from the first day (14).
-3. Verbs and the pause (5, 9). Brood and economy (6). Rooms (7).
-4. Renderer: instanced far ants, `rig.js` near ants, ink-and-wash terrain (10). Two or three look variants of the same scene for the owner to pick.
-5. Days, dusk summary, saves (8). Spider (12).
-6. First minute (11). Lab recording, words, sound (13).
-7. Phone check lines; deploy unlisted; tell the owner.
-
-Each step is a pull request with bots and a phone check, as in Ant Promotion.
+1. R0 first: the gate fails today's build.
+2. New starting values and the porch store (feature 3). First delivery and first birth lines pass.
+3. Crews, the who-goes rule, route cards, gap reasons (4). Doors and traffic (5).
+4. Navigation goal manager (10), so crews, doors and structures do not run out of flow slots.
+5. Husk, roof, bird (6). Sprouts and the bloom map (7).
+6. Nest cutaway in place (8). Chapter card, Field into Ember (11).
+7. Saves (9). Teaching (12). Recording, sound, words (13). Phone check (14).
+8. Deploy unlisted at `/cinderhill/`; five fresh players; tell the owner.
 
 ## How we know it works
 
-- **Bots** (`bots.mjs`, Ant Promotion style): careful, greedy and idle players run every day on many seeds. The careful bot must finish, the idle bot must lose, and no seed may soft-lock.
-- **Reference solver:** on tiny maps, the flow-field paths are compared with a plain shortest-path solver written separately.
-- **Replays:** every bug report carries the seed and command log, so an agent can replay the exact game.
-- **Phone check:** `experiments/kit/check/phone.mjs` gets Cinderhill's section and seed save at M1.
-- **Lab records:** Day 1 completion and help opened, read with the lab tools after each test round.
-- **Not verifiable by agents:** feel, fun and real-phone audio. These are owner and tester gates.
+- **Pace gate** (02 section 3.1): bots on 20 seeds in CI; people from lab records. The quota fixture must fail.
+- **Bots:** median, passive and idle on every chapter. The median bot must finish; the passive bot must finish chapter 1; the idle bot must lose by chapter 3; no seed may soft-lock.
+- **Replays:** every lab record and bug report replays to the same hash with `replay-lab.mjs`.
+- **Phone check:** `experiments/kit/check/phone.mjs`, plus one real phone at R1.
+- **Not verifiable by agents:** fun, feel and real-phone audio. These are owner and tester gates.
 
 ## Risks
 
 | Risk | Where it bites | Plan |
 | --- | --- | --- |
-| Lockstep desyncs | M4 | S2 first; hash per subsystem; replay harness; snapshot on mismatch |
-| Indirect control feels vague on a phone | M1 | Order feedback in under 0.5 s; owner gate at M1 before building more |
-| Two layers confuse new players | M1 to M2 | One gesture to switch; the first two days stay mostly on one layer |
-| Scope: four seasons, five species | M5 | Seasons ship one at a time; species beyond the player's are P3 |
-| Indirect control feels like watching | M1 | One goal per day; each day poses a choice the day before could not; crews and "why waiting" make orders readable |
-| A bad day ruins later days | M2 | Dawn restart of any day; a catch-up floor at each dawn (02-spec 6.9) |
-| Tournaments reward the bigger swarm anyway | M0 | Ring cap of 30 a side; tested in the tournament toy before M3 |
-| Name collision | M3 | A trademark and store search before listing |
-| Spring passes without testing the premise | M1 | Founding bloom (53) in the slice; the first-minute gate asks for a deliberate second husk |
-| Every hill rewards the same plan | Depth gate | Two test hills before more seasons |
-| A deploy resets live rooms | M4 | Durable Object code updates restart rooms within minutes (08-cloudflare-and-prior-art.md). Rooms checkpoint to SQLite and carry a sim version in the handshake; clients reconnect and resume |
-| A sleeping phone freezes the room | M4 | The room seals ticks on its own clock and never waits for the slowest phone (unlike `kit/lockstep.js`, which waits for both) |
+| Fast pace makes it a toy with no depth | R2a | Depth check before chapters 4 to 6; the now-or-later bill; shared scent |
+| 300 ants at the start are too many to read | R1 | Crews and route cards make the swarm readable; testers at R1; decision 6 has smaller starts |
+| Faster walking makes trails look like streams, not ants | R1 | Owner plays R1; walk speed is a starting value |
+| Water and structures cost too much CPU on phones | R2a | Water in dirty chunks; measured in the free hill at 2,000 ants before R2a ends |
+| Shared-scent rivals feel unfair | R2b | The rival uses only the player's verbs; its scouts are visible; decoys work both ways |
+| Real phones miss the frame line | Real-phone check | Lower the cap, density drawing at far zoom |
+| The rebuild drifts from the spec again | All | The pace gate is in CI; 02 is the one source of numbers; changes to it go in NOTES.md and the pull request |
+| Name collision | R2c | Name and trademark check before listing |
+| A deploy resets live rooms | R3 | Rooms checkpoint to SQLite; clients reconnect and resume (05) |
