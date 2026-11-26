@@ -351,10 +351,7 @@ Opened from `/small/` (`?from=small`), the page shows "‹ Small games" ("‹ K�
 **What changed.**
 - **Forecast line.** `sim.js` has a new `forecast(s)`. It adds up the glass's count, the drops in the air above the glass, and a lag term (flow × lag × 0.35). It only reads the state; the rules, the digest and the save are unchanged. On the page it is a dashed line over the liquid: dark while short, green when the pour is heading into the band, red when it is heading over.
   - Measured error at lift: the line over-predicts by 0.5 to 1.0 drops on average, which errs towards lifting early. The largest single error is 5.2 drops, on level 4, where the glass sways.
-- **When the line shows, three ways for a pick:**
-  - `?v=a`, the default: on levels 1 to 3 and the daily pour, and on any level after a lost pour there, until that level is won.
-  - `?v=b`: always.
-  - `?v=c`: never (the page as it was).
+- **When the line shows (the owner picked this on 2026-11-26; `?v=b` always and `?v=c` never were removed):** on levels 1 to 3 and the daily pour, and on any level after a lost pour there, until that level is won. Run records keep `v: 'a'`.
   - A banner explains the line the first time it shows on a device (`wild-pour:forecast-seen`). A second banner appears when the line comes back after a loss.
 - **Haptics through `navigator.vibrate`:**
   - a tick when the forecast enters the band;
@@ -390,6 +387,6 @@ Opened from `/small/` (`?from=small`), the page shows "‹ Small games" ("‹ K�
 **Not verified.**
 - No person has played it.
 - The bots read the line perfectly; a person will not.
-- A 100% clear rate for the forecast watcher may make `?v=b` too easy. That is why the default shows the line only while learning or after a loss.
+- A 100% clear rate for the forecast watcher may make an always-on line too easy. That is why the line shows the line only while learning or after a loss.
 - Haptics were not felt, and iOS Safari ignores `vibrate`.
 - The Turkish was not read by a native speaker.

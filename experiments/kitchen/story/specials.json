@@ -1,0 +1,14 @@
+{
+  "note": "Daily specials. One per day when no story mission is open, or alongside one. {n} and {dish} are filled by the game. n = round(nPerRank[rank]) (last value repeats for higher ranks). Pay = round(pay x day income at that rank). Day income: 28, 55, 100, 180, 300, 450, then about 620, 800, 1000, 1250, 1500.",
+  "specials": [
+    {"id": "order_of_day", "text": "Order of the day: {dish}. Serve {n}.", "goal": {"type": "dish", "n": "nPerRank"}, "nPerRank": [1, 2, 2, 2, 2, 3], "minRank": 0, "pay": 0.4},
+    {"id": "neat_day", "text": "Neat day: nothing extra on the tray. Not one.", "goal": {"type": "no_extra_day", "n": 1}, "minRank": 0, "maxRank": 1, "pay": 0.7},
+    {"id": "neat_catches", "text": "Neat hands: {n} orders caught clean.", "goal": {"type": "clean_catch", "n": "nPerRank"}, "nPerRank": [3, 3, 3, 2, 2, 2], "minRank": 2, "pay": 0.7},
+    {"id": "triple_star", "text": "Triple star: {n} perfect dishes today.", "goal": {"type": "perfect_cook", "n": "nPerRank"}, "nPerRank": [2, 2, 3, 3, 4, 4], "minRank": 0, "pay": 0.5},
+    {"id": "quick_service", "text": "Quick service: {n} guests served before they frown.", "goal": {"type": "quick_serve", "n": "nPerRank"}, "nPerRank": [2, 3, 3, 3, 4, 4], "minRank": 0, "pay": 0.5, "newGoalType": true},
+    {"id": "tip_jar", "text": "Tip jar: earn {n} in tips today.", "goal": {"type": "tips", "n": "nPerRank"}, "nPerRank": [4, 8, 15, 27, 45, 70], "minRank": 0, "pay": 0.4},
+    {"id": "crumb_birthday", "text": "It's Crumb's birthday. {n} clean catches. He wants crumbs, not cans.", "goal": {"type": "clean_catch", "n": "nPerRank"}, "nPerRank": [2, 2, 2, 2, 2, 2], "minRank": 0, "pay": 0.6},
+    {"id": "vane_binoculars", "text": "Vane is watching through binoculars. Spin the Wheel once. Wave.", "goal": {"type": "wheel_use", "n": 1}, "needsMood": "rude", "minRank": 2, "pay": 0.4},
+    {"id": "marigold_mother", "text": "Marigold brought her mother. {n} perfects. She gives threes.", "goal": {"type": "perfect_cook", "n": "nPerRank"}, "nPerRank": [2, 2, 3, 3, 4, 4], "minRank": 1, "pay": 0.7}
+  ]
+}
