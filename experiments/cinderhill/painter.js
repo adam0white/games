@@ -196,6 +196,7 @@ function dayRestart() {
   const day = dayCard.day;
   const before = host.tick;
   if (!host.restartDay(day)) return;
+  crewSeq = -1;
   labrec.restart(day, before); labrec.event('restart', { day });
   selected = -1; $('antCard').classList.remove('on'); alarmAt = null; pulses = [];
   stats = host.stats(); uploadAll(); retext();
@@ -214,7 +215,7 @@ function toMenu() {
 function setCount(n) {
   if (colonyMode || !COUNTS.includes(n) || n === host.ants) return;
   run(G.reset('count'));
-  host = new Host(n); save.ants = n; persist();
+  host = new Host(n); save.ants = n; persist(); crewSeq = -1; setSpeed(1);
   if (running) startRecord(); // a new game: its own replay
   selected = -1; tapStart = null; stats = host.stats();
   uploadAll(); retext();
@@ -236,6 +237,10 @@ $('zin').addEventListener('click', () => { cams[layer].z *= 1.4; clampCam(); });
 $('zout').addEventListener('click', () => { cams[layer].z /= 1.4; clampCam(); });
 function setHold(on) { if (on === held) return; held = on; labrec.hold(on, performance.now()); host.last = null; retext(); if (held) toast('held'); }
 $('hold').addEventListener('click', () => setHold(!held));
+// View speed (solo play): 1×, 2×, 4× ticks per second. Page-side, like Hold: the sim and its hashes do not change.
+const SPEEDS = [1, 2, 4];
+function setSpeed(x) { if (!SPEEDS.includes(x)) x = 1; host.speed = x; $('speed').textContent = `${x}×`; $('speed').setAttribute('aria-pressed', String(x > 1)); }
+$('speed').addEventListener('click', () => { const x = SPEEDS[(SPEEDS.indexOf(host.speed ?? 1) + 1) % SPEEDS.length]; setSpeed(x); labrec.emit('speed', { at: host.tick, x }); snd.tone(500 + 150 * x, 0.06, 0.03, 'triangle'); });
 $('recall').addEventListener('click', () => { const on = !host.sim.g[GI.RECALL]; order({ type: CMD.RECALL, on: on ? 1 : 0 }); setTimeout(retext, 80); });
 $('sound').addEventListener('click', () => { save.sound = !save.sound; persist(); if (!save.sound) snd.hold(); retext(); });
 $('tapTrail').addEventListener('click', () => { save.tapTrail = !save.tapTrail; persist(); retext(); });
@@ -286,22 +291,35 @@ function crewStep(delta) {
   snd.tone(delta > 0 ? 700 : 500, 0.08, 0.04, 'triangle', delta > 0 ? 120 : -120);
   setTimeout(hud, 80);
 }
+// A click (pointer, keyboard or assistive tech) moves one; a hold moves eight and suppresses the click after it. The
+// hold keeps the trail it started on and stops on pointer loss, blur, leaving play or that trail going.
+const crewStops = [];
 for (const [id, sign] of [['crewPlus', 1], ['crewMinus', -1]]) {
-  const b = $(id); let timer = 0, held = false;
+  const b = $(id); let timer = 0, long = false, seq = -1;
   const stop = () => { clearInterval(timer); clearTimeout(timer); timer = 0; };
+  crewStops.push(stop);
+  const step8 = () => { if (screen !== 'play' || crewTrail()?.seq !== seq) return stop(); crewStep(8 * sign); };
   b.addEventListener('pointerdown', e => {
-    e.preventDefault(); held = false; stop();
-    timer = setTimeout(() => { held = true; crewStep(8 * sign); timer = setInterval(() => crewStep(8 * sign), 400); }, 400);
+    long = false; stop(); seq = crewTrail()?.seq ?? -1;
+    try { b.setPointerCapture(e.pointerId); } catch { /* not every engine */ }
+    timer = setTimeout(() => { long = true; step8(); if (timer) timer = setInterval(step8, 400); }, 400);
   });
-  b.addEventListener('pointerup', () => { if (timer && !held) crewStep(sign); stop(); });
-  for (const ev of ['pointercancel', 'pointerleave']) b.addEventListener(ev, stop);
-  b.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); crewStep(sign); } });
+  b.addEventListener('pointerup', stop);
+  for (const ev of ['pointercancel', 'lostpointercapture', 'blur']) b.addEventListener(ev, stop);
+  b.addEventListener('click', e => { e.preventDefault(); if (long) { long = false; return; } crewStep(sign); });
 }
+addEventListener('blur', () => crewStops.forEach(f => f()));
 /** A tap near a trail's number picks that trail for plus and minus. */
 function pickTrailAt(sx, sy) {
   if (layer !== SURFACE) return false;
-  for (const tr of stats.trails) { const p = toScreen(tr.x + 0.5, tr.y + 0.5); if ((p.x - sx) ** 2 + (p.y - sy) ** 2 < 22 * 22) { crewSeq = tr.seq; hud(); return true; } }
-  return false;
+  let best = null, bd = 22 * 22;
+  for (const tr of stats.trails) { const p = toScreen(tr.x + 0.5, tr.y + 0.5), d = (p.x - sx) ** 2 + (p.y - sy) ** 2; if (d < bd || (d === bd && best && tr.seq === crewSeq)) { bd = d; best = tr; } }
+  if (!best) return false;
+  // Trails whose numbers sit on top of each other: each tap picks the next of them.
+  const tied = stats.trails.filter(tr => { const p = toScreen(tr.x + 0.5, tr.y + 0.5); return (p.x - sx) ** 2 + (p.y - sy) ** 2 <= bd + 4; });
+  const at = tied.findIndex(tr => tr.seq === crewSeq);
+  crewSeq = tied.length > 1 && at >= 0 ? tied[(at + 1) % tied.length].seq : best.seq;
+  hud(); return true;
 }
 const cellOf = (sx, sy) => { const w = toWorld(sx, sy); return [Math.floor(w.x), Math.floor(w.y)]; };
 function trailPoints(screenPts) {
@@ -351,6 +369,7 @@ function act(a) {
     }
     case 'tap': {
       if (tool === 'trail' && save.tapTrail && layer === SURFACE) {
+        if (!tapStart && pickTrailAt(a.x, a.y)) break; // a trail's number first, unless a stroke is waiting for its end
         if (!tapStart) { tapStart = toWorld(a.x, a.y); toast('tapStart'); break; }
         const s = toScreen(tapStart.x, tapStart.y), points = trailPoints([[s.x, s.y], [a.x, a.y]]);
         tapStart = null;
@@ -521,6 +540,20 @@ function spiderNews(e) {
   else if (e.state === SPIDER.LEFT) { toast(e.arg ? 'spiderLeft' : host.sim.g[GI.RECALL] ? 'spiderLeftNone' : 'spiderGone', { kills: e.arg }); if (save.sound) snd.tone(660, 0.12, 0.03, 'triangle'); }
 }
 
+// Colony moments the page names once each (no sim state): the first birth, and larvae with no protein in store.
+let newsBorn = 0, newsHungry = false, newsSim = null;
+function colonyNews() {
+  if (!host.colony) return;
+  const g = host.sim.g, born = g[GI.BORN];
+  if (newsSim !== host.sim) { newsSim = host.sim; newsBorn = born; newsHungry = false; } // a new game or a restarted day
+  if (born > newsBorn) { if (newsBorn === 0 || born % 10 === 0) toast(born === 1 ? 'bornFirst' : 'bornMore', { n: born }); if (save.sound) snd.tone(990, 0.08, 0.03, 'sine', 300); }
+  newsBorn = born;
+  const larvae = host.sim.brood.n > 0 && Array.prototype.some.call(host.sim.brood.stage.subarray(0, host.sim.brood.n), s => s === 1); // STAGE.LARVA
+  const hungry = larvae && g[GI.PROTEIN] === 0;
+  if (hungry && !newsHungry) { toast('larvaeHungry'); labrec.event('hungry', { at: host.tick }); }
+  newsHungry = hungry;
+}
+
 // ---- frame loop, with a frame-time sampler (S3) ----
 const frames = { on: false, dt: [], work: [], last: 0, drawn: 0 };
 const fpsOn = query.get('fps') === '1';
@@ -533,6 +566,8 @@ function frame(now) {
   const stepped = host.advance(now, screen !== 'play' || held);
   if (screen === 'play') { labrec.tick(); labrec.camera(layer, cams[layer], now); if (frames.last) labrec.frame(now - frames.last); }
   for (const e of host.spiderNews.splice(0)) spiderNews(e);
+  for (const e of host.pileNews.splice(0)) { toast(e.kind ? 'pileNewProtein' : 'pileNewSugar'); labrec.event('pile', { at: e.tick, p: e.pile, k: e.kind }); if (save.sound) snd.tone(e.kind ? 520 : 780, 0.18, 0.05, 'triangle', 200); }
+  colonyNews();
   if (host.dusk && screen === 'play') showDusk(); // the day is over: time stops on the dusk card
   if (host.shifted) { host.shifted = false; selected = -1; $('antCard').classList.remove('on'); } // a death renumbered the ants
   if (stepped) {
@@ -562,7 +597,7 @@ requestAnimationFrame(frame);
 window.painter = {
   rooms: () => nestRooms().map(r => ({ size: r.size, queen: r.queen })),
   day: () => host.day(), dusk: () => host.dusk, dawns: () => [...host.dawns.keys()], hashes: () => host.sim.hashes(),
-  state: () => ({ screen: screen === 'paused' ? 'paused' : screen, look: lookName, dayCard: dayCard?.kind ?? null, spider: host.sim.g[GI.SP], spiderVisits: host.sim.g[GI.SP_VISITS], held, t: host.tick, paused: screen === 'paused', ants: host.ants, sound: save.sound, tapTrail: save.tapTrail, tool, layer, preview: preview ? preview.points.length : 0, orders: host.log.length, gl: !!renderer && !renderer.lost, glLosses: renderer?.losses ?? 0, glRestored: renderer?.restored ?? 0, glFailed, drawn: frames.drawn, selected, help: help.shown }),
+  state: () => ({ screen: screen === 'paused' ? 'paused' : screen, look: lookName, speed: host.speed ?? 1, dayCard: dayCard?.kind ?? null, spider: host.sim.g[GI.SP], spiderVisits: host.sim.g[GI.SP_VISITS], held, t: host.tick, paused: screen === 'paused', ants: host.ants, sound: save.sound, tapTrail: save.tapTrail, tool, layer, preview: preview ? preview.points.length : 0, orders: host.log.length, gl: !!renderer && !renderer.lost, glLosses: renderer?.losses ?? 0, glRestored: renderer?.restored ?? 0, glFailed, drawn: frames.drawn, selected, help: help.shown }),
   log: () => JSON.parse(JSON.stringify(host.log)),
   stats: () => host.stats(),
   lab: () => ({ open: labrec.open, part: labrec.part, chain: labrec.chain, pending: labrec.buf?.length ?? 0, orders: { ...labrec.byType } }),

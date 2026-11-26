@@ -463,6 +463,40 @@ export const pageRuns = {
     await until(page, () => window.painter.log().some(o => o.type === 'crew' && o.delta === -8), 'a held minus asks eight fewer');
     await until(page, () => /of/.test(document.querySelector('#crewWho').textContent), 'the panel shows on and wanted');
   },
+  async 'cinderhill speed'(page, { base, until }) {
+    // 4x view speed runs about four times the ticks a second, and the game it makes is the one a 1x replay of the
+    // same orders makes (Host in Node, here): the speed is the page's, not the sim's.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`${base}/notes/button.js`);
+    await page.evaluate(() => { localStorage.clear(); localStorage.setItem('cinderhill:hint', '1'); });
+    await page.goto(`${base}/cinderhill/?colony=1&lang=en&labRunSource=agent`);
+    await until(page, () => window.painter, 'painter script');
+    await page.click('#play');
+    await until(page, () => window.painter.state().screen === 'play', 'play');
+    await page.evaluate(() => {
+      const el = document.querySelector('#c'), x = innerWidth / 2, y = innerHeight / 2;
+      for (const [type, dx, dy] of [['pointerdown', 0, 0], ['pointermove', 30, -30], ['pointermove', 60, -60], ['pointerup', 60, -60]]) el.dispatchEvent(new PointerEvent(type, { pointerId: 1, pointerType: 'touch', isPrimary: true, clientX: x + dx, clientY: y + dy, pressure: type === 'pointerup' ? 0 : 0.5, bubbles: true, cancelable: true }));
+    });
+    await until(page, () => window.painter.log().length === 1, 'a trail order');
+    const t1 = await page.evaluate(() => window.painter.state().t);
+    await page.waitForTimeout(1000);
+    const r1 = (await page.evaluate(() => window.painter.state().t)) - t1;
+    await page.click('#speed'); await page.click('#speed');
+    assert.equal(await page.evaluate(() => window.painter.state().speed), 4);
+    assert.equal(await page.textContent('#speed'), '4×');
+    const t4 = await page.evaluate(() => window.painter.state().t);
+    await page.waitForTimeout(1000);
+    const r4 = (await page.evaluate(() => window.painter.state().t)) - t4;
+    assert.ok(r4 >= 2.5 * Math.max(r1, 10), `4x ran ${r4} ticks in a second, 1x ${r1}`);
+    await page.click('#pause');
+    await until(page, () => window.painter.state().screen === 'paused', 'paused');
+    const { t, total, log } = await page.evaluate(() => ({ t: window.painter.state().t, total: window.painter.hashes().total, log: window.painter.log() }));
+    const { Host } = await import('../../cinderhill/host.js');
+    const h = new Host(0, 2026, { colony: true });
+    for (const o of log) { while (h.tick < o.tick) h.step(); const { id, tick, type, state, ...rest } = o; h.order({ ...rest, type: { trail: 1, dig: 2, alarm: 3, recall: 4, crew: 5 }[type] }); }
+    while (h.tick < t) h.step();
+    assert.equal(h.sim.hashes().total, total, `a 1x replay to tick ${t} makes the same game`);
+  },
   async 'cinderhill hud'(page, { base, until }) {
     await page.setViewportSize({ width: 360, height: 640 });
     await page.goto(`${base}/notes/button.js`);

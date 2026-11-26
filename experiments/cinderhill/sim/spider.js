@@ -18,7 +18,7 @@ import { SURFACE } from './grid.js';
 import { hurt } from './colony.js';
 
 export const SPIDER = { NONE: 0, WARN: 1, HUNT: 2, LEFT: 3 };
-export const SP = { FROM_DAY: 2, MOVE: 10, EAT: 20, KILL_CAP: 30, EDGE: 6 };
+export const SP = { FROM_DAY: 1, MOVE: 6, EAT: 20, KILL_CAP: 30, EDGE: 6 };
 // Each time is at most an eighth (a half for the hunt) of the day, so a visit ends before the next day's warning.
 const short = (v, T, k) => Math.max(1, Math.min(v, T >> k));
 const warnTicks = T => short(Math.max(20, (T / 30) | 0), T, 3), hungerTicks = T => short(Math.max(40, (T / 40) | 0), T, 3);

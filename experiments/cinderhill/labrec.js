@@ -19,7 +19,7 @@ import { SNAPSHOT_VERSION } from './sim/snapshot.js';
 
 export const FORMAT = 'cinderhill-replay/1', SAMPLE_TICKS = 600;
 export const LIMITS = { events: 300, bytes: 96 * 1024, event: 4096 }; // kit/lab.js; test/labrec.test.mjs reads them from it
-const NAME = { [CMD.TRAIL]: 'trail', [CMD.DIG]: 'dig', [CMD.ALARM]: 'alarm', [CMD.RECALL]: 'recall' };
+const NAME = { [CMD.TRAIL]: 'trail', [CMD.DIG]: 'dig', [CMD.ALARM]: 'alarm', [CMD.RECALL]: 'recall', [CMD.CREW]: 'crew' };
 const hex = () => { const b = new Uint8Array(8); crypto.getRandomValues(b); return [...b].map(x => x.toString(16).padStart(2, '0')).join(''); };
 
 export class LabRecord {

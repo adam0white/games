@@ -16,9 +16,9 @@ import { STREAM, STREAMS, below, seedStreams } from './rng.js';
 import { DIAG, G, GOAL, INF, MAX_GOALS, PATH_MAX, SLOT, STEP, TRAIL_OFF, backCell, backDist, distAt, dropGoal, isTrailSlot, makeFlow, nextCell, rebuild, rebuildDirty, setGoal, terrainChanged } from './flow.js';
 import { FIELD, FIELDS, deposit, makeScent, smell, stepScent } from './scent.js';
 import { SUBSYSTEMS, finish, hashArray, hashInt } from './hash.js';
-import { generate } from './world.js';
+import { WINDFALL_AT, generate, windfall } from './world.js';
 import { stepSpider } from './spider.js';
-import { BROOD_MAX, CASTE, CASTE_HP, DAY_TICKS, FOOD, LOAD, STAGE, addBrood, fight, makeBrood, startDays, stepColony, stepDay } from './colony.js';
+import { BROOD_MAX, C, CASTE, CASTE_HP, DAY_TICKS, FOOD, LOAD, STAGE, addBrood, fight, makeBrood, startDays, stepColony, stepDay } from './colony.js';
 
 export const SIM_VERSION = 7; // 2: trails keep their drawn shape (a path per trail, `via` per ant); 3: eight directions; 4: the colony (colony.js); 5: days; 6: the spider, and foragers stay in under Recall; 7: crews (CMD.CREW)
 export const TICK_HZ = 20;
@@ -27,30 +27,30 @@ export { G, GOAL, SLOT, INF, STEP, DIAG, FIELD, MAT, SURFACE, NEST, SUB, SUBSYST
 export const JOB = { FORAGE: 0, DIG: 1, GUARD: 2 };
 export const MODE = { SEEK: 0, RETURN: 1, WORK: 2, REST: 3 };
 export const CMD = { TRAIL: 1, DIG: 2, ALARM: 3, RECALL: 4, CREW: 5 };
-export const EVENT = { DUG: 1, PILE_EMPTY: 2, REJECTED: 3, LATE: 4, DUSK: 5, SPIDER: 6 }; // DUSK: (day, won); SPIDER: (spider.js SPIDER state, slot or kills)
+export const EVENT = { DUG: 1, PILE_EMPTY: 2, REJECTED: 3, LATE: 4, DUSK: 5, SPIDER: 6, PILE_NEW: 7 }; // DUSK: (day, won); SPIDER: (spider.js SPIDER state, slot or kills); PILE_NEW: (pile, kind)
 export const MAX_PILES = 8;
 const EVENT_CAP = 1024; // events kept until the host drains them; older ones are dropped (counted in globals)
 
 export const DEFAULTS = {
   seed: 1, sw: 256, sh: 256, nw: 192, nh: 128, ants: 500, maxAnts: 5000,
   // Per scent field (trail, food, alarm): spread D/256 per neighbour per tick, and half-life in ticks.
-  // Trail: a third of a ten-minute day (02-spec section 10).
-  spread: [6, 40, 48], halfLife: [4000, 60, 200],
+  // Trail: a third of a 3.5-minute day (02-spec section 10).
+  spread: [6, 40, 48], halfLife: [1400, 60, 200],
   blank: false, // true: an empty map for tests (surface open, nest all clay); no world generation
   // A colony game: a queen, brood and the colony's meals (colony.js). `ants` workers start in the chamber
   // with `sugar` units and one larva per `larvae`. Off (0): the sandbox, adults only, as in M0.
-  colony: 0, sugar: 0, larvae: 0,
+  colony: 0, sugar: 0, larvae: 0, pupae: 0,
   dayTicks: DAY_TICKS, // a colony game's day length (colony.js, Days)
 };
 
-const WALK = 24, RUN = 36; // sub-cell units per tick: about 1.9 and 2.8 cells a second
+const WALK = 48, RUN = 72; // sub-cell units per tick: about 3.75 and 5.6 cells a second (sim 7: twice as fast, the pace pass)
 const TURN = 32; // most a heading turns in one tick when steering toward a target
 const SEP_R = 160; // separation radius in sub-cell units
 const SENSE_AT = 2 * SUB, SENSE_SIDE = 28, SENSE_MIN = 2000;
 const TRAIL_LAY = 60000, TRAIL_STROKE = 400000, FOOD_EMIT = 200000, ALARM_EMIT = 600000, ALARM_FADE = 5000;
 const FAR = 150 * STEP; // a seeking forager this far from home (150 straight steps) goes back
 const STALL_KICK = 50, KICK_EVERY = 30, KICK_FOR = 8;
-const SEEK_GIVE_UP = 1200; // a forager that finds nothing in a minute goes home
+const SEEK_GIVE_UP = 600; // a forager that finds nothing in 30 s goes home
 const BRIDGE_MARGIN = 12; // a stroke blocked by a closed cell is routed around inside this many cells of the gap first
 
 export class Sim {
@@ -108,6 +108,8 @@ export class Sim {
     if (cfg.colony) {
       this.g[G.QUEEN] = 1; this.g[G.SUGAR] = cfg.sugar;
       for (let k = 0; k < cfg.larvae; k++) addBrood(this, STAGE.LARVA);
+      // Pupae near hatching (sim 7): the first births 30, 45 and 60 s in.
+      for (let k = 0; k < cfg.pupae; k++) if (addBrood(this, STAGE.PUPA)) this.brood.age[this.brood.n - 1] = Math.max(0, C.PUPA_TICKS - 600 - 300 * k);
       startDays(this);
     }
     rebuildDirty(this);
@@ -204,11 +206,11 @@ export class Sim {
     } else if (type === CMD.CREW) {
       // [trail seq, change] (seq 0: the newest trail; a trail's seq is never 0): the trail with that creation number wants `change` more ants (or fewer). From "as many as
       // come" the count starts at the ants on it now. Seekers join a trail short of its crew; one over it is sent home.
-      const F = this.flow, delta = Math.max(-64, Math.min(64, e[5]));
+      const F = this.flow, delta = e.length < 6 ? 0 : Math.max(-64, Math.min(64, e[5]));
       let slot = -1;
       if (e[4] === 0) slot = this.newestTrail();
       else for (let s = SLOT.TRAIL0; s < SLOT.TRAIL0 + SLOT.TRAILS; s++) if (F.live[s] && F.seq[s] === (e[4] >>> 0)) slot = s;
-      if (slot < 0 || delta === 0) return this.event(EVENT.REJECTED, e[1], e[2]);
+      if (slot < 0 || delta === 0 || e.length < 6) return this.event(EVENT.REJECTED, e[1], e[2]);
       const k = slot - SLOT.TRAIL0, w = this.g[G.WANT0 + k];
       let base = w - 1;
       if (w === 0) { base = 0; for (let i = 0; i < this.n; i++) if (this.hp[i] > 0 && this.job[i] === JOB.FORAGE && this.via[i] === slot) base++; }
@@ -303,6 +305,10 @@ export class Sim {
   step() {
     const g = this.g;
     while (this.queue.length && this.queue[0][0] === g[G.TICK]) this.applyCommand(this.queue.shift());
+    if (this.cfg.colony) {
+      const T = this.cfg.dayTicks, inDay = g[G.TICK] % T;
+      for (const k of WINDFALL_AT) if (inDay === Math.floor((T * k) / 20) && T >= 20) windfall(this, G, setGoal, SLOT.FOOD0, GOAL.FOOD, (p, kind) => this.event(EVENT.PILE_NEW, p, kind));
+    }
     this.rebuildFields();
     this.stepWorld();
     if (this.cfg.colony) stepColony(this);
@@ -403,13 +409,15 @@ export class Sim {
         }
       } else if (layer === NEST) { if (this.g[G.RECALL]) { still = true; this.since[i] = 0; } else follow = SLOT.EXIT; } // under Recall foragers stay in, and their search starts when they go out
       else {
-        const p = this.pileAt(c);
-        if (p >= 0) {
+        const p = this.pileAt(c), vv = this.via[i];
+        const over = isTrailSlot(vv) && this.flow.live[vv] && this.g[G.WANT0 + vv - SLOT.TRAIL0] > 0 && this.crew[vv - SLOT.TRAIL0] >= this.g[G.WANT0 + vv - SLOT.TRAIL0];
+        if (p >= 0 && !over) {
           this.carry[i] = this.cfg.colony && this.pileKind[p] === FOOD.PROTEIN ? 2 : 1; /* the sandbox carries one kind */ this.mem[i] = SLOT.FOOD0 + p; this.setMode(i, MODE.RETURN); // `via` stays: her route
           this.heading[i] = (this.heading[i] + 128) & 255; this.g[G.PICKED]++;
           if (--this.pileAmount[p] === 0) { dropGoal(this, SLOT.FOOD0 + p); this.event(EVENT.PILE_EMPTY, p, 0); }
           still = true;
         } else if (this.since[i] > SEEK_GIVE_UP || distAt(this, SLOT.HOME, c) > FAR) {
+          if (isTrailSlot(this.via[i])) this.crew[this.via[i] - SLOT.TRAIL0]--; // she leaves her crew now, not next tick
           this.setMode(i, MODE.RETURN); follow = SLOT.HOME; this.via[i] = -1; // nothing found: home, then out again
         } else {
           // Seeking, in order: the trail that led this ant out before (her route), the pile she took from last
@@ -418,6 +426,7 @@ export class Sim {
           const m = this.mem[i], t = this.newestTrail();
           if (m >= 0 && !this.flow.live[m]) this.mem[i] = -1;
           if (this.via[i] >= 0 && !(isTrailSlot(this.via[i]) && this.flow.live[this.via[i]])) this.via[i] = -1;
+          if (this.via[i] >= 0 && distAt(this, this.via[i], c) === INF) { this.crew[this.via[i] - SLOT.TRAIL0]--; this.via[i] = -1; } // her route cannot be reached from here: she frees her place
           let v = this.via[i];
           // Crews: an ant over her trail's crew size leaves it and goes home (then out again, free).
           if (v >= 0 && this.g[G.WANT0 + v - SLOT.TRAIL0] > 0 && this.crew[v - SLOT.TRAIL0] >= this.g[G.WANT0 + v - SLOT.TRAIL0]) {
@@ -425,16 +434,22 @@ export class Sim {
             this.setMode(i, MODE.RETURN); follow = SLOT.HOME;
           } else {
           // A free ant, or one on a trail without a crew size, joins the nearest trail short of its crew (ties: the
-          // lower slot). So plus moves ants from free work and from unsized trails, never from another crew.
+          // lower slot). So plus moves ants from free work and from unsized trails, never from another crew. Nearest
+          // is by distance to the trail's path (0 on it; a path cell's own value is the steps left along it).
           let short = -1, ds = INF;
           if (v < 0 || this.g[G.WANT0 + v - SLOT.TRAIL0] === 0) for (let s = SLOT.TRAIL0; s < SLOT.TRAIL0 + SLOT.TRAILS; s++) {
             const w = this.g[G.WANT0 + s - SLOT.TRAIL0];
             if (s === v || !this.flow.live[s] || w === 0 || this.crew[s - SLOT.TRAIL0] >= w - 1) continue;
-            const d = distAt(this, s, c); if (d > 1 && d < ds) { ds = d; short = s; }
+            const d = distAt(this, s, c); if (d === INF) continue;
+            const off = d < TRAIL_OFF ? 0 : d - TRAIL_OFF;
+            if (off < ds) { ds = off; short = s; }
           }
           const tAuto = t >= 0 && this.g[G.WANT0 + t - SLOT.TRAIL0] === 0; // the newest trail recruits only without a crew size
           const dv = v >= 0 ? distAt(this, v, c) : INF, dt = tAuto ? distAt(this, t, c) : INF;
-          if (short >= 0) { if (v >= 0) this.crew[v - SLOT.TRAIL0]--; follow = short; this.via[i] = short; this.crew[short - SLOT.TRAIL0]++; }
+          if (short >= 0) { if (v >= 0) this.crew[v - SLOT.TRAIL0]--; v = short; this.via[i] = short; this.crew[short - SLOT.TRAIL0]++; }
+          const dv2 = short >= 0 ? distAt(this, short, c) : dv;
+          if (short >= 0 && dv2 <= 1) { want = this.sense(i); if (want < 0) wander = true; } // she joined at the trail's end: the food is here
+          else if (short >= 0) follow = short;
           else if (dv > 1 && dv !== INF) follow = v;
           else if (v < 0 && this.mem[i] >= 0 && distAt(this, m, c) !== INF) follow = m;
           else if (v < 0 && dt > 1 && dt !== INF && (this.since[i] < SEEK_GIVE_UP >> 1 || this.goal[i] === t)) { follow = t; this.via[i] = t; this.crew[t - SLOT.TRAIL0]++; }
@@ -682,7 +697,7 @@ export function encodeCommand(c) {
     case CMD.DIG: return Int32Array.from([...head, c.cells.length >> 1, ...c.cells]);
     case CMD.ALARM: return Int32Array.from([...head, c.layer ?? SURFACE, c.x, c.y, c.hold ?? 100]);
     case CMD.RECALL: return Int32Array.from([...head, c.on ? 1 : 0]);
-    case CMD.CREW: return Int32Array.from([...head, c.seq, c.delta]);
+    case CMD.CREW: { const d = Number(c.delta); return Int32Array.from([...head, c.seq >>> 0, Number.isFinite(d) ? Math.max(-64, Math.min(64, Math.trunc(d))) : 0]); } // clamped before it can wrap
     default: return Int32Array.from(head);
   }
 }

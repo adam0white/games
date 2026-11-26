@@ -25,7 +25,7 @@ const KEEP_HASHES = 30; // seconds of hashes kept for comparison
 const int = v => (Number.isInteger(v) && v >= -0x80000000 && v <= 0x7fffffff ? v : null);
 const ints = (a, max) => (Array.isArray(a) && a.length <= max && a.length % 2 === 0 && a.every(v => int(v) !== null) ? a : null);
 
-/** A client's order to the sim's encoding, or null. Only the sim's four command types, with bounded sizes. */
+/** A client's order to the sim's encoding, or null. Only the sim's five command types, with bounded sizes. */
 export function cleanCommand(cmd, tick, seat, id) {
   if (!cmd || typeof cmd !== 'object') return null;
   const base = { tick, seat, id, type: cmd.type };
@@ -33,6 +33,7 @@ export function cleanCommand(cmd, tick, seat, id) {
   if (cmd.type === 2) { const c = ints(cmd.cells, 512); return c && c.length >= 2 ? encodeCommand({ ...base, cells: c }) : null; }
   if (cmd.type === 3) { const [l, x, y, h] = [cmd.layer ?? 0, cmd.x, cmd.y, cmd.hold ?? 100].map(int); return [l, x, y, h].includes(null) ? null : encodeCommand({ ...base, layer: l, x, y, hold: h }); }
   if (cmd.type === 4) return encodeCommand({ ...base, on: !!cmd.on });
+  if (cmd.type === 5) { const seq = cmd.seq, d = int(cmd.delta); return Number.isInteger(seq) && seq >= 0 && seq <= 0xffffffff && d !== null ? encodeCommand({ ...base, seq, delta: Math.max(-64, Math.min(64, d)) }) : null; } // crews
   return null;
 }
 

@@ -69,6 +69,8 @@ export const G = { TICK: 0, STORES: 1, RECALL: 2, ALARM_HOLD: 3, GOAL_SEQ: 4, DI
   // its walk, ticks since it last ate, kills this visit, ants eaten ever, visits so far, its walk's length, and the
   // trail's creation number (a trail replaced in that slot ends the visit).
   SP: 27, SP_X: 28, SP_Y: 29, SP_T: 30, SP_SLOT: 31, SP_I: 32, SP_HUNGRY: 33, SP_KILLS: 34, SP_EATEN: 35, SP_VISITS: 36, SP_LEN: 37, SP_SEQ: 38,
+  // Windfalls (world.js): new piles fallen so far.
+  WINDFALLS: 39,
   // Crews (CMD.CREW): the ants each trail slot wants, plus one; 0 is "as many as come" (the newest trail recruits).
   WANT0: 40,
   SIZE: 44 };

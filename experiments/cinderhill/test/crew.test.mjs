@@ -94,3 +94,37 @@ test('a snapshot taken with crew sizes plays on the same', () => {
   run(a, 600); run(b, 600);
   assert.deepEqual(b.hashes(), a.hashes());
 });
+
+test('an ant over her crew size takes no more loads, and one that gives up leaves the count at once', () => {
+  // Food beside the entrance: a member coming out over her crew's size must not pick up there (the size is checked
+  // on the surface before a pickup, not only while seeking).
+  const s = colony(12);
+  east(s); run(s, 1); const seq = s.flow.seq[s.newestTrail()], slot = slotOf(s, seq);
+  run(s, 600);
+  assert.ok(crewOf(s, slot) >= 6, `a crew of ${crewOf(s, slot)}`);
+  s.pileCell[2] = cellAt(s.L, SURFACE, 25, 24); s.pileAmount[2] = 4000; s.pileKind[2] = FOOD.SUGAR; s.startGoals(); s.rebuildFields(); // now food at the door
+  const picked0 = s.g[G.PICKED];
+  order(s, { type: CMD.CREW, seq, delta: -64 }); run(s, 1); // size 0: everyone over
+  assert.equal(s.g[G.WANT0 + slot - SLOT.TRAIL0], 1);
+  let pickedOnTrail = 0;
+  let prev = Uint8Array.from(s.carry), pv = Int8Array.from(s.via), pn = s.n;
+  run(s, 400, s => {
+    if (s.n === pn) for (let i = 0; i < s.n; i++) if (pv[i] === slot && !prev[i] && s.carry[i]) pickedOnTrail++; // a member took a load this tick
+    prev = Uint8Array.from(s.carry); pv = Int8Array.from(s.via); pn = s.n;
+  });
+  assert.equal(pickedOnTrail, 0, 'no member of a crew of 0 picks up a load');
+  assert.equal(crewOf(s, slot), 0);
+  assert.ok(s.g[G.PICKED] >= picked0);
+});
+
+test('encoded crew orders: a missing change is refused, a huge one is clamped, not wrapped', () => {
+  const s = colony(4);
+  east(s); run(s, 1); const seq = s.flow.seq[s.newestTrail()], slot = slotOf(s, seq);
+  run(s, 200); const c0 = crewOf(s, slot);
+  order(s, { type: CMD.CREW, seq, delta: 2 ** 31 }); run(s, 1);
+  assert.equal(s.g[G.WANT0 + slot - SLOT.TRAIL0], c0 + 64 + 1, 'clamped to +64 from the crew at the order');
+  const short = Int32Array.from([s.tick, 0, ++id, CMD.CREW, seq]); // no change word
+  s.queueCommand(short);
+  const ev = run(s, 1);
+  assert.equal(ev.filter(e => e[0] === EVENT.REJECTED).length, 1);
+});

@@ -26,8 +26,8 @@ function colony(opts = {}, workers = 24) {
 const run = (s, ticks, onTick) => { const dusks = []; for (let t = 0; t < ticks; t++) { onTick?.(s); s.step(); const ev = s.drainEvents(); for (let k = 0; k < ev.length; k += 3) if (ev[k] === EVENT.DUSK) dusks.push({ tick: s.tick, day: ev[k + 1], won: ev[k + 2] }); } return dusks; };
 
 test('goals: day 1 trail loads, day 2 digging, day 3 both foods, then day 3 again with a larger target', () => {
-  assert.deepEqual([1, 2, 3, 4, 5].map(d => goalOf(d)), [{ kind: GOAL_KIND.TRAIL_LOADS, target: 40 }, { kind: GOAL_KIND.DUG, target: 40 }, { kind: GOAL_KIND.BOTH_FOODS, target: 60 }, { kind: GOAL_KIND.BOTH_FOODS, target: 90 }, { kind: GOAL_KIND.BOTH_FOODS, target: 120 }]);
-  assert.equal(goalOf(1, 1).target, 30, 'eased by a quarter');
+  assert.deepEqual([1, 2, 3, 4, 5].map(d => goalOf(d)), [{ kind: GOAL_KIND.TRAIL_LOADS, target: 60 }, { kind: GOAL_KIND.DUG, target: 40 }, { kind: GOAL_KIND.BOTH_FOODS, target: 110 }, { kind: GOAL_KIND.BOTH_FOODS, target: 140 }, { kind: GOAL_KIND.BOTH_FOODS, target: 170 }]);
+  assert.equal(goalOf(1, 1).target, 45, 'eased by a quarter');
   assert.equal(DAY_GOALS.length, 3);
 });
 
@@ -80,8 +80,11 @@ test('a dig day is won by digging; it counts cells opened since dawn', () => {
   assert.equal(dayState(s).done, Math.min(dayState(s).target, s.g[G.DUG]));
 });
 
+// The floor tests shut the entrance, so no load comes home (ants are quick enough to fetch some within a short day).
+const shut = s => { const e = cellAt(s.L, SURFACE, 24, 24), top = s.link[e]; s.link[e] = -1; s.link[top] = -1; return s; };
+
 test('the floor: a colony short of sugar at dawn is given some', () => {
-  const s = colony();
+  const s = shut(colony());
   s.g[G.SUGAR] = 0; s.g[G.QUEEN] = 0; // no laying, no adults eating yet at tick T - 1
   run(s, T - 1);
   const sugar = s.g[G.SUGAR];
@@ -155,16 +158,16 @@ test('the dusk verdict is the one judged at dusk: a load home during the last ti
   const h = new Host(20, 2026, { colony: true, dayTicks: 200 });
   for (let t = 0; t < 199; t++) h.step();
   const s = h.sim, world = s.stepWorld.bind(s);
-  s.g[G.TRAIL_LOADS] = s.g[G.BASE_A] + 39;
-  s.stepWorld = () => { world(); s.g[G.TRAIL_LOADS]++; }; // the 40th load lands inside the dusk tick
+  s.g[G.TRAIL_LOADS] = s.g[G.BASE_A] + goalOf(1).target - 1;
+  s.stepWorld = () => { world(); s.g[G.TRAIL_LOADS]++; }; // the last load needed lands inside the dusk tick
   h.step();
   assert.equal(h.dusk.won, true);
-  assert.equal(h.dusk.goal.won, true); assert.equal(h.dusk.goal.done, 40);
+  assert.equal(h.dusk.goal.won, true); assert.equal(h.dusk.goal.done, goalOf(1).target);
 });
 
 test('days won counts wins only, across a win, a loss and a restore', () => {
   const s = colony();
-  run(s, T - 1); s.g[G.TRAIL_LOADS] = s.g[G.BASE_A] + 40; run(s, 1);
+  run(s, T - 1); s.g[G.TRAIL_LOADS] = s.g[G.BASE_A] + goalOf(1).target; run(s, 1);
   assert.equal(s.g[G.DAYS_WON], 1);
   run(s, T);
   assert.equal(s.g[G.DAY_LAST], 2); assert.equal(s.g[G.DAYS_WON], 1);
@@ -181,7 +184,7 @@ test('both foods: the smaller count decides', () => {
 
 test('the floor: fewer than the starting ants brings the gift even with sugar in store; a colony at the floor gets none', () => {
   const gift = (ants, sugar) => {
-    const s = colony({}, ants); s.g[G.QUEEN] = 0; s.g[G.SUGAR] = sugar;
+    const s = shut(colony({}, ants)); s.g[G.QUEEN] = 0; s.g[G.SUGAR] = sugar;
     run(s, T - 1); const before = s.g[G.SUGAR]; run(s, 1); return s.g[G.SUGAR] - before;
   };
   assert.equal(gift(START.ants - 1, 40), GIFT_SUGAR);

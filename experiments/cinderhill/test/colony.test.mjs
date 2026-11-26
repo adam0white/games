@@ -23,7 +23,7 @@ function colony({ larvae = 0, ...opts } = {}) {
 test('the queen lays one egg per sugar unit, every LAY_EVERY ticks, and stops when sugar runs out', () => {
   const s = colony();
   s.g[G.SUGAR] = 3;
-  for (let t = 0; t < 4 * C.LAY_EVERY; t++) s.step();
+  for (let t = 0; t < 2 * C.LAY_EVERY + 40; t++) s.step(); // three eggs, before they hatch (EGG_TICKS) and before the adults' meal
   assert.equal(s.brood.n, 3);
   assert.equal(s.g[G.SUGAR], 0);
   for (let k = 0; k < 3; k++) assert.equal(s.brood.stage[k], STAGE.EGG);
@@ -85,10 +85,11 @@ test('a load from a protein pile fills the protein store; from a sugar pile, the
 
 test('fight hook: ants of two teams bite on their own cooldown; the dead are removed in index order', () => {
   const s = colony({ colony: 0 });
-  const at = (i, x, y) => { s.layer[i] = SURFACE; s.x[i] = x; s.y[i] = y; s.lastCell[i] = s.cellOfAnt(i); return i; };
-  for (let k = 0; k < 4; k++) at(s.spawn(JOB.GUARD), 5 * 256 + 100 + 10 * k, 5 * 256 + 128);
-  const foe = at(s.spawn(JOB.GUARD, CASTE.WORKER, 1), 5 * 256 + 130, 5 * 256 + 140);
-  at(s.spawn(JOB.GUARD, CASTE.MAJOR), 40 * 256, 40 * 256); // far away; index 5, the only major
+  // Guards in the nest with no alarm stand still, so the bites are counted without anyone walking off.
+  const at = (i, x, y) => { s.layer[i] = NEST; s.x[i] = x; s.y[i] = y; s.lastCell[i] = s.cellOfAnt(i); return i; };
+  for (let k = 0; k < 4; k++) at(s.spawn(JOB.GUARD), 12 * 256 + 100 + 10 * k, 11 * 256 + 128);
+  const foe = at(s.spawn(JOB.GUARD, CASTE.WORKER, 1), 12 * 256 + 130, 11 * 256 + 140);
+  at(s.spawn(JOB.GUARD, CASTE.MAJOR), 17 * 256 + 128, 13 * 256 + 128); // five cells away; index 5, the only major
   const hp = [];
   for (let t = 0; t < 4 * BITE_EVERY && s.n === 6; t++) { s.step(); hp.push(s.n === 6 ? s.hp[foe] : 0); }
   // Four workers bite 2 each in the first tick (8 taken), then wait BITE_EVERY ticks: the foe (12) falls then.
