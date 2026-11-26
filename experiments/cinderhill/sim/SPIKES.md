@@ -84,6 +84,7 @@ Seed 2026, 2,000 ants, 12,000 ticks (10 minutes), 41 orders. Every engine got th
 - **Planted mutation** (`spikes/mutant.js`): after each ant step, the last mantissa bit of `Math.sin(...)` turns the ant one angle unit. The spike also compared the raw bits of `Math.sin` for the 20,000 arguments the first 20 ticks use. Chromium 156 differed from Node 26.13 on 631 of them and WebKit on 891. So the divergence comes from the engines, not from the harness. With the mutation, both browsers diverge from Node at the first comparison (tick 20), and the check names `ants`. Without it, both match for all 12,000 ticks.
 - A surprise: Chromium and Node do not share `Math.sin` bits, though both run V8. The two V8 versions differ. "Node agrees with Chromium" is therefore no evidence that floating-point code is safe.
 - **Firefox: not run.** Playwright's Firefox build is not installed on this machine. It was not installed for this spike, as the instructions asked.
+- **Firefox on a real phone (sim 4, 2026-11-26):** the owner's phone, Firefox (Gecko) 163.0 on Android 17, ran `/cinderhill/check` on `SIM_VERSION` 4: short SAME (b08dd22b, 0.4 s), long SAME (6a89375e, 35.8 s), both equal to sim 4's `EXPECTED` and `EXPECTED_LONG`. This closes the Firefox gap for sim 4. Firefox has not been run on sim 5 (section Days).
 - **60-minute bot soak:** see "S2 soak" below.
 - **In CI:** the phone check now runs the page's short replay (600 ticks, 300 ants) in WebKit (iPhone 13) and Chromium (Pixel 7) and fails if the hash differs from Node's. It failed as expected with a wrong expected hash.
 
@@ -293,3 +294,59 @@ Colony bots (`bots.mjs`, three days = 36,000 ticks, start 20 workers, 40 sugar, 
 | 8 | 148 | 20 (380 starved) | 94 |
 
 Idle play does well on seed 8 because wandering foragers find a protein pile near the entrance. With a flat laying rate (one egg per 240 ticks) careful and idle both reached about 94 on that seed; laying faster on rich sugar is what lets careful play pull ahead.
+
+## Days (SIM_VERSION 5, snapshot format 5, 2026-11-26)
+
+Days (`../NOTES.md`, Days) add day counters to the globals (`G` slots 18 to 26) and `cfg.dayTicks` to the hash and the snapshot header. The sandbox plays as before; its hashes changed because the globals hash covers the new slots and setting. New totals: `EXPECTED` 765780965, `EXPECTED_LONG` 3759976591 (after the review fixes below; 2892084396 before them). A third quick run, `QUICK_COLONY` (a colony game of 3,000 ticks with 600-tick days, so five dusks), has `EXPECTED_COLONY` 4065397823; the check page and the phone check now run it too.
+
+| Measure | Before (SIM_VERSION 4) | After |
+| --- | --- | --- |
+| S2 sandbox: Node, workerd, Chromium 156.0.8078.4, WebKit 27.2 on all 600 records | agree | agree (final total 3759976591; also before the review fixes) |
+| S2 colony (`s2.mjs --colony`, `workerd.mjs --colony`: 20 workers, days of 1,200 ticks, ten dusks in 12,000 ticks) | not run | Node, workerd, Chromium and WebKit agree on all 600 records (final total 3029667849), before and after the review fixes |
+| S2 planted fault | diverges at tick 20 in `ants` | sandbox: tick 20 everywhere; colony: tick 20 in Node and WebKit, tick 40 in Chromium, all in `ants` |
+| S2 Firefox | see the note below | not run (Playwright's Firefox is not installed here) |
+| S1 Node, 2,000 ants, mean / p95 / max | 1.63 / 1.69 / 3.52 ms | 1.63 / 1.68 / 3.54 ms |
+| S1 Node, 5,000 ants | 1.93 / 2.04 / 3.62 ms | 1.94 / 2.05 / 3.65 ms |
+| S1 all 9 fields at once | 11.24 ms | 11.27 ms |
+| S1 workerd, 2,000 / 5,000 ants, mean | 1.57 / 1.89 ms | 1.56 / 1.90 ms |
+| S4, 5,000 ants, 3,000 / 8,000 / 24,000 ticks | 45.6 / 58.2 / 60.7 KB | 45.6 / 58.2 / 60.7 KB (margin 5.8 and 3.3 KB) |
+
+Every S4 snapshot restores to the same hash. The colony's planted fault diverging first at tick 40 in Chromium means its 20 ants took no step in the first 20 ticks whose `Math.sin` bits differ in Chromium; the clean colony run agrees everywhere.
+
+**Firefox, sim 4 (owner's phone).** Firefox (Gecko) 163.0 on Android 17 ran `/cinderhill/check` on sim 4 on 2026-11-26: short SAME (b08dd22b = 2962084395, 0.4 s), long SAME (6a89375e = 1787377502, 35.8 s). This closes the "Firefox not run" gap for sim 4 (the S2 tables above say not run because they predate it). Firefox has not been run on sim 5.
+
+S1 and S4 were run before the review fixes; S4 was run again after them (the same sizes). The fixes change no ant's movement, so S1 was not rerun.
+
+**Bots** (`bots.mjs`, 12 seeds, three days of 12,000 ticks; day 3 shows sugar and protein loads since dawn against the target, 45 when eased after a lost day; ants alive at the end of day 3):
+
+| Seed | careful: day 1 / day 2 / day 3 | ants | greedy: day 1 / 2 / 3 | idle: day 1 / 2 / 3 | idle ants |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 154/40 / 47/40 / 199s 309p of 60 | 130 | won / 0 of 40 / 108s 0p of 45 | 0 / 0 / 18s 244p of 45 | 117 |
+| 2 | 143 / 48 / 181s 324p | 124 | won / 0 / 96s 0p | 0 / 0 / 0s 338p | 68 |
+| 3 | 84 / 46 / 235s 217p | 142 | won / 0 / 144s 0p | 0 / 0 / 143s 0p | 20 |
+| 4 | 144 / 48 / 194s 241p | 128 | won / 0 / 96s 0p | 0 / 0 / 0s 309p | 68 |
+| 5 | 133 / 48 / 183s 386p | 136 | won / 0 / 120s 0p | 0 / 0 / 202s 32p | 47 |
+| 6 | 72 / 48 / 108s 242p | 114 | won / 0 / 108s 0p | 0 / 0 / 99s 7p | 20 |
+| 7 | 144 / 48 / 177s 231p | 122 | won / 0 / 96s 0p | 0 / 0 / 0s 77p | 68 |
+| 8 | 104 / 48 / 152s 262p | 157 | won / 0 / 96s 0p | 0 / 0 / 8s 217p | 102 |
+| 9 | 144 / 48 / 190s 347p | 125 | won / 0 / 96s 0p | 0 / 0 / 0s 218p | 68 |
+| 10 | 84 / 48 / 216s 253p | 144 | won / 0 / 144s 0p | 0 / 0 / 144s 0p | 20 |
+| 11 | 108 / 48 / 199s 289p | 175 | won / 0 / 120s 0p | 0 / 0 / 204s 22p | 35 |
+| 12 | 132 / 48 / 168s 315p | 118 | won / 0 / 84s 0p | 0 / 0 / 0s 254p | 68 |
+
+Careful wins all three days on all 12 seeds; idle loses all three on all 12 (its best day 3 is 32 protein against 45, seed 5); greedy wins day 1 and loses days 2 and 3. Idle's days 1 and 2 are 0 by construction: no trail, no marked cell. Day 3 is the one that depends on the map. CI runs careful on seed 6, the narrowest day 1 and day 3 (`test/days-bots.test.mjs`). The sweep ran before the review fixes; the only fix that touches a goal counter (a load whose trail was replaced on the way home now counts) can only raise careful's day 1 and leaves idle at 0.
+
+**Independent review** (Codex, `gpt-6.2-astra`, read-only). Fixed, each with a test that fails on the old code:
+- A day length that is not a 32-bit integer (2.5, 2^32 + 2) hashed and restored as another value, so a restored sim reached dusk on another tick. The sim now refuses it.
+- The page took the next dawn's save at the dusk tick, then let go of a held alarm on the way to the card; a restarted day lacked that order. The save is now taken when the player goes on.
+- Restarting a day marked as undone an order that was in the dawn save and still waiting for its tick, so the log and the sim disagreed. Each dawn save now keeps the log's length: orders after it are undone, orders before it that had not run are queued again.
+- The dusk card and the bots read the goal one tick before dusk, so a load home in the last tick showed "goal met, 39 of 40". The sim now keeps the verdict it judged (`sim.lastDusk`, not state).
+- A carrier whose trail was replaced by a fifth trail on her way home lost credit for the trail goal. Her route becomes -2 ("came by trail, trail gone") until she delivers.
+- The floor gift could wrap sugar past 2^31; it saturates. An eased goal used a signed shift; it is unsigned.
+- A two-tap trail's first tap survived a dusk; it is cleared. A restart now restores the run report's delivered count.
+- Three mutations survived the first tests: no `DAYS_WON` count, no headcount test in the floor rule, and the larger food deciding the both-foods goal. Each now fails a test.
+
+Kept, written down (`../NOTES.md`, Days): later days ask for more food than a map holds (seed 2026 has about 1,060 loads of each food; days 3 to 9 together ask for 1,050 of each), so a long campaign ends in lost days; the tick count is signed 32-bit and wraps after about 3.4 years of play.
+
+**Mutations shown to fail** (`test/days.test.mjs`, 19 tests): judging a day won only when progress is over the target (`done > target`) fails "progress counts from dawn"; counting trail loads without the `via` check fails "trail loads"; reverting any of the review fixes above fails its test (checked one by one), except the restored delivered count, which no test catches. Restore was checked mid-day, on the tick before dusk and across a dusk: each continues to the same hashes as the run that was not saved.
+

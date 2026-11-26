@@ -152,3 +152,66 @@ export function hurt(sim, i, amount) {
   sim.hp[i] = hp > amount ? hp - amount : 0;
   if (sim.hp[i] === 0) { sim.g[G.DIED]++; sim.anyDead = true; }
 }
+
+// ---- Days (02-spec 6.8, 6.9) ----
+// A day is cfg.dayTicks ticks (12,000: ten minutes). Each day has one goal, checked at dusk: the last tick of the
+// day, after everything else in that tick. Goals count from dawn, so a day cannot be won with yesterday's work.
+// Day 1 asks for the trail, day 2 for digging, day 3 for both foods; each needs an order, so a colony left alone
+// fails all three (bots.mjs measures it). Later days repeat day 3 with a larger target.
+// Losing a day: the colony keeps what it has, and the next day's goal is eased by a quarter. At every dawn a colony
+// below the floor (fewer than START.ants ants, or under FLOOR_SUGAR sugar) gets GIFT_SUGAR sugar (02-spec 6.9:
+// "Burr brings seeds"). The page offers a restart from the dawn save; that lives in the page, not here.
+export const DAY_TICKS = 12000;
+export const GOAL_KIND = { TRAIL_LOADS: 1, DUG: 2, BOTH_FOODS: 3 };
+// [kind, target] per day, from day 1.
+export const DAY_GOALS = [[GOAL_KIND.TRAIL_LOADS, 40], [GOAL_KIND.DUG, 40], [GOAL_KIND.BOTH_FOODS, 60]];
+export const FLOOR_SUGAR = 10, GIFT_SUGAR = 20;
+
+/** The goal of day `day` (1 = the first): { kind, target }, eased by a quarter when `eased`. */
+export function goalOf(day, eased = 0) {
+  const k = day <= DAY_GOALS.length ? day - 1 : DAY_GOALS.length - 1;
+  const [kind, base] = DAY_GOALS[k], target = day <= DAY_GOALS.length ? base : base + 30 * (day - DAY_GOALS.length);
+  return { kind, target: eased ? target - (target >>> 2) : target };
+}
+
+/** The counters a goal is measured with, as [a, b]; progress is what they gained since dawn. */
+function counters(g, kind) {
+  if (kind === GOAL_KIND.TRAIL_LOADS) return [g[G.TRAIL_LOADS], 0];
+  if (kind === GOAL_KIND.DUG) return [g[G.DUG], 0];
+  return [g[G.SUGAR_LOADS], g[G.PROTEIN_LOADS]];
+}
+
+/** Today's goal and progress: { day, kind, target, done (0..target), a, b, won, left (ticks to dusk) }. For both
+ *  foods, a and b are the sugar and protein loads since dawn and done is the smaller. */
+export function dayState(sim) {
+  const g = sim.g, day = g[G.DAY], { kind, target } = goalOf(day, g[G.EASED]);
+  const [ca, cb] = counters(g, kind), a = ca - g[G.BASE_A], b = cb - g[G.BASE_B];
+  const done = kind === GOAL_KIND.BOTH_FOODS ? (a < b ? a : b) : a;
+  const T = sim.cfg.dayTicks;
+  return { day, kind, target, a, b, done: done > target ? target : done, won: done >= target, left: T - (g[G.TICK] % T), eased: g[G.EASED] };
+}
+
+/** Dawn of day `day`: its goal's counters as they are now. */
+function dawn(sim, day, eased) {
+  const g = sim.g;
+  g[G.DAY] = day; g[G.EASED] = eased;
+  const [a, b] = counters(g, goalOf(day, eased).kind);
+  g[G.BASE_A] = a; g[G.BASE_B] = b;
+}
+
+export function startDays(sim) { dawn(sim, 1, 0); }
+
+/** Called at the end of every colony tick, before the tick count moves on. At dusk: judge the goal, raise
+ *  EVENT.DUSK (day, won), and start the next day. Returns true at dusk. */
+export function stepDay(sim, duskEvent) {
+  const g = sim.g, T = sim.cfg.dayTicks;
+  if ((g[G.TICK] + 1) % T !== 0) return false;
+  const day = g[G.DAY], st = dayState(sim), won = st.won;
+  sim.lastDusk = st; // the goal as judged, for the page and bots (not sim state: read it right after the step)
+  g[G.DAY_LAST] = won ? 1 : 2;
+  if (won) g[G.DAYS_WON]++;
+  sim.event(duskEvent, day, won ? 1 : 0);
+  if (sim.n < START.ants || g[G.SUGAR] < FLOOR_SUGAR) g[G.SUGAR] = g[G.SUGAR] > 0x7fffffff - GIFT_SUGAR ? 0x7fffffff : g[G.SUGAR] + GIFT_SUGAR; // saturates
+  dawn(sim, day + 1, won ? 0 : 1);
+  return true;
+}

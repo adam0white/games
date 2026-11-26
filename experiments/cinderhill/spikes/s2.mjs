@@ -1,7 +1,8 @@
 // Spike S2: the same seed and 10 minutes (12,000 ticks) of scripted orders in Node and in each browser
 // Playwright can launch here, compared every 20 ticks per subsystem. Then the planted fault (mutant.js,
 // floating-point Math.sin in the ant step) in each engine, to show the check fails when engines differ.
-// Usage: PLAYWRIGHT=<dir with playwright> node s2.mjs [--ticks=12000] [--ants=2000]
+// Usage: PLAYWRIGHT=<dir with playwright> node s2.mjs [--ticks=12000] [--ants=2000] [--colony]
+// --colony: a colony game (queen, brood, days of 1,200 ticks: ten dusks in 12,000 ticks) under the same scripted orders.
 import { createServer } from 'node:http';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
@@ -14,10 +15,11 @@ import { EXPECTED_LONG, LONG } from '../quick.js';
 
 const args = process.argv.slice(2), opt = (k, d) => Number(args.find(a => a.startsWith(`--${k}=`))?.split('=')[1] ?? d);
 const TICKS = opt('ticks', 12000), ANTS = opt('ants', 2000), EVERY = 20;
-const cfg = { seed: 2026, ants: ANTS };
+const COLONY = args.includes('--colony');
+const cfg = COLONY ? { seed: 2026, ants: 20, sugar: 40, larvae: 4, colony: 1, dayTicks: 1200 } : { seed: 2026, ants: ANTS };
 const commands = script(cfg, TICKS), json = JSON.stringify(commands);
 const digest = createHash('sha256').update(json).digest('hex');
-console.log(`${commands.length} orders over ${TICKS} ticks, ${ANTS} ants; command log sha256 ${digest.slice(0, 16)}`);
+console.log(`${commands.length} orders over ${TICKS} ticks, ${cfg.ants} ants${COLONY ? ' (colony)' : ''}; command log sha256 ${digest.slice(0, 16)}`);
 
 const results = [];
 // The fault's own input: Math.sin on the arguments the first 20 ticks use, as raw bits. Shows whether an
@@ -29,7 +31,7 @@ const node = (mutate) => { const undo = mutate ? plant() : null; try { const t =
 const nodeClean = node(false), nodeMutant = node(true);
 console.log(`node ${process.version}: clean ${Math.round(nodeClean.ms)} ms, final total ${nodeClean.records.at(-1).total}; mutant final total ${nodeMutant.records.at(-1).total}`);
 // The check page's long run (quick.js LONG) is this run at its defaults: its expected total must be Node's.
-if (TICKS === LONG.ticks && ANTS === LONG.cfg.ants && nodeClean.records.at(-1).total !== EXPECTED_LONG.total) {
+if (!COLONY && TICKS === LONG.ticks && ANTS === LONG.cfg.ants && nodeClean.records.at(-1).total !== EXPECTED_LONG.total) {
   console.error(`quick.js EXPECTED_LONG.total is ${EXPECTED_LONG.total}; Node computes ${nodeClean.records.at(-1).total}. Update it.`);
   process.exitCode = 1;
 }

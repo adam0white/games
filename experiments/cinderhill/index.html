@@ -17,6 +17,9 @@
   #hud { position: fixed; top: calc(60px + env(safe-area-inset-top)); left: calc(8px + env(safe-area-inset-left)); right: calc(8px + env(safe-area-inset-right)); display: none; flex-direction: column; align-items: flex-start; pointer-events: none; color: #2b1d12; font-size: 13px; line-height: 1.3; }
   #hud > div { background: #f4ecdcdd; border: 1.5px solid #2b1d12; border-radius: 10px; padding: 4px 8px; margin-bottom: 4px; max-width: 100%; box-sizing: border-box; }
   #crew:empty { display: none; }
+  #hud > #goal { background: #2b1d12e6; color: #f4ecdc; font-weight: 600; }
+  #hud > #goal[hidden] { display: none; }
+  #dayResult.won { color: #2e6b2a; font-weight: 700; } #dayResult.lost { color: #8a2a1a; font-weight: 700; }
   #crew small { opacity: .75; }
   #tools { position: fixed; left: 0; right: 0; bottom: calc(8px + env(safe-area-inset-bottom)); display: none; justify-content: center; gap: 6px; padding: 0 8px; flex-wrap: wrap; }
   #tools button[aria-pressed="true"] { background: #2b1d12; color: #f4ecdc; }
@@ -54,7 +57,7 @@
 <canvas id="gl" aria-hidden="true"></canvas>
 <canvas id="c" aria-label="The hill"></canvas>
 <div id="nogl" data-i18n="noGl"></div>
-<div id="hud"><div id="stats"></div><div id="crew"></div><div id="fps"></div></div>
+<div id="hud"><div id="goal" hidden></div><div id="stats"></div><div id="crew"></div><div id="fps"></div></div>
 <div id="top">
   <button id="layer"></button>
   <button id="zout" data-i18n-aria="zoomOut">−</button>
@@ -80,7 +83,16 @@
   <div class="counts"><span data-i18n="antsLabel"></span><button data-count="500">500</button><button data-count="2000">2,000</button><button data-count="5000">5,000</button></div>
   <p><button id="play" class="main" data-i18n="play"></button></p>
   <p><button id="langMenu" data-i18n="lang"></button></p>
-  <p class="small"><a href="check.html" data-i18n="check"></a></p>
+  <p class="small"><a id="modeLink" href="?colony=1" data-i18n="toColony"></a> · <a href="check.html" data-i18n="check"></a></p>
+</div></section>
+<section id="day" class="screen"><div class="card" id="dayCard">
+  <h2 id="dayHead"></h2>
+  <p id="dayResult"></p>
+  <p id="dayGoal"></p>
+  <p class="small" id="dayTip"></p>
+  <p class="small" id="dayNote"></p>
+  <p><button id="dayGo" class="main"></button></p>
+  <p><button id="dayRestart"></button></p>
 </div></section>
 <section id="paused" class="screen"><div class="card" id="pauseCard">
   <h2 data-i18n="paused"></h2>

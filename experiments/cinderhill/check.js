@@ -1,7 +1,7 @@
 // The page side of the determinism check. Also what the S2 spike drives in each browser (window.cinderhill).
 import { SUBSYSTEMS } from './sim/hash.js';
 import { replay, script, firstDivergence } from './sim/replay.js';
-import { EXPECTED, EXPECTED_LONG, LONG, QUICK, quick } from './quick.js';
+import { EXPECTED, EXPECTED_COLONY, EXPECTED_LONG, LONG, QUICK, QUICK_COLONY, quick, quickColony } from './quick.js';
 import { SIM_VERSION, Sim, encodeCommand } from './sim/sim.js';
 
 /** Run a replay with an exact command log (S2). `mutate` loads the planted fault first. */
@@ -16,21 +16,23 @@ async function run({ cfg, commands, ticks, every = 20, mutate = false }) {
 }
 
 const state = { result: null, long: null };
-window.cinderhill = { run, quick, script, firstDivergence, expected: EXPECTED, state: () => state };
+window.cinderhill = { run, quick, quickColony, script, firstDivergence, expected: EXPECTED, state: () => state };
 
 const $ = id => document.getElementById(id);
 $('run')?.addEventListener('click', () => {
   $('run').disabled = true;
   $('status').textContent = 'Running 600 ticks...';
   setTimeout(() => {
-    const t0 = performance.now(), h = quick(), ms = performance.now() - t0;
-    $('hashes').innerHTML = SUBSYSTEMS.concat('total').map(k => `<tr><td>${k}</td><td>${h[k].toString(16).padStart(8, '0')}</td></tr>`).join('');
-    const same = h.total === EXPECTED.total && h.tick === EXPECTED.tick;
-    $('verdict').textContent = same ? 'Same as Node.' : `Different from Node (expected ${EXPECTED.total.toString(16)}).`;
+    const t0 = performance.now(), h = quick(), c = quickColony(), ms = performance.now() - t0;
+    const hex = v => v.toString(16).padStart(8, '0');
+    $('hashes').innerHTML = SUBSYSTEMS.concat('total').map(k => `<tr><td>${k}</td><td>${hex(h[k])}</td><td>${hex(c[k])}</td></tr>`).join('');
+    const sameSandbox = h.total === EXPECTED.total && h.tick === EXPECTED.tick, sameColony = c.total === EXPECTED_COLONY.total && c.tick === EXPECTED_COLONY.tick;
+    const same = sameSandbox && sameColony;
+    $('verdict').textContent = same ? 'Same as Node.' : `Different from Node (${sameSandbox ? '' : `sandbox: expected ${hex(EXPECTED.total)}`}${sameSandbox || sameColony ? '' : '; '}${sameColony ? '' : `colony: expected ${hex(EXPECTED_COLONY.total)}`}).`;
     $('verdict').className = same ? 'ok' : 'bad';
-    $('status').textContent = `${QUICK.ticks} ticks in ${Math.round(ms)} ms.`;
+    $('status').textContent = `${QUICK.ticks} sandbox ticks and ${QUICK_COLONY.ticks} colony ticks in ${Math.round(ms)} ms.`;
     $('run').disabled = false;
-    state.result = { ...h, same, ms };
+    state.result = { ...h, same, sameSandbox, sameColony, colonyTotal: c.total, ms };
     showReport();
   }, 30);
 });
@@ -46,7 +48,7 @@ function engineName() {
 }
 function reportLine() {
   const q = state.result, l = state.long;
-  const part = (r, name) => (r ? `${name} ${r.same ? 'SAME' : 'DIFFERENT'} (${r.total.toString(16)}, ${(r.ms / 1000).toFixed(1)} s)` : `${name} not run`);
+  const part = (r, name) => (r ? `${name} ${r.same ? 'SAME' : 'DIFFERENT'} (${r.total.toString(16)}${r.colonyTotal !== undefined ? `, colony ${r.colonyTotal.toString(16)}` : ''}, ${(r.ms / 1000).toFixed(1)} s)` : `${name} not run`);
   return `Cinderhill check, sim ${SIM_VERSION}: ${part(q, 'short')}; ${part(l, 'long')}; ${engineName()}; ${navigator.userAgent}`;
 }
 function showReport() {

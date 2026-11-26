@@ -3,7 +3,17 @@
 import { replay, script } from './sim/replay.js';
 
 export const QUICK = { cfg: { seed: 2026, sw: 128, sh: 128, nw: 96, nh: 64, ants: 300 }, ticks: 600 };
-export const EXPECTED = { tick: 600, total: 2962084395 };
+export const EXPECTED = { tick: 600, total: 765780965 };
+
+// The colony short check: a colony game (queen, brood, days of 600 ticks) under the same scripted orders, so
+// browsers also check colony.js and the days, which the sandbox runs above never touch. Five dusks in 3,000 ticks.
+export const QUICK_COLONY = { cfg: { seed: 2026, sw: 128, sh: 128, nw: 96, nh: 64, ants: 20, sugar: 40, larvae: 4, colony: 1, dayTicks: 600 }, ticks: 3000 };
+export const EXPECTED_COLONY = { tick: 3000, total: 4065397823 };
+
+export function quickColony() {
+  const { cfg, ticks } = QUICK_COLONY;
+  return replay({ cfg, commands: script(cfg, ticks), ticks, every: ticks }).records.at(-1);
+}
 
 export function quick() {
   const { cfg, ticks } = QUICK;
@@ -13,4 +23,4 @@ export function quick() {
 // The long check on the page: spike S2's run (seed 2026, 2,000 ants, 10 minutes of play, the scripted orders).
 // Checked by test/page.test.mjs (about 22 s in Node) and by spikes/s2.mjs.
 export const LONG = { cfg: { seed: 2026, ants: 2000 }, ticks: 12000 };
-export const EXPECTED_LONG = { tick: 12000, total: 1787377502 };
+export const EXPECTED_LONG = { tick: 12000, total: 3759976591 };

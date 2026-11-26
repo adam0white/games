@@ -111,11 +111,33 @@ Snapshot format 4 codes pile kinds, caste, hit points (as damage taken), team, a
 
 Choices the owner may want to change: the start (20/40/4), sugar and protein per load, faster laying on rich sugar, adults never starving, majors from protein surplus rather than a caste dial (02-spec 6.3 names a dial), jobs by birth order, piles alternating by index.
 
-Bots after three days (`sim/SPIKES.md`): careful 130 to 153 ants, greedy (sugar only) 20, idle 20 to 94. Idle play does not lose on every map: adults never starve and there is no goal yet. Acceptance for the days PR: idle fails the day goal on every seed and careful passes.
+Bots after three days (`sim/SPIKES.md`): careful 130 to 153 ants, greedy (sugar only) 20, idle 20 to 94. Idle play does not lose on every map: adults never starve and there is no goal yet. Days (below) now give idle play a goal it fails.
 
 Foraging two foods needs crews split between trails. Seekers take the newest trail and keep their route, so the careful bot redraws to the scarcer food every 1,500 ticks. The spec's crew plus and minus (02-spec 6.4) is the real answer and is not built.
 
 The page draws the queen and brood as placeholder shapes in the nest view; the HUD shows ants, sugar, protein and the brood by stage. A newborn ant is drawn without interpolation on her first tick. When an ant dies the later ants move down one index, so that tick is drawn without interpolation and the selected ant is let go.
+
+## Days (M1, SIM_VERSION 5, 2026-11-26)
+
+A colony game (`?colony=1`) is played in days of 12,000 ticks (ten minutes; `?day=<ticks>` shortens them for testing, 100 to 100,000). Each day has one goal, shown on a dawn card and on the HUD's goal line. The sim judges it at dusk, the last tick of the day (`colony.js`, section Days; `stepDay` runs after everything else in that tick). Progress counts from dawn, so a day cannot be won with yesterday's work.
+
+| Day | Goal | Target | Why it needs the player |
+| --- | --- | --- | --- |
+| 1 | Loads brought home along a drawn trail | 40 | A load counts only if a trail led the forager out to it (`via` set). Loads found by wandering do not count. |
+| 2 | Cells dug | 40 | Diggers dig only marked cells. |
+| 3 | Loads of both foods, the smaller count | 60 each | Seekers take the newest trail, so both foods need trails to both. |
+| 4 and later | Both foods | 60 + 30 a day | |
+
+- A lost day: the colony keeps what it has, and the next day's goal is eased by a quarter (`target - target/4`).
+- The floor (02-spec 6.9): at every dawn, a colony with fewer than 20 ants or under 10 sugar gets 20 sugar, won or lost.
+- The page stops time at dusk and shows a summary card: the goal and its result, ants, sugar, protein, born and lost that day, and the next goal. "Go on" starts the next dawn. "Restart the day" restores that day's dawn snapshot. The sim raises `EVENT.DUSK`; the stop, the card and the dawn snapshots live in the page (`host.js` `dawns`, `dusk`, `restartDay`), so a room can decide its own rule.
+- Dawn saves are kept in memory: today's, and at a dusk card the finished day's. The next day's save is taken when the player goes on, so orders the page queues on the way to the card are in it. A reload loses them; the IndexedDB save is the next PR.
+- Restarting a day marks the orders given after its dawn save as undone in the order log; orders in the save that had not yet run are queued again.
+- Open: later days ask for more food than a map holds (seed 2026: about 1,060 loads of each food; days 3 to 9 ask for 1,050 of each), so a long campaign ends in lost days. Piles that regrow, or a last day, would fix it; M1 plays three days.
+- The sandbox (`/cinderhill/` without `?colony=1`) has no days. The menu links the two.
+- `bots.mjs` plays the goals: on a digging day the careful bot marks an 8 x 6 nursery beside the chamber at dawn. On 12 seeds, careful wins days 1 to 3 every time and idle loses every day (`sim/SPIKES.md`, Days). `test/days-bots.test.mjs` checks careful on seed 6, the seed with the narrowest day 3, in CI.
+
+Choices the owner may want to change: the three goals and their targets, +30 a day after day 3, easing by a quarter after a loss, the floor rule and its gift, time stopping at dusk (a room could run straight on), the day length, and keeping the colony behind `?colony=1` rather than making it the page's default.
 
 ## The tactical hold (2026-11-26)
 

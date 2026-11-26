@@ -2,7 +2,8 @@
 // numbers the page shows (crews, the "why" for one ant). The sim in sim/ is unchanged and pure; this file is the host.
 import { Sim, JOB, MODE, CMD, EVENT, G, SLOT, MAX_PILES, SURFACE, NEST, MAT, FIELD } from './sim/sim.js';
 import { cellAt } from './sim/grid.js';
-import { START, STAGE } from './sim/colony.js';
+import { START, STAGE, dayState } from './sim/colony.js';
+import { restore, snapshot } from './sim/snapshot.js';
 
 export const TICK_MS = 50;
 export const COUNTS = [500, 2000, 5000];
@@ -11,7 +12,7 @@ export { JOB, MODE, CMD, SLOT, SURFACE, NEST, MAT, FIELD, G, MAX_PILES };
 const NAMES = { [CMD.TRAIL]: 'trail', [CMD.DIG]: 'dig', [CMD.ALARM]: 'alarm', [CMD.RECALL]: 'recall' };
 
 export class Host {
-  constructor(ants = 2000, seed = SEED, { colony = false } = {}) { this.log = []; this.colony = colony; this.reset(ants, seed); }
+  constructor(ants = 2000, seed = SEED, { colony = false, dayTicks } = {}) { this.log = []; this.colony = colony; this.dayTicks = dayTicks; this.reset(ants, seed); }
 
   /** A new colony. Jobs: 17 in 20 forage, 2 dig, 1 guards. Seven in ten foragers start on the surface near the
    *  entrance and their time out is staggered, so the page opens on a busy surface rather than one wave that leaves
@@ -19,7 +20,7 @@ export class Host {
   reset(ants, seed = this.seed ?? SEED) {
     this.seed = seed; this.ants = ants;
     // A colony game (?colony=1): the queen, START's workers in her chamber, sugar and larvae; it grows by births.
-    const sim = (this.sim = this.colony ? new Sim({ seed, ...START, colony: 1, maxAnts: 5000 }) : new Sim({ seed, ants: 0, maxAnts: Math.max(5000, ants) }));
+    const sim = (this.sim = this.colony ? new Sim({ seed, ...START, colony: 1, maxAnts: 5000, ...(this.dayTicks ? { dayTicks: this.dayTicks } : {}) }) : new Sim({ seed, ants: 0, maxAnts: Math.max(5000, ants) }));
     if (this.colony) ants = 0;
     let r = (seed * 2654435761) >>> 0 || 1;
     const rand = n => { r = (Math.imul(r, 1664525) + 1013904223) >>> 0; return (r >>> 8) % n; };
@@ -37,22 +38,60 @@ export class Host {
         break;
       }
     }
-    // Sized for the cap: in a colony game ants are born (new indices) and die (later ones move down).
-    const A = sim.cfg.maxAnts;
+    this.attach();
+    this.acc = 0; this.last = null; this.terrainVersion = 1; this.ticks = 0; this.tickMs = [];
+    // Days (colony.js): the dawn save of each day still open to a restart (today's, and yesterday's until the
+    // player picks at dusk), and the dusk that has just happened, until the page has shown it. A dawn save is
+    // { bytes, log: the order log's length then, delivered }.
+    this.dawns = new Map(); this.dusk = null;
+    if (this.colony) this.saveDawn();
+  }
+
+  /** Buffers for the sim in this.sim. Sized for the cap: in a colony game ants are born (new indices) and die
+   *  (later ones move down). */
+  attach() {
+    const A = this.sim.cfg.maxAnts;
     this.px = new Uint16Array(A); this.py = new Uint16Array(A); this.pl = new Uint8Array(A); this.pn = 0;
     this.snap();
-    this.acc = 0; this.last = null; this.terrainVersion = 1; this.ticks = 0; this.tickMs = [];
-    this.lastStores = 0; this.delivered = 0;
+    this.lastStores = this.sim.g[G.STORES]; this.delivered = 0;
+  }
+
+  /** Keeps today's dawn save. At a dusk it is taken when the player goes on, not at the dusk tick, so orders the
+   *  page queues on the way to the card (an alarm let go) are in it and a restarted day replays them. */
+  saveDawn() { this.dawns.set(this.sim.g[G.DAY], { bytes: snapshot(this.sim), log: this.log.length, delivered: this.delivered }); }
+
+  /** Today's goal and progress (colony.js dayState), or null in the sandbox. */
+  day() { return this.colony ? dayState(this.sim) : null; }
+
+  /** Back to the dawn of `day` (02-spec 6.9: the dawn save is always kept). Orders given since are gone from the
+   *  sim; the log keeps them, marked. Returns false when that dawn is not kept. */
+  restartDay(day) {
+    const save = this.dawns.get(day);
+    if (!save) return false;
+    this.sim = restore(save.bytes);
+    for (const [d] of this.dawns) if (d > day) this.dawns.delete(d);
+    // Orders given after the save are gone; orders in the save still waiting for their tick run again.
+    this.log.forEach((e, k) => { if (k >= save.log) e.state = 'undone'; else if (e.tick >= this.sim.tick) e.state = 'queued'; });
+    this.attach(); this.delivered = save.delivered; this.dusk = null; this.shifted = true; this.terrainVersion++; this.acc = 0; this.last = null;
+    return true;
+  }
+
+  /** The player chose to go on after a dusk: yesterday's dawn is no longer offered. */
+  goOn() {
+    const today = this.sim.g[G.DAY];
+    for (const [d] of this.dawns) if (d < today) this.dawns.delete(d);
+    this.saveDawn(); this.dusk = null;
   }
 
   snap() { const s = this.sim, n = (this.pn = s.n); this.px.set(s.x.subarray(0, n)); this.py.set(s.y.subarray(0, n)); this.pl.set(s.layer.subarray(0, n)); }
 
   /** Steps the sim for the time since the last call (at most 4 ticks a frame). Returns the ticks run. */
   advance(now, paused) {
-    if (this.last === null || paused) { this.last = now; return 0; }
+    if (this.last === null || paused || this.dusk) { this.last = now; return 0; }
     this.acc += Math.min(now - this.last, 250); this.last = now;
     let k = 0;
-    while (this.acc >= TICK_MS && k < 4) { this.step(); this.acc -= TICK_MS; k++; }
+    while (this.acc >= TICK_MS && k < 4 && !this.dusk) { this.step(); this.acc -= TICK_MS; k++; }
+    if (this.dusk) this.acc = 0; // time stops at dusk until the page moves on
     if (this.acc > TICK_MS) this.acc = TICK_MS; // a slow phone drops time rather than spiralling
     return k;
   }
@@ -75,6 +114,11 @@ export class Host {
     for (let k = 0; k < ev.length; k += 3) {
       const type = ev[k];
       if (type === EVENT.DUG) this.terrainVersion++;
+      else if (type === EVENT.DUSK) {
+        // The sim is now at the next dawn: what the page shows on the dusk card (its save is taken at goOn).
+        const s = this.sim, d = ev[k + 1];
+        this.dusk = { day: d, won: !!ev[k + 2], goal: s.lastDusk, ants: s.n, sugar: s.g[G.SUGAR], protein: s.g[G.PROTEIN], born: s.g[G.BORN], lost: s.g[G.BROOD_LOST], next: dayState(s) };
+      }
       else if (type === EVENT.REJECTED || type === EVENT.LATE) {
         const e = this.log.find(o => o.id === ev[k + 2]);
         if (e) e.state = type === EVENT.REJECTED ? 'rejected' : 'late';
