@@ -19,6 +19,9 @@ export const LEAVE_TIME = 0.8;
 export const NEXT_TIME = 1.6;
 export const MEMORY_TIME = 2.5;
 export const LAUGH_TRAVEL = 7;
+export const SWING_TIME = 4.5;
+export const SNEEZE_AT = 0.5;
+export const ENCORE_LIVES = 3;
 const EPSILON = 1e-9;
 
 // Targets with a name. Numbers left out are 0.
@@ -34,7 +37,13 @@ export const FACES = Object.freeze({
   cat: { e: 0.9, w: -0.3, n: -0.6, m: 0.35 }, dog: { e: -0.9, w: 0.4, o: 0.3, n: 0.5 },
   bunny: { e: 1, w: -0.5, l: 0.35, o: -0.3 }, pig: { n: 0.8, e: 0.4, w: 0.65, l: -0.3 },
   owl: { l: 0.9, b: 0.6, w: 0.3, n: -0.55, e: 0.45 }, mouse: { e: 0.3, w: -0.6, n: -0.4, o: 0.35 },
+  // 2026-11-26: four more sitters.
+  frog: { w: 0.85, o: 0.5, l: 0.65, n: -0.8 }, grumpy: { m: -0.85, b: -0.7, l: -0.45, w: 0.25 },
+  baby: { w: 0.55, o: -0.35, l: 0.55, n: -0.65, e: -0.35 }, goblin: { e: 0.85, n: 0.75, m: 0.55, b: -0.6, w: -0.3 },
 });
+// The daily picks from the sitters it had when it began, so a day's five never change under a saved best.
+const DAILY_NAMES = Object.freeze(['wide', 'long', 'gasp', 'hush', 'grin', 'pinch', 'yawn', 'squash', 'surprised', 'angry', 'happy',
+  'sour', 'sleepy', 'startled', 'clown', 'snooty', 'smug', 'cat', 'dog', 'bunny', 'pig', 'owl', 'mouse']);
 
 // One new thing per rung. `unlock` opens a part; `mod` changes what the eye or hand must do.
 //   memory  the portrait shows for MEMORY_TIME, then turns face down
@@ -42,6 +51,8 @@ export const FACES = Object.freeze({
 //   mirror  every drag moves the other way
 //   spoon   the portrait is seen in a spoon: upside down and squashed
 //   twins   two faces, two portraits; each drag works on the face it lands on
+//   sneeze  halfway through a good hold the sitter sneezes, and one part of your face jolts: set it again
+//   swing   the sitter's mood swings between two faces every SWING_TIME seconds; either one counts while it shows
 //   laugh   no portrait: pull faces until the sitter laughs
 export const RUNGS = Object.freeze([
   { id: 'stretch', unlock: ['w'], pool: ['wide', 'long'] },
@@ -57,6 +68,8 @@ export const RUNGS = Object.freeze([
   { id: 'mirror', mod: 'mirror', pool: 'all' },
   { id: 'spoon', mod: 'spoon', pool: 'all' },
   { id: 'twins', mod: 'twins', pool: 'simple' },
+  { id: 'sneeze', mod: 'sneeze', pool: 'all', patience: 11 },
+  { id: 'swing', mod: 'swing', pool: 'simple', patience: 11 },
   { id: 'quick', count: 4, patience: 5.5, pool: 'simple' },
   { id: 'laugh', mod: 'laugh', count: 1, patience: 15, pool: [] },
 ].map((rung, i) => Object.freeze({
@@ -65,6 +78,22 @@ export const RUNGS = Object.freeze([
   ...rung,
 })));
 export const DAILY_MODS = Object.freeze([null, 'memory', 'moving', 'spoon', 'mirror']);
+// Encore (2026-11-26): after the ladder, sitters keep coming with every part open and a twist each time, a little
+// stricter and a little less patient, until ENCORE_LIVES of them have left. ENCORE_RUNGS is far more than anyone plays.
+const ENCORE_MODS = [null, 'memory', 'moving', 'mirror', 'spoon', 'sneeze', 'swing', 'twins'];
+const ENCORE_RUNGS = 60;
+export function encoreRungs(seed) {
+  const random = randomGenerator((seed ^ 0xe7c02e) >>> 0);
+  let last = null;
+  return Array.from({ length: ENCORE_RUNGS }, (_, i) => {
+    let mod = ENCORE_MODS[Math.floor(random() * ENCORE_MODS.length)];
+    if (mod === last) mod = ENCORE_MODS[(ENCORE_MODS.indexOf(mod) + 1) % ENCORE_MODS.length];
+    last = mod;
+    const k = Math.min(1, i / 20);
+    return Object.freeze({ id: 'encore', n: i + 1, unlock: i === 0 ? [...PARAMS] : [], mod, pool: mod === 'twins' ? 'simple' : 'all', count: 3,
+      tol: +(0.24 - 0.09 * k).toFixed(3), hold: 0.55, patience: +(11 - 4 * k).toFixed(2) });
+  });
+}
 
 const clamp1 = n => Math.max(-1, Math.min(1, Number.isFinite(n) ? n : 0));
 export const neutral = () => ({ w: 0, o: 0, b: 0, m: 0, l: 0, n: 0, e: 0 });
@@ -115,6 +144,16 @@ function targetsFor(rung, open, random) {
     if (pool.length > 1 && name === last) name = pool[(pool.indexOf(name) + 1) % pool.length];
     last = name;
     const target = { name, mod: rung.mod, p: makeTarget(name, random, open), phase: random() * Math.PI * 2 };
+    if (rung.mod === 'swing') {
+      let other = pool[Math.floor(random() * pool.length)];
+      if (other === name && pool.length > 1) other = pool[(pool.indexOf(other) + 1) % pool.length];
+      target.nameAlt = other; target.pAlt = makeTarget(other, random, open);
+    }
+    if (rung.mod === 'sneeze') {
+      // The jolt: one of the open numbers knocked half the way across.
+      const keys = PARAMS.filter(k => open.has(k));
+      target.kick = { [keys[Math.floor(random() * keys.length)]]: random() < 0.5 ? -0.5 : 0.5 };
+    }
     if (rung.mod === 'twins') {
       let other = pool[Math.floor(random() * pool.length)];
       if (other === name && pool.length > 1) other = pool[(pool.indexOf(other) + 1) % pool.length];
@@ -127,7 +166,7 @@ function targetsFor(rung, open, random) {
 
 export function dailyRungs(day) {
   const random = randomGenerator(daySeed(day) ^ 0x51f15e);
-  const names = Object.keys(FACES).filter(n => Object.keys(FACES[n]).length >= 2);
+  const names = DAILY_NAMES.filter(n => Object.keys(FACES[n]).length >= 2);
   const order = DAILY_MODS.map(() => names[Math.floor(random() * names.length)]);
   return [Object.freeze({ id: 'daily', unlock: [...PARAMS], mod: null, pool: order, count: DAILY_MODS.length,
     tol: 0.22, hold: 0.55, patience: 12, mods: DAILY_MODS })];
@@ -147,8 +186,9 @@ function enterRung(state) {
 
 // mode 'booth' climbs RUNGS from `from`; mode 'daily' plays the day's five sitters.
 // wait: the first sitter waits for the first touch (the page's cold open): no clock, no patience until then.
+// mode 'encore' is the endless run after the ladder.
 export function createBooth({ seed = 1, mode = 'booth', day = '2026-01-01', from = 0, mutate = null, wait = false } = {}) {
-  const rungs = mode === 'daily' ? dailyRungs(day) : RUNGS;
+  const rungs = mode === 'daily' ? dailyRungs(day) : mode === 'encore' ? encoreRungs(seed >>> 0) : RUNGS;
   const base = {
     mode, day: mode === 'daily' ? day : null, seed: (mode === 'daily' ? daySeed(day) : Number(seed)) >>> 0, rungs, ri: Math.max(0, Math.min(rungs.length - 1, from | 0)),
     score: 0, streak: 0, bestStreak: 0, shots: [], missed: 0, results: [], elapsed: 0,
@@ -160,6 +200,7 @@ export function createBooth({ seed = 1, mode = 'booth', day = '2026-01-01', from
 // The target the sitter is showing now (a drifting face moves with the pose's age).
 export function targetNow(state, which = 0) {
   const t = state.targets[Math.min(state.index, state.targets.length - 1)];
+  if (t.mod === 'swing') return swingSide(state) ? t.pAlt : t.p;
   const p = which === 1 ? t.p2 : t.p;
   if (t.mod !== 'moving') return p;
   const out = { ...p };
@@ -167,6 +208,9 @@ export function targetNow(state, which = 0) {
   keys.forEach((k, i) => { out[k] = clamp1(p[k] + 0.22 * Math.sin(state.age * Math.PI * 2 / 5 + t.phase + i * 2.1)); });
   return out;
 }
+
+// Which mood a swinging sitter shows: 0 the first, 1 the other.
+export function swingSide(state) { return Math.floor((state.age + EPSILON) / SWING_TIME) % 2; }
 
 export function portraitVisible(state) {
   const t = state.targets[Math.min(state.index, state.targets.length - 1)];
@@ -225,7 +269,7 @@ function lockAndClamp(p, open) {
 }
 
 function nextSitter(state) {
-  const next = { ...state, held: 0, qsum: 0, age: 0, phaseTime: 0, laugh: 0, faces: state.faces.map(neutral) };
+  const next = { ...state, held: 0, qsum: 0, age: 0, phaseTime: 0, laugh: 0, sneezed: false, faces: state.faces.map(neutral) };
   // A finger still down keeps working from the fresh face.
   if (next.grab) next.grab = { ...next.grab, rebase: true };
   if (state.index + 1 < state.targets.length) return { ...next, index: state.index + 1, phase: 'play' };
@@ -242,7 +286,13 @@ export function stepBooth(state, input = {}, dt = DT) {
   if (state.phase === 'photo' || state.phase === 'leave') {
     next.phaseTime += dt;
     if (!input.active) next.grab = null;
-    if (next.phaseTime + EPSILON >= (state.phase === 'photo' ? PHOTO_TIME : LEAVE_TIME)) next = nextSitter(next);
+    if (next.phaseTime + EPSILON >= (state.phase === 'photo' ? PHOTO_TIME : LEAVE_TIME)) {
+      if (state.mode === 'encore' && state.phase === 'leave' && state.missed >= ENCORE_LIVES) {
+        const result = { rung: state.rung.id, photos: state.rungPhotos, of: state.index + 1, score: state.rungScore };
+        return { ...next, phase: 'done', grab: null, results: [...state.results, result] };
+      }
+      next = nextSitter(next);
+    }
     return next;
   }
   if (state.phase === 'next') {
@@ -287,6 +337,14 @@ export function stepBooth(state, input = {}, dt = DT) {
   } else {
     const err = errorOf(next), tol = tolOf(next);
     if (err <= tol + EPSILON) { next.held += dt; next.qsum += (1 - err / tol) * dt; } else { next.held = 0; next.qsum = 0; }
+    if (target.mod === 'sneeze' && !state.sneezed && next.held + EPSILON >= state.rung.hold * SNEEZE_AT) {
+      // Achoo: the face jolts, the hold starts over, and a finger still down works on from the jolted face.
+      const face = { ...next.faces[0] };
+      for (const [k, v] of Object.entries(target.kick)) face[k] = clamp1(face[k] + (Math.abs(face[k] + v) > 1 ? -v : v));
+      next.faces = [lockAndClamp(face, state.open), ...next.faces.slice(1)];
+      next.sneezed = true; next.sneezeAge = next.age; next.held = 0; next.qsum = 0;
+      if (next.grab) next.grab = { ...next.grab, rebase: true };
+    }
     if (next.held + EPSILON >= state.rung.hold) return snap(next, next.held > 0 ? next.qsum / next.held : 0);
   }
   if (next.age + EPSILON >= state.rung.patience) {
@@ -311,7 +369,7 @@ function snap(state, quality) {
   const streak = quick ? state.streak + 1 : 0;
   const t = state.targets[state.index];
   const shot = { rung: state.rung.id, index: state.index, name: t.name, mod: t.mod, points, quality: +quality.toFixed(3), age: +state.age.toFixed(3),
-    faces: state.faces.map(f => ({ ...f })), target: { ...t.p }, ...(t.p2 ? { target2: { ...t.p2 } } : {}) };
+    faces: state.faces.map(f => ({ ...f })), target: { ...(t.mod === 'swing' ? targetNow(state) : t.p) }, ...(t.p2 ? { target2: { ...t.p2 } } : {}) };
   return { ...state, phase: 'photo', phaseTime: 0, score: state.score + points, rungScore: state.rungScore + points, rungPhotos: state.rungPhotos + 1,
     streak, bestStreak: Math.max(state.bestStreak, streak), shots: [...state.shots, shot] };
 }

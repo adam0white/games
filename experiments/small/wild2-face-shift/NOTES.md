@@ -176,3 +176,23 @@ Opened from `/small/` (`?from=small`), the page shows "‹ Small games" ("‹ K�
 - The kit phone entry (`kit/check/lab-pages.mjs`, this game's block only) is now `startsOnBoard`, with the hint timed from the board. Both pass on both engines.
 
 **Not verified.** A real phone. Whether a first-time player reads the strip or simply drags. Firefox on Android, which is what Adam uses; the checks run WebKit and Chromium only.
+
+## 2026-11-26 — variety: sitters with looks, sneeze and mood-swing rungs, an endless encore
+
+**Why.** Adam (2026-11-24): "face shift but improve as it needs more variety and gameplay". Every sitter was the same blob in one of four colours, and the ladder ended at the laugh.
+
+**What changed (player-visible).**
+- **Each sitter has a look** (drawing only; the rules never see it): a bowler, beanie, cap, top hat, nightcap or beret; curls, a bun, a bob, spikes, clown puffs; round glasses or a monocle; a moustache, a bow, a flower; whiskers, frog spots, a dog's eye patch, a pig's snout, stubble, warts; and animal skins. Your face wears the sitter's look while you copy it, from the first sitter on. Nothing covers a part you must read: glasses are rims, hats and hair sit above the highest brow, whiskers stay off the mouth. The strip and the end card's photos wear them too.
+- **Four new sitters**: Frog, Grumpy, Baby, Goblin (from the memory rung on). The daily picks from the 23 sitters it had, so a day's five never change: checked equal to main for 400 days.
+- **Two new rungs** before Quick (the ladder is 17 rungs): *Sneeze* — halfway through a good hold the sitter winds up ("ah… AH…") and sneezes; one part of your face jolts and the hold starts over; the jolted part is marked at once. *Mood swings* — the sitter swings between two faces every 4.5 s; the other mood peeks out behind the portrait, a small ring counts down to the swing, either mood counts while it shows.
+- **Encore**: after the ladder, the end card offers an endless run: every part open, a twist on every rung (memory, moving, mirror, spoon, sneeze, swing, twins or none), a little stricter and less patient each rung, three hearts; it ends when three sitters have left. The menu offers it after one booth run. Best encore score is kept as `encore` in `wild2-face-shift:booth` (added only once there is one; old saves load unchanged). Recorded as `rec.start({mode:'encore', seed})`, ended `won` with summary `mode: 'encore'`.
+- **A drawing bug fixed**: since the booth was added, `face()` read its options from the wrong argument, so the pupils following the finger, the rubber bulge of a pulled part and the laugh blush never showed in the booth. They do now.
+- Haptics: a short buzz on a photo, a longer one on a sneeze, a pattern when a sitter leaves (`navigator.vibrate`, off with sound off or reduced motion).
+- New recorded event: `sneeze` (`{rung}`).
+
+**Verified.**
+- `bots.mjs`: careful 100% on all 17 rungs; clumsy photo rate sneeze 79%, swing 90.8%, quick 81% (was 86.9% at rung 14 of 15, now rung 16 of 17 with a stricter tolerance); no adjacent drop over 15 points; first photo ≤1.73 s. New examples: a held match makes the sitter sneeze before the photo, the jolt breaks the match, set again the photo comes with no second sneeze; a swinging sitter alternates moods; an idle encore ends after exactly three sitters leave; an encore is repeatable by seed. Clumsy bot in the encore: median 23 photos, 169 s. The bot reacts to a swing or a sneeze at once and re-aims only the jolted part, because the page marks it; whether people do is not known. Mutations: removing the `sneezed` flag fails "a held match makes the sitter sneeze"; never ending the encore fails "an idle encore ends".
+- `check.mjs --booth` (WebKit iPhone 13 full ladder, Chromium last three rungs): 34 photos on WebKit; sneeze rung sneezes then photographs with real drags on both engines; the end card offers Encore; the encore opens every part and takes photos; the menu then offers Encore. Cold-open block unchanged and passing. `phone.mjs small/wild2-face-shift` passes on both engines.
+- Screenshots looked at: cold open, every new look on several rungs, sneeze, swing, twins, encore, end card.
+
+**Not verified.** A real phone; Firefox on Android; how the sneeze and the swing feel to a person; whether three hearts is the right encore length; the haptics on a device.
