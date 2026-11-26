@@ -139,6 +139,19 @@ A colony game (`?colony=1`) is played in days of 12,000 ticks (ten minutes; `?da
 
 Choices the owner may want to change: the three goals and their targets, +30 a day after day 3, easing by a quarter after a loss, the floor rule and its gift, time stopping at dusk (a room could run straight on), the day length, and keeping the colony behind `?colony=1` rather than making it the page's default.
 
+## The lab record: a full replay (2026-11-26)
+
+Every game sends its whole replay to the game lab, so a session can be played again in Node and read minute by minute (`labrec.js`, using only kit/lab.js's `start`, `event`, `end` and its flush when the page is put away).
+
+- Start: format `cinderhill-replay/1`, a chain id and part, mode, look, ants, seed, `SIM_VERSION`, snapshot format, the day length, the viewport.
+- `log` events: the replay stream, in order: every order exactly as `host.order` got it with its tick, go-on after a dusk, and a day restarted. Batched to about 3 KB an event.
+- `sample` every 30 s of play: tick and the sim's total hash, ants by caste, sugar, protein, brood by stage, loads home, frames a second (p50 and the p95 slow frame), ms held, the camera. The log up to a sample is sent before it, so the hash checks the stream.
+- `cam` (settled camera, at most one each 5 s), `hold` with its length, `hide` and `show`, `error` (10 at most), `dusk` with the goal's result, `dawn`, `restart`.
+- Summary: totals, orders by type, holds, the longest play with no order, the final tick and hash.
+- The kit keeps a run to 300 events and 96 KB. Near 270 events or 80 KB the part ends as `continued` and the next part starts where it stopped; parts share the chain id. A 10-minute bot game is about 6 KB and 57 events.
+
+`spikes/replay-lab.mjs <record.json> [...]` makes the game again with `host.js`, replays the stream, checks every hash (part starts, samples, the final one) and writes a report: deliveries by food per minute, working and idle ants, each trail (ants on it, trips, time to the first delivery, how it ended), digs and what they opened, alarms and recalls with their effect, brood and castes, deaths, stalls of 60 s with nothing happening, days and restarts, and the page's frame rate, holds and errors. Trips are not attributed on ticks where an ant died. A record from another sim version will not match; the report says so. `test/labrec.test.mjs` plays a bot game through a Host as the page does, checks the kit's limits, replays it, and shows that one changed order is caught at the next sample.
+
 ## The tactical hold (2026-11-26)
 
 The Hold button (Durdur in Turkish) stops time on the page: the host stops advancing ticks, so the sim, scent and ants stand still. Orders still work while held. A trail or dig drawn while held is queued at the current tick (the page state says queued); the first tick after Go applies it. A blue frame marks the held screen. The hold lives in the page (`painter.js` `held`, `host.advance(now, ... || held)`), not in the sim, so it changes no hash and needs nothing from the room. In a shared room a hold would have to be a room rule (who may stop time for everyone); that is open. Trail, dig and Recall all go through the same `order()` path to `host.order`; the Recall button shows its new state only once Go applies it (it follows the sim). The `cinderhill orders` phone line checks that no tick runs while held, that a trail stroke queues, and that Go applies it; it fails when the hold does not stop time. Dig and Recall while held are not checked on their own. The kit's `pause.js` is the full pause (pause card, page hidden) and Cinderhill uses it; a hold that takes orders has one user, so it stays in the game until a second game needs it (kit rule 1).
