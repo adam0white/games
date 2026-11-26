@@ -242,3 +242,20 @@ No assertion was loosened.
 ## 2026-11-25 — the way back to the small games home
 
 Opened from `/small/` (`?from=small`), the page shows "‹ Small games" ("‹ Küçük oyunlar" in Turkish) on the pause card and beside Next plate when a plate is won, through `kit/home.js`; a finished plate is reported to the home as a win. The recording notice, its Privacy link and the switch are now in the page's language (`lab('night-podwire', { lang })`). `check.mjs` asserts the two links in Turkish. Nothing else changed: same keys, same records.
+
+## 2026-11-26 — feel: the burst lands
+
+Page only (`main.js`); `sim.js`, the plates, pars and saves are unchanged, so the bot claims stand as they were.
+
+- **Hit-stop.** The wire's clock stops for 60 ms when a pod bursts (110 ms on the last pod), so the split reads as an impact.
+- **Slow motion on the last pod.** For 0.5 s after the final pod opens, the wire runs at 0.3× while the seeds fly.
+- **Shake.** The plate jolts a few units and settles (stronger on the last pod).
+- **Burst ring.** A ring with eight short rays opens from the husk's middle and fades in 0.5 s (bigger on the last pod); rust on herbarium, pale gold on blueprint.
+- **Haptics** through `navigator.vibrate` (Android; iOS Safari ignores it): a tap when the finger takes the wire, a tick for each 20 units of pull (the wire creaks), a release thump scaled by depth, a pulse per pod and a pattern on the last one. Off with the sound switch.
+- Reduced motion turns off hit-stop, slow motion, shake, rings and vibration.
+
+Checks: `check.mjs` PASS on WebKit iPhone 13 and Chromium Pixel 7 (page work p95 0.2 ms, max 4.8 ms on Chromium at 390×844). `kit/check/phone.mjs small/night-podwire` ok on both. A Pixel 7 probe pulled the centre of plate I and captured the ring on the husk 90 ms after the burst, with no page errors.
+
+First minute (Pixel 7, empty storage, probe): the plate is playable at 0.04 s with zero taps (no start card); one drag; first plate won about 2.2 s after load. Same as before this pass; the pass changes how the win feels, not how fast it comes.
+
+Not verified: vibration on a real phone; whether the shake and slow motion feel good or slow to a person.
