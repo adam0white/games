@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#ffd9b8">
+<title>Sky Kitchen</title>
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="flash"></div>
+
+<!-- play heads-up: coins, star and day; the order ticket bottom left; the step banner -->
+<div id="hud">
+  <div id="coins" class="pill"><i class="coin"></i><b id="coinText">0</b></div>
+  <div id="rank" class="pill"><span id="rankStars">☆</span><span id="dayText"></span></div>
+</div>
+<button id="pause" aria-label="Pause" data-i18n-aria="pause"></button>
+<div id="banner"></div>
+<div id="ticket"><div id="ticketHead"></div><div id="ticketRows"></div><div id="patience"><i></i></div></div>
+<div id="gauge"><div id="gaugeBand"></div><div id="gaugeNeedle"></div><div id="gaugeLabel"></div></div>
+<div id="coach"><div id="coachText"></div></div>
+<div id="finger"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M26 6c3 0 5 2 5 5v17l3-1c2-1 5 0 6 2l1 1c2-1 5 0 6 2l1 1c3-1 6 1 6 4v11c0 8-6 14-14 14h-5c-5 0-9-3-11-7l-7-13c-1-2 0-5 3-6 2-1 4 0 5 1l2 3V11c0-3 2-5 5-5z" fill="#fff" stroke="#2b1d14" stroke-width="3" stroke-linejoin="round"/></svg></div>
+<div id="float"></div>
+
+<div id="menu" class="screen on"><div class="card">
+  <h1>Sky Kitchen</h1>
+  <p class="sub" data-i18n="tagline">Catch what falls, cook it, serve it.</p>
+  <p><button id="play" class="main" data-i18n="play">Play</button></p>
+  <p><button id="toShop" data-i18n="restaurant">Restaurant</button></p>
+  <p id="menuLine" class="small"></p>
+  <p class="row"><button id="look" class="small"></button><button id="lang" class="small">EN / TR</button></p>
+  <p class="row"><button id="sound1" class="small">Sound: on</button><button id="music1" class="small">Music: on</button></p>
+  <p class="desk small" data-i18n="desk">Mouse or arrow keys move the tray. Space for the stove and the microwave.</p>
+</div></div>
+
+<div id="paused" class="screen"><div class="card">
+  <h2 data-i18n="paused">Paused</h2>
+  <p><button id="resume" class="main" data-i18n="resume">Keep cooking</button></p>
+  <p><button id="quit" data-i18n="toMenu">Menu</button></p>
+  <p class="small" data-i18n="quitNote">Menu ends this day. Coins you have taken stay.</p>
+  <p class="row"><button id="sound2" class="small">Sound: on</button><button id="music2" class="small">Music: on</button></p>
+</div></div>
+
+<div id="extra" class="screen"><div class="card">
+  <div id="extraPic" class="pic"></div>
+  <h2 data-i18n="extraTitle">Oops, an extra!</h2>
+  <p id="extraLine" class="sub"></p>
+  <p><button id="restart" class="main" data-i18n="restartCatch">Catch again</button></p>
+  <p><button id="payOn"></button></p>
+</div></div>
+
+<div id="dayEnd" class="screen"><div class="card">
+  <h2 id="dayTitle"></h2>
+  <div id="dayStars" class="bigstars"></div>
+  <table class="ledger" id="ledger"></table>
+  <p id="dayLine" class="sub"></p>
+  <p><button id="toShop2" class="main" data-i18n="restaurant">Restaurant</button></p>
+  <p><button id="nextDay" data-i18n="nextDay">Next day</button><button id="dayMenu" data-i18n="toMenu">Menu</button></p>
+</div></div>
+
+<div id="shop" class="screen"><div class="card wide">
+  <div class="shopTop"><h2 data-i18n="restaurant">Restaurant</h2><div class="pill"><i class="coin"></i><b id="shopCoins">0</b></div></div>
+  <div id="starBox"></div>
+  <div id="builds"></div>
+  <p><button id="shopGo" class="main" data-i18n="open">Open for the day</button><button id="shopBack" data-i18n="back">Back</button></p>
+</div></div>
+
+<script type="module" src="./main.js"></script>
+<script src="/notes/button.js" defer></script>
+</body>
+</html>
