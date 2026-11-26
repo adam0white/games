@@ -129,3 +129,46 @@ test('a record is queued before it is sent, so a page closed before the answer k
   await settle(() => JSON.parse(localStorage.getItem('hf-lab-kit-queue') ?? '[]').length === 2);
   assert.equal(JSON.parse(localStorage.getItem('hf-lab-kit-queue')).length, 2);
 });
+
+test('a queued record from another game is not sent once recording is off for that game', async () => {
+  page();
+  const { lab } = await import(`../experiments/kit/lab.js?${Math.random()}`);
+  const down = await server(() => ['throw']);
+  const a = lab('game-a', { fetch: down.fetch });
+  a.notice(document.createElement('div')); a.start({}); a.end('left', {});
+  await settle(() => JSON.parse(localStorage.getItem('hf-lab-kit-queue') ?? '[]').length === 2);
+  // The player now sends a privacy signal and has not ticked game-a; game-b is ticked.
+  navigator.globalPrivacyControl = true;
+  localStorage.setItem('hf-lab-privacy-override:game-b', '1');
+  const up = await server(() => [200]);
+  const b = lab('game-b', { fetch: up.fetch });
+  b.notice(document.createElement('div'));
+  await settle(() => localStorage.getItem('hf-lab-kit-queue') === null);
+  assert.equal(up.seen.filter(r => r.game === 'game-a').length, 0, 'game-a records never sent');
+  assert.equal(localStorage.getItem('hf-lab-kit-queue'), null, 'and dropped from the queue');
+
+  // Same for a game whose events were switched off.
+  navigator.globalPrivacyControl = false;
+  const c = lab('game-c', { fetch: down.fetch });
+  c.notice(document.createElement('div')); c.start({}); c.end('left', {});
+  await settle(() => JSON.parse(localStorage.getItem('hf-lab-kit-queue') ?? '[]').length === 2);
+  localStorage.setItem('hf-lab-events-off:game-c', '1');
+  const b2 = lab('game-b', { fetch: up.fetch });
+  b2.notice(document.createElement('div'));
+  await settle(() => localStorage.getItem('hf-lab-kit-queue') === null);
+  assert.equal(up.seen.filter(r => r.game === 'game-c').length, 0, 'game-c records never sent');
+});
+
+test('an expired queued record is removed without being sent', async () => {
+  page();
+  const { lab, QUEUE_DAYS } = await import(`../experiments/kit/lab.js?${Math.random()}`);
+  const old = { r: { v: 2, id: 'a'.repeat(32), player: 'b'.repeat(32), session: 'c'.repeat(32), runId: 'd'.repeat(32), game: 'game-a', kind: 'run', at: Date.now() - (QUEUE_DAYS + 1) * 86400000, data: {} }, n: 0 };
+  const worn = { r: { ...old.r, id: 'e'.repeat(32), at: Date.now() }, n: 99 };
+  localStorage.setItem('hf-lab-kit-queue', JSON.stringify([old, worn]));
+  const up = await server(() => [200]);
+  const a = lab('game-a', { fetch: up.fetch });
+  a.notice(document.createElement('div'));
+  await settle(() => localStorage.getItem('hf-lab-kit-queue') === null);
+  await settle();
+  assert.equal(up.seen.length, 0, 'nothing expired or worn out was sent');
+});

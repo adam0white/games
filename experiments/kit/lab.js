@@ -90,11 +90,17 @@ export function lab(game, options = {}) {
   }
 
   // The queue: records the lab did not store, oldest first, shared by every kit page on this origin.
-  const readQueue = () => { try { const q = JSON.parse(get('localStorage', QUEUE) ?? '[]'); return Array.isArray(q) ? q : []; } catch { return []; } };
+  // Expired or worn-out items are dropped on every read, so none is sent before it is removed.
+  const fresh = x => x && x.r && Number.isFinite(x.r.at) && Date.now() - x.r.at < QUEUE_DAYS * 86400000 && (x.n ?? 0) < QUEUE_TRIES;
+  const readQueue = () => { try { const q = JSON.parse(get('localStorage', QUEUE) ?? '[]'); return Array.isArray(q) ? q.filter(fresh) : []; } catch { return []; } };
+  // A queued record may come from another game. It is sent only while recording is on for that game now:
+  // not switched off, its events not switched off, and under a privacy signal only with that game's own tick.
+  const allowedFor = g => typeof g === 'string' && /^[a-z0-9-]{1,40}$/.test(g) && get('localStorage', OFF) !== '1' &&
+    get('localStorage', `hf-lab-events-off:${g}`) !== '1' && (!signal() || get('localStorage', `hf-lab-privacy-override:${g}`) === '1');
   const writeQueue = q => {
-    const fresh = q.filter(x => x && x.r && Date.now() - x.r.at < QUEUE_DAYS * 86400000 && (x.n ?? 0) < QUEUE_TRIES);
-    while (fresh.length > QUEUE_MAX || (fresh.length && JSON.stringify(fresh).length > QUEUE_BYTES)) fresh.shift();
-    set('localStorage', QUEUE, fresh.length ? JSON.stringify(fresh) : null);
+    const kept = q.filter(x => fresh(x) && allowedFor(x.r.game));
+    while (kept.length > QUEUE_MAX || (kept.length && JSON.stringify(kept).length > QUEUE_BYTES)) kept.shift();
+    set('localStorage', QUEUE, kept.length ? JSON.stringify(kept) : null);
   };
   const enqueue = r => { if (JSON.stringify(r).length > QUEUE_BYTES / 4) return; const q = readQueue(); if (!q.some(x => x.r?.id === r.id)) q.push({ r, n: 0 }); writeQueue(q); };
   let draining = false;
@@ -105,7 +111,10 @@ export function lab(game, options = {}) {
       for (const item of readQueue()) {
         if (!on()) break;
         if (inFlight.has(item.r?.id)) continue;
-        const answer = await post(item.r);
+        if (!fresh(item) || !allowedFor(item.r.game)) { dequeue(item.r.id); continue; }
+        // The privacy flag says what holds now, not what held when the record was made.
+        const out = { ...item.r }; delete out.privacyOverride; if (signal()) out.privacyOverride = true;
+        const answer = await post(out);
         const q = readQueue(), i = q.findIndex(x => x.r?.id === item.r.id);
         if (i < 0) continue;
         if (answer === 'ok' || answer === 'skip') q.splice(i, 1); else q[i].n = (q[i].n ?? 0) + 1;
