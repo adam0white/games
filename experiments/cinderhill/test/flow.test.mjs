@@ -82,8 +82,8 @@ for (const seed of [1, 2, 3, 4, 5, 6]) {
 
 test('after terrain changes, the updated fields equal fresh searches', () => {
   const s = tinyMap(9);
-  const goals = [[SLOT.ALARM, cellAt(s.L, NEST, 7, 4)], [SLOT.TRAIL0, cellAt(s.L, SURFACE, 11, 9)], [SLOT.TRAIL0 + 1, cellAt(s.L, SURFACE, 0, 0)]];
-  for (const [slot, c] of goals) { s.mat[c] = MAT.OPEN; setGoal(s, slot, GOAL.TRAIL, c); }
+  const goals = [[SLOT.ALARM, cellAt(s.L, NEST, 7, 4)], [SLOT.FOOD0, cellAt(s.L, SURFACE, 11, 9)], [SLOT.FOOD0 + 1, cellAt(s.L, SURFACE, 0, 0)]];
+  for (const [slot, c] of goals) { s.mat[c] = MAT.OPEN; setGoal(s, slot, GOAL.FOOD, c); }
   s.rebuildFields();
   let r = 99, rebuilt = 0;
   for (let k = 0; k < 200; k++) {

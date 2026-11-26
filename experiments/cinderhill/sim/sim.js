@@ -13,12 +13,12 @@
 import { ANGLES, COS, SIN, angleOf, turnTo } from './math.js';
 import { HARDNESS, MAT, NEST, SUB, SURFACE, baseOf, cellAt, cellXY, heightOf, makeLayout, widthOf } from './grid.js';
 import { STREAM, STREAMS, below, seedStreams } from './rng.js';
-import { G, GOAL, INF, MAX_GOALS, SLOT, distAt, dropGoal, makeFlow, nextCell, rebuild, rebuildDirty, setGoal, terrainChanged } from './flow.js';
+import { G, GOAL, INF, MAX_GOALS, PATH_MAX, SLOT, TRAIL_OFF, backCell, backDist, distAt, dropGoal, isTrailSlot, makeFlow, nextCell, rebuild, rebuildDirty, setGoal, terrainChanged } from './flow.js';
 import { FIELD, FIELDS, deposit, makeScent, smell, stepScent } from './scent.js';
 import { SUBSYSTEMS, finish, hashArray, hashInt } from './hash.js';
 import { generate } from './world.js';
 
-export const SIM_VERSION = 1;
+export const SIM_VERSION = 2; // 2: trails keep their drawn shape (a path per trail, `via` per ant)
 export const TICK_HZ = 20;
 export { G, GOAL, SLOT, INF, FIELD, MAT, SURFACE, NEST, SUB, SUBSYSTEMS };
 
@@ -44,7 +44,8 @@ const SENSE_AT = 2 * SUB, SENSE_SIDE = 28, SENSE_MIN = 2000;
 const TRAIL_LAY = 60000, TRAIL_STROKE = 400000, FOOD_EMIT = 200000, ALARM_EMIT = 600000, ALARM_FADE = 5000;
 const FAR = 150; // a seeking forager this many steps from home goes back
 const STALL_KICK = 50;
-const SEEK_GIVE_UP = 1200; // a forager that finds nothing in a minute goes home // ticks without progress before an ant turns at random
+const SEEK_GIVE_UP = 1200; // a forager that finds nothing in a minute goes home
+const BRIDGE_MARGIN = 12; // a stroke blocked by a closed cell is routed around inside this many cells of the gap first
 
 export class Sim {
   constructor(options = {}) {
@@ -73,8 +74,12 @@ export class Sim {
     this.stall = new Uint16Array(A); // ticks without progress
     this.since = new Uint16Array(A); // ticks in the current mode (saturates)
     this.lastCell = new Int32Array(A);
+    this.via = new Int8Array(A); // trail slot that led this forager out (her route), or -1
     // Spatial hash (rebuilt every tick from positions; not state).
     this.head = new Int32Array(n); this.nextAnt = new Int32Array(A);
+    // Scratch for building a trail's path (not state).
+    this.pathAt = new Int32Array(L.nestBase).fill(-1); this.seen = new Int32Array(L.nestBase); this.prev = new Int32Array(L.nestBase);
+    this.seenMark = 0; this.pathBuf = new Int32Array(PATH_MAX);
     this.queue = []; // pending commands, each an Int32Array [tick, seat, id, type, ...payload], sorted
     this.events = []; // [type, a, b] triples not yet drained
     this.maxStall = 0; // a counter for tests and bots; not state
@@ -100,7 +105,7 @@ export class Sim {
     this.x[i] = (h.x + below(r, A, h.w)) * SUB + 128;
     this.y[i] = (h.y + below(r, A, h.h)) * SUB + 128;
     this.heading[i] = below(r, A, ANGLES);
-    this.job[i] = job; this.mode[i] = MODE.SEEK; this.carry[i] = 0; this.mem[i] = -1; this.goal[i] = -1;
+    this.job[i] = job; this.mode[i] = MODE.SEEK; this.carry[i] = 0; this.mem[i] = -1; this.goal[i] = -1; this.via[i] = -1;
     this.best[i] = INF; this.stall[i] = 0; this.since[i] = 0; this.lastCell[i] = this.cellOfAnt(i);
     return i;
   }
@@ -125,21 +130,11 @@ export class Sim {
   applyCommand(e) {
     const L = this.L, type = e[3];
     if (type === CMD.TRAIL) {
-      // [layer, count, x0, y0, x1, y1, ...]: a stroke on the surface. Scent along it; a goal at its end.
+      // [layer, count, x0, y0, x1, y1, ...]: a stroke on the surface, from the nest end to the far end.
+      // It becomes an ordered path of open cells (trailPath); scent goes along it, and the trail's field
+      // leads ants along the path in the drawn order, not straight to its end.
       const count = Math.min(e[5], 64);
       if (e[4] !== SURFACE || count < 1) return this.event(EVENT.REJECTED, e[1], e[2]);
-      let end = -1;
-      for (let k = 0; k < count; k++) {
-        const x0 = e[6 + 2 * k], y0 = e[7 + 2 * k];
-        const x1 = k + 1 < count ? e[8 + 2 * k] : x0, y1 = k + 1 < count ? e[9 + 2 * k] : y0;
-        line(x0, y0, x1, y1, (x, y) => {
-          const c = cellAt(L, SURFACE, x, y);
-          if (c < 0 || this.mat[c] !== MAT.OPEN) return;
-          end = c;
-          deposit(this, FIELD.TRAIL, c, TRAIL_STROKE);
-        });
-      }
-      if (end < 0) return this.event(EVENT.REJECTED, e[1], e[2]);
       // Replace the oldest trail goal (lowest creation number) when all four are live.
       let slot = -1;
       for (let s = SLOT.TRAIL0; s < SLOT.TRAIL0 + SLOT.TRAILS; s++) if (!this.flow.live[s]) { slot = s; break; }
@@ -147,7 +142,14 @@ export class Sim {
         slot = SLOT.TRAIL0;
         for (let s = SLOT.TRAIL0 + 1; s < SLOT.TRAIL0 + SLOT.TRAILS; s++) if (this.flow.seq[s] < this.flow.seq[slot]) slot = s;
       }
-      setGoal(this, slot, GOAL.TRAIL, end);
+      // Built in scratch first: a rejected stroke must leave the trail in that slot as it was.
+      const F = this.flow, k = slot - SLOT.TRAIL0, len = this.trailPath(e, count, this.pathBuf, 0);
+      if (len < 1) return this.event(EVENT.REJECTED, e[1], e[2]);
+      F.path.set(this.pathBuf, k * PATH_MAX);
+      F.pathLen[k] = len;
+      for (let j = 0; j < len; j++) deposit(this, FIELD.TRAIL, F.path[k * PATH_MAX + j], TRAIL_STROKE);
+      for (let i = 0; i < this.n; i++) if (this.via[i] === slot) this.via[i] = -1; // a route on the replaced trail is gone
+      setGoal(this, slot, GOAL.TRAIL, F.path[k * PATH_MAX + len - 1]);
     } else if (type === CMD.DIG) {
       // [count, x0, y0, ...]: nest cells to dig.
       const count = Math.min(e[4], 256);
@@ -168,6 +170,77 @@ export class Sim {
     } else if (type === CMD.RECALL) {
       this.g[G.RECALL] = e[4] ? 1 : 0;
     } else this.event(EVENT.REJECTED, e[1], e[2]);
+  }
+
+  /** The stroke in command `e` as an ordered path of open surface cells, written to out[at ..]; returns its
+   *  length (0: nothing walkable). Steps are 4-connected (a diagonal step goes through an open side cell),
+   *  as ants and fields move. Stroke cells that are closed, or that no ant can reach from home, are left
+   *  out, and the gap they leave is bridged by the shortest way around: first inside a box of
+   *  BRIDGE_MARGIN cells around the gap, then over the whole surface; a cell no bridge reaches is skipped.
+   *  Where the path comes back to a cell it already holds, the loop is cut out (loop erasure), so each
+   *  cell appears once and the field has one value per cell. At most PATH_MAX cells. */
+  trailPath(e, count, out, at) {
+    const L = this.L, sw = L.sw, pos = this.pathAt;
+    let len = 0;
+    const append = c => {
+      if (len >= PATH_MAX) return;
+      const j = pos[c];
+      if (j >= 0) { for (let q = j + 1; q < len; q++) pos[out[at + q]] = -1; len = j + 1; return; }
+      pos[c] = len; out[at + len++] = c;
+    };
+    const walkable = (x, y) => {
+      const c = cellAt(L, SURFACE, x, y);
+      return c >= 0 && this.mat[c] === MAT.OPEN && distAt(this, SLOT.HOME, c) !== INF ? c : -1;
+    };
+    const visit = (x, y) => {
+      const c = walkable(x, y);
+      if (c < 0 || (len && out[at + len - 1] === c)) return;
+      if (len === 0) { append(c); return; }
+      const last = out[at + len - 1], lx = last % sw, ly = (last - lx) / sw;
+      const adx = x > lx ? x - lx : lx - x, ady = y > ly ? y - ly : ly - y;
+      if (adx + ady === 1) { append(c); return; }
+      if (adx === 1 && ady === 1) {
+        const side = walkable(x, ly) >= 0 ? walkable(x, ly) : walkable(lx, y);
+        if (side >= 0) { append(side); append(c); return; }
+      }
+      this.bridge(last, c, append) || this.bridge(last, c, append, true);
+    };
+    for (let k = 0; k < count && len < PATH_MAX; k++) {
+      const x0 = e[6 + 2 * k], y0 = e[7 + 2 * k];
+      const x1 = k + 1 < count ? e[8 + 2 * k] : x0, y1 = k + 1 < count ? e[9 + 2 * k] : y0;
+      line(x0, y0, x1, y1, visit); // a joint is visited twice; visit skips the repeat
+    }
+    for (let j = 0; j < len; j++) pos[out[at + j]] = -1;
+    out.fill(0, at + len, at + PATH_MAX);
+    return len;
+  }
+
+  /** Shortest 4-connected way over open surface cells from `a` to `b`, handed to `append` without `a`.
+   *  Inside a box around both unless `wide`. Fixed neighbour order, so the same way on every machine. */
+  bridge(a, b, append, wide = false) {
+    const L = this.L, sw = L.sw, nb = L.nb, q = this.flow.queue, seen = this.seen, prev = this.prev;
+    const mark = ++this.seenMark;
+    const ax = a % sw, ay = (a - ax) / sw, bx = b % sw, by = (b - bx) / sw;
+    const x0 = wide ? 0 : Math.min(ax, bx) - BRIDGE_MARGIN, x1 = wide ? sw - 1 : Math.max(ax, bx) + BRIDGE_MARGIN;
+    const y0 = wide ? 0 : Math.min(ay, by) - BRIDGE_MARGIN, y1 = wide ? L.sh - 1 : Math.max(ay, by) + BRIDGE_MARGIN;
+    let head = 0, tail = 0;
+    seen[a] = mark; q[tail++] = a;
+    while (head < tail && seen[b] !== mark) {
+      const c = q[head++];
+      for (let k = 0; k < 4; k++) {
+        const m = nb[c * 4 + k];
+        if (m < 0 || seen[m] === mark || this.mat[m] !== MAT.OPEN) continue;
+        const mx = m % sw, my = (m - mx) / sw;
+        if (mx < x0 || mx > x1 || my < y0 || my > y1) continue;
+        seen[m] = mark; prev[m] = c; q[tail++] = m;
+      }
+    }
+    if (seen[b] !== mark) return false;
+    // Walk back from b to a, then hand the cells over start first (the queue is free again here).
+    let k = 0;
+    for (let c = b; c !== a; c = prev[c]) q[k++] = c;
+    while (k > 0) append(q[--k]);
+    return true;
   }
 
   event(type, a, b) {
@@ -226,7 +299,7 @@ export class Sim {
   stepAnt(i) {
     if (this.since[i] < 0xFFFF) this.since[i]++;
     const L = this.L, c = this.cellOfAnt(i), layer = this.layer[i], r = this.rng, A = STREAM.ants;
-    let follow = -1, want = -1, speed = WALK, still = false, wander = false;
+    let follow = -1, want = -1, speed = WALK, still = false, wander = false, back = false;
     const atHome = distAt(this, SLOT.HOME, c) === 0;
 
     if (this.g[G.RECALL] && layer === SURFACE) { follow = SLOT.HOME; speed = RUN; }
@@ -238,25 +311,37 @@ export class Sim {
           still = true;
         } else {
           follow = SLOT.HOME;
+          // A carrier that came out on a trail walks it back to its start, then takes the way home. Once she
+          // follows home she keeps to it for this trip, so she does not turn back at the trail's start.
+          const v = this.via[i];
+          if (this.carry[i] && layer === SURFACE && v >= 0 && this.goal[i] !== SLOT.HOME) {
+            const bd = backDist(this, v, c);
+            if (bd !== INF && bd > 0) { follow = v; back = true; }
+          }
           if (this.carry[i] && layer === SURFACE) deposit(this, FIELD.TRAIL, c, TRAIL_LAY);
         }
       } else if (layer === NEST) follow = SLOT.EXIT;
       else {
         const p = this.pileAt(c);
         if (p >= 0) {
-          this.carry[i] = 1; this.mem[i] = SLOT.FOOD0 + p; this.setMode(i, MODE.RETURN);
+          this.carry[i] = 1; this.mem[i] = SLOT.FOOD0 + p; this.setMode(i, MODE.RETURN); // `via` stays: her route
           this.heading[i] = (this.heading[i] + 128) & 255; this.g[G.PICKED]++;
           if (--this.pileAmount[p] === 0) { dropGoal(this, SLOT.FOOD0 + p); this.event(EVENT.PILE_EMPTY, p, 0); }
           still = true;
         } else if (this.since[i] > SEEK_GIVE_UP || distAt(this, SLOT.HOME, c) > FAR) {
-          this.setMode(i, MODE.RETURN); follow = SLOT.HOME; // nothing found: home, then out again
+          this.setMode(i, MODE.RETURN); follow = SLOT.HOME; this.via[i] = -1; // nothing found: home, then out again
         } else {
-          // Seeking, in order: the pile this ant took from last (route memory), the newest trail to its end,
-          // then the three scent sensors (food smell and trail scent), then a random walk.
+          // Seeking, in order: the trail that led this ant out before (her route), the pile she took from last
+          // (route memory), the newest trail along its drawn shape, then the three scent sensors (food smell
+          // and trail scent), then a random walk. A trail is followed until its end is a step away.
           const m = this.mem[i], t = this.newestTrail();
           if (m >= 0 && !this.flow.live[m]) this.mem[i] = -1;
-          if (this.mem[i] >= 0 && distAt(this, m, c) !== INF) follow = m;
-          else if (t >= 0 && distAt(this, t, c) > 1 && distAt(this, t, c) !== INF && (this.since[i] < SEEK_GIVE_UP >> 1 || this.goal[i] === t)) follow = t;
+          if (this.via[i] >= 0 && !(isTrailSlot(this.via[i]) && this.flow.live[this.via[i]])) this.via[i] = -1;
+          const v = this.via[i];
+          const dv = v >= 0 ? distAt(this, v, c) : INF, dt = t >= 0 ? distAt(this, t, c) : INF;
+          if (dv > 1 && dv !== INF) follow = v;
+          else if (v < 0 && this.mem[i] >= 0 && distAt(this, m, c) !== INF) follow = m;
+          else if (v < 0 && dt > 1 && dt !== INF && (this.since[i] < SEEK_GIVE_UP >> 1 || this.goal[i] === t)) { follow = t; this.via[i] = t; }
           else { want = this.sense(i); if (want < 0) wander = true; }
         }
       }
@@ -286,14 +371,19 @@ export class Sim {
     if (follow >= 0 && distAt(this, follow, c) === INF) { follow = -1; wander = true; still = false; }
     if (follow >= 0) {
       if (this.goal[i] !== follow) { this.goal[i] = follow; this.best[i] = INF; }
-      const d = distAt(this, follow, c);
+      // `back`: walking a trail toward its start (a carrier on her way home).
+      const d = back ? backDist(this, follow, c) : distAt(this, follow, c);
       if (d < this.best[i]) { this.best[i] = d; this.stall[i] = 0; }
-      const n1 = nextCell(this, follow, c);
-      if (n1 < 0) { still = true; }
+      // Off a trail's path (pushed aside in a crowd) the value is not progress along it: there, a new cell
+      // counts as progress, and `best` keeps the place reached on the path.
+      else if (d >= TRAIL_OFF && d !== INF && isTrailSlot(follow) && c !== this.lastCell[i]) this.stall[i] = 0;
+      const n1 = back ? backCell(this, follow, c) : nextCell(this, follow, c);
+      // A trail path broken by a cell closed after it was drawn leaves a dead end: wander off it.
+      if (n1 < 0) { if (isTrailSlot(follow) && d !== 0) wander = true; else still = true; }
       else if (this.link[c] === n1) { this.moveTo(i, n1); return; }
       else {
         // Aim two steps ahead when both are on this layer: ants then cut staircase corners on diagonals.
-        const n2 = nextCell(this, follow, n1), aim = n2 >= 0 && this.link[n1] !== n2 ? n2 : n1;
+        const n2 = back ? backCell(this, follow, n1) : nextCell(this, follow, n1), aim = n2 >= 0 && this.link[n1] !== n2 ? n2 : n1;
         const [, ax, ay] = cellXY(L, aim);
         want = angleOf(ax * SUB + 128 - this.x[i], ay * SUB + 128 - this.y[i]);
       }
@@ -419,7 +509,7 @@ export class Sim {
     let h;
     const out = {};
     h = hashInt(0x1A, n);
-    for (const a of [this.x, this.y, this.layer, this.heading, this.job, this.mode, this.carry, this.mem, this.goal, this.best, this.stall, this.since, this.lastCell]) h = hashArray(h, a, n);
+    for (const a of [this.x, this.y, this.layer, this.heading, this.job, this.mode, this.carry, this.mem, this.goal, this.best, this.stall, this.since, this.lastCell, this.via]) h = hashArray(h, a, n);
     out.ants = finish(h);
     h = 0x5C;
     for (let f = 0; f < FIELDS; f++) h = hashArray(h, S.cur[f]);
@@ -431,6 +521,8 @@ export class Sim {
     h = 0xF1;
     for (const a of [F.kind, F.live, F.dirty, F.cell, F.seq]) h = hashArray(h, a);
     for (let s = 0; s < MAX_GOALS; s++) if (F.live[s]) h = hashArray(h, F.dist.subarray(s * this.L.n, (s + 1) * this.L.n));
+    h = hashArray(h, F.pathLen);
+    for (let k = 0; k < SLOT.TRAILS; k++) h = hashArray(h, F.path.subarray(k * PATH_MAX, k * PATH_MAX + Math.min(F.pathLen[k], PATH_MAX)));
     out.flow = finish(h);
     out.rng = finish(hashArray(0x22, this.rng));
     h = hashInt(0xE7, this.queue.length);

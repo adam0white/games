@@ -53,6 +53,10 @@ test('any state round-trips: values no play produces still restore exactly', () 
     sim.heading[i] = rand(256); sim.carry[i] = rand(256); sim.mem[i] = rand(256) - 128; sim.goal[i] = rand(256) - 128;
     sim.best[i] = rand(65536); sim.stall[i] = rand(65536); sim.since[i] = rand(65536); sim.lastCell[i] = int32();
   });
+  // Trail paths: any lengths and cells, including int32 extremes; any `via`.
+  for (let k = 0; k < sim.flow.pathLen.length; k++) sim.flow.pathLen[k] = rand(3000);
+  some(40, () => { sim.flow.path[rand(sim.flow.path.length)] = [int32(), -1, 0x7FFFFFFF, -0x80000000][rand(4)]; });
+  some(50, () => { sim.via[rand(A)] = rand(256) - 128; });
   sim.queue.push(Int32Array.from([int32(), int32(), 0x7FFFFFFF, -0x80000000]), new Int32Array(0));
   sim.events.push(int32(), -1, 0x7FFFFFFF);
   const want = sim.hashes(), bytes = snapshot(sim);
@@ -61,7 +65,11 @@ test('any state round-trips: values no play produces still restore exactly', () 
   // Flow distances are rebuilt from the (now inconsistent) terrain, so only the flow hash may differ;
   // the flow state that is written must match exactly.
   for (const k of SUBSYSTEMS.filter(k => k !== 'flow')) assert.equal(got[k], want[k], k);
-  for (const k of ['kind', 'live', 'dirty', 'cell', 'seq']) assert.deepEqual(back.flow[k], sim.flow[k], `flow.${k}`);
+  for (const k of ['kind', 'live', 'dirty', 'cell', 'seq', 'pathLen']) assert.deepEqual(back.flow[k], sim.flow[k], `flow.${k}`);
+  for (let k = 0; k < back.flow.pathLen.length; k++) {
+    const len = Math.min(back.flow.pathLen[k], 2048), at = k * 2048;
+    assert.deepEqual(back.flow.path.subarray(at, at + len), sim.flow.path.subarray(at, at + len), `flow.path ${k}`);
+  }
   assert.deepEqual(snapshot(back), bytes, 'and writes the same bytes');
 });
 
@@ -69,7 +77,7 @@ test('old versions and damaged snapshots are refused', () => {
   const bytes = snapshot(new Sim({ ...cfg, ants: 20 }));
   assert.equal(bytes[4] | (bytes[5] << 8), SNAPSHOT_VERSION);
   const v1 = bytes.slice(); v1[4] = 1; v1[5] = 0;
-  assert.throws(() => restore(v1), /snapshot 1\/1, this sim reads 2\/1/, 'version 1 (raw arrays) is refused by number');
+  assert.throws(() => restore(v1), /snapshot 1\/2, this sim reads 2\/2/, 'version 1 (raw arrays) is refused by number');
   const sim2 = bytes.slice(); sim2[6] ^= 0xFF;
   assert.throws(() => restore(sim2), /this sim reads/);
   assert.throws(() => restore(bytes.subarray(0, bytes.length - 3)), /truncated/);

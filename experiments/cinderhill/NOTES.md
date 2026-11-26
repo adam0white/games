@@ -18,7 +18,7 @@ Working name for the ant colony game specified in `docs/design/colony/`. This di
 | `sim/world.js` | Seeded terrain: surface with stones, a pond and four food piles; nest with soil bands, shaft and chamber |
 | `sim/SPIKES.md` | Spike results S1, S2, S3 and S4 with numbers |
 | `test/` | `node --test` suites; CI runs them in the `changes` job (step "Cinderhill sim") |
-| `spikes/` | S1, S2, S3, S4 and the workerd harness; the planted fault `mutant.js` |
+| `spikes/` | S1, S2, S3, S4, the trail-shape cases (`trail-shape.mjs`) and the workerd harness; the planted fault `mutant.js` |
 | `check.html`, `check.js`, `quick.js` | The determinism check page; the phone check runs it in WebKit and Chromium (`cinderhill check`) |
 | `index.html`, `painter.js` | The trail painter page: menu, pause card, tool strip, HUD, the ant card, the frame sampler (`?fps=1`) |
 | `host.js` | Runs the sim for the page: 20 ticks a second from the frame clock (at most 4 a frame), the command log, crews and the "why" for one ant |
@@ -69,6 +69,8 @@ Decisions:
 - Sim change: foragers keep following the newest trail while they are on it. Before, a forager dropped any trail 30 s into her trip, so a trail longer than about 30 cells never reached its food (2,000 ants, trail to pile 3: 51 seeds picked by tick 1,600 before, 592 and the pile emptied after). This changed the hashes (`quick.js`, S2 re-run).
 - Saved: `cinderhill:save` `{ v: 1, sound, ants, tapTrail }` and `cinderhill:hint`. Written on a setting change or the first Play.
 
+- Sim change (`SIM_VERSION` 2): trails keep their drawn shape. The stroke becomes an ordered path, and the trail's field leads along it in order. Carriers walk their trail back, and a forager keeps her trail as her route. Before, ants walked the straight line to a trail's end. Numbers are in `sim/SPIKES.md`, "Trail shape", and the cases are in `spikes/trail-shape.mjs`.
+
 Not built: undo (the sim has no erase order), the small view of the other layer, an "ants wanted" number.
 
 When a sim change alters play, `test/page.test.mjs` fails and prints the new hash to put in `quick.js`.
@@ -76,7 +78,7 @@ When a sim change alters play, `test/page.test.mjs` fails and prints the new has
 ## Simplifications to revisit in M1
 
 - Diggers dig the nearest marked cell, not the painted order, and carry no spoil. A dig crew is capped (4 per marked cell, 24 in all).
-- Foragers seek in this order: the pile they last took from, the newest trail, the three scent sensors, a random walk. After a minute with nothing found they go home. The scripted orders do not give good foraging; that is tuning work.
+- Foragers seek in this order: the trail that led them out last (their route), the pile they last took from, the newest trail, the three scent sensors, a random walk. After a minute with nothing found they go home. The scripted orders do not give good foraging; that is tuning work.
 - A field rebuild is a whole-field search (0.7 ms on the full map). Regional rebuilds and a per-tick rebuild budget are not built.
 - Ants in a crowd pass through one another. Separation bends a path but never cancels the step.
 - No duplicate-command check in the sim; the room drops duplicates (05-tech, room protocol).
