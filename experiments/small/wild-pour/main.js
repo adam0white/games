@@ -1,5 +1,5 @@
 // Pour: the page. Drawing, input (finger, keys, and the phone's own tilt), sound, save, cards. Rules are in sim.js.
-import { create, step, band, levelY, toWorld, jugAngle, jugSurface, pourShare, JUG, FLOOR, LEVELS, MAX_TILT, DT, SPOUT, R } from './sim.js';
+import { create, step, band, forecast, levelY, toWorld, jugAngle, jugSurface, pourShare, JUG, FLOOR, LEVELS, MAX_TILT, DT, SPOUT, R } from './sim.js';
 import { readJson, writeJson } from '../../kit/save.js';
 import { sound } from '../../kit/audio.js';
 import { onLeave, isPauseKey } from '../../kit/pause.js';
@@ -102,6 +102,12 @@ const show = screens(['menu', 'paused', 'end'], name => {
   $('pause').style.display = name === 'play' ? 'grid' : 'none';
   $('tilt').style.display = name === 'play' && sensor !== null ? 'grid' : 'none';
 });
+// The forecast line (2026-11-26): a faint line where the glass is heading, counting the drops in the air. Three ways to
+// offer it, for a pick: ?v=a (default) on levels 1 to 3 and the daily pour, and on any level after a lost pour there,
+// until it is won; ?v=b always; ?v=c never (the page as it was).
+const V = ['a', 'b', 'c'].includes(query.get('v')) ? query.get('v') : 'a';
+const lostOn = new Set();
+const forecastOn = () => V === 'b' || (V === 'a' && (lvl <= 3 || !!daily || lostOn.has(lvl)));
 const COLORS = { juice: ['#ff8a3d', '#ffc078', '#e8692a'], honey: ['#e39a12', '#ffd36b', '#b86f05'], soda: ['#7a3b1c', '#c98b5e', '#55260f'] };
 
 // Play recording for the game lab (kit/lab.js): one run for each pour, started by Play, Daily pour, Next or Again.
@@ -120,12 +126,12 @@ function start(n, challenge = null) {
   const seed = daily ? daily.seed : query.has('seed') ? +query.get('seed') : save.tries * 101 + n;
   s = create(n, seed); finger = null; keyDown = false; keyTilt = 0; want = 0; fx = []; shake = 0; acc = 0; endAt = 0; lineFlash = 0; overAt = 0; endShownAt = 0;
   waves = s.glasses.map(gl => ({ h: new Float32Array(16), v: new Float32Array(16), x: [gl.x, gl.x] }));
-  mode = 'play'; paused = false; show('play'); snd.release();
-  runOpen = true; rec.start({ level: n, daily: !!daily });
+  mode = 'play'; paused = false; show('play'); snd.release(); heading = 'low'; told = false;
+  runOpen = true; rec.start({ level: n, daily: !!daily, v: V, forecast: forecastOn() });
   banner(n === 1 && !daily ? t('tagline') : t('idea-' + s.L.idea));
   tone(520, 0.12, 0.08, 'triangle', 200);
 }
-function banner(text) { $('banner').textContent = text; $('banner').classList.add('on'); bannerUntil = performance.now() + 2600; }
+function banner(text, ms = 2600) { $('banner').textContent = text; $('banner').classList.add('on'); bannerUntil = performance.now() + ms; }
 function pause() { if (mode !== 'play' || paused) return; paused = true; finger = null; snd.hold(); show('paused'); }
 function resume() { paused = false; snd.release(); show('play'); last = performance.now(); }
 onLeave(pause);
@@ -196,17 +202,45 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 
+// Haptics where the phone has them (Android browsers; iOS Safari ignores it).
+const buzz = pattern => { if (!calm && save.sound) try { navigator.vibrate?.(pattern); } catch {} };
+let heading = 'low', told = false;
+const SEEN_KEY = 'wild-pour:forecast-seen';
 function react() {
   const now = performance.now();
+  // The forecast's verdict changes: a soft tick when the pour is heading into the band, a double buzz when it is
+  // heading over it (lift now). Only while the forecast line is shown.
+  if (forecastOn() && !s.over) {
+    const f = forecast(s), [lo, hi] = band(s), h = f > hi + 0.5 ? 'over' : f >= lo ? 'band' : 'low';
+    // The first time the line shows on this device, and the first time it comes back after a lost pour, say what it is.
+    if (!told && f > s.glass.n + 2) {
+      told = true;
+      const seen = readJson(SEEN_KEY, null) === 1;
+      if (!seen || (lostOn.has(lvl) && lvl > 3)) { banner(t(seen ? 'forecastBack' : 'forecastHint'), 4500); writeJson(SEEN_KEY, 1); }
+    }
+    if (h !== heading) {
+      if (h === 'band' && heading === 'low') buzz(12);
+      if (h === 'over') { buzz([25, 50, 25]); tone(220, 0.12, 0.05, 'square', -40); }
+      heading = h;
+    }
+  }
   for (const e of s.events) {
-    if (e === 'drip' && now - lastDrip > 110) { lastDrip = now; const f = 600 + s.inGlass / s.L.target * 700; tone(f, 0.05, 0.025, 'sine', 120); }
-    if (e === 'line') { lineFlash = 1; [784, 988, 1319].forEach((f, i) => setTimeout(() => tone(f, 0.25, 0.07, 'triangle'), i * 70)); }
+    if (e === 'drip' && now - lastDrip > 110) { lastDrip = now; ripple(); const f = 600 + s.inGlass / s.L.target * 700; tone(f, 0.05, 0.025, 'sine', 120); }
+    if (e === 'line') { lineFlash = 1; buzz(20); [784, 988, 1319].forEach((f, i) => setTimeout(() => tone(f, 0.25, 0.07, 'triangle'), i * 70)); }
     if (e === 'belt') tone(392, 0.2, 0.06, 'triangle', 200);
     if (e === 'spill' && now - lastSplat > 60) {
-      lastSplat = now; noise(0.1, 0.12, 900); shake = Math.min(6, shake + 1.5);
+      lastSplat = now; noise(0.1, 0.12, 900); buzz(8); shake = Math.min(6, shake + 1.5);
       const q = s.p.find(q => q.st === 2 && !q.fx); if (q) { q.fx = 1; splash(q.x, FLOOR, COLORS[s.L.liquid][0], 6); }
     }
   }
+}
+// Where the stream meets the liquid in the glass, a few droplets jump: the landing point is the lowest drop in the air.
+function ripple() {
+  if (calm) return;
+  let q = null; for (const p of s.p) if (p.air && p.st === 1 && (!q || p.y > q.y)) q = p;
+  const gl = s.glass; if (!q || q.x < gl.x - gl.w || q.x > gl.x + gl.w) return;
+  const y = levelY(s, gl.n, gl), c = COLORS[s.L.liquid];
+  for (let i = 0; i < 2; i++) fx.push({ x: q.x + (Math.random() - 0.5) * 2, y, vx: (Math.random() - 0.5) * 30, vy: -25 - Math.random() * 30, life: 0.25 + Math.random() * 0.15, color: c[1], r: 0.5 + Math.random() * 0.4 });
 }
 function splash(x, y, color, n) { if (calm) return; for (let i = 0; i < n; i++) fx.push({ x, y, vx: (Math.random() - 0.5) * 60, vy: -40 - Math.random() * 60, life: 0.5 + Math.random() * 0.3, color, r: 0.8 + Math.random() }); }
 
@@ -242,11 +276,13 @@ function finish() {
   finger = null; overAt = performance.now(); endAt = overAt + (s.won ? 900 : 350);
   rec.event(daily ? 'daily-finished' : 'level-finished', { level: lvl, won: s.won, stars: s.won ? s.stars : 0 });
   runEnd(s.won ? 'won' : 'lost');
+  if (!daily) { if (s.won) lostOn.delete(lvl); else lostOn.add(lvl); }
   if (s.won) {
     if (!daily && s.stars > save.stars[lvl - 1]) save.stars[lvl - 1] = s.stars; store();
+    buzz(s.stars === 3 ? [30, 40, 30, 40, 60] : 30);
     [523, 659, 784, 1047, 1319].slice(0, 2 + s.stars).forEach((f, i) => setTimeout(() => tone(f, 0.3, 0.08, 'triangle'), i * 90));
     for (const g2 of s.glasses) for (let i = 0; i < 18; i++) fx.push({ x: g2.x + (Math.random() - 0.5) * g2.w * 2, y: g2.top, vx: (Math.random() - 0.5) * 90, vy: -80 - Math.random() * 90, life: 1.2, color: ['#ffd23f', '#ff8a3d', '#fff'][i % 3], r: 1.2, star: true });
-  } else { tone(330, 0.25, 0.08, 'sawtooth', -150); shake = 6; }
+  } else { tone(330, 0.25, 0.08, 'sawtooth', -150); shake = 6; buzz([60, 40, 60]); }
 }
 function offText(st) {
   const worst = st.glasses.reduce((a, gl) => Math.abs(gl.n - st.L.target) > Math.abs(a - st.L.target) ? gl.n : a, st.glasses[0].n);
@@ -360,7 +396,7 @@ function drawDrops(st, col) {
     for (const q of st.p) {
       if (q.air) continue;
       let hidden = false;
-      for (const gl of st.glasses) if (q.st === 1 && q.x > gl.x - gl.w && q.x < gl.x + gl.w && q.y > levelY(st, gl.n, gl) - 0.6) { hidden = true; break; }
+      for (const gl of st.glasses) if (q.st === 1 && q.x > gl.x - gl.w && q.x < gl.x + gl.w && q.y > levelY(st, gl.n, gl) - 2.2) { hidden = true; break; }
       if (!hidden) loose.push(q);
     }
     liquid.draw(loose, col[0], col[1]);
@@ -391,6 +427,7 @@ function drawGlassFront(st, gl, time) {
   const { l, r, tp, bt } = edges(gl);
   const [lo, hi] = band(st), ym = Y(levelY(st, st.L.target, gl));
   const inBand = gl.n >= lo && gl.n <= hi, near = Math.max(0, 1 - Math.abs(gl.n - st.L.target) / (st.L.band * 1.5));
+  if (s && mode === 'play' && forecastOn()) drawForecast(st, gl, lo, hi);
   g.strokeStyle = inBand ? '#3e8f1c' : '#3b2a3f'; g.lineWidth = Math.max(3, 1.1 * k) * (1 + 0.4 * near); g.lineCap = 'round';
   g.beginPath(); g.moveTo(l - 3 * k, ym); g.lineTo(r + 3 * k, ym); g.stroke();
   const bob = calm ? 0 : Math.sin(time * 5) * 0.8 * k;
@@ -402,6 +439,18 @@ function drawGlassFront(st, gl, time) {
   g.beginPath(); g.moveTo(l, tp); g.lineTo(l, bt); g.lineTo(r, bt); g.lineTo(r, tp); g.stroke();
   g.strokeStyle = '#ffffffb0'; g.lineWidth = Math.max(1.5, 0.7 * k);
   g.beginPath(); g.moveTo(l + 2 * k, tp + 4 * k); g.lineTo(l + 2 * k, bt - 6 * k); g.stroke();
+}
+// Where the glass is heading: a dashed line over the liquid, green while it would settle in the band, red once it
+// would settle over it. Hidden when nothing more is coming.
+function drawForecast(st, gl, lo, hi) {
+  const f = forecast(st, gl);
+  if (f < gl.n + 0.6) return;
+  const { il, ir } = edges(gl), y = Y(Math.max(gl.top + 1, levelY(st, f, gl))), y0 = Y(levelY(st, gl.n, gl));
+  const c = f > hi + 0.5 ? '#c8452f' : f >= lo ? '#3e8f1c' : '#3b2a3f';
+  g.fillStyle = c + '22'; g.fillRect(il, y, ir - il, Math.max(0, y0 - y));
+  g.strokeStyle = c; g.globalAlpha = 0.85; g.lineWidth = Math.max(2, 0.7 * k); g.setLineDash([2.2 * k, 1.6 * k]);
+  g.beginPath(); g.moveTo(il, y); g.lineTo(ir, y); g.stroke();
+  g.setLineDash([]); g.globalAlpha = 1;
 }
 function drawJug(st, col) {
   const a = jugAngle(st), p = toWorld(st, JUG.w, 0, a);
@@ -506,7 +555,7 @@ window.pourState = (details = true) => {
     over: !!s?.over, won: !!s?.won, why: s?.why ?? '', stars: s?.stars ?? 0, inGlass: s?.inGlass ?? 0, spilled: s?.spilled ?? 0,
     inJug: s?.inJug ?? 0, flying: s?.flying ?? 0, angle: s?.angle ?? 0, t: s?.t ?? 0, target: s?.L.target ?? 0, saved: save.stars.slice(),
     sensor: sensor !== null, seed: s?.seed, liquid: s?.L.liquid, idea: s?.L.idea, flow: s?.flow ?? 0, glasses: s ? s.glasses.map(gl => gl.n) : [],
-    foam: s ? Math.max(...s.glasses.map(gl => gl.foam)) : 0, band: s?.L.band ?? 0,
+    foam: s ? Math.max(...s.glasses.map(gl => gl.foam)) : 0, band: s?.L.band ?? 0, v: V, forecast: s && forecastOn() ? forecast(s) : null,
     remaining: s ? Math.max(0, s.L.time - s.t) : 30, overAt, endShownAt,
     jugClearance: Y(SPOUT.y - REACH) - (top + 96),
     jug: s ? { x: X(s.pivot.x), y: Y(s.pivot.y) } : null, W, H,

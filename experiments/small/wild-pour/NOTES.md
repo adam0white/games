@@ -343,3 +343,53 @@ A real phone (frame time, the tilt sensor, touch feel), the sound by ear, the Tu
 ## 2026-11-25 — the way back to the small games home
 
 Opened from `/small/` (`?from=small`), the page shows "‹ Small games" ("‹ Küçük oyunlar" in Turkish) on the menu and end cards, through `kit/home.js`; a filled glass is reported to the home as a win. The recording notice and switch are now in the page's language. `check.mjs` asserts the two links in Turkish. The shared phone check pins this page's `Date` (`kit/check/clock.mjs`) so its daily-best line no longer fails when a run crosses midnight UTC. Same keys, same records.
+
+## 2026-11-26 — the forecast line: see where the pour will settle
+
+**Why.** Adam: "too difficult". The losses are overfills. Drops in the stream take about 0.9 s to fall, so at a full pour about 8 drops are already in the air when the thumb lifts. That is as wide as the band on most levels. The frozen thumb (`thumb.mjs`) wins anyway because it counts half the drops in the air; a new player watches the glass. A new bot, `naive.mjs`, lifts when the level it watches reaches the line. It reacts late and slides at most to full tilt. Watching the glass, it clears 38.5% to 72.5% of pours. It also loses level 1 in 27.5% of seeds, all of them overfills.
+
+**What changed.**
+- **Forecast line.** `sim.js` has a new `forecast(s)`. It adds up the glass's count, the drops in the air above the glass, and a lag term (flow × lag × 0.35). It only reads the state; the rules, the digest and the save are unchanged. On the page it is a dashed line over the liquid: dark while short, green when the pour is heading into the band, red when it is heading over.
+  - Measured error at lift: the line over-predicts by 0.5 to 1.0 drops on average, which errs towards lifting early. The largest single error is 5.2 drops, on level 4, where the glass sways.
+- **When the line shows, three ways for a pick:**
+  - `?v=a`, the default: on levels 1 to 3 and the daily pour, and on any level after a lost pour there, until that level is won.
+  - `?v=b`: always.
+  - `?v=c`: never (the page as it was).
+  - A banner explains the line the first time it shows on a device (`wild-pour:forecast-seen`). A second banner appears when the line comes back after a loss.
+- **Haptics through `navigator.vibrate`:**
+  - a tick when the forecast enters the band;
+  - a double buzz and a low tone when it heads over;
+  - pulses for the line, a spill, a win and a loss.
+- **Droplets.** Small droplets jump where the stream lands. A drop resting just above the drawn surface no longer shows as a lone ball.
+- **Recording.** The run start records `v` and `forecast`.
+
+**Verified.**
+- `node naive.mjs --count=200` exits 0. It checks that watching the forecast clears every level at least 80% of the time, and at least 15 points more often than watching the glass on levels 3 to 8.
+
+  | Level | Watching the glass | Watching the forecast |
+  | --- | --- | --- |
+  | 1 | 72.5% | 100% |
+  | 2 | 71.0% | 100% |
+  | 3 | 57.0% | 100% |
+  | 4 | 70.5% | 100% |
+  | 5 | 48.0% | 100% |
+  | 6 | 45.0% | 82.5% (losses are spills) |
+  | 7 | 42.5% | 100% |
+  | 8 | 38.5% | 100% |
+
+- `--mutate`, which makes the forecast only the glass, fails 8 of 8 and exits 1.
+- `bots.mjs` exits 0 with the same numbers as before, because the physics did not change.
+- `grid-check.mjs` and `daily.test.mjs` pass.
+- `check.mjs` passes on both engines.
+- `kit/check/phone.mjs small/wild-pour` passes on WebKit and Chromium.
+- I looked at screenshots of the line and the first-time banner on iPhone 13 WebKit and Pixel 7 Chromium.
+
+**Choices made.**
+- I tried raising level 6's spill allowance from 15 to 16, 17 and 18. Its spills cluster at 15 to 17, so each step jumps the clear rate (thumb: 60.5% → 81% → 92.5% → 98.5%) and breaks the frozen curve's order. I kept 15.
+
+**Not verified.**
+- No person has played it.
+- The bots read the line perfectly; a person will not.
+- A 100% clear rate for the forecast watcher may make `?v=b` too easy. That is why the default shows the line only while learning or after a loss.
+- Haptics were not felt, and iOS Safari ignores `vibrate`.
+- The Turkish was not read by a native speaker.
