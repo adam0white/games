@@ -9,7 +9,7 @@ const SEEDS = Number(process.argv.find(a => a.startsWith('--seeds='))?.slice(8))
 const MUTATION = (process.argv.find(a => a.startsWith('--mutate=')) || '').slice(9);
 const OPTS = MUTATE ? { mixedScores: true } : {};
 // The rules the page plays since 2026-11-24 (sim.js defaults stay main's): fair moths and a wick back for full jars.
-const PAGE = { fair: MUTATION !== 'fair', relight: true };
+const PAGE = { fair: MUTATION !== 'fair', relight: true, lift: true };
 if (MUTATION === 'sleep') NIGHTS[1][7].sleep = false;
 if (MUTATION === 'thorns') THORNS_OFF();
 function THORNS_OFF() { for (const night of NIGHTS) for (const l of night) if (l.thorns) l.thorns = 0; }
@@ -408,6 +408,29 @@ check('a mixed ring scores nothing and startles; a pure ring scores n squared (c
   for (let i = 0; i < 4; i++) put(i, c0, 170 + i * 8, 300 + (i % 2) * 8);
   const before = s.score; draw(182, 304, 50);
   assert.equal(s.score - before, 16, 'four fireflies score 16');
+});
+check('lift (page rules): a finger lifted near its own thread closes the ring there; a ring too big for the thread is a burnt miss (constructed)', () => {
+  const trial = lift => {
+    const s = create(7, { ...OPTS, start: 0, lift }); s.kind.fill(0);
+    const c0 = s.def.colors[0];
+    for (let i = 0; i < 4; i++) { s.kind[i] = FLY; s.col[i] = c0; s.x[i] = 170 + i * 7; s.y[i] = 295 + (i % 2) * 8; s.vx[i] = 0; s.vy[i] = 0; s.wait2[i] = 0; }
+    const before = s.score, ev = [], go = (x, y) => { step(s, x, y); ev.push(...s.ev); };
+    // A '6': a stem up from below, then once round the fireflies, lifted where the stem met the circle.
+    for (let y = 450; y >= 350; y -= 3.5) go(180, y);
+    for (let a = 0; a <= Math.PI * 2 - 0.15; a += 0.07) go(180 + 50 * Math.sin(a), 300 + 50 * Math.cos(a));
+    step(s, NaN, NaN); ev.push(...s.ev);
+    return { gain: s.score - before, miss: ev.filter(e => e.type === 'miss') };
+  };
+  const on = trial(true), off = trial(false);
+  assert.equal(on.gain, 16, 'with lift, the 6 catches four fireflies');
+  assert.equal(off.gain, 0, 'without it (main), the same stroke catches nothing');
+  assert.equal(on.miss.length, 0);
+  // A circle too big for the 600-unit thread: its tail burns away before the finger comes round.
+  const s = create(7, { ...OPTS, start: 0, lift: true }); s.kind.fill(0); const ev = [];
+  for (let a = 0; a <= Math.PI * 2; a += 0.03) { step(s, 180 + 110 * Math.sin(a), 300 + 110 * Math.cos(a)); ev.push(...s.ev); }
+  step(s, NaN, NaN); ev.push(...s.ev);
+  const miss = ev.filter(e => e.type === 'miss');
+  assert.equal(miss.length, 1, 'one miss'); assert.equal(miss[0].burnt, true, 'and it says the thread burnt');
 });
 check('endless: rounds refill the jars with a shorter dawn, and the run ends', () => {
   const rounds = [], scores = [];
