@@ -76,7 +76,7 @@ let art = null, ready = null;
 $('play').disabled = true; $('play').classList.add('loading');
 let day = null;        // { plan, i, served, earned, tips, stars[], seed }
 let g = null;          // the guest being served: { recipe, model, phase, catch, q[], wait, ... }
-let peopleIn = false, phase = 'idle', trayX = 0, trayTarget = 0, finger = null, keys = new Set(), touched = false;
+let skipCatch = false, peopleIn = false, phase = 'idle', trayX = 0, trayTarget = 0, finger = null, keys = new Set(), touched = false;
 const meshes = new Map();  // falling item n -> mesh
 
 const show = screens(['menu', 'paused', 'extra', 'dayEnd', 'shop'], name => {
@@ -158,7 +158,7 @@ function order() {
   if (g.tut === 0) coach(t('t1'));
   wait(g.tut === 0 ? 2.2 : 1.1, () => startCatch());
 }
-function dishModel(id) { const r = RECIPES[id]; return r.dish ?? (r.bowl ? 'bowl' : 'carrot'); }
+function dishModel(id) { const r = RECIPES[id]; if (r.dish) return r.dish; if (r.bowl) return 'bowl'; const first = Object.keys(r.need)[0]; return ING[first]?.chop ?? ING[first]?.model ?? 'carrot'; }
 const itemModel = id => (ING[id] ?? JUNK[id]).model;
 
 // ---------- the catch
@@ -180,6 +180,7 @@ function stepCatch(dt) {
   const c = g.catch;
   // Small steps so a slow frame cannot drop an item through the tray.
   const ev = []; for (let left = dt; left > 1e-6; left -= 0.034) ev.push(...sim.stepCatch(c, trayX / LANE.s, Math.min(0.034, left)));
+  if (skipCatch && !c.done && !c.extra) { skipCatch = false; c.got = { ...c.need }; c.done = true; ev.push({ type: 'done' }); }
   for (const e of ev) {
     if (e.type === 'caught') {
       const m = meshes.get(e.it.n); meshes.delete(e.it.n);
@@ -747,5 +748,7 @@ window.kitchenState = () => art && peopleIn && ({
 });
 window.kitchenMusic = () => song && { ...song.melody, on: song.state.on, step: song.step, notes: song.log.length, kinds: song.log.map(l => l.kind) };
 // Keeps a catch going for checks that wait on the hint: nothing is caught or finished while it runs.
+// Checks only: finish the current catch at once, to reach the cooking steps of any dish.
+window.kitchenSkipCatch = () => { skipCatch = true; };
 window.kitchenAlive = () => { if (g?.catch) { g.catch.got = {}; g.catch.tray = []; g.catch.done = false; } };
 window.kitchenScreen = (x, y, z) => art && art.toScreen(new art.THREE.Vector3(x, y, z));
