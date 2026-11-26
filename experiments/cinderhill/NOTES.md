@@ -12,7 +12,8 @@ Working name for the ant colony game specified in `docs/design/colony/`. This di
 | `sim/flow.js` | Flow fields: breadth-first search per live goal (16 slots), rebuilt only when a change touches them |
 | `sim/scent.js` | Three scent fields (trail, food, alarm): mass-conserving spread, 24-bit decay with a set half-life |
 | `sim/math.js`, `sim/rng.js`, `sim/hash.js` | Table trig and integer `angleOf`; mulberry32 streams; 32-bit hashes |
-| `sim/snapshot.js` | `snapshot(sim)` to bytes with a version header, `restore(bytes)` |
+| `sim/snapshot.js` | `snapshot(sim)` to bytes with a version header, `restore(bytes)`; format 2 models each value and range-codes it (S4: 55 KB at 5,000 ants, 24,000 ticks) |
+| `sim/rangecoder.js` | The binary range coder the snapshot uses: adaptive probabilities, integers only, one walk for both directions |
 | `sim/replay.js` | `script(cfg, ticks)` (scripted orders), `replay(...)`, `firstDivergence(a, b)` |
 | `sim/world.js` | Seeded terrain: surface with stones, a pond and four food piles; nest with soil bands, shaft and chamber |
 | `sim/SPIKES.md` | Spike results S1, S2 and S4 with numbers |
@@ -31,10 +32,10 @@ Working name for the ant colony game specified in `docs/design/colony/`. This di
 ## How to run
 
 ```
-node --test experiments/cinderhill/test/                         # all tests, about 15 s
+node --test experiments/cinderhill/test/                         # all tests, about 15 s (the S4 size test plays 3,000 ticks of 5,000 ants)
 node experiments/cinderhill/spikes/s1.mjs 2000 5000              # S1 tick cost in Node
 PLAYWRIGHT=<dir with playwright> node experiments/cinderhill/spikes/s2.mjs   # S2 Node and browsers
-node experiments/cinderhill/spikes/s4.mjs [--ticks=8000]         # S4 snapshot size
+node experiments/cinderhill/spikes/s4.mjs [--ants=5000] [--ticks=8000]   # S4 snapshot size
 node experiments/cinderhill/spikes/workerd.mjs                   # S1 and S2 in a local Durable Object (needs wrangler)
 PLAYWRIGHT=<dir> node experiments/kit/check/phone.mjs cinderhill # the page in WebKit and Chromium
 ```

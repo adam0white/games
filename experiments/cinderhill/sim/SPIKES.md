@@ -59,21 +59,36 @@ Seed 2026, 2,000 ants, 12,000 ticks (10 minutes), 41 orders. Every engine got th
 
 Pass line: a late-join snapshot of a dug nest plus 5,000 ants, compressed, under 64 KB.
 
-The snapshot holds every state array: terrain, all three scent fields, all ant fields, globals, random streams, goals and queued commands. It leaves out the flow distances, which restore rebuilds exactly; the restore check reached the same total hash. Arrays are byte-shuffled before compression. The nest was pre-dug with galleries at four depths, shafts and eight rooms (2,384 open nest cells), then played with the scripted orders.
+**Verdict: pass, lossless, at 3,000, 8,000 and 24,000 ticks (snapshot format 2, 2026-11-25).** Format 1 failed at 8,000 ticks.
 
-| Played ticks | Ants on the surface | Compressed (gzip; deflate the same) | Scent | Ants | Terrain | Verdict |
-| --- | --- | --- | --- | --- | --- | --- |
-| 3,000 (2.5 min) | 259 | 60.5 KB | 29.9 KB | 24.1 KB | 2.6 KB | Pass |
-| 8,000 (6.7 min) | 161 | 74.6 KB | 41.4 KB | 25.7 KB | 2.6 KB | **Fail** |
+The world: seed 2026; the nest pre-dug with galleries at four depths, shafts and eight rooms (2,384 open nest cells); then the scripted orders `script(seed 2026, ticks)` played for that many ticks. Each tick count is its own run, as `spikes/s4.mjs` does (a longer script draws its random strokes in a different order, so a staged run gives other states). Sizes are gzip through `CompressionStream`, as a browser or workerd has it; deflate gave the same within 0.1 KB.
 
-The raw snapshot is 1,776 KB. At 8,000 ticks the trail field alone compresses to 30.3 KB; the ant fields `lastCell`, `best`, `stall` and `since` add 10.2 KB between them.
+| Ants | Played ticks | Ants on the surface | Format 1 gzip | Format 2 coded | Format 2 gzip | Scent | Ants part | Terrain | Verdict |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 5,000 | 3,000 (2.5 min) | 259 | 60.5 KB | 37.6 KB | 37.5 KB | 19.5 KB | 16.4 KB | 1.3 KB | Pass |
+| 5,000 | 8,000 (6.7 min) | 161 | 74.6 KB | 43.8 KB | 43.7 KB | 24.1 KB | 17.8 KB | 1.4 KB | Pass |
+| 5,000 | 24,000 (20 min) | 2,560 | 96.2 KB | 54.8 KB | 54.7 KB | 28.2 KB | 24.2 KB | 1.4 KB | Pass |
+| 2,000 | 3,000 | 180 | 51.4 KB | 32.6 KB | 32.4 KB | 22.6 KB | 8.2 KB | 1.3 KB | Pass |
+| 2,000 | 8,000 | 287 | 66.3 KB | 40.1 KB | 40.0 KB | 28.8 KB | 9.4 KB | 1.4 KB | Pass |
+| 2,000 | 24,000 | 258 | 81.2 KB | 43.8 KB | 43.8 KB | 31.6 KB | 9.9 KB | 1.4 KB | Pass |
 
-**Verdict: fail.** The pass holds only early in play. Scent is the largest part and grows as trails accumulate; ant fields come second.
+Part sizes are coded bytes (the coder's output is already near entropy, so gzip adds nothing). Encoding takes 40 to 70 ms and restoring 40 to 60 ms in Node on this Mac; restore includes rebuilding the live flow fields. Every run restored to the same total hash.
 
-Options, none built yet:
-- Send the ant fields that follow from others (`lastCell`, `best`) as nothing, and rebuild them on restore.
-- Store positions relative to the cell.
-- Send the snapshot from a checkpoint a few seconds old, plus the commands since; the joiner replays them.
-- Quantize the scent for sending and run the joiner on coarse scent until its next checkpoint. That gives up exact lockstep for the joiner until then, so it needs a protocol decision.
+**Method (sim/snapshot.js, sim/rangecoder.js).** Format 1 wrote every state array byte-shuffled and left compression to gzip. Format 2 writes the same state through a binary range coder with adaptive probabilities (the LZMA design, 15-bit probabilities, integers only) and models the values instead of the bytes. Nothing is lost and nothing is quantized: restore gives the same hash in every subsystem, the restored sim re-encodes to the same bytes, and the next 2,000 ticks match tick for tick (test/snapshot.test.mjs, at three random ticks). Each prediction below is followed by an exact residual or an escape, so values no play produces also round-trip (the test corrupts every state array to check that).
 
-The roadmap's fallback, "terrain as a seed plus a dig log", does not help. Terrain is already the smallest part (2.6 KB).
+| Part | Format 2 coding | Gain measured on 5,000 ants, 24,000 ticks |
+| --- | --- | --- |
+| Scent | Open cells only (closed cells hold 0; a list carries any that do not). Each cell predicted as left + up - upper-left, the residual coded in a context of how much those neighbours differ; all-zero neighbourhoods get their own context | 52.9 KB to 28.2 KB |
+| Ant position | The cell as its rank among the layer's open cells, through an adaptive 12-bit tree per layer and job (ants share cells: diggers and guards at rest stand together), then the offset inside the cell | The cell: 10.7 bits an ant with a plain integer model, 6.9 with the tree |
+| Ant fields | Job in the context of the spawn order (index mod 20); `since` as the difference from the tick (an ant that never changed mode has since equal to the tick); `lastCell` as same cell, one of five neighbours, or raw; `best` as the difference from the rebuilt flow distance at `lastCell` | `lastCell` and `best` together under 0.1 KB; job 0.9 KB to 0.1 KB; `since` 6.4 KB to 4.6 KB |
+| Terrain | Material in a context of its left and upper neighbours; dig marks, dig work and links as lists of exceptions | 2.7 KB to 1.4 KB |
+
+Measured and dropped: the median (MED) predictor, a least-squares predictor over up to eight neighbours (both larger than left + up - upper-left on the trail field), a second scent context axis for magnitude (no gain), and coding repeated in-cell offsets by reference (larger). The 11-bit probabilities LZMA uses cost about 4 KB more here: a near-certain zero then still costs 0.02 bits, over 200,000 scent cells.
+
+**What dominates now.** The trail field, 22.6 KB at 24,000 ticks: about 7.5 bits for each of its 24,505 non-zero cells. Its low bits come from decay rounding and many small deposits and look like noise to every predictor tried. Then ant offsets, headings and `since`, which are close to uniform for moving ants (about 6, 6 and 7 bits an ant).
+
+**Open risk, not measured:** the trail field grows with the area ants have walked. If every open surface cell (about 64,000) held trail scent at the same cost per cell, scent alone would come to about 60 KB and the pass would fail. The 24,000-tick run reaches 36% of them. A bot soak over a full match would show where play really goes.
+
+**Not built: checkpoint plus command suffix.** A checkpoint is the same state at an earlier tick, so it is the same size; it would help the room reuse one snapshot for several joiners, not shrink it. Only the extreme form, the seed plus the whole command log, is smaller, and the joiner then replays every tick (about 2 ms a tick at 5,000 ants, S1: 48 s at 24,000 ticks). Because the lossless format passes on its own, neither was built, and join cost was not measured beyond the restore times above.
+
+The roadmap's fallback, "terrain as a seed plus a dig log", does not help: terrain is 1.4 KB.
