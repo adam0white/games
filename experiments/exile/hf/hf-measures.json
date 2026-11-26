@@ -1,0 +1,1191 @@
+{
+  "environment": {
+    "node": "v26.12.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpu": "Apple M4"
+  },
+  "bundleBytes": {
+    "raw": 808527,
+    "gzip": 192470
+  },
+  "sampleSeconds": 5,
+  "durationSeconds": 1200,
+  "minutesPerSecond": 2,
+  "aggregates": [
+    {
+      "size": 8,
+      "initMs": {
+        "p50": 3.522,
+        "p95": 5.085,
+        "max": 5.085
+      },
+      "tickMs": {
+        "p50": 27.835,
+        "p95": 53.188,
+        "max": 104.763
+      },
+      "bridgeTickMs": {
+        "p50": 27.845,
+        "p95": 53.2,
+        "max": 104.79
+      },
+      "rallyTickMs": {
+        "p50": 47.724,
+        "p95": 66.839,
+        "max": 69.276
+      },
+      "deterministicSeed": 5
+    },
+    {
+      "size": 16,
+      "initMs": {
+        "p50": 5.239,
+        "p95": 6.269,
+        "max": 6.269
+      },
+      "tickMs": {
+        "p50": 84.878,
+        "p95": 331.803,
+        "max": 914.208
+      },
+      "bridgeTickMs": {
+        "p50": 84.892,
+        "p95": 331.839,
+        "max": 914.229
+      },
+      "rallyTickMs": {
+        "p50": 137.998,
+        "p95": 440.25,
+        "max": 457.206
+      },
+      "deterministicSeed": 5
+    }
+  ],
+  "runs": [
+    {
+      "size": 8,
+      "seed": 5,
+      "initMs": 5.085,
+      "tickMs": {
+        "p50": 33.071,
+        "p95": 58.865,
+        "max": 76.544
+      },
+      "bridgeTickMs": {
+        "p50": 33.085,
+        "p95": 58.878,
+        "max": 76.56
+      },
+      "rallyEdges": [
+        {
+          "t": 240,
+          "rally": true,
+          "following": 8
+        },
+        {
+          "t": 320,
+          "rally": false,
+          "following": 0
+        },
+        {
+          "t": 600,
+          "rally": true,
+          "following": 8
+        },
+        {
+          "t": 680,
+          "rally": false,
+          "following": 0
+        }
+      ],
+      "byAct": {
+        "wood": 59,
+        "stone": 65,
+        "farm": 102,
+        "guard": 65,
+        "eat": 24,
+        "rest": 652,
+        "follow": 64,
+        "idle": 889
+      },
+      "foodEaten": 27,
+      "eatingShare": 0.013,
+      "restingShare": 0.34,
+      "rallyVerdicts": {
+        "assented": 31,
+        "deferred": 0,
+        "modified": 0,
+        "refused": 1,
+        "complied": 0,
+        "commanded": 0
+      },
+      "decisions": 1025,
+      "zeroFood": {
+        "firstSecond": 310,
+        "seconds": 855,
+        "byAct": {
+          "wood": 5,
+          "stone": 8,
+          "farm": 22,
+          "guard": 14,
+          "eat": 0,
+          "rest": 578,
+          "follow": 31,
+          "idle": 710
+        },
+        "workShare": 0.036,
+        "stockedWorkShare": 0.438,
+        "meanFoodNeedLevelAtFirstZero": 0.885,
+        "rallyOnVerdicts": {
+          "assented": 8,
+          "deferred": 0,
+          "modified": 0,
+          "refused": 0,
+          "complied": 0,
+          "commanded": 0
+        },
+        "narratedLines": [
+          {
+            "line": "This time, I accepted the advice.",
+            "count": 6
+          },
+          {
+            "line": "After considering it, I accepted the advice.",
+            "count": 7
+          },
+          {
+            "line": "I accepted the advice after thinking it over.",
+            "count": 4
+          },
+          {
+            "line": "I accepted the advice.",
+            "count": 6
+          },
+          {
+            "line": "This time, I could not follow the advice. I cannot manage that physically.",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "size": 8,
+      "seed": 17,
+      "initMs": 3.522,
+      "tickMs": {
+        "p50": 28.053,
+        "p95": 47.866,
+        "max": 74.432
+      },
+      "bridgeTickMs": {
+        "p50": 28.068,
+        "p95": 47.88,
+        "max": 74.448
+      },
+      "rallyEdges": [
+        {
+          "t": 240,
+          "rally": true,
+          "following": 8
+        },
+        {
+          "t": 320,
+          "rally": false,
+          "following": 0
+        },
+        {
+          "t": 600,
+          "rally": true,
+          "following": 8
+        },
+        {
+          "t": 680,
+          "rally": false,
+          "following": 0
+        }
+      ],
+      "byAct": {
+        "wood": 51,
+        "stone": 34,
+        "farm": 73,
+        "guard": 102,
+        "eat": 25,
+        "rest": 599,
+        "follow": 70,
+        "idle": 966
+      },
+      "foodEaten": 24,
+      "eatingShare": 0.013,
+      "restingShare": 0.312,
+      "rallyVerdicts": {
+        "assented": 30,
+        "deferred": 0,
+        "modified": 0,
+        "refused": 2,
+        "complied": 0,
+        "commanded": 0
+      },
+      "decisions": 1035,
+      "zeroFood": {
+        "firstSecond": 195,
+        "seconds": 965,
+        "byAct": {
+          "wood": 20,
+          "stone": 13,
+          "farm": 23,
+          "guard": 46,
+          "eat": 0,
+          "rest": 533,
+          "follow": 67,
+          "idle": 842
+        },
+        "workShare": 0.066,
+        "stockedWorkShare": 0.42,
+        "meanFoodNeedLevelAtFirstZero": 0.917,
+        "rallyOnVerdicts": {
+          "assented": 16,
+          "deferred": 0,
+          "modified": 0,
+          "refused": 0,
+          "complied": 0,
+          "commanded": 0
+        },
+        "narratedLines": [
+          {
+            "line": "I accepted the advice.",
+            "count": 7
+          },
+          {
+            "line": "After considering it, I accepted the advice.",
+            "count": 8
+          },
+          {
+            "line": "I accepted the advice after thinking it over.",
+            "count": 9
+          },
+          {
+            "line": "This time, I accepted the advice.",
+            "count": 6
+          },
+          {
+            "line": "After considering it, I could not follow the advice. I cannot manage that physically.",
+            "count": 1
+          },
+          {
+            "line": "I could not follow the advice after thinking it over. I cannot manage that physically.",
+            "count": 1
+          },
+          {
+            "line": "I choose to eat. I need to eat first.",
+            "count": 2
+          },
+          {
+            "line": "I will eat. I need to eat first.",
+            "count": 1
+          },
+          {
+            "line": "I have decided to eat. I need to eat first.",
+            "count": 3
+          },
+          {
+            "line": "My decision is to eat. I need to eat first.",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "size": 8,
+      "seed": 29,
+      "initMs": 3.826,
+      "tickMs": {
+        "p50": 27.282,
+        "p95": 51.976,
+        "max": 64.261
+      },
+      "bridgeTickMs": {
+        "p50": 27.292,
+        "p95": 51.986,
+        "max": 64.271
+      },
+      "rallyEdges": [
+        {
+          "t": 240,
+          "rally": true,
+          "following": 8
+        },
+        {
+          "t": 320,
+          "rally": false,
+          "following": 0
+        },
+        {
+          "t": 600,
+          "rally": true,
+          "following": 8
+        },
+        {
+          "t": 680,
+          "rally": false,
+          "following": 0
+        }
+      ],
+      "byAct": {
+        "wood": 80,
+        "stone": 17,
+        "farm": 66,
+        "guard": 107,
+        "eat": 25,
+        "rest": 614,
+        "follow": 69,
+        "idle": 942
+      },
+      "foodEaten": 23,
+      "eatingShare": 0.013,
+      "restingShare": 0.32,
+      "rallyVerdicts": {
+        "assented": 31,
+        "deferred": 0,
+        "modified": 0,
+        "refused": 1,
+        "complied": 0,
+        "commanded": 0
+      },
+      "decisions": 1025,
+      "zeroFood": {
+        "firstSecond": 215,
+        "seconds": 970,
+        "byAct": {
+          "wood": 32,
+          "stone": 2,
+          "farm": 14,
+          "guard": 54,
+          "eat": 0,
+          "rest": 543,
+          "follow": 69,
+          "idle": 838
+        },
+        "workShare": 0.066,
+        "stockedWorkShare": 0.457,
+        "meanFoodNeedLevelAtFirstZero": 0.903,
+        "rallyOnVerdicts": {
+          "assented": 16,
+          "deferred": 0,
+          "modified": 0,
+          "refused": 0,
+          "complied": 0,
+          "commanded": 0
+        },
+        "narratedLines": [
+          {
+            "line": "This time, I accepted the advice.",
+            "count": 9
+          },
+          {
+            "line": "I accepted the advice after thinking it over.",
+            "count": 6
+          },
+          {
+            "line": "After considering it, I accepted the advice.",
+            "count": 7
+          },
+          {
+            "line": "I accepted the advice.",
+            "count": 9
+          },
+          {
+            "line": "After considering it, I could not follow the advice. I cannot manage that physically.",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "size": 8,
+      "seed": 43,
+      "initMs": 3.379,
+      "tickMs": {
+        "p50": 28.69,
+        "p95": 50.391,
+        "max": 74.576
+      },
+      "bridgeTickMs": {
+        "p50": 28.707,
+        "p95": 50.404,
+        "max": 74.59
+      },
+      "rallyEdges": [
+        {
+          "t": 240,
+          "rally": true,
+          "following": 8
+        },
+        {
+          "t": 320,
+          "rally": false,
+          "following": 0
+        },
+        {
+          "t": 600,
+          "rally": true,
+          "following": 8
+        },
+        {
+          "t": 680,
+          "rally": false,
+          "following": 0
+        }
+      ],
+      "byAct": {
+        "wood": 65,
+        "stone": 32,
+        "farm": 85,
+        "guard": 91,
+        "eat": 24,
+        "rest": 660,
+        "follow": 74,
+        "idle": 889
+      },
+      "foodEaten": 25,
+      "eatingShare": 0.013,
+      "restingShare": 0.344,
+      "rallyVerdicts": {
+        "assented": 31,
+        "deferred": 0,
+        "modified": 0,
+        "refused": 1,
+        "complied": 0,
+        "commanded": 0
+      },
+      "decisions": 1022,
+      "zeroFood": {
+        "firstSecond": 300,
+        "seconds": 875,
+        "byAct": {
+          "wood": 11,
+          "stone": 7,
+          "farm": 22,
+          "guard": 21,
+          "eat": 0,
+          "rest": 592,
+          "follow": 31,
+          "idle": 716
+        },
+        "workShare": 0.044,
+        "stockedWorkShare": 0.408,
+        "meanFoodNeedLevelAtFirstZero": 0.848,
+        "rallyOnVerdicts": {
+          "assented": 8,
+          "deferred": 0,
+          "modified": 0,
+          "refused": 0,
+          "complied": 0,
+          "commanded": 0
+        },
+        "narratedLines": [
+          {
+            "line": "After considering it, I accepted the advice.",
+            "count": 5
+          },
+          {
+            "line": "This time, I accepted the advice.",
+            "count": 8
+          },
+          {
+            "line": "I accepted the advice.",
+            "count": 5
+          },
+          {
+            "line": "I accepted the advice after thinking it over.",
+            "count": 5
+          },
+          {
+            "line": "I could not follow the advice. I cannot manage that physically.",
+            "count": 1
+          },
+          {
+            "line": "I have decided to eat. I need to eat first.",
+            "count": 3
+          },
+          {
+            "line": "I will eat. I need to eat first.",
+            "count": 2
+          }
+        ]
+      }
+    },
+    {
+      "size": 8,
+      "seed": 71,
+      "initMs": 3.297,
+      "tickMs": {
+        "p50": 24.89,
+        "p95": 48.279,
+        "max": 104.763
+      },
+      "bridgeTickMs": {
+        "p50": 24.906,
+        "p95": 48.292,
+        "max": 104.79
+      },
+      "rallyEdges": [
+        {
+          "t": 240,
+          "rally": true,
+          "following": 8
+        },
+        {
+          "t": 320,
+          "rally": false,
+          "following": 0
+        },
+        {
+          "t": 600,
+          "rally": true,
+          "following": 8
+        },
+        {
+          "t": 680,
+          "rally": false,
+          "following": 0
+        }
+      ],
+      "byAct": {
+        "wood": 80,
+        "stone": 38,
+        "farm": 79,
+        "guard": 69,
+        "eat": 24,
+        "rest": 684,
+        "follow": 61,
+        "idle": 885
+      },
+      "foodEaten": 24,
+      "eatingShare": 0.013,
+      "restingShare": 0.356,
+      "rallyVerdicts": {
+        "assented": 31,
+        "deferred": 0,
+        "modified": 0,
+        "refused": 1,
+        "complied": 0,
+        "commanded": 0
+      },
+      "decisions": 1023,
+      "zeroFood": {
+        "firstSecond": 265,
+        "seconds": 915,
+        "byAct": {
+          "wood": 12,
+          "stone": 6,
+          "farm": 19,
+          "guard": 20,
+          "eat": 0,
+          "rest": 625,
+          "follow": 31,
+          "idle": 751
+        },
+        "workShare": 0.039,
+        "stockedWorkShare": 0.458,
+        "meanFoodNeedLevelAtFirstZero": 0.804,
+        "rallyOnVerdicts": {
+          "assented": 8,
+          "deferred": 0,
+          "modified": 0,
+          "refused": 0,
+          "complied": 0,
+          "commanded": 0
+        },
+        "narratedLines": [
+          {
+            "line": "This time, I accepted the advice.",
+            "count": 5
+          },
+          {
+            "line": "I accepted the advice after thinking it over.",
+            "count": 3
+          },
+          {
+            "line": "After considering it, I accepted the advice.",
+            "count": 3
+          },
+          {
+            "line": "I accepted the advice.",
+            "count": 4
+          },
+          {
+            "line": "After considering it, I could not follow the advice. I cannot manage that physically.",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "size": 16,
+      "seed": 5,
+      "initMs": 5.198,
+      "tickMs": {
+        "p50": 68.597,
+        "p95": 123.898,
+        "max": 205.002
+      },
+      "bridgeTickMs": {
+        "p50": 68.616,
+        "p95": 123.915,
+        "max": 205.021
+      },
+      "rallyEdges": [
+        {
+          "t": 240,
+          "rally": true,
+          "following": 16
+        },
+        {
+          "t": 320,
+          "rally": false,
+          "following": 0
+        },
+        {
+          "t": 600,
+          "rally": true,
+          "following": 16
+        },
+        {
+          "t": 680,
+          "rally": false,
+          "following": 0
+        }
+      ],
+      "byAct": {
+        "wood": 111,
+        "stone": 120,
+        "farm": 156,
+        "guard": 142,
+        "eat": 45,
+        "rest": 1284,
+        "follow": 161,
+        "idle": 1821
+      },
+      "foodEaten": 49,
+      "eatingShare": 0.012,
+      "restingShare": 0.334,
+      "rallyVerdicts": {
+        "assented": 60,
+        "deferred": 1,
+        "modified": 0,
+        "refused": 3,
+        "complied": 0,
+        "commanded": 0
+      },
+      "decisions": 2037,
+      "zeroFood": {
+        "firstSecond": 270,
+        "seconds": 885,
+        "byAct": {
+          "wood": 10,
+          "stone": 25,
+          "farm": 27,
+          "guard": 30,
+          "eat": 0,
+          "rest": 1137,
+          "follow": 92,
+          "idle": 1511
+        },
+        "workShare": 0.032,
+        "stockedWorkShare": 0.434,
+        "meanFoodNeedLevelAtFirstZero": 0.852,
+        "rallyOnVerdicts": {
+          "assented": 16,
+          "deferred": 0,
+          "modified": 0,
+          "refused": 0,
+          "complied": 0,
+          "commanded": 0
+        },
+        "narratedLines": [
+          {
+            "line": "This time, I accepted the advice.",
+            "count": 11
+          },
+          {
+            "line": "After considering it, I accepted the advice.",
+            "count": 13
+          },
+          {
+            "line": "I accepted the advice after thinking it over.",
+            "count": 8
+          },
+          {
+            "line": "I accepted the advice.",
+            "count": 12
+          },
+          {
+            "line": "I put off acting on the advice.",
+            "count": 1
+          },
+          {
+            "line": "This time, I could not follow the advice. I cannot manage that physically.",
+            "count": 2
+          },
+          {
+            "line": "After considering it, I could not follow the advice. I cannot manage that physically.",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "size": 16,
+      "seed": 17,
+      "initMs": 5.174,
+      "tickMs": {
+        "p50": 68.42,
+        "p95": 115.767,
+        "max": 170.385
+      },
+      "bridgeTickMs": {
+        "p50": 68.434,
+        "p95": 115.78,
+        "max": 170.406
+      },
+      "rallyEdges": [
+        {
+          "t": 240,
+          "rally": true,
+          "following": 16
+        },
+        {
+          "t": 320,
+          "rally": false,
+          "following": 0
+        },
+        {
+          "t": 600,
+          "rally": true,
+          "following": 16
+        },
+        {
+          "t": 680,
+          "rally": false,
+          "following": 0
+        }
+      ],
+      "byAct": {
+        "wood": 110,
+        "stone": 78,
+        "farm": 160,
+        "guard": 170,
+        "eat": 54,
+        "rest": 1225,
+        "follow": 130,
+        "idle": 1913
+      },
+      "foodEaten": 49,
+      "eatingShare": 0.014,
+      "restingShare": 0.319,
+      "rallyVerdicts": {
+        "assented": 61,
+        "deferred": 0,
+        "modified": 0,
+        "refused": 3,
+        "complied": 0,
+        "commanded": 0
+      },
+      "decisions": 2042,
+      "zeroFood": {
+        "firstSecond": 225,
+        "seconds": 935,
+        "byAct": {
+          "wood": 15,
+          "stone": 21,
+          "farm": 33,
+          "guard": 53,
+          "eat": 0,
+          "rest": 1097,
+          "follow": 121,
+          "idle": 1652
+        },
+        "workShare": 0.041,
+        "stockedWorkShare": 0.467,
+        "meanFoodNeedLevelAtFirstZero": 0.896,
+        "rallyOnVerdicts": {
+          "assented": 32,
+          "deferred": 0,
+          "modified": 0,
+          "refused": 0,
+          "complied": 0,
+          "commanded": 0
+        },
+        "narratedLines": [
+          {
+            "line": "I accepted the advice.",
+            "count": 11
+          },
+          {
+            "line": "After considering it, I accepted the advice.",
+            "count": 16
+          },
+          {
+            "line": "I accepted the advice after thinking it over.",
+            "count": 12
+          },
+          {
+            "line": "This time, I accepted the advice.",
+            "count": 6
+          },
+          {
+            "line": "I could not follow the advice after thinking it over. I cannot manage that physically.",
+            "count": 1
+          },
+          {
+            "line": "After considering it, I could not follow the advice. I cannot manage that physically.",
+            "count": 1
+          },
+          {
+            "line": "This time, I could not follow the advice. I cannot manage that physically.",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "size": 16,
+      "seed": 29,
+      "initMs": 5.239,
+      "tickMs": {
+        "p50": 72.806,
+        "p95": 131.351,
+        "max": 305.834
+      },
+      "bridgeTickMs": {
+        "p50": 72.82,
+        "p95": 131.409,
+        "max": 305.853
+      },
+      "rallyEdges": [
+        {
+          "t": 240,
+          "rally": true,
+          "following": 16
+        },
+        {
+          "t": 320,
+          "rally": false,
+          "following": 0
+        },
+        {
+          "t": 600,
+          "rally": true,
+          "following": 16
+        },
+        {
+          "t": 680,
+          "rally": false,
+          "following": 0
+        }
+      ],
+      "byAct": {
+        "wood": 119,
+        "stone": 72,
+        "farm": 178,
+        "guard": 156,
+        "eat": 55,
+        "rest": 1257,
+        "follow": 140,
+        "idle": 1863
+      },
+      "foodEaten": 51,
+      "eatingShare": 0.014,
+      "restingShare": 0.327,
+      "rallyVerdicts": {
+        "assented": 60,
+        "deferred": 0,
+        "modified": 0,
+        "refused": 4,
+        "complied": 0,
+        "commanded": 0
+      },
+      "decisions": 2066,
+      "zeroFood": {
+        "firstSecond": 230,
+        "seconds": 915,
+        "byAct": {
+          "wood": 18,
+          "stone": 13,
+          "farm": 36,
+          "guard": 45,
+          "eat": 0,
+          "rest": 1121,
+          "follow": 129,
+          "idle": 1566
+        },
+        "workShare": 0.038,
+        "stockedWorkShare": 0.453,
+        "meanFoodNeedLevelAtFirstZero": 0.904,
+        "rallyOnVerdicts": {
+          "assented": 32,
+          "deferred": 0,
+          "modified": 0,
+          "refused": 0,
+          "complied": 0,
+          "commanded": 0
+        },
+        "narratedLines": [
+          {
+            "line": "This time, I accepted the advice.",
+            "count": 13
+          },
+          {
+            "line": "I accepted the advice after thinking it over.",
+            "count": 11
+          },
+          {
+            "line": "After considering it, I accepted the advice.",
+            "count": 9
+          },
+          {
+            "line": "I accepted the advice.",
+            "count": 11
+          },
+          {
+            "line": "I could not follow the advice after thinking it over. I cannot manage that physically.",
+            "count": 1
+          },
+          {
+            "line": "I could not follow the advice. I cannot manage that physically.",
+            "count": 2
+          },
+          {
+            "line": "This time, I could not follow the advice. I cannot manage that physically.",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "size": 16,
+      "seed": 43,
+      "initMs": 5.32,
+      "tickMs": {
+        "p50": 188.906,
+        "p95": 459.868,
+        "max": 660.439
+      },
+      "bridgeTickMs": {
+        "p50": 188.926,
+        "p95": 459.888,
+        "max": 660.459
+      },
+      "rallyEdges": [
+        {
+          "t": 240,
+          "rally": true,
+          "following": 16
+        },
+        {
+          "t": 320,
+          "rally": false,
+          "following": 0
+        },
+        {
+          "t": 600,
+          "rally": true,
+          "following": 15
+        },
+        {
+          "t": 680,
+          "rally": false,
+          "following": 0
+        }
+      ],
+      "byAct": {
+        "wood": 127,
+        "stone": 88,
+        "farm": 143,
+        "guard": 166,
+        "eat": 45,
+        "rest": 1300,
+        "follow": 159,
+        "idle": 1812
+      },
+      "foodEaten": 47,
+      "eatingShare": 0.012,
+      "restingShare": 0.339,
+      "rallyVerdicts": {
+        "assented": 60,
+        "deferred": 2,
+        "modified": 0,
+        "refused": 2,
+        "complied": 0,
+        "commanded": 0
+      },
+      "decisions": 2012,
+      "zeroFood": {
+        "firstSecond": 290,
+        "seconds": 880,
+        "byAct": {
+          "wood": 15,
+          "stone": 15,
+          "farm": 21,
+          "guard": 28,
+          "eat": 0,
+          "rest": 1167,
+          "follow": 67,
+          "idle": 1503
+        },
+        "workShare": 0.028,
+        "stockedWorkShare": 0.435,
+        "meanFoodNeedLevelAtFirstZero": 0.826,
+        "rallyOnVerdicts": {
+          "assented": 15,
+          "deferred": 1,
+          "modified": 0,
+          "refused": 0,
+          "complied": 0,
+          "commanded": 0
+        },
+        "narratedLines": [
+          {
+            "line": "I accepted the advice after thinking it over.",
+            "count": 8
+          },
+          {
+            "line": "I accepted the advice.",
+            "count": 5
+          },
+          {
+            "line": "This time, I accepted the advice.",
+            "count": 10
+          },
+          {
+            "line": "After considering it, I accepted the advice.",
+            "count": 5
+          },
+          {
+            "line": "This time, I put off acting on the advice. I need to rest first.",
+            "count": 1
+          },
+          {
+            "line": "I could not follow the advice. I cannot manage that physically.",
+            "count": 1
+          },
+          {
+            "line": "I put off acting on the advice after thinking it over.",
+            "count": 1
+          },
+          {
+            "line": "After considering it, I could not follow the advice. I cannot manage that physically.",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "size": 16,
+      "seed": 71,
+      "initMs": 6.269,
+      "tickMs": {
+        "p50": 182.746,
+        "p95": 384.08,
+        "max": 914.208
+      },
+      "bridgeTickMs": {
+        "p50": 182.769,
+        "p95": 384.095,
+        "max": 914.229
+      },
+      "rallyEdges": [
+        {
+          "t": 240,
+          "rally": true,
+          "following": 16
+        },
+        {
+          "t": 320,
+          "rally": false,
+          "following": 0
+        },
+        {
+          "t": 600,
+          "rally": true,
+          "following": 16
+        },
+        {
+          "t": 680,
+          "rally": false,
+          "following": 0
+        }
+      ],
+      "byAct": {
+        "wood": 158,
+        "stone": 79,
+        "farm": 142,
+        "guard": 150,
+        "eat": 54,
+        "rest": 1323,
+        "follow": 121,
+        "idle": 1813
+      },
+      "foodEaten": 47,
+      "eatingShare": 0.014,
+      "restingShare": 0.345,
+      "rallyVerdicts": {
+        "assented": 63,
+        "deferred": 0,
+        "modified": 0,
+        "refused": 1,
+        "complied": 0,
+        "commanded": 0
+      },
+      "decisions": 2051,
+      "zeroFood": {
+        "firstSecond": 265,
+        "seconds": 880,
+        "byAct": {
+          "wood": 25,
+          "stone": 14,
+          "farm": 20,
+          "guard": 36,
+          "eat": 0,
+          "rest": 1174,
+          "follow": 54,
+          "idle": 1493
+        },
+        "workShare": 0.034,
+        "stockedWorkShare": 0.424,
+        "meanFoodNeedLevelAtFirstZero": 0.819,
+        "rallyOnVerdicts": {
+          "assented": 16,
+          "deferred": 0,
+          "modified": 0,
+          "refused": 0,
+          "complied": 0,
+          "commanded": 0
+        },
+        "narratedLines": [
+          {
+            "line": "This time, I accepted the advice.",
+            "count": 9
+          },
+          {
+            "line": "I accepted the advice after thinking it over.",
+            "count": 5
+          },
+          {
+            "line": "After considering it, I accepted the advice.",
+            "count": 7
+          },
+          {
+            "line": "I accepted the advice.",
+            "count": 10
+          },
+          {
+            "line": "After considering it, I could not follow the advice. I cannot manage that physically.",
+            "count": 1
+          }
+        ]
+      }
+    }
+  ]
+}
