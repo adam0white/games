@@ -13,6 +13,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 import { join } from 'node:path';
+import { joinRuns } from '../../scripts/lab-join.mjs';
 
 const args = process.argv.slice(2), dir = args.find(a => !a.startsWith('--'));
 const opt = n => args.find(a => a.startsWith(`--${n}=`))?.slice(n.length + 3);
@@ -41,8 +42,9 @@ if (days > 0) {
   console.error(`Fetched ${fresh} new records${failed ? `, ${failed} failed` : ''}.`);
 }
 
-// One run can arrive more than once (sent when the page is put away, again when it ends): keep the latest copy.
-const runs = new Map(), between = [];
+// A run can arrive as several records: an older copy sent when the page was put away, or, since 2026-11-26, numbered
+// parts. scripts/lab-join.mjs joins them into one record per run.
+const runs = new Map(), between = [], parts = [];
 let files = []; try { files = readdirSync(join(dir, 'linked')).filter(f => f.includes('-exile-') && f.endsWith('.json')); } catch {}
 for (const f of files) {
   let records = []; try { records = JSON.parse(readFileSync(join(dir, 'linked', f), 'utf8')); } catch { continue; }
@@ -50,9 +52,10 @@ for (const f of files) {
     if (r.game !== 'exile' || r.kind !== 'run' || r.data?.format !== 'kit-lab/1') continue;
     if (r.runSource === 'agent' && !agents) continue;
     if (r.data.outcome === 'between-runs') { between.push(r); continue; }
-    const old = runs.get(r.runId); if (!old || r.at >= old.at) runs.set(r.runId, r);
+    parts.push(r);
   }
 }
+for (const r of joinRuns(parts)) runs.set(r.runId, r);
 
 const PHASES = ['Camp', 'Raid', 'Free', 'Judge', 'Won', 'Lost'];
 const rows = [...runs.values()].sort((a, b) => a.at - b.at).map(r => {
