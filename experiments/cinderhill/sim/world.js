@@ -86,6 +86,10 @@ export function windfall(sim, G, setGoal, slot0, goalFood, event) {
     const py = Math.max(3, Math.min(L.sh - 4, ey + Math.floor((dy * r * 7) / 10) + ((q >> 3) & 3) - 2));
     const c = cellAt(L, SURFACE, px, py);
     if (sim.mat[c] !== MAT.OPEN || sim.link[c] >= 0) continue;
+    let near = false; // not on or beside a pile with food: pileAt() finds the lower slot first, so the new one would wait
+    for (let k = 0; k < sim.pileCell.length && !near; k++) if (sim.pileAmount[k] > 0) { const q2 = sim.pileCell[k], qx = q2 % L.sw, qy = Math.floor(q2 / L.sw); near = Math.abs(qx - px) <= 2 && Math.abs(qy - py) <= 2; }
+    if (near) continue;
+    for (let i = 0; i < sim.n; i++) if (sim.mem[i] === slot0 + p) sim.mem[i] = -1; // the slot's old pile is gone: no ant remembers the new one
     const kind = sim.g[G.WINDFALLS] & 1 ? 0 : 1;
     sim.g[G.WINDFALLS]++;
     sim.pileCell[p] = c; sim.pileAmount[p] = 200 + below(rng, W, 200); sim.pileKind[p] = kind;

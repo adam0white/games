@@ -116,6 +116,7 @@ export class LabRecord {
   /** The part is near the kit's limits: end it and go on in a new part of the same chain. Only from tick(), so the
    *  new part starts from a state the previous parts' streams reach. */
   rollOver() {
+    this.flushLog(); // orders still buffered belong to this part, or the next part's stream would miss them
     this.open = false;
     const s = this.host.sim;
     this.rec.end('continued', { tick: s.tick, hash: s.hashes().total, part: this.part });

@@ -109,7 +109,7 @@ export class Sim {
       this.g[G.QUEEN] = 1; this.g[G.SUGAR] = cfg.sugar;
       for (let k = 0; k < cfg.larvae; k++) addBrood(this, STAGE.LARVA);
       // Pupae near hatching (sim 7): the first births 30, 45 and 60 s in.
-      for (let k = 0; k < cfg.pupae; k++) if (addBrood(this, STAGE.PUPA)) this.brood.age[this.brood.n - 1] = Math.max(0, C.PUPA_TICKS - 600 - 300 * k);
+      for (let k = 0; k < cfg.pupae; k++) if (addBrood(this, STAGE.PUPA)) this.brood.age[this.brood.n - 1] = Math.max(0, C.PUPA_TICKS - 300 * (k + 1)); // they hatch 15 s apart: 15, 30 and 45 s with PUPA_TICKS 900
       startDays(this);
     }
     rebuildDirty(this);

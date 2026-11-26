@@ -4,8 +4,9 @@
 // Two passive players, the kind that quit in the lab records of 2026-11-26:
 // - near: one trail at 3 s from the entrance to the nearest pile, then nothing.
 // - owner: one trail at 3 s to the nearest protein pile (what the owner did), then nothing.
-// Notable things (the page shows each): the first delivery, a birth, a new pile, a pile empty, the spider's
-// warning, a dusk, and a larva lost.
+// Notable things (the page shows each): the first delivery, the first birth and every tenth (the page's toasts), a
+// new pile, a pile empty (it goes from the map), the spider's warning and a dusk. A larva lost is counted but has no
+// toast, so it does not end a quiet stretch.
 // Acceptance (the coordinator's brief): first delivery 10 to 15 s after the first trail, the first birth within 60 s,
 // and no gap over 45 s in the first five minutes.
 // Usage: node experiments/cinderhill/spikes/pace.mjs [seeds: first-last, default 1-24] [--json=out.json]
@@ -47,7 +48,7 @@ export function pace(seed, policy) {
     if (host.dusk) { if (day1 === null) day1 = { done: host.dusk.goal.a, target: host.dusk.goal.target, won: host.dusk.won }; host.goOn(); } // the player taps on at the dusk card
     const t = host.tick, g = sim.g;
     if (g[G.STORES] > stores && firsts.delivery === undefined) mark('delivery', t);
-    if (g[G.BORN] > born) mark('birth', t);
+    for (let b = born + 1; b <= g[G.BORN]; b++) if (b === 1 || b % 10 === 0) mark('birth', t); // the page toasts the first birth and every tenth
     if (g[G.BROOD_LOST] > lost) mark('larva lost', t);
     stores = g[G.STORES]; born = g[G.BORN]; lost = g[G.BROOD_LOST];
     for (const e of host.lastEvents ?? []) {
@@ -57,7 +58,7 @@ export function pace(seed, policy) {
       else if (e[0] === EVENT.DUSK) mark('dusk', t);
     }
   }
-  const times = [0, ...marks.map(m => m[0]), FIVE_MIN].sort((a, b) => a - b);
+  const times = [0, ...marks.filter(m => m[1] !== 'larva lost').map(m => m[0]), FIVE_MIN].sort((a, b) => a - b); // a lost larva has no toast: not counted for the gap
   let gap = 0, gapAt = 0;
   for (let k = 1; k < times.length; k++) if (times[k] - times[k - 1] > gap) { gap = times[k] - times[k - 1]; gapAt = times[k - 1]; }
   return {

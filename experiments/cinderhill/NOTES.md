@@ -236,7 +236,7 @@ What changed, all in the sim:
 | New piles during a day | none | at 7, 10, 14 and 18 twentieths of the day (73, 105, 147, 189 s), 24 to 63 cells out, 200 to 400 food, protein first then alternating (`world.js` `windfall`, event `PILE_NEW`) |
 | Day length (`DAY_TICKS`) | 12,000 (10 min) | 4,200 (3.5 min) |
 | Brood: egg / larva meal / starve / pupa / adult meal (ticks) | 3,000 / 1,200 / 6,000 / 4,800 / 1,200 (egg to adult 9.5 min) | 600 / 300 / 2,400 / 900 / 600 (egg to adult 2 min) |
-| Brood at the start | 4 larvae | 4 larvae and 3 pupae that hatch at 30, 45 and 60 s |
+| Brood at the start | 4 larvae | 4 larvae and 3 pupae that hatch at 15, 30 and 45 s |
 | Spider | from day 2 | day 1 walks the edge at a quarter of the day (52 s) and eats no one; first hunt on day 2 |
 | Seeking gives up after | 60 s | 30 s |
 | Trail scent half-life | 4,000 ticks | 1,400 ticks |

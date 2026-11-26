@@ -128,3 +128,20 @@ test('encoded crew orders: a missing change is refused, a huge one is clamped, n
   const ev = run(s, 1);
   assert.equal(ev.filter(e => e[0] === EVENT.REJECTED).length, 1);
 });
+
+test('the crew count matches the ants on each trail after every ant\'s step, through give-ups and a crew of one', () => {
+  // A crew of one: when its member gives up, a later seeker in the same tick may take her place, but only if the
+  // count drops at once.
+  const s = colony(20);
+  east(s); run(s, 1); const seq = s.flow.seq[s.newestTrail()];
+  run(s, 400);
+  order(s, { type: CMD.CREW, seq, delta: -64 }); run(s, 1); order(s, { type: CMD.CREW, seq, delta: 1 }); run(s, 1);
+  const step = s.stepAnt.bind(s);
+  let bad = 0;
+  s.stepAnt = i => {
+    step(i);
+    for (let k = 0; k < SLOT.TRAILS; k++) { let n = 0; for (let j = 0; j < s.n; j++) if (s.hp[j] > 0 && s.job[j] === JOB.FORAGE && s.via[j] === SLOT.TRAIL0 + k) n++; if (n !== s.crew[k]) bad++; }
+  };
+  run(s, 600, s => { if (s.tick % 50 === 0) for (let i = 0; i < s.n; i++) if (s.via[i] >= 0 && s.mode[i] === MODE.SEEK) s.since[i] = 0xFFF0; }); // every 50 ticks the crew gives up
+  assert.equal(bad, 0);
+});

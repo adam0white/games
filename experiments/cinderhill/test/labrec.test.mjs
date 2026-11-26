@@ -113,3 +113,16 @@ test('a long game rolls over into parts that replay as one', () => {
   const missing = small.runs.filter((_, k) => k !== 1);
   assert.match(replayChain(parts(missing)[0]).notes.join(), /part 2 is missing/);
 });
+
+test('an order still buffered when a part rolls over is in the stream (a page event triggered the roll)', () => {
+  const host = new Host(20, 2026, { colony: true, dayTicks: 3000 }), rec = fakeLab(), lab = new LabRecord(rec, { rollEvents: 6, rollBytes: 100000, batch: 100000 });
+  lab.start(host, { mode: 'colony', look: 'default', viewport: [390, 844, 3] });
+  for (let t = 0; t < 40; t++) { host.step(); lab.tick(); }
+  const o = { type: CMD.RECALL, on: true }; lab.order(o, host.order(o));
+  for (let k = 0; k < 6; k++) lab.event('speed', { at: host.tick, x: 2 }); // the roll is due at the next tick()
+  for (let t = 0; t < 400; t++) { host.step(); lab.tick(); }
+  lab.end('left');
+  assert.ok(rec.runs.length >= 2, `${rec.runs.length} parts`);
+  const out = replayChain(parts(rec.runs)[0]);
+  assert.equal(out.divergence, null); assert.ok(out.ok);
+});

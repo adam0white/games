@@ -33,7 +33,7 @@ export function cleanCommand(cmd, tick, seat, id) {
   if (cmd.type === 2) { const c = ints(cmd.cells, 512); return c && c.length >= 2 ? encodeCommand({ ...base, cells: c }) : null; }
   if (cmd.type === 3) { const [l, x, y, h] = [cmd.layer ?? 0, cmd.x, cmd.y, cmd.hold ?? 100].map(int); return [l, x, y, h].includes(null) ? null : encodeCommand({ ...base, layer: l, x, y, hold: h }); }
   if (cmd.type === 4) return encodeCommand({ ...base, on: !!cmd.on });
-  if (cmd.type === 5) { const seq = cmd.seq, d = int(cmd.delta); return Number.isInteger(seq) && seq >= 0 && seq <= 0xffffffff && d !== null ? encodeCommand({ ...base, seq, delta: Math.max(-64, Math.min(64, d)) }) : null; } // crews
+  if (cmd.type === 5) { const seq = cmd.seq, d = int(cmd.delta); return Number.isInteger(seq) && seq >= 0 && seq <= 0xffffffff && d !== null && d !== 0 ? encodeCommand({ ...base, seq, delta: Math.max(-64, Math.min(64, d)) }) : null; } // crews
   return null;
 }
 

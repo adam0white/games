@@ -472,6 +472,8 @@ export const pageRuns = {
     await page.goto(`${base}/cinderhill/?colony=1&lang=en&labRunSource=agent`);
     await until(page, () => window.painter, 'painter script');
     await page.click('#play');
+    await until(page, () => window.painter.state().dayCard === 'dawn', 'the dawn card');
+    await page.click('#dayGo');
     await until(page, () => window.painter.state().screen === 'play', 'play');
     await page.evaluate(() => {
       const el = document.querySelector('#c'), x = innerWidth / 2, y = innerHeight / 2;
@@ -536,10 +538,10 @@ export const pageRuns = {
     await until(page, () => window.painter.state().screen === 'play', 'play');
     await until(page, () => /şeker/.test(document.querySelector('#stats').textContent), 'the colony line', 10000);
     const st = await page.evaluate(() => window.painter.stats());
-    assert.equal(st.ants, 20);
+    assert.ok(st.ants >= 20 && st.ants <= 23, `${st.ants} ants (20, and the three starting pupae hatch from 15 s)`);
     assert.equal(st.colony.queen, 1);
     assert.equal(st.colony.larvae, 4);
-    assert.match(await page.textContent('#stats'), /20 karınca · \d+ şeker · 0 protein · yavrular: \d+ yumurta, 4 larva, 0 pupa/);
+    assert.match(await page.textContent('#stats'), /2\d karınca · \d+ şeker · 0 protein · yavrular: \d+ yumurta, 4 larva, [0-3] pupa/);
     await page.evaluate(() => window.painter.setLayer(1));
     await until(page, () => window.painter.state().layer === 1, 'nest view');
     // Each brood item is drawn inside its own cell: some overlay pixel in that cell's square is painted.
@@ -569,11 +571,11 @@ export const pageRuns = {
     const dawnHash = await page.evaluate(() => window.painter.hashes().total);
     await page.click('#play');
     await until(page, () => window.painter.state().dayCard === 'dawn', 'the dawn card');
-    assert.match(await page.textContent('#dayGoal'), /40 loads of food along your trails/);
+    assert.match(await page.textContent('#dayGoal'), /60 loads of food along your trails/);
     assert.equal(await page.evaluate(() => window.painter.state().t), 0, 'no time passes on the dawn card');
     await page.click('#dayGo');
     await until(page, () => window.painter.state().screen === 'play', 'play');
-    await until(page, () => /Day 1 · 0 of 40 loads on your trails · dusk in/.test(document.querySelector('#goal').textContent), 'the goal line');
+    await until(page, () => /Day 1 · 0 of 60 loads on your trails · dusk in/.test(document.querySelector('#goal').textContent), 'the goal line');
     await until(page, () => window.painter.state().dayCard === 'dusk', 'the dusk card', 30000);
     assert.match(await page.textContent('#dayResult'), /Goal missed/);
     assert.match(await page.textContent('#dayNote'), /Tomorrow: Dig 30 cells of soil/);
@@ -601,7 +603,8 @@ export const pageRuns = {
     await until(page, () => /Spider: coming/.test(document.querySelector('#crew').textContent), 'the coming line');
     await until(page, () => window.painter.state().spider === 2, 'the spider hunting', 30000);
     await until(page, () => /Spider: hunting/.test(document.querySelector('#crew').textContent), 'the hunting line');
-    await until(page, () => window.painter.state().spider === 0 && window.painter.state().spiderVisits === 1, 'the spider gone', 30000);
+    await until(page, () => window.painter.state().spider === 0 && window.painter.state().spiderVisits >= 1, 'the spider gone', 30000);
+    assert.equal(await page.evaluate(() => window.painter.state().spiderVisits), 2, 'day 1 had its edge walk (sim 7), day 2 its hunt');
     const rooms = await page.evaluate(() => window.painter.rooms());
     assert.ok(rooms.length >= 1 && rooms[0].queen, 'the nest view finds the queen\'s chamber');
     const labState = await page.evaluate(() => window.painter.lab());
