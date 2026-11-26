@@ -51,6 +51,10 @@ Evidence: on 2026-11-26 the owner's phone opened the home once and then went str
 - **Sound and buzz**: short notes from `kit/audio.js` when a card comes to the middle (one note of a pentatonic scale per position), when a game opens, on Surprise me and on a first try. A short `navigator.vibrate` goes with them where the browser has it, only after the player has touched the page. One switch (♪ in the header, `hub:small:sound`, '0' is off) covers both. Default on.
 - Check: `small tried` in `kit/check/phone.mjs` (runs with `small`). It covers the order, the count, a tile tap, the first-try note after back, the order kept through the visit, the remembered switch and the Turkish count. With the first-try code switched off, the check fails (tried).
 
+## 2026-11-26: a grid to pick from (taste call)
+
+`?v=grid` shows "All the small games" as a grid, two to a row: every game's preview moving while on screen (at most eight at once), its hook, name, time and Play. Any card's Play opens its game. The default stays the deck (`?v=deck`), the owner's pick of 2026-11-24. The grid puts every game on the first two screens of a phone and the deck shows one at a time, which is the reason to offer it; the owner picks. Check: `small grid` in `kit/check/phone.mjs`.
+
 ## Not verified
 
 - How the previews read to a person, and their cost on a slow Android phone (Firefox): only headless Chromium and WebKit ran them.

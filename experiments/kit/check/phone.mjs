@@ -1448,6 +1448,21 @@ GAMES['small tried'] = async page => {
   await page.click('#lang'); await until(page, () => document.documentElement.lang === 'tr', 'Turkish');
   assert.equal(await page.textContent('#triedText'), '12 oyunun 4 tanesini denedin');
 };
+// ?v=grid: every game at once. Any card's Play opens its game, the previews on screen move, no sideways scroll.
+GAMES['small grid'] = async page => {
+  await page.goto(`${base}/notes/button.js`); await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('hf-lab-send-localhost', '1'); localStorage.setItem('hub:small:intro', '1'); });
+  await page.goto(`${base}/small/?lang=en&day=2026-11-24&v=grid`); await until(page, () => window.smallState, 'home script');
+  assert.equal((await page.evaluate(() => window.smallState())).v, 'grid');
+  assert.equal(await page.locator('.card.away').count(), 0, 'no card is set aside');
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no sideways scroll');
+  await page.evaluate(() => document.getElementById('deck').scrollIntoView());
+  await until(page, () => window.smallState().live.length >= 4, 'the previews on screen move');
+  const slug = (await page.evaluate(() => window.smallState())).order[3];
+  await page.click(`.card.${slug} a.play`); await page.waitForURL(url => url.pathname === `/small/${slug}/`);
+  await page.goBack(); await until(page, () => window.smallState, 'back on the home');
+  await page.click('#lang'); await until(page, () => document.documentElement.lang === 'tr', 'Turkish');
+  assert.equal(await page.textContent('#all .lead'), 'Hepsi burada, oynuyor. Başlamak için birine dokun.');
+};
 
 const MUTATE = process.argv.includes('--mutate'); // only 'lantern ripples' reads it: its check must then fail
 const [onlyGame, onlyPhone] = process.argv.slice(2).filter(a => a !== '--mutate');
@@ -1458,7 +1473,7 @@ const picked = game => !onlyGame || onlyGame === 'all' || onlyGame.split(',').so
 // A check that never answers becomes a FAIL line naming it, not a job that runs until its time limit.
 const within = (p, ms, what) => { let t; return Promise.race([p, new Promise((_, no) => { t = setTimeout(() => no(new Error(`no answer in ${ms / 1000}s: ${what}`)), ms); })]).finally(() => clearTimeout(t)); };
 let failed = 0;
-WITH.small = ['small live', 'small tried']; // the small games' home: its extra checks run with 'small'
+WITH.small = ['small live', 'small tried', 'small grid']; // the small games' home: its extra checks run with 'small'
 for (const [phone, [engine, device]] of Object.entries(PHONES)) {
   if (onlyPhone && onlyPhone !== phone) continue;
   // Headless macOS WebKit still needs a display link to schedule animation frames.
