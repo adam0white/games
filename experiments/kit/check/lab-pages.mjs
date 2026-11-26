@@ -178,12 +178,13 @@ const splitlightLegacy = { 'night-splitlight:plate': '2', 'night-splitlight:soun
 
 export const labPages = {
   'small/wild2-face-shift': pageEntry('wild2-face-shift:save', saves.face, 'wild2-face-shift:hint', {
-    clock: true, menu: '#toMenu', sound: '#sound',
+    // Opens on the first sitter (2026-11-26); the run starts with the first touch on the face.
+    clock: true, startsOnBoard: true, menu: '#toMenu', sound: '#sound',
     state: () => { const s = window.faceShiftState?.(); return s && { screen: s.mode, paused: s.mode === 'paused', t: s.state?.elapsed ?? 0 }; },
     verify: () => { const s = window.faceShiftState(); return { saved: s.saved, booth: s.booth, daily: s.daily, line: document.querySelector('#dailyLine').textContent }; },
     expect: { saved: saves.face, booth: saves.faceBooth, daily: { v: 1, day: utcDay, best: 412 }, line: 'Today: best 412' },
     touch: dragTouch(() => window.faceShiftState().state.x, n => window.faceShiftState().state.x > n),
-    hint: { delay: 1600, before: () => window.faceShiftState().state.x, moved: n => window.faceShiftState().state.x > n },
+    hint: { delay: 1600, play: '#c', timing: { board: true }, before: () => window.faceShiftState().state.x, moved: n => window.faceShiftState().state.x > n },
   }, { 'wild2-face-shift:booth': json(saves.faceBooth), 'wild2-face-shift:daily': json({ v: 1, day: utcDay, best: 412 }) }),
   'small/wild-pour': pageEntry('wild-pour:save', saves.pour, 'wild-pour:hint', {
     clock: true, menu: '#quit', sound: '#sound2', changed: { 'wild-pour:save': { tries: 1 } },

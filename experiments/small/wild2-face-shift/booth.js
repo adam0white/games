@@ -146,12 +146,13 @@ function enterRung(state) {
 }
 
 // mode 'booth' climbs RUNGS from `from`; mode 'daily' plays the day's five sitters.
-export function createBooth({ seed = 1, mode = 'booth', day = '2026-01-01', from = 0, mutate = null } = {}) {
+// wait: the first sitter waits for the first touch (the page's cold open): no clock, no patience until then.
+export function createBooth({ seed = 1, mode = 'booth', day = '2026-01-01', from = 0, mutate = null, wait = false } = {}) {
   const rungs = mode === 'daily' ? dailyRungs(day) : RUNGS;
   const base = {
     mode, day: mode === 'daily' ? day : null, seed: (mode === 'daily' ? daySeed(day) : Number(seed)) >>> 0, rungs, ri: Math.max(0, Math.min(rungs.length - 1, from | 0)),
     score: 0, streak: 0, bestStreak: 0, shots: [], missed: 0, results: [], elapsed: 0,
-    ...(mutate ? { mutate } : {}),
+    ...(mutate ? { mutate } : {}), ...(wait ? { wait: true } : {}),
   };
   return enterRung(base);
 }
@@ -255,7 +256,8 @@ export function stepBooth(state, input = {}, dt = DT) {
     return next;
   }
 
-  // Play: move the grabbed part.
+  // Play: move the grabbed part. A waiting booth stands still until the first touch, then never waits again.
+  if (state.wait) { if (!input.active) return state; next.wait = false; }
   const mirror = state.targets[state.index].mod === 'mirror' ? -1 : 1;
   if (input.active) {
     let grab = state.grab;

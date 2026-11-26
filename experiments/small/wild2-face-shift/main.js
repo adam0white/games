@@ -27,6 +27,9 @@ const query=new URLSearchParams(location.search);
 const today=()=>{const d=query.get('day');return d&&/^\d{4}-\d{2}-\d{2}$/.test(d)?d:new Date().toISOString().slice(0,10);};
 const dailyBest=day=>{const d=readJson(DAILY_KEY);return d?.v===1&&d.day===day&&Number.isFinite(d.best)?d.best:null;};
 const snd=sound({on:()=>save.sound}), store=()=>writeJson(KEY,save), storeBooth=()=>writeJson(BOOTH_KEY,boothSave);
+// Cold open (2026-11-26): the page opens on the first sitter, and the run starts with the first touch on the face.
+// ?v=b keeps the old menu-first opening.
+const COLD=query.get('v')!=='b';let pending=false;
 let mode='menu', game='booth', s=null, b=null, allShots=[], total=0, seed=17, cleared=0, input={x:0,y:0,active:false}, keys=new Set();
 let W=0,H=0,top=0,bottom=0,unit=1,cx=0,cy=0,clock=0,last=performance.now(),acc=0,flash=0,shake=0,particles=[],visual={x:0,y:0},lastTone=0;
 const calm=matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -48,11 +51,16 @@ let keyTravel={x:0,y:0};
 const rec=home(lab('wild2-face-shift',{lang}),{back:['#menu .card','#end .card'],lang});let runOpen=false;
 function runEnd(outcome){if(!runOpen)return;runOpen=false;if(game==='classic')rec.end(outcome,{rounds:cleared,round:s?s.level+1:null,score:total,photos:allShots.length,best:save.best,stars:save.stars.reduce((a,n)=>a+n,0)});else rec.end(outcome,{mode:game,rungs:b?b.results.length:0,score:b?b.score:0,photos:b?b.shots.filter(x=>!x.missed).length:0,missed:b?b.missed:0,bestStreak:b?b.bestStreak:0,best:game==='daily'?dailyBest(b?.day)??0:boothSave.best});}
 function clearFx(){flash=0;shake=0;particles=[];acc=0;visual={x:0,y:0};springs=null;pull=null;strip=[];}
-function start(kind=game){runEnd('quit');game=kind;tap();snd.release();resetInput();clearFx();allShots=[];total=0;cleared=0;
+function start(kind=game){runEnd('quit');pending=false;coldBar(false);game=kind;tap();snd.release();resetInput();clearFx();allShots=[];total=0;cleared=0;
  const requestedSeed=query.get('seed');const given=requestedSeed!==null&&requestedSeed.trim()!==''&&Number.isFinite(Number(requestedSeed));
  if(game==='classic'){seed=given?Number(requestedSeed):17;s=create(seed,0);b=null;show('play');runOpen=true;rec.start({mode:'classic',seed});return;}
  s=null;seed=given?Number(requestedSeed):(boothSave.runs*7919+boothSave.photos*31+1);const from=Math.max(0,Math.min(RUNGS.length-1,parseInt(query.get('rung')||'1',10)-1||0));
  b=game==='daily'?createBooth({mode:'daily',day:today()}):createBooth({seed,from});show('play');runOpen=true;rec.start(game==='daily'?{mode:'daily',day:b.day}:{mode:'booth',seed,rung:from+1});}
+// The first sitter, ready before any tap: no sound and no record until the finger lands on the face.
+function coldStart(){game='booth';s=null;clearFx();allShots=[];total=0;cleared=0;const requestedSeed=query.get('seed');const given=requestedSeed!==null&&requestedSeed.trim()!==''&&Number.isFinite(Number(requestedSeed));
+ seed=given?Number(requestedSeed):(boothSave.runs*7919+boothSave.photos*31+1);const from=Math.max(0,Math.min(RUNGS.length-1,parseInt(query.get('rung')||'1',10)-1||0));
+ b=createBooth({seed,from,wait:true});pending={mode:'booth',seed,rung:from+1,cold:true};show('play');coldBar(true);}
+function coldBar(on){$('cold').classList.toggle('on',on);}
 function pause(){if(mode!=='play')return;resetInput();if(s&&s.phase==='play')s={...s,held:0};if(b&&b.phase==='play')b={...b,held:0,qsum:0,grab:null};snd.hold();show('paused');}
 function resume(){tap();snd.release();resetInput();acc=0;show('play');}
 function end(won){allShots.push(...s.shots);total+=s.score;save.runs++;save.best=Math.max(save.best,total);store();runEnd(won?'won':'lost');resetInput();show('end');endCard(won);if(won){burst(cx,cy,65);[523,659,784,1047].forEach((f,i)=>setTimeout(()=>{if(mode==='end')tone(f,.28,.055);},i*100));}else tone(180,.24,.05,-60);}
@@ -60,7 +68,7 @@ function success(){cleared++;rec.event('round-cleared',{round:s.level+1,stars:st
 function boothEnd(){const photos=b.shots.filter(x=>!x.missed).length;if(game==='daily'){const prev=readJson(DAILY_KEY);const keep=prev?.v===1&&typeof prev.day==='string'&&prev.day>b.day?prev:{v:1,day:b.day,best:Math.max(dailyBest(b.day)??0,b.score)};writeJson(DAILY_KEY,keep);}else{boothSave.runs++;boothSave.best=Math.max(boothSave.best,b.score);boothSave.bestStreak=Math.max(boothSave.bestStreak,b.bestStreak);boothSave.photos+=photos;storeBooth();}
  runEnd('won');resetInput();show('end');endCard(true);burst(cx,cy,65);[523,659,784,1047].forEach((f,i)=>setTimeout(()=>{if(mode==='end')tone(f,.28,.055);},i*100));}
 $('play').onclick=()=>start('booth');$('daily').onclick=()=>start('daily');$('classic').onclick=()=>start('classic');$('again').onclick=()=>start();$('restart').onclick=()=>start();$('pause').onclick=pause;$('resume').onclick=resume;
-for(const id of ['toMenu','endMenu'])$(id).onclick=()=>{runEnd('quit');snd.release();tap();resetInput();show('menu');};
+for(const id of ['toMenu','endMenu'])$(id).onclick=()=>{runEnd('quit');pending=false;coldBar(false);snd.release();tap();resetInput();show('menu');};
 function soundText(){$('sound').textContent=t(save.sound?'soundOn':'soundOff');}
 $('sound').onclick=()=>{save.sound=!save.sound;store();soundText();if(save.sound)tap();};
 function menuText(){const best=dailyBest(today());$('dailyLine').textContent=best===null?t('dailyNone'):t('dailyBest',{n:best});}
@@ -73,7 +81,7 @@ function allText(){apply();soundText();menuText();for(const id of ['lang','lang2
 for(const id of ['lang','lang2'])$(id).onclick=()=>{setLang(lang()==='en'?'tr':'en');tap();allText();};
 allText();
 // The recording notice is on the menu card, which the player sees before Play; its switch is on the pause card.
-rec.notice($('menu').firstElementChild);rec.toggle($('paused').firstElementChild);
+rec.notice($('menu').firstElementChild);if(COLD)rec.notice($('coldNote'));rec.toggle($('paused').firstElementChild);
 onLeave(pause);
 canvas.addEventListener('pointerdown',()=>{if(mode==='play'){snd.unlock();tone(240,.12,.05,130);}});
 canvas.addEventListener('pointerup',()=>{if(mode==='play'){if(game==='classic')tone(280,.09,.035,-80);else boing();}});
@@ -102,11 +110,12 @@ function tickBooth(){
  if(pad.touch){if(!down||down.id!==pad.touch.id)down={id:pad.touch.id,x:pad.touch.ox,y:pad.touch.oy};if(!down.grab)down.grab=grabAt(down.x,down.y);inp={active:true,part:down.grab.part,face:down.grab.face,dx:(pad.touch.x-down.x)/REACH,dy:(pad.touch.y-down.y)/REACH};}
  else if(keys.size){keyTravel.x+=((keys.has('ArrowRight')?1:0)-(keys.has('ArrowLeft')?1:0))*DT*.8;keyTravel.y+=((keys.has('ArrowDown')?1:0)-(keys.has('ArrowUp')?1:0))*DT*.8;inp={active:true,part:'head',face:0,dx:keyTravel.x,dy:keyTravel.y};}
  else{keyTravel={x:0,y:0};if(down&&!pad.touch)down=null;}
+ if(pending&&inp.active){runOpen=true;rec.start(pending);pending=false;}
  const before=b;b=stepBooth(b,inp,DT);
  if(b.grab&&b.phase==='play'){lastPart=b.grab.part;let moved=0;for(const k of PARAMS)moved+=Math.abs(b.faces[b.grab.face][k]-before.faces[b.grab.face][k]);
   if(moved>.004&&clock-lastTone>.07){const stretch=PARAMS.reduce((a,k)=>a+Math.abs(b.faces[b.grab.face][k]),0);tone(260+stretch*90+(b.grab.part==='head'?0:120),.07,.02,40,'sine');lastTone=clock;}}
  const shot=b.shots.length>before.shots.length?b.shots[b.shots.length-1]:null;
- if(shot&&!shot.missed){flash=1;shake=calm?0:5;const sp=faceSpots(before);burst(sp[0].x,sp[0].y,26);snd.noise(.065,.07,2200);tone(880,.18,.06);if(b.streak>1)tone(520+b.streak*90,.14,.04,160);if(shot.mod==='laugh'){laughAt=clock;[0,1,2,3].forEach(i=>setTimeout(()=>{if(mode==='play')tone(520-i*30,.08,.05,-60,'square');},i*120));}strip.push({...shot,at:clock});}
+ if(shot&&!shot.missed){flash=1;shake=calm?0:5;const sp=faceSpots(before);burst(sp[0].x,sp[0].y,26);snd.noise(.065,.07,2200);tone(880,.18,.06);if(b.streak>1)tone(520+b.streak*90,.14,.04,160);if(shot.mod==='laugh'){laughAt=clock;[0,1,2,3].forEach(i=>setTimeout(()=>{if(mode==='play')tone(520-i*30,.08,.05,-60,'square');},i*120));}strip.push({...shot,at:clock});coldBar(false);if(b.shots.filter(x=>!x.missed).length===1)rec.event('first-photo',{age:shot.age});}
  if(shot&&shot.missed){leftAt=clock;tone(330,.16,.045,-120);setTimeout(()=>{if(mode==='play')tone(220,.22,.045,-80);},150);strip.push({...shot,at:clock});}
  if(before.phase==='photo'&&b.phase!=='photo'&&!calm)boing(.7);
  if(b.results.length>before.results.length){const r=b.results[b.results.length-1];rec.event('rung-cleared',{rung:b.ri+1,kind:r.rung,photos:r.photos,of:r.of,score:r.score});}
@@ -236,6 +245,7 @@ function drawAlbum(){const c=$('album'),q=c.getContext('2d');c.width=640;c.heigh
   text(q,String(sh.points),0,64,22,'#d35f51');q.restore();});}
 // Paint after the first surface is ready, including a fresh WebKit context.
 requestAnimationFrame(drawHero);
+if(COLD)coldStart();
 function frame(now){const dt=Math.min((now-last)/1000,.1);last=now;if(mode==='play'){clock+=dt;acc+=dt;while(acc>=DT){tick();acc-=DT;}}if(game!=='classic')springStep(dt);flash=Math.max(0,flash-dt*3.5);shake=Math.max(0,shake-dt*20);particles=particles.filter(p=>{p.life-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=190*dt;return p.life>0;});draw();requestAnimationFrame(frame);}requestAnimationFrame(frame);
 // Read-only snapshots for browser assertions; no state setters or shortcuts. In the booth, `state.x`/`state.y` are
 // the head's width and opening (the first face) and `state.elapsed` its play clock, as in the classic rounds.
