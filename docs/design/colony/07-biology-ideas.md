@@ -4,6 +4,9 @@ Date: 2026-11-25. Scope: biology that existing ant games rarely use, translated 
 
 Confidence notes. "Source" names a page I opened in this session. "(from memory)" marks a claim I did not verify against an opened page this session. Where an opened page contradicted my prior, I say so. Search-result snippets I did not open are not cited as sources.
 
+
+> **Clean-room flags (round 4, 2026-11-26).** This is a raw idea bank written before the clean-room line in [02 section 1](02-spec.md#1-clean-room-line). Entries marked **[excluded]** sit too close to the reference game's own roster or set pieces and must not be built from this file: exploding workers (1.7), bullet ants (1.8), trap-jaw knockback (1.3), ladybirds thinning aphid herds (1.12), the Matabele carry-home rescue and medic loop (1.14, and its row in the ranking), living ant bridges as spent units (2.8), and a species field guide (section 4). The ranking's originality scores predate this check. Spec 02 does not use any of them.
+
 ---
 
 ## 1. Species and colony strategies
@@ -20,7 +23,7 @@ Confidence notes. "Source" names a page I opened in this session. "(from memory)
 - Building cost is "larva-time": larvae used as glue are not maturing. Builders must carry a larva to the seam. Expansion competes directly with growth.
 - Leaf-gap chains: a gap of N tiles needs N workers locked in a chain while the seam is sewn, so construction pulls labour from foraging.
 
-### 1.3 Trap-jaw ants (*Odontomachus*)
+### 1.3 Trap-jaw ants (*Odontomachus*) [excluded]
 **Biology.** Mandibles lock open at 180° and snap shut when trigger hairs are touched, closing in ~130 µs at peak 126–230 km/h. They use the snap to fling intruders away or to launch themselves backward to escape. Source: https://en.wikipedia.org/wiki/Odontomachus
 **Mechanics.**
 - Knockback unit: on contact, an enemy is thrown 2–3 tiles (breaks enemy lines and bridges) rather than damaged.
@@ -44,11 +47,11 @@ Confidence notes. "Source" names a page I opened in this session. "(from memory)
 - Gates are units: a soldier sits in a tunnel opening and is the door. Friendly ants pass with a key-check (nestmate odour, see 2.8); enemies must kill the soldier. Entrance diameter decides how many soldiers a door needs.
 - Glide: units falling from height drift back toward their tree instead of dying.
 
-### 1.7 Exploding ants (*Colobopsis saundersi*)
+### 1.7 Exploding ants (*Colobopsis saundersi*) [excluded]
 **Biology.** Workers contract the gaster until it ruptures, bursting enlarged mandibular glands and spraying a sticky, corrosive secretion; it is used when a fight is going badly, against rival ants, weaver ants and spiders. Source: https://en.wikipedia.org/wiki/Colobopsis_saundersi
 **Mechanics.** Self-destruct worker that leaves a glue patch (slows and damages) rather than doing burst damage; cheap to implement as an area effect and a clear last-stand decision.
 
-### 1.8 Bullet ants (*Paraponera clavata*)
+### 1.8 Bullet ants (*Paraponera clavata*) [excluded]
 **Biology.** Most painful sting on Schmidt's index, pain lasting up to 24 h, venom contains the neurotoxin poneratoxin. Colonies of several hundred nest at tree bases and forage in the canopy for nectar and small arthropods. Source: https://en.wikipedia.org/wiki/Paraponera_clavata
 **Mechanics.** "Paralysis" status: a stung unit is frozen for a few seconds rather than killed. Good for a family mode where fights immobilise instead of kill.
 
@@ -70,7 +73,7 @@ Confidence notes. "Source" names a page I opened in this session. "(from memory)
 - Waste dump placement matters: too close to the garden raises disease chance.
 - Hitchhiker escort: a small unit riding a carrier blocks parasitoid attacks on it.
 
-### 1.12 Trophobiosis: herding aphids and scale insects
+### 1.12 Trophobiosis: herding aphids and scale insects [ladybird part excluded]
 **Biology.** Ants tend sap-feeding hemipterans for honeydew, protect them, build shelters for them, and some move them daily between plants and underground chambers or take them along when relocating. *Acropyga* queens carry a "seed" mealybug on the mating flight. Source: https://en.wikipedia.org/wiki/Trophobiosis. Ants stroking aphids to trigger honeydew release, chemically suppressing aphid wing development, and *Lasius* overwintering aphid eggs in the nest (from memory).
 **Mechanics.**
 - Herds as livestock: aphid flocks on plants produce honeydew only while tended; untended herds are eaten by ladybirds or fly away. Players move herds between plants (pasture rotation).
@@ -80,7 +83,7 @@ Confidence notes. "Source" names a page I opened in this session. "(from memory)
 **Biology.** The bullhorn acacia's hollow thorns house the ants; the tree feeds them with protein-lipid Beltian bodies and extrafloral nectar. Ants swarm herbivores (including leafcutters and livestock) with alarm pheromone and clear competing seedlings around the tree. Source: https://en.wikipedia.org/wiki/Vachellia_cornigera
 **Mechanics.** Partner tree: a plant you can garrison. It pays food per tick while you keep it clear of vines and herbivores; neglect it and it shrinks. A clean co-op and non-violent loop.
 
-### 1.14 Matabele ants (*Megaponera analis*): rescue and medicine
+### 1.14 Matabele ants (*Megaponera analis*): rescue and medicine [excluded]
 **Biology.** They raid termite sites in columns. Injured ants release mandibular-gland pheromone that summons nestmates to carry them home; ants missing 1–2 legs are rescued, those missing 3+ are not (they do not cooperate). In the nest, nestmates lick wounds, mostly within the first hour; untreated injured ants have ~80% mortality. Infected wounds are signalled by changed cuticular hydrocarbons and treated with antimicrobial metapleural-gland secretions. Source: https://en.wikipedia.org/wiki/Megaponera_analis
 **Mechanics.**
 - Wounded state instead of death: downed ants emit a call; any friendly unit (including a friend's in co-op) can carry them home, where a medic station treats them within a time window. Very cheap: one state, one timer.
@@ -149,7 +152,7 @@ Confidence notes. "Source" names a page I opened in this session. "(from memory)
 **Biology.** Scouts assess candidate sites and recruit by slow tandem runs; once a site's population passes a quorum, recruiters switch to carrying nestmates and brood, which is faster. Quorum was ~5.7 ants in forced (urgent) emigrations vs ~12.7 in unforced; urgent moves were faster but less accurate (~65% vs ~90% chose the good nest). Source: https://pmc.ncbi.nlm.nih.gov/articles/PMC1635101 (Pratt and Sumpter 2006, PNAS).
 **Mechanic.** Relocation as a group vote: in co-op, each player's scouts "vote" by standing at candidate sites; when a quorum is reached, everyone moves. A slider trades speed against accuracy (lower quorum = faster but riskier choice). Same mechanic for choosing where to build.
 
-### 2.8 Self-assembled bridges and chains
+### 2.8 Self-assembled bridges and chains [excluded]
 **Biology.** *Eciton* ants build living bridges that lengthen, widen and shift with traffic; the placement balances the shortcut gained against workers removed from foraging, with no leader (Reid et al. 2015, PNAS; Princeton release returned 403, from search snippets). Source available: weaver-ant chains, https://en.wikipedia.org/wiki/Weaver_ant; bivouacs, https://en.wikipedia.org/wiki/Army_ant
 **Mechanic.** Gaps are crossed by spending ants as bridge tiles; heavy traffic keeps them; light traffic dissolves them. Enemy trap-jaws can knock a bridge loose.
 

@@ -78,7 +78,7 @@ This is the one table of numbers. Pace lines are gates, read from replays; every
 | First player-funded birth (larva fed by a protein load the player routed) | ≤ 90 s (script: about 65 s) | replay-lab births |
 | First real choice (two options with different costs, both visible) | ≤ 30 s | Chapter script; decision events (new field) |
 | Its consequence visible | ≤ 60 s | Chapter script |
-| First threat telegraphed | ≤ 60 s | Decision events |
+| First threat telegraphed | ≤ 60 s in chapter 1. Later chapters open with their own scripted beat (chapter 2's rain warning is at 2:00) | Decision events |
 | First threat resolved (won, dodged or lost) | ≤ 3 min | Decision events |
 | Longest gap between decision events, minutes 0 to 10 | ≤ 30 s | Decision events. A decision event is one that offers a choice: a new source seen, a source empty, a threat telegraphed, a room full, brood short of protein, a rain warning, a route jammed, a build offered, a sprout that opens a covered route. Each chapter's script (section 8.1) places them; a script that cannot meet this line is rewritten, not padded with small piles |
 | Same gap, after minute 10 | ≤ 45 s | Decision events |
@@ -88,7 +88,11 @@ This is the one table of numbers. Pace lines are gates, read from replays; every
 | Chapters 2 to 6 length | 6 to 12 min for the median bot | replay-lab |
 | Passive bot | finishes chapter 1 | Bot run |
 | Idle bot | loses chapter 2 or 3 | Bot run |
+| Consequential choices (round 4) | In each chapter, at least 4 of the median bot's orders each change ants, stores or open routes at dusk by 5% or more when a paired replay changes only that order. A decision event that changes nothing does not count toward the gap lines | Paired replays (new tool) |
+| Quiet stretches (round 4) | In the first 2 min of the median replay, no 15 s window without a delivery, a birth, a new source, a finished structure or a threat change | replay-lab per-second events |
 | The old quota opening (20 workers, 40 sugar, 4 larvae, a 40-load day) | **fails** this table | A fixture in CI; if it ever passes, the table is too loose |
+
+**Which lines block what (round 4).** A line blocks a pull request only once the sim has the parts it reads. R0 blocks on: first delivery, deliveries in minute 1, first birth, the quota fixture failing, and a planted slow-down (brood ×10) failing. From R1 step 3 (crews): wasted labour and queued share. From R1 step 5 (bird): the threat and first-choice lines and consequential choices for chapter 1. At the R1 gate: every line for chapter 1, on 20 seeds. R2a adds chapters 2 and 3; R2b adds 4 to 6. A line that cannot be read yet is reported, not skipped silently.
 
 ### 3.2 Starting values (tune these, keep the gates)
 
@@ -105,21 +109,22 @@ This is the one table of numbers. Pace lines are gates, read from replays; every
 | Starvation | At 0 sugar, adults move at half speed; after 60 s at 0, one adult in a hundred dies every 10 s, oldest first. Larvae with no protein for 60 s die. The queen dies last, and only after all workers | Gives the idle bot a way to lose |
 | Porch store | a store chamber 3 cells under the entrance; a load counts as home there | The old chamber was 24 cells down: 6.9 s one way even at 3.5 cells/s |
 | Nursery and queen | 10 to 16 cells down | Depth protects brood from rain and raids; nurses carry food down, foragers do not |
-| Colony at start | 300 adults (owner choice, 11 decision 6): 100 on the surface around the entrance, 200 inside on nursing, digging and stores. Queen, 12 pupae due from 8 s and then every 3 to 5 s, 20 larvae aged 0 to 20 s, 20 eggs aged 0 to 10 s. Nursery of 80 cells | Births inside 15 s; the swarm is visible at once |
+| Colony at start | 300 adults (owner choice, 11 decision 6): 100 on the surface around the entrance, 200 inside on nursing, digging and stores. Queen, 12 pupae due from 8 s and then every 3 to 5 s, 20 larvae aged 0 to 20 s, 20 eggs aged 0 to 10 s. Nursery of 64 cells | Births inside 15 s; the swarm is visible at once. Round 4: at 1 egg a second and 60 s from egg to adult, a fed colony holds about 60 brood, so 80 cells never filled; 64 cells fill once protein flows, and the "room full" beat fires on that event, not on a clock |
 | Brood | egg 15 s, larva 25 s (needs 1 protein load), pupa 20 s: egg to adult 60 s | Now 570 s (`colony.js`, 11,400 ticks) |
-| Queen laying | 1 egg a second while sugar stores are above 0; 2 a second once a queen chamber of worth 60 or more is dug (from chapter 3); at most 1 brood per nursery cell. Eggs are free; each larva needs 1 protein load | Nursery cells and protein set the real rate |
-| Adults eat | 1 sugar load per 10 adults a minute | 300 ants need 30 loads a minute: food matters from minute 1 |
+| Queen laying | 1 egg a second while sugar stores are above 0; 2 a second once a queen chamber of worth 60 or more is dug (from chapter 3); at most 1 brood per nursery cell. Eggs are free; each larva needs 1 protein load | Nursery cells and protein set the real rate. Round 4: 2 eggs a second only adds ants when the nursery holds more than about 60 cells, so chapter 3 offers the queen chamber and a nursery dig together |
+| Adults eat | 1 sugar load per 10 adults a minute | 300 ants need 30 loads a minute. Round 4 check: one forager on a 7 s trip brings about 8 loads a minute and feeds about 80 ants, so sugar is loose. Tuning target, read from bots: the median bot needs 20 to 30% of its outside workers on sugar to break even; raise upkeep until it does |
 | Ants at chapter ends (median bot) | about 450 after chapter 1, 900 after 3, 1,500 to 2,000 after 6 | Chapter 1 ceiling is about 590 at 1 egg a second; chapters 2 and 3 need 450 births of up to 1,000; chapters 4 to 6 need about 1,000 of up to 3,600 at 2 a second. Losses fit. 2,000 matches the frame gate; free play goes to 5,000 |
 | Food sources | finite piles; seeds, nectar plants and prey that regrow as the hill blooms | A fixed map runs out (NOTES.md found days asking for more than the map holds) |
-| Doors | The entrance starts 3 cells wide. Each cell passes 6 ants a second in each direction (out and in are separate lanes). A door is **jammed** when 10 or more ants queue at it for 5 s | 18 a second each way. Chapter 1's Steady crews (20 to 40 ants on two short routes) use under 6 a second. The jam comes when the third pile's long route runs on Surge with 400 or more ants, about 3 to 5 min in |
-| Crews | Light, Steady, Surge = 10%, 25%, 50% of the foraging pool (adults not on a crew, not nursing, not digging), set when the order is given and recomputed only when the pool changes by 10% | No oscillation. Auto jobs (rule 4) take only ants left after crews |
-| Bird | Shadow 10 to 15 s ahead; strikes a circle of radius 6 cells for 5 s, taking 1 ant a second from open cells in it. A husk covers 3 by 3 cells, a sprout 5 by 5, a roof as built. A trail runs under cover where its cells are covered | One pass costs at most 5 ants: a lesson, not a wipe |
-| Recall | Ants go to the nearest shelter: inside a door, or a covered cell (cover holds 4 ants a cell). Recall is not limited by door lanes for ants already within 2 cells of a door | Recall can beat a 10 s telegraph |
+| Doors | The entrance starts 3 cells wide. Each cell passes 6 ants a second in each direction (out and in are separate lanes). A door is **jammed** when 10 or more ants queue at it for 5 s | 18 a second each way. Round 4: chapter 1 cannot jam this door. At 3 to 5 min Surge is about 100 to 190 ants, which sends about 9 to 12 a second. The first jam moves to chapter 4 (long routes, a bigger colony), where the skeleton already has it. A jam is shown only when it really happens; bots test congestion in a separate fixture with a one-cell door |
+| Crews | Light, Steady, Surge = 10%, 25%, 50% of the **outside workforce** (all adults not nursing and not digging, including ants already on crews), recomputed only when that workforce changes by 10%. If the crews would add up to more than 100%, the new crew gets what is left and its card says "no free foragers" | Round 4: the round-3 base excluded ants already on crews, so Steady settled near 20% and Surge near 33%. Spare outside ants wait by the door as a visible "free" count and do not forage on their own (rule 4), so crew size decides throughput |
+| Bird | Shadow 10 to 15 s ahead; strikes a circle of radius 6 cells for 5 s. Each second it takes 1 ant for every 10 exposed ants in the circle (at least 1 if any are exposed); every exposed carrier in the circle drops its load; the struck route scatters for 10 s. A husk covers 3 by 3 cells, a sprout 5 by 5, a roof as built. A trail runs under cover where its cells are covered | Round 4: a flat 5 ants is 1.7% of 300, too small to feel, and good and bad husk placement could both show 5 deaths. Now the cost is economic (dropped loads, a dip in loads a minute) and scales with how many ants the player left in the open. Size is owner taste call 12-A |
+| Recall | Ants go to the nearest shelter: inside a door, or a covered cell (cover holds 4 ants a cell). This is the one rule; 6.7 follows it. Recall ends when the threat passes or on a second tap; crews then resume. Recall is not limited by door lanes for ants already within 2 cells of a door | Recall can beat a 10 s telegraph |
 | Trails | A trail whose scent falls under 5% of its peak (about 4 half-lives unused) is removed | Bounds goals (05) |
 | Structure costs | Husk: free (it is a carried object). Roof: 3 husks or 6 leaves. Span: 10 soil. Ramp: 6 soil. Plug: 4 soil, or one major standing in it. Channel: dug, 1 soil a cell. Mound: rises one step per 20 soil | Crew time 5 to 20 s each |
 | Majors | A larva fed 3 protein becomes a major; 4 times the hit points, 3 times the damage, eats double | From chapter 3 |
-| Rain | Chapter 2: warning at 2:00, the first 30 s pulse at 2:30; then a warning 30 s before each pulse, every 2 to 4 min. Rain slows ants in the open; it kills only by flooding: an ant or brood in a flooded cell for 10 s drowns | Rain is the first terrain test, and Recall is not the answer to it |
-| Chapter checkpoint | at chapter start, and every 20 s | The 20 s save line |
+| Rain | Chapter 2: warning at 2:00, the first 30 s pulse at 2:30; then a warning 30 s before each pulse, every 2 to 4 min. The warning draws the predicted waterline in the nest. The first pulse floods only an empty low passage; the second is the first that can reach brood. Rain slows ants in the open; it kills only by flooding: an ant or brood in a flooded cell for 10 s drowns | Rain is the first terrain test, and Recall is not the answer to it. Round 4: a structure takes 5 to 20 s, so a first pulse that reaches brood before a plug is offered is unfair |
+| Now-or-later bill (chapter 3 on) | Due during dusk: 0.2 sugar loads per adult, counted live from the moment it is shown. A seed in the granary cracks into 2 sugar loads. A projected surplus or deficit shows on the top bar from mid-chapter. A shortfall costs one adult per missing load, weakest first, at most a quarter of the colony; the chapter then ends and the colony advances smaller | Round 4 worked dusk (round4/review-a-player.md, assumed inputs): 1,012 adults owe 202 loads; a growth plan holding 213 sugar clears it by 10, while at 0.25 a load the same play misses by 40. R2a must show a lower-growth storing plan that beats it on a second hill |
+| Chapter checkpoint | at chapter start, and every 20 s. Solo time pauses and the game saves when the tab is hidden | The 20 s save line |
 | Surface region | 256 by 256 cells | As now |
 | Nest | 192 wide by 64 deep cells | Shallower than 128: walking depth is time |
 | Trail fade | half-life about 60 s unused | Now a third of a day |
@@ -137,15 +142,16 @@ This is the chapter the M1 build failed. It is written second by second so a bui
 | 15 to 30 s | The seed husks pile at the entrance. A prompt shows two places to put the first husk: in the open beside the busier trail, or under a charred stalk off the trail. The husk is a light object a crew carries | Drag the husk to a place, or ignore it (a crew then drops it by the stalk) | Build |
 | 30 to 60 s | A bird's shadow crosses from the hill's edge, slowly, with a sound | Recall, move a trail under the husk, or do nothing | Threat, cover |
 | 40 to 50 s | The seed head empties. The beetle empties near 50 s. A new sugar source, a nectar stalk, shows across open ash | Draw a new trail, open or under the husk | Sources run out |
-| 45 to 75 s | The bird takes ants in the open (at most 5). Ants under the husk are safe. A loss counter shows what it cost | | Consequence of the first choice, inside a minute |
-| about 65 s | The first ant raised on the player's beetle protein stands up; the larva pupated at about 45 s | | Player-funded brood |
+| 45 to 60 s | The bird strikes. Exposed carriers drop their loads, the struck route scatters for 10 s and its loads a minute dip; it takes ants in proportion to how many were in the open (3.2). Ants under the husk keep working. A loss counter shows ants and loads lost. Two replays that differ only in husk placement must look different by 60 s | | Consequence of the first choice, inside a minute |
+| about 65 s | The first ant raised on the player's beetle protein stands up; the larva pupated at about 45 s. The cutaway follows that load: the beetle piece reaches a larva at about 20 s and the larva is marked; the new adult comes out marked in the beetle trail's colour and walks to the free count | | Player-funded brood, seen as caused by the player |
 | 70 to 90 s | The nursery shows larvae short of protein; the only protein left is a dead cricket by the bird's path | Route to it now, or wait under cover | Risk against need |
 | 90 s to 2 min | A seed planted in the midden sprouts: a green tuft on the ash, with a shadow ants can stand in | Plant (drop husks and seeds on the midden spot) | Bloom |
-| 2:00 | A third pile appears farther off, past a stone. The trail to it is long and open; a shorter path goes under the sprout | Choose route and crew size | Routes, crews |
+| 2:00 | A third pile appears farther off, past a stone. The quick route to it crosses open ash; a longer route runs under the sprout and the husk | Choose route and crew size | Routes, crews |
 | 2:30 | The second bird pass, now along the long route | Keep, cover or reroute | Threats return to what you built |
-| 3:00 | The nursery is full (room full) | Dig nursery cells | Dig |
-| 3 to 5 min | With the third route on Surge, the door jams. A "jammed" marker. Dig paint shows where a second door could go. A beetle carcass drops near the far pile | Dig a second door or widen the first; route to the carcass | Traffic, dig |
-| 4 to 6 min | Dusk. The Ember look comes in. Stores, ants, sprouts and losses on a short card. Chapter 1 ends | Go on, or stop (the game is saved) | Natural stop |
+| when it fills (about 2 to 3 min if protein flows) | The nursery is full (room full). Laying stops; dig paint for new nursery cells is pre-marked | One tap to dig them, or leave it | Dig. Shown only when it happens; a colony short of protein sees "brood short of protein" instead |
+| 3 to 4 min | A beetle carcass drops near the far pile; the stalk's nectar runs low | Route to the carcass, open or covered | Sources run out; risk against need |
+| 4 to 5 min | The third bird pass, along whichever route carries most | Keep, cover or reroute | The cover you built pays |
+| 4 to 6 min | Dusk. The Ember look comes in. Stores, ants, sprouts and losses on a short card, and a look at tomorrow's hill: where the sprouts will spread, which piles will regrow, and the next threat's first sign. Chapter 1 ends | Go on, or stop (the game is saved) | Natural stop, and a reason to come back |
 
 Chapter 1 cannot be lost by doing nothing (the passive bot finishes it). It can go badly: a colony that ignored the bird starts chapter 2 smaller.
 
@@ -166,7 +172,7 @@ Warm, small and alive. Death is shown (ants carry their dead to the midden) but 
 
 - **Sugar** (nectar, honeydew, seed tips) feeds adults. **Protein** (prey, the dead) feeds larvae. **Seeds** keep in a dry granary and can be cracked into sugar slowly. No other currency.
 - **Soil** from digging goes on the entrance mound (raises the door above rain water) or on a spoil spot the player marks (fills antlion pits, makes low walls).
-- **Now or later.** From chapter 3 each chapter ends with a bill shown from its start: a dry spell or a cold night that needs stored seeds or sugar per ant. A load eaten now grows the colony; a load stored pays the bill. Short of the bill, the weakest ants die at the chapter card.
+- **Now or later.** From chapter 3 each chapter ends with a bill shown from its start: a dry spell or a cold night that needs stored seeds or sugar per ant. A load eaten now grows the colony; a load stored pays the bill. It comes due during dusk, with numbers in 3.2; short of it, the weakest ants die and the colony advances smaller.
 - **Starvation warning:** when sugar will run out within 60 s, a warning with its cause and one fix.
 
 ### 6.2 Crews, routes and traffic
@@ -174,7 +180,7 @@ Warm, small and alive. Death is shown (ants carry their dead to the midden) but 
 Every trail, dig, build and alarm has a **crew**. Its card shows ants on it, ants wanted, loads a minute, and the reason for a gap ("no free foragers", "door jammed", "path flooded").
 
 - **Crew size** is set on the route card: **Light**, **Steady** or **Surge** (about 10%, 25% and 50% of free workers, capped by the route's width), or plus and minus one ant, hold for eight.
-- **Who goes.** One rule, applied every tick in this order: (1) Recall; (2) an ant carrying a load finishes the delivery; (3) an ant on an explicit crew keeps it; (4) free ants take auto jobs by need: feed brood, store food, dig marked cells, forage the nearest open route. An ant is free when it has no load and no crew.
+- **Who goes.** One rule, applied every tick in this order: (1) Recall; (2) an ant carrying a load finishes the delivery; (3) an ant on an explicit crew keeps it; (4) free ants take auto jobs by need: feed brood, store food, dig marked cells. Free ants do **not** forage on their own: they wait by the door, shown as a "free" count the player can put on a route (round 4; with auto-forage, 100 surface ants on a 8 s cycle empty both opening piles by about 20 s whatever the crew size). An ant is free when it has no load and no crew.
 - **Traffic.** Doors and narrow passages have a throughput (section 3.2). Queues show as a jam marker. Widening, a second door, a span or a ramp fixes it. Loads a minute on every route make throughput visible.
 - **Tactical pause** (solo, and co-op when all players agree): time stops; orders can be given; they take effect on resume.
 
@@ -199,7 +205,8 @@ Every trail, dig, build and alarm has a **crew**. Its card shows ants on it, ant
 | 6 | A storm night and a raid together | Both warnings | Everything above |
 
 - **Shared scent.** Every colony reads every trail. A rival's scouts follow your strongest trail to your food and to your door. A trail drawn to nothing with Alarm held is a **decoy**: scouts follow it into your guards. Rivals do the same to you. The rival AI uses the player's own verbs and rules; it has no hidden powers.
-- **No stuck enemies.** An enemy that has not moved for 20 s wanders, then leaves the map edge. No goal requires every enemy to die.
+- **No stuck enemies.** An enemy that has not moved for 20 s wanders, then leaves the map edge, unless it is holding a door or fighting. No goal requires every enemy to die.
+- **Equal-cost test (round 4).** Combat is tuned on forces of equal protein (one major against three workers), on open ground and at a held door, counting the income of workers left foraging.
 
 ### 6.5 Water and terrain
 
@@ -223,14 +230,14 @@ Portrait phone layout: a top bar (chapter goal, stores, ants, pause), the play f
 | Trail | Trail mode: draw from the entrance or an existing trail | The crew follows the drawn shape and lays scent. A trail with food at its end strengthens; an unused one fades (section 3.2). Erase by drawing over it with Dig or from the route card |
 | Dig | Dig mode: paint soil | The dig crew digs painted cells in order and carries spoil to the mound or spoil spot |
 | Build | Build mode: drag a structure from the strip, or drag a husk | A crew carries materials and builds it |
-| Alarm | Alarm mode: press and hold | Guards and nearby ants run there in waves while held. Held at the end of a trail drawn to nothing, it makes a decoy |
-| Recall | One button | Every ant outside goes home at a run. Carriers keep their loads |
+| Alarm | Alarm mode: press and hold | Guards and nearby ants run there in waves while held. Held at the end of a trail drawn to nothing, it makes a decoy. Round 4: the route card of a trail that ends on nothing also has a **Make decoy** button, so one thumb can do it |
+| Recall | One button | Every ant outside runs to the nearest shelter (3.2). Carriers keep their loads. A second tap, or the threat passing, ends it |
 
 One finger acts in the chosen mode; two fingers always pan and zoom. A stroke is a preview until the finger lifts; a second touch or a `pointercancel` cancels it. A mouse uses the left button to act and the right button or wheel to move. One-finger camera, zoom buttons, undo of the last order, and tap-start, tap-end trails are in settings. Every order shows its effect within 0.5 s.
 
 ## 7. What the screen must always answer
 
-- Where is my food going, and how fast? (loads a minute on routes, store counters)
+- Where is my food going, and how fast? (loads a minute on routes, store counters; selecting a route shows on the ground how many ants wait to pick up, carry, and wait to unload, so a full store looks different from a queue; a trail being drawn previews its first trip in seconds)
 - What is about to hurt me, and when? (telegraphs, section 6.4)
 - Why is this ant or crew not doing what I asked? (the gap reason on every card; tap an ant for its load, goal and wait reason)
 - What did my last choice cost or win? (loss and gain counters for 5 s after an event)
@@ -241,9 +248,9 @@ One finger acts in the chosen mode; two fingers always pan and zoom. A stroke is
 
 | # | Chapter | New verb or threat | Ends when |
 | --- | --- | --- | --- |
-| 1 | Up from the deep | Trail, husk, bird, births, a second door | Dusk, about 5 min |
+| 1 | Up from the deep | Trail, husk, bird, births, the sprout (round 4: the door jam moved to chapter 4) | Dusk, about 5 min |
 | 2 | First rain | Dig, mound, plugs, channels, brood moved up | The storm passes with the queen dry |
-| 3 | The spider on the trails | Alarm, majors, decoy, the first now-or-later bill | The spider is driven off or starved of trails; the bill is paid |
+| 3 | The spider on the trails | Alarm, majors, decoy, the first now-or-later bill | Dusk after the spider is driven off or starved of trails; the bill is settled at dusk, paid or short (3.2) |
 | 4 | The dry slope | Antlion pits, spans and ramps, crews under traffic | A route to the far seed field runs for 60 s |
 | 5 | Neighbours | Shared scent, rival scouts, raids, walls | The border holds through a raid, or a counter-raid takes their granary |
 | 6 | Storm night | All of it at once, in the Ember look | Dawn, with the queen alive; the bloom picture |
@@ -260,7 +267,7 @@ Each chapter has a script like section 4, written before it is built, with a dec
 
 ### 8.2 Stakes (owner choice, 11 decision 5; recommended A)
 
-A chapter is lost if an enemy reaches the queen, if the brood all drowns, or if the colony falls under 50 ants. The idle bot loses in chapter 2: with no mound, plug or channel its nest floods in the storm, the nurses have no dry room to carry brood to, and the brood drowns. The floor at a chapter start is 150 ants and 30 sugar. A lost chapter retries from its start checkpoint or from any 20 s checkpoint in the last two minutes. The campaign never dead-ends: a chapter always starts with at least a floor of ants and stores, and the chapter card says when the floor was used.
+A chapter is lost if an enemy reaches the queen, if the queen drowns, if the colony has had no brood and no sugar for 2 minutes, or if it falls under 50 ants. The idle bot loses in chapter 2: its larvae starve by about 3 min, its sugar runs out, and with no mound, plug or channel the storm peak floods the queen's chamber. (Round 4: brood starves before the first lethal pulse, so "the brood all drowns" could not be the idle bot's loss; under 50 ants by starvation alone takes about 30 min.) The floor at a chapter start is 150 ants and 30 sugar. A lost chapter retries from its start checkpoint or from any 20 s checkpoint in the last two minutes. The campaign never dead-ends: a chapter always starts with at least a floor of ants and stores, and the chapter card says when the floor was used.
 
 Difficulty: **Gentle** (no loss; a lost chapter becomes a poor score), **Standard**, **Hard** (fewer floor stores, faster raids).
 
@@ -308,6 +315,7 @@ The round-2 arc (Summer bloom, Autumn and the invading supercolony, Winter, the 
 ## 13. What is not decided
 
 - Owner decisions: [11, "Decisions only the owner can make"](11-round3-findings.md#decisions-only-the-owner-can-make).
+- Round 4 taste calls: [12, "Taste calls"](12-round4-findings.md#taste-calls-for-the-owner).
 - Fun and phone feel: unmeasured until chapter 1 runs on a real phone. Every value in 3.2 is a starting value.
 - Whether 50,000 ants as a fluid at far zoom works on a phone: the fluid colony toy.
 - Whether a founding run beats chapters: the founding runs toy.
