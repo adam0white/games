@@ -191,3 +191,9 @@ The note answers #232 (what should come next in Ant Draft): bigger explosions. T
 | Date | Experiment | Idea tested | Checked | Verdict |
 | --- | --- | --- | --- | --- |
 | 2026-11-25 | `cinderhill-tournament` | Cinderhill border tournament (spec 6.7) as a toy: two colonies display in a ring capped at 30 a side; tired ants crouch, fresh ones stand tall; the player paces with Send wave, Hold and Rotate against three rule-based neighbours; 90 s; ants die only when a side breaks | `node bots.mjs 300`: careful 60 beats all-in 120 in 82% (13% lost, 4% drawn); all-in 60 v all-in 120 wins 1%; no side bias; claims fail as they should when freshness or the cap is removed. `node --test`: 11 pass. Phone check on WebKit and Chromium. Not checked: a real phone, a person, the Turkish, lab records (slug not yet in `LAB_PROTOTYPES`) | Keep testing. Details in `cinderhill-tournament/NOTES.md` |
+
+## 2026-11-26
+
+| Date | Experiment | Idea tested | Checked | Verdict |
+| --- | --- | --- | --- | --- |
+| 2026-11-26 | [Cinderhill battle toy](cinderhill-battle/NOTES.md) | Head-on colony battle using trails, Alarm and Recall. Open ground admits swarm grapples. The rock gap admits two pairs and the tunnel admits one. Compare held Alarm with a persistent rally flag. | In 48 rounds per terrain, 20 majors lost all open fights against 60 minors and won 32 at the two-cell gap with 11 draws. Nine rules tests pass. The phone runner could not bind localhost in this workspace. | Open. Play both variants on a phone and pick which Alarm control to keep. |
