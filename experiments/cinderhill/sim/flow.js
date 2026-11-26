@@ -58,7 +58,9 @@ export function dropGoal(sim, slot) {
 }
 
 // Globals indices shared with sim.js (kept here so flow.js does not import sim.js).
-export const G = { TICK: 0, STORES: 1, RECALL: 2, ALARM_HOLD: 3, GOAL_SEQ: 4, DIG_COUNT: 5, DUG: 6, PICKED: 7, LATE: 8, DIG_CREW: 9, SIZE: 16 };
+// Globals. STORES counts loads brought home (ever); SUGAR and PROTEIN are the stores in units (colony.js).
+export const G = { TICK: 0, STORES: 1, RECALL: 2, ALARM_HOLD: 3, GOAL_SEQ: 4, DIG_COUNT: 5, DUG: 6, PICKED: 7, LATE: 8, DIG_CREW: 9,
+  SUGAR: 10, PROTEIN: 11, QUEEN: 12, LAY: 13, BORN: 14, HUNGRY: 15, BROOD_LOST: 16, DIED: 17, SIZE: 24 };
 
 /** Push the goal's source cells (distance 0) in ascending cell order. */
 function sources(sim, slot, push) {

@@ -17,10 +17,11 @@ import { DIAG, G, GOAL, INF, MAX_GOALS, PATH_MAX, SLOT, STEP, TRAIL_OFF, backCel
 import { FIELD, FIELDS, deposit, makeScent, smell, stepScent } from './scent.js';
 import { SUBSYSTEMS, finish, hashArray, hashInt } from './hash.js';
 import { generate } from './world.js';
+import { BROOD_MAX, CASTE, CASTE_HP, FOOD, LOAD, STAGE, addBrood, fight, makeBrood, stepColony } from './colony.js';
 
-export const SIM_VERSION = 3; // 2: trails keep their drawn shape (a path per trail, `via` per ant); 3: eight directions
+export const SIM_VERSION = 4; // 2: trails keep their drawn shape (a path per trail, `via` per ant); 3: eight directions; 4: the colony (colony.js)
 export const TICK_HZ = 20;
-export { G, GOAL, SLOT, INF, STEP, DIAG, FIELD, MAT, SURFACE, NEST, SUB, SUBSYSTEMS };
+export { G, GOAL, SLOT, INF, STEP, DIAG, FIELD, MAT, SURFACE, NEST, SUB, SUBSYSTEMS, CASTE, CASTE_HP, FOOD, LOAD, STAGE, BROOD_MAX };
 
 export const JOB = { FORAGE: 0, DIG: 1, GUARD: 2 };
 export const MODE = { SEEK: 0, RETURN: 1, WORK: 2, REST: 3 };
@@ -35,6 +36,9 @@ export const DEFAULTS = {
   // Trail: a third of a ten-minute day (02-spec section 10).
   spread: [6, 40, 48], halfLife: [4000, 60, 200],
   blank: false, // true: an empty map for tests (surface open, nest all clay); no world generation
+  // A colony game: a queen, brood and the colony's meals (colony.js). `ants` workers start in the chamber
+  // with `sugar` units and one larva per `larvae`. Off (0): the sandbox, adults only, as in M0.
+  colony: 0, sugar: 0, larvae: 0,
 };
 
 const WALK = 24, RUN = 36; // sub-cell units per tick: about 1.9 and 2.8 cells a second
@@ -58,6 +62,7 @@ export class Sim {
     this.link = new Int32Array(n).fill(-1);
     this.pileCell = new Int32Array(MAX_PILES).fill(-1);
     this.pileAmount = new Int32Array(MAX_PILES);
+    this.pileKind = new Uint8Array(MAX_PILES); // FOOD.SUGAR or FOOD.PROTEIN
     this.home = { x: 0, y: 0, w: 1, h: 1 };
     this.g = new Int32Array(G.SIZE);
     this.rng = seedStreams(cfg.seed);
@@ -75,6 +80,12 @@ export class Sim {
     this.since = new Uint16Array(A); // ticks in the current mode (saturates)
     this.lastCell = new Int32Array(A);
     this.via = new Int8Array(A); // trail slot that led this forager out (her route), or -1
+    this.caste = new Uint8Array(A); // CASTE (colony.js): worker or major
+    this.hp = new Uint8Array(A); // hit points; 0 is removed at the end of the tick
+    this.team = new Uint8Array(A); // 0 the player's colony; others for fights to come
+    this.cool = new Uint8Array(A); // ticks until this ant can bite again (colony.js fight)
+    this.brood = makeBrood();
+    this.anyDead = false; // an ant is at 0 hit points: removed at the end of the tick (restore recomputes it)
     // Spatial hash (rebuilt every tick from positions; not state).
     this.head = new Int32Array(n); this.nextAnt = new Int32Array(A);
     // Scratch for building a trail's path (not state).
@@ -88,6 +99,10 @@ export class Sim {
     else { this.mat.fill(MAT.OPEN, 0, L.nestBase); this.mat.fill(MAT.CLAY, L.nestBase); }
     this.startGoals();
     for (let i = 0; i < cfg.ants; i++) this.spawn(i % 20 < 12 ? JOB.FORAGE : i % 20 < 17 ? JOB.DIG : JOB.GUARD);
+    if (cfg.colony) {
+      this.g[G.QUEEN] = 1; this.g[G.SUGAR] = cfg.sugar;
+      for (let k = 0; k < cfg.larvae; k++) addBrood(this, STAGE.LARVA);
+    }
     rebuildDirty(this);
   }
 
@@ -97,14 +112,20 @@ export class Sim {
     for (let p = 0; p < MAX_PILES; p++) if (this.pileAmount[p] > 0) setGoal(this, SLOT.FOOD0 + p, GOAL.FOOD, this.pileCell[p]);
   }
 
-  /** A new ant in the home chamber. Returns its index or -1 at the cap. */
-  spawn(job) {
+  /** A new ant in the home chamber, or in nest cell `cell` (a hatching pupa). Returns its index or -1 at the cap. */
+  spawn(job, caste = CASTE.WORKER, team = 0, cell = -1) {
     if (this.n >= this.cfg.maxAnts) return -1;
     const i = this.n++, h = this.home, r = this.rng, A = STREAM.ants;
-    this.layer[i] = NEST;
-    this.x[i] = (h.x + below(r, A, h.w)) * SUB + 128;
-    this.y[i] = (h.y + below(r, A, h.h)) * SUB + 128;
+    if (cell >= 0) {
+      const [layer, cx, cy] = cellXY(this.L, cell);
+      this.layer[i] = layer; this.x[i] = cx * SUB + 128; this.y[i] = cy * SUB + 128;
+    } else {
+      this.layer[i] = NEST;
+      this.x[i] = (h.x + below(r, A, h.w)) * SUB + 128;
+      this.y[i] = (h.y + below(r, A, h.h)) * SUB + 128;
+    }
     this.heading[i] = below(r, A, ANGLES);
+    this.caste[i] = caste; this.hp[i] = CASTE_HP[caste & 1]; this.team[i] = team; this.cool[i] = 0;
     this.job[i] = job; this.mode[i] = MODE.SEEK; this.carry[i] = 0; this.mem[i] = -1; this.goal[i] = -1; this.via[i] = -1;
     this.best[i] = INF; this.stall[i] = 0; this.since[i] = 0; this.lastCell[i] = this.cellOfAnt(i);
     return i;
@@ -262,8 +283,11 @@ export class Sim {
     while (this.queue.length && this.queue[0][0] === g[G.TICK]) this.applyCommand(this.queue.shift());
     this.rebuildFields();
     this.stepWorld();
+    if (this.cfg.colony) stepColony(this);
     this.buildBuckets();
     for (let i = 0; i < this.n; i++) this.stepAnt(i);
+    fight(this);
+    if (this.anyDead) this.removeDead();
     stepScent(this);
     this.rebuildFields();
     g[G.TICK]++;
@@ -301,7 +325,25 @@ export class Sim {
 
   setMode(i, mode) { this.mode[i] = mode; this.since[i] = 0; }
 
+  /** Every per-ant array, in hash order. */
+  antArrays() {
+    return [this.x, this.y, this.layer, this.heading, this.job, this.mode, this.carry, this.mem, this.goal, this.best, this.stall, this.since, this.lastCell, this.via, this.caste, this.hp, this.team, this.cool];
+  }
+
+  /** Remove the ants at 0 hit points, keeping the others in index order (a stable compaction). */
+  removeDead() {
+    const arrays = this.antArrays();
+    let w = 0;
+    for (let i = 0; i < this.n; i++) {
+      if (this.hp[i] === 0) { if (this.job[i] === JOB.DIG && this.mode[i] === MODE.WORK) this.g[G.DIG_CREW]--; continue; } // her place in the dig crew frees up
+      if (w !== i) for (const a of arrays) a[w] = a[i];
+      w++;
+    }
+    this.n = w; this.anyDead = false;
+  }
+
   stepAnt(i) {
+    if (this.hp[i] === 0) return; // bitten to death this tick; removed at its end
     if (this.since[i] < 0xFFFF) this.since[i]++;
     const L = this.L, c = this.cellOfAnt(i), layer = this.layer[i], r = this.rng, A = STREAM.ants;
     let follow = -1, want = -1, speed = WALK, still = false, wander = false, back = false;
@@ -311,7 +353,12 @@ export class Sim {
     else if (this.job[i] === JOB.FORAGE) {
       if (this.mode[i] === MODE.RETURN) {
         if (atHome) {
-          if (this.carry[i]) { this.g[G.STORES]++; this.carry[i] = 0; }
+          if (this.carry[i]) {
+            this.g[G.STORES]++;
+            const kind = this.carry[i] === 2 ? FOOD.PROTEIN : FOOD.SUGAR;
+            this.g[kind === FOOD.PROTEIN ? G.PROTEIN : G.SUGAR] += LOAD[kind];
+            this.carry[i] = 0;
+          }
           this.setMode(i, MODE.SEEK); this.heading[i] = (this.heading[i] + 128) & 255;
           still = true;
         } else {
@@ -329,7 +376,7 @@ export class Sim {
       else {
         const p = this.pileAt(c);
         if (p >= 0) {
-          this.carry[i] = 1; this.mem[i] = SLOT.FOOD0 + p; this.setMode(i, MODE.RETURN); // `via` stays: her route
+          this.carry[i] = this.cfg.colony && this.pileKind[p] === FOOD.PROTEIN ? 2 : 1; /* the sandbox carries one kind */ this.mem[i] = SLOT.FOOD0 + p; this.setMode(i, MODE.RETURN); // `via` stays: her route
           this.heading[i] = (this.heading[i] + 128) & 255; this.g[G.PICKED]++;
           if (--this.pileAmount[p] === 0) { dropGoal(this, SLOT.FOOD0 + p); this.event(EVENT.PILE_EMPTY, p, 0); }
           still = true;
@@ -532,13 +579,16 @@ export class Sim {
     let h;
     const out = {};
     h = hashInt(0x1A, n);
-    for (const a of [this.x, this.y, this.layer, this.heading, this.job, this.mode, this.carry, this.mem, this.goal, this.best, this.stall, this.since, this.lastCell, this.via]) h = hashArray(h, a, n);
+    for (const a of this.antArrays()) h = hashArray(h, a, n);
+    const B = this.brood;
+    h = hashInt(h, B.n);
+    for (const a of [B.stage, B.age, B.fed, B.hunger, B.cell]) h = hashArray(h, a, B.n);
     out.ants = finish(h);
     h = 0x5C;
     for (let f = 0; f < FIELDS; f++) h = hashArray(h, S.cur[f]);
     out.scent = finish(h);
     h = 0x7E;
-    for (const a of [this.mat, this.dig, this.digWork, this.link, this.pileCell, this.pileAmount]) h = hashArray(h, a);
+    for (const a of [this.mat, this.dig, this.digWork, this.link, this.pileCell, this.pileAmount, this.pileKind]) h = hashArray(h, a);
     for (const v of [this.home.x, this.home.y, this.home.w, this.home.h]) h = hashInt(h, v);
     out.terrain = finish(h);
     h = 0xF1;
@@ -552,7 +602,9 @@ export class Sim {
     for (const e of this.queue) h = hashArray(h, e);
     h = hashArray(h, Int32Array.from(this.events));
     out.events = finish(h);
-    out.globals = finish(hashArray(0x61, this.g));
+    // Globals, and the settings that steer later ticks (the population cap, colony mode, scent spread and decay).
+    const c = this.cfg;
+    out.globals = finish(hashArray(hashArray(0x61, this.g), Int32Array.from([c.maxAnts, c.colony ? 1 : 0, ...c.spread, ...c.halfLife])));
     h = 0;
     for (const k of SUBSYSTEMS) h = hashInt(h, out[k]);
     out.total = finish(h);

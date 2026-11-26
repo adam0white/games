@@ -22,12 +22,13 @@
 // is exact), the spatial hash and other scratch buffers, and counters marked "not state".
 
 import { G, INF, MAX_GOALS, PATH_MAX, SLOT, rebuild } from './flow.js';
+import { BROOD_MAX, CASTE_HP } from './colony.js';
 import { FIELDS, SCENT_MAX } from './scent.js';
 import { MAT, SUB } from './grid.js';
 import { SIM_VERSION, Sim } from './sim.js';
 import { Decoder, Encoder, intModel, probs, sint, tree, uint } from './rangecoder.js';
 
-export const SNAPSHOT_VERSION = 3; // 3: lastCell codes the diagonal neighbours
+export const SNAPSHOT_VERSION = 4; // 3: lastCell codes the diagonal neighbours; 4: the colony (pile kinds, caste, hit points, team, brood; colony flag in the header)
 const SCTX = 24; // scent contexts per field
 const LIST_MAX = 1 << 20; // a longer command queue, command or event list is a corrupt payload, not an allocation
 const RANK_BITS = 12; // measured: 6, 8, 10, 12, 14 bits; 12 is near the best (ants share cells, so a fine model pays)
@@ -83,6 +84,7 @@ function walk(sim, io, mark = () => {}) {
   exceptions(sim.link, () => -1, 3);
   putAll(sim.pileCell, 6);
   putAll(sim.pileAmount, 6);
+  putAll(sim.pileKind, 6);
 
   mark('terrain');
 
@@ -195,6 +197,26 @@ function walk(sim, io, mark = () => {}) {
     // to the tick, so code the difference from the tick (capped the same way).
     const top = Math.min(sim.g[G.TICK] >>> 0, 0xFFFF);
     sim.since[i] = top - sint(io, AM, 24 + job * 4 + mode, top - sim.since[i]);
+    // Caste, hit points as the difference from the caste's full hit points, team, bite cooldown.
+    sim.caste[i] = uint(io, AM, 52, sim.caste[i]);
+    const full = CASTE_HP[sim.caste[i] & 1];
+    sim.hp[i] = full - sint(io, AM, 53, full - sim.hp[i]);
+    sim.team[i] = uint(io, AM, 54, sim.team[i]);
+    sim.cool[i] = uint(io, AM, 63, sim.cool[i]);
+  }
+
+  // ---- brood ----
+  const B = sim.brood;
+  B.n = uint(io, AM, 55, B.n);
+  if (B.n > BROOD_MAX) throw new Error('snapshot payload is corrupt');
+  for (let k = 0; k < B.n; k++) {
+    B.stage[k] = uint(io, AM, 56, B.stage[k]);
+    B.age[k] = uint(io, AM, 57 + Math.min(B.stage[k], 2), B.age[k]);
+    B.fed[k] = uint(io, AM, 60, B.fed[k]);
+    B.hunger[k] = uint(io, AM, 61, B.hunger[k]);
+    // From the cell before (brood lies together); the prediction is kept to a cell index so any int32 residual fits.
+    const q = k ? B.cell[k - 1] : 0, p = q >= 0 && q < n ? q : 0;
+    B.cell[k] = sint(io, AM, 62, B.cell[k] - p) + p;
   }
 
   mark('ants');
@@ -220,7 +242,7 @@ function walk(sim, io, mark = () => {}) {
 
 function headerValues(sim) {
   const c = sim.cfg, h = sim.home;
-  return [c.seed >>> 0, c.sw, c.sh, c.nw, c.nh, c.maxAnts, sim.n, h.x, h.y, h.w, h.h, ...c.spread, ...c.halfLife];
+  return [c.seed >>> 0, c.sw, c.sh, c.nw, c.nh, c.maxAnts, sim.n, h.x, h.y, h.w, h.h, ...c.spread, ...c.halfLife, c.colony ? 1 : 0];
 }
 
 /** Coded bytes per part, in walk order (the spike reports them): [[name, bytes], ...]. */
@@ -253,17 +275,18 @@ export function restore(bytes) {
   // Version 1 (raw shuffled arrays) and any other version are refused by number, never guessed at.
   if (version !== SNAPSHOT_VERSION || simVersion !== SIM_VERSION) throw new Error(`snapshot ${version}/${simVersion}, this sim reads ${SNAPSHOT_VERSION}/${SIM_VERSION}`);
   const count = dv.getUint32(8, true);
-  if (count !== 11 + 2 * FIELDS || bytes.length < 12 + 4 * count) throw new Error('snapshot header is corrupt');
+  if (count !== 12 + 2 * FIELDS || bytes.length < 12 + 4 * count) throw new Error('snapshot header is corrupt');
   const header = [];
   for (let k = 0; k < count; k++) header.push(dv.getUint32(12 + 4 * k, true));
   const [seed, sw, sh, nw, nh, maxAnts, n, hx, hy, hw, hh] = header;
-  const spread = header.slice(11, 11 + FIELDS), halfLife = header.slice(11 + FIELDS, 11 + 2 * FIELDS);
+  const spread = header.slice(11, 11 + FIELDS), halfLife = header.slice(11 + FIELDS, 11 + 2 * FIELDS), colony = header[11 + 2 * FIELDS];
   if (n > maxAnts) throw new Error('snapshot header is corrupt');
-  const sim = new Sim({ seed, sw, sh, nw, nh, maxAnts, ants: 0, spread, halfLife, restoring: true });
+  const sim = new Sim({ seed, sw, sh, nw, nh, maxAnts, ants: 0, spread, halfLife, colony, restoring: true });
   sim.n = n;
-  sim.home = { x: hx, y: hy, w: hw, h: hh };
+  sim.home = { x: hx | 0, y: hy | 0, w: hw, h: hh }; // a chamber can start left of the nest's edge: signed
   const dec = new Decoder(bytes.subarray(12 + 4 * count));
   walk(sim, dec);
   dec.finish();
+  for (let i = 0; i < n && !sim.anyDead; i++) if (sim.hp[i] === 0) sim.anyDead = true; // hurt between ticks
   return sim;
 }

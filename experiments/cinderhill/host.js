@@ -2,6 +2,7 @@
 // numbers the page shows (crews, the "why" for one ant). The sim in sim/ is unchanged and pure; this file is the host.
 import { Sim, JOB, MODE, CMD, EVENT, G, SLOT, MAX_PILES, SURFACE, NEST, MAT, FIELD } from './sim/sim.js';
 import { cellAt } from './sim/grid.js';
+import { START, STAGE } from './sim/colony.js';
 
 export const TICK_MS = 50;
 export const COUNTS = [500, 2000, 5000];
@@ -10,14 +11,16 @@ export { JOB, MODE, CMD, SLOT, SURFACE, NEST, MAT, FIELD, G, MAX_PILES };
 const NAMES = { [CMD.TRAIL]: 'trail', [CMD.DIG]: 'dig', [CMD.ALARM]: 'alarm', [CMD.RECALL]: 'recall' };
 
 export class Host {
-  constructor(ants = 2000, seed = SEED) { this.log = []; this.reset(ants, seed); }
+  constructor(ants = 2000, seed = SEED, { colony = false } = {}) { this.log = []; this.colony = colony; this.reset(ants, seed); }
 
   /** A new colony. Jobs: 17 in 20 forage, 2 dig, 1 guards. Seven in ten foragers start on the surface near the
    *  entrance and their time out is staggered, so the page opens on a busy surface rather than one wave that leaves
    *  the nest together and gives up together. This is page setup; the sim's rules are untouched. */
   reset(ants, seed = this.seed ?? SEED) {
     this.seed = seed; this.ants = ants;
-    const sim = (this.sim = new Sim({ seed, ants: 0, maxAnts: Math.max(5000, ants) }));
+    // A colony game (?colony=1): the queen, START's workers in her chamber, sugar and larvae; it grows by births.
+    const sim = (this.sim = this.colony ? new Sim({ seed, ...START, colony: 1, maxAnts: 5000 }) : new Sim({ seed, ants: 0, maxAnts: Math.max(5000, ants) }));
+    if (this.colony) ants = 0;
     let r = (seed * 2654435761) >>> 0 || 1;
     const rand = n => { r = (Math.imul(r, 1664525) + 1013904223) >>> 0; return (r >>> 8) % n; };
     const L = sim.L, ex = L.sw >> 1, ey = L.sh >> 1;
@@ -34,14 +37,15 @@ export class Host {
         break;
       }
     }
-    const n = sim.n;
-    this.px = new Uint16Array(n); this.py = new Uint16Array(n); this.pl = new Uint8Array(n);
+    // Sized for the cap: in a colony game ants are born (new indices) and die (later ones move down).
+    const A = sim.cfg.maxAnts;
+    this.px = new Uint16Array(A); this.py = new Uint16Array(A); this.pl = new Uint8Array(A); this.pn = 0;
     this.snap();
     this.acc = 0; this.last = null; this.terrainVersion = 1; this.ticks = 0; this.tickMs = [];
     this.lastStores = 0; this.delivered = 0;
   }
 
-  snap() { const s = this.sim, n = s.n; this.px.set(s.x.subarray(0, n)); this.py.set(s.y.subarray(0, n)); this.pl.set(s.layer.subarray(0, n)); }
+  snap() { const s = this.sim, n = (this.pn = s.n); this.px.set(s.x.subarray(0, n)); this.py.set(s.y.subarray(0, n)); this.pl.set(s.layer.subarray(0, n)); }
 
   /** Steps the sim for the time since the last call (at most 4 ticks a frame). Returns the ticks run. */
   advance(now, paused) {
@@ -59,8 +63,12 @@ export class Host {
   step() {
     this.snap();
     const t0 = performance.now();
+    const died = this.sim.g[G.DIED];
     this.sim.step();
     const ms = performance.now() - t0;
+    // A death moves the later ants down one index: their last positions no longer match, so draw this tick
+    // without interpolation, and tell the page (its selected ant may now be another ant).
+    if (this.sim.g[G.DIED] !== died) { this.pn = 0; this.shifted = true; }
     this.tickMs.push(ms); if (this.tickMs.length > 2000) this.tickMs.splice(0, 1000);
     this.ticks++;
     const ev = this.sim.drainEvents();
@@ -117,7 +125,13 @@ export class Host {
     const dig = { marked: s.g[G.DIG_COUNT], crew: s.g[G.DIG_CREW], cap: Math.min(24, 4 * s.g[G.DIG_COUNT]), diggers, dug: s.g[G.DUG] };
     const piles = [];
     for (let p = 0; p < MAX_PILES; p++) if (s.pileCell[p] >= 0) piles.push({ p, x: s.pileCell[p] % s.L.sw, y: Math.floor(s.pileCell[p] / s.L.sw), amount: s.pileAmount[p], crew: slots[SLOT.FOOD0 + p] });
-    return { ants: n, surface, carrying, foragers, seeking, trails, alarm, dig, piles, picked: s.g[G.PICKED], stores: s.g[G.STORES], recall: !!s.g[G.RECALL], tick: s.tick };
+    let colony = null;
+    if (this.colony) {
+      const B = s.brood, by = [0, 0, 0];
+      for (let k = 0; k < B.n; k++) by[B.stage[k]]++;
+      colony = { queen: s.g[G.QUEEN], sugar: s.g[G.SUGAR], protein: s.g[G.PROTEIN], eggs: by[STAGE.EGG], larvae: by[STAGE.LARVA], pupae: by[STAGE.PUPA], born: s.g[G.BORN], lost: s.g[G.BROOD_LOST], hungry: s.g[G.HUNGRY] };
+    }
+    return { ants: n, surface, carrying, foragers, seeking, trails, alarm, dig, piles, picked: s.g[G.PICKED], stores: s.g[G.STORES], recall: !!s.g[G.RECALL], tick: s.tick, colony };
   }
 
   /** One ant, for the inspection card: what she is, what she carries, where she is going and why. Keys for words.js. */

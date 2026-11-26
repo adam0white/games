@@ -62,5 +62,6 @@ export function generate(sim) {
     disc(sim, SURFACE, px, py, 3, MAT.OPEN, () => false);
     sim.pileCell[p] = cellAt(L, SURFACE, px, py);
     sim.pileAmount[p] = 400 + below(rng, W, 400);
+    sim.pileKind[p] = p & 1; // even piles sugar (nectar), odd protein (insects): FOOD in colony.js
   }
 }
