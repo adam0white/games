@@ -12,6 +12,7 @@ import { onLeave, isPauseKey } from '../kit/pause.js';
 import { sound } from '../kit/audio.js';
 import { hint } from '../kit/hint.js';
 import { lab } from '../kit/lab.js';
+import { LabRecord } from './labrec.js';
 import { readJson, writeJson } from '../kit/save.js';
 
 noZoom();
@@ -41,6 +42,12 @@ const G = makeGestures();
 const snd = sound({ on: () => save.sound });
 const rec = lab('cinderhill', { lang });
 rec.notice($('menuCard')); rec.toggle($('pauseCard'));
+// The full replay of each game and what only the page sees (labrec.js; spikes/replay-lab.mjs reads it back).
+const labrec = new LabRecord(rec);
+const startRecord = () => labrec.start(host, { mode: colonyMode ? 'colony' : 'sandbox', look: query.get('look') ?? 'default', viewport: [innerWidth, innerHeight, Math.round(devicePixelRatio * 100) / 100] });
+addEventListener('error', e => labrec.error(e.message ?? 'error'));
+addEventListener('unhandledrejection', e => labrec.error(`rejection: ${e.reason?.message ?? e.reason}`));
+document.addEventListener('visibilitychange', () => labrec.visible(document.visibilityState === 'visible')); // on document: before the kit's own flush on window
 let running = false; // a lab run is open
 
 // ---- canvases, camera ----
@@ -137,7 +144,7 @@ function setScreen(s) {
 function play() {
   snd.unlock();
   if (saved0 === null && readJson(SAVE) === null) persist();
-  if (!running) { rec.start({ ants: host.ants, colony: colonyMode ? 1 : 0 }); running = true; }
+  if (!running) { startRecord(); running = true; }
   if (colonyMode && !dawnSeen) { showDawn(); return; }
   setScreen('play'); host.last = null; snd.release();
 }
@@ -168,21 +175,22 @@ function showDusk() {
   $('dayNote').textContent = `${t('nextGoal', { goal: goalText(k.next) })}${k.next.eased ? ' ' + t('eased') : ''}`;
   $('dayGo').textContent = t('startDay', { day: k.day + 1 });
   $('dayRestart').textContent = t('restartDay', { day: k.day }); $('dayRestart').hidden = false;
-  rec.event('dusk', { day: k.day, won: k.won ? 1 : 0, ants: k.ants });
+  labrec.event('dusk', { day: k.day, won: k.won ? 1 : 0, kind: k.goal.kind, done: k.goal.done, target: k.goal.target, ants: k.ants, sugar: k.sugar, protein: k.protein, born: k.born, lost: k.lost });
   run(G.reset('pause')); tapStart = null;
   setScreen('day'); snd.hold();
   if (k.won) snd.tone(523, 0.2, 0.06, 'triangle', 260); else snd.tone(330, 0.3, 0.05, 'triangle', -120);
 }
 function dayGo() {
-  if (dayCard?.kind === 'dusk') { host.goOn(); rec.event('dawn', { day: host.day().day }); dayCard = null; showDawn(); return; }
+  if (dayCard?.kind === 'dusk') { host.goOn(); labrec.goOn(); labrec.event('dawn', { day: host.day().day }); dayCard = null; showDawn(); return; }
   dawnSeen = true; dayCard = null;
   setScreen('play'); host.last = null; snd.release();
 }
 function dayRestart() {
   if (dayCard?.kind !== 'dusk') return;
   const day = dayCard.day;
+  const before = host.tick;
   if (!host.restartDay(day)) return;
-  rec.event('restart', { day });
+  labrec.restart(day, before); labrec.event('restart', { day });
   selected = -1; $('antCard').classList.remove('on'); alarmAt = null; pulses = [];
   stats = host.stats(); uploadAll(); retext();
   dayCard = null; showDawn();
@@ -194,13 +202,14 @@ function pauseGame() {
 }
 function resume() { setScreen('play'); host.last = null; snd.release(); }
 function toMenu() {
-  if (running) { rec.end('left', { ticks: host.tick, orders: host.log.length, delivered: host.delivered, ants: host.ants }); running = false; }
+  if (running) { labrec.end('left'); running = false; }
   setScreen('menu'); snd.hold();
 }
 function setCount(n) {
   if (colonyMode || !COUNTS.includes(n) || n === host.ants) return;
   run(G.reset('count'));
   host = new Host(n); save.ants = n; persist();
+  if (running) startRecord(); // a new game: its own replay
   selected = -1; tapStart = null; stats = host.stats();
   uploadAll(); retext();
 }
@@ -219,7 +228,7 @@ $('toMenu').addEventListener('click', toMenu);
 $('layer').addEventListener('click', () => setLayer(layer === SURFACE ? NEST : SURFACE));
 $('zin').addEventListener('click', () => { cams[layer].z *= 1.4; clampCam(); });
 $('zout').addEventListener('click', () => { cams[layer].z /= 1.4; clampCam(); });
-function setHold(on) { if (on === held) return; held = on; host.last = null; retext(); if (held) toast('held'); }
+function setHold(on) { if (on === held) return; held = on; labrec.hold(on, performance.now()); host.last = null; retext(); if (held) toast('held'); }
 $('hold').addEventListener('click', () => setHold(!held));
 $('recall').addEventListener('click', () => { const on = !host.sim.g[GI.RECALL]; order({ type: CMD.RECALL, on: on ? 1 : 0 }); setTimeout(retext, 80); });
 $('sound').addEventListener('click', () => { save.sound = !save.sound; persist(); if (!save.sound) snd.hold(); retext(); });
@@ -238,7 +247,7 @@ const help = hint(ui, { kind: 'path', key: HINT, when: () => screen === 'play' &
 let preview = null, tapStart = null, selected = -1, alarmAt = null, pulses = [], stats = host.stats();
 function order(o) {
   const e = host.order(o);
-  rec.event('order', { type: e.type });
+  labrec.order(o, e);
   return e;
 }
 const cellOf = (sx, sy) => { const w = toWorld(sx, sy); return [Math.floor(w.x), Math.floor(w.y)]; };
@@ -435,6 +444,7 @@ function frame(now) {
   const t0 = performance.now();
   run(G.tick(t0));
   const stepped = host.advance(now, screen !== 'play' || held);
+  if (screen === 'play') { labrec.tick(); labrec.camera(layer, cams[layer], now); if (frames.last) labrec.frame(now - frames.last); }
   if (host.dusk && screen === 'play') showDusk(); // the day is over: time stops on the dusk card
   if (host.shifted) { host.shifted = false; selected = -1; $('antCard').classList.remove('on'); } // a death renumbered the ants
   if (stepped) {
@@ -466,6 +476,7 @@ window.painter = {
   state: () => ({ screen: screen === 'paused' ? 'paused' : screen, dayCard: dayCard?.kind ?? null, held, t: host.tick, paused: screen === 'paused', ants: host.ants, sound: save.sound, tapTrail: save.tapTrail, tool, layer, preview: preview ? preview.points.length : 0, orders: host.log.length, gl: !!renderer && !renderer.lost, glLosses: renderer?.losses ?? 0, glRestored: renderer?.restored ?? 0, glFailed, drawn: frames.drawn, selected, help: help.shown }),
   log: () => JSON.parse(JSON.stringify(host.log)),
   stats: () => host.stats(),
+  lab: () => ({ open: labrec.open, part: labrec.part, chain: labrec.chain, pending: labrec.buf?.length ?? 0, orders: { ...labrec.byType } }),
   brood: () => Array.from({ length: host.sim.brood.n }, (_, k) => [...cellXY(host.sim.L, host.sim.brood.cell[k]).slice(1), host.sim.brood.stage[k]]),
   inspect: i => host.inspect(i),
   toScreen: (x, y, l) => toScreen(x, y, l),

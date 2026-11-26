@@ -492,6 +492,8 @@ export const pageRuns = {
     await page.click('#dayGo');
     await until(page, () => window.painter.state().screen === 'play' && window.painter.day().day === 2, 'day 2 in play');
     assert.deepEqual(await page.evaluate(() => window.painter.dawns()), [2], 'yesterday\'s dawn is let go');
+    const labState = await page.evaluate(() => window.painter.lab());
+    assert.equal(labState.open, true, 'the lab replay record is open'); assert.equal(labState.part, 1);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no sideways scroll');
   },
   async small(page, { base, until }) {
