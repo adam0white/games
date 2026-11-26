@@ -1419,6 +1419,35 @@ GAMES['small live'] = async page => {
   await page.emulateMedia({ reducedMotion: 'reduce' }); await page.reload(); await until(page, () => window.smallState, 'home script again'); await sleep(500);
   assert.deepEqual((await page.evaluate(() => window.smallState())).live, [], 'nothing moves under reduced motion');
 };
+// The collection: the deck puts untried games right after the pick and keeps that order through a visit; a game tried
+// for the first time lights its tile with a note when the player comes back; the sound switch is remembered.
+GAMES['small tried'] = async page => {
+  await page.goto(`${base}/notes/button.js`);
+  await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('hf-lab-send-localhost', '1'); localStorage.setItem('hub:small:intro', '1');
+    localStorage.setItem('hub:opened', JSON.stringify({ 'night-saltplate': '2026-11-20', 'wild-pour': '2026-11-24' }));
+    localStorage.setItem('night-bells:save', JSON.stringify({ v: 1, stars: [2, 0, 0, 0, 0, 0, 0, 0], best: 0, sound: true, tries: 1, look: 'amber' })); });
+  await page.goto(`${base}/small/?lang=en&day=2026-11-24`); await until(page, () => window.smallState, 'home script');
+  let st = await page.evaluate(() => window.smallState());
+  assert.equal(st.order[0], st.pick, 'the deck starts on the pick');
+  assert.deepEqual(st.tried.sort(), ['night-bells', 'night-saltplate', 'wild-pour'], 'played and opened games count as tried');
+  assert.deepEqual(st.order.slice(-3).sort(), ['night-bells', 'night-saltplate', 'wild-pour'], 'tried games come last');
+  assert.equal(await page.textContent('#triedText'), 'You have tried 3 of 12');
+  assert.equal(await page.locator('.tile.lit').count(), 3);
+  // A tile brings its card to the middle; that card's game, new until now, is opened and the player comes back.
+  await page.click('.tile[data-i="1"]'); await until(page, () => window.smallState().at === 1, 'a tile brings its card');
+  await page.waitForTimeout(600);
+  const slug = st.order[1];
+  await page.click(`.card.${slug} a.play`); await page.waitForURL(url => url.pathname === `/small/${slug}/`); await page.waitForLoadState("networkidle"); // WebKit counts module requests cut off by an early goBack as failed requests
+  await page.goBack(); await until(page, () => window.smallState, 'back on the home');
+  await until(page, s => document.querySelector(`.tile[data-slug="${s}"]`)?.classList.contains('lit'), 'its tile lights', 4000, slug);
+  assert.equal(await page.textContent('#toast'), 'New one tried · 4 of 12');
+  assert.deepEqual((await page.evaluate(() => window.smallState())).order, st.order, 'the deck keeps its order through the visit');
+  await page.click('#sound'); assert.equal(await page.evaluate(() => localStorage.getItem('hub:small:sound')), '0');
+  await page.reload(); await until(page, () => window.smallState, 'home script again');
+  assert.equal((await page.evaluate(() => window.smallState())).sound, false, 'sound off is remembered');
+  await page.click('#lang'); await until(page, () => document.documentElement.lang === 'tr', 'Turkish');
+  assert.equal(await page.textContent('#triedText'), '12 oyunun 4 tanesini denedin');
+};
 
 const MUTATE = process.argv.includes('--mutate'); // only 'lantern ripples' reads it: its check must then fail
 const [onlyGame, onlyPhone] = process.argv.slice(2).filter(a => a !== '--mutate');
@@ -1429,7 +1458,7 @@ const picked = game => !onlyGame || onlyGame === 'all' || onlyGame.split(',').so
 // A check that never answers becomes a FAIL line naming it, not a job that runs until its time limit.
 const within = (p, ms, what) => { let t; return Promise.race([p, new Promise((_, no) => { t = setTimeout(() => no(new Error(`no answer in ${ms / 1000}s: ${what}`)), ms); })]).finally(() => clearTimeout(t)); };
 let failed = 0;
-WITH.small = ['small live']; // the small games' home: its extra checks run with 'small'
+WITH.small = ['small live', 'small tried']; // the small games' home: its extra checks run with 'small'
 for (const [phone, [engine, device]] of Object.entries(PHONES)) {
   if (onlyPhone && onlyPhone !== phone) continue;
   // Headless macOS WebKit still needs a display link to schedule animation frames.
