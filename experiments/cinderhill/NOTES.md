@@ -169,7 +169,7 @@ The sim is not touched (no hash change). Rooms with purposes (02-spec 6.2: nurse
 
 ## Looks (2026-11-26, page only)
 
-Three looks of the same scene, for the owner to pick one (04-roadmap M1 item 4). Open the page with `?look=ink`, `?look=ember` or `?look=field`, or use the Look row on the pause card. The row reloads the page with the new look and keeps the other parameters, such as `colony=1`. The game in progress is lost on that reload, because there is no autosave yet.
+Three looks of the same scene, for the owner to pick one (04-roadmap M1 item 4). Open the page with `?look=ink`, `?look=ember` or `?look=field`, or use the Look row on the pause card. The row switches the look in place: the shaders are built again and the textures uploaded again, the game goes on, and the URL keeps the new look (a lab `look` event records the switch).
 
 | Look | Ground | Edges | Scent | Ants |
 |---|---|---|---|---|
@@ -181,7 +181,7 @@ Three looks of the same scene, for the owner to pick one (04-roadmap M1 item 4).
 - Each look is its own shader build: `render.js` adds `#define LOOK n` after `#version`, and the context-restore path builds the same variant.
 - An unknown name falls back to `ink`. The lab record's start carries the resolved name, not the raw query.
 - The sim and its hashes do not change.
-- The phone line `cinderhill looks` checks the following in WebKit and Chromium. `ember`, `field` and an unknown name each compile and draw, and each survives a lost context. The pause card keeps `colony=1` when it switches looks. A syntax error in the `field` shader made this line fail (`timed out waiting for: field: frames drawn`). Every other cinderhill line still passed, because a shader that does not compile leaves the page running with no WebGL.
+- The phone line `cinderhill looks` checks the following in WebKit and Chromium. `ember`, `field` and an unknown name each compile and draw, and each survives a lost context. The pause card switches looks without restarting the game (same tick and hash) and keeps `colony=1` in the URL. A syntax error in the `field` shader made this line fail (`timed out waiting for: field: frames drawn`). Every other cinderhill line still passed, because a shader that does not compile leaves the page running with no WebGL.
 - S3 per look, run with `spikes/s3.mjs --only=webkit --look=<name>`: WebKit 27.2 with the iPhone 13 profile, on the Mac's GPU, with the machine's load average at about 13. These numbers are not from a phone: every look holds the display's frame rate here.
 
 | Look | Ants | Frame mean / p95 ms | fps | Page work mean / p95 ms |
@@ -195,7 +195,7 @@ Three looks of the same scene, for the owner to pick one (04-roadmap M1 item 4).
 
   Feature 10's bar is 30 fps with 2,000 ants on an iPhone 13 class phone. That bar is not yet checked on a real phone for any look: open `/cinderhill/?fps=1&look=<name>` on one.
 
-Choices the owner may want to change: which look to keep (or parts of each), the field look's bigger ants, and whether to reload or switch looks in place.
+Choices the owner may want to change: which look to keep (or parts of each), the field look's bigger ants, and switching looks in place rather than by reload.
 
 ## The lab record: a full replay (2026-11-26)
 

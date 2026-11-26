@@ -395,7 +395,7 @@ export const pageRuns = {
   // stats line, the crew line, the sampler, the top buttons and the tool strip overlap (owner feedback, 2026-11-26:
   // the sampler covered the other panes on an Android phone).
   // ?look= (looks.js): each look is its own shader build. Each compiles and draws, survives a lost context, and
-  // an unknown name falls back to ink. The pause card's look buttons reload with the new look and keep ?colony=1.
+  // an unknown name falls back to ink. The pause card's look buttons switch in place: the game goes on, the URL keeps the look.
   async 'cinderhill looks'(page, { base, until }) {
     await page.setViewportSize({ width: 360, height: 640 });
     await page.goto(`${base}/notes/button.js`);
@@ -420,12 +420,20 @@ export const pageRuns = {
     await until(page, () => window.painter.state().dayCard === 'dawn', 'the dawn card');
     await page.click('#dayGo');
     await until(page, () => window.painter.state().screen === 'play', 'play');
+    await until(page, () => window.painter.state().t > 40, 'time runs');
     await page.click('#pause');
     await until(page, () => window.painter.state().paused, 'paused');
-    await Promise.all([page.waitForURL(/look=field/), page.click('[data-look="field"]')]);
+    const before = await page.evaluate(() => ({ t: window.painter.state().t, hash: window.painter.hashes().total, drawn: window.painter.state().drawn }));
+    await page.click('[data-look="field"]');
+    await until(page, () => window.painter.state().look === 'field', 'the field look in place');
+    const after = await page.evaluate(() => ({ t: window.painter.state().t, hash: window.painter.hashes().total, failed: window.painter.state().glFailed, gl: window.painter.state().gl, pressed: document.querySelector('[data-look="field"]').getAttribute('aria-pressed') }));
+    assert.equal(after.t, before.t, 'the game is not restarted'); assert.equal(after.hash, before.hash, 'the sim is untouched');
+    assert.equal(after.failed, ''); assert.ok(after.gl); assert.equal(after.pressed, 'true');
     const u = new URL(page.url());
-    assert.equal(u.searchParams.get('colony'), '1', 'the colony game is kept');
-    await until(page, () => window.painter && window.painter.state().look === 'field', 'the field look after the reload');
+    assert.equal(u.searchParams.get('look'), 'field', 'the URL keeps the look'); assert.equal(u.searchParams.get('colony'), '1', 'and the colony game');
+    await page.evaluate(d => { window.__drawn0 = d; }, before.drawn);
+    await page.click('#resume');
+    await until(page, () => window.painter.state().drawn > window.__drawn0 + 5, 'frames drawn in the new look');
   },
   async 'cinderhill hud'(page, { base, until }) {
     await page.setViewportSize({ width: 360, height: 640 });
