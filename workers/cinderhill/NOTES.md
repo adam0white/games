@@ -61,7 +61,7 @@ Full tables, method and caveats: `experiments/cinderhill/sim/SPIKES.md`, "S1 dep
 - A deploy reaches an occupied room up to 300 s later (Cloudflare holds the old version while sockets are open); the players were back on the new version 2.6 s after the cut, at the same tick, with each order stored once.
 - Unexplained: 8 of 11 authority rooms lost their sockets once, 25 to 71 s after first starting, same version, no exception; recovery 2.0 to 3.3 s with no hash difference. No relay room did.
 - **Recommendation: relay.** Same cost, 25 times less CPU, no replay on restart, no reset seen. Authority stays behind `DEBUG_ROLES` until join snapshots for an empty room or refusing a forged state need a server copy.
-- **Idle:** deployed with `DEBUG_ROLES` "0" (version 09286256, 2026-11-26). An empty room stops its clock after 5 s and is evicted, so no duration is billed while idle. What remains is SQLite storage of the test rooms (command logs and checkpoints, well under 1 MB in all), inside the 5 GB included; $0.20 per GB-month beyond it.
+- **Idle:** deployed with `DEBUG_ROLES` "0" (version 68d70086, 2026-11-26, sim version 2; a 30 s two-player relay check on it held 20.0 ticks a second with 0 hash differences). An empty room stops its clock after 5 s and is evicted, so no duration is billed while idle. What remains is SQLite storage of the test rooms (command logs and checkpoints, well under 1 MB in all), inside the 5 GB included; $0.20 per GB-month beyond it.
 - 60-minute determinism soak (offline replay of a fixed log), on sim versions 1 and 2: Node, Chromium 156, WebKit 27.2 and local workerd agree at all 3,600 records (Chromium 159 too, on sim 1). Firefox not run (not installed). The deployed S1 runs used sim version 1.
 
 ## Open
