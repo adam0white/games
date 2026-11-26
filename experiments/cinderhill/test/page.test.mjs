@@ -2,12 +2,18 @@
 // report a false mismatch.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { EXPECTED, quick } from '../quick.js';
+import { EXPECTED, EXPECTED_COLONY, quick, quickColony } from '../quick.js';
 
 test('the page expects the hash Node computes for the quick run', () => {
   const h = quick();
   assert.equal(h.tick, EXPECTED.tick);
   assert.equal(h.total, EXPECTED.total, `set EXPECTED.total to ${h.total} in quick.js`);
+});
+
+test('the page expects the hash Node computes for the colony run (days, brood)', () => {
+  const h = quickColony();
+  assert.equal(h.tick, EXPECTED_COLONY.tick);
+  assert.equal(h.total, EXPECTED_COLONY.total, `set EXPECTED_COLONY.total to ${h.total} in quick.js`);
 });
 
 // The check page's long run (check.js, the Firefox route for spike S2) steps the same way: a fresh Sim, every

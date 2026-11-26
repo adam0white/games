@@ -428,6 +428,8 @@ export const pageRuns = {
     await until(page, () => window.painter, 'painter script');
     assert.ok(await page.evaluate(() => [...document.querySelectorAll('.counts')].every(el => el.hidden)), 'no ant count buttons');
     await page.click('#play');
+    await until(page, () => window.painter.state().dayCard === 'dawn', 'the dawn card');
+    await page.click('#dayGo');
     await until(page, () => window.painter.state().screen === 'play', 'play');
     await until(page, () => /şeker/.test(document.querySelector('#stats').textContent), 'the colony line', 10000);
     const st = await page.evaluate(() => window.painter.stats());
@@ -452,6 +454,45 @@ export const pageRuns = {
     assert.ok((await page.evaluate(() => window.painter.brood().length)) >= 4, 'the four larvae are there');
     assert.deepEqual(missing, [], 'every brood item is drawn in its cell');
     assert.deepEqual(JSON.parse(await page.evaluate(() => localStorage.getItem('cinderhill:save'))).ants, 500, 'the saved count is untouched');
+  },
+  // Days (02-spec 6.9) with a 200-tick day: the dawn card shows the goal; at dusk time stops on the dusk card; a restart
+  // goes back to the dawn save (tick 0, the same hash); going on starts day 2 with the eased goal after a missed day.
+  async 'cinderhill days'(page, { base, until }) {
+    await page.setViewportSize({ width: 360, height: 640 });
+    await page.goto(`${base}/notes/button.js`);
+    await page.evaluate(() => { localStorage.clear(); localStorage.setItem('cinderhill:hint', '1'); });
+    await page.goto(`${base}/cinderhill/?colony=1&day=200&labRunSource=agent`);
+    await until(page, () => window.painter, 'painter script');
+    const dawnHash = await page.evaluate(() => window.painter.hashes().total);
+    await page.click('#play');
+    await until(page, () => window.painter.state().dayCard === 'dawn', 'the dawn card');
+    assert.match(await page.textContent('#dayGoal'), /40 loads of food along your trails/);
+    assert.equal(await page.evaluate(() => window.painter.state().t), 0, 'no time passes on the dawn card');
+    await page.click('#dayGo');
+    await until(page, () => window.painter.state().screen === 'play', 'play');
+    await until(page, () => /Day 1 · 0 of 40 loads on your trails · dusk in/.test(document.querySelector('#goal').textContent), 'the goal line');
+    await until(page, () => window.painter.state().dayCard === 'dusk', 'the dusk card', 30000);
+    assert.match(await page.textContent('#dayResult'), /Goal missed/);
+    assert.match(await page.textContent('#dayNote'), /Tomorrow: Dig 30 cells of soil/);
+    const t0 = await page.evaluate(() => window.painter.state().t);
+    assert.equal(t0, 200);
+    await page.waitForTimeout(600);
+    assert.equal(await page.evaluate(() => window.painter.state().t), t0, 'time stops at dusk');
+    assert.deepEqual(await page.evaluate(() => window.painter.dawns()), [1], 'the next dawn is saved when the player goes on');
+    await page.click('#dayRestart');
+    await until(page, () => window.painter.state().dayCard === 'dawn', 'the dawn card after a restart');
+    assert.equal(await page.evaluate(() => window.painter.state().t), 0, 'back at dawn');
+    assert.equal(await page.evaluate(() => window.painter.hashes().total), dawnHash, 'the dawn save, hash for hash');
+    await page.click('#dayGo');
+    await until(page, () => window.painter.state().dayCard === 'dusk', 'dusk again', 30000);
+    await page.click('#dayGo');
+    await until(page, () => window.painter.state().dayCard === 'dawn', 'the dawn of day 2');
+    assert.match(await page.textContent('#dayHead'), /Dawn, day 2/);
+    assert.match(await page.textContent('#dayNote'), /a quarter smaller/);
+    await page.click('#dayGo');
+    await until(page, () => window.painter.state().screen === 'play' && window.painter.day().day === 2, 'day 2 in play');
+    assert.deepEqual(await page.evaluate(() => window.painter.dawns()), [2], 'yesterday\'s dawn is let go');
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no sideways scroll');
   },
   async small(page, { base, until }) {
     const gameKeys = () => page.evaluate(() => Object.fromEntries(Object.keys(localStorage).filter(k => !/^(hub:|kit:|hf-lab-)/.test(k)).map(k => [k, localStorage.getItem(k)])));

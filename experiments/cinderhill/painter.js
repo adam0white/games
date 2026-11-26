@@ -1,7 +1,7 @@
 // Cinderhill's trail painter (04-roadmap S3, 03-features "trail painter toy"): the deterministic sim at 20 ticks a
 // second, drawn with WebGL2, and the touch rules of 02-spec section 6.4. No goals; draw trails and watch the ants.
 import { Host, CMD, SURFACE, NEST, FIELD, COUNTS, TICK_MS, SEED, G as GI } from './host.js';
-import { START, STAGE } from './sim/colony.js';
+import { START, STAGE, GOAL_KIND } from './sim/colony.js';
 import { cellXY } from './sim/grid.js';
 import { makeGestures } from './gestures.js';
 import { Renderer } from './render.js';
@@ -28,8 +28,11 @@ const qAnts = Number(query.get('ants'));
 // ?colony=1: a colony game (queen, brood, sugar and protein; M1). Without it, the trail painter sandbox as in M0.
 // The ant count buttons and the saved count do not apply to a colony game.
 const colonyMode = query.get('colony') === '1';
-let host = colonyMode ? new Host(START.ants, SEED, { colony: true }) : new Host(COUNTS.includes(qAnts) ? qAnts : save.ants);
+// ?day=<ticks> shortens a colony game's day (tests and the phone check); the game's day is colony.js DAY_TICKS.
+const qDay = Number(query.get('day'));
+let host = colonyMode ? new Host(START.ants, SEED, { colony: true, dayTicks: qDay >= 100 && qDay <= 100000 ? Math.floor(qDay) : undefined }) : new Host(COUNTS.includes(qAnts) ? qAnts : save.ants);
 if (colonyMode) for (const el of document.querySelectorAll('.counts')) el.hidden = true;
+if (colonyMode) { $('modeLink').href = './'; $('modeLink').dataset.i18n = 'toPainter'; for (const [el, k] of [[document.querySelector('#menuCard .sub'), 'colonySub'], [document.querySelector('#menuCard [data-i18n="intro"]'), 'colonyIntro']]) if (el) el.dataset.i18n = k; }
 let screen = 'menu', tool = 'trail', layer = SURFACE;
 // The tactical hold: time stops but the game stays on screen and takes orders; they apply on the first tick
 // after Go (an order is queued for the current tick, which has not run yet, so it is never late).
@@ -128,13 +131,61 @@ function setScreen(s) {
   screen = s;
   $('menu').classList.toggle('on', s === 'menu');
   $('paused').classList.toggle('on', s === 'paused');
+  $('day').classList.toggle('on', s === 'day');
   document.body.classList.toggle('playing', s !== 'menu');
 }
 function play() {
   snd.unlock();
   if (saved0 === null && readJson(SAVE) === null) persist();
-  if (!running) { rec.start({ ants: host.ants }); running = true; }
+  if (!running) { rec.start({ ants: host.ants, colony: colonyMode ? 1 : 0 }); running = true; }
+  if (colonyMode && !dawnSeen) { showDawn(); return; }
   setScreen('play'); host.last = null; snd.release();
+}
+
+// ---- days (colony games): the dawn card with the day's goal, the dusk card with the result, a restart ----
+let dawnSeen = false, dayCard = null;
+const goalText = g => t('goal_' + g.kind, { target: g.target });
+const goalHud = g => t('hudGoal_' + g.kind, g);
+function showDawn() {
+  const d = host.day();
+  dayCard = { kind: 'dawn', day: d.day };
+  $('dayHead').textContent = t('dawnTitle', { day: d.day });
+  $('dayResult').textContent = ''; $('dayResult').className = '';
+  $('dayGoal').textContent = goalText(d);
+  $('dayTip').textContent = t('tip_' + d.kind);
+  $('dayNote').textContent = d.eased ? t('eased') : '';
+  $('dayGo').textContent = t('goDay');
+  $('dayRestart').hidden = true;
+  setScreen('day'); snd.hold();
+}
+function showDusk() {
+  const k = host.dusk;
+  dayCard = { kind: 'dusk', day: k.day };
+  $('dayHead').textContent = t('dayTitle', { day: k.day });
+  $('dayResult').textContent = t(k.won ? 'duskWon' : 'duskLost'); $('dayResult').className = k.won ? 'won' : 'lost';
+  $('dayGoal').textContent = `${t('duskWas', { goal: goalText(k.goal) })} ${t('duskDone', { done: goalHud(k.goal) })}`;
+  $('dayTip').textContent = t('duskSummary', { ants: k.ants, born: k.born, lost: k.lost });
+  $('dayNote').textContent = `${t('nextGoal', { goal: goalText(k.next) })}${k.next.eased ? ' ' + t('eased') : ''}`;
+  $('dayGo').textContent = t('startDay', { day: k.day + 1 });
+  $('dayRestart').textContent = t('restartDay', { day: k.day }); $('dayRestart').hidden = false;
+  rec.event('dusk', { day: k.day, won: k.won ? 1 : 0, ants: k.ants });
+  run(G.reset('pause')); tapStart = null;
+  setScreen('day'); snd.hold();
+  if (k.won) snd.tone(523, 0.2, 0.06, 'triangle', 260); else snd.tone(330, 0.3, 0.05, 'triangle', -120);
+}
+function dayGo() {
+  if (dayCard?.kind === 'dusk') { host.goOn(); rec.event('dawn', { day: host.day().day }); dayCard = null; showDawn(); return; }
+  dawnSeen = true; dayCard = null;
+  setScreen('play'); host.last = null; snd.release();
+}
+function dayRestart() {
+  if (dayCard?.kind !== 'dusk') return;
+  const day = dayCard.day;
+  if (!host.restartDay(day)) return;
+  rec.event('restart', { day });
+  selected = -1; $('antCard').classList.remove('on'); alarmAt = null; pulses = [];
+  stats = host.stats(); uploadAll(); retext();
+  dayCard = null; showDawn();
 }
 function pauseGame() {
   if (screen !== 'play') return;
@@ -160,6 +211,8 @@ function setLayer(l) {
 }
 function setTool(next) { if (next === tool) return; run(G.reset('tool')); tool = next; tapStart = null; retext(); if (tool === 'alarm') toast('alarmHold'); }
 $('play').addEventListener('click', play);
+$('dayGo').addEventListener('click', dayGo);
+$('dayRestart').addEventListener('click', dayRestart);
 $('pause').addEventListener('click', pauseGame);
 $('resume').addEventListener('click', resume);
 $('toMenu').addEventListener('click', toMenu);
@@ -365,6 +418,9 @@ function hud() {
   if (stats.alarm) lines.push(t('alarmCrew', stats.alarm));
   if (lines.length && newest) lines.push(`<small>${t('noWanted')}</small>`);
   $('crew').innerHTML = lines.join('<br>');
+  const d = host.day();
+  $('goal').hidden = !d;
+  if (d) { const s = Math.ceil(d.left / 20), time = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; $('goal').textContent = t('hudDay', { day: d.day, goal: goalHud(d), time }); $('goal').classList.toggle('done', d.won); }
   showAnt();
   if ($('recall').getAttribute('aria-pressed') !== String(stats.recall)) retext();
 }
@@ -379,6 +435,7 @@ function frame(now) {
   const t0 = performance.now();
   run(G.tick(t0));
   const stepped = host.advance(now, screen !== 'play' || held);
+  if (host.dusk && screen === 'play') showDusk(); // the day is over: time stops on the dusk card
   if (host.shifted) { host.shifted = false; selected = -1; $('antCard').classList.remove('on'); } // a death renumbered the ants
   if (stepped) {
     uploadAnts(); uploadScent();
@@ -405,7 +462,8 @@ requestAnimationFrame(frame);
 
 // ---- hooks for the phone check and the S3 script ----
 window.painter = {
-  state: () => ({ screen: screen === 'paused' ? 'paused' : screen, held, t: host.tick, paused: screen === 'paused', ants: host.ants, sound: save.sound, tapTrail: save.tapTrail, tool, layer, preview: preview ? preview.points.length : 0, orders: host.log.length, gl: !!renderer && !renderer.lost, glLosses: renderer?.losses ?? 0, glRestored: renderer?.restored ?? 0, glFailed, drawn: frames.drawn, selected, help: help.shown }),
+  day: () => host.day(), dusk: () => host.dusk, dawns: () => [...host.dawns.keys()], hashes: () => host.sim.hashes(),
+  state: () => ({ screen: screen === 'paused' ? 'paused' : screen, dayCard: dayCard?.kind ?? null, held, t: host.tick, paused: screen === 'paused', ants: host.ants, sound: save.sound, tapTrail: save.tapTrail, tool, layer, preview: preview ? preview.points.length : 0, orders: host.log.length, gl: !!renderer && !renderer.lost, glLosses: renderer?.losses ?? 0, glRestored: renderer?.restored ?? 0, glFailed, drawn: frames.drawn, selected, help: help.shown }),
   log: () => JSON.parse(JSON.stringify(host.log)),
   stats: () => host.stats(),
   brood: () => Array.from({ length: host.sim.brood.n }, (_, k) => [...cellXY(host.sim.L, host.sim.brood.cell[k]).slice(1), host.sim.brood.stage[k]]),

@@ -1,5 +1,6 @@
 // Spikes S1 and S2 in a Durable Object under workerd, through `wrangler dev` (local, nothing deployed).
-// Usage: node workerd.mjs [--wrangler=<command>] [--ticks=12000] [--ants=2000]
+// Usage: node workerd.mjs [--wrangler=<command>] [--ticks=12000] [--ants=2000] [--colony]
+// --colony: S2 replays the colony game of s2.mjs --colony instead of the sandbox.
 // The wrangler config goes in a temporary directory; it is a local harness, not a Worker of this repo.
 import { spawn } from 'node:child_process';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
@@ -40,12 +41,12 @@ try {
     console.log(`S1 workerd ${ants} ants: per tick over 2,400 ticks in 20-tick requests: mean ${mean.toFixed(2)} ms, p95 of batches ${s[Math.floor(s.length * 0.95)].toFixed(2)} ms, max ${s.at(-1).toFixed(2)} ms (request round trip with no ticks ${rt.toFixed(2)} ms, included)`);
   }
   // S2: the same replay in the room and in Node.
-  const cfg = { seed: 2026, ants: ANTS }, commands = script(cfg, TICKS);
+  const cfg = args.includes('--colony') ? { seed: 2026, ants: 20, sugar: 40, larvae: 4, colony: 1, dayTicks: 1200 } : { seed: 2026, ants: ANTS }, commands = script(cfg, TICKS);
   const t = performance.now();
   const room = await post('/replay', { cfg, commands, ticks: TICKS, every: 20 });
   const wms = performance.now() - t;
   const local = replay({ cfg, commands, ticks: TICKS, every: 20 }).records;
-  console.log(`S2 workerd ${TICKS} ticks, ${ANTS} ants: ${Math.round(wms)} ms; divergence from Node: ${JSON.stringify(firstDivergence(local, room))}; records ${room.length}`);
+  console.log(`S2 workerd ${TICKS} ticks, ${cfg.ants} ants${cfg.colony ? ' (colony)' : ''}: ${Math.round(wms)} ms; divergence from Node: ${JSON.stringify(firstDivergence(local, room))}; records ${room.length}`);
 } finally {
   child.kill('SIGTERM');
   rmSync(dir, { recursive: true, force: true });

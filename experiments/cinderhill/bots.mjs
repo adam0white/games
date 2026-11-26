@@ -4,10 +4,14 @@
 // - greedy: trails to sugar only (sugar lays eggs; with no protein the larvae starve).
 // - idle: no orders; foragers find food only by wandering.
 // The careful bot should grow the colony toward 100 ants in three days, and idle should do clearly worse.
+// Each day has a goal (colony.js, Days). The careful bot also works toward it: on a digging day it marks a
+// nursery beside the queen's chamber at dawn. Acceptance (Days PR): idle fails every day's goal on every seed,
+// and careful passes every day on every seed.
 //
 // Usage: node experiments/cinderhill/bots.mjs [seeds, comma-separated] [ticks] [bots, comma-separated]
 import { CMD, FOOD, G, STAGE, SURFACE, Sim } from './sim/sim.js';
-import { START } from './sim/colony.js';
+import { GOAL_KIND, START, goalOf } from './sim/colony.js';
+import { EVENT } from './sim/sim.js';
 const DAY = 12000;
 
 function piles(sim, kind) {
@@ -26,13 +30,23 @@ const BOTS = {
   greedy: [FOOD.SUGAR],
   idle: [],
 };
+const DIGS = { careful: true, greedy: false, idle: false };
 
-export function play(bot, seed, ticks = 3 * DAY) {
-  const sim = new Sim({ seed, ...START, colony: 1 });
-  const L = sim.L, ex = L.sw >> 1, ey = L.sh >> 1, kinds = BOTS[bot];
+/** A nursery of 8 x 6 cells beside the queen's chamber (the side with more soil). */
+function nursery(sim) {
+  const h = sim.home, L = sim.L, cells = [], x0 = h.x + h.w + 8 <= L.nw ? h.x + h.w : h.x - 8;
+  for (let y = h.y; y < h.y + 6; y++) for (let x = x0; x < x0 + 8; x++) cells.push(x, y);
+  return cells;
+}
+
+export function play(bot, seed, ticks = 3 * DAY, extra = {}) {
+  const sim = new Sim({ seed, ...START, colony: 1, ...extra });
+  const L = sim.L, ex = L.sw >> 1, ey = L.sh >> 1, kinds = BOTS[bot], T = sim.cfg.dayTicks;
   const days = [];
   let id = 0, last = -1, lastPile = -1;
   for (let t = 0; t < ticks; t++) {
+    // At dawn: a digging day's goal needs a room dug.
+    if (DIGS[bot] && t % T === 0 && goalOf(sim.g[G.DAY]).kind === GOAL_KIND.DUG) sim.queueCommand({ tick: sim.tick, id: ++id, seat: 0, type: CMD.DIG, cells: nursery(sim) });
     // Every 1,500 ticks (or when the trail's pile runs out), a trail to the food the colony is shortest of.
     // Seeking foragers take the newest trail, and a forager keeps the trail that led her out, so redrawing
     // to the scarcer food splits the crew between the two foods over time.
@@ -46,7 +60,8 @@ export function play(bot, seed, ticks = 3 * DAY) {
       }
     }
     sim.step();
-    if ((t + 1) % DAY === 0) days.push(count(sim));
+    const ev = sim.drainEvents();
+    for (let k = 0; k < ev.length; k += 3) if (ev[k] === EVENT.DUSK) days.push({ day: ev[k + 1], won: ev[k + 2], goal: sim.lastDusk, ...count(sim) });
   }
   return days;
 }
@@ -68,6 +83,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const bots = process.argv[4] ? process.argv[4].split(',') : Object.keys(BOTS);
   for (const bot of bots) for (const seed of seeds) {
     const t0 = performance.now(), days = play(bot, seed, ticks);
-    console.log(`${bot.padEnd(7)} seed ${String(seed).padStart(2)}: ` + days.map((d, k) => `day ${k + 1} ants ${d.ants} brood ${d.brood} (born ${d.born}, lost ${d.lost}, hungry ${d.hungry}, sugar ${d.sugar}, protein ${d.protein})`).join(' | ') + `  ${((performance.now() - t0) / 1000).toFixed(1)} s`);
+    console.log(`${bot.padEnd(7)} seed ${String(seed).padStart(2)}: ` + days.map((d, k) => `day ${k + 1} ${d.won ? 'WON' : 'lost'} ${d.goal.kind === GOAL_KIND.BOTH_FOODS ? `${d.goal.a}s/${d.goal.b}p` : d.goal.a}/${d.goal.target} ants ${d.ants} brood ${d.brood} (born ${d.born}, lost ${d.lost}, hungry ${d.hungry}, sugar ${d.sugar}, protein ${d.protein})`).join(' | ') + `  ${((performance.now() - t0) / 1000).toFixed(1)} s`);
   }
 }

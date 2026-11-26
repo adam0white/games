@@ -17,16 +17,16 @@ import { DIAG, G, GOAL, INF, MAX_GOALS, PATH_MAX, SLOT, STEP, TRAIL_OFF, backCel
 import { FIELD, FIELDS, deposit, makeScent, smell, stepScent } from './scent.js';
 import { SUBSYSTEMS, finish, hashArray, hashInt } from './hash.js';
 import { generate } from './world.js';
-import { BROOD_MAX, CASTE, CASTE_HP, FOOD, LOAD, STAGE, addBrood, fight, makeBrood, stepColony } from './colony.js';
+import { BROOD_MAX, CASTE, CASTE_HP, DAY_TICKS, FOOD, LOAD, STAGE, addBrood, fight, makeBrood, startDays, stepColony, stepDay } from './colony.js';
 
-export const SIM_VERSION = 4; // 2: trails keep their drawn shape (a path per trail, `via` per ant); 3: eight directions; 4: the colony (colony.js)
+export const SIM_VERSION = 5; // 2: trails keep their drawn shape (a path per trail, `via` per ant); 3: eight directions; 4: the colony (colony.js); 5: days
 export const TICK_HZ = 20;
 export { G, GOAL, SLOT, INF, STEP, DIAG, FIELD, MAT, SURFACE, NEST, SUB, SUBSYSTEMS, CASTE, CASTE_HP, FOOD, LOAD, STAGE, BROOD_MAX };
 
 export const JOB = { FORAGE: 0, DIG: 1, GUARD: 2 };
 export const MODE = { SEEK: 0, RETURN: 1, WORK: 2, REST: 3 };
 export const CMD = { TRAIL: 1, DIG: 2, ALARM: 3, RECALL: 4 };
-export const EVENT = { DUG: 1, PILE_EMPTY: 2, REJECTED: 3, LATE: 4 };
+export const EVENT = { DUG: 1, PILE_EMPTY: 2, REJECTED: 3, LATE: 4, DUSK: 5 }; // DUSK: (day, won)
 export const MAX_PILES = 8;
 const EVENT_CAP = 1024; // events kept until the host drains them; older ones are dropped (counted in globals)
 
@@ -39,6 +39,7 @@ export const DEFAULTS = {
   // A colony game: a queen, brood and the colony's meals (colony.js). `ants` workers start in the chamber
   // with `sugar` units and one larva per `larvae`. Off (0): the sandbox, adults only, as in M0.
   colony: 0, sugar: 0, larvae: 0,
+  dayTicks: DAY_TICKS, // a colony game's day length (colony.js, Days)
 };
 
 const WALK = 24, RUN = 36; // sub-cell units per tick: about 1.9 and 2.8 cells a second
@@ -54,6 +55,8 @@ const BRIDGE_MARGIN = 12; // a stroke blocked by a closed cell is routed around 
 export class Sim {
   constructor(options = {}) {
     const cfg = { ...DEFAULTS, ...options };
+    // The day length is hashed and snapshotted as a 32-bit integer: anything else would restore as another value.
+    if (!Number.isInteger(cfg.dayTicks) || cfg.dayTicks < 1 || cfg.dayTicks > 0x7fffffff) throw new RangeError(`dayTicks must be an integer from 1 to 2^31 - 1, not ${cfg.dayTicks}`);
     cfg.spread = cfg.spread.slice(); cfg.halfLife = cfg.halfLife.slice(); // the sim's own copies: hashed and snapshotted
     this.cfg = cfg;
     const L = (this.L = makeLayout(cfg)), n = L.n, A = cfg.maxAnts;
@@ -80,7 +83,7 @@ export class Sim {
     this.stall = new Uint16Array(A); // ticks without progress
     this.since = new Uint16Array(A); // ticks in the current mode (saturates)
     this.lastCell = new Int32Array(A);
-    this.via = new Int8Array(A); // trail slot that led this forager out (her route), or -1
+    this.via = new Int8Array(A); // trail slot that led this forager out (her route), or -1; -2: a carrier whose trail was replaced on her way home (she still came by trail: the day 1 goal counts her load)
     this.caste = new Uint8Array(A); // CASTE (colony.js): worker or major
     this.hp = new Uint8Array(A); // hit points; 0 is removed at the end of the tick
     this.team = new Uint8Array(A); // 0 the player's colony; others for fights to come
@@ -103,6 +106,7 @@ export class Sim {
     if (cfg.colony) {
       this.g[G.QUEEN] = 1; this.g[G.SUGAR] = cfg.sugar;
       for (let k = 0; k < cfg.larvae; k++) addBrood(this, STAGE.LARVA);
+      startDays(this);
     }
     rebuildDirty(this);
   }
@@ -173,7 +177,7 @@ export class Sim {
       F.pathLen[k] = len;
       for (let j = 0; j < len; j++) deposit(this, FIELD.TRAIL, F.path[k * PATH_MAX + j], TRAIL_STROKE);
       // A route on the replaced trail is gone, and so is progress on it: `best` starts again on the new path.
-      for (let i = 0; i < this.n; i++) { if (this.via[i] === slot) this.via[i] = -1; if (this.goal[i] === slot) this.goal[i] = -1; }
+      for (let i = 0; i < this.n; i++) { if (this.via[i] === slot) this.via[i] = this.carry[i] ? -2 : -1; if (this.goal[i] === slot) this.goal[i] = -1; }
       setGoal(this, slot, GOAL.TRAIL, F.path[k * PATH_MAX + len - 1]);
     } else if (type === CMD.DIG) {
       // [count, x0, y0, ...]: nest cells to dig.
@@ -293,6 +297,7 @@ export class Sim {
     if (this.anyDead) this.removeDead();
     stepScent(this);
     this.rebuildFields();
+    if (this.cfg.colony) stepDay(this, EVENT.DUSK);
     g[G.TICK]++;
   }
 
@@ -359,6 +364,9 @@ export class Sim {
           if (this.carry[i]) {
             this.g[G.STORES]++;
             const kind = this.carry[i] === 2 ? FOOD.PROTEIN : FOOD.SUGAR;
+            this.g[kind === FOOD.PROTEIN ? G.PROTEIN_LOADS : G.SUGAR_LOADS]++;
+            if (this.via[i] !== -1) this.g[G.TRAIL_LOADS]++; // her trip used a trail (the day 1 goal)
+            if (this.via[i] === -2) this.via[i] = -1;
             this.g[kind === FOOD.PROTEIN ? G.PROTEIN : G.SUGAR] += LOAD[kind];
             this.carry[i] = 0;
           }
@@ -607,7 +615,7 @@ export class Sim {
     out.events = finish(h);
     // Globals, and the settings that steer later ticks (layer sizes, the population cap, colony mode, scent).
     const c = this.cfg;
-    out.globals = finish(hashArray(hashArray(0x61, this.g), Int32Array.from([c.sw, c.sh, c.nw, c.nh, c.maxAnts, c.colony ? 1 : 0, ...c.spread, ...c.halfLife])));
+    out.globals = finish(hashArray(hashArray(0x61, this.g), Int32Array.from([c.sw, c.sh, c.nw, c.nh, c.maxAnts, c.colony ? 1 : 0, c.dayTicks, ...c.spread, ...c.halfLife])));
     h = 0;
     for (const k of SUBSYSTEMS) h = hashInt(h, out[k]);
     out.total = finish(h);
