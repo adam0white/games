@@ -34,7 +34,7 @@
   // A Unity WebGL build (source outside this repo; see NOTES.md). The files are gzip with Unity's own
   // unpacking, so they need no content-encoding header from the server.
   const canvas = document.getElementById('game'), card = document.getElementById('card'), status = document.getElementById('status');
-  createUnityInstance(canvas, {
+  const startUnity = () => createUnityInstance(canvas, {
     dataUrl: 'Build/webgl.data.unityweb',
     frameworkUrl: 'Build/webgl.framework.js.unityweb',
     codeUrl: 'Build/webgl.wasm.unityweb',
@@ -44,6 +44,11 @@
   }, p => { document.getElementById('fill').style.width = Math.round(p * 100) + '%'; })
     .then(() => { card.style.display = 'none'; canvas.focus(); window.exileEvent?.('loaded', JSON.stringify({ s: Math.round(performance.now() / 1000) })); })
     .catch(err => { status.textContent = 'Could not start: ' + err; window.exileEvent?.('loadFailed', JSON.stringify({ msg: String(err).slice(0, 200) })); });
+  if (new URLSearchParams(location.search).get('hf') === '1') {
+    import('./hf/exile-hf.js').then(startUnity).catch(err => {
+      status.textContent = 'Could not load HF: ' + String(err);
+    });
+  } else startUnity();
   addEventListener('pointerdown', () => canvas.focus());
   // A phone must not zoom or scroll the page under the game's own touch controls.
   for (const type of ['gesturestart', 'gesturechange', 'dblclick']) addEventListener(type, e => e.preventDefault(), { passive: false });
