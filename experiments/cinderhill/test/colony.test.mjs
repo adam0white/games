@@ -7,6 +7,7 @@ import { CMD, G, JOB, MAT, NEST, STAGE, SURFACE, Sim, CASTE, CASTE_HP, FOOD, LOA
 import { BITE_EVERY, C, CASTE_BITE, addBrood, hurt } from '../sim/colony.js';
 import { cellAt } from '../sim/grid.js';
 import { restore, snapshot } from '../sim/snapshot.js';
+const LONG = process.env.CINDERHILL_LONG === '1' ? false : 'over 15 s: runs nightly (CINDERHILL_LONG=1)';
 
 function colony({ larvae = 0, ...opts } = {}) {
   const s = new Sim({ seed: 7, sw: 48, sh: 48, nw: 32, nh: 24, ants: 0, blank: true, colony: 1, ...opts });
@@ -172,7 +173,7 @@ test('a colony game round-trips through a snapshot with brood in every stage', (
   assert.equal(back.hashes().total, s.hashes().total);
 });
 
-test('the page host runs a colony game: births get new indices, stats count the brood', async () => {
+test('the page host runs a colony game: births get new indices, stats count the brood', { skip: LONG }, async () => {
   const { Host } = await import('../host.js');
   const h = new Host(20, 2026, { colony: true });
   assert.equal(h.sim.n, 20);

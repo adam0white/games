@@ -9,6 +9,7 @@ import { next, seedStreams } from '../sim/rng.js';
 import { firstDivergence, replay, script } from '../sim/replay.js';
 import { SNAPSHOT_VERSION, restore, snapshot } from '../sim/snapshot.js';
 import { s4World } from '../spikes/s4.mjs';
+const LONG = process.env.CINDERHILL_LONG === '1' ? false : 'over 15 s: runs nightly (CINDERHILL_LONG=1)';
 
 const cfg = { seed: 23, sw: 96, sh: 96, nw: 64, nh: 48, ants: 300 };
 const FOLLOW = 2000;
@@ -93,7 +94,7 @@ test('old versions and damaged snapshots are refused', () => {
   assert.throws(() => restore(magic), /not a Cinderhill snapshot/);
 });
 
-test('S4 pass line: a dug nest with 5,000 ants after 8,000 ticks is under 64 KB gzip-compressed', async () => {
+test('S4 pass line: a dug nest with 5,000 ants after 8,000 ticks is under 64 KB gzip-compressed', { skip: LONG }, async () => {
   // 8,000 ticks is where format 1 failed (74.6 KB); spikes/s4.mjs also measures 3,000 and 24,000 (SPIKES.md).
   const sim = s4World(5000, 8000), bytes = snapshot(sim);
   const gz = new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer());
