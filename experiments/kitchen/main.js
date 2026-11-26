@@ -176,7 +176,8 @@ function clearCatch() {
 }
 function stepCatch(dt) {
   const c = g.catch;
-  const ev = sim.stepCatch(c, trayX / LANE.s, dt);
+  // Small steps so a slow frame cannot drop an item through the tray.
+  const ev = []; for (let left = dt; left > 1e-6; left -= 0.034) ev.push(...sim.stepCatch(c, trayX / LANE.s, Math.min(0.034, left)));
   for (const e of ev) {
     if (e.type === 'caught') {
       const m = meshes.get(e.it.n); meshes.delete(e.it.n);
@@ -237,6 +238,7 @@ function extraCard() {
   const can = save.coins >= cost;
   $('payOn').innerHTML = `<i class="coin"></i> ${t(can ? 'pay' : 'payPoor', { n: cost })}`;
   $('payOn').disabled = !can;
+  $('extraNote').textContent = t('extraNote');
   show('extra');
 }
 $('restart').addEventListener('click', () => {
@@ -459,7 +461,8 @@ function serve() {
 let slide = null;
 function ringUp() {
   phase = 'ring'; banner(t('ring'), t('ringSub'));
-  if (g.tut === 0) { coach(t('t4')); fingerTap(art.register.group.position.clone().add(new art.THREE.Vector3(0, 0.45, 0))); }
+  if (g.tut === 0) coach(t('t4'));
+  if (g.tut === 0 || save.day <= 2) { fingerTap(art.register.group.position.clone().add(new art.THREE.Vector3(0, 0.45, 0))); }
   art.view('serve');
 }
 function openRegister() {
@@ -478,7 +481,7 @@ function openRegister() {
   save.served++; day.served++; day.earned += b.price; day.tips += b.tip; day.stars.push(b.stars);
   setTimeout(() => { if (given < b.total) { save.coins += b.total - given; given = b.total; hud(); } store(); }, 140 + n * 70 + 900);
   rec.event('serve', { recipe: g.recipe, stars: b.stars, coins: b.total });
-  wait(0.9, () => { phase = 'close'; banner(t('ring'), t('closeSub')); if (g.tut === 0) { coach(t('t5')); fingerTap(art.register.drawerWorld()); } });
+  wait(0.9, () => { phase = 'close'; banner(t('ring'), t('closeSub')); if (g.tut === 0) coach(t('t5')); if (g.tut === 0 || save.day <= 2) fingerTap(art.register.drawerWorld()); });
 }
 function closeRegister() {
   if (phase !== 'close') return;
@@ -538,7 +541,7 @@ function shop(fresh = null) {
   }
   $('builds').innerHTML = BUILDING_IDS.map(id => {
     const lv = save.built[id], c = sim.canBuild(save, id);
-    const label = c.why === 'max' || (c.why === 'star' && BUILDINGS[id].max.at(-1) <= lv) ? t('maxed') : c.why === 'star' ? t('needStar', { stars: '★'.repeat(BUILDINGS[id].max.findIndex(m => m > lv)) }) : `<i class="coin"></i>${c.cost}`;
+    const label = c.why === 'max' || (c.why === 'star' && BUILDINGS[id].max.at(-1) <= lv) ? t('maxed') : c.why === 'star' ? t('needStar', { stars: t('rank_' + TIERS[BUILDINGS[id].max.findIndex(m => m > lv)].name) }) : `<i class="coin"></i>${c.cost}`;
     const pic = art ? `<img alt="" src="${art.thumb(THUMB[id], 64)}">` : '';
     return `<div class="bld${fresh === id ? ' new' : ''}">${pic}<div class="name">${t('b_' + id)}</div><div class="lv">${lv ? t('lv', { n: lv }) : t('notBuilt')}</div><div class="what">${t('w_' + id)}</div><button data-b="${id}" ${c.ok ? '' : 'disabled'}>${lv ? '' : t('build') + ' '}${label}</button></div>`;
   }).join('');
@@ -610,6 +613,13 @@ function stepFinger(dt) {
 
 // ---------- input
 // The tray follows the finger's x at the tray's depth; arrows and A/D move it too. A tap stops the microwave, a hold fries.
+// How far the tray may go and stay at least half on screen on a narrow phone.
+function trayEdge() {
+  if (phase !== 'catch') return 1;
+  const p = art.toScreen(art.tray.group.getWorldPosition(new art.THREE.Vector3()));
+  const right = art.toPlane(innerWidth, p.y, LANE.z).x / LANE.s;
+  return Number.isFinite(right) ? Math.max(0.6, Math.min(1, right - 0.1)) : 1;
+}
 function pointerX(e) { const w = art.toPlane(e.clientX, e.clientY, LANE.z); return Math.max(-1, Math.min(1, w.x)); }
 let swipeId = 0;
 canvas.addEventListener('pointerdown', e => {
@@ -684,7 +694,7 @@ $('lang').addEventListener('click', () => { W.setLang(W.lang() === 'en' ? 'tr' :
 // ---------- the frame
 function frame(now) {
   requestAnimationFrame(frame);
-  const dt = Math.min(0.05, Math.max(0, (now - last) / 1000)); last = now;
+  const dt = Math.min(0.1, Math.max(0, (now - last) / 1000)); last = now;
   if (!art) return;
   const live = screen === 'play' && !paused;
   if (live) {
@@ -694,12 +704,14 @@ function frame(now) {
     const kx = (keys.has('ArrowRight') || keys.has('d') || keys.has('D') ? 1 : 0) - (keys.has('ArrowLeft') || keys.has('a') || keys.has('A') ? 1 : 0);
     if (kx) trayTarget = Math.max(-1, Math.min(1, trayTarget + kx * 2.4 * dt));
     trayX += (trayTarget - trayX) * (1 - Math.exp(-dt * 22));
+    { const lim = trayEdge(); trayX = Math.max(-lim, Math.min(lim, trayX)); }
     art.tray.setX(trayX);
-    art.tray.group.visible = phase === 'catch' || phase === 'caught' || phase === 'order';
+    art.tray.group.visible = phase === 'catch' || phase === 'caught' || phase === 'order' || phase === 'enter';
     if (phase === 'catch' && g?.catch) stepCatch(dt);
     else if (phase === 'fry' && cook) stepFry(dt);
     else if (phase === 'micro' && cook) stepMicro(dt);
     else if (phase === 'blend' && cook) stepBlend(dt);
+    if (!(g && phase === 'catch')) { const bar = $('patience').firstElementChild; bar.style.transform = ''; bar.style.background = ''; }
     if (g && phase === 'catch') { const w = (clock - g.catchT0) / TUNE.patience; $('patience').firstElementChild.style.transform = `scaleX(${Math.max(0, 1 - w)})`; $('patience').firstElementChild.style.background = w > 0.75 ? '#ff6b6b' : w > 0.5 ? '#ffb347' : ''; }
     for (const b of cook?.bits ?? []) { if (b.t > 0.6) continue; b.t += dt; b.v.y -= 6 * dt; b.m.position.addScaledVector(b.v, dt); if (b.m.position.y < b.y0) { b.m.position.y = b.y0; b.v.set(0, 0, 0); b.t = 1; } b.m.rotation.z += dt * 6 * Math.sign(b.v.x); }
     for (let i = flying.length - 1; i >= 0; i--) { const f = flying[i]; f.t += dt; f.v.y -= 9 * dt; f.m.position.addScaledVector(f.v, dt); f.m.rotation.z += dt * 10; if (f.t > 1.2) { art.world.remove(f.m); flying.splice(i, 1); } }
@@ -717,7 +729,7 @@ labels(); hud(); menu();
 // First-time help (kit/hint.js): a see-through finger slides side to side under the tray.
 hint(canvas, {
   kind: 'drag', key: 'kitchen:hint', delay: 1500,
-  when: () => screen === 'play' && !paused && phase === 'catch',
+  when: () => screen === 'play' && !paused && (phase === 'enter' || phase === 'order' || phase === 'catch'),
   played: hadSave, bottom: () => Math.max(120, innerHeight * 0.3),
 });
 

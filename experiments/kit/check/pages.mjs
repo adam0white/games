@@ -333,12 +333,12 @@ export const pages = {
     verify: () => { const s = window.kitchenState(); return [s.tier, s.day, s.built, s.sound, s.tutorial]; },
     expect: [1, 4, { tray: 2, knife: 1, stove: 1, micro: 0, blender: 0, tables: 1, decor: 1 }, true, true],
     async touch(page, { finger, until }) {
-      await until(page, () => window.kitchenState().phase === 'catch', 'the first guest orders', 8000);
+      // The tray shows from the guest's walk-in; CI's software WebGL runs the game slowly, so only the tray is awaited.
       const before = await page.evaluate(() => window.kitchenState().tray);
       const { w, h } = await page.evaluate(() => ({ w: innerWidth, h: innerHeight }));
       const x = before > 0 ? w * 0.2 : w * 0.8;
       await finger(page, '#c', [['pointerdown', w / 2, h * 0.6], ['pointermove', x, h * 0.6]]);
-      await until(page, t => Math.abs(window.kitchenState().tray - t) > 0.1, 'the tray follows the finger', 8000, before);
+      await until(page, t => Math.abs(window.kitchenState().tray - t) > 0.1, 'the tray follows the finger', 20000, before);
       await finger(page, '#c', [['pointerup', x, h * 0.6]]);
     },
     hint: { key: 'kitchen:hint', delay: 1500, moved: () => window.kitchenState().touched, alive: () => window.kitchenAlive(), legacy: { 'kitchen-save': '{"v":1,"tutorial":true}' } },
