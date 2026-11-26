@@ -264,3 +264,32 @@ Each restores to the same hash. The margin under 64 KB is 5.9 KB at 8,000 ticks 
 All 200 ants made 2 or more round trips in every case.
 
 **Bots** (`test/bots.test.mjs`): 800 ants, 3,000 ticks: longest stall 30, 29, 28 and 32 ticks on seeds 3, 8, 5 and 11 (the test's line is 100). A strict movement corner rule (both side cells must be open) gave 97 to 199 at every stall-kick period tried, and 2,983 with the old kick, so movement uses the lenient rule.
+
+## The colony (SIM_VERSION 4, snapshot format 4, 2026-11-26)
+
+The colony layer (`sim/colony.js`) adds per-ant caste, hit points, team and bite cooldown, pile kinds, the brood and a fight pass. The sandbox runs (`cfg.colony` 0) play as before; the hashes changed because they cover the new fields and the settings that steer later ticks. New totals: `EXPECTED` 2962084395, `EXPECTED_LONG` 1787377502 (after the second review added the layer sizes to the hash; play is unchanged).
+
+| Measure | Before (SIM_VERSION 3) | After |
+| --- | --- | --- |
+| S2: Node, workerd, Chromium 156.0.8078.4, WebKit 27.2 on all 600 records | agree | agree (Firefox not installed here: not run) |
+| S2 planted fault | diverges at tick 20 in `ants` | the same |
+| S1 Node, 2,000 ants, mean / p95 / max | 1.68 / 1.87 / 7.58 ms | 1.63 / 1.69 / 3.52 ms |
+| S1 Node, 5,000 ants | 1.98 / 2.16 / 8.05 ms | 1.93 / 2.04 / 3.62 ms |
+| S1 all 9 fields at once | 11.76 ms | 11.24 ms |
+| S1 workerd, 2,000 / 5,000 ants, mean | 1.59 / 1.93 ms | 1.57 / 1.89 ms |
+| S4, 5,000 ants, 3,000 ticks | 45.5 KB | 45.6 KB |
+| S4, 8,000 ticks | 58.1 KB | 58.2 KB (margin 5.8 KB) |
+| S4, 24,000 ticks | 60.6 KB | 60.7 KB (margin 3.3 KB) |
+| Trail shape, all five strokes | as in the section above | identical numbers |
+
+The S1 "before" figures come from a quieter machine run earlier the same day; the difference is within run-to-run noise, so the colony costs nothing measurable in the sandbox. Every S4 snapshot restores to the same hash.
+
+Colony bots (`bots.mjs`, three days = 36,000 ticks, start 20 workers, 40 sugar, 4 larvae), ants alive at the end of day 3:
+
+| Seed | careful | greedy (sugar only) | idle |
+| --- | --- | --- | --- |
+| 3 | 153 | 20 (406 larvae starved) | 20 (400 starved) |
+| 5 | 130 | 20 (396 starved) | 47 |
+| 8 | 148 | 20 (380 starved) | 94 |
+
+Idle play does well on seed 8 because wandering foragers find a protein pile near the entrance. With a flat laying rate (one egg per 240 ticks) careful and idle both reached about 94 on that seed; laying faster on rich sugar is what lets careful play pull ahead.

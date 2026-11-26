@@ -57,6 +57,11 @@ test('any state round-trips: values no play produces still restore exactly', () 
   for (let k = 0; k < sim.flow.pathLen.length; k++) sim.flow.pathLen[k] = rand(3000);
   some(40, () => { sim.flow.path[rand(sim.flow.path.length)] = [int32(), -1, 0x7FFFFFFF, -0x80000000][rand(4)]; });
   some(50, () => { sim.via[rand(A)] = rand(256) - 128; });
+  // Castes, hit points and teams of any byte; pile kinds; brood of any stage, age and cell.
+  some(50, () => { const i = rand(A); sim.caste[i] = rand(256); sim.hp[i] = rand(256); sim.team[i] = rand(256); });
+  some(4, () => { sim.pileKind[rand(sim.pileKind.length)] = rand(256); });
+  const B = sim.brood; B.n = 40;
+  for (let k = 0; k < B.n; k++) { B.stage[k] = rand(256); B.age[k] = rand(65536); B.fed[k] = rand(256); B.hunger[k] = rand(65536); B.cell[k] = [int32(), -1, 0x7FFFFFFF, -0x80000000][k & 3]; }
   sim.queue.push(Int32Array.from([int32(), int32(), 0x7FFFFFFF, -0x80000000]), new Int32Array(0));
   sim.events.push(int32(), -1, 0x7FFFFFFF);
   const want = sim.hashes(), bytes = snapshot(sim);

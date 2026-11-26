@@ -405,6 +405,41 @@ export const pageRuns = {
       assert.ok(!over, `${a.sel} overlaps ${b.sel}: ${JSON.stringify([a, b])}`);
     }
   },
+  // ?colony=1: a colony game. The HUD shows sugar, protein and brood in Turkish; the count buttons are hidden and
+  // the saved ant count is left alone; the nest view draws the queen and brood (the overlay is not blank there).
+  async 'cinderhill colony'(page, { base, until }) {
+    await page.setViewportSize({ width: 360, height: 640 });
+    await page.goto(`${base}/notes/button.js`);
+    await page.evaluate(() => { localStorage.clear(); localStorage.setItem('cinderhill:hint', '1'); localStorage.setItem('cinderhill:save', JSON.stringify({ v: 1, sound: true, ants: 500, tapTrail: false })); });
+    await page.goto(`${base}/cinderhill/?colony=1&lang=tr`);
+    await until(page, () => window.painter, 'painter script');
+    assert.ok(await page.evaluate(() => [...document.querySelectorAll('.counts')].every(el => el.hidden)), 'no ant count buttons');
+    await page.click('#play');
+    await until(page, () => window.painter.state().screen === 'play', 'play');
+    await until(page, () => /şeker/.test(document.querySelector('#stats').textContent), 'the colony line', 10000);
+    const st = await page.evaluate(() => window.painter.stats());
+    assert.equal(st.ants, 20);
+    assert.equal(st.colony.queen, 1);
+    assert.equal(st.colony.larvae, 4);
+    assert.match(await page.textContent('#stats'), /20 karınca · \d+ şeker · 0 protein · yavrular: \d+ yumurta, 4 larva, 0 pupa/);
+    await page.evaluate(() => window.painter.setLayer(1));
+    await until(page, () => window.painter.state().layer === 1, 'nest view');
+    // Each brood item is drawn inside its own cell: some overlay pixel in that cell's square is painted.
+    const missing = await page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(() => {
+      const c = document.querySelector('#c'), g = c.getContext('2d'), k = c.width / innerWidth, out = [];
+      for (const [x, y] of window.painter.brood()) {
+        const a = window.painter.toScreen(x, y), b = window.painter.toScreen(x + 1, y + 1);
+        const w = Math.max(1, Math.round((b.x - a.x) * k)), h = Math.max(1, Math.round((b.y - a.y) * k));
+        const d = g.getImageData(Math.round(a.x * k), Math.round(a.y * k), w, h).data;
+        let any = false; for (let i = 3; i < d.length; i += 4) if (d[i]) { any = true; break; }
+        if (!any) out.push([x, y]);
+      }
+      done(out);
+    }))));
+    assert.ok((await page.evaluate(() => window.painter.brood().length)) >= 4, 'the four larvae are there');
+    assert.deepEqual(missing, [], 'every brood item is drawn in its cell');
+    assert.deepEqual(JSON.parse(await page.evaluate(() => localStorage.getItem('cinderhill:save'))).ants, 500, 'the saved count is untouched');
+  },
   async small(page, { base, until }) {
     const gameKeys = () => page.evaluate(() => Object.fromEntries(Object.keys(localStorage).filter(k => !/^(hub:|kit:|hf-lab-)/.test(k)).map(k => [k, localStorage.getItem(k)])));
     await page.goto(`${base}/notes/button.js`);
