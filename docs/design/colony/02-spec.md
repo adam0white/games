@@ -1,40 +1,39 @@
 # Cinderhill: game spec
 
-Status: spec, 2026-11-25. No code yet. Working name **Cinderhill** (slug `cinderhill`); the name and setting are a taste pick for the owner (section 2). Genre: ant colony real-time strategy and base builder, played in a phone or desktop browser, alone or with friends by link.
+Status: rebuild spec, round 3, 2026-11-26. It replaces the round-2 spec. The M1 build (SIM_VERSION 6) taught us that the round-2 spec, built as written, makes a slow game: replays of the owner's sessions showed no birth, no threat and a first delivery 73 seconds after the first trail. [11-round3-findings.md](11-round3-findings.md) says what changed and why; the full reviews are in [round3/](round3/). Genre: ant colony real-time strategy and base builder, played in a phone or desktop browser, alone or with friends by link.
 
-Read with: [01-reference-research.md](01-reference-research.md) (the reference game, reference only), [03-features.md](03-features.md) (ranked features), [04-roadmap.md](04-roadmap.md), [05-tech.md](05-tech.md), [07-biology-ideas.md](07-biology-ideas.md).
+Read with: [01-reference-research.md](01-reference-research.md) (the reference game, reference only), [03-features.md](03-features.md), [04-roadmap.md](04-roadmap.md), [05-tech.md](05-tech.md), [07-biology-ideas.md](07-biology-ideas.md).
+
+**For the builder.** Every pace and economy number is in section 3; a few rule-local numbers (telegraph times, crew presets) sit beside their rule. Other files cite this spec. [01](01-reference-research.md) is reference only: its complaint mapping was written for round 2 (days, 30 s saves, bands, tournaments) and is not spec. When this spec and an older file disagree, this spec wins. When a rule here is missing, take the simplest rule that keeps the pace budget, write it down in `experiments/cinderhill/NOTES.md`, and say so in the pull request.
 
 ## 0. What done means
 
-The game is done for release when outside players finish the first season without help and say they would recommend it. Measured through the lab recording (`kit/lab.js`):
+The first release is **Spring**: six chapters on one hill, plus free play and a daily hill. It is done when outside players finish chapter 1 without help, most of them go on, and they say they would recommend it.
 
-| Gate | Target |
-| --- | --- |
-| New players who finish Day 1 without opening help | 80% |
-| New players who start Day 2 | 60% |
-| Players who finish season one (Spring, 6 days) | 30% of those who start Day 2 |
-| Lost progress after a crash, reload or closed tab | at most 30 seconds of play, every time |
-| A full day on a mid-range phone (iPhone 13 class, Pixel 7 class) | 30 frames a second or better at 2,000 ants |
-| Friends' hill by link (measured at M4, not before) | a second phone is playable in under 10 seconds with no account, counting download, decode and catch-up |
-| "Would you recommend it?" on the end card | a majority of yes from outside players |
+| Gate | Target | How it is read |
+| --- | --- | --- |
+| Pace budget (section 3) | Every line passes for the scripted bots on 20 seeds, and for the median of outside players | `replay-lab.mjs` on every pull request (bots) and on lab records (people) |
+| New players who finish chapter 1 without opening help | 4 of 5 at R1, then 80% | Lab records |
+| New players who start chapter 2 | 60% | Lab records |
+| Players who finish Spring | 30% of those who start chapter 2 | Lab records |
+| Lost progress after a crash, reload or closed tab | at most 20 s of play, every time | Kill-the-tab test (05) |
+| Frame rate on a mid-range phone (iPhone 13 class, Pixel 7 class) | 30 frames a second at 2,000 ants, on a real phone | Phone check plus one real phone |
+| "Would you recommend it?" on the chapter card | a majority of yes from outside players | Lab records; players who leave earlier are counted apart |
 
-Every rate is reported with its denominator. Players who leave before the end card are counted separately, because an end-card majority samples only those who stayed.
-
-The owner accepts each milestone by playing it (section 12 of the roadmap).
+Every rate is reported with its denominator. The owner accepts each milestone by playing it (04).
 
 ## 1. Clean-room line
 
-The project rule (owner, 2026-11-24): for a specific published game, take the genre, not the game. These tables list what we keep from the genre and what we leave with the reference game.
+The project rule (owner, 2026-11-24): for a specific published game, take the genre, not the game.
 
 ### Taken: genre conventions shared by many games
 
-- A colony with one queen who lays every egg. Lose her and you lose.
+- A colony with one queen who lays every egg. Lose her and you lose the chapter.
 - Workers forage, carry food home and dig the nest. Food pays for brood.
 - Brood grows through egg, larva and pupa. Castes differ in size and job.
 - An underground nest seen as a cutaway, and a surface world above it.
-- Indirect control of a swarm. You guide ants with scent, not by moving each ant.
-- Fights with other insects and rival colonies. Day and night.
-- A home colony that grows across a campaign.
+- Indirect control of a swarm with scent, not by moving each ant.
+- Fights with other insects and rival colonies. Day and night. Weather.
 
 SimAnt (1991) already had most of these: pheromone trails, a nest cutaway and a surface map, and rival colonies.
 
@@ -42,229 +41,273 @@ SimAnt (1991) already had most of these: pheromone trails, a nest cutaway and a 
 
 | Reference game has | Cinderhill has instead |
 | --- | --- |
-| A wildlife documentary narrator | No narrator. The story plays out in short wordless scenes and one-line scent notes from named ants (section 4) |
-| A lab colony tested by two scientists, then separate missions as other real species | One wild colony on one burned hillside for the whole campaign. No humans appear on screen |
-| A fictional gene-stealing ant and a jelly meta-currency | Fictional native species of our own (section 5). Progress comes from the colony's age and the hill's regrowth ("bloom") |
-| A hex-tile nest where tiles upgrade from same-type neighbours | Free digging in a soil grid. A room's purpose is painted on, and its worth comes from depth, size, dryness and distance (section 6.2) |
-| Five numbered pheromone groups fed by assigned nurseries | Trails you draw with a finger, an alarm call, a recall, and job sliders (section 6.4) |
-| A named class of giant bosses | One large animal per season, each its own set piece with its own rules; the game gives them no shared class name |
-| Biome tiers with real species per tier | Five regions of one hill across four seasons |
-| Its look, UI, music, names and levels | All ours: procedural ink-and-wash art, our own UI and levels |
+| A wildlife documentary narrator | No narrator. Wordless scenes (tone is an owner choice, 11 decision 4) |
+| A lab colony tested by scientists, then separate missions as other real species | One wild colony on one burned hillside. No humans on screen |
+| A fictional gene-stealing ant and a jelly meta-currency | Progress is the colony itself and the hill's regrowth ("bloom") |
+| A hex-tile nest where tiles upgrade from same-type neighbours | Free digging in a soil grid. A room's worth comes from depth, size, dryness and distance |
+| Numbered pheromone groups fed by assigned nurseries | Trails you draw, each with a crew you size (section 6.2) |
+| A named class of giant bosses | Large animals that come because of what the colony did, with no shared class name |
+| Defending aphids from ladybirds as an advertised decision | Not used. Ladybirds are dropped (round 3) |
+| Its look, UI, music, names and levels | All ours |
 
-### Design goals drawn from the genre's common complaints
+The natural-history framing (one-line notes on real behaviour) is allowed only as the owner picks in 11 decision 4, because the red team found that a field-guide identity echoes the reference game's documentary identity.
 
-The research (01, section 10) maps each common complaint in this genre to the system below that answers it. In short:
+## 2. Name, premise and shape
 
-- **Never lose more than 30 seconds of play**, and pause to give orders at any time.
-- **Short days** (8 to 12 minutes) that end in a save, inside one colony that persists.
-- **A retreat in one tap**, and orders that show their effect within half a second.
-- **Large swarms that stay smooth on a phone.**
-- **Threats and contests where the bigger swarm does not simply win.**
-- **No goal that a stuck enemy can block.**
-- **Play with friends by link.**
+**Name.** Cinderhill is the working name (owner pick open, todo `lab-5w7.1`; variants in [09](09-round2-findings.md) and 11). A name and trademark check comes before any public listing.
 
-## 2. Name and setting: owner's pick
+**Premise.** A summer fire burned the hill black. Deep under it, one colony lived through the fire in its lowest chambers. You are that colony on the morning it comes up. Hundreds of ants pour out onto black ash. Feed them, dig, raise brood, and plant the seeds they carry, and the hill turns green behind you. Rain floods the low tunnels, a spider that smells like an ant walks your trails, and a neighbour colony reads every trail you draw.
 
-These are taste choices, so here are four variants. A web search on 2026-11-25 found no game with any of these exact names. A name check comes before anything public. Recommended: **A**.
+**Shape.** The first release is **Spring**: six chapters of 4 to 12 minutes on one hill. The colony, the nest and the bloom carry from chapter to chapter. Each chapter runs from morning (Field look) into dusk and night (Ember look) and ends at a natural stop. Free play and a five-minute daily hill sit beside it on the menu. Summer, Autumn, Winter, the invading supercolony and friends' modes come after the first release (section 11).
 
-| | Name | Setting | Why |
+## 3. Numbers: the pace budget and the starting values
+
+This is the one table of numbers. Pace lines are gates, read from replays; everything else is a starting value, tuned by bots and play. No clock in this game is measured in days.
+
+### 3.1 Pace budget (gates)
+
+"Median bot" every 15 s draws a trail to the nearest visible food of the kind the colony is shortest of, erases its oldest trail when it has more than six, answers telegraphed threats with Recall, builds the chapter's offered structures, and leaves crews on Steady. "Passive bot" draws one trail and then gives no order. "Idle bot" gives no order.
+
+| Line | Target | Read from |
+| --- | --- | --- |
+| Input ready after the page opens | ≤ 3 s on a mid-range phone | Page timing |
+| First order (people) | ≤ 10 s for 80% of sessions | Lab record |
+| First delivery from the player's first trail | ≤ 10 s after the stroke commits | replay-lab trail table, "first" |
+| Deliveries in minute 1 (median bot) | ≥ 25 | replay-lab per-minute table |
+| First birth | ≤ 15 s | replay-lab births (new field) |
+| First player-funded birth (larva fed by a protein load the player routed) | ≤ 90 s (script: about 65 s) | replay-lab births |
+| First real choice (two options with different costs, both visible) | ≤ 30 s | Chapter script; decision events (new field) |
+| Its consequence visible | ≤ 60 s | Chapter script |
+| First threat telegraphed | ≤ 60 s | Decision events |
+| First threat resolved (won, dodged or lost) | ≤ 3 min | Decision events |
+| Longest gap between decision events, minutes 0 to 10 | ≤ 30 s | Decision events. A decision event is one that offers a choice: a new source seen, a source empty, a threat telegraphed, a room full, brood short of protein, a rain warning, a route jammed, a build offered, a sprout that opens a covered route. Each chapter's script (section 8.1) places them; a script that cannot meet this line is rewritten, not padded with small piles |
+| Same gap, after minute 10 | ≤ 45 s | Decision events |
+| Wasted labour: workers idle for more than 10 s while any crew or marked job has a gap | ≤ 15% at any sampled tick | replay-lab idle column. Idle = no load, no crew, no auto job and no goal for 10 s. Ants queued at a door are counted apart as "queued" |
+| Queued at doors outside a jam event | ≤ 10% of ants outside | replay-lab (new field) |
+| Chapter 1 length | 4 to 6 min for the median bot; human median ≤ 8 min | replay-lab |
+| Chapters 2 to 6 length | 6 to 12 min for the median bot | replay-lab |
+| Passive bot | finishes chapter 1 | Bot run |
+| Idle bot | loses chapter 2 or 3 | Bot run |
+| The old quota opening (20 workers, 40 sugar, 4 larvae, a 40-load day) | **fails** this table | A fixture in CI; if it ever passes, the table is too loose |
+
+### 3.2 Starting values (tune these, keep the gates)
+
+| Thing | Start value | Why, multiplied out |
+| --- | --- | --- |
+| Cell | about one ant length; 256 sub-cell units | As now |
+| Tick | 20 a second, fixed | As now |
+| Walk on a trail | 3.5 cells/s (45 units a tick) | Now 1.9 (`WALK = 24` in `sim/sim.js`). At 1.9 the first delivery cannot meet 10 s |
+| Walk off a trail | 2.5 cells/s | Scouting and wandering |
+| Run (Recall, Alarm) | 5 cells/s | |
+| First food | a seed head (80 sugar loads) and a dead beetle (60 protein loads), 8 to 12 cells from the entrance, visible at 0 s; a third pile (300 loads, mixed) past a stone at 2:00 | 10 cells out (2.9 s), pick up (0.5 s), 10 back (2.9 s), 3 down (0.9 s): **7.2 s** to a delivery. A Steady crew of 20 brings about 2.8 loads a second, so the seed head empties near 0:40 and the beetle near 0:50: two decision events |
+| Loads | 1 load = 1 unit of food. The rebuild drops today's `LOAD = [4, 2]` units | Avoids a 4x fork in upkeep |
+| Starting stores | 60 sugar, 20 protein in the porch store | Covers 2 min of upkeep with no orders |
+| Starvation | At 0 sugar, adults move at half speed; after 60 s at 0, one adult in a hundred dies every 10 s, oldest first. Larvae with no protein for 60 s die. The queen dies last, and only after all workers | Gives the idle bot a way to lose |
+| Porch store | a store chamber 3 cells under the entrance; a load counts as home there | The old chamber was 24 cells down: 6.9 s one way even at 3.5 cells/s |
+| Nursery and queen | 10 to 16 cells down | Depth protects brood from rain and raids; nurses carry food down, foragers do not |
+| Colony at start | 300 adults (owner choice, 11 decision 6): 100 on the surface around the entrance, 200 inside on nursing, digging and stores. Queen, 12 pupae due from 8 s and then every 3 to 5 s, 20 larvae aged 0 to 20 s, 20 eggs aged 0 to 10 s. Nursery of 80 cells | Births inside 15 s; the swarm is visible at once |
+| Brood | egg 15 s, larva 25 s (needs 1 protein load), pupa 20 s: egg to adult 60 s | Now 570 s (`colony.js`, 11,400 ticks) |
+| Queen laying | 1 egg a second while sugar stores are above 0; 2 a second once a queen chamber of worth 60 or more is dug (from chapter 3); at most 1 brood per nursery cell. Eggs are free; each larva needs 1 protein load | Nursery cells and protein set the real rate |
+| Adults eat | 1 sugar load per 10 adults a minute | 300 ants need 30 loads a minute: food matters from minute 1 |
+| Ants at chapter ends (median bot) | about 450 after chapter 1, 900 after 3, 1,500 to 2,000 after 6 | Chapter 1 ceiling is about 590 at 1 egg a second; chapters 2 and 3 need 450 births of up to 1,000; chapters 4 to 6 need about 1,000 of up to 3,600 at 2 a second. Losses fit. 2,000 matches the frame gate; free play goes to 5,000 |
+| Food sources | finite piles; seeds, nectar plants and prey that regrow as the hill blooms | A fixed map runs out (NOTES.md found days asking for more than the map holds) |
+| Doors | The entrance starts 3 cells wide. Each cell passes 6 ants a second in each direction (out and in are separate lanes). A door is **jammed** when 10 or more ants queue at it for 5 s | 18 a second each way. Chapter 1's Steady crews (20 to 40 ants on two short routes) use under 6 a second. The jam comes when the third pile's long route runs on Surge with 400 or more ants, about 3 to 5 min in |
+| Crews | Light, Steady, Surge = 10%, 25%, 50% of the foraging pool (adults not on a crew, not nursing, not digging), set when the order is given and recomputed only when the pool changes by 10% | No oscillation. Auto jobs (rule 4) take only ants left after crews |
+| Bird | Shadow 10 to 15 s ahead; strikes a circle of radius 6 cells for 5 s, taking 1 ant a second from open cells in it. A husk covers 3 by 3 cells, a sprout 5 by 5, a roof as built. A trail runs under cover where its cells are covered | One pass costs at most 5 ants: a lesson, not a wipe |
+| Recall | Ants go to the nearest shelter: inside a door, or a covered cell (cover holds 4 ants a cell). Recall is not limited by door lanes for ants already within 2 cells of a door | Recall can beat a 10 s telegraph |
+| Trails | A trail whose scent falls under 5% of its peak (about 4 half-lives unused) is removed | Bounds goals (05) |
+| Structure costs | Husk: free (it is a carried object). Roof: 3 husks or 6 leaves. Span: 10 soil. Ramp: 6 soil. Plug: 4 soil, or one major standing in it. Channel: dug, 1 soil a cell. Mound: rises one step per 20 soil | Crew time 5 to 20 s each |
+| Majors | A larva fed 3 protein becomes a major; 4 times the hit points, 3 times the damage, eats double | From chapter 3 |
+| Rain | Chapter 2: warning at 2:00, the first 30 s pulse at 2:30; then a warning 30 s before each pulse, every 2 to 4 min. Rain slows ants in the open; it kills only by flooding: an ant or brood in a flooded cell for 10 s drowns | Rain is the first terrain test, and Recall is not the answer to it |
+| Chapter checkpoint | at chapter start, and every 20 s | The 20 s save line |
+| Surface region | 256 by 256 cells | As now |
+| Nest | 192 wide by 64 deep cells | Shallower than 128: walking depth is time |
+| Trail fade | half-life about 60 s unused | Now a third of a day |
+
+## 4. The first five minutes (chapter 1, "Up from the deep")
+
+This is the chapter the M1 build failed. It is written second by second so a builder does not have to guess.
+
+| Time | What the player sees | What the player can do | What it teaches |
 | --- | --- | --- | --- |
-| **A** | **Cinderhill** | A hillside after a wildfire. The colony regrows it | A visible goal (black to green), renewal and stewardship, family-friendly, and a seed economy grounded in real biology |
-| B | Floodline | A riverbank with seasonal floods | Water as the main threat, raft-building, strong nest-design puzzles |
-| C | Kerbside | Under one city square: pavement cracks, a café and a bin | Funny and familiar. Humans appear only as feet, crumbs and weather |
-| D | Seedkeepers | A meadow with seed granaries and a long winter | Calm economy-first play. An itch.io game is called "SeedKeeper", so this name is close to taken |
+| 0 s | Morning, Field look. The entrance on black ash. Ants pour out and mill. Two food piles glint 8 to 12 cells away: a seed head and a dead beetle. A ghost finger draws from the entrance to the seed head | Draw a trail | Trail |
+| 2 to 5 s | The stroke commits on lift. A stream of ants turns onto it at once; a count on the trail ticks up | Draw a second trail to the beetle | Orders have an effect within 0.5 s |
+| 7 to 10 s | The first seed reaches the porch. A pop and a store counter. The first beetle load reaches the nursery by about 20 s | | Food home |
+| 8 to 15 s | The nest cutaway opens in place over the entrance for 3 s (or on a tap): the first pupae split and new ants stand up | | Births |
+| 15 to 30 s | The seed husks pile at the entrance. A prompt shows two places to put the first husk: in the open beside the busier trail, or under a charred stalk off the trail. The husk is a light object a crew carries | Drag the husk to a place, or ignore it (a crew then drops it by the stalk) | Build |
+| 30 to 60 s | A bird's shadow crosses from the hill's edge, slowly, with a sound | Recall, move a trail under the husk, or do nothing | Threat, cover |
+| 40 to 50 s | The seed head empties. The beetle empties near 50 s. A new sugar source, a nectar stalk, shows across open ash | Draw a new trail, open or under the husk | Sources run out |
+| 45 to 75 s | The bird takes ants in the open (at most 5). Ants under the husk are safe. A loss counter shows what it cost | | Consequence of the first choice, inside a minute |
+| about 65 s | The first ant raised on the player's beetle protein stands up; the larva pupated at about 45 s | | Player-funded brood |
+| 70 to 90 s | The nursery shows larvae short of protein; the only protein left is a dead cricket by the bird's path | Route to it now, or wait under cover | Risk against need |
+| 90 s to 2 min | A seed planted in the midden sprouts: a green tuft on the ash, with a shadow ants can stand in | Plant (drop husks and seeds on the midden spot) | Bloom |
+| 2:00 | A third pile appears farther off, past a stone. The trail to it is long and open; a shorter path goes under the sprout | Choose route and crew size | Routes, crews |
+| 2:30 | The second bird pass, now along the long route | Keep, cover or reroute | Threats return to what you built |
+| 3:00 | The nursery is full (room full) | Dig nursery cells | Dig |
+| 3 to 5 min | With the third route on Surge, the door jams. A "jammed" marker. Dig paint shows where a second door could go. A beetle carcass drops near the far pile | Dig a second door or widen the first; route to the carcass | Traffic, dig |
+| 4 to 6 min | Dusk. The Ember look comes in. Stores, ants, sprouts and losses on a short card. Chapter 1 ends | Go on, or stop (the game is saved) | Natural stop |
 
-The rest of this spec is written for A. Most systems carry over to B to D unchanged. What changes is the map, the threats and the story.
+Chapter 1 cannot be lost by doing nothing (the passive bot finishes it). It can go badly: a colony that ignored the bird starts chapter 2 smaller.
 
-## 3. Pitch
+## 5. Story and tone
 
-A summer fire has burned Cinderhill black. One young queen landed in the ash after her wedding flight and dug in. You are her colony. Forage, dig and raise brood. Plant the seeds your ants carry, and the hill turns green behind you. Rain floods the low tunnels, a spider that smells like an ant walks your trails, and from the valley road a pale invading supercolony climbs toward you, driving out every colony it meets. A day of play lasts ten minutes. Spring, Summer and Autumn last six days each. Win by bringing the hill back to life and turning the native colonies from rivals into allies before the pale tide reaches the top.
+The story is told in short wordless scenes, 3 to 10 seconds, in the game's own style (tone is 11 decision 4). Words appear only on controls, goals and the chapter card.
 
-## 4. Story and characters
+- **The colony.** It survived the fire underground. Its queen is old and still laying. She is the colony's weak point: if an enemy reaches her, the chapter is lost.
+- **The hill.** Black ash at first; it greens where the colony plants seeds. The bloom map is the record of play and the picture a player shares.
+- **The neighbours.** A rival colony across the creek (chapter 5 onward), run by the same rules as the player (section 6.4). It is not a villain; it is another colony trying to live.
+- **Later (after Spring):** an invading supercolony from the road, allies, seasons. Kept in 07 and the P3 list.
 
-The story is told without a narrator. Scenes last 5 to 15 seconds and are drawn in the game's own style. Named ants speak one-line scent notes, and the player can tap a note to see the ant who left it.
-
-### Characters
-
-- **Queen Sorrel.** The founder. She is the colony's heart and its weak point. Her lines are few and come at season turns.
-- **Tally.** The first worker to hatch. She is the player's guide and is never forced on the player. The first trail of the game is hers. If she dies, her trail fades and a younger ant takes her name ("Tally the Second"), so the colony's memory survives.
-- **Burr.** An old ground beetle who lived through the fire under a stone. He trades seeds for protection and knows where things are. Ant guests like him are real: myrmecophiles.
-- **The Changeling.** A caterpillar the colony adopts in Summer. It smells like brood, so the nurses carry it in and feed it, and it eats brood in secret. Caterpillars of the large blue butterfly (*Phengaris*) do this. When the colony finds out, the player chooses: drive it out, or keep it and let it eat. Kept until Autumn, it emerges as a butterfly that pollinates the high meadow, and the bloom jumps. This is a mercy choice with a cost and a payoff. Neither path is "wrong".
-- **The Pale Tide.** An invasive supercolony coming from the road. It has no queen you can reach, only many nests that share one scent and never fight each other. It displaces the native colonies it reaches. It is a slow, unbeatable flood that must be held back with allies, scent and terrain. Argentine ants behave this way. The Tide is drawn without faces. It is a force, not a villain.
-- **Neighbour colonies.** Three native colonies: the **Thornbacks** (big, slow, proud), the **Jar-keepers** (honeypot ants who store food in living workers) and the **Leafstitchers** (who sew nests from leaves with silk from their larvae). Each starts as a rival and can become an ally through a tournament (section 6.7).
-
-### Arc by season
-
-| Season | Days | What happens | New verb or system |
-| --- | --- | --- | --- |
-| Spring | 6 | Founding. The first workers, the first trail, the first rain. Burr appears. An ant-eating spider that wears ant scent hunts the trails | Trail, dig, rooms, Recall, Alarm, rain |
-| Summer | 6 | The hill starts to bloom. The Changeling is adopted. Thornback tournament. Heat closes the midday. Antlion pits on the dry slope. A horned lizard waits beside the trails | Seeds and bloom, tournaments, heat, castes |
-| Autumn | 6 | The Pale Tide reaches the creek. Jar-keeper and Leafstitcher alliances. The Changeling choice pays off. Night raids | Scent disguise, allies, repletes, plugs |
-| Winter | 4 | Diapause. Short defensive days in a cold, slow nest. The Tide tests the hill's edge. The colony survives on stores | Stores, brood pause, defence |
-| Spring again | 2 | The wedding flight. Winged daughters leave to found new colonies, which seed New Hill+ and friends' games | Wedding flight, legacy |
-
-End: the hill's bloom level and the allies won decide one of three closing scenes. All three are wins. A colony that lost its queen does not end the campaign: on Gentle and Standard, a worker becomes the egg-layer at a cost, and play goes on. Mated egg-laying workers (gamergates) exist in about 1% of ant species, not in harvesters; this is a borrowed rule, and the game says so in its field guide.
-
-### Tone
-
-Warm, small and alive. Death is shown (ants carry their dead to the midden, which real ants do) but never gory. There is no human cruelty. Themes of stewardship, mercy and renewal, without preaching. Nothing in the game names a religion.
-
-## 5. Species (all fictional, built on real behaviour)
-
-| Species | Plays as | Real basis | Special |
-| --- | --- | --- | --- |
-| Cinder harvesters (player) | Campaign colony | Seed-harvester ants (*Messor*, *Pogonomyrmex*) | Store seeds in granaries. Majors crack seeds. Plant seeds by dropping them in the midden |
-| Thornbacks | Rival, later ally; playable later (P3) | Turtle ants (*Cephalotes*) | Majors plug entrances with their flat heads |
-| Jar-keepers | Rival, later ally; playable later (P3) | Honeypot ants (*Myrmecocystus*) | Repletes: living food stores. Tournament displays |
-| Leafstitchers | Rival, later ally; playable later (P3) | Weaver ants (*Oecophylla*) | Build above-ground leaf nests. Chain-bridges |
-| Pale Tide | Enemy only | Argentine ant supercolonies | Never fight each other. Drive out and kill native colonies, as real Argentine ants do |
-
-Each playable species has 3 or 4 castes from one shared list of body parts (rig.js, section 9). One species is enough for the vertical slice.
+Warm, small and alive. Death is shown (ants carry their dead to the midden) but never gory. No human cruelty. Nothing in the game names a religion.
 
 ## 6. Systems
 
-### 6.1 The two layers
+### 6.1 Economy and the now-or-later choice
 
-- **Surface:** a top-down map of a region of the hill (ash, stones, burned stumps, plants regrowing, water). Foraging, threats, tournaments and the Tide happen here.
-- **Nest:** a side cutaway of the soil under the colony's entrance or entrances. Digging, rooms, brood, the queen and stores live here.
-- The layer button switches between them. Each layer is one grid, so pathfinding and scent work the same way in both. Ants pass between layers through entrances.
-- A small inset always shows the other layer, with alert pips for fights, floods and hungry brood. The first emergency of each kind pauses the game in solo play and points to it.
+- **Sugar** (nectar, honeydew, seed tips) feeds adults. **Protein** (prey, the dead) feeds larvae. **Seeds** keep in a dry granary and can be cracked into sugar slowly. No other currency.
+- **Soil** from digging goes on the entrance mound (raises the door above rain water) or on a spoil spot the player marks (fills antlion pits, makes low walls).
+- **Now or later.** From chapter 3 each chapter ends with a bill shown from its start: a dry spell or a cold night that needs stored seeds or sugar per ant. A load eaten now grows the colony; a load stored pays the bill. Short of the bill, the weakest ants die at the chapter card.
+- **Starvation warning:** when sugar will run out within 60 s, a warning with its cause and one fix.
 
-### 6.2 Digging and rooms
+### 6.2 Crews, routes and traffic
 
-- Soil is a grid of cells: loose ash, topsoil, clay, stone (cannot be dug), roots, and water. Paint cells to mark them for digging. Workers dig in order of the paint and carry spoil to the surface, where it forms a mound. The mound is a real thing: it raises the entrance above flood water.
-- **Rooms.** Any dug space can be given a purpose by painting it:
+Every trail, dig, build and alarm has a **crew**. Its card shows ants on it, ants wanted, loads a minute, and the reason for a gap ("no free foragers", "door jammed", "path flooded").
 
-| Room | Works best | Real basis |
-| --- | --- | --- |
-| Queen's chamber | Deep, dry, far from entrances | Queens stay deep |
-| Nursery | Warm (shallow by day, deep by night: nurses move brood, which is real) | Brood carried to the best temperature |
-| Granary | Dry. Seeds rot below the water line | Harvester granaries |
-| Larder | Cool. Meat spoils in two days | |
-| Replete gallery (Jar-keepers and allies) | Ceiling hooks, deep | Honeypot repletes hang from ceilings |
-| Midden | Near the surface, away from brood | Waste chambers; disease if they are near brood |
+- **Crew size** is set on the route card: **Light**, **Steady** or **Surge** (about 10%, 25% and 50% of free workers, capped by the route's width), or plus and minus one ant, hold for eight.
+- **Who goes.** One rule, applied every tick in this order: (1) Recall; (2) an ant carrying a load finishes the delivery; (3) an ant on an explicit crew keeps it; (4) free ants take auto jobs by need: feed brood, store food, dig marked cells, forage the nearest open route. An ant is free when it has no load and no crew.
+- **Traffic.** Doors and narrow passages have a throughput (section 3.2). Queues show as a jam marker. Widening, a second door, a span or a ramp fixes it. Loads a minute on every route make throughput visible.
+- **Tactical pause** (solo, and co-op when all players agree): time stops; orders can be given; they take effect on resume.
 
-- A room's worth is a number from 0 to 100 shown on the room: depth, size, dryness, distance from where its goods come from, and neighbours that harm it (midden next to nursery). There are no adjacency upgrades. Players learn by reading one number and its tooltip.
-- **Cave-ins** happen only in loose ash when a span is too wide, with a warning crack first. **Flooding** follows the water cells (section 6.8). Plugs and mounds stop it.
+### 6.3 Brood and growth
 
-### 6.3 Economy and brood
+- Queen lays when fed; eggs, larvae and pupae need nursery cells. A larva needs one protein load. Well-fed larvae (a caste dial from chapter 3) become **majors**: slower, stronger, they crack seeds and hold doors.
+- Brood times are in section 3.2. Pupae at the start make the first births arrive in seconds.
+- Nurses carry brood up or down by heat and water: brood rises in rain, sinks at midday.
 
-- **Sugar** (nectar, honeydew from aphids) feeds adults. **Protein** (insects, the dead) feeds larvae. **Seeds** keep and can be cracked into both, slowly. No other currencies.
-- **Brood:** egg (queen lays when fed) to larva (eats protein, needs nurses) to pupa to adult. Larval feeding decides caste: well-fed larvae become majors. This is real, and it is how the player chooses castes. A caste dial sets the share of food that goes to big larvae.
-- **Age jobs:** young ants work inside (nurse, dig) and old ants forage and fight. This is automatic, as in real colonies. The player shifts the balance with four **job sliders**: Dig, Nurse, Forage, Guard. Ants answer by threshold: an ant takes a job when its need passes that ant's own threshold. The colony adjusts by itself and the sliders tilt it.
-- **Starvation guard:** when stores will run out within one day, a warning shows with the cause ("no protein for 40 larvae") and one suggested fix. The queen has a fasting reserve worth one day. Brood is eaten last (real colonies eat eggs in a famine; the game shows it as a warning, never a surprise).
+### 6.4 Threats and combat
 
-### 6.4 Control: scent, not cursors
+- **Combat contact rule.** Fights are automatic. Each ant can engage at most a fixed number of enemies it touches (frontage contact slots, 05). On open ground more ants touch, so the bigger swarm wins by its square; in a tunnel one faces one, so quality and doors win. Several ants can pin a big enemy: each on a leg slows it.
+- **Threat order in Spring** (each first in a safe form):
 
-A tool strip at the bottom picks the mode: Trail, Dig or Alarm. One finger acts in the chosen mode. Two fingers always pan and zoom, in every mode. The first finger of a pinch looks exactly like the start of a trail, so a stroke is only a preview until the finger lifts: a second touch, or a `pointercancel`, cancels it. A mouse uses the left button to act and the right button or wheel to move the camera.
+| Chapter | Threat | Telegraph | Answer |
+| --- | --- | --- | --- |
+| 1 | Bird | A shadow and a sound, 10 to 15 s ahead | Recall, cover (husk, sprout), trails under cover |
+| 2 | Rain | A sky change and a rain marker 30 s ahead | Mound, plugs, channels, carry brood up, redraw trails |
+| 3 | A spider that wears ant scent and walks the busiest trail | Its trail of wrong-coloured scent | Alarm with majors, cut the trail for 20 s, decoy trail |
+| 4 | Antlion pits on the dry slope | Sand cones | Route around, fill with spoil |
+| 5 | The neighbour colony | Its scouts on your trails | Guards on doors, decoy trails, walls, a counter-raid |
+| 6 | A storm night and a raid together | Both warnings | Everything above |
 
-For one-handed play and accessibility there is also a one-finger camera mode, zoom buttons, an undo for the last order, and a tap-start, tap-end trail. The M0 trail painter tests this scheme before anything else is built. Its pass line: after pinches, a phone call interruption and a layer switch on real phones, the command log holds zero orders the player did not mean.
+- **Shared scent.** Every colony reads every trail. A rival's scouts follow your strongest trail to your food and to your door. A trail drawn to nothing with Alarm held is a **decoy**: scouts follow it into your guards. Rivals do the same to you. The rival AI uses the player's own verbs and rules; it has no hidden powers.
+- **No stuck enemies.** An enemy that has not moved for 20 s wanders, then leaves the map edge. No goal requires every enemy to die.
+
+### 6.5 Water and terrain
+
+- Soil is a grid of cells: loose ash, topsoil, clay, stone, roots, water. Water is an integer cellular automaton on the same grid, its own hashed subsystem: rain fills low surface cells, runs down open tunnels and pools in low rooms.
+- **Structures** are placed objects a crew builds from husks, soil or leaves: a **span** (crosses a gap or water), a **ramp**, a **roof** (cover from birds and rain), a **plug** (closes a door; majors can hold one), a **channel** (leads water away), and the **mound** (raises the door). Each has a cost in loads and a crew time of 5 to 20 s. Chapter 1 and 2 offer marked placement spots; later chapters allow any legal edge.
+- **Rooms** are dug spaces with a painted purpose (nursery, granary, porch store, queen, midden). A room's capacity is its cells. Its worth (0 to 100, shown on it) comes from the room's own depth, dryness and size only. Nothing about its neighbours changes it (round 3: a neighbour term read too close to the reference game's tile adjacency).
+- **Cave-ins** only in loose ash under too wide a span, with a crack 5 s ahead.
+
+### 6.6 Bloom
+
+- Seeds carried home are eaten for the fatty tip; the husk and some seeds go on the midden or a place the player drops them. Middens near the surface sprout in 45 to 90 s.
+- Sprouts give shade (cover from birds), nectar, and roots that stop cave-ins. By chapter 6 a well-played hill has a green patch that changes routes.
+- The **bloom map** (black to green) is the chapter card picture and the share picture.
+
+### 6.7 Controls
+
+Portrait phone layout: a top bar (chapter goal, stores, ants, pause), the play field, and a bottom tool strip: **Trail**, **Dig**, **Build**, **Alarm**, and a **Recall** button at the right edge. Route cards slide up from the bottom when a trail or job is tapped. The nest opens as a cutaway in place over the entrance (tap the entrance, or pinch in on it); the surface stays visible above it.
 
 | Verb | Gesture | What ants do |
 | --- | --- | --- |
-| **Trail** | Trail mode: draw a line from the nest or an existing trail | Ants of the chosen job follow it and lay scent as they use it. Unused trails fade in about one day. A trail with food at its end grows stronger by itself, as in nature. Trails can be erased |
-| **Alarm** | Alarm mode: press and hold on a spot | Guards and nearby ants rush there. The call grows while held, and ants arrive in waves. Release to let it fade |
-| **Recall** | One button | Every ant outside heads home on the shortest path at a run. Carriers drop nothing. This is the retreat |
-| **Dig** | Dig mode: paint soil (nest layer) | Workers dig the painted cells in order |
+| Trail | Trail mode: draw from the entrance or an existing trail | The crew follows the drawn shape and lays scent. A trail with food at its end strengthens; an unused one fades (section 3.2). Erase by drawing over it with Dig or from the route card |
+| Dig | Dig mode: paint soil | The dig crew digs painted cells in order and carries spoil to the mound or spoil spot |
+| Build | Build mode: drag a structure from the strip, or drag a husk | A crew carries materials and builds it |
+| Alarm | Alarm mode: press and hold | Guards and nearby ants run there in waves while held. Held at the end of a trail drawn to nothing, it makes a decoy |
+| Recall | One button | Every ant outside goes home at a run. Carriers keep their loads |
 
-- **Crew on every order.** Each trail, dig and alarm shows its crew: ants on it, ants wanted, and the reason for a gap ("no idle foragers", "path blocked at the east door"). Tap any ant to see her load, destination and why she is waiting. Plus and minus move one ant; hold to move eight. This makes indirect control readable: the player can tell an ant that refused an order from one that cannot reach it.
-- **Bands (later, maybe).** Named groups with their own orders would give more control, but group selection is the reference game's rhythm. Bands stay out unless crews and job sliders prove too coarse in play (03-features, P3).
-- **Tactical pause** (solo, and co-op when all players agree): time stops; trails, alarms, digs and sliders can still be set; they take effect when time resumes.
-- **Feedback:** every order shows its effect within 0.5 seconds: a pulse on the trail, ants turning, a count of ants on their way. The measure of good control is not orders per minute. It is whether a player can reroute a forager around danger and say whether it worked.
+One finger acts in the chosen mode; two fingers always pan and zoom. A stroke is a preview until the finger lifts; a second touch or a `pointercancel` cancels it. A mouse uses the left button to act and the right button or wheel to move. One-finger camera, zoom buttons, undo of the last order, and tap-start, tap-end trails are in settings. Every order shows its effect within 0.5 s.
 
-### 6.5 Combat and threats
+## 7. What the screen must always answer
 
-- Fights are automatic when ants meet enemies. Ants bite, sting or spray by caste. Several ants can **pin** a big enemy: each ant on a leg slows it, and enough ants stop it. This is real ant behaviour, and it makes small ants matter against big foes.
-- Terrain decides how numbers count. On open ground every ant can touch an enemy, so a swarm wins by the square of its size (Lanchester's square law, which fits some real ant fights). In a tunnel one ant faces one enemy, so quality wins (the linear law). This gives majors, choke points and plugs their worth with one rule: how many enemies each ant can touch. Attacks from the side or behind do more.
-- **Threats that punish "bigger swarm wins":**
-  - **Antlion pits** on the dry slope (from Summer). Ants that stream down a straight trail into one are lost one by one. Answer: route the trail around it, or fill it with spoil.
-  - **Fly parasites** that hover over dense crowds and pick off ants. They are an ambient hazard that grows with crowding, never a scripted wave. Answer: thin trails and keep crowds underground. Real phorid flies do this.
-  - **Spider webs** across gaps. Answer: route around them, or send majors to cut them.
-  - **Birds**, shown as a shadow first. Ants on open ash are taken. Answer: Recall, or trails under cover.
-- **Large animals come because of what the colony did**, not one fixed set piece per season (a fixed seasonal giant reads like a boss tier even without the name). They return across days to what the colony built, so each is a routing problem over several days, not one fight. The cast, with no shared class name in the game: an ant-eating spider that wears ant scent and walks the trails (Spring; it teaches scent and is the first hint of disguise), a horned lizard that comes back each day to the busiest trail and eats ants one by one (Summer; horned lizards specialise in harvester ants, from memory; answer: move the trail, or plug and wait for the heat), a mole digging through the nest from below (Autumn; a nest-layer fight), a hungry shrew at the frozen entrance (Winter). Each one teaches the next season's skill.
-- **The Pale Tide** is not a beast. It advances one front per day on a visible map. It can be slowed by allies, by scent tricks, by plugging and by burning bridges (dropping the leaf-bridges it uses). It is never beaten outright. Winning is holding the top of the hill.
+- Where is my food going, and how fast? (loads a minute on routes, store counters)
+- What is about to hurt me, and when? (telegraphs, section 6.4)
+- Why is this ant or crew not doing what I asked? (the gap reason on every card; tap an ant for its load, goal and wait reason)
+- What did my last choice cost or win? (loss and gain counters for 5 s after an event)
 
-### 6.6 Movement and pathing
+## 8. Chapters, stakes and modes
 
-- Each goal (each room, each food source, each trail, the Recall home) has a **flow field** over its layer's grid, rebuilt when the soil changes. Ants read the field under them and add separation and a little noise. Thousands of ants cost the same as a handful of goals.
-- Scent trails are a field too. Following a trail and following a path use the same code.
-- **No stuck enemies:** an enemy that has not moved for 20 seconds switches to wandering and then leaves the map edge. No goal requires every enemy to die.
+### 8.1 Spring, six chapters
 
-### 6.7 Tournaments: winning without war
+| # | Chapter | New verb or threat | Ends when |
+| --- | --- | --- | --- |
+| 1 | Up from the deep | Trail, husk, bird, births, a second door | Dusk, about 5 min |
+| 2 | First rain | Dig, mound, plugs, channels, brood moved up | The storm passes with the queen dry |
+| 3 | The spider on the trails | Alarm, majors, decoy, the first now-or-later bill | The spider is driven off or starved of trails; the bill is paid |
+| 4 | The dry slope | Antlion pits, spans and ramps, crews under traffic | A route to the far seed field runs for 60 s |
+| 5 | Neighbours | Shared scent, rival scouts, raids, walls | The border holds through a raid, or a counter-raid takes their granary |
+| 6 | Storm night | All of it at once, in the Ember look | Dawn, with the queen alive; the bloom picture |
 
-Real honeypot ants settle borders with displays: workers face off, stand tall and stilt-walk, and the colony that shows more and bigger ants takes the ground, often with no deaths. In Cinderhill:
+Each chapter has a script like section 4, written before it is built, with a decision event at least every 30 s for its first 10 minutes. The skeleton for chapters 2 to 6:
 
-- A tournament is called on a border with a neighbour. Each side sends ants to a ring. Ants display for 60 seconds. The ring holds at most 30 ants a side, so a bigger colony cannot simply flood it: freshness, size and timing decide.
-- Score is display, not kills: the number of ants in the ring, their size, their freshness (well-fed ants display longer) and timing. The player paces the ants in waves: fresh ants replace tired ones.
-- Winning makes the neighbour yield the border. Winning by a wide margin, or winning twice, opens an alliance. An ally sends guards when the Tide comes and trades goods (Jar-keepers trade sugar; Leafstitchers build bridges).
-- Losing costs ground, not ants. A player can always fight instead, at a cost in dead ants and a lasting grudge.
-- Tournaments are also a non-violent versus mode for families in Friends' hill.
+| # | Beats in order (about one every 20 to 30 s) |
+| --- | --- |
+| 2 | New sources uphill and downhill; room full; rain warning at 2:00; first pulse floods the lowest tunnel; brood short of protein; a plug or mound offered; second pulse at a new low point; a channel offered; a sprout gives a dry route; storm peak; dry-out |
+| 3 | Spider's wrong-coloured trail seen; busiest route hit; majors unlocked (caste dial); a decoy offered; queen chamber offered; the bill shown (it grows with the colony); spider returns to the new busiest route; sources empty; bill due at dusk |
+| 4 | Dry slope opens; first pit; spoil spot offered; span over a crack; ramp to the seed field; jams on the long route; second door; pits move as sand slides; far field runs |
+| 5 | Rival scouts on your trail; their trail seen; a decoy works; their raid telegraphed; walls and plugs; a counter-raid route; their granary in view; border settles |
+| 6 | Dusk; storm warning; raid warning; flood and raid together; Ember night; dawn |
 
-### 6.8 World, weather and bloom
+### 8.2 Stakes (owner choice, 11 decision 5; recommended A)
 
-- **Day and night:** a day is 8 to 12 minutes of play. Night brings different hunters and slower foraging.
-- **Weather:** rain (water fills low cells and flows down open tunnels; ants carry brood upward), heat (midday surface is deadly in Summer; forage at dawn and dusk), cold (Winter: everything slows; ants cluster).
-- **Bloom:** seeds carried home are eaten for the fatty tip, and the seed is thrown in the midden. Middens near the surface sprout. Real ants spread seeds this way (myrmecochory). Plants grow over days: shade, nectar, aphids, cover from birds, roots that stop cave-ins. The **bloom map** turns black ash green where the colony has been. Bloom is the campaign's score, and the map is the reward a player shows a friend.
-- **Aphid herding:** the player chooses which regrown plant gets the herd. A plant close to the nest is a short, safe sugar route but shades a trail the birds watch; a far plant is richer but stretches the foragers in the open. Ladybirds are ambient, like the fly parasites: they thin a herd that nobody visits. There is no "defend the herd" fight (that is the decision the reference game advertises).
+A chapter is lost if an enemy reaches the queen, if the brood all drowns, or if the colony falls under 50 ants. The idle bot loses in chapter 2: with no mound, plug or channel its nest floods in the storm, the nurses have no dry room to carry brood to, and the brood drowns. The floor at a chapter start is 150 ants and 30 sugar. A lost chapter retries from its start checkpoint or from any 20 s checkpoint in the last two minutes. The campaign never dead-ends: a chapter always starts with at least a floor of ants and stores, and the chapter card says when the floor was used.
 
-### 6.9 A day's goal, losing a day, and catching up
+Difficulty: **Gentle** (no loss; a lost chapter becomes a poor score), **Standard**, **Hard** (fewer floor stores, faster raids).
 
-- **One goal per day**, shown on the dawn card (for example "Bring home 20 seeds before dusk" or "Keep the nursery dry through the storm"), plus up to two optional goals. A day is won at dusk when the main goal is met.
-- **Losing a day** means the goal was missed or the queen was in danger at dusk. The colony keeps what it has, and the player chooses: go on to the next day, or **restart the day from dawn** (the dawn save is always kept). No day can be lost in a way that makes a later day impossible: the next day's dawn checks the colony against a floor (ants, stores, a dry queen's chamber) and, below it, Burr brings seeds and the day's goal is eased. The dusk card says so plainly.
-- **A decision floor:** each day must pose at least one choice the day before could not. Bots still log orders per minute to catch a day that plays itself, but the gate is a person: can they say what they decided today and what it changed tomorrow?
-
-### 6.10 Progress between days
-
-- The colony carries everything from day to day: the nest, stores, brood, ants, trails (faded overnight) and bloom.
-- **Colony traits:** at each season's end the colony picks one of three traits (for example: "Deep sleepers: Winter costs half the stores"; "Long legs: foragers run 15% faster on ash"; "Sweet tooth: aphid herds yield double"). Traits are earned by playing, not by replaying for currency. A trait choice can be changed once per season.
-- **Rebuild:** any room can be filled in and redug. Nothing about a layout is permanent.
-
-## 7. Modes
+### 8.3 Modes in the first release
 
 | Mode | Players | Length | Notes |
 | --- | --- | --- | --- |
-| Campaign | 1, or 2 in co-op | 24 days, about 4 to 5 hours | Co-op: the friend plays a sister nest (real colonies with several nests do this) on the same hill, with shared bloom |
-| Friends' hill | 2 to 4 by link | one 20 to 30 minute match | Co-op against the year's hunters and weather, versus by tournaments only (family), or versus with fights. Co-op against the Tide comes with the full campaign (M5) |
-| Daily hill | 1 | one day, about 10 minutes | Same seed for everyone, shared leaderboard (the lab's board Worker) |
-| Skirmish | 1 against bots | one match | Bot colonies use the same rules |
-| Sandbox | 1 | open | Every system unlocked, sliders for weather and threats |
-| New Hill+ | 1 or 2 | campaign | Starts from a daughter colony of a finished campaign, on a new seeded hill |
+| Spring | 1 | six chapters, 45 to 60 min in all | The campaign |
+| Free hill | 1 | open | 200 to 5,000 ants, any look, weather and rivals on or off. The owner's longest session was free play |
+| Daily hill | 1 | 5 min | Same seed for everyone; score is loads home plus bloom; the lab board Worker; a replay link to the best run |
 
-## 8. First minute and teaching
+## 9. Friends (after the solo release)
 
-- No reading needed, and the first minute already teaches the premise (the colony regrows the hill). The game opens on Day 1 with the queen sealed in a small chamber, a hungry larva and an open entrance. Tally hatches and walks out. The kit's hint shows a finger drawing a line from the entrance to a seed. Tally brings it home; the larva eats the fatty tip.
-- The player then chooses where the husk goes: one of two midden spots, one by the open path and one under a charred stalk. At dawn of Day 2 a sprout stands where it went, and a bird's shadow crosses: a forager under the sprout is safe, one in the open runs. A second seed is offered with no hint.
-- Day 1 has one end: dusk, with the larva fed and the first husk placed. The founding gate is whether a new player places the second husk on purpose, predicts which route is safer, and sees whether they were right.
-- Each day adds at most one new verb or threat, first in a safe form: the first rain floods an empty tunnel; the first spider hunts where the player has no trail.
-- Help is always one tap away (a "?" on any thing shows a one-line note with a small moving picture). The hint never comes back once the player has shown the skill.
-- Lab recording logs which help was opened and where players stalled, for the Day 1 gate.
+Order, each gated on the one before:
 
-## 9. Look and sound
+1. **Same-seed challenge.** A link to a daily hill or a chapter seed; friends' runs and replays side by side. No room needed.
+2. **Ghost trails.** Past players' trails on the daily hill show as fading shared scent.
+3. **One shared colony.** Two to four players on one colony, each with their own trail colour and their own crews; pause by all. Lockstep through the relay room (05).
+4. **Versus** on one hill, shared scent as the battlefield. Only after 3 is stable.
 
-- **Art:** procedural and drawn in code, no paid assets. Ink outlines and watercolour washes. Ash is grey-black with ember specks. Regrowth is green with flowers that sway. Ants are drawn by a rig of body parts and legs with a real tripod gait (Ant Promotion's `rig.js` and `creature.js`), recoloured per species and caste. Close up, ants show legs and antennae. Zoomed out, each ant is one instanced shape with a two-frame wiggle.
-- **Optional 3D look:** Ant Promotion's `look3d.js` turns 2D draw calls into lit 3D shapes. It is offered as a second look in settings, if the frame-rate gate allows it.
-- **Sound:** made in code (`kit/audio.js`, `kit/music.js` with a new hill preset). The music follows bloom (sparse on ash, fuller on green) and danger. Ants have tiny clicks and stridulation. CC0 sound effects (Freesound CC0, Kenney) only where code sound is weak.
-- **Accessibility:** a spider toggle that redraws spiders as beetles, colour-blind palettes for colony colours, all controls by one finger or one mouse button, reduced motion, English and Turkish (`kit/i18n.js`).
+## 10. Cut from the first release, and why
 
-## 10. Numbers to start from (to tune by bots and play)
-
-| Thing | Start value |
+| Cut | Why |
 | --- | --- |
-| Ants alive, solo, end of Spring | 300 to 600 |
-| Ants alive, solo, peak | 2,000 (hard cap 5,000 across all colonies on the hill) |
-| Surface region | 256 by 256 cells, one cell about one ant length |
-| Nest | 192 wide by 128 deep cells |
-| Sim tick | 20 per second, fixed |
-| Day length | 8 to 12 minutes of play |
-| Egg to adult | about 1 day of play (Spring), faster in Summer |
-| Trail fade | half-life of about a third of a day |
+| Summer, Autumn, Winter, the invading supercolony, allies | Spring must prove the game first |
+| Wedding flight, New Hill+, colony traits | They reward a long campaign that does not exist yet |
+| The Changeling caterpillar | A story beat that needs words; kept in 07 |
+| Two of the three neighbour species | One rival is enough to test shared scent |
+| Tournaments (display contests) | A direct-control minigame inside an indirect-control game; an optional set piece later, not the only path to allies |
+| Named ants who speak, a field guide | Tone choice pending (decision 4) |
+| Lockstep versus | After the shared colony |
 
-## 11. What is not decided
+## 11. After Spring
 
-- Name and setting: owner's pick (section 2). Work proceeds on A, Cinderhill, which the owner's reply to the spec seemed to accept; it stays open in the todo list until confirmed.
-- Net model: server-ordered lockstep is chosen, but it depends on spike S2 (roadmap) proving the sim is deterministic on every engine. If S2 fails, the fallback is coarse server state (05-tech.md). Whether the room also runs the sim (an authority that checks hashes and makes join snapshots) or only orders commands is decided by spike S1's cost numbers. The protocol rules that hold either way are in 05-tech.md.
-- Whether a living-bridge crew (ants that hold a span and so cannot work) becomes a core verb. The independent design in 10-fresh-design.md built a whole game on that trade; it is a wildcard toy first (03-features).
-- Whether the first two hills of strategic-depth testing (roadmap, depth gate) show that yesterday's choices change today's plan. If they do not, the later seasons wait.
-- Whether the 3D look ships: decided by the frame-rate spike.
-- Whether ants are drawn as individuals at all zoom levels on low-end phones: decided by spike S3.
-- How a person feels about tournaments as the main path to allies: unknown until playtests.
+The round-2 arc (Summer bloom, Autumn and the invading supercolony, Winter, the wedding flight) stays as the direction for later seasons, re-cut into chapters with the same pace budget. Ideas: [07-biology-ideas.md](07-biology-ideas.md), [10-fresh-design.md](10-fresh-design.md), [round3/design-a.md](round3/design-a.md) (a season-cycle session with a campaign map), [round3/wildcards.md](round3/wildcards.md).
+
+## 12. Look, sound, money
+
+- **Looks.** Field (day) and Ember (night) are kept: the owner liked both (2026-11-26). How they are used is 11 decision 2; recommended: each chapter runs from Field into Ember. Ink stays as a settings option.
+- **Ants** are drawn by the rig (close) and instanced shapes (far). At far zoom, very large counts may be drawn as density (the fluid colony toy tests this).
+- **Sound** in code (`kit/audio.js`, `kit/music.js`). Music follows bloom and danger.
+- **Accessibility:** a spider toggle (spiders drawn as beetles), colour-blind palettes, one-finger controls, reduced motion, English and Turkish.
+- **Money.** None in the core game. No timers, no premium currency, no ads in the game. A supporter pack or extra looks may come after release, as an owner decision.
+
+## 13. What is not decided
+
+- Owner decisions: [11, "Decisions only the owner can make"](11-round3-findings.md#decisions-only-the-owner-can-make).
+- Fun and phone feel: unmeasured until chapter 1 runs on a real phone. Every value in 3.2 is a starting value.
+- Whether 50,000 ants as a fluid at far zoom works on a phone: the fluid colony toy.
+- Whether a founding run beats chapters: the founding runs toy.
