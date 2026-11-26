@@ -1,5 +1,16 @@
 # Splitlight
 
+## 2026-11-26 — exposure you can feel, and a reason to go on
+
+- A colour landing on a receiver throws a small spray of sparks in that colour and a short buzz (`navigator.vibrate`, where the phone has it).
+- A finished plate flashes the bench, bursts 30 sparks and a widening ring at each receiver, and buzzes a short pattern.
+- The result card shows a row of pips, one per plate: lit for plates exposed, gold for plates done in par turns or fewer, ringed for the plate just played. Under it, "Next: <plate name>". Both are hidden for the daily. Turkish is complete.
+- `check.mjs`: the forbidden-storage regex now allows `hf-lab-kit-queue`, the kit's own retry queue for records. The check failed on main before this change (verified with the change stashed); nothing in the page writes that key.
+
+Verified: `check.mjs` on WebKit iPhone 13 and Chromium Pixel 7 (first plate 0.42 s simulated, 0 browser errors, no lab writes); `phone.mjs small/night-splitlight` ok and hint ok on both; screenshots of the flash, sparks, pips and teaser in English and Turkish looked at.
+
+Not judged by a person: whether the sparks and flash read as reward or noise on a real phone, the buzz strength, and whether the next-plate teaser makes anyone press on.
+
 ## 2026-11-24 — first exposure
 
 Turn the glass until the missing colours land on the receiver. On the opening plate, red already reaches the receiver while violet reflects inside the prism and leaves through another face. One rightward movement can bring the beams together. The six lamps outside the receiver show which wavelengths it currently catches. The first plate needs all six at once. A coloured receiver on a later plate needs only its own wavelength. An exposed receiver stays lit while the player turns the glass to find the next one.

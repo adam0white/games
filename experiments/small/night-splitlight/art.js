@@ -241,6 +241,26 @@ function receivers(ctx, state, rules, time, p) {
   }
 }
 
+// Where a receiver sits on the rail now (canvas units), for the page's sparks.
+export function receiverPoint(target, elapsed) { return polar(R, receiverAngle(target, elapsed || 0)); }
+// The exposure (2026-11-26): sparks in each receiver's colour, a ring of light running out from it, and a flash over
+// the bench like a plate taking the light. fx: { sparks: [{x, y, vx, vy, life, band}], rings: [{x, y, age, band}], flash }.
+export function effects(ctx, fx) {
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  for (const r of fx.rings) {
+    const u = Math.min(1, r.age / .7);
+    ctx.strokeStyle = bandColour(r.band, (1 - u) * .8); ctx.lineWidth = 3 * (1 - u) + .5;
+    ctx.beginPath(); ctx.arc(r.x, r.y, 6 + u * 46, 0, Math.PI * 2); ctx.stroke();
+  }
+  for (const s of fx.sparks) {
+    const a = Math.max(0, Math.min(1, s.life));
+    ctx.strokeStyle = bandColour(s.band, a); ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(s.x - s.vx * .035, s.y - s.vy * .035); ctx.stroke();
+  }
+  if (fx.flash > 0) { ctx.fillStyle = `rgba(255,246,226,${fx.flash * .32})`; ctx.fillRect(0, 0, 360, 400); }
+  ctx.restore();
+}
+
 // state: the bench; rules: the six-band trace (what the rules see); dense: the drawing trace; time in seconds.
 export function draw(ctx, state, rules, dense, time, look = 'nocturne', selectedPart = -1) {
   const p = LOOKS[look] || LOOKS.nocturne;

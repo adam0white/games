@@ -416,7 +416,15 @@ button:disabled { opacity: .45; cursor: default; }
 /* Buttons keep their whole label; when the row is full the way back wraps to its own line. */
 #result .pair > button { flex: 1 0 auto; }
 #share { flex: 1; border-color: var(--brass); color: var(--brass); }
-#result-line:empty { display: none; }
+#result-line:empty, #teaser:empty { display: none; }
+/* The plates so far (2026-11-26): lit when exposed, gold at par, ringed for the plate just played. */
+#pips { display: flex; gap: 3px; }
+#pips[hidden] { display: none; }
+#pips i { flex: 1; height: 5px; max-width: 16px; border-radius: 3px; background: #ffffff1a; }
+#pips i.lit { background: color-mix(in srgb, var(--brass) 55%, #0000); }
+#pips i.gold { background: var(--spectrum); }
+#pips i.now { outline: 1px solid var(--brass); outline-offset: 1px; }
+#teaser { margin: 0; color: var(--brass); font: 600 10px/1.2 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
 #result button { padding: 6px 8px; font-size: 13px; }
 #result #next { flex: 1.2 0 auto; }
 

@@ -404,7 +404,8 @@ async function watchRequests(context, page) {
   await context.addInitScript(() => {
     if (location.protocol !== 'http:') return;
     localStorage.setItem('hf-lab-send-localhost', '1');
-    const forbiddenWrite = /^(?!hf-lab-(?:send-localhost|player|session:night-splitlight)$)(hf-lab-|night-splitlight:lab)/;
+    // hf-lab-kit-queue is kit/lab.js's own retry queue for records (added to the kit after this check was written).
+    const forbiddenWrite = /^(?!hf-lab-(?:send-localhost|player|kit-queue|session:night-splitlight)$)(hf-lab-|night-splitlight:lab)/;
     const setItem = Storage.prototype.setItem;
     window.splitlightCheckLabWrites = [];
     Storage.prototype.setItem = function (key, value) {
