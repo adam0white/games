@@ -34,7 +34,7 @@ export const CASTE = { WORKER: 0, MAJOR: 1 };
 export const CASTE_HP = [12, 30];
 export const CASTE_BITE = [2, 5];
 export const BITE_EVERY = 10; // ticks between one ant's bites
-export const BITE_R = 160; // sub-cell units on each axis: the separation radius, so ants that touch can bite
+export const BITE_R = 160; // sub-cell units, by the separation's distance estimate: ants that touch can bite
 export const STAGE = { EGG: 0, LARVA: 1, PUPA: 2 };
 export const FOOD = { SUGAR: 0, PROTEIN: 1 };
 export const LOAD = [4, 2]; // store units per load brought home: sugar, protein
@@ -108,8 +108,10 @@ export function stepColony(sim) {
     if (g[G.LAY] > 0) g[G.LAY]--;
     if (g[G.LAY] === 0 && g[G.SUGAR] > 0 && B.n < BROOD_MAX && sim.n + B.n < sim.cfg.maxAnts) {
       const sugar = g[G.SUGAR];
-      if (addBrood(sim, STAGE.EGG)) g[G.SUGAR]--;
-      g[G.LAY] = sugar >= 4 * C.LAY_RICH ? C.LAY_EVERY >> 2 : sugar >= C.LAY_RICH ? C.LAY_EVERY >> 1 : C.LAY_EVERY;
+      if (addBrood(sim, STAGE.EGG)) { // no open cell in the chamber: she tries again next tick
+        g[G.SUGAR]--;
+        g[G.LAY] = sugar >= 4 * C.LAY_RICH ? C.LAY_EVERY >> 2 : sugar >= C.LAY_RICH ? C.LAY_EVERY >> 1 : C.LAY_EVERY;
+      }
     }
   }
   if (g[G.TICK] % C.ADULT_EAT_EVERY === C.ADULT_EAT_EVERY - 1 && sim.n > 0) {
@@ -135,7 +137,8 @@ export function fight(sim) {
       for (let j = sim.head[cc]; j >= 0; j = sim.nextAnt[j]) {
         if (team[j] === team[i] || hp[j] === 0) continue;
         const dx = X[i] - X[j], dy = Y[i] - Y[j];
-        if ((dx < 0 ? -dx : dx) < BITE_R && (dy < 0 ? -dy : dy) < BITE_R) { target = j; break; }
+        const adx = dx < 0 ? -dx : dx, ady = dy < 0 ? -dy : dy;
+        if ((adx > ady ? adx + ((ady * 3) >> 3) : ady + ((adx * 3) >> 3)) < BITE_R) { target = j; break; } // the separation's distance estimate
       }
     }
     if (target >= 0) { hurt(sim, target, CASTE_BITE[sim.caste[i] & 1]); cool[i] = BITE_EVERY; }

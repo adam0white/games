@@ -267,7 +267,7 @@ All 200 ants made 2 or more round trips in every case.
 
 ## The colony (SIM_VERSION 4, snapshot format 4, 2026-11-26)
 
-The colony layer (`sim/colony.js`) adds per-ant caste, hit points, team and bite cooldown, pile kinds, the brood and a fight pass. The sandbox runs (`cfg.colony` 0) play as before; the hashes changed because they cover the new fields and the settings that steer later ticks. New totals: `EXPECTED` 954118908, `EXPECTED_LONG` 2668501999.
+The colony layer (`sim/colony.js`) adds per-ant caste, hit points, team and bite cooldown, pile kinds, the brood and a fight pass. The sandbox runs (`cfg.colony` 0) play as before; the hashes changed because they cover the new fields and the settings that steer later ticks. New totals: `EXPECTED` 2962084395, `EXPECTED_LONG` 1787377502 (after the second review added the layer sizes to the hash; play is unchanged).
 
 | Measure | Before (SIM_VERSION 3) | After |
 | --- | --- | --- |

@@ -113,6 +113,14 @@ test('fight hook: only ants that touch, on the same layer, bite; standing ants b
   assert.deepEqual(pair(100, NEST), [CASTE_HP[0] - CASTE_BITE[0], CASTE_HP[0] - CASTE_BITE[0]], 'touching: both bite');
   assert.deepEqual(pair(255, NEST), [CASTE_HP[0], CASTE_HP[0]], 'a cell apart: no bite');
   assert.deepEqual(pair(0, SURFACE), [CASTE_HP[0], CASTE_HP[0]], 'other layer: no bite');
+  const diag = (() => {
+    const s = colony({ colony: 0 });
+    const a = s.spawn(JOB.GUARD), b = s.spawn(JOB.GUARD, CASTE.WORKER, 1);
+    for (const [i, d] of [[a, 0], [b, 150]]) { s.layer[i] = NEST; s.x[i] = 14 * 256 + 50 + d; s.y[i] = 11 * 256 + 50 + d; s.lastCell[i] = s.cellOfAnt(i); }
+    s.step();
+    return [s.hp[a], s.hp[b]];
+  })();
+  assert.deepEqual(diag, [CASTE_HP[0], CASTE_HP[0]], '150 apart on both axes is not touching');
 });
 
 test('a snapshot taken mid-fight, and one with a death pending, play on as the uninterrupted game', () => {
@@ -131,9 +139,25 @@ test('a snapshot taken mid-fight, and one with a death pending, play on as the u
   assert.ok(a.g[G.DIED] >= 1 && a.n < 6, "the pending death happened in both");
 });
 
-test('the hash covers the population cap, which decides whether the queen can lay', () => {
+test('the hash covers the settings that steer later ticks; the sim keeps its own copy of them', () => {
   const h = cfg => colony(cfg).hashes().total;
   assert.notEqual(h({ maxAnts: 100 }), h({ maxAnts: 101 }));
+  const blank = sw => new Sim({ seed: 1, sw, sh: 32 * 64 / sw, nw: 4, nh: 4, ants: 0, blank: true }).hashes().total;
+  assert.notEqual(blank(32), blank(64), 'layer sizes');
+  const spread = [6, 40, 48], s = new Sim({ seed: 1, sw: 16, sh: 16, nw: 4, nh: 4, ants: 0, blank: true, spread });
+  spread[0] = 32;
+  assert.equal(s.cfg.spread[0], 6);
+});
+
+test('a queen with no open cell keeps her sugar and lays as soon as there is room', () => {
+  const s = colony();
+  for (let y = 10; y < 14; y++) for (let x = 10; x < 18; x++) s.mat[cellAt(s.L, NEST, x, y)] = MAT.CLAY;
+  s.g[G.SUGAR] = 1;
+  s.step();
+  assert.equal(s.brood.n, 0); assert.equal(s.g[G.SUGAR], 1);
+  s.mat[cellAt(s.L, NEST, 12, 11)] = MAT.OPEN;
+  s.step();
+  assert.equal(s.brood.n, 1); assert.equal(s.g[G.SUGAR], 0);
 });
 
 test('a colony game round-trips through a snapshot with brood in every stage', () => {
@@ -159,6 +183,10 @@ test('the page host runs a colony game: births get new indices, stats count the 
   assert.ok(st.colony.born >= 4 && h.sim.n === 20 + st.colony.born, `born ${st.colony.born}, n ${h.sim.n}`);
   assert.equal(st.colony.eggs + st.colony.larvae + st.colony.pupae, h.sim.brood.n);
   assert.equal(h.pn, h.sim.n);
+  // A death pending before a step (hurt between ticks) still renumbers: that tick is drawn without interpolation.
+  hurt(h.sim, 0, 255);
+  h.step();
+  assert.ok(h.shifted && h.pn === 0);
   // The sandbox host is unchanged: no colony numbers.
   assert.equal(new Host(500).stats().colony, null);
 });
@@ -185,8 +213,22 @@ test('the queen lays faster when sugar is plentiful', () => {
 test('a chamber that starts left of a narrow nest restores to the same place', () => {
   const s = new Sim({ seed: 1, sw: 48, sh: 48, nw: 12, nh: 36, ants: 5, colony: 1, sugar: 5 });
   assert.ok(s.home.x < 0, `home.x ${s.home.x}`);
+  for (let i = 0; i < s.n; i++) assert.ok(s.cellOfAnt(i) >= 0, `ant ${i} starts inside the nest`);
   const b = restore(snapshot(s));
   assert.equal(b.home.x, s.home.x);
   for (let t = 0; t < 300; t++) { s.step(); b.step(); }
   assert.equal(b.hashes().total, s.hashes().total);
+});
+
+test('the sandbox carries one kind: a load from a protein pile counts as one load, not protein', () => {
+  const s = colony({ colony: 0 });
+  s.pileCell[1] = cellAt(s.L, SURFACE, 30, 24); s.pileAmount[1] = 50; s.pileKind[1] = FOOD.PROTEIN;
+  s.startGoals();
+  for (let k = 0; k < 6; k++) s.spawn(JOB.FORAGE);
+  s.queueCommand({ tick: s.tick, type: CMD.TRAIL, layer: SURFACE, points: [24, 24, 30, 24] });
+  let carried2 = false;
+  for (let t = 0; t < 2500; t++) { s.step(); for (let i = 0; i < s.n; i++) if (s.carry[i] === 2) carried2 = true; }
+  assert.ok(s.g[G.STORES] > 0, 'loads came home');
+  assert.equal(carried2, false);
+  assert.equal(s.g[G.PROTEIN], 0);
 });

@@ -339,7 +339,6 @@ function drawBrood() {
 
 // ---- the HUD (a few times a second) ----
 function hud() {
-  if (host.shifted) { host.shifted = false; selected = -1; } // a death renumbered the ants
   stats = host.stats();
   const num = v => v.toLocaleString(lang()), c = stats.colony;
   $('stats').textContent = c
@@ -372,6 +371,7 @@ function frame(now) {
   const t0 = performance.now();
   run(G.tick(t0));
   const stepped = host.advance(now, screen !== 'play');
+  if (host.shifted) { host.shifted = false; selected = -1; $('antCard').classList.remove('on'); } // a death renumbered the ants
   if (stepped) {
     uploadAnts(); uploadScent();
     if (host.terrainVersion !== uploadedTerrain) uploadTerrain();

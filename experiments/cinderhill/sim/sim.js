@@ -54,6 +54,7 @@ const BRIDGE_MARGIN = 12; // a stroke blocked by a closed cell is routed around 
 export class Sim {
   constructor(options = {}) {
     const cfg = { ...DEFAULTS, ...options };
+    cfg.spread = cfg.spread.slice(); cfg.halfLife = cfg.halfLife.slice(); // the sim's own copies: hashed and snapshotted
     this.cfg = cfg;
     const L = (this.L = makeLayout(cfg)), n = L.n, A = cfg.maxAnts;
     this.mat = new Uint8Array(n);
@@ -121,8 +122,10 @@ export class Sim {
       this.layer[i] = layer; this.x[i] = cx * SUB + 128; this.y[i] = cy * SUB + 128;
     } else {
       this.layer[i] = NEST;
-      this.x[i] = (h.x + below(r, A, h.w)) * SUB + 128;
-      this.y[i] = (h.y + below(r, A, h.h)) * SUB + 128;
+      // Inside the nest even where the chamber runs past its edge (same draws either way).
+      const cx = h.x + below(r, A, h.w), cy = h.y + below(r, A, h.h), L = this.L;
+      this.x[i] = (cx < 0 ? 0 : cx >= L.nw ? L.nw - 1 : cx) * SUB + 128;
+      this.y[i] = (cy < 0 ? 0 : cy >= L.nh ? L.nh - 1 : cy) * SUB + 128;
     }
     this.heading[i] = below(r, A, ANGLES);
     this.caste[i] = caste; this.hp[i] = CASTE_HP[caste & 1]; this.team[i] = team; this.cool[i] = 0;
@@ -602,9 +605,9 @@ export class Sim {
     for (const e of this.queue) h = hashArray(h, e);
     h = hashArray(h, Int32Array.from(this.events));
     out.events = finish(h);
-    // Globals, and the settings that steer later ticks (the population cap, colony mode, scent spread and decay).
+    // Globals, and the settings that steer later ticks (layer sizes, the population cap, colony mode, scent).
     const c = this.cfg;
-    out.globals = finish(hashArray(hashArray(0x61, this.g), Int32Array.from([c.maxAnts, c.colony ? 1 : 0, ...c.spread, ...c.halfLife])));
+    out.globals = finish(hashArray(hashArray(0x61, this.g), Int32Array.from([c.sw, c.sh, c.nw, c.nh, c.maxAnts, c.colony ? 1 : 0, ...c.spread, ...c.halfLife])));
     h = 0;
     for (const k of SUBSYSTEMS) h = hashInt(h, out[k]);
     out.total = finish(h);

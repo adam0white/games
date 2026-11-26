@@ -63,7 +63,7 @@ export class Host {
   step() {
     this.snap();
     const t0 = performance.now();
-    const died = this.sim.g[G.DIED];
+    const died = this.sim.anyDead ? -1 : this.sim.g[G.DIED]; // a death may already be pending (hurt between ticks)
     this.sim.step();
     const ms = performance.now() - t0;
     // A death moves the later ants down one index: their last positions no longer match, so draw this tick
