@@ -59,7 +59,7 @@
   const q = new URLSearchParams(location.search), box = document.getElementById('rec');
   if (q.get('autoplay') === '1' && q.get('labRunSource') !== 'agent') box.remove();
   else {
-    const rec = lab('exile', { version: '0.4' });
+    const rec = lab('exile', { version: '0.5' });
     rec.notice(box); rec.toggle(box);
     let errors = 0;
     window.exileEvent = (name, json) => {
