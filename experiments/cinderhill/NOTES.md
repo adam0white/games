@@ -1,6 +1,6 @@
 # Cinderhill: notes
 
-Working name for the ant colony game specified in `docs/design/colony/`. This directory holds the M0 work: the deterministic sim core, its tests and the spikes. There is no game page yet. `/cinderhill/` serves a determinism check page.
+Working name for the ant colony game specified in `docs/design/colony/`. This directory holds the M0 work: the deterministic sim core, its tests, the spikes and the trail painter. `/cinderhill/` is the trail painter (M0 roadmap item, spike S3); the determinism check page moved to `/cinderhill/check.html`.
 
 ## What exists (2026-11-25)
 
@@ -16,10 +16,15 @@ Working name for the ant colony game specified in `docs/design/colony/`. This di
 | `sim/rangecoder.js` | The binary range coder the snapshot uses: adaptive probabilities, integers only, one walk for both directions |
 | `sim/replay.js` | `script(cfg, ticks)` (scripted orders), `replay(...)`, `firstDivergence(a, b)` |
 | `sim/world.js` | Seeded terrain: surface with stones, a pond and four food piles; nest with soil bands, shaft and chamber |
-| `sim/SPIKES.md` | Spike results S1, S2 and S4 with numbers |
+| `sim/SPIKES.md` | Spike results S1, S2, S3 and S4 with numbers |
 | `test/` | `node --test` suites; CI runs them in the `changes` job (step "Cinderhill sim") |
-| `spikes/` | S1, S2, S4 and the workerd harness; the planted fault `mutant.js` |
-| `index.html`, `check.js`, `quick.js` | The determinism check page; the phone check runs it in WebKit and Chromium |
+| `spikes/` | S1, S2, S3, S4 and the workerd harness; the planted fault `mutant.js` |
+| `check.html`, `check.js`, `quick.js` | The determinism check page; the phone check runs it in WebKit and Chromium (`cinderhill check`) |
+| `index.html`, `painter.js` | The trail painter page: menu, pause card, tool strip, HUD, the ant card, the frame sampler (`?fps=1`) |
+| `host.js` | Runs the sim for the page: 20 ticks a second from the frame clock (at most 4 a frame), the command log, crews and the "why" for one ant |
+| `gestures.js` | The touch rules as a pure reducer (pointer events in, preview, order, alarm, pan and zoom actions out); `test/gestures.test.mjs` |
+| `render.js` | WebGL2: the ground as one full-screen pass (terrain and scent as textures), ants as one instanced draw with a procedural body, interpolated between ticks; context loss and restore |
+| `words.js` | English and Turkish words (the Turkish is not checked by a native speaker) |
 
 ## Rules the sim keeps
 
@@ -37,8 +42,34 @@ node experiments/cinderhill/spikes/s1.mjs 2000 5000              # S1 tick cost 
 PLAYWRIGHT=<dir with playwright> node experiments/cinderhill/spikes/s2.mjs   # S2 Node and browsers
 node experiments/cinderhill/spikes/s4.mjs [--ants=5000] [--ticks=8000]   # S4 snapshot size
 node experiments/cinderhill/spikes/workerd.mjs                   # S1 and S2 in a local Durable Object (needs wrangler)
-PLAYWRIGHT=<dir> node experiments/kit/check/phone.mjs cinderhill # the page in WebKit and Chromium
+PLAYWRIGHT=<dir> node experiments/kit/check/phone.mjs cinderhill # both pages in WebKit and Chromium, and the command-log check
+PLAYWRIGHT=<dir> node experiments/cinderhill/spikes/s3.mjs        # S3 frame times in emulated phones
 ```
+
+The painter takes `?ants=500|2000|5000` and `?fps=1` (frame, work and sim tick times on screen, for a real phone).
+
+## The trail painter (2026-11-25)
+
+Touch rules (02-spec 6.4), in `gestures.js`:
+
+- One finger draws. The stroke is a local preview; it becomes one order when the finger lifts.
+- A second finger ends the stroke with no order and starts a pinch (zoom and pan). The fingers that were down stay "dead" until all have lifted, so lifting one finger of a pinch never draws.
+- `pointercancel`, `lostpointercapture`, a layer switch, a tool switch, a pause (blur, pagehide, the pause key) and an ant count change each end a stroke with no order.
+- Alarm: a still single finger held 300 ms starts the alarm (an order with hold 400 ticks); it is renewed every 10 s while held, and the lift sends hold 1 to end it. So one alarm is two orders. A second finger before 300 ms gives none.
+- Dig: on the nest layer only, a 3 x 3 brush along the stroke, at most 256 cells an order (the sim's cap).
+- The Move tool, a mouse's right or middle button, and two fingers pan. A tap with any tool inspects the nearest ant, unless "trail by two taps" is on (pause card).
+
+The phone check `cinderhill orders` plays pinches and two-finger pans mid-stroke, a pointercancel, a layer switch and a pause mid-stroke, and alarm and dig pinches, and asserts the log holds only the intended orders. On Chromium it repeats a pinch and a stroke as real touches (DevTools protocol). It fails when the page ignores `pointercancel` or when a second finger does not end the stroke (both tried).
+
+Decisions:
+
+- The sim runs on the main thread (S3: a few ms a tick on an M4 Mac). A Worker waits for a real phone to show long frames.
+- Ant crews are counts only: the sim has no "ants wanted" number, and the page says so.
+- The page sets up the colony: 17 in 20 ants forage, 2 dig, 1 guards; seven in ten foragers start on the surface near the entrance with staggered time out. The sim's rules are not changed by this.
+- Sim change: foragers keep following the newest trail while they are on it. Before, a forager dropped any trail 30 s into her trip, so a trail longer than about 30 cells never reached its food (2,000 ants, trail to pile 3: 51 seeds picked by tick 1,600 before, 592 and the pile emptied after). This changed the hashes (`quick.js`, S2 re-run).
+- Saved: `cinderhill:save` `{ v: 1, sound, ants, tapTrail }` and `cinderhill:hint`. Written on a setting change or the first Play.
+
+Not built: undo (the sim has no erase order), the small view of the other layer, an "ants wanted" number.
 
 When a sim change alters play, `test/page.test.mjs` fails and prints the new hash to put in `quick.js`.
 
