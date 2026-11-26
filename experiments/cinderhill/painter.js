@@ -2,6 +2,7 @@
 // second, drawn with WebGL2, and the touch rules of 02-spec section 6.4. No goals; draw trails and watch the ants.
 import { Host, CMD, SURFACE, NEST, FIELD, COUNTS, TICK_MS, SEED, G as GI } from './host.js';
 import { START, STAGE, GOAL_KIND } from './sim/colony.js';
+import { SPIDER } from './sim/spider.js';
 import { cellXY } from './sim/grid.js';
 import { makeGestures } from './gestures.js';
 import { Renderer } from './render.js';
@@ -132,7 +133,7 @@ function retext() {
 }
 retext();
 let toastTimer = 0;
-function toast(key) { const el = $('toast'); el.textContent = t(key); el.classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('on'), 1800); }
+function toast(key, params) { const el = $('toast'); el.textContent = t(key, params); el.classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('on'), 1800); }
 
 function setScreen(s) {
   screen = s;
@@ -362,6 +363,7 @@ function drawOverlay(now) {
       ctx.beginPath(); for (let i = 0; i < pu.pts.length; i += 2) { const p = toScreen(pu.pts[i] + 0.5, pu.pts[i + 1] + 0.5); i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); } ctx.stroke();
     }
     pulses = pulses.filter(pu => now - pu.at < 900);
+    drawSpider(now);
   }
   if (layer === NEST && colonyMode) drawBrood();
   if (held) { ctx.strokeStyle = '#2f5b8acc'; ctx.lineWidth = 6; ctx.strokeRect(3, 3, W - 6, H - 6); } // time is held
@@ -384,6 +386,39 @@ function drawOverlay(now) {
     const p = toScreen(x, y);
     ctx.strokeStyle = '#e2913a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(10, cams[layer].z * 1.2), 0, 7); ctx.stroke();
   }
+}
+
+// The spider (sim/spider.js): while it is coming, a red ring where it will appear; while it hunts, a dark body
+// with eight legs that step, and the cell it reaches into. Placeholder shapes until the look work.
+function drawSpider(now) {
+  const g = host.sim.g, st = g[GI.SP];
+  if (st !== SPIDER.WARN && st !== SPIDER.HUNT) return;
+  const z = cams[SURFACE].z, p = toScreen(g[GI.SP_X] + 0.5, g[GI.SP_Y] + 0.5), u = Math.max(7, z * 1.4);
+  if (p.x < 0 || p.y < 0 || p.x > W || p.y > H) { drawSpiderArrow(p); return; }
+  if (st === SPIDER.WARN) {
+    const k = (now % 1000) / 1000;
+    ctx.strokeStyle = `rgba(184, 67, 47, ${1 - k})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(p.x, p.y, u * (1 + 2 * k), 0, 7); ctx.stroke();
+    return;
+  }
+  ctx.strokeStyle = '#b8432f55'; ctx.lineWidth = 2; ctx.strokeRect(p.x - 1.5 * z, p.y - 1.5 * z, 3 * z, 3 * z); // its reach: one cell around
+  ctx.strokeStyle = '#1b1210'; ctx.lineWidth = Math.max(1.5, u * 0.16); ctx.lineCap = 'round';
+  const step = Math.sin(now / 90);
+  for (let side = -1; side <= 1; side += 2) for (let l = 0; l < 4; l++) {
+    const a = (l - 1.5) * 0.5 + (l & 1 ? step : -step) * 0.18, dx = side * Math.cos(a), dy = Math.sin(a);
+    ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x + dx * u * 1.1, p.y + dy * u * 1.1 - u * 0.4); ctx.lineTo(p.x + dx * u * 1.9, p.y + dy * u * 1.9 + u * 0.3); ctx.stroke();
+  }
+  ctx.fillStyle = '#1b1210'; ctx.beginPath(); ctx.ellipse(p.x, p.y + u * 0.45, u * 0.7, u * 0.8, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(p.x, p.y - u * 0.45, u * 0.42, 0, 7); ctx.fill();
+  ctx.fillStyle = '#b8432f'; ctx.beginPath(); ctx.arc(p.x, p.y + u * 0.45, u * 0.22, 0, 7); ctx.fill(); // the red mark
+}
+/** The spider is off screen: an arrow at the edge, pointing to it. */
+function drawSpiderArrow(p) {
+  const cx = W / 2, cy = H / 2, a = Math.atan2(p.y - cy, p.x - cx), m = 28; // where the ray to it meets the edge, inset
+  const k = Math.min(Math.abs(Math.cos(a)) > 1e-6 ? (W / 2 - m) / Math.abs(Math.cos(a)) : Infinity, Math.abs(Math.sin(a)) > 1e-6 ? (H / 2 - m) / Math.abs(Math.sin(a)) : Infinity);
+  const x = cx + Math.cos(a) * k, y = cy + Math.sin(a) * k;
+  ctx.fillStyle = '#b8432f'; ctx.beginPath();
+  ctx.moveTo(x + Math.cos(a) * 14, y + Math.sin(a) * 14); ctx.lineTo(x + Math.cos(a + 2.5) * 12, y + Math.sin(a + 2.5) * 12); ctx.lineTo(x + Math.cos(a - 2.5) * 12, y + Math.sin(a - 2.5) * 12);
+  ctx.fill();
 }
 
 // The queen and the brood, in the nest view: the queen in the middle of her chamber, each egg, larva and pupa
@@ -425,6 +460,8 @@ function hud() {
   if (food) lines.push(t('foodCrew', { crew: food }));
   if (stats.dig.marked) lines.push(`${t('digCrew', stats.dig)}${stats.dig.crew >= stats.dig.cap ? ` <small>· ${t('digFull')}</small>` : ''}`);
   if (stats.alarm) lines.push(t('alarmCrew', stats.alarm));
+  const sp = host.sim.g[GI.SP];
+  if (sp === SPIDER.WARN || sp === SPIDER.HUNT) lines.unshift(`<b class="spider">${t('spiderHud', { what: t(sp === SPIDER.WARN ? 'spiderComing' : 'spiderHunting'), kills: host.sim.g[GI.SP_KILLS] })}</b>`);
   if (lines.length && newest) lines.push(`<small>${t('noWanted')}</small>`);
   $('crew').innerHTML = lines.join('<br>');
   const d = host.day();
@@ -432,6 +469,14 @@ function hud() {
   if (d) { const s = Math.ceil(d.left / 20), time = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; $('goal').textContent = t('hudDay', { day: d.day, goal: goalHud(d), time }); $('goal').classList.toggle('done', d.won); }
   showAnt();
   if ($('recall').getAttribute('aria-pressed') !== String(stats.recall)) retext();
+}
+
+// The spider's events: a toast and a sound each, and a lab event (the replay has them too; these say what the page showed).
+function spiderNews(e) {
+  labrec.event('spider', { at: e.tick, s: e.state, a: e.arg, recall: host.sim.g[GI.RECALL] });
+  if (e.state === SPIDER.WARN) { toast(e.arg < 0 ? 'spiderEdge' : host.sim.g[GI.RECALL] ? 'spiderHold' : 'spiderWarn'); if (save.sound) { snd.tone(220, 0.25, 0.05, 'sawtooth'); setTimeout(() => snd.tone(196, 0.3, 0.05, 'sawtooth'), 260); } }
+  else if (e.state === SPIDER.HUNT) { if (e.arg >= 0) toast(host.sim.g[GI.RECALL] ? 'spiderHold' : 'spiderHunt'); if (save.sound) snd.tone(147, 0.4, 0.06, 'sawtooth'); }
+  else if (e.state === SPIDER.LEFT) { toast(e.arg ? 'spiderLeft' : host.sim.g[GI.RECALL] ? 'spiderLeftNone' : 'spiderGone', { kills: e.arg }); if (save.sound) snd.tone(660, 0.12, 0.03, 'triangle'); }
 }
 
 // ---- frame loop, with a frame-time sampler (S3) ----
@@ -445,6 +490,7 @@ function frame(now) {
   run(G.tick(t0));
   const stepped = host.advance(now, screen !== 'play' || held);
   if (screen === 'play') { labrec.tick(); labrec.camera(layer, cams[layer], now); if (frames.last) labrec.frame(now - frames.last); }
+  for (const e of host.spiderNews.splice(0)) spiderNews(e);
   if (host.dusk && screen === 'play') showDusk(); // the day is over: time stops on the dusk card
   if (host.shifted) { host.shifted = false; selected = -1; $('antCard').classList.remove('on'); } // a death renumbered the ants
   if (stepped) {
@@ -473,7 +519,7 @@ requestAnimationFrame(frame);
 // ---- hooks for the phone check and the S3 script ----
 window.painter = {
   day: () => host.day(), dusk: () => host.dusk, dawns: () => [...host.dawns.keys()], hashes: () => host.sim.hashes(),
-  state: () => ({ screen: screen === 'paused' ? 'paused' : screen, dayCard: dayCard?.kind ?? null, held, t: host.tick, paused: screen === 'paused', ants: host.ants, sound: save.sound, tapTrail: save.tapTrail, tool, layer, preview: preview ? preview.points.length : 0, orders: host.log.length, gl: !!renderer && !renderer.lost, glLosses: renderer?.losses ?? 0, glRestored: renderer?.restored ?? 0, glFailed, drawn: frames.drawn, selected, help: help.shown }),
+  state: () => ({ screen: screen === 'paused' ? 'paused' : screen, dayCard: dayCard?.kind ?? null, spider: host.sim.g[GI.SP], spiderVisits: host.sim.g[GI.SP_VISITS], held, t: host.tick, paused: screen === 'paused', ants: host.ants, sound: save.sound, tapTrail: save.tapTrail, tool, layer, preview: preview ? preview.points.length : 0, orders: host.log.length, gl: !!renderer && !renderer.lost, glLosses: renderer?.losses ?? 0, glRestored: renderer?.restored ?? 0, glFailed, drawn: frames.drawn, selected, help: help.shown }),
   log: () => JSON.parse(JSON.stringify(host.log)),
   stats: () => host.stats(),
   lab: () => ({ open: labrec.open, part: labrec.part, chain: labrec.chain, pending: labrec.buf?.length ?? 0, orders: { ...labrec.byType } }),

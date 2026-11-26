@@ -492,6 +492,13 @@ export const pageRuns = {
     await page.click('#dayGo');
     await until(page, () => window.painter.state().screen === 'play' && window.painter.day().day === 2, 'day 2 in play');
     assert.deepEqual(await page.evaluate(() => window.painter.dawns()), [2], 'yesterday\'s dawn is let go');
+    // Day 2's spider (sim/spider.js): a warning at a quarter of the day, the hunt (the safe form: the top edge, no meals), then it leaves.
+    await until(page, () => window.painter.state().spider === 1, 'the spider\'s warning', 30000);
+    assert.match(await page.textContent('#toast'), /spider is prowling the edge/);
+    await until(page, () => /Spider: coming/.test(document.querySelector('#crew').textContent), 'the coming line');
+    await until(page, () => window.painter.state().spider === 2, 'the spider hunting', 30000);
+    await until(page, () => /Spider: hunting/.test(document.querySelector('#crew').textContent), 'the hunting line');
+    await until(page, () => window.painter.state().spider === 0 && window.painter.state().spiderVisits === 1, 'the spider gone', 30000);
     const labState = await page.evaluate(() => window.painter.lab());
     assert.equal(labState.open, true, 'the lab replay record is open'); assert.equal(labState.part, 1);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no sideways scroll');
