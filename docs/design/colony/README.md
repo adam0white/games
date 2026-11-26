@@ -16,5 +16,7 @@ An original ant colony real-time strategy and base-building game for phone and d
 | [10-fresh-design.md](10-fresh-design.md) | The round-2 independent from-scratch design, kept as a source of ideas. Not our game |
 | [11-round3-findings.md](11-round3-findings.md) | Round 3 (2026-11-26), after the owner found the M1 build too slow and too basic: the play evidence, nine reviews, findings adopted and rejected, and the owner's decisions |
 | [round3/](round3/) | The nine round-3 reviews in full: three blind designs, red team, players, tech, cold builder, business, wildcards |
+| [12-round4-findings.md](12-round4-findings.md) | Round 4 (2026-11-26): eight reviews from two model families (unbiased, player lens, adversarial, blind from scratch), 26 findings checked and folded into 02, 03, 04 and 07, and six new taste calls |
+| [round4/](round4/) | The eight round-4 reviews in full and the evidence summary they read |
 
-Roadmap items are in the todo list under epic `lab-5w7` (`bd list --label cinderhill`). The open owner decisions are listed in 11; `lab-5w7.1` (name and setting) is one of them.
+Roadmap items are in the todo list under epic `lab-5w7` (`bd list --label cinderhill`). The open owner decisions are listed in 11 and 12; `lab-5w7.1` (name and setting) is one of them.
