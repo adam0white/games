@@ -185,3 +185,9 @@ Nobody has judged any of this by ear, eye or thumb, and no native reader has rea
 ## 2026-11-24: Ant Draft, bigger explosions (tester t1, note #237)
 
 The note answers #232 (what should come next in Ant Draft): bigger explosions. They were built the same day (the blast reaches further with each level, with a fireball, a shockwave, smoke and a deeper sound; bots and phone check passed) before the cleanup above moved Ant Draft to `archive/lab/`. Archived code is not polished, so this is not merged. The signed commit is 20ef0ea2 on the branch `ant-draft-blast`. Left as a proposal: apply it if Ant Draft comes back.
+
+## 2026-11-25: `cinderhill-tournament`
+
+| Date | Experiment | Idea tested | Checked | Verdict |
+| --- | --- | --- | --- | --- |
+| 2026-11-25 | `cinderhill-tournament` | Cinderhill border tournament (spec 6.7) as a toy: two colonies display in a ring capped at 30 a side; tired ants crouch, fresh ones stand tall; the player paces with Send wave, Hold and Rotate against three rule-based neighbours; 90 s; ants die only when a side breaks | `node bots.mjs 300`: careful 60 beats all-in 120 in 82% (13% lost, 4% drawn); all-in 60 v all-in 120 wins 1%; no side bias; claims fail as they should when freshness or the cap is removed. `node --test`: 11 pass. Phone check on WebKit and Chromium. Not checked: a real phone, a person, the Turkish, lab records (slug not yet in `LAB_PROTOTYPES`) | Keep testing. Details in `cinderhill-tournament/NOTES.md` |
