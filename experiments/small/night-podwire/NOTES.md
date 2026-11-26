@@ -253,9 +253,11 @@ Page only (`main.js`); `sim.js`, the plates, pars and saves are unchanged, so th
 - **Burst ring.** A ring with eight short rays opens from the husk's middle and fades in 0.5 s (bigger on the last pod); rust on herbarium, pale gold on blueprint.
 - **Haptics** through `navigator.vibrate` (Android; iOS Safari ignores it): a tap when the finger takes the wire, a tick for each 20 units of pull (the wire creaks), a release thump scaled by depth, a pulse per pod and a pattern on the last one. Off with the sound switch.
 - Reduced motion turns off hit-stop, slow motion, shake, rings and vibration.
+- Vibration waits for the page's first completed tap (`navigator.userActivation.hasBeenActive`): Chrome ignores and logs it before then, and Podwire has no start card, so the first grab and creak ticks of the very first drag stay silent.
+- **Two strengths, for a pick:** `?v=a` (default) has all of it; `?v=b` keeps the ring and the buzz without hit-stop, slow motion or shake. The run start records `v`.
 
 Checks: `check.mjs` PASS on WebKit iPhone 13 and Chromium Pixel 7 (page work p95 0.2 ms, max 4.8 ms on Chromium at 390×844). `kit/check/phone.mjs small/night-podwire` ok on both. A Pixel 7 probe pulled the centre of plate I and captured the ring on the husk 90 ms after the burst, with no page errors.
 
-First minute (Pixel 7, empty storage, probe): the plate is playable at 0.04 s with zero taps (no start card); one drag; first plate won about 2.2 s after load. Same as before this pass; the pass changes how the win feels, not how fast it comes.
+First minute (Pixel 7 Chromium, empty storage, the same probe, three runs each): playable at 0.04-0.14 s with zero taps (no start card) and one drag. The win card appeared 1.76-1.82 s after load on main, 2.23-2.40 s with `?v=a` (hit-stop and slow motion add about 0.45 s), and 1.82 s with `?v=b`.
 
 Not verified: vibration on a real phone; whether the shake and slow motion feel good or slow to a person.
