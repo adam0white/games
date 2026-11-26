@@ -184,6 +184,7 @@ async function labChecks() {
   const run = sent.find(r => r.body.kind === 'run')?.body, events = sent.find(r => r.body.kind === 'events')?.body;
   check('lab: a run end sends one run record and one events record', () => sent.length === 2 && !!run && !!events && sent.every(r => r.url === 'https://human.adamwhite.work/lab/api/linked'));
   check('lab: the run record carries the outcome, the summary and the choices', () => run.v === 2 && run.game === 'kit-selftest' && run.data.outcome === 'dawn' && run.data.summary.embers === 7 && run.data.start.night === 3 && run.data.events.map(e => e.type).join() === 'buy' && run.build.a === 'kit-1');
+  check('lab: a short run is one part with the trace and the device class', () => run.data.part === 0 && run.data.final === true && run.data.parts === 1 && Array.isArray(run.data.trace) && ['phone', 'tablet', 'desktop'].includes(run.data.env?.device) && run.data.env.w > 0);
   check('lab: a choice between runs is sent at once as its own record', () => between.length === 1 && between[0].body.data.outcome === 'between-runs' && between[0].body.data.events[0].type === 'before');
   check('lab: ids are 32 hex characters and both records share the run', () => ['id', 'player', 'session', 'runId'].every(k => /^[a-f0-9]{32}$/.test(run[k])) && events.runId === run.runId && events.player === run.player);
   check('lab: the events record uses only labels the lab accepts', () => JSON.stringify(events.data.e.map(e => e[2] ?? null)) === '[null,"run started","ending reached",null]');
