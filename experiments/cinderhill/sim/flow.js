@@ -12,6 +12,12 @@ export const GOAL = { NONE: 0, HOME: 1, EXIT: 2, DIG: 3, ALARM: 4, TRAIL: 5, FOO
 // Fixed slots; the cap on live goals is the slot count.
 export const SLOT = { HOME: 0, EXIT: 1, DIG: 2, ALARM: 3, TRAIL0: 4, TRAILS: 4, FOOD0: 8, FOODS: 8 };
 export const MAX_GOALS = 16;
+// A trail's shape: the stroke as an ordered, 4-connected path of open surface cells (built by the sim when
+// the order applies). Its field is not plain distance: a cell on the path holds the path length still to
+// walk to the trail's end (0 at the end), a cell off it holds TRAIL_OFF plus its steps to the nearest path
+// cell. Descending the field from off the path reaches the trail, then walks it in the drawn order.
+export const PATH_MAX = 2048, TRAIL_OFF = 4096;
+export const isTrailSlot = s => s >= SLOT.TRAIL0 && s < SLOT.TRAIL0 + SLOT.TRAILS;
 
 export function makeFlow(n) {
   return {
@@ -21,6 +27,8 @@ export function makeFlow(n) {
     cell: new Int32Array(MAX_GOALS).fill(-1), // the goal's cell for ALARM, TRAIL and FOOD
     seq: new Uint32Array(MAX_GOALS), // creation order, to replace the oldest trail
     dist: new Uint16Array(MAX_GOALS * n).fill(INF), // slot-major: dist[slot * n + cell]
+    pathLen: new Uint16Array(SLOT.TRAILS), // cells in each trail slot's path
+    path: new Int32Array(SLOT.TRAILS * PATH_MAX), // trail slot k's path: path[k * PATH_MAX + index], start first
     queue: new Int32Array(n), // scratch for the search; not state
     rebuilds: 0, repairs: 0, // counters for the spikes; not state
   };
@@ -71,6 +79,7 @@ function sources(sim, slot, push) {
 export function rebuild(sim, slot) {
   const { L, mat, link, flow: F } = sim, n = L.n, nb = L.nb, q = F.queue, base = slot * n, d = F.dist;
   d.fill(INF, base, base + n);
+  if (isTrailSlot(slot) && F.kind[slot] === GOAL.TRAIL) return rebuildTrail(sim, slot);
   let head = 0, tail = 0;
   sources(sim, slot, c => { if (d[base + c] !== 0) { d[base + c] = 0; q[tail++] = c; } });
   while (head < tail) {
@@ -78,6 +87,31 @@ export function rebuild(sim, slot) {
     if (nd >= INF) continue; // cannot happen on 256x256 layers; keeps INF meaning unreachable
     for (let k = 0; k < 5; k++) {
       const m = k < 4 ? nb[c * 4 + k] : link[c];
+      if (m < 0 || mat[m] !== MAT.OPEN || d[base + m] !== INF) continue;
+      d[base + m] = nd; q[tail++] = m;
+    }
+  }
+  F.dirty[slot] = 0;
+  F.rebuilds++;
+}
+
+/** A trail's field (see PATH_MAX above): path cells first, in path order, then a breadth-first search
+ *  outward on the surface only. Trails are surface orders and nest ants head for the exit first, so the
+ *  field never crosses an entrance and nest digging never touches it. */
+function rebuildTrail(sim, slot) {
+  const { L, mat, flow: F } = sim, nb = L.nb, q = F.queue, base = slot * L.n, d = F.dist, k = slot - SLOT.TRAIL0;
+  const len = F.pathLen[k] < PATH_MAX ? F.pathLen[k] : PATH_MAX, at = k * PATH_MAX;
+  let head = 0, tail = 0;
+  for (let j = 0; j < len; j++) {
+    const c = F.path[at + j];
+    if (c < 0 || c >= L.nestBase || mat[c] !== MAT.OPEN || d[base + c] !== INF) continue;
+    d[base + c] = len - 1 - j; q[tail++] = c;
+  }
+  while (head < tail) {
+    const c = q[head++], v = d[base + c], nd = v >= TRAIL_OFF ? v + 1 : TRAIL_OFF + 1;
+    if (nd >= INF) continue;
+    for (let e = 0; e < 4; e++) {
+      const m = nb[c * 4 + e];
       if (m < 0 || mat[m] !== MAT.OPEN || d[base + m] !== INF) continue;
       d[base + m] = nd; q[tail++] = m;
     }
@@ -103,6 +137,9 @@ export function terrainChanged(sim, c) {
   for (let s = 0; s < MAX_GOALS; s++) {
     if (!F.live[s] || F.dirty[s]) continue;
     const base = s * n, d = F.dist;
+    // A trail's field is not uniform distance, so the in-place repair below does not apply: any surface
+    // change rebuilds it. Nest changes never reach it.
+    if (isTrailSlot(s) && F.kind[s] === GOAL.TRAIL) { if (c < L.nestBase) F.dirty[s] = 1; continue; }
     if (isSourceCell(sim, s, c)) { F.dirty[s] = 1; continue; }
     if (!opened) { if (d[base + c] !== INF) F.dirty[s] = 1; continue; }
     let best = INF;
@@ -151,6 +188,25 @@ export function nextCell(sim, slot, c) {
     if (d[base + m] < best) { best = d[base + m]; to = m; }
   }
   return to;
+}
+
+/** Walking a trail backward (toward its start): on the path, the previous path cell; off it, the way to the
+ *  nearest path cell; -1 at the start or when unreachable. */
+export function backCell(sim, slot, c) {
+  const { L, mat, flow: F } = sim, base = slot * L.n, d = F.dist, v = d[base + c];
+  if (v >= TRAIL_OFF) return nextCell(sim, slot, c);
+  const want = v + 1;
+  for (let e = 0; e < 4; e++) {
+    const m = L.nb[c * 4 + e];
+    if (m >= 0 && mat[m] === MAT.OPEN && d[base + m] === want) return m;
+  }
+  return -1;
+}
+
+/** Steps still to walk backward to a trail's start: the path index on the path, TRAIL_OFF plus steps off it. */
+export function backDist(sim, slot, c) {
+  const v = sim.flow.dist[slot * sim.L.n + c];
+  return v >= TRAIL_OFF ? v : sim.flow.pathLen[slot - SLOT.TRAIL0] - 1 - v;
 }
 
 export const distAt = (sim, slot, c) => sim.flow.dist[slot * sim.L.n + c];

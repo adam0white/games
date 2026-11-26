@@ -69,7 +69,7 @@ test('old versions and damaged snapshots are refused', () => {
   const bytes = snapshot(new Sim({ ...cfg, ants: 20 }));
   assert.equal(bytes[4] | (bytes[5] << 8), SNAPSHOT_VERSION);
   const v1 = bytes.slice(); v1[4] = 1; v1[5] = 0;
-  assert.throws(() => restore(v1), /snapshot 1\/1, this sim reads 2\/1/, 'version 1 (raw arrays) is refused by number');
+  assert.throws(() => restore(v1), /snapshot 1\/2, this sim reads 2\/2/, 'version 1 (raw arrays) is refused by number');
   const sim2 = bytes.slice(); sim2[6] ^= 0xFF;
   assert.throws(() => restore(sim2), /this sim reads/);
   assert.throws(() => restore(bytes.subarray(0, bytes.length - 3)), /truncated/);
