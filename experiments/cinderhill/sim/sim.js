@@ -13,14 +13,14 @@
 import { ANGLES, COS, SIN, angleOf, turnTo } from './math.js';
 import { HARDNESS, MAT, NEST, SUB, SURFACE, baseOf, cellAt, cellXY, heightOf, makeLayout, widthOf } from './grid.js';
 import { STREAM, STREAMS, below, seedStreams } from './rng.js';
-import { G, GOAL, INF, MAX_GOALS, PATH_MAX, SLOT, TRAIL_OFF, backCell, backDist, distAt, dropGoal, isTrailSlot, makeFlow, nextCell, rebuild, rebuildDirty, setGoal, terrainChanged } from './flow.js';
+import { DIAG, G, GOAL, INF, MAX_GOALS, PATH_MAX, SLOT, STEP, TRAIL_OFF, backCell, backDist, distAt, dropGoal, isTrailSlot, makeFlow, nextCell, rebuild, rebuildDirty, setGoal, terrainChanged } from './flow.js';
 import { FIELD, FIELDS, deposit, makeScent, smell, stepScent } from './scent.js';
 import { SUBSYSTEMS, finish, hashArray, hashInt } from './hash.js';
 import { generate } from './world.js';
 
-export const SIM_VERSION = 2; // 2: trails keep their drawn shape (a path per trail, `via` per ant)
+export const SIM_VERSION = 3; // 2: trails keep their drawn shape (a path per trail, `via` per ant); 3: eight directions
 export const TICK_HZ = 20;
-export { G, GOAL, SLOT, INF, FIELD, MAT, SURFACE, NEST, SUB, SUBSYSTEMS };
+export { G, GOAL, SLOT, INF, STEP, DIAG, FIELD, MAT, SURFACE, NEST, SUB, SUBSYSTEMS };
 
 export const JOB = { FORAGE: 0, DIG: 1, GUARD: 2 };
 export const MODE = { SEEK: 0, RETURN: 1, WORK: 2, REST: 3 };
@@ -42,8 +42,8 @@ const TURN = 32; // most a heading turns in one tick when steering toward a targ
 const SEP_R = 160; // separation radius in sub-cell units
 const SENSE_AT = 2 * SUB, SENSE_SIDE = 28, SENSE_MIN = 2000;
 const TRAIL_LAY = 60000, TRAIL_STROKE = 400000, FOOD_EMIT = 200000, ALARM_EMIT = 600000, ALARM_FADE = 5000;
-const FAR = 150; // a seeking forager this many steps from home goes back
-const STALL_KICK = 50;
+const FAR = 150 * STEP; // a seeking forager this far from home (150 straight steps) goes back
+const STALL_KICK = 50, KICK_EVERY = 30, KICK_FOR = 8;
 const SEEK_GIVE_UP = 1200; // a forager that finds nothing in a minute goes home
 const BRIDGE_MARGIN = 12; // a stroke blocked by a closed cell is routed around inside this many cells of the gap first
 
@@ -173,8 +173,8 @@ export class Sim {
   }
 
   /** The stroke in command `e` as an ordered path of open surface cells, written to out[at ..]; returns its
-   *  length (0: nothing walkable). Steps are 4-connected (a diagonal step goes through an open side cell),
-   *  as ants and fields move. Stroke cells that are closed, or that no ant can reach from home, are left
+   *  length (0: nothing walkable). Steps are 8-connected with the corner rule (a diagonal step whose side
+   *  cells are not both open goes through an open side cell), as ants and fields move. Stroke cells that are closed, or that no ant can reach from home, are left
    *  out, and the gap they leave is bridged by the shortest way around: first inside a box of
    *  BRIDGE_MARGIN cells around the gap, then over the whole surface; a cell no bridge reaches is skipped.
    *  Where the path comes back to a cell it already holds, the loop is cut out (loop erasure), so each
@@ -200,7 +200,11 @@ export class Sim {
       const adx = x > lx ? x - lx : lx - x, ady = y > ly ? y - ly : ly - y;
       if (adx + ady === 1) { append(c); return; }
       if (adx === 1 && ady === 1) {
-        const side = walkable(x, ly) >= 0 ? walkable(x, ly) : walkable(lx, y);
+        // A diagonal step is taken as one step when both side cells are open (the corner rule ants and fields
+        // keep); with one side closed it goes through the open side; with both closed it is bridged.
+        const s1 = walkable(x, ly), s2 = walkable(lx, y);
+        if (s1 >= 0 && s2 >= 0 && this.mat[s1] === MAT.OPEN && this.mat[s2] === MAT.OPEN) { append(c); return; }
+        const side = s1 >= 0 ? s1 : s2;
         if (side >= 0) { append(side); append(c); return; }
       }
       this.bridge(last, c, append) || this.bridge(last, c, append, true);
@@ -360,7 +364,7 @@ export class Sim {
       else still = true;
     } else { // guard
       const d = this.flow.live[SLOT.ALARM] ? distAt(this, SLOT.ALARM, c) : INF;
-      if (d !== INF && d > 2) { follow = SLOT.ALARM; speed = RUN; }
+      if (d !== INF && d > 2 * STEP) { follow = SLOT.ALARM; speed = RUN; }
       else if (d !== INF) still = true; // at the call: hold the spot
       else if (layer === SURFACE) follow = SLOT.HOME;
       else still = true;
@@ -394,13 +398,18 @@ export class Sim {
     }
     if (still) { this.stall[i] = 0; this.lastCell[i] = c; return; }
 
+    // Stuck (no progress for STALL_KICK ticks): turn a random way and wander for KICK_FOR ticks, then steer
+    // again; repeat every KICK_EVERY ticks while still stuck. Steering again between kicks lets an ant that a
+    // crowd pushed back find its way once the crowd thins (a kick every tick was a random walk for good).
     let h = this.heading[i];
-    if (want >= 0) {
+    const st = ++this.stall[i], phase = st > STALL_KICK ? (st - STALL_KICK - 1) % KICK_EVERY : -1;
+    if (phase === 0) h = (h + 64 + below(r, A, 128)) & 255;
+    else if (phase > 0 && phase < KICK_FOR) h = (h + below(r, A, 17) - 8) & 255;
+    else if (want >= 0) {
       const t = turnTo(h, want);
       h = (h + (t > TURN ? TURN : t < -TURN ? -TURN : t) + below(r, A, 5) - 2) & 255;
     } else if (wander) h = (h + below(r, A, 17) - 8) & 255;
-    if (++this.stall[i] > STALL_KICK) h = (h + 64 + below(r, A, 128)) & 255; // stuck: try another way
-    if (this.stall[i] > this.maxStall) this.maxStall = this.stall[i];
+    if (st > this.maxStall) this.maxStall = st;
     this.heading[i] = h;
 
     // Separation from ants within SEP_R in this and the neighbouring cells, capped at half the speed per
@@ -417,7 +426,10 @@ export class Sim {
         const adx = dx < 0 ? -dx : dx, ady = dy < 0 ? -dy : dy;
         if (adx >= SEP_R || ady >= SEP_R) continue;
         if (dx === 0 && dy === 0) { px += j < i ? 8 : -8; continue; } // same spot: split by index
-        if (adx >= ady) px += dx > 0 ? SEP_R - adx : adx - SEP_R; else py += dy > 0 ? SEP_R - ady : ady - SEP_R;
+        // Away from the other ant along the line between them (any direction, not only the axes): the push is
+        // SEP_R less the larger axis gap, shared between the axes in proportion to the gaps.
+        const far = adx > ady ? adx : ady, k = SEP_R - far;
+        px += Math.trunc((dx * k) / far); py += Math.trunc((dy * k) / far);
       }
     }
     const cap = speed >> 1;
@@ -436,8 +448,13 @@ export class Sim {
     const layer = this.layer[i], w = widthOf(this.L, layer) * SUB, h = heightOf(this.L, layer) * SUB;
     const nx = this.x[i] + dx, ny = this.y[i] + dy;
     if (nx < 0 || ny < 0 || nx >= w || ny >= h) return false;
-    const c = baseOf(this.L, layer) + (ny >> 8) * widthOf(this.L, layer) + (nx >> 8);
+    const base = baseOf(this.L, layer), lw = widthOf(this.L, layer), ox = this.x[i] >> 8, oy = this.y[i] >> 8;
+    const c = base + (ny >> 8) * lw + (nx >> 8);
     if (this.mat[c] !== MAT.OPEN) return false;
+    // Crossing straight into a diagonal cell passes the shared corner point. With both side cells closed that
+    // is squeezing between two walls that touch at a corner, which no ant may do. With one side open, the
+    // step only grazes a wall's corner and is allowed (forbidding it jams crowds at tunnel mouths).
+    if ((nx >> 8) !== ox && (ny >> 8) !== oy && this.mat[base + oy * lw + (nx >> 8)] !== MAT.OPEN && this.mat[base + (ny >> 8) * lw + ox] !== MAT.OPEN) return false;
     this.x[i] = nx; this.y[i] = ny;
     return true;
   }

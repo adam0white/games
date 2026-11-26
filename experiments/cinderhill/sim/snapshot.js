@@ -11,7 +11,7 @@
 //   and the residual is coded in a context chosen by how much those neighbours differ.
 // - Ants: the cell as its rank among the layer's open cells (an adaptive model per layer and job: many
 //   ants share a cell), then the offset inside the cell. Job in the context of the spawn order by index.
-//   `since` as the difference from the tick. `lastCell` as "same cell", one of the five neighbours, or a
+//   `since` as the difference from the tick. `lastCell` as "same cell", one of the nine neighbours (with diagonals and the link), or a
 //   raw value. `best` as the difference from the flow distance at `lastCell` (the value it usually equals).
 // - Terrain: material in a context of its left and upper neighbours; dig marks, dig work and entrance
 //   links as lists of the cells that differ from the usual value.
@@ -27,7 +27,7 @@ import { MAT, SUB } from './grid.js';
 import { SIM_VERSION, Sim } from './sim.js';
 import { Decoder, Encoder, intModel, probs, sint, tree, uint } from './rangecoder.js';
 
-export const SNAPSHOT_VERSION = 2;
+export const SNAPSHOT_VERSION = 3; // 3: lastCell codes the diagonal neighbours
 const SCTX = 24; // scent contexts per field
 const LIST_MAX = 1 << 20; // a longer command queue, command or event list is a corrupt payload, not an allocation
 const RANK_BITS = 12; // measured: 6, 8, 10, 12, 14 bits; 12 is near the best (ants share cells, so a fine model pays)
@@ -36,7 +36,7 @@ const MAGIC = [0x43, 0x48, 0x53, 0x4D]; // "CHSM"
 /** Every live goal's distances, rebuilt into a fresh array from terrain, links, dig marks and goals. */
 function rebuiltDistances(sim) {
   const F = sim.flow, n = sim.L.n;
-  const flow = { kind: F.kind, live: F.live, dirty: F.dirty.slice(), cell: F.cell, seq: F.seq, pathLen: F.pathLen, path: F.path, dist: new Uint16Array(MAX_GOALS * n).fill(INF), queue: new Int32Array(n), rebuilds: 0 };
+  const flow = { kind: F.kind, live: F.live, dirty: F.dirty.slice(), cell: F.cell, seq: F.seq, pathLen: F.pathLen, path: F.path, dist: new Uint16Array(MAX_GOALS * n).fill(INF), queue: new Int32Array(n), buckets: F.buckets, btail: F.btail, pending: 0, rebuilds: 0 };
   const view = { L: sim.L, mat: sim.mat, link: sim.link, dig: sim.dig, home: sim.home, flow };
   for (let s = 0; s < MAX_GOALS; s++) if (F.live[s]) rebuild(view, s);
   return flow.dist;
@@ -135,7 +135,7 @@ function walk(sim, io, mark = () => {}) {
   mark('scent');
 
   // ---- ants ----
-  const AM = intModel(64), whereP = probs(1), rankP = probs(2 * 4 * (1 << RANK_BITS)), headP = probs(4 * 256), offP = probs(2 * 256), lastP = probs(4 * 8);
+  const AM = intModel(64), whereP = probs(1), rankP = probs(2 * 4 * (1 << RANK_BITS)), headP = probs(4 * 256), offP = probs(2 * 256), lastP = probs(4 * 16);
   const rank = new Int32Array(n).fill(-1), byRank = [[], []];
   for (const [layer, base, end] of [[0, 0, L.nestBase], [1, L.nestBase, n]]) {
     for (let c = base; c < end; c++) if (mat[c] === MAT.OPEN) { rank[c] = byRank[layer].length; byRank[layer].push(c); }
@@ -170,18 +170,22 @@ function walk(sim, io, mark = () => {}) {
     sim.mem[i] = sint(io, AM, 13 + job, sim.mem[i]);
     sim.goal[i] = sint(io, AM, 17 + mode, sim.goal[i]);
     sim.via[i] = sint(io, AM, 48 + mode, sim.via[i]);
-    // lastCell: 0 the ant's cell, 1..4 a neighbour (up, right, down, left), 5 the linked cell, 6 raw.
+    // lastCell: 0 the ant's cell, 1..4 a neighbour (up, right, down, left), 5..8 a diagonal (up-right,
+    // down-right, down-left, up-left), 9 the linked cell, 10 raw.
     const c = sim.cellOfAnt(i), lc = sim.lastCell[i];
-    let code = 6;
+    let code = 10;
     if (!io.decoding && c >= 0) {
       if (lc === c) code = 0;
-      else if (lc === L.nb[c * 4]) code = 1; else if (lc === L.nb[c * 4 + 1]) code = 2;
-      else if (lc === L.nb[c * 4 + 2]) code = 3; else if (lc === L.nb[c * 4 + 3]) code = 4;
-      else if (lc >= 0 && lc === sim.link[c]) code = 5;
+      else if (lc >= 0) {
+        for (let k = 0; k < 4 && code === 10; k++) if (lc === L.nb[c * 4 + k]) code = 1 + k; else if (lc === L.dg[c * 4 + k]) code = 5 + k;
+        if (code === 10 && lc === sim.link[c]) code = 9;
+      }
     }
-    code = tree(io, lastP, mode * 8, 3, code);
-    if (code < 6 && c < 0) throw new Error('snapshot payload is corrupt');
-    sim.lastCell[i] = code === 0 ? c : code < 5 ? L.nb[c * 4 + code - 1] : code === 5 ? sim.link[c] : sint(io, AM, 21, lc);
+    code = tree(io, lastP, mode * 16, 4, code);
+    if (code > 10 || (code < 10 && c < 0)) throw new Error('snapshot payload is corrupt');
+    const near = code === 0 ? c : code < 5 ? L.nb[c * 4 + code - 1] : code < 9 ? L.dg[c * 4 + code - 5] : code === 9 ? sim.link[c] : 0;
+    if (code < 10 && code > 0 && near < 0) throw new Error('snapshot payload is corrupt');
+    sim.lastCell[i] = code < 10 ? near : sint(io, AM, 21, lc);
     // best: the difference from the rebuilt distance at lastCell on the followed field (INF for no field).
     const g = sim.goal[i], l = sim.lastCell[i];
     const pred = g >= 0 && g < MAX_GOALS && l >= 0 && l < n ? dist[g * n + l] : INF;

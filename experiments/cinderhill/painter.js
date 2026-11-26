@@ -348,7 +348,7 @@ function frame(now) {
   }
   const L = host.sim.L, ent = { x: L.sw / 2 + 1, y: L.sh / 2 + 0.5 };
   const alarmLive = stats.alarm && alarmAt && alarmAt.layer === layer ? alarmAt : null;
-  if (renderer && renderer.draw({ layer, cam: cams[layer], alpha: screen === 'play' ? host.alpha : 1, time: now / 1000, piles: layer === SURFACE ? stats.piles : [], entrance: layer === SURFACE ? ent : null, alarm: alarmLive })) frames.drawn++;
+  if (renderer && renderer.draw({ layer, cam: cams[layer], alpha: screen === 'play' ? host.alpha : 1, running: screen === 'play', time: now / 1000, piles: layer === SURFACE ? stats.piles : [], entrance: layer === SURFACE ? ent : null, alarm: alarmLive })) frames.drawn++;
   drawOverlay(now);
   if (now - lastHud > 250) { lastHud = now; if (screen !== 'menu') hud(); }
   const work = performance.now() - t0;

@@ -10,6 +10,7 @@ import { dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { script, replay, firstDivergence } from '../sim/replay.js';
 import { plant } from './mutant.js';
+import { EXPECTED_LONG, LONG } from '../quick.js';
 
 const args = process.argv.slice(2), opt = (k, d) => Number(args.find(a => a.startsWith(`--${k}=`))?.split('=')[1] ?? d);
 const TICKS = opt('ticks', 12000), ANTS = opt('ants', 2000), EVERY = 20;
@@ -27,6 +28,11 @@ const sinDiff = other => { let d = 0; for (let k = 0; k < nodeSin.length; k += 2
 const node = (mutate) => { const undo = mutate ? plant() : null; try { const t = performance.now(); const r = replay({ cfg, commands: JSON.parse(json), ticks: TICKS, every: EVERY }).records; return { records: r, ms: performance.now() - t }; } finally { undo?.(); } };
 const nodeClean = node(false), nodeMutant = node(true);
 console.log(`node ${process.version}: clean ${Math.round(nodeClean.ms)} ms, final total ${nodeClean.records.at(-1).total}; mutant final total ${nodeMutant.records.at(-1).total}`);
+// The check page's long run (quick.js LONG) is this run at its defaults: its expected total must be Node's.
+if (TICKS === LONG.ticks && ANTS === LONG.cfg.ants && nodeClean.records.at(-1).total !== EXPECTED_LONG.total) {
+  console.error(`quick.js EXPECTED_LONG.total is ${EXPECTED_LONG.total}; Node computes ${nodeClean.records.at(-1).total}. Update it.`);
+  process.exitCode = 1;
+}
 console.log(`node mutant vs node clean (the fault changes play): ${JSON.stringify(firstDivergence(nodeClean.records, nodeMutant.records))}`);
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');

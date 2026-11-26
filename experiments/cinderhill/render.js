@@ -115,8 +115,8 @@ precision highp float;
 in vec2 aCorner;
 in vec4 aPos;    // previous x, y, new x, y (cells)
 in vec4 aInfo;   // heading (radians), job, carry, phase
-uniform vec2 uView; uniform vec3 uCam; uniform float uAlpha; uniform float uTime;
-out vec2 vLocal; flat out vec4 vInfo; out float vPx;
+uniform vec2 uView; uniform vec3 uCam; uniform float uAlpha; uniform float uTime; uniform float uRun;
+out vec2 vLocal; flat out vec4 vInfo; out float vPx; flat out float vMove;
 void main() {
   vec2 p = mix(aPos.xy, aPos.zw, uAlpha);
   float big = aInfo.y > 1.5 ? 1.25 : 1.0;
@@ -127,11 +127,12 @@ void main() {
   vec2 px = (p + r - uCam.xy) * uCam.z + uView * 0.5;
   gl_Position = vec4(px.x / uView.x * 2.0 - 1.0, 1.0 - px.y / uView.y * 2.0, 0.0, 1.0);
   vLocal = aCorner; vInfo = aInfo; vPx = half_ * uCam.z;
+  vMove = uRun > 0.5 && length(aPos.zw - aPos.xy) > 0.004 ? 1.0 : 0.0;   // moved this tick (a step is 0.09 to 0.14 cells); paused: still
 }`;
 
 const ANT_FS = `#version 300 es
 precision highp float;
-in vec2 vLocal; flat in vec4 vInfo; in float vPx; out vec4 outColor;
+in vec2 vLocal; flat in vec4 vInfo; in float vPx; flat in float vMove; out vec4 outColor;
 uniform float uTime;
 float ell(vec2 p, vec2 c, vec2 r) { vec2 q = (p - c) / r; return (length(q) - 1.0) * min(r.x, r.y); }
 float seg(vec2 p, vec2 a, vec2 b) { vec2 pa = p - a, ba = b - a; float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0); return length(pa - ba * h); }
@@ -146,7 +147,10 @@ void main() {
     if (a < 0.02) discard;
     outColor = vec4(body, a); return;
   }
-  float step_ = step(0.5, fract(uTime * 5.0 + vInfo.w));        // the tripod gait in two frames
+  // The tripod gait in two frames while the ant moves; standing, the legs rest in the middle pose and only
+  // the antennae twitch a little.
+  float step_ = vMove > 0.5 ? step(0.5, fract(uTime * 5.0 + vInfo.w)) : 0.5;
+  float twitch = vMove > 0.5 ? 0.0 : 0.05 * sin(uTime * 2.3 + vInfo.w * 40.0) * step(0.7, fract(uTime * 0.37 + vInfo.w));
   float d = ell(p, vec2(0.55, 0.0), vec2(0.2, 0.17));           // head
   d = min(d, ell(p, vec2(0.17, 0.0), vec2(0.22, 0.13)));        // thorax
   d = min(d, ell(p, vec2(-0.4, 0.0), vec2(0.4, 0.27)));         // gaster
@@ -156,8 +160,8 @@ void main() {
     legs = min(legs, seg(p, vec2(x, 0.0), vec2(x + 0.14 * float(1 - k) + swing, 0.5)));
     legs = min(legs, seg(p, vec2(x, 0.0), vec2(x + 0.14 * float(1 - k) - swing, -0.5)));
   }
-  legs = min(legs, seg(p, vec2(0.6, 0.06), vec2(0.88, 0.24)));    // antennae
-  legs = min(legs, seg(p, vec2(0.6, -0.06), vec2(0.88, -0.24)));
+  legs = min(legs, seg(p, vec2(0.6, 0.06), vec2(0.88, 0.24 + twitch)));    // antennae
+  legs = min(legs, seg(p, vec2(0.6, -0.06), vec2(0.88, -0.24 + twitch)));
   float lw = max(0.035, 0.9 / vPx);
   float a = max(1.0 - smoothstep(-aa, aa, d), 1.0 - smoothstep(lw - aa, lw + aa, legs));
   vec3 col = body * (1.0 + 0.6 * smoothstep(0.0, -0.12, d) * (p.y > 0.0 ? 0.0 : 0.6));   // a little wash light on one side
@@ -259,7 +263,7 @@ export class Renderer {
     this.dpr = dpr;
   }
   /** cam: { x, y, z } with z in CSS px per cell. */
-  draw({ layer, cam, alpha, time, piles, entrance, alarm }) {
+  draw({ layer, cam, alpha, time, piles, entrance, alarm, running = true }) {
     const gl = this.gl; if (this.lost || !this.layers[layer]) return false;
     const W = this.canvas.width, H = this.canvas.height, dpr = this.dpr ?? 1, L = this.layers[layer];
     gl.viewport(0, 0, W, H);
@@ -279,7 +283,7 @@ export class Renderer {
       const a = this.ant;
       gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
       gl.useProgram(a.p);
-      gl.uniform2f(a.u.uView, W, H); gl.uniform3f(a.u.uCam, cam.x, cam.y, cam.z * dpr); gl.uniform1f(a.u.uAlpha, alpha); gl.uniform1f(a.u.uTime, time);
+      gl.uniform2f(a.u.uView, W, H); gl.uniform3f(a.u.uCam, cam.x, cam.y, cam.z * dpr); gl.uniform1f(a.u.uAlpha, alpha); gl.uniform1f(a.u.uTime, time); gl.uniform1f(a.u.uRun, running ? 1 : 0);
       gl.bindVertexArray(this.avao); gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, this.antCount);
     }
     gl.bindVertexArray(null);

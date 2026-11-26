@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { CMD, EVENT, MAT, SUBSYSTEMS, SURFACE, Sim } from '../sim/sim.js';
 import { restore, snapshot } from '../sim/snapshot.js';
-import { PATH_MAX, SLOT, TRAIL_OFF } from '../sim/flow.js';
+import { PATH_MAX, SLOT, STEP, TRAIL_OFF } from '../sim/flow.js';
 import { cellAt } from '../sim/grid.js';
 import { trailShape } from '../spikes/trail-shape.mjs';
 
@@ -26,7 +26,7 @@ for (const [name, [max, mean]] of Object.entries(LIMITS)) {
   });
 }
 
-test('the path is open, 4-connected, holds each cell once, and goes round a stone close by', () => {
+test('the path is open, 8-connected without cutting a corner, holds each cell once, and goes round a stone close by', () => {
   const s = new Sim({ seed: 1, sw: 64, sh: 64, nw: 16, nh: 16, ants: 0, blank: true });
   s.home = { x: 0, y: 0, w: 1, h: 1 };
   s.mat[s.L.nestBase] = MAT.OPEN; s.link[cellAt(s.L, SURFACE, 2, 2)] = s.L.nestBase; s.link[s.L.nestBase] = cellAt(s.L, SURFACE, 2, 2);
@@ -40,16 +40,22 @@ test('the path is open, 4-connected, holds each cell once, and goes round a ston
   assert.equal(new Set(path).size, len, 'each cell once');
   for (let j = 0; j < len; j++) {
     assert.equal(s.mat[path[j]], MAT.OPEN, `cell ${j} open`);
-    if (j) { const a = path[j - 1], b = path[j], dx = Math.abs((a % 64) - (b % 64)), dy = Math.abs(Math.floor(a / 64) - Math.floor(b / 64)); assert.equal(dx + dy, 1, `step ${j} is one cell`); }
+    if (!j) continue;
+    const a = path[j - 1], b = path[j], ax = a % 64, ay = Math.floor(a / 64), bx = b % 64, by = Math.floor(b / 64);
+    const dx = Math.abs(ax - bx), dy = Math.abs(ay - by);
+    assert.ok(dx <= 1 && dy <= 1 && dx + dy >= 1, `step ${j} is one cell`);
+    if (dx + dy === 2) assert.ok(s.mat[cellAt(s.L, SURFACE, bx, ay)] === MAT.OPEN && s.mat[cellAt(s.L, SURFACE, ax, by)] === MAT.OPEN, `diagonal step ${j} cuts no corner`);
   }
   assert.equal(path[0], cellAt(s.L, SURFACE, 5, 21));
   assert.equal(path[len - 1], cellAt(s.L, SURFACE, 55, 45));
   assert.equal(F.cell[SLOT.TRAIL0], path[len - 1], 'the goal cell is the end');
   for (const c of path) { const y = Math.floor(c / 64); assert.ok(y >= 21 - 4 && y <= 45, `row ${y}: close to the stroke`); }
-  // The field: on the path the steps left to the end; off it TRAIL_OFF plus steps to the path.
+  assert.ok(path.some((c, j) => j && Math.abs((c % 64) - (path[j - 1] % 64)) === 1 && Math.abs(Math.floor(c / 64) - Math.floor(path[j - 1] / 64)) === 1), 'the diagonal leg takes diagonal steps');
+  // The field: on the path the steps left to the end; off it TRAIL_OFF plus the distance to the path (5 a
+  // straight step, 7 a diagonal one).
   const d = j => F.dist[SLOT.TRAIL0 * s.L.n + path[j]];
   for (let j = 0; j < len; j++) assert.equal(d(j), len - 1 - j);
-  assert.equal(F.dist[SLOT.TRAIL0 * s.L.n + cellAt(s.L, SURFACE, 5, 19)], TRAIL_OFF + 2);
+  assert.equal(F.dist[SLOT.TRAIL0 * s.L.n + cellAt(s.L, SURFACE, 5, 19)], TRAIL_OFF + 2 * STEP);
 });
 
 test('a rejected stroke leaves the four live trails as they were, and restore still matches', () => {

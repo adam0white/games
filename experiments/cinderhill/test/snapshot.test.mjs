@@ -2,7 +2,7 @@
 // that play produces), old versions and damaged payloads are refused, and the S4 size pass line holds.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { G, SUBSYSTEMS, Sim } from '../sim/sim.js';
+import { G, SIM_VERSION, SUBSYSTEMS, Sim } from '../sim/sim.js';
 import { FIELDS } from '../sim/scent.js';
 import { MAX_GOALS } from '../sim/flow.js';
 import { next, seedStreams } from '../sim/rng.js';
@@ -77,7 +77,9 @@ test('old versions and damaged snapshots are refused', () => {
   const bytes = snapshot(new Sim({ ...cfg, ants: 20 }));
   assert.equal(bytes[4] | (bytes[5] << 8), SNAPSHOT_VERSION);
   const v1 = bytes.slice(); v1[4] = 1; v1[5] = 0;
-  assert.throws(() => restore(v1), /snapshot 1\/2, this sim reads 2\/2/, 'version 1 (raw arrays) is refused by number');
+  assert.throws(() => restore(v1), new RegExp(`snapshot 1/${SIM_VERSION}, this sim reads ${SNAPSHOT_VERSION}/${SIM_VERSION}`), 'version 1 (raw arrays) is refused by number');
+  const v2 = bytes.slice(); v2[4] = 2; v2[5] = 0;
+  assert.throws(() => restore(v2), /snapshot 2\//, 'version 2 (lastCell without diagonals) is refused by number');
   const sim2 = bytes.slice(); sim2[6] ^= 0xFF;
   assert.throws(() => restore(sim2), /this sim reads/);
   assert.throws(() => restore(bytes.subarray(0, bytes.length - 3)), /truncated/);
