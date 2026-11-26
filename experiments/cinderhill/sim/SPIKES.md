@@ -400,7 +400,7 @@ Acceptance, written before tuning: careful (with Recall) wins days 1 to 3 on eve
 
 ## Crews and the pace pass (SIM_VERSION 7, snapshot format 7, 2026-11-26)
 
-Crews (`CMD.CREW`, `G.WANT0` to `WANT3`) and the pace pass (`../NOTES.md`, Crews and The pace pass): walk 48 and run 72 units a tick, a trail half-life of 1,400 ticks, a colony start of 20 ants, 40 sugar, 4 larvae and 3 pupae (hatching at 15, 30 and 45 s), a 4,200-tick day, piles 17 to 21 cells out, windfalls on days 7, 10, 14 and 18. New totals: `EXPECTED` 1411691088, `EXPECTED_LONG` 2162690173, `EXPECTED_COLONY` 175470471.
+Crews (`CMD.CREW`, `G.WANT0` to `WANT3`) and the pace pass (`../NOTES.md`, Crews and The pace pass): walk 48 and run 72 units a tick, a trail half-life of 1,400 ticks, a colony start of 20 ants, 40 sugar, 4 larvae and 3 pupae (hatching at 15, 30 and 45 s), a 4,200-tick day, piles 17 to 21 cells out, new piles (windfalls) 73, 105, 147 and 189 s into each day. New totals: `EXPECTED` 1411691088, `EXPECTED_LONG` 2162690173, `EXPECTED_COLONY` 175470471.
 
 | Measure | Before (SIM_VERSION 6) | After |
 | --- | --- | --- |
