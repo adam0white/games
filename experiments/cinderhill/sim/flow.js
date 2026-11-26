@@ -22,7 +22,7 @@ export function makeFlow(n) {
     seq: new Uint32Array(MAX_GOALS), // creation order, to replace the oldest trail
     dist: new Uint16Array(MAX_GOALS * n).fill(INF), // slot-major: dist[slot * n + cell]
     queue: new Int32Array(n), // scratch for the search; not state
-    rebuilds: 0, // a counter for the spikes; not state
+    rebuilds: 0, repairs: 0, // counters for the spikes; not state
   };
 }
 
@@ -91,18 +91,38 @@ export function rebuildDirty(sim) {
   for (let s = 0; s < MAX_GOALS; s++) if (F.live[s] && F.dirty[s]) rebuild(sim, s);
 }
 
-/** A cell changed between open and closed: mark every live field whose area it touches. */
+/** A cell changed between open and closed (it already has its new material).
+ *  Closing: every live field that reached the cell, or has it as a source, is marked for a full rebuild
+ *  (distances can grow, which a local repair cannot see cheaply).
+ *  Opening, the common case (digging): distances can only shrink, so the field is repaired in place by a
+ *  breadth-first relaxation from the new cell. Shortest distances are unique, so the repaired field equals
+ *  a full rebuild cell for cell (tested in test/flow.test.mjs); the cost is the area that got closer.
+ *  A cell that is one of the goal's sources still takes a full rebuild. */
 export function terrainChanged(sim, c) {
-  const { L, flow: F, link } = sim, n = L.n;
+  const { L, flow: F, link, mat } = sim, n = L.n, nb = L.nb, q = F.queue, opened = mat[c] === MAT.OPEN;
   for (let s = 0; s < MAX_GOALS; s++) {
     if (!F.live[s] || F.dirty[s]) continue;
-    const base = s * n;
-    // The cell may be (or stop being) one of the goal's sources; otherwise the field changes only if the
-    // cell was reached, or now opens next to a reached cell.
-    let touched = isSourceCell(sim, s, c) || F.dist[base + c] !== INF;
-    for (let k = 0; k < 4 && !touched; k++) { const m = L.nb[c * 4 + k]; if (m >= 0 && F.dist[base + m] !== INF) touched = true; }
-    if (!touched && link[c] >= 0 && F.dist[base + link[c]] !== INF) touched = true;
-    if (touched) F.dirty[s] = 1;
+    const base = s * n, d = F.dist;
+    if (isSourceCell(sim, s, c)) { F.dirty[s] = 1; continue; }
+    if (!opened) { if (d[base + c] !== INF) F.dirty[s] = 1; continue; }
+    let best = INF;
+    for (let k = 0; k < 5; k++) {
+      const m = k < 4 ? nb[c * 4 + k] : link[c];
+      if (m >= 0 && mat[m] === MAT.OPEN && d[base + m] + 1 < best) best = d[base + m] + 1;
+    }
+    if (best >= d[base + c]) continue; // nothing reaches it, or it is no shortcut
+    d[base + c] = best;
+    let head = 0, tail = 0;
+    q[tail++] = c;
+    while (head < tail) {
+      const x = q[head++], nd = d[base + x] + 1;
+      for (let k = 0; k < 5; k++) {
+        const m = k < 4 ? nb[x * 4 + k] : link[x];
+        if (m < 0 || mat[m] !== MAT.OPEN || d[base + m] <= nd) continue;
+        d[base + m] = nd; q[tail++] = m;
+      }
+    }
+    F.repairs++;
   }
 }
 

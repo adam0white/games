@@ -97,6 +97,7 @@ test('after terrain changes, the updated fields equal fresh searches', () => {
     for (const [slot, g] of goals) check(s, slot, [g]);
   }
   assert.ok(rebuilt < 3 * 200, `only touched fields rebuild (${rebuilt} rebuilds for 200 changes)`);
+  assert.ok(s.flow.repairs > 20, `openings were repaired in place, not rebuilt (${s.flow.repairs} repairs)`);
 });
 
 test('a change far from a field does not rebuild it', () => {
