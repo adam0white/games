@@ -74,7 +74,8 @@ jobs:
           CF_SEND_TELEMETRY: 'false'
         run: pnpm run deploy:check
   games:
-    timeout-minutes: 45
+    # Nightly, smallworks took 38 min and warren 26 min (2026-11-25).
+    timeout-minutes: 60
     needs: changes
     if: needs.changes.outputs.count != '0'
     strategy:

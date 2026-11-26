@@ -38,6 +38,9 @@ export default mergeConfig(
         'test/next-edition.test.ts',
         'test/standing.test.ts',
         'test/goodhands-current.test.ts',
+        // The week-two browser flows took 16 min of the nightly run and pushed Murmur past its 45 min limit (2026-11-24, 2026-11-25).
+        'test/week2-ui.test.ts',
+        'test/week2-ui-wide.test.ts',
         'test/cast-ui.test.ts',
       ],
     },
