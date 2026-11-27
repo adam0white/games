@@ -118,6 +118,7 @@ export const LOSS_ANTS = 8;
 export const ROAD = {
   pair: ['hunt', 'stones'],
   late: { hunt: { beastHp: 4200, foeHarm: 400 }, stones: { foePoints: 40 } },
+  price: { hunt: 'tougher beetle, rival +400 harm', stones: 'rival +40 points' },
   text: { hunt: 'The beetle has fed for a season, and the rival has hunted it. It takes half as much again to bring down, and the rival starts ahead on harm.', stones: 'The rival has held the stones for a season. It starts forty points ahead.' },
 };
 

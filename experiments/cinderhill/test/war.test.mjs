@@ -687,6 +687,10 @@ test('a mission starts in the nests an earlier one left: rooms kept, nothing nea
   // Seats that change sides keep their own nests; a cell near the line between the hills is not kept.
   const mid = b.L.sw >> 1, far = mid - (b.door[0] % b.L.sw) - 2, c = new Sim({ seed: 4, mission: 'frost', nests: [[far, 20, 0], null] });
   assert.equal(c.mat[c.L.nestBase + 20 * c.L.nw + mid - 2], MAT.CLAY);
+  // A kept nursery with no way to the queen is clay again, and is not counted.
+  const lone = new Sim({ seed: 4, mission: 'frost', nests: [[20, 40, ROOM.NURSERY, 21, 40, ROOM.NURSERY], null] });
+  assert.equal(lone.mat[lone.L.nestBase + 40 * lone.L.nw + (lone.door[0] % lone.L.sw) + 20], MAT.CLAY);
+  assert.equal(lone.g(0, CG.CAP_BROOD), fresh.g(0, CG.CAP_BROOD));
   assert.equal(MISSIONS.frost.from, 'crossing'); assert.equal(MISSIONS.hunt.from, undefined);
 });
 
