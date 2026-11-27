@@ -347,3 +347,14 @@ test('caches: each hill has the same ones in its clay, and digging one open carr
   assert.ok(s.g(0, slot) > before - 10 + (v >> 1) - 12, 'the loads are in the stores');
   assert.equal(new Sim({ seed: 5, mission: 'crossing', caches: 0 }).cache.some(x => x), false, 'a match can be set with none');
 });
+
+test('stores: a save taken after a dig mark carries on the same', () => {
+  const s = new Sim({ seed: 2, mission: 'crossing' }), L = s.L, dx = s.door[0] % L.sw;
+  for (let k = 0; k < 40; k++) s.step();
+  s.order({ team: 0, type: CMD.DIG, cells: [dx + 3, 5, dx + 4, 5] }); s.step();
+  const b = Sim.load(JSON.parse(JSON.stringify(s.save(), (k, v) => (ArrayBuffer.isView(v) ? Array.from(v) : v))));
+  assert.equal(b.hash(), s.hash());
+  s.take(0, 0, 1); b.take(0, 0, 1); assert.equal(b.hash(), s.hash(), 'the same cell gives up the load');
+  for (let k = 0; k < 600; k++) { s.step(); b.step(); }
+  assert.equal(b.hash(), s.hash());
+});

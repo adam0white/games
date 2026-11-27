@@ -13,7 +13,7 @@ const SLOTS = [
   [ROOM.STORE, 3, 4, 6, 6], [ROOM.STORE, -6, 4, -3, 6],
   [ROOM.REST, 1, 7, 5, 8], [ROOM.REST, -5, 7, -1, 8], [ROOM.REST, 3, 14, 7, 15], [ROOM.REST, -7, 14, -3, 15], [ROOM.REST, 6, 7, 10, 8], [ROOM.REST, -10, 7, -6, 8],
   [ROOM.NURSERY, 6, 10, 9, 13], [ROOM.NURSERY, -10, 10, -7, 13],
-  [ROOM.POST, 0, 1, 0, 3], [ROOM.POST, 0, 7, 0, 9], // the throat above the store, then the shaft below it
+  [ROOM.POST, 0, 2, 0, 3], [ROOM.POST, 0, 7, 0, 9], // the throat above the store, then the shaft below it
 ];
 
 // A mind that keeps its food deep digs its stores beside the queen's chamber, a long walk from the door.
@@ -32,13 +32,13 @@ export function buildNext(sim, t, kind, deep = false) {
 }
 
 /** The cells to dig to reach this colony's nearest cache through its own clay, as [x, y, ...] (the cache last), or none. */
-export function cacheRun(sim, t) {
+export function cacheRun(sim, t, fits = () => true) {
   const L = sim.L, nw = L.nw, nh = L.nh, NN = nw * nh, prev = new Int32Array(NN).fill(-2), q = [];
   // From every open cell of its own, outward through its own clay.
   for (let k = 0; k < NN; k++) if (sim.mat[L.nestBase + k] === MAT.OPEN && sim.owner(k) === t) { prev[k] = -1; q.push(k); }
   for (let h = 0; h < q.length; h++) {
     const k = q[h], x = k % nw, y = Math.floor(k / nw);
-    if (sim.cache[k]) { const cells = []; for (let c = k; prev[c] !== -1; c = prev[c]) cells.unshift(c % nw, Math.floor(c / nw)); return cells; }
+    if (sim.cache[k] && fits(sim.cache[k])) { const cells = []; for (let c = k; prev[c] !== -1; c = prev[c]) cells.unshift(c % nw, Math.floor(c / nw)); return cells; }
     for (const [ax, ay] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) {
       if (ax < 1 || ax >= nw - 1 || ay < 2 || ay >= nh - 1) continue;
       const a = ay * nw + ax;
@@ -118,10 +118,9 @@ export function think(sim, t, mind = 1) {
     for (const kind of wants) { const b = buildNext(sim, t, kind, deep); if (b.length) { out.push(...b); dug = true; break; } }
     // With nothing pressing to build and hands to spare, it digs for the nearest cache: a seed a cell, paid back at the end.
     if (!dug && adults >= 40 && (typeof mind === 'number' || mind.caches !== false)) {
-      const run = cacheRun(sim, t), cells = run.length >> 1;
+      const run = cacheRun(sim, t, v => cg[o + (v & 1 ? CG.PROTEIN : CG.SUGAR)] + (v >> 1) <= capF), cells = run.length >> 1;
       if (cells && cells <= 24 && cg[o + CG.SUGAR] >= cells * C.DIG_SUGAR + C.DIG_KEEP + 6 && !frozen) {
-        const v = sim.cache[run[run.length - 1] * L.nw + run[run.length - 2]];
-        if (cg[o + (v & 1 ? CG.PROTEIN : CG.SUGAR)] + (v >> 1) <= capF) out.push({ team: t, type: CMD.DIG, cells: run });
+        out.push({ team: t, type: CMD.DIG, cells: run });
       }
     }
   }

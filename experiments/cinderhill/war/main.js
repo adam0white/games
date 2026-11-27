@@ -462,7 +462,7 @@ function news() {
       if (a === ME) deaths++;
     } else if (type === EVENT.PILE_EMPTY) { /* its trail goes dry: see DRY */ }
     else if (type === EVENT.DRY && a === ME) { toast('That food is gone. The trail waits for more.'); tone(300, 0.2, 0.04, 'triangle', -90); }
-    else if (type === EVENT.FOUND) { if (a === ME) { toast(`A cache: ${c >> 1} loads of ${c & 1 ? 'meat' : 'seed'} carried to your stores`, 3200); rec.event('cache', { at: sim.tick, loads: c >> 1, kind: c & 1 }); } }
+    else if (type === EVENT.FOUND) { if (a === ME) { toast(c >> 1 ? `A cache: ${c >> 1} loads of ${c & 1 ? 'meat' : 'seed'} carried to your stores` : 'A cache, and no room in your stores: it spoiled', 3200, !(c >> 1)); rec.event('cache', { at: sim.tick, loads: c >> 1, kind: c & 1 }); } }
     else if (type === EVENT.DUG && a === ME) { if (nestOpen) tone(210 + Math.random() * 60, 0.05, 0.03, 'square', -60); }
     else if (type === EVENT.FULL && a === ME) { if (now - (told.fullAt ?? 0) > 20000) { told.fullAt = now; toast(`No room for more ${b ? 'meat' : 'seeds'}. Dig a store in the Nest.`, 3600, true); } }
     else if (type === EVENT.REJECTED && a === ME) {
@@ -709,7 +709,6 @@ function drawNest(now) {
   for (const t of [ME, FOE]) {
     const st = sim.store[t] - base, stx = st % w, sty = Math.floor(st / w), q = sim.queen[t] - base, qx = sx(q % w + 0.5), qy = sy(Math.floor(q / w) + 0.5), tint = t ? '120, 150, 255' : '255, 170, 80';
     const gl = c.createRadialGradient(qx, qy, 0, qx, qy, z * 7); gl.addColorStop(0, `rgba(${tint}, ${0.28 + 0.05 * Math.sin(now / 700)})`); gl.addColorStop(1, `rgba(${tint}, 0)`); c.fillStyle = gl; c.fillRect(qx - z * 7, qy - z * 7, z * 14, z * 14);
-    for (const [amount, left, col] of [[g(t, CG.SUGAR), true, '#f3d77a'], [g(t, CG.PROTEIN), false, '#b0452f']]) { c.fillStyle = col; const n = Math.min(60, amount); for (let i = 0; i < n; i++) { const row = Math.floor(i / 6), off = (i % 6) * 0.36 + (row & 1) * 0.18; c.beginPath(); c.arc(sx(left ? stx - 1.9 + off : stx + 2.9 - off), sy(sty + 1.9 - row * 0.2), Math.max(1.2, z * 0.15), 0, 7); c.fill(); } }
     if (g(t, CG.QUEEN_HP) > 0) {
       const u = Math.max(8, z * 1.5), pulse = 1 + 0.06 * Math.sin(now / 300);
       c.fillStyle = t ? '#27345e' : '#6a2a16'; c.strokeStyle = t ? '#9fb8ff' : '#ffc070'; c.lineWidth = 1.5; c.shadowColor = t ? '#6a8cff' : '#ff9a3c'; c.shadowBlur = 14;

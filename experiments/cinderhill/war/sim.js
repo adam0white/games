@@ -206,6 +206,7 @@ export class Sim {
       cg[o + CG.CAP_FOOD] = Math.max(C.STORE_MIN, cap.food); cg[o + CG.CAP_BROOD] = Math.max(C.BROOD_MIN, cap.brood); cg[o + CG.CAP_ADULTS] = C.REST_BASE + cap.ants;
       cg[o + CG.MARKS] = marks[t];
     }
+    this.dirty = true; // the cells that hold food are in index order until the fields are rebuilt, which sorts them by the walk from the door
   }
 
   /** How many loads of one food a nest cell holds. */
@@ -731,7 +732,7 @@ export class Sim {
         if (this.digLeft[k] === 1) { if (cg[o + CG.SUGAR] < C.DIG_SUGAR + C.DIG_KEEP) return c; this.take(t, FOOD.SUGAR, C.DIG_SUGAR); }
         if (--this.digLeft[k] === 0) { this.mat[m] = MAT.OPEN; this.mark[k] = 0; this.recount(); this.dirty = true; this.event(EVENT.DUG, t, m);
           // A cache: its loads join the stores (the next rebuild finds them cells; what finds no room spoils).
-          if (this.cache[k]) { const v = this.cache[k]; cg[o + (v & 1 ? CG.PROTEIN : CG.SUGAR)] += v >> 1; cg[o + CG.FOUND] += v >> 1; this.cache[k] = 0; this.event(EVENT.FOUND, t, m, v); } }
+          if (this.cache[k]) { const v = this.cache[k], slot = o + (v & 1 ? CG.PROTEIN : CG.SUGAR), got = Math.max(0, Math.min(v >> 1, cg[o + CG.CAP_FOOD] - cg[slot])); cg[slot] += got; cg[o + CG.FOUND] += got; this.cache[k] = 0; this.settle(t); this.dirtyStore = true; this.event(EVENT.FOUND, t, m, got * 2 + (v & 1)); } }
         return c;
       }
       this.task[i] = TASK.REST; return c;
@@ -844,7 +845,9 @@ export class Sim {
         let m = F[c] === 0 ? c : -1;
         for (let j = 0; j < 4 && m < 0; j++) { const a = L.nb[c * 4 + j]; if (a >= 0 && F[a] === 0) m = a; }
         const k = m - L.nestBase;
-        if (m >= 0 && (this.binS[k] | this.binP[k])) {
+        // Another thief emptied it this tick: she waits a tick for the next nearest cell.
+        if (m < 0 || !(this.binS[k] | this.binP[k])) { if (cg[eo + CG.SUGAR] + cg[eo + CG.PROTEIN] > 0) return c; }
+        else {
           const kind = this.binP[k] > this.binS[k] ? FOOD.PROTEIN : FOOD.SUGAR, bin = kind === FOOD.PROTEIN ? this.binP : this.binS;
           bin[k]--; cg[eo + (kind === FOOD.PROTEIN ? CG.PROTEIN : CG.SUGAR)]--; this.dirtyStore = true;
           cg[eo + CG.LOST]++; cg[t * CG.SIZE + CG.STOLEN]++; this.carry[i] = (kind === FOOD.PROTEIN ? CARRY.PROTEIN : CARRY.SUGAR) | CARRY.LOOT; this.event(EVENT.STOLEN, e, t, kind + 2 * m);
@@ -852,7 +855,9 @@ export class Sim {
         this.inv[i] = 0; this.task[i] = TASK.BACK;
         return this.next(this.homeF[t], c);
       }
-      const m = this.next(F, c); return m < 0 ? c : m;
+      const m = this.next(F, c);
+      if (m < 0) { this.inv[i] = 0; this.task[i] = TASK.BACK; return this.next(this.homeF[t], c); } // no way to the food
+      return m;
     }
     // Where the stores are the goal, the fighters hold the store for the thieves and leave the queen be.
     const Q = this.mission.goals.haul ? this.homeF[e] : this.queenF[e];
