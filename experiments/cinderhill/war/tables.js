@@ -139,7 +139,7 @@ export const MISSIONS = {
   // Half way through, the frost takes the food outside. Meals come four times as often and hunger kills fast: the hill
   // lives on what it stored, or on what it steals.
   frost: {
-    id: 'frost', name: 'First Frost', map: 'crossing',
+    from: 'crossing', id: 'frost', name: 'First Frost', map: 'crossing',
     kit: { ants: 30, sugar: 10, protein: 5, eggs: 20, larvae: 20, pupae: 12, duskTick: 10800, frostTick: 4800, frostEat: 300, starveAfter: 300, starveDiv: 10, queenHp: 3200, glut: 3 },
     goals: { queen: true, dusk: 'adults' },
     deeds: [{ id: 'a', text: 'See the thaw with a hundred ants or more.', won: true, min: { ADULTS: 100 }, opens: 'post' }, { id: 'b', text: 'Carry three stolen loads home.', min: { HAUL: 3 }, opens: 'raiders' }],
@@ -161,7 +161,7 @@ export const MISSIONS = {
   // Four standing stones. A stone pays a point a second to the colony that has more ants beside it (three at least).
   // First to the goal wins; at dusk, more points. Two stones stand on the fords, one on each colony's far flank.
   stones: {
-    id: 'stones', name: 'The Stones', map: 'crossing',
+    from: 'frost', id: 'stones', name: 'The Stones', map: 'crossing',
     kit: { ants: 30, sugar: 10, protein: 5, eggs: 20, larvae: 20, pupae: 12, duskTick: 10800, queenHp: 2400 },
     goals: { queen: true, points: 400, dusk: 'points' },
     sites: [[79, 28], [80, 84], [54, 100], [105, 100]],
@@ -172,7 +172,7 @@ export const MISSIONS = {
   // A lean season: little outside, full stores inside. A load counts when a thief carries it all the way home. The
   // queens are too tough to be worth the bites, so the stores are the fight.
   larder: {
-    id: 'larder', name: 'The Larder', map: 'crossing',
+    from: 'stones', id: 'larder', name: 'The Larder', map: 'crossing',
     kit: { ants: 30, sugar: 40, protein: 20, eggs: 20, larvae: 20, pupae: 12, duskTick: 9600, queenHp: 6000, lean: 3 },
     goals: { queen: true, haul: 10, dusk: 'haul' },
     deeds: [{ id: 'a', text: 'Win by ten loads, not by dusk.', won: true, why: 'HAUL', opens: 'post' }, { id: 'b', text: 'Win inside six minutes.', won: true, by: 7200, opens: 'raiders' }],
