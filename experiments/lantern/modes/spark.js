@@ -2,9 +2,9 @@
 // unchanged) under the spark layer (./spark-sim.js); this file draws the dark river, plays the spark sounds, reads the spark input
 // and keeps Spark's own save. index.html owns the run: steering, hearts, embers and the bank, the boat's looks, crashes, victories,
 // pause and the end card. How a mode plugs in is in ../NOTES.md ("How a mode plugs in").
-import { start, tick, view, stars, murmur, rating, reach, centre, half, NIGHTS, TIN_MAX, RING_MAX } from './spark-sim.js';
+import { start, tick, view, stars, murmur, rating, reach, centre, half, NIGHTS, TIN_MAX, RING_MAX } from './spark-sim.js?v=1';
 import { read, write, readJson, writeJson } from '../../kit/save.js';
-import { t } from '../words.js';
+import { t } from '../words.js?v=1';
 import { mark, TINT } from '../looks.js?v=4';
 
 // Save. lantern-mode-spark:save is { v: 1, best: highest night open, stars: { night: 0..3 }, played: runs }.
@@ -138,10 +138,10 @@ export function mode(page) {
     save.played++;
     if (won) { save.stars[n] = Math.max(save.stars[n] | 0, st); if (n < NIGHTS) save.best = Math.max(save.best, n + 1); }
     writeJson(KEY, save);
-    const mark3 = ' ' + '★'.repeat(st) + '☆'.repeat(3 - st), why = t(['bank', 'ice', 'log', 'pool', 'geyser', 'isle'].includes(e.s.over) ? `why_${e.s.over}` : 'why_rock');
+    const mark3 = ' ' + '★'.repeat(st) + '☆'.repeat(3 - st), why = t(['dark', 'bank', 'ice', 'log', 'pool', 'geyser', 'isle'].includes(e.s.over) ? `why_${e.s.over}` : 'why_rock');
     if (won && n >= NIGHTS) return { title: t('dawn') + mark3, line: t('sparkAll', { n: NIGHTS }), go: t('playNight', { n }) };
     if (won) { night = n + 1; return { title: t('dawn') + mark3, line: t('sparkWon', { used: e.used, next: n + 1 }), go: t('playNight', { n: night }) }; }
-    return { title: t('nightTitle', { n }), line: t('sparkLost', { why, pct: Math.floor(reach(e) * 100) }), go: t('playAgain') };
+    return { title: t('dawnResult', { n: Math.floor(reach(e) * 100) }), line: why, go: t('playAgain') };
   }
 
   // ------------------------------------------------------------ sound and time between frames

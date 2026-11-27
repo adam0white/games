@@ -5,12 +5,12 @@
 // main.js moved inside Lantern: the page draws the river and the player's boat, steers, plays the music and keeps the HUD; this
 // file runs the room, the lobby and the countdown, the bots and the results, and draws the other boats through the dark.
 // How a mode plugs in is in ../NOTES.md ("How a mode plugs in"); why Race is built this way is under "Race is a mode inside Lantern".
-import { create, step, progress, DT } from '../sim.js?v=15';
+import { create, step, progress, DT } from '../sim.js?v=16';
 import { hull } from '../looks.js?v=4';
-import { DISTANCE, SEND_MS, clamp, cleanName, roomCode, makeCode, dailySeed, countdown, decodeRoomFrame, position, ranking, ghostTrack, interpolate, nightForSeed, botControl, bytes } from './race-sim.js';
+import { DISTANCE, SEND_MS, clamp, cleanName, roomCode, makeCode, dailySeed, countdown, decodeRoomFrame, position, ranking, ghostTrack, interpolate, nightForSeed, botControl, bytes } from './race-sim.js?v=1';
 import { read, readJson, writeJson } from '../../kit/save.js';
 import { shareLink } from '../../kit/room.js';
-import { t } from '../words.js';
+import { t } from '../words.js?v=1';
 
 // Save. lantern-mode-race:save is { v: 1, best: 0..100000 (the farthest crossing), name: the boat's name, played: races finished }.
 // The lab page's keys (lantern-race-best, lantern-race-name, lantern-race-played) are read once, and never written.
@@ -396,8 +396,9 @@ export function mode(page) {
   // The end card's words (the page has banked the embers and recorded the run). Results fill in under them as boats finish.
   function end() {
     settle(s.over); phase = 'end'; botAcc = 0; ranksLast = '';
-    const why = s.over;
-    return { title: t(why === 'dawn' ? 'raceDawn' : why === 'left' ? 'raceLeft' : why === 'dark' ? 'raceDark' : why === 'bank' ? 'raceBank' : 'raceWreck'), line: label(), go: t('raceRematch') };
+    const won = s.over === 'dawn';
+    const cause = t(s.over === 'left' ? 'raceLeft' : ['dark', 'bank', 'ice', 'log', 'pool', 'geyser', 'isle'].includes(s.over) ? `why_${s.over}` : 'why_rock');
+    return { title: t(won ? 'raceDawn' : 'dawnResult', { n: Math.floor(progress(s) * 100) }), line: won ? label() : `${cause} · ${label()}`, go: t('raceRematch') };
   }
 
   return {

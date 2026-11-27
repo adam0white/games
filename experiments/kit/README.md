@@ -56,6 +56,8 @@ hint(canvas, { kind: 'stick', key: '<slug>:hint', when: () => mode === 'play', p
   - `hold-and-move`: the finger presses, holds, and moves slowly along a dotted arc, then lifts.
   - `path`: the finger presses on the first of four dots in a zigzag and drags through each in turn; the line behind it brightens. Then it lifts.
 
+  - `fingertip`: one translucent contact slides side to side. A `follow(offset, opacity)` callback can draw the response. With `manual: true`, the game calls `done()` once the player deliberately steers.
+
   A new kind is a new entry in `KINDS` in `hint.js`; callers do not change.
 - The look is a constructed stylesheet (`adoptedStyleSheets`), with a `<style>` element where the browser has none, so a page whose policy is `style-src 'self'` (Crumbwar) still gets it.
 - `key`: a new key, never an existing one. It is `'1'` once the player has given input in play, and then the hint never shows again on that device. Add it to the game's seed in `check/phone.mjs`.
@@ -66,7 +68,7 @@ hint(canvas, { kind: 'stick', key: '<slug>:hint', when: () => mode === 'play', p
 - With `prefers-reduced-motion: reduce` it shows a still copy with a short line of words instead of motion.
 - `?hint=hand` or `?hint=ring` on any page that uses it shows it whatever the save says, with that look; `?hint=0` turns it off. This is how to see it on a phone that has played already.
 
-Used by: `ant-promotion` (stick, 3 s), `lantern` (drag, 1.5 s, low, because a boat left alone meets a rock in 3 to 9 s), `lab/ant-nemesis`, `lab/ant-wilds` (stick), `lab/lantern-3d` (drag), `borrowed` (tap, `bottom` as a function that finds a clear tile above the player), `ducklings` (hold-and-move, above Quack), `grapevine` (path, between the teller's row and the next) and Crumbwar (`workers/crumbwar`, stick, loaded from `/kit/hint.js` on the same origin, so it shows only once this site serves that file). In Borrowed, Follow Me and Grapevine the game's own first-level ghost finger waits while the shared hint shows. Not verified on a real phone.
+Used by: `ant-promotion` (stick, 3 s), `lantern` (fingertip, 1 s, over open water), `lab/ant-nemesis`, `lab/ant-wilds` (stick), `lab/lantern-3d` (drag), `borrowed` (tap, `bottom` as a function that finds a clear tile above the player), `ducklings` (hold-and-move, above Quack), `grapevine` (path, between the teller's row and the next) and Crumbwar (`workers/crumbwar`, stick, loaded from `/kit/hint.js` on the same origin, so it shows only once this site serves that file). In Borrowed, Follow Me and Grapevine the game's own first-level ghost finger waits while the shared hint shows. Not verified on a real phone.
 
 ## Music (`music.js`)
 

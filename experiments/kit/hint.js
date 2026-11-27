@@ -3,7 +3,8 @@
 //   const help = hint(canvas, { kind: 'stick', key: 'ant-promotion:hint', when: () => mode === 'play', played: readJson(KEY) !== null });
 //   kind    'stick' (a floating joystick: the finger presses and circles the knob), 'drag' (relative steering: the finger
 //           slides side to side), 'tap' (the finger taps a spot twice), 'hold-and-move' (the finger presses, holds, and moves
-//           slowly along a curve) or 'path' (the finger drags through a row of dots). A new kind is a new entry in KINDS below;
+//           slowly along a curve), 'path' (the finger drags through a row of dots), or 'fingertip' (a single contact without a rail).
+//           A new kind is a new entry in KINDS below;
 //           callers do not change.
 //   key     a new save.js key, '1' once the player has used the control. Then the hint never shows again on this device.
 //   when    true while the run is in play and no card covers it. Idle time counts only then and adds up across runs, so a
@@ -17,6 +18,8 @@
 //           A function is asked again each time the copy appears, for a game whose clear spot moves.
 //   help.shown   true while it is on screen
 //   help.done()  put it away for good and remember the player (the game saw input some other way)
+//   manual  leave dismissal to help.done(), after the game detects deliberate steering
+//   follow  optional drawing callback with the delayed lateral offset in CSS px and the fingertip opacity
 // Input that ends it: a pointer going down on `el`, or a key that is not a pause key, while `when()` is true (for `drag`, a
 // mouse moving over `el` too). The tap on Play
 // and taps on cards do not count. It never takes input itself (pointer-events: none) and never cancels an event.
@@ -32,6 +35,8 @@ const CSS = `
 .kit-hint .ring { position: absolute; border-radius: 50%; border: 3px solid #ffffff66; box-sizing: border-box; background: #ffffff0f; }
 .kit-hint .knob { position: absolute; left: -22px; top: -22px; width: 44px; height: 44px; border-radius: 50%; background: #ffffff70; box-shadow: 0 1px 6px #0006; }
 .kit-hint .knob::after { content: ''; position: absolute; inset: -9px; border-radius: 50%; border: 2px solid #fff; opacity: var(--press, 0); transform: scale(calc(1.25 - .25 * var(--press, 0))); }
+.kit-hint[data-kind="fingertip"] .knob { width: 22px; height: 22px; left: -11px; top: -11px; background: #fff5dc48; }
+.kit-hint[data-kind="fingertip"] .knob::after { inset: -4px; border-width: 1px; }
 .kit-hint .hand { position: absolute; left: -17px; top: -3px; width: 40px; height: 52px; transform-origin: 17px 3px; filter: drop-shadow(0 1px 2px #000c); opacity: .92; }
 .kit-hint .track { position: absolute; top: -22px; height: 44px; border-radius: 22px; border: 3px solid #ffffff55; box-sizing: border-box; background: #ffffff0f; }
 .kit-hint .track::before, .kit-hint .track::after { position: absolute; top: 50%; transform: translateY(-52%); font: bold 26px/1 system-ui, sans-serif; color: #ffffffaa; }
@@ -49,6 +54,16 @@ const ease = t => t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t);
 // Each kind draws its control into `box` and returns where the label goes (px from the middle; above, clear of the hand), and place(t, still): where the finger is (px from the centre), how hard it presses (0 to 1) and, optionally, how far it is lifted
 // off the screen (lift, px). place may also move the kind's own parts.
 const KINDS = {
+  fingertip: {
+    label: 'Slide your finger sideways to steer',
+    build(box, { reach }) {
+      const position = t => reach * Math.sin(2 * Math.PI * t / 2300);
+      return { cycle: 2300, labelAt: -42, place(t, still) {
+        return still ? { x: reach / 2, y: 0, press: 0.5, follow: reach / 3 }
+          : { x: position(t), y: 0, press: 0.55, follow: position(t - 120) };
+      } };
+    },
+  },
   stick: {
     label: 'Touch and drag to move',
     build(box, { reach }) {
@@ -158,9 +173,10 @@ function style() {
   const st = document.createElement('style'); st.id = 'kit-hint-css'; st.textContent = CSS; document.head.append(st);
 }
 
-export function hint(el, { kind = 'stick', key, when, played = false, delay = 3000, look = 'hand', label, reach = 55, bottom = 120 }) {
+export function hint(el, { kind = 'stick', key, when, played = false, delay = 3000, look = 'hand', label, reach = 55, bottom = 120, manual = false, follow }) {
   const asked = new URLSearchParams(location.search).get('hint'), forced = asked === 'hand' || asked === 'ring';
   if (forced) look = asked;
+  if (kind === 'fingertip') look = 'ring';
   let over = asked === '0' || (!forced && (played || read(key) === '1'));
   const handle = { get shown() { return !over && box?.classList.contains('on'); }, done: () => finish() };
   if (over || !KINDS[kind]) { over = true; return handle; }
@@ -187,7 +203,8 @@ export function hint(el, { kind = 'stick', key, when, played = false, delay = 30
       const lift = p.lift ?? 0; // px the finger is off the screen: the hand stands back from the knob
       knob.style.transform = `translate(${p.x}px, ${p.y}px)`; hand.style.transform = `translate(${p.x + 0.4 * lift}px, ${p.y + lift}px) scale(${1.08 - 0.08 * p.press})`;
       knob.style.setProperty('--press', p.press);
-    }
+      follow?.(p.follow, p.press);
+    } else follow?.(0, 0);
     frame = requestAnimationFrame(tick);
   }
   function finish() {
@@ -198,6 +215,10 @@ export function hint(el, { kind = 'stick', key, when, played = false, delay = 30
   const touched = () => { if (when()) finish(); };
   const pressed = e => { if (when() && !isPauseKey(e) && !['Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) finish(); };
   const hovered = e => { if (e.pointerType === 'mouse') touched(); };
-  el.addEventListener('pointerdown', touched, true); if (KINDS[kind].hover) el.addEventListener('pointermove', hovered, true); addEventListener('keydown', pressed, true);
+  if (!manual) {
+    el.addEventListener('pointerdown', touched, true);
+    if (KINDS[kind].hover) el.addEventListener('pointermove', hovered, true);
+    addEventListener('keydown', pressed, true);
+  }
   return handle;
 }

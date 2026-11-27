@@ -1,5 +1,5 @@
 // Race rules only. Lantern owns every river, collision and pickup rule.
-import { centre, half, sight, boat, speed, nightPace } from '../sim.js?v=15';
+import { centre, half, sight, boat, speed, nightPace } from '../sim.js?v=16';
 export const DISTANCE = 100000;
 export const SEND_MS = 200;
 export const NIGHTS = [1, 3, 6];

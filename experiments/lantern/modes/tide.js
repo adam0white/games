@@ -3,9 +3,9 @@
 // river, the boat, the dark and the embers as on a story night; this file draws the water on it (the channel, its flecks, the
 // lees) through the page's water() hook, plays the water's sounds and keeps Tide's own save. How a mode plugs in is in
 // ../NOTES.md ("How a mode plugs in"); why Tide is built this way is under "Tide is a mode inside Lantern".
-import { start, tick, jet, strength, rating, reach, centre, half, NIGHTS } from './tide-sim.js';
+import { start, tick, jet, strength, rating, reach, centre, half, NIGHTS } from './tide-sim.js?v=1';
 import { read, readJson, writeJson } from '../../kit/save.js';
-import { t } from '../words.js';
+import { t } from '../words.js?v=1';
 
 // Save. lantern-mode-tide:save is { v: 1, best: highest stage open, stars: { stage: 0..3 }, far: { stage: best % reached }, played: runs }.
 // The lab page's save (lantern-tide:night, '2' once its first night was won) is read once to open stage 2, and never written.
@@ -86,7 +86,7 @@ export function mode(page) {
     if (won && n >= NIGHTS) return { title: t('dawn') + mark3, line: t('tideAll', { n: NIGHTS }), go: t('tidePlay', { n }) };
     if (won) { night = n + 1; return { title: t('dawn') + mark3, line: t('tideWon', { s: Math.round(e.ridden), next: n + 1, idea: idea(n + 1) }), go: t('tidePlay', { n: night }) }; }
     const why = t(['dark', 'bank', 'ice', 'log', 'pool', 'geyser', 'isle'].includes(e.s.over) ? `why_${e.s.over}` : 'why_rock');
-    return { title: t('tideSay', { n, idea: idea(n) }), line: t('tideLost', { why, pct, far: save.far[n] }), go: t('playAgain') };
+    return { title: t('dawnResult', { n: pct }), line: t('tideLost', { why, far: save.far[n] }), go: t('playAgain') };
   }
 
   // ------------------------------------------------------------ sound between frames: the rush of fast water under the hull

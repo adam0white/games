@@ -28,7 +28,6 @@
   h3 { font-weight: normal; font-size: 1.1em; letter-spacing: .06em; color: #ffd9a0; margin: .6em 0 0; }
   #steers button { min-width: 0; min-height: 44px; margin: .15em; padding: .4em .8em; font-size: .85em; } #steers button.on { color: #2a1606; background: #ffb45a; border-color: #ffb45a; }
   #views button.on { color: #2a1606; background: #ffb45a; border-color: #ffb45a; }
-  #dareCard { margin: .5em auto; padding: .6em .8em; max-width: 19em; border: 1px solid #ffb45a88; border-radius: 14px; background: #ffb45a14; } #dareCard button { margin-top: .5em; } #dareUrl { display: block; box-sizing: border-box; width: 100%; max-width: 19em; margin: .4em auto 0; padding: .5em; font: inherit; font-size: .8em; color: inherit; background: #0006; border: 1px solid #fff4; border-radius: 8px; } #dareUrl[hidden] { display: none; }
   #settings > div { max-height: 100dvh; box-sizing: border-box; overflow-y: auto; touch-action: pan-y; } #settings h2 { margin: 0; } .setting { margin: .7em 0; } .setting b { font-weight: normal; letter-spacing: .06em; color: #ffd9a0; } .setting small { display: inline-block; opacity: .75; font-size: .82em; line-height: 1.3; max-width: 19em; }
   .setting button { min-width: 0; min-height: 44px; margin: .15em; padding: .4em .9em; font-size: .9em; } .setting button.on { color: #2a1606; background: #ffb45a; border-color: #ffb45a; }
   .screen { position: fixed; inset: 0; display: none; place-items: center; text-align: center; pointer-events: none; }
@@ -36,6 +35,25 @@
   .screen > div { max-width: 21em; width: calc(100% - 2em); padding: 1em; pointer-events: auto; }
   #card > div { pointer-events: none; } #card button { pointer-events: auto; }
   .veil { background: #05080fd9; } #menu.veil { background: #05080f99; }
+  #menu.compact { align-items: start; background: linear-gradient(#05080fc9, #05080f2a 54%, transparent 72%); }
+  #menu.compact > div { margin-top: max(12px, min(12dvh, 96px)); }
+  #menu.compact .menuOption, #dareCard[hidden], #storyStart[hidden] { display: none; }
+  #menu .language { top: .8em; right: .2em; }
+  #menu.compact h1 { margin-bottom: .5em; }
+  #menu .lab-toggle { font-size: .82em; }
+  #menu .lab-notice a { display: inline-block; padding: .15em .35em; }
+  #ordinaryPlay { color: #ffe6bd; display: inline-flex; align-items: center; min-height: 44px; padding: 0 .5em; touch-action: manipulation; }
+  #skipCrash { position: fixed; bottom: calc(16px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); }
+  #card.on { background: radial-gradient(ellipse at center, #05080fe0 0%, #05080f70 64%, transparent 100%); }
+  #card > div { max-height: 100dvh; box-sizing: border-box; overflow-y: auto; touch-action: pan-y; }
+  #card h1 { font-size: clamp(1.65em, 8vw, 2.6em); letter-spacing: .05em; }
+  #card #pauseLanguage { top: 0; right: 0; }
+  #card.result > div { pointer-events: auto; }
+  #card.result .music, #card.result .steerRow { display: none; }
+  #primaryRetry, #riverRetries:not([hidden]) { display: flex; justify-content: center; }
+  #primaryRetry #go { min-width: min(9.5em, 50%); }
+  #riverRetries button, #sameRiver { min-width: 0; padding-inline: 1em; }
+  #dareUrl { box-sizing: border-box; width: 100%; max-width: 20em; padding: .5em; color: inherit; background: #070b14; border: 1px solid #ffd9a088; border-radius: 8px; pointer-events: auto; }
   h1 { font-weight: normal; font-size: 2.6em; letter-spacing: .12em; margin: 0 0 .2em; color: #ffd9a0; text-shadow: 0 0 28px #ff9a3c88; }
   h2 { font-weight: normal; font-size: 1.7em; letter-spacing: .1em; margin: 0 0 .4em; color: #ffd9a0; }
   p { margin: .4em 0; opacity: .88; }
@@ -74,11 +92,21 @@
   #tabs button { min-width: 7em; min-height: 40px; margin: .15em; font-size: .9em; } #tabs button.on { color: #2a1606; background: #ffb45a; border-color: #ffb45a; }
   #got.long { position: static; } #got { min-height: 1.6em; color: #ffe6bd; position: sticky; top: 0; z-index: 2; margin: 0; padding: .45em .3em; background: #070b14f2; border-radius: 0 0 12px 12px; } /* stays in view while the packs scroll */
   #hud { position: fixed; top: calc(8px + env(safe-area-inset-top)); left: calc(12px + env(safe-area-inset-left)); display: none; text-align: left; pointer-events: none; text-shadow: 0 1px 6px #000; }
-  #hearts { font: 26px/1 sans-serif; color: #ff4d5e; letter-spacing: 2px; }
+  #hearts { font: 26px/1 sans-serif; color: #ffd5ac; letter-spacing: 2px; }
+  #hearts .empty { color: #b8b1aa; }
+  #hearts.hit .empty { color: #ff5c64; }
+  #fuel { position: relative; width: 58px; height: 6px; overflow: hidden; margin: 6px 0 3px; border: 1px solid #ffd9a066; border-radius: 8px; background: #100f13; }
+  #fuel::before, #fuel::after { content: ''; position: absolute; inset: 0 auto 0 0; background: #ffbc6d; }
+  #fuel::before { width: var(--level, 0%); }
+  #fuel::after { left: var(--restored-from, 0%); width: var(--restored-size, 0%); background: #fff2bb; opacity: var(--restored-alpha, 0); }
+  #fuel.low::before { background: #ffe9b2; }
+  #fuel.low { outline: 1px dashed #ffe9b2; outline-offset: 2px; }
   #embers { font-size: 26px; line-height: 1.3; color: #ffd9a0; }
-  #big { position: fixed; top: calc(6px + env(safe-area-inset-top)); left: 0; right: 0; display: none; text-align: center; font-size: 40px; line-height: 1.1; color: #fff3dc; pointer-events: none; text-shadow: 0 1px 8px #000; font-variant-numeric: tabular-nums; }
+  #count { display: inline-block; }
+  #big { position: fixed; top: calc(6px + env(safe-area-inset-top)); left: 0; right: 0; display: none; text-align: center; font-size: clamp(22px, 7vw, 36px); line-height: 1.1; color: #fff3dc; pointer-events: none; text-shadow: 0 1px 8px #000; font-variant-numeric: tabular-nums; }
   #warn, #say { position: fixed; left: 0; right: 0; text-align: center; pointer-events: none; opacity: 0; transition: opacity .3s; text-shadow: 0 1px 8px #000; padding: 0 1em; }
-  #warn { top: 20%; font-size: 26px; line-height: 1.2; font-weight: bold; color: #ff4a4a; }
+  #warn { top: 24%; font-size: 18px; line-height: 1.2; color: #ffe9b2; }
+  body.ember-intro .kit-hint[data-kind="fingertip"] .label { display: none; }
   #warn.on { opacity: 1; animation: pulse .9s infinite alternate; }
   @keyframes pulse { to { opacity: .7; } }
   #tip { position: fixed; top: 17%; left: 1em; right: 1em; display: none; text-align: center; font-size: 22px; line-height: 1.3; color: #ffe6bd; text-shadow: 0 1px 8px #000, 0 0 16px #000; pointer-events: none; }
@@ -94,7 +122,7 @@
 <body>
 <canvas id="c3" hidden></canvas>
 <canvas id="c"></canvas>
-<div id="hud"><div id="hearts"></div><div id="embers"><span class="dot"></span><span id="count">0</span></div></div>
+<div id="hud"><div id="hearts"></div><div id="fuel" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" data-i18n-aria="fuel"></div><div id="embers"><span class="dot"></span><span id="count">0</span></div></div>
 <div id="big"></div>
 <div id="warn" data-i18n="fade">The lantern is beginning to fade</div>
 <div id="say"></div>
@@ -102,18 +130,23 @@
 <div id="flash"></div>
 <div id="look" aria-label="Tap to go back to the shop" data-i18n-aria="lookBack"></div>
 <button id="pause" aria-label="Pause" data-i18n-aria="pause"></button>
+<button id="skipCrash" hidden data-i18n="skipCrash">Show result</button>
 <div id="menu" class="screen veil on"><div>
   <button id="menuLanguage" class="language"></button>
   <h1 data-i18n="title">Lantern</h1>
-  <p data-i18n="tagline">Carry the light down the river to dawn.</p>
-  <p id="dareCard" hidden><span id="dareText"></span><br><button id="dareGo" class="main" data-i18n="dareGo">Take the dare</button></p>
-  <p class="bank"><span class="dot"></span><span id="bank">0</span> <span data-i18n="embers">embers</span><span id="stars"></span></p>
-  <p><button id="less" class="small" aria-label="Earlier night" data-i18n-aria="earlier">&lsaquo;</button><button id="play" class="main">Play</button><button id="more" class="small" aria-label="Later night" data-i18n-aria="later">&rsaquo;</button></p>
-  <p id="about"></p>
-  <p id="ready"></p>
-  <p class="groups"><button id="toModes"><b data-i18n="modes">Game mode</b><small id="modesNow"></small></button><button id="toShop"><b data-i18n="shop">Shop</b><small id="shopNow"></small></button><button id="toView"><b data-i18n="perspective">Perspective</b><small id="viewNow"></small></button></p>
-  <p class="foot"><button id="toBoard" data-i18n="board">Leaderboard</button><button id="toTutor" data-i18n="howTo">How to play</button><button id="toSettings" data-i18n="settings">Settings</button><button class="music"></button><button id="toCredits" data-i18n="credits">Credits</button></p>
-  <p class="hint viewNote" id="viewNote" hidden></p>
+  <p class="menuOption" data-i18n="tagline">Carry the light down the river to dawn.</p>
+  <p class="bank menuOption"><span class="dot"></span><span id="bank">0</span> <span data-i18n="embers">embers</span><span id="stars"></span></p>
+  <p id="storyStart"><button id="less" class="small menuOption" aria-label="Earlier night" data-i18n-aria="earlier">&lsaquo;</button><button id="play" class="main">Play</button><button id="more" class="small menuOption" aria-label="Later night" data-i18n-aria="later">&rsaquo;</button></p>
+  <p id="dareCard" hidden><span id="dareText" hidden></span><button id="dareGo" class="main"></button><br><a id="ordinaryPlay" href="./" data-i18n="ordinaryPlay">Play Lantern</a></p>
+  <p><button id="moreOptions" aria-controls="menuOptions" aria-expanded="false" data-i18n="moreOptions">More</button></p>
+  <div id="menuOptions" class="menuOption">
+    <p id="about"></p>
+    <p id="ready"></p>
+    <p class="groups"><button id="toModes"><b data-i18n="modes">Game mode</b><small id="modesNow"></small></button><button id="toShop"><b data-i18n="shop">Shop</b><small id="shopNow"></small></button><button id="toView"><b data-i18n="perspective">Perspective</b><small id="viewNow"></small></button></p>
+    <p class="foot"><button id="toBoard" data-i18n="board">Leaderboard</button><button id="toTutor" data-i18n="howTo">How to play</button><button id="toSettings" data-i18n="settings">Settings</button><button class="music"></button><button id="toCredits" data-i18n="credits">Credits</button></p>
+    <p class="hint viewNote" id="viewNote" hidden></p>
+  </div>
+  <div id="recordMenu"></div>
 </div></div>
 <div id="shop" class="screen veil"><div>
   <h2 data-i18n="shop">Shop</h2>
@@ -168,7 +201,7 @@
   <p><button class="back" data-i18n="back">Back</button></p>
 </div></div>
 <div id="board" class="screen veil"><div>
-  <h2 data-i18n="board">Leaderboard</h2>
+  <h2 id="boardTitle" data-i18n="board">Leaderboard</h2>
   <p class="hint" id="boardHint"></p>
   <p><label for="name" data-i18n="yourName">Your name</label><br><input id="name" maxlength="16" autocomplete="nickname" enterkeyhint="done" placeholder="Type a name"></p>
   <p id="tabs" hidden><button id="tabPhone" data-i18n="tabPhone">This phone</button><button id="tabAll" data-i18n="tabAll">All players</button><button id="tabDay" data-i18n="tabDay">Today</button></p>
@@ -178,10 +211,13 @@
   <p><button class="back" data-i18n="back">Back</button></p>
 </div></div>
 <div id="card" class="screen"><div><button id="pauseLanguage" class="language" hidden></button><h1 id="title"></h1><p id="line"></p><p id="sub"></p>
+  <p id="primaryRetry"><button id="go" class="main">Play again</button><button id="sameRiver" hidden data-i18n="sameRiver">Same river</button></p>
+  <p id="riverRetries" hidden><button id="wonNewRiver" data-i18n="newRiver">New river</button><button id="wonSameRiver" data-i18n="sameRiver">Same river</button></p>
+  <p id="dareRow" hidden><button id="dareSend">Dare a friend</button><br><span class="hint" id="dareNote" aria-live="polite"></span><input id="dareUrl" readonly hidden aria-label="Dare link" data-i18n-aria="dareLinkLabel"></p>
   <div id="ask" hidden><p data-i18n="ask">Show your endless scores to everyone on the leaderboard? After a yes, every run from the next one goes up by itself.</p><p><input id="askName" maxlength="16" autocomplete="nickname" enterkeyhint="done" placeholder="Type a name"></p><p class="hint" id="askNote">Your name and your score are sent, and a signal when a run starts. Nothing else.</p><p><button id="askYes" data-i18n="askYes">Yes, show them</button><button id="askNo" data-i18n="askNo">No</button></p></div>
-  <p><button id="go" class="main">Play again</button></p><p id="dareRow" hidden><button id="dareSend"></button><br><span class="hint" id="dareNote"></span><input id="dareUrl" readonly hidden aria-label="Link"></p><p><button id="toMenu">Menu</button><button class="music"></button></p><p><button id="viewNext" hidden></button></p><p class="steerRow" hidden><button class="steer"></button></p></div></div>
+  <p><button id="toMenu">Menu</button><button class="music"></button></p><p><button id="viewNext" hidden></button></p><p class="steerRow" hidden><button class="steer"></button></p><div id="recordCard"></div></div></div>
 <script type="module">
-import { create, step, centre, half, sight, fall, fog, wind, rain, dazzle, level, score, boat, progress, DT, GOAL, BOAT, NIGHTS, STATS, POWERS, LAST, FLOORS, LEVELS, SECTORS, towerStage, climbPace, FIELD, REBORN_PACE, GIFTS, ABILITIES, startAt, pace } from './sim.js?v=15'; // raise v when sim.js changes its exports, so a cached copy cannot break the page
+import { create, step, centre, half, sight, fall, fog, wind, rain, dazzle, level, score, boat, progress, DT, GOAL, BOAT, NIGHTS, STATS, POWERS, LAST, FLOORS, LEVELS, SECTORS, towerStage, climbPace, FIELD, REBORN_PACE, GIFTS, ABILITIES, startAt, pace } from './sim.js?v=16'; // raise v when sim.js changes its exports, so a cached copy cannot break the page
 import { read, readNumber, readJson, write } from '../kit/save.js';
 import { sound } from '../kit/audio.js';
 import { music } from './music.js';
@@ -190,15 +226,20 @@ import { screens } from '../kit/screens.js';
 import { drag } from '../kit/drag.js';
 import { sides } from '../kit/sides.js';
 import { tiltSteer } from '../kit/tilt.js';
-import { hint } from '../kit/hint.js';
+import { hint } from '../kit/hint.js?v=2';
+import { feedback } from '../kit/fx.js';
 import { dareLink, dareRead, shareLink } from '../kit/dare.js'; // a dare by link: the same river for a friend, no account (dare below)
+import { readRiver, riverBits } from './dare-river.js?v=1';
+import { drawHazards, poolLead } from './hazards.js?v=1';
 import { lab } from '../kit/lab.js'; // lab recording: the rec lines below
 import { settings } from '../kit/settings.js'; // options with a default, and a record of each change: opts below
 import { noZoom } from '../kit/zoom.js'; noZoom(); // no double-tap or pinch zoom (note #74)
 import { hull, wake, flame, burn, glow as flameGlow, mark, TINT, reeds, shine, halo, flood } from './looks.js?v=4';
-import { t, lang, setLang, apply, langs } from './words.js'; // every word the player sees, in English and Turkish
+import { t, lang, setLang, apply, langs } from './words.js?v=1'; // every word the player sees, in English and Turkish
 
 const query = new URLSearchParams(location.search);
+const dare = readRiver(dareRead());
+let landingMore = false;
 // A portal copy (scripts/portal-zip.mjs sets window.PORTAL before this script): the page runs inside another site's frame, so it
 // asks this site for nothing: no shared board, no lab recording (kit/lab.js), no tester notes, no Race rooms. 'itch' may link out,
 // so a dare link points at HOME; 'strict' is for portals that allow no links out, and has no dare.
@@ -217,7 +258,7 @@ let fromFloor = 0; // the floor this tower try starts on
 // What each night brings is in words.js: night1 to night20, and front1 to front8 for nights 21 to 50 (see ahead below).
 // Nights 21 to 50 hold all twenty things, each night faster, closer and narrower; one old thing takes its turn up front (sim.js).
 // The tower has two sectors of 50 levels; climb 51 is sector 2, level 1.
-const tag = n => n > LEVELS ? t('tagSector', { n: n - LEVELS }) : t('tagLevel', { n }), Tag = n => tag(n).replace(/^./, c => c.toUpperCase()), head = n => t('head', { n: n > LEVELS ? n - LEVELS : n }), TOP = LEVELS * SECTORS;
+const tag = n => n > LEVELS ? t('tagSector', { n: n - LEVELS }) : t('tagLevel', { n }), Tag = n => tag(n).replace(/^./, c => c.toUpperCase()), TOP = LEVELS * SECTORS;
 const ahead = n => n >= 1 && n <= 20 ? t(`night${n}`) : n > 20 && n <= NIGHTS ? t(n === NIGHTS ? 'nightLast' : 'nightLate', { front: t(`front${(n - 21) % 8 + 1}`) }) : '';
 
 // The shop. Embers are the money. A pack gives one thing you do not own yet, picked at random.
@@ -333,7 +374,7 @@ window.lanternSim = () => s; // the browser checks use this to reach late stretc
 const cards = screens(['menu', 'shop', 'credits', 'card', 'board', 'modes', 'perspective', 'tutor', 'mode', 'settings']);
 // More modes (NOTES.md, "How a mode plugs in"): a mode is a module in modes/ that index.html loads when it is chosen. mod is the mode
 // chosen, or null; with null, every line below runs as before modes. A mode is drawn flat: the view the player chose comes back after.
-const MODES = { spark: () => import('./modes/spark.js'), tide: () => import('./modes/tide.js'), duet: () => import('./modes/duet.js'), race: () => import('./modes/race.js') }, made = {};
+const MODES = { spark: () => import('./modes/spark.js?v=1'), tide: () => import('./modes/tide.js?v=1'), duet: () => import('./modes/duet.js?v=1'), race: () => import('./modes/race.js?v=1') }, made = {};
 let mod = null;
 const pct = () => mod ? mod.reach() : progress(s);
 async function chooseMode(id) {
@@ -346,6 +387,9 @@ for (const b of document.querySelectorAll('[data-mode]')) b.addEventListener('cl
 function show(name) {
   screen = name;
   cards(name);
+  $('skipCrash').hidden = true;
+  $('card').classList.toggle('result', name === 'card' && !paused);
+  if (recording) $(name === 'card' && paused ? 'recordCard' : 'recordMenu').append(recording);
   const play = name === 'play';
   $('hud').style.display = $('big').style.display = play ? 'block' : 'none'; pauseButton.style.display = play ? 'grid' : 'none';
   if (!play) $('warn').classList.remove('on'); $('tip').style.display = play ? 'block' : 'none';
@@ -364,7 +408,7 @@ function size3() { if (R3) { const k = Math.min(1.5, dpr) / dpr; R3.resize(Math.
 async function setView(v, keep = true) {
   if (!VIEWS.includes(v)) v = '2d';
   if (v !== '2d' && !R3) {
-    loading3 ??= import('./view3d.js?v=3').then(m => m.createRenderer(canvas3)).catch(() => null);
+    loading3 ??= import('./view3d.js?v=4').then(m => m.createRenderer(canvas3)).catch(() => null);
     const made = await loading3;
     if (!made || made.errors.length) { v = '2d'; loading3 = null; noteView('viewNoStart'); }
     else if (!R3) { R3 = made; canvas3.addEventListener('webglcontextlost', () => { setView('2d', false); R3 = null; noteView('viewStopped'); }); size3(); }
@@ -372,7 +416,20 @@ async function setView(v, keep = true) {
   view = v; snap3 = true; canvas3.hidden = v === '2d'; pads.drop(); steer.drop(); if (keep) store.set('lantern-view', v); views();
 }
 function menu() {
-  $('dareCard').hidden = !dare; if (dare) $('dareText').textContent = t('dareCard', { name: dare.name || t('dareAnon'), n: dare.score });
+  const compact = !landingMore && (Boolean(dare) || newcomer());
+  $('menu').classList.toggle('compact', compact);
+  $('moreOptions').hidden = !compact;
+  $('moreOptions').setAttribute('aria-expanded', String(!compact));
+  $('dareCard').hidden = !dare;
+  $('storyStart').hidden = Boolean(dare);
+  if (dare) {
+    const name = dare.name || t('dareAnon');
+    const dawn = dare.night && dare.score === 100;
+    $('dareGo').textContent = t(dawn ? 'dareMatch' : dare.night ? 'dareBeatNight' : 'dareBeat', { name, n: dare.score });
+    // The recording trace uses the accessible label. Keep the sender's name on the page.
+    $('dareGo').setAttribute('aria-label', t(dawn ? 'dareAriaMatch' : dare.night ? 'dareAriaNight' : 'dareAria', { n: dare.score }));
+    $('dareText').textContent = t(dare.night ? 'dareRivalNight' : 'dareRival', { name, n: dare.score });
+  }
   $('stars').textContent = reborn ? ` · ${'★'.repeat(Math.min(5, reborn))}${reborn > 5 ? reborn : ''}` : '';
   $('modesNow').textContent = t('modesNow'); $('shopNow').textContent = t('shopNow'); $('bank').textContent = bank; $('play').textContent = t('playNight', { n: stage });
   $('less').disabled = stage <= 1; $('more').disabled = stage >= opened;
@@ -607,8 +664,8 @@ window.lanternMusic = () => song && { ...song.melody, bare: song.bare, step: son
 const tone = (freq, dur, vol, type = 'sine', slide = 0) => { if (snd.ctx) snd.tone(freq, dur, vol, type, slide); }; // slide was dropped here before, so the crash sounds never slid
 const scale = [392, 440, 523.25, 587.33, 659.25, 783.99, 880, 1046.5];
 
-// The tutorial (tester t1, note #236, answering #230): offered once to a player with no save, and always under "How to play". A calm river
-// with nothing in it but what each step lays down; nobody can lose here, and nothing of it is banked or scored. lantern-tutorial: '1' once played or skipped.
+// How to play is a calm practice river. Nobody can lose here, and nothing is banked or scored.
+// lantern-tutorial keeps its existing format and is set when practice starts or finishes.
 // Each step: the words, what it lays in the river (again whenever it has drifted past), and when it is done.
 const rock = (x, y, rad) => ({ x, x0: x, y, y0: y, rad, kind: '', len: 0, on: true, a: 0, w: 0, b: 0, wy: 0, ph: 0, phy: 0, vy: 0, ice: false, grazed: false });
 let tutor = null;
@@ -619,7 +676,7 @@ const stone = (off, dy = 1.3) => { const p = ahead1(off, dy); s.rocks.push(rock(
 const waiting1 = kind => s.embers.some(e => !e.got && e.kind === kind && e.y > s.y - 0.1);
 const side1 = () => (s.x > centre(s, s.y) ? -0.75 : 0.75); // the far side, so the player has to steer
 const TUTOR = [
-  { say: () => view === 'first' && steering === 'tilt' ? 'tutTilt' : view === 'first' && steering === 'press' ? 'tutPress' : 'tutSteer', lay() { s.light = Math.max(s.light, 0.8); }, done: () => tutor.moved > 0.25 },
+  { say: () => tilting() ? 'tutTilt' : dragging() ? 'tutSteer' : 'tutPress', lay() { s.light = Math.max(s.light, 0.8); }, done: () => tutor.moved > 0.25 },
   { say: () => 'tutEmber', lay() { s.light = Math.max(s.light, 0.5); if (!waiting1('ember')) lay('ember', side1()); }, done: () => s.taken >= 2 },
   { say: () => 'tutFade', lay() { if (tutor.age < 0.1) s.light = Math.min(s.light, 0.35); if (tutor.age > 2.2 && !waiting1('ember')) lay('ember', side1(), 1); }, done: () => tutor.age > 2.2 && s.taken > tutor.from },
   { say: () => 'tutHeart', lay() { if (!waiting1('heart')) lay('heart', side1()); }, done: () => s.events.includes('heart') },
@@ -643,57 +700,86 @@ function tutorTick(was) {
 }
 function tutorEnd() {
   playing = false; ended = performance.now(); tutor = null; steer.drop(); pads.drop(); $('tip').textContent = ''; rec.end('done', { mode: 'tutorial', night: 0 });
-  $('toMenu').textContent = t('menu'); $('ask').hidden = $('viewNext').hidden = true; $('title').textContent = t('tutDone'); $('line').textContent = t('tutDoneLine'); $('sub').textContent = ''; $('go').textContent = t('playNight', { n: stage });
+  $('toMenu').textContent = t('menu'); $('ask').hidden = $('viewNext').hidden = true; $('title').textContent = t('tutDone');
+  $('line').textContent = t(dare ? 'tutDoneDare' : 'tutDoneLine'); $('sub').textContent = '';
+  $('go').textContent = dare ? t('dareGo') : t('playNight', { n: stage });
+  practiceFinished = true;
   show('card');
 }
-function begin() {
+let practiceFinished = false;
+function begin({ replay, challenge = null } = {}) {
   audio(); // a tower level holds the things of the nights up to towerStage(level); see sim.js
-  // Stats last one run; a whole climb is one run. They do not work on the endless river (tester t1, notes #119 and #120), so its
-  // leaderboard is fair: an endless run neither uses them nor spends them, and they wait for the next night or climb.
-  const fresh = !tutor && (!tower || !onward); onward = false; if (tutor) runStats = {}; else if (fresh) { runStats = endless || mod ? {} : stats; if (!endless && !mod) { stats = {}; store.set('lantern-stats', '{}'); } } // a mode neither uses nor spends stats
-  const waiting = (endless || mod) && Object.values(stats).some(v => v > 0);
-  const daring = dareRun && endless && !tower && !daily && !mod && !tutor ? dareRun : null; // a friend's river (dare below): their seed and the things their river held
+  // A new story river or climb consumes the saved upgrades. A replay or dare uses the original river's upgrades.
+  const fresh = !tutor && (!tower || !onward);
+  onward = false;
+  if (tutor || challenge || replay) runStats = challenge?.stats ?? replay?.st ?? {};
+  else if (fresh) {
+    runStats = endless || mod ? {} : stats;
+    if (!endless && !mod) { stats = {}; store.set('lantern-stats', '{}'); }
+  }
+  const waiting = (endless || mod) && !challenge && Object.values(stats).some(v => v > 0);
   if (mod) setView('2d', false);
-  s = mod ? mod.start(powersOwned()) : create(daily && endless && !tower ? daySeed(ranDay = today()) : daring ? daring.seed : (Math.random() * 2 ** 31) | 0, tower ? towerStage(climb) : endless || tutor ? 1 : stage, tower ? 'tower' : endless, tutor ? [] : daring ? dareThings(daring.extra) : powersOwned(), runStats, climb, tutor ? 0 : reborn); // after a rebirth the story nights run faster
+  const runSeed = challenge?.seed ?? replay?.seed ?? (daily && endless ? daySeed(ranDay = today()) : (Math.random() * 2 ** 31) | 0);
+  const runNight = tower ? towerStage(climb) : endless || tutor ? 1 : challenge?.night ?? stage;
+  const abilities = tutor ? [] : challenge?.abilities ?? (replay ? [...replay.on, ...replay.gifts] : powersOwned());
+  s = mod ? mod.start(abilities) : create(runSeed, runNight, tower ? 'tower' : endless, abilities, runStats, climb, tutor ? 0 : challenge?.reborn ?? reborn);
+  if (challenge) s.dare = challenge;
+  practiceFinished = false;
+  $('sameRiver').hidden = $('riverRetries').hidden = $('dareRow').hidden = true;
   if (!tower) fromFloor = 0; else if (fromFloor) startAt(s, fromFloor); // part-way up the level (note #142)
   song?.start(s.seed); // a new tune for each river; today's river has the same tune for everyone
-  if (daring) s.dare = daring; $('dareRow').hidden = true;
-  if (endless && !tower && !daring) boardTicket(); else ticket = null; // the shared board's run ticket, only for a player who shares; a dare is never on a board
+  if (endless && !tower && !challenge) boardTicket(); else ticket = null; // a dare never takes a board ticket
   const boosted = fresh && Object.values(runStats).some(v => v > 0);
   target = s.x; crash = null; victory = null; playing = true; paused = false; acc = 0; streak = 0; sparks = []; lastLevel = 1; size = 1; fire0 = flame(); nearFall = false; weather = ''; steer.reset(); pads.drop(); snap3 = true; slide = 0; tilt.zero();
   if (tutor) { s.next = Infinity; s.rocks = []; s.embers = []; s.powers = []; s.calm = 0.75; s.hearts = 2; } // an empty, slow river
-  if (gentleRun()) { s.gentle = true; s.hearts = Math.max(s.hearts, 2); } // story nights on a gentle river: the banks push the boat back (sim.js), and there is a spare heart
-  $('tip').textContent = ''; shown = ''; show('play'); hud();
+  if (challenge?.gentle ?? (replay ? Boolean(replay.gentle) : gentleRun())) { s.gentle = true; s.hearts = Math.max(s.hearts, 2); }
+  impactFx = pickupFx = null; maxHearts = s.hearts; keys.clear();
+  fuel.style.setProperty('--restored-alpha', 0);
+  $('tip').textContent = ''; shown = ''; show('play'); introTick(); hud();
   if (tutor) { floor = 0; rec.start({ ...opts.snapshot(), view, mode: 'tutorial', night: 0 }); return; }
-  say(mod ? mod.hello() : (tower ? t(climb > LEVELS ? (fromFloor ? 'saySectorFloor' : 'saySector') : (fromFloor ? 'sayTowerFloor' : 'sayTower'), { n: climb > LEVELS ? climb - LEVELS : climb, of: LEVELS, f: fromFloor }) : daring ? t('sayDare', { n: daring.score }) : endless ? t('endless') : t('sayNight', { n: stage })) + (boosted ? '. ' + t('statsOn') : waiting ? '. ' + t('statsWait') : ''), waiting ? 2800 : 1800); floor = fromFloor;
-  rec.start({ ...opts.snapshot(), view, mode: mode(), night: mod ? mod.night() : tower || endless ? 0 : stage, ...(tower ? { level: climb, floor: fromFloor } : {}), gentle: !!s.gentle, ...(daring ? { their: daring.score } : {}) });
+  if ($('tip').textContent) $('say').style.opacity = 0;
+  else say(mod ? mod.hello() : (tower ? t(climb > LEVELS ? (fromFloor ? 'saySectorFloor' : 'saySector') : (fromFloor ? 'sayTowerFloor' : 'sayTower'), { n: climb > LEVELS ? climb - LEVELS : climb, of: LEVELS, f: fromFloor }) : endless ? t('endless') : t('sayNight', { n: runNight })) + (boosted && !challenge ? '. ' + t('statsOn') : waiting ? '. ' + t('statsWait') : ''), waiting ? 2800 : 1800);
+  floor = fromFloor;
+  const river = challenge || replay ? (s.gentle ? 'gentle' : 'classic') : opts.get('river');
+  rec.start({ ...opts.snapshot(), view, river, mode: mode(), night: runNightNumber(), ...(tower ? { level: climb, floor: fromFloor } : {}), gentle: !!s.gentle, ...(challenge ? { their: challenge.score } : {}) });
 }
 // The gentle river (the lab's own change, 2026-11-27; NOTES.md): play records showed new players ending their first runs on the bank
 // within seconds. On story nights a gentle river's banks push the boat back and dim the flame a little; rocks, ice and the dark are as
 // they were. The endless river, today's river, the tower and the modes always have classic banks, so every board stays fair.
-// A dare (below) follows the setting: it is on no board, and a friend who arrives by a link is often new.
-const gentleRun = () => !tutor && (!endless || !!s.dare) && !tower && !daily && !mod && opts.get('river') === 'gentle'; // a dare is on no board, so a friend who is new meets the gentle river there too
+const gentleRun = () => !tutor && !endless && !tower && !daily && !mod && opts.get('river') === 'gentle';
 const mode = () => mod ? mod.id : tutor ? 'tutorial' : tower ? 'tower' : s.dare ? 'dare' : endless ? 'endless' : 'night';
-// A dare by link (kit/dare.js; the lab's own change, 2026-11-27, for play between friends with no account). The card after an endless
-// run, a run on today's river or a dare has "Dare a friend": a link that carries the river's seed, the score, the name and which
-// abilities lay in that river. The friend's menu shows the dare; their run is the same river with the same abilities in it, takes no
-// board ticket and is on no board, and its card compares the two scores and offers to send theirs back.
-const dare = dareRead(); let dareRun = null;
-const dareThings = n => ABILITIES.filter((k, i) => n & (1 << i)), dareExtra = st => ABILITIES.reduce((n, k, i) => n | (st.on.includes(k) || st.gifts.includes(k) ? 1 << i : 0), 0);
+const runNightNumber = () => mod ? mod.night() : tower || endless || tutor ? 0 : s.stage;
+const dareResult = state => state.endless ? score(state) : Math.floor(progress(state) * 100);
+function playDare(challenge = dare) {
+  endless = !challenge.night;
+  tower = daily = false;
+  begin({ challenge });
+}
 async function dareSend() {
-  const pts = score(s), url = dareLink({ seed: s.seed, score: pts, extra: s.dare ? s.dare.extra : dareExtra(s), name: boardName(playerName()) }, PORTAL ? { href: HOME } : location); if (!url) return;
-  const how = await shareLink(url, t('dareWords', { n: pts }));
-  rec.event('dare_send', { how, score: pts, back: !!s.dare });
-  $('dareNote').textContent = t(how === 'copied' ? 'dareCopied' : how === 'shown' ? 'dareShown' : 'dareNote'); $('dareUrl').hidden = how !== 'shown'; $('dareUrl').value = url; if (how === 'shown') $('dareUrl').select();
+  const ran = s, pts = dareResult(ran);
+  const url = dareLink({ seed: ran.seed, score: pts, extra: riverBits(ran), name: boardName(playerName()) }, PORTAL ? { href: HOME } : location);
+  if (!url) return;
+  const how = await shareLink(url, t(ran.endless ? 'dareWords' : pts === 100 ? 'dareWordsDawn' : 'dareWordsNight', { n: pts, night: ran.stage }));
+  if (s !== ran || screen !== 'card') return;
+  rec.event('dare_send', { how, score: pts, back: !!ran.dare });
+  $('dareNote').textContent = t(how === 'copied' ? 'dareCopied' : how === 'shown' ? 'dareShown' : 'dareShared');
+  $('dareUrl').hidden = how !== 'shown';
+  $('dareUrl').value = url;
+  if (how === 'shown') { $('dareUrl').focus(); $('dareUrl').select(); }
 }
 function bankRun() { s.banked = Math.round(s.taken * boon() * (mod?.share ?? 1)); bank += s.banked; store.set('lantern-bank', bank); } // a rebirth's bonus is added as the run banks; a mode can bank a share (Duet's rope takes about twice a night's embers)
 function finish() {
-  const paid = s.over === 'dawn' && !tower && !endless && !mod && reborn ? 10 * Math.min(5, reborn) : 0; s.taken += paid; // a reborn night pays more at dawn
+  const paid = s.over === 'dawn' && !tower && !endless && !mod && !s.dare && reborn ? 10 * Math.min(5, reborn) : 0; s.taken += paid; // a reborn night pays more at dawn
   playing = false; ended = performance.now(); steer.drop(); pads.drop(); bankRun();
-  rec.end(s.over, { mode: mode(), night: mod ? mod.night() : tower || endless ? 0 : stage, reached: Math.floor(pct() * 100), score: endless ? score(s) : null, embers: s.taken, hearts: s.hearts, bank });
-  $('hud').style.display = $('big').style.display = pauseButton.style.display = 'none'; $('warn').classList.remove('on');
-  const won = s.over === 'dawn', why = t(['dark', 'bank', 'ice', 'log', 'pool', 'geyser', 'isle'].includes(s.over) ? `why_${s.over}` : 'why_rock');
+  rec.end(s.over, { mode: mode(), night: runNightNumber(), reached: Math.floor(pct() * 100), score: endless ? score(s) : null, embers: s.taken, hearts: s.hearts, bank });
+  pauseButton.style.display = 'none';
+  if (!crash) $('hud').style.display = $('big').style.display = 'none';
+  $('warn').classList.remove('on');
+  const won = s.over === 'dawn', why = !won && t(['dark', 'bank', 'ice', 'log', 'pool', 'geyser', 'isle'].includes(s.over) ? `why_${s.over}` : 'why_rock');
   const gained = t(s.banked > s.taken ? 'gainedBonus' : s.banked === 1 ? 'gained1' : 'gained', { n: s.banked, taken: s.taken, bank });
+  const reached = Math.floor(pct() * 100);
+  const story = !mod && !tower && !endless && !s.dare;
+  const nextNight = story && won && s.stage < NIGHTS ? s.stage + 1 : 0;
   $('toMenu').textContent = t('menu'); $('ask').hidden = $('viewNext').hidden = true;
   if (mod) { const c = mod.end(); $('title').textContent = c.title; $('line').textContent = c.line; $('go').textContent = c.go; } // a mode keeps its own save: no board, no night, no best
   else if (tower) { // after each level: climb on to a harder one, or stop. The next climb goes on where this one left off (tester t1, note #73)
@@ -707,33 +793,48 @@ function finish() {
       const faster = Math.round((climbPace(climb + 1) / climbPace(1) - 1) * 100), joins = towerStage(climb + 1) > towerStage(climb) ? t('towerNew', { what: ahead(towerStage(climb + 1)) }) : '';
       $('title').textContent = t('levelCleared', { n: climb > LEVELS ? climb - LEVELS : climb }); $('line').textContent = t(faster >= 5 ? 'towerHarderPct' : 'towerHarder', { Tag: Tag(climb + 1), tag: tag(climb + 1), pct: faster, joins }); // the card's title stays on one line; the line under it names the sector
       $('go').textContent = t('climbOn', { tag: tag(climb + 1) }); $('toMenu').textContent = t('stop');
-    } else { $('title').textContent = head(climb); $('line').textContent = t(back ? 'towerLostFloor' : 'towerLost', { why, best: best > LEVELS ? tag(best) : t('nOf', { n: best, of: LEVELS }), tag: tag(climb), back, at }); $('go').textContent = back ? t('tryFloor', { n: back }) : t('tryLevel', { tag: tag(climb) }); }
-  } else if (s.dare) { // a friend's river: on no board, and it does not change the best endless score
-    const pts = score(s), their = s.dare.score, name = s.dare.name || t('dareAnon');
-    $('title').textContent = `${pts}`; $('line').textContent = t(pts > their ? 'dareWon' : pts === their ? 'dareTie' : 'dareLost', { why, name, n: pts, their }); $('go').textContent = t('dareAgain');
+    } else { $('title').textContent = t('floorResult', { n: at, of: FLOORS }); $('line').textContent = t(back ? 'towerLostFloor' : 'towerLost', { why, best: best > LEVELS ? tag(best) : t('nOf', { n: best, of: LEVELS }), tag: tag(climb), back, at }); $('go').textContent = back ? t('tryFloor', { n: back }) : t('tryLevel', { tag: tag(climb) }); }
+  } else if (s.dare) {
+    const n = dareResult(s), their = s.dare.score, name = s.dare.name || t('dareAnon');
+    const rival = t(endless ? 'dareRival' : 'dareRivalNight', { name, n: their });
+    $('title').textContent = endless ? String(n) : t(won ? 'dawn' : 'dawnResult', { n });
+    $('line').textContent = [why, t(n > their ? 'dareWon' : n === their ? 'dareTie' : 'dareLost', { rival })].filter(Boolean).join(' ');
+    $('go').textContent = t('sameRiver');
   } else if (endless && daily) {
     // A run that ends after midnight UTC was on yesterday's river: it counts for neither day and is not sent.
-    const late = ranDay !== today(), pts = score(s), was = plain(store.json('lantern-daily', {})), best = Math.max(late ? 0 : pts, was.d === today() ? Math.floor(was.s) || 0 : 0); if (!late) store.set('lantern-daily', JSON.stringify({ d: today(), s: best }));
+    const late = ranDay !== today(), pts = score(s), was = plain(store.json('lantern-daily', {})), prior = was.d === today() ? Math.floor(was.s) || 0 : 0, best = Math.max(late ? 0 : pts, prior); if (!late) store.set('lantern-daily', JSON.stringify({ d: today(), s: best }));
     if (!late) boardSend(pts, ticket); ticket = null;
     if (!decided && pts > 0) { $('ask').hidden = false; $('askName').value = playerName(); $('askNote').textContent = t('askNote'); }
-    $('title').textContent = `${pts}`; $('line').textContent = t(late ? 'dailyLate' : 'dailyLine', { why, best }); $('go').textContent = t('tryDaily');
+    $('title').textContent = !late && pts > prior ? t('scorePersonalBest', { n: pts }) : String(pts);
+    $('line').textContent = t(late ? 'dailyLate' : 'dailyLine', { why, best }); $('go').textContent = t('playAgain');
   } else if (endless) {
-    const pts = score(s), best = Math.max(pts, store.get('lantern-best-endless')); store.set('lantern-best-endless', best);
+    const pts = score(s), prior = store.get('lantern-best-endless'), best = Math.max(pts, prior); store.set('lantern-best-endless', best);
     const place = onBoard(pts);
     boardSend(pts, ticket); ticket = null;
     if (!decided && pts > 0) { $('ask').hidden = false; $('askName').value = playerName(); $('askNote').textContent = t('askNote'); }
-    $('title').textContent = `${pts}`; $('line').textContent = t(place ? 'endlessPlace' : 'endlessLine', { why, best, place }); $('go').textContent = t('playAgain');
+    $('title').textContent = pts > prior ? t('scorePersonalBest', { n: pts }) : String(pts);
+    $('line').textContent = t(place ? 'endlessPlace' : 'endlessLine', { why, best, place }); $('go').textContent = t('playAgain');
   } else {
-    const pct = Math.floor(progress(s) * 100), key = `lantern-best-${stage}`, best = Math.max(pct, store.get(key)); store.set(key, best);
-    $('title').textContent = t(won ? 'dawn' : s.over === 'dark' ? 'dark' : 'nightTitle', { n: stage });
-    if (won && stage >= NIGHTS) { $('line').textContent = t('allNights', { n: NIGHTS }); $('go').textContent = t('playNightAgain', { n: stage }); }
-    else if (won) { $('line').textContent = t('wonNight', { n: stage, next: stage + 1, ahead: ahead(stage + 1) }); stage++; opened = Math.max(opened, stage); store.set('lantern-night', opened); $('go').textContent = t('playNight', { n: stage }); }
-    else { $('line').textContent = t('nightLost', { why, pct, best }); $('go').textContent = t('playAgain'); }
+    const night = s.stage, key = `lantern-best-${night}`;
+    store.set(key, Math.max(reached, store.get(key)));
+    $('title').textContent = t(won ? 'dawn' : 'dawnResult', { n: reached });
+    $('line').textContent = won ? t(night >= NIGHTS ? 'allNights' : 'clearedNight', { n: night }) : why;
+    if (nextNight) {
+      opened = Math.max(opened, nextNight); stage = nextNight; store.set('lantern-night', opened);
+      $('go').textContent = t('playNight', { n: nextNight });
+    } else $('go').textContent = t('newRiver');
   }
-  { const can = endless && !tower && !mod && score(s) > 0 && PORTAL !== 'strict'; $('dareRow').hidden = !can; $('dareUrl').hidden = true; if (can) { $('dareSend').textContent = t(s.dare && score(s) > s.dare.score ? 'dareBack' : 'dareFriend'); $('dareNote').textContent = t('dareNote'); } }
+  $('sameRiver').hidden = !story || Boolean(nextNight);
+  $('riverRetries').hidden = !story || !nextNight;
+  $('dareRow').hidden = Boolean(mod || tower || PORTAL === 'strict' || (endless && dareResult(s) === 0));
+  $('dareSend').textContent = t(s.dare && dareResult(s) > s.dare.score ? 'dareBack' : 'dareFriend');
+  $('dareUrl').hidden = true; $('dareNote').textContent = '';
   const tune = song && song.melody, laid = tune ? tune.played + tune.missed : 0; // the share of tonight's melody the embers played
   $('sub').textContent = gained + (musicOn && laid >= 4 ? ' ' + t('melodyPlayed', { pct: Math.round(tune.share * 100) }) : '');
-  setTimeout(() => { if (!playing && screen === 'play') show('card'); }, won ? 2600 : crash ? 1300 : 700); // a crash plays out before the card
+  const ran = s;
+  const isEnding = () => s === ran && !playing && screen === 'play';
+  if (crash) setTimeout(() => { if (isEnding()) $('skipCrash').hidden = false; }, 260);
+  setTimeout(() => { if (isEnding()) show('card'); }, won ? 2600 : crash ? 1300 : 700);
 }
 // The leaderboard on this phone: a run's score goes in if it beats the tenth. Returns its place, 1 to 10, or 0.
 const playerName = () => cleanName(read('lantern-name', ''));
@@ -816,6 +917,7 @@ async function share(yes) {
 function boardShow() {
   if (document.activeElement !== $('name')) $('name').value = playerName();
   const day = tab === 'day' && !!shared, all = tab === 'all' && !!shared, list = day ? sharedDay || [] : all ? shared : board, ol = $('rows'); ol.textContent = '';
+  $('boardTitle').textContent = t(day || all ? 'board' : 'boardOnPhone');
   // The tabs and the tick appear only when the shared board answered.
   $('tabs').hidden = $('shareRow').hidden = !shared; $('tabPhone').className = all ? '' : 'on'; $('tabAll').className = all ? 'on' : ''; $('tabDay').className = day ? 'on' : ''; $('tabPhone').className = all || day ? '' : 'on';
   const playText = t(day ? 'playDaily' : 'playEndless'); if ($('boardPlay').textContent !== playText) $('boardPlay').textContent = playText; // WebKit drops a tap on a button whose text is rewritten under the finger
@@ -891,10 +993,24 @@ function crashFx(cause, shown = '') { // shown: a crash effect previewed in the 
   else if (how === 'bolt') { snd.noise(0.5, 0.5, 6000); tone(60, 0.8, 0.3, 'sawtooth', -30); setTimeout(() => snd.noise(0.9, 0.2, 300), 150); shake = 1.2; }
   else if (how === 'splash') { snd.noise(0.25, 0.4, 900); setTimeout(() => snd.noise(0.7, 0.25, 500), 300); tone(180, 0.6, 0.15, 'sine', -120); shake = 0.7; }
 }
+const { bump } = feedback();
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+const fuel = $('fuel');
+let maxHearts = 0, impactFx = null, pickupFx = null;
 function hud() {
-  const big = tutor ? '' : endless ? `${score(s)}` : `${Math.floor(pct() * 100)}%`, low = playing && !paused && !tutor && s.light < 0.28, now = `${s.hearts}|${s.taken}|${big}|${low}`;
+  const flame = Math.max(0, Math.min(100, s.light * 100));
+  const flamePct = Math.round(flame);
+  if (fuel.getAttribute('aria-valuenow') !== String(flamePct)) fuel.setAttribute('aria-valuenow', flamePct);
+  fuel.style.setProperty('--level', `${flame}%`);
+  fuel.classList.toggle('low', flame < 16);
+  maxHearts = Math.max(maxHearts, s.hearts);
+  const big = tutor ? '' : t(endless ? 'hudScore' : 'hudDawn', { n: endless ? score(s) : Math.floor(pct() * 100) });
+  const low = playing && !paused && !tutor && flame < 16, now = `${s.hearts}|${maxHearts}|${s.taken}|${big}|${low}`;
   if (now === shown) return; shown = now; // touch the page only when a number changes
-  $('hearts').textContent = '♥'.repeat(Math.max(0, s.hearts)); $('count').textContent = s.taken; $('big').textContent = big;
+  const empty = document.createElement('span');
+  empty.className = 'empty'; empty.textContent = '♡'.repeat(maxHearts - s.hearts);
+  $('hearts').replaceChildren('♥'.repeat(s.hearts), empty);
+  $('count').textContent = s.taken; $('big').textContent = big;
   $('warn').classList.toggle('on', low);
 }
 
@@ -907,7 +1023,8 @@ function aim(x) { const c = centre(s, s.y), h = view === 'first' ? Math.max(0, h
 // The tap that ends a pause does not steer until that finger has moved a clear distance (experiments/kit/drag.js).
 // First person takes the same drag when the player chose to slide; there the bank holds the boat, as with the other two ways.
 const dragging = () => view !== 'first' || steering === 'slide';
-const steer = drag(canvas, { playing: () => playing && dragging(), paused: () => paused && dragging(), resume: () => resume(), from: () => s.x, travel: dx => dx * dpr / unit * gain, aim, mouse: e => aim(mouseX(e)), settle: 12 });
+function steerTo(x) { if (Math.abs(x - s.x) > 0.014) deliberateSteer(); aim(x); }
+const steer = drag(canvas, { playing: () => playing && dragging(), paused: () => paused && dragging(), resume: () => resume(), from: () => s.x, travel: dx => dx * dpr / unit * gain, aim: steerTo, mouse: e => steerTo(mouseX(e)), settle: 12 });
 const mouseX = e => { if (view === 'first') return centre(s, s.y) + (e.clientX / innerWidth - 0.5) * 2 * half(s, s.y); if (view === '2d' || !R3) return (e.clientX * dpr - left) / unit; const row = R3.boatRow(), k = canvas3.width / innerWidth; return (e.clientX * k - row.left) / row.unit; };
 // First person: press the left or right half of the screen; hold to keep turning (experiments/kit/sides.js, note #159).
 const pads = sides(canvas, { on: () => view === 'first' && steering !== 'slide', playing: () => playing, paused: () => paused, resume: () => resume() });
@@ -932,17 +1049,48 @@ function glide() { if (steering === 'slide') { slide = 0; aim(target); return; }
   const room = Math.max(0, half(s, s.y) - boat(s) - 0.01), c = centre(s, s.y), to = s.x + slide * DT;
   target = slide > 0 ? Math.min(to, c + room) : slide < 0 ? Math.max(to, c - room) : s.x;
 }
-hint(canvas, { kind: 'drag', label: t('hint'), key: 'lantern-hint', delay: 1500, bottom: () => mod ? 120 : 56, when: () => playing && !paused && screen === 'play' && dragging() && !mod?.steers, played: read('lantern-bank') !== null }); // a first-time player who does not touch sees how (experiments/kit/hint.js); 1.5 s, as a boat left alone meets a rock in 3 to 9 s; low, below the boat
+const introAtLoad = read('lantern-bank') === null && read('lantern-hint') !== '1';
+let introDone = !introAtLoad, demoOffset = 0, demoOpacity = 0;
+const demoBottom = () => innerHeight * 0.19;
+const steerHint = hint(canvas, {
+  kind: 'fingertip', label: t('hint'), key: 'lantern-hint', delay: 1000, reach: 35, manual: true, bottom: demoBottom,
+  when: () => playing && !paused && screen === 'play' && dragging() && !mod?.steers && !introDone,
+  played: !introAtLoad,
+  follow: (x, opacity) => { demoOffset = x; demoOpacity = opacity; },
+});
+function deliberateSteer() { introDone = true; steerHint.done(); }
+function introTick() {
+  const on = !introDone && playing && !tutor && !mod && !endless && !tower && s.stage === 1;
+  document.body.classList.toggle('ember-intro', on);
+  if (tutor) return;
+  const line = on ? t(dragging() ? 'slideEmber' : tilting() ? 'tiltEmber' : 'pressEmber') : '';
+  if ($('tip').textContent !== line) $('tip').textContent = line;
+}
+function drawSteerDemo() {
+  if (!steerHint.shown || !demoOpacity) return;
+  g.save();
+  g.translate(W / 2 + demoOffset * dpr, H - (demoBottom() + 32) * dpr);
+  g.globalAlpha = demoOpacity * 0.72;
+  hull(g, skin('boat')[0], 220 * dpr, '#c9c1ac', 0);
+  g.restore();
+}
 
 // Buttons.
-$('dareGo').addEventListener('click', () => { dareRun = dare; endless = true; tower = daily = false; if (newcomer()) { show('tutor'); return; } begin(); });
+function playStory() { endless = tower = daily = false; begin(); }
+$('play').addEventListener('click', playStory);
+$('dareGo').addEventListener('click', () => playDare());
 $('dareSend').addEventListener('click', dareSend);
-$('play').addEventListener('click', () => { dareRun = null; endless = tower = daily = false; if (newcomer()) { show('tutor'); return; } begin(); });
+$('ordinaryPlay').addEventListener('click', e => {
+  if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  e.preventDefault();
+  playStory();
+});
+$('moreOptions').addEventListener('click', () => { landingMore = true; menu(); $('toModes').focus(); });
 $('toTutor').addEventListener('click', () => tutorial());
 $('tutorYes').addEventListener('click', () => tutorial());
-$('tutorNo').addEventListener('click', () => { store.set('lantern-tutorial', '1'); if (dareRun) { endless = true; tower = daily = false; } else endless = tower = daily = false; begin(); }); // a newcomer who came by a dare goes on to it
-$('endless').addEventListener('click', () => { dareRun = null; endless = true; tower = daily = false; begin(); });
-$('daily').addEventListener('click', () => { dareRun = null; endless = daily = true; tower = false; begin(); });
+$('tutorNo').addEventListener('click', () => { if (dare) playDare(); else playStory(); });
+$('endless').addEventListener('click', () => { endless = true; tower = daily = false; begin(); });
+$('daily').addEventListener('click', () => { endless = daily = true; tower = false; begin(); });
 $('tower').addEventListener('click', () => { tower = true; endless = daily = false; climb = towerAt(); fromFloor = towerFloor(); begin(); });
 $('anew').addEventListener('click', () => { // two taps: the first only asks, so a stray tap does not lose the climb
   const b = $('anew'); if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = t('anewSure'); return; }
@@ -974,18 +1122,43 @@ $('askYes').addEventListener('click', () => {
   store.set('lantern-name', n); $('ask').hidden = true; if (lastRun) { lastRun.n = n; store.set('lantern-board', JSON.stringify(board)); } share(true);
 });
 $('askNo').addEventListener('click', () => { $('ask').hidden = true; share(false); });
-$('boardPlay').addEventListener('click', () => { if (busy) return; dareRun = null; endless = true; tower = false; daily = tab === 'day' && !!shared; begin(); });
+$('boardPlay').addEventListener('click', () => { if (busy) return; endless = true; tower = false; daily = tab === 'day' && !!shared; begin(); });
 $('name').addEventListener('input', () => { store.set('lantern-name', cleanName($('name').value)); });
 $('name').addEventListener('change', () => { $('name').value = playerName(); boardShow(); });
 $('name').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') $('name').blur(); });
 for (const b of document.querySelectorAll('.back')) b.addEventListener('click', () => show('menu'));
-$('go').addEventListener('click', () => { if (paused) resume(); else if (performance.now() - ended > 600) { if (mod?.go?.()) return; if (tower) { onward = s.over === 'dawn' && climbNext > climb; climb = climbNext; fromFloor = towerFloor(); } begin(); } });
-// Lab recording (experiments/kit/lab.js): the notice on the menu, the switch on the pause card; begin, finish, quit and the shop call rec.
-const rec = lab('lantern'), notice = rec.notice($('menu').firstElementChild), recording = rec.toggle($('card').firstElementChild);
+$('go').addEventListener('click', () => {
+  if (screen !== 'card') return;
+  if (paused) { resume(); return; }
+  if (practiceFinished && dare) { playDare(); return; }
+  if (s.dare) { playDare(s.dare); return; }
+  if (mod?.go?.()) return;
+  if (tower) { onward = s.over === 'dawn' && climbNext > climb; climb = climbNext; fromFloor = towerFloor(); }
+  begin();
+});
+function retryStory(same) {
+  if (screen !== 'card' || paused) return;
+  stage = s.stage;
+  begin(same ? { replay: s } : undefined);
+}
+$('sameRiver').addEventListener('click', () => retryStory(true));
+$('wonSameRiver').addEventListener('click', () => retryStory(true));
+$('wonNewRiver').addEventListener('click', () => retryStory(false));
+$('skipCrash').addEventListener('click', () => {
+  if (screen !== 'play' || playing || $('skipCrash').hidden || !crash) return;
+  crash.t0 = performance.now() - 1300;
+  impactFx = null;
+  shake = 0;
+  show('card');
+});
+// The same recording switch is reachable before play and on the pause card.
+const rec = lab('lantern'), recording = rec.toggle($('recordMenu')), notice = rec.notice($('recordMenu'));
 // Settings (kit/settings.js; owner, 2026-11-27: more options, each with a default, and count who changes them). river: 'gentle' is the
 // default for a player with no save, 'classic' for one who has played before, decided once. view and music keep their old keys.
 const opts = settings('lantern', {
   river: { values: ['gentle', 'classic'], def: () => (newcomer() ? 'gentle' : 'classic') },
+  outline: { values: ['1', '0'], def: '1' },
+  haptics: { values: ['1', '0'], def: '1' },
   gain: { values: ['1', '1.3', '1.7'], def: '1.3' },
   view: { values: VIEWS, def: '2d', key: 'lantern-view' },
   music: { values: ['1', '0'], def: '1', key: 'lantern-music' },
@@ -993,8 +1166,8 @@ const opts = settings('lantern', {
 if (!Number(query.get('gain'))) gain = Number(opts.get('gain')) || 1.3;
 const setDraw = opts.panel($('setRows'), {
   label: id => t(`set_${id}`),
-  name: (id, v) => id === 'view' ? t(`view_${v}`) : id === 'music' ? t(v === '1' ? 'optOn' : 'optOff') : t(`${id}_${v}`),
-  what: (id, v) => id === 'river' ? t(`riverWhat_${v}`) : id === 'gain' ? t('gainWhat') : '',
+  name: (id, v) => id === 'view' ? t(`view_${v}`) : ['music', 'outline', 'haptics'].includes(id) ? t(v === '1' ? 'optOn' : 'optOff') : t(`${id}_${v}`),
+  what: (id, v) => id === 'river' ? t(`riverWhat_${v}`) : id === 'gain' ? t('gainWhat') : id === 'outline' ? t('outlineWhat') : id === 'haptics' ? t('hapticsWhat') : '',
   onChange: (id, v) => { if (id === 'gain') gain = Number(v); if (id === 'music') { musicOn = v === '1'; musicShow(); } if (id === 'view') setView(v).then(setDraw); },
 });
 window.lanternSet = () => ({ ...opts.snapshot(), changed: opts.changed(), defaults: opts.defaults(), gain, gentle: !!s.gentle }); // read by the browser checks
@@ -1002,11 +1175,11 @@ window.lanternSet = () => ({ ...opts.snapshot(), changed: opts.changed(), defaul
 if (notice) { const link = notice.querySelector('a'), copy = document.createElement('span'); copy.dataset.i18n = 'notice'; link.dataset.i18n = 'privacy'; notice.replaceChildren(copy, ' ', link); }
 if (recording) { const input = recording.querySelector('input'), copy = document.createElement('span'); copy.dataset.i18n = 'record'; recording.replaceChildren(input, ' ', copy); }
 // Leaving a paused run for the menu ends it and keeps its embers.
-$('toMenu').addEventListener('click', () => { if (paused) { rec.end('quit', { mode: mode(), night: mod ? mod.night() : tower || endless ? 0 : stage, reached: Math.floor(pct() * 100), embers: s.taken, hearts: s.hearts }); } if (paused) { paused = false; playing = false; if (!tutor) bankRun(); snd.release(); } tutor = null; $('tip').textContent = ''; show(mod ? 'mode' : 'menu'); });
+$('toMenu').addEventListener('click', () => { if (paused) { rec.end('quit', { mode: mode(), night: runNightNumber(), reached: Math.floor(pct() * 100), embers: s.taken, hearts: s.hearts }); } if (paused) { paused = false; playing = false; if (!tutor) bankRun(); snd.release(); } tutor = null; $('tip').textContent = ''; show(mod ? 'mode' : 'menu'); });
 
 // Pause: the button, P or Escape, and whenever the page loses the screen (a phone call, another app).
 function pauseText() { // the pause card's words; the language button draws them again
-  $('toMenu').textContent = t('menu'); $('title').textContent = t('paused'); $('line').textContent = mod ? mod.pauseLine() : endless ? t('pauseScore', { n: score(s) }) : tutor ? t('pauseTutor') : tower ? t('pauseTower', { tag: tag(climb), f: Math.floor(progress(s) * FLOORS), of: FLOORS }) : t('pauseNight', { n: stage, pct: Math.floor(progress(s) * 100) }); $('sub').textContent = t(view === 'first' && steering !== 'slide' ? (tilting() ? 'touchGoTilt' : 'touchGoFirst') : 'touchGo'); $('go').textContent = t('goOn');
+  $('toMenu').textContent = t('menu'); $('title').textContent = t('paused'); $('line').textContent = mod ? mod.pauseLine() : endless ? t('pauseScore', { n: score(s) }) : tutor ? t('pauseTutor') : tower ? t('pauseTower', { tag: tag(climb), f: Math.floor(progress(s) * FLOORS), of: FLOORS }) : t('pauseNight', { n: s.stage, pct: Math.floor(progress(s) * 100) }); $('sub').textContent = t(view === 'first' && steering !== 'slide' ? (tilting() ? 'touchGoTilt' : 'touchGoFirst') : 'touchGo'); $('go').textContent = t('goOn');
 }
 function pause(why) { // why: 'button', 'key', or nothing (the page lost the screen)
   if (!playing || paused) return; if (mod?.pause?.(why)) return; // a mode may take the pause (Race: a live race cannot stop its clock, so the boat retires)
@@ -1021,35 +1194,58 @@ function resume() {
 pauseButton.addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); pause('button'); });
 onLeave(pause);
 const keys = new Set();
+const KEY_SIDE = new Map([['ArrowLeft', -1], ['a', -1], ['ArrowRight', 1], ['d', 1]]);
 addEventListener('keydown', e => {
   if (looking) { unlook(); return; }
   if (isPauseKey(e)) { paused ? resume() : pause('key'); return; }
   if (paused) { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); resume(); } return; }
-  keys.add(e.key);
+  const key = e.key.toLowerCase();
+  if (playing && KEY_SIDE.has(key)) { e.preventDefault(); keys.add(key); }
 });
-addEventListener('keyup', e => keys.delete(e.key));
+addEventListener('keyup', e => {
+  if (keys.delete(e.key.toLowerCase()) && !keys.size) { target = s.x; slide = 0; steer.rebase(); }
+});
+
+function markImpact() {
+  const impact = s.impact;
+  if (!impact) return;
+  impactFx = { ...impact, time: performance.now(), side: Math.sign(impact.x - s.x), safe: s.safe };
+  if (snd.ctx) snd.noise(0.16, 0.22, 2400);
+  if (opts.get('haptics') === '1') navigator.vibrate?.(30);
+}
 
 // What each event of a run sounds and looks like; the shop's showings of an ability use it too.
 function react(e) {
   // With the music on in a run, an ember plays the next note of tonight's melody (kit/music.js); elsewhere (the shop's showings) a chime as before.
-  if (e === 'ember') { const n = streak++; if (!(song && musicOn && song.ember())) tone(song && musicOn ? song.chime(Math.min(n, 7)) : scale[Math.min(n, scale.length - 1)], 0.5, 0.12, 'triangle'); glow = 1; for (let i = 0; i < 8; i++) sparks.push({ x: s.x, y: s.y, vx: (Math.random() - 0.5) * 0.4, vy: Math.random() * 0.5, life: 0.6 }); }
+  if (e === 'ember') {
+    tone(1500, 0.055, 0.08, 'triangle', -620);
+    const n = streak++;
+    if (!(song && musicOn && song.ember())) tone(song && musicOn ? song.chime(Math.min(n, 7)) : scale[Math.min(n, scale.length - 1)], 0.5, 0.12, 'triangle');
+    glow = 1;
+    if (s.emberPickup) {
+      const { before, after } = s.emberPickup;
+      pickupFx = { ...s.emberPickup, time: performance.now() };
+      fuel.style.setProperty('--restored-from', `${before * 100}%`);
+      fuel.style.setProperty('--restored-size', `${(after - before) * 100}%`);
+    }
+    if (playing) { bump($('count')); bump(fuel); }
+  }
   if (e === 'graze') { tone(1320, 0.12, 0.05); glow = Math.max(glow, 0.5); }
   if (e === 'shield') { tone(880, 0.5, 0.1); setTimeout(() => tone(1320, 0.7, 0.08), 110); glow = 1; say(t('sayField'), 1700); }
   if (e === 'push') { tone(300, 0.15, 0.08, 'triangle', 220); snd.ctx && snd.noise(0.08, 0.1, 900); }
   if (e === 'fieldEnd') tone(660, 0.3, 0.06, 'sine', -300);
   if (e === 'break') {
     // The shield took the blow. Steering restarts from where the boat now is, so a held finger does not drag it back in.
-    tone(240, 0.35, 0.25, 'square'); tone(1760, 0.25, 0.06); shake = 0.6; target = s.x; steer.rebase();
-    for (let i = 0; i < 14; i++) sparks.push({ x: s.x, y: s.y, vx: (Math.random() - 0.5) * 0.9, vy: (Math.random() - 0.3) * 0.9, life: 0.7, blue: true });
+    tone(240, 0.35, 0.25, 'square'); tone(1760, 0.25, 0.06); target = s.x; steer.rebase();
   }
   if ((e === 'wisp' || e === 'hurt' || e === 'break') && playing) song?.hit(); // a blow: the melody's streak ends and the music thins for two bars
   if (e === 'wisp') { tone(150, 0.5, 0.2, 'sawtooth'); say(t('sayWisp'), 1400); streak = 0; }
   if (e === 'heart') { tone(523.25, 0.4, 0.1, 'triangle'); setTimeout(() => tone(783.99, 0.6, 0.1, 'triangle'), 120); glow = 1; say(t('sayHeart'), 1500); }
   if (e === 'hurt') {
     // A heart took the blow. Steering restarts from where the boat now is.
-    tone(180, 0.4, 0.3, 'square'); shake = 0.8; target = s.x; steer.rebase();
-    for (let i = 0; i < 14; i++) sparks.push({ x: s.x, y: s.y, vx: (Math.random() - 0.5) * 0.9, vy: (Math.random() - 0.3) * 0.9, life: 0.7, red: true });
-    say(t('sayHurt'), 1500);
+    tone(180, 0.25, 0.18, 'triangle'); target = s.x; steer.rebase();
+    const key = `why_${s.impact?.cause}`, cause = t(key);
+    say(cause !== key ? cause : t(s.impact ? 'why_rock' : 'sayHurt'), 1500);
   }
   if (e === 'boost') { [392, 523.25, 783.99, 1046.5].forEach((f, i) => setTimeout(() => tone(f, 0.3, 0.09, 'sawtooth'), i * 60)); glow = 1; say(t('sayBoost'), 1600); }
   if (e === 'slow') { tone(440, 0.9, 0.1); setTimeout(() => tone(330, 1.1, 0.1), 160); glow = 1; say(t('saySlow'), 1800); }
@@ -1058,14 +1254,15 @@ function react(e) {
   if (e === 'magnet') { tone(660, 0.3, 0.1, 'triangle'); setTimeout(() => tone(990, 0.5, 0.1, 'triangle'), 90); glow = 1; say(t('sayMagnet'), 1700); }
   if (e === 'flare') { [523.25, 783.99, 1046.5, 1568].forEach((f, i) => setTimeout(() => tone(f, 0.7, 0.08), i * 70)); glow = 1; say(t('sayFlare'), 1600); }
   if (e === 'hit') crashFx(s.over);
+  if (e === 'hit' || e === 'hurt' || e === 'break') markImpact();
   if (e === 'out') tone(110, 1.2, 0.2);
   if (e === 'dawn') { [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => setTimeout(() => tone(f, 1.6, 0.1, 'triangle'), i * 180)); if (winOn.length) winFx(winOn[Math.floor(Math.random() * winOn.length)]); }
 }
 function tick() {
-  if (keys.has('ArrowLeft') || keys.has('a')) target = s.x - 0.1;
-  if (keys.has('ArrowRight') || keys.has('d')) target = s.x + 0.1;
-  const keyed = keys.has('ArrowLeft') || keys.has('a') || keys.has('ArrowRight') || keys.has('d');
+  const keyed = keys.size > 0;
   if (view === 'first' && !keyed) glide(); else slide = 0;
+  if (keyed) { deliberateSteer(); target = s.x + 0.1 * KEY_SIDE.get([...keys].at(-1)); }
+  introTick();
   const was = s.x; if (tutor) { s.light = Math.max(s.light, tutor.at === 2 ? 0.2 : 0.45); s.hearts = Math.max(2, s.hearts); }
   const events = mod ? mod.step(target) : (step(s, target), s.events);
   for (const e of events) { react(e); mod?.react(e); }
@@ -1132,9 +1329,57 @@ function wreck(now) {
 }
 // 3D and first person. The WebGL canvas holds the river; this one holds what lies on top of it, placed where the 3D picture says.
 const rgb = t => t.split(',').map(v => v / 255), hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255);
+const markHazards = () => playing && s.gentle && opts.get('outline') === '1';
+const fxAge = (fx, now) => fx ? Math.max(0, (now - fx.time) / 1000) : Infinity;
+const recoil = now => reducedMotion.matches ? 0 : Math.max(0, 1 - fxAge(impactFx, now) / 0.22) ** 2;
+function drawContact(now, project, fx, radius) {
+  const hitAge = fxAge(impactFx, now);
+  g.save();
+  if (hitAge < 0.48) {
+    const p = hitAge / 0.48, [x, y] = project(impactFx.x, impactFx.y, 0.015);
+    g.globalAlpha = 1 - p;
+    g.lineWidth = (2.5 - p) * dpr;
+    g.strokeStyle = '#d0edf7';
+    g.beginPath();
+    g.ellipse(x, y, (7 + 35 * p) * dpr, (4 + 16 * p) * dpr, 0, 0, Math.PI * 2);
+    g.stroke();
+    g.fillStyle = '#ecfaff';
+    for (let i = 0; i < 9; i++) {
+      const angle = i * 2.4, spread = 5 + 30 * p;
+      g.beginPath();
+      g.arc(x + Math.cos(angle) * spread * dpr, y + (Math.sin(angle) * spread * 0.55 - 48 * p * (1 - p)) * dpr, (2 - p) * dpr, 0, Math.PI * 2);
+      g.fill();
+    }
+  }
+  if (impactFx?.safe && hitAge > 0.12 && s.safe && playing && !s.boost && !s.field) {
+    const left = Math.max(0, Math.min(1, s.safe / (impactFx.safe - 0.12)));
+    g.globalAlpha = Math.min(1, left * 4);
+    g.strokeStyle = '#bce5ff'; g.lineWidth = 2 * dpr;
+    const [x, y] = project(s.x, s.y, 0.009);
+    g.beginPath();
+    g.ellipse(x, y, radius, radius * 0.72, 0, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * left);
+    g.stroke();
+  }
+  const pickupAge = fxAge(pickupFx, now);
+  if (pickupAge < 0.24 && !reducedMotion.matches) {
+    const p = (pickupAge / 0.24) ** 1.6;
+    const [x, y] = project(pickupFx.x, pickupFx.y, 0.045);
+    const dx = fx[0] - x, dy = fx[1] - y;
+    for (let i = 3; i >= 0; i--) {
+      const f = Math.max(0, p - i * 0.12);
+      g.globalAlpha = 1 - i * 0.23;
+      g.fillStyle = i ? '#ffb563' : '#fff2c1';
+      g.beginPath();
+      g.arc(x + dx * f, y + dy * f - 8 * Math.sin(Math.PI * f) * dpr, (3.7 - i * 0.7) * dpr, 0, Math.PI * 2);
+      g.fill();
+    }
+  }
+  g.restore();
+}
 function draw3(now, dt, dawn, day) {
   const first = view === 'first', e = crash ? Math.max(0, Math.min(1, (now - crash.t0) / 900)) : 0;
-  R3.draw(s, { now, dt, target: first ? s.x + slide * 0.12 : target, shake, glow, sparks, dawn, day, playing, snap: snap3, cam: view, fire: rgb(skin('flame')[2]), wet: hex(skin('water')[2]).map(v => 0.02 + 0.5 * v), tint: skin('boat')[0] === 'oak' ? null : hex(skin('boat')[2]), hideBoat: !!crash && !first, sink: first ? e : 0 });
+  const kick = recoil(now);
+  R3.draw(s, { now, dt, target: first ? s.x + slide * 0.12 : target, shake: reducedMotion.matches ? 0 : shake, recoilX: kick * (impactFx?.side || 0) * 0.016, recoilY: kick * 0.012, glow, sparks, dawn, day, playing, snap: snap3, cam: view, fire: rgb(skin('flame')[2]), wet: hex(skin('water')[2]).map(v => 0.02 + 0.5 * v), tint: skin('boat')[0] === 'oak' ? null : hex(skin('boat')[2]), hideBoat: !!crash && !first, sink: first ? e : 0 });
   snap3 = false;
   const k = W / canvas3.width, at = (x, y, h = 0) => R3.project(x, -(y - s.y), h).map(v => v * k), row = R3.boatRow().unit * k;
   g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; g.clearRect(0, 0, W, H);
@@ -1144,6 +1389,7 @@ function draw3(now, dt, dawn, day) {
     const mx = W * 0.95 - turn * 0.4, my = hy * (0.32 + 0.6 * progress(s)), mr = 13 * dpr, mg = g.createRadialGradient(mx, my, mr * 0.6, mx, my, mr * 4); mg.addColorStop(0, `rgba(230,235,255,${0.25 * f})`); mg.addColorStop(1, 'rgba(230,235,255,0)');
     g.fillStyle = mg; g.fillRect(mx - mr * 4, my - mr * 4, mr * 8, mr * 8); g.fillStyle = `rgba(232,236,250,${0.85 * f})`; g.beginPath(); g.arc(mx, my, mr, 0, 7); g.fill();
   }
+  if (markHazards()) drawHazards(g, s, at, dpr);
   if (s.tower) for (let f = 1; f < FLOORS; f++) { // each floor's ledge, with its number
     const y = f * GOAL / FLOORS, d = y - s.y; if (d < 0.1 || d > 2.6) continue;
     const c = centre(s, y), h = half(s, y), a = at(c - h, y, 0.01), b = at(c + h, y, 0.01), fade = Math.min(1, (2.6 - d) / 0.6);
@@ -1165,10 +1411,12 @@ function draw3(now, dt, dawn, day) {
     g.fillStyle = `rgba(255,217,160,${0.5 + 0.45 * Math.abs(k)})`; g.beginPath(); g.arc(W / 2 + k * w, y, 8 * dpr, 0, 7); g.fill();
     if (s.t < 4) { g.fillStyle = `rgba(255,230,189,${Math.min(0.9, 4 - s.t)})`; g.font = `${16 * dpr}px Georgia, serif`; g.textAlign = 'center'; g.textBaseline = 'bottom'; g.fillText(t('tiltHint'), W / 2, y - 16 * dpr); }
   }
-  else if (first && playing && !paused) for (const d of [-1, 1]) { // the two halves to press
+  else if (first && playing && !paused && !dragging()) for (const d of [-1, 1]) { // the two halves to press
     const on = pads.side() === d, x = W / 2 + d * W * 0.38, y = H * 0.9, r = 12 * dpr; g.strokeStyle = `rgba(255,217,160,${on ? 0.95 : 0.4})`; g.lineWidth = (on ? 5 : 3.5) * dpr; g.lineCap = 'round'; g.lineJoin = 'round'; g.beginPath(); g.moveTo(x - d * r * 0.5, y - r); g.lineTo(x + d * r * 0.5, y); g.lineTo(x - d * r * 0.5, y + r); g.stroke();
   }
   if (victory) winDraw(now);
+  drawContact(now, at, R3.lampPosition().map(v => v * k), 0.06 * row);
+  drawSteerDemo();
   if (!s.endless) { g.fillStyle = 'rgba(255,217,160,.5)'; g.fillRect(0, 0, W * progress(s), 3 * dpr); }
 }
 function boatAt(now, bx, by) { // the boat in its looks, or its crash; a mode draws it with this too
@@ -1184,7 +1432,9 @@ function draw(now) {
   if (mod && !looking) canvas3.hidden = true; // a mode is drawn flat
   if (mod?.draw && !looking) { mod.draw(now, day); return; } // a mode that draws its own river (Spark); one without draw() (Tide) draws on the page's river through water()
   const solid = view !== '2d' && R3 && !looking; canvas3.hidden = !solid; if (solid) { draw3(now, step3, dawn, day); return; } // a look in the shop stays flat
-  const ox = shake * (Math.random() - 0.5) * 14 * dpr, oy = shake * (Math.random() - 0.5) * 14 * dpr;
+  const kick = recoil(now), jitter = reducedMotion.matches ? 0 : shake * 14;
+  const ox = (jitter * (Math.random() - 0.5) - kick * (impactFx?.side || 0) * 9) * dpr;
+  const oy = (jitter * (Math.random() - 0.5) + kick * 6) * dpr;
   g.setTransform(1, 0, 0, 1, ox, oy);
   const wet = skin('water'), fire = skin('flame')[2];
   const two = s.tower && s.climb > LEVELS; // the second sector is built of violet stone
@@ -1257,15 +1507,17 @@ function draw(now) {
   // darkness with a hole of light
   const flick = 1 + Math.sin(now / 90) * 0.015 + Math.sin(now / 37) * 0.01, r = (sight(s) + glow * 0.09) * unit * flick, flash = dazzle(s) < 0;
   const dark = flash ? 0.25 : looking === 'win' ? 0.2 : looking === 'power' ? 0.8 : looking ? 0.45 : Math.max(0, 0.97 - dawn * 0.75 - day); // a look shown in the shop is lit wider
-  const m = g.createRadialGradient(bx, by - 0.05 * unit, r * 0.15, bx, by - 0.05 * unit, r);
+  const lead = poolLead(s), ly = by - lead * unit;
+  const m = g.createRadialGradient(bx, ly - 0.05 * unit, r * 0.15, bx, ly - 0.05 * unit, r);
   m.addColorStop(0, 'rgba(4,6,12,0)'); m.addColorStop(0.7, `rgba(4,6,12,${dark * 0.55})`); m.addColorStop(1, `rgba(4,6,12,${dark})`);
   g.fillStyle = m; g.fillRect(-20, -20, W + 40, H + 40);
+  if (markHazards()) drawHazards(g, s, (x, y) => [sx(x), sy(y)], dpr);
   // warm wash inside the light
   g.globalCompositeOperation = 'lighter';
-  const w = g.createRadialGradient(bx, by, 0, bx, by, r * 0.8);
+  const w = g.createRadialGradient(bx, ly, 0, bx, ly, r * 0.8);
   w.addColorStop(0, `rgba(${fire},${0.22 + glow * 0.2})`); w.addColorStop(1, `rgba(${fire},0)`);
-  g.fillStyle = w; g.fillRect(bx - r, by - r, r * 2, r * 2);
-  if (!s.tower) reeds(g, edge, sy, unit, s.y - sight(s) - 0.1, s.y + sight(s) + 0.2, now / 1000, { x: bx, y: by, r, rgb: fire, a: dark }); // the lantern lights the reed tips
+  g.fillStyle = w; g.fillRect(bx - r, ly - r, r * 2, r * 2);
+  if (!s.tower) reeds(g, edge, sy, unit, s.y + lead - sight(s) - 0.1, s.y + lead + sight(s) + 0.2, now / 1000, { x: bx, y: ly, r, rgb: fire, a: dark }); // the lantern lights the reed tips
   // embers show through the dark: you can see where light is before you can see what guards it
   for (const e of s.embers) if (!e.got) {
     const ex = sx(e.x), ey = sy(e.y) + Math.sin(now / 300 + e.y * 9) * 2 * dpr, er = 0.05 * unit;
@@ -1298,7 +1550,7 @@ function draw(now) {
     const bub = g.createRadialGradient(bx, by, R * 0.5, bx, by, R); bub.addColorStop(0, 'rgba(120,190,255,0)'); bub.addColorStop(1, `rgba(140,205,255,${0.35 * fade})`); g.fillStyle = bub; g.beginPath(); g.arc(bx, by, R, 0, 7); g.fill();
     g.strokeStyle = `rgba(170,220,255,${0.9 * fade})`; g.lineWidth = 2.5 * dpr; g.beginPath(); g.arc(bx, by, R, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI * s.field / full); g.stroke();
   }
-  if (s.shield || (s.safe > 0 && !s.boost && !s.field && Math.floor(now / 90) % 2)) {
+  if (s.shield) {
     halo(g, bx, by, unit, s.shield ? 1 : 0.5, now / 1000);
     g.strokeStyle = `rgba(120,190,255,${s.shield ? 0.2 : 0.12})`; g.lineWidth = 9 * dpr; g.beginPath(); g.arc(bx, by - 0.005 * unit, (0.06 + 0.006 * Math.max(0, s.shield - 1)) * unit, 0, 7); g.stroke();
     g.strokeStyle = `rgba(120,190,255,${s.shield ? 0.8 : 0.5})`; g.lineWidth = 2.5 * dpr;
@@ -1324,6 +1576,10 @@ function draw(now) {
     g.globalCompositeOperation = 'lighter'; flood(g, W, H, dawn, day); g.globalCompositeOperation = 'source-over'; // the morning pours down the river
   }
   if (victory) winDraw(now);
+  if (!looking) {
+    drawContact(now, (x, y) => [sx(x), sy(y)], [bx, by], 0.06 * unit);
+    drawSteerDemo();
+  }
   // progress: a thin line at the top edge on a story night
   if (!s.endless && !looking) { g.fillStyle = 'rgba(255,217,160,.5)'; g.fillRect(0, 0, W * progress(s), 3 * dpr); }
 }
@@ -1334,6 +1590,12 @@ function frame(now) {
   tilt.awake(playing && !paused && tilting());
   if (playing && !paused && !tilt.asking()) { acc += dt; while (acc >= DT && playing) { tick(); acc -= DT; } }
   else if (looking) drift(dt);
+  if (pickupFx) {
+    const pickupAge = fxAge(pickupFx, now);
+    fuel.style.setProperty('--restored-alpha', Math.max(0, 1 - pickupAge / 0.55));
+    if (pickupAge >= 0.55) pickupFx = null;
+  }
+  $('hearts').classList.toggle('hit', fxAge(impactFx, now) < 0.45);
   if (!paused && !(s.over && s.over !== 'dawn')) burn(fire0, skin('flame')[0], dt, Math.max(-0.5, Math.min(0.5, (target - s.x) * 4)), s.light);
   shake = Math.max(0, shake - dt * 3); glow = Math.max(0, glow - dt * 2);
   for (const p of sparks) { p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; } sparks = sparks.filter(p => p.life > 0);
@@ -1365,7 +1627,7 @@ const askedMode = (query.get('mode') ?? '').split('?')[0]; // the worker's lab r
 const askedView = (query.get('view') ?? '').split('?')[0]; // /lantern/?view=3d opens this visit in 3D (the lab's old ripples address); the saved choice is kept
 const startView = VIEWS.includes(askedView) ? askedView : read('lantern-view', '2d');
 views(); if (startView !== '2d' && !Object.hasOwn(MODES, askedMode)) setView(startView, false);
-show('menu'); chooseMode(askedMode); // /lantern/?mode=spark opens with Spark chosen
+show('menu'); if (!dare) chooseMode(askedMode); // /lantern/?mode=spark opens with Spark chosen
 requestAnimationFrame(frame);
 </script>
 <script src="/notes/button.js" id="notesScript" defer></script>

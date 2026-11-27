@@ -8,7 +8,7 @@ import { hull, wake, reeds } from '../looks.js?v=4';
 import { drag } from '../../kit/drag.js';
 import { hint } from '../../kit/hint.js';
 import { read, readJson, writeJson } from '../../kit/save.js';
-import { t } from '../words.js';
+import { t } from '../words.js?v=1';
 
 // Save. lantern-mode-duet:save is { v: 1, best: { night, pct }, unlocked: nights open, played: runs }.
 // The lab page's save (lantern-duet:v1, { best, unlocked, sound }) is read once for its best and its nights, and never written.
@@ -158,7 +158,7 @@ export function mode(page) {
     if (won && n >= NIGHTS) { night = 1; return { title: t('dawn'), line: t('duetAll'), go: t('playNight', { n: 1 }) }; }
     if (won) { night = n + 1; return { title: t('dawn'), line: t('duetWon', { taken: s.taken, snags: s.snags, next: night }), go: t('playNight', { n: night }) }; }
     const why = t(['dark', 'bank', 'rope'].includes(s.over) ? `why_${s.over}` : 'why_rock');
-    return { title: t('nightTitle', { n }), line: t('duetLost', { why, pct, taken: s.taken, snags: s.snags }) + (bestText() ? ' ' + bestText() + '.' : ''), go: t('playAgain') };
+    return { title: t('dawnResult', { n: pct }), line: t('duetLost', { why, snags: s.snags }) + (bestText() ? ' ' + bestText() + '.' : ''), go: t('playAgain') };
   }
 
   // ------------------------------------------------------------ drawing, from the lab page, in the canvas's device pixels

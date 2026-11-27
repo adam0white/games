@@ -1,9 +1,10 @@
 // Lantern 3D renderer: draws one frame of the Lantern simulation with WebGL2.
 // It reads the simulation and never changes it. World axes: x is the sim's x (river units),
 // y is up, z points back toward the camera; the boat's row is always z = 0, so z = -(y - s.y).
-import { centre, half, fall, fog, wind, rain, sight, dazzle, boat, BOAT, DT } from './sim.js?v=15';
-import { disturb, solids, riverOf, SPONGE } from './ripples.js';
-import { createWaterGL } from './ripples-gl.js';
+import { centre, half, fall, fog, wind, rain, sight, dazzle, boat, BOAT, DT } from './sim.js?v=16';
+import { poolLead } from './hazards.js?v=1';
+import { disturb, solids, riverOf, SPONGE } from './ripples.js?v=1';
+import { createWaterGL } from './ripples-gl.js?v=1';
 
 const ROWS = 256, DY = 0.05, BEHIND = 40; // river table: 256 rows, 0.05 apart, from 2 units behind the boat
 const NEAR = -1.2, FAR = 4.2, ROW_STEP = 0.025; // ground mesh rows, boat-relative
@@ -24,6 +25,7 @@ uniform sampler2D uRows;
 uniform float uTime;
 uniform vec3 uLamp;
 uniform vec3 uLampCol;
+uniform float uPoolLead;
 uniform float uR;
 uniform vec4 uPt[8];
 uniform vec3 uPtCol[8];
@@ -52,9 +54,9 @@ float bankH(float off, float yA, float side) {
   float n = vnoise(vec2(yA * 7., off * 9. + side * 17.));
   return 0.075 * smoothstep(0.0, 0.07, off) * (0.7 + 0.6 * n) + 0.03 * smoothstep(0.15, 0.6, off) * n - 0.008 * (1. - smoothstep(0., 0.01, off));
 }
-// The lantern: a point light whose reach ends at uR river units across the water.
+// The lantern's pool reaches farther ahead of the bow on Gentle.
 float lampW(vec3 p) {
-  float x = length(p.xz - uLamp.xz) / uR;
+  float x = length(p.xz - uLamp.xz + vec2(0., uPoolLead)) / uR;
   float w = clamp(1. - x * x * x * x, 0., 1.);
   return w * w / (1. + 3. * x * x);
 }
@@ -677,7 +679,7 @@ export function createRenderer(canvas) {
   const overVao = gl.createVertexArray();
   gl.bindVertexArray(null);
 
-  let W = 1, H = 1, camX = 0.5, vp = null, view = null, cam = null, trail = [], lastY = -1;
+  let W = 1, H = 1, camX = 0.5, vp = null, view = null, cam = null, trail = [], lastY = -1, lampScreen = [0, 0];
 
   // ---------- the ripples (ripples.js, ripples-gl.js): on unless the browser cannot run them, the frames run long, or the player asks for less motion ----------
   // ?ripples=0, 1 or 2 holds a quality level (the checks use this); ?ripples=cpu runs the CPU solver. Nothing is saved.
@@ -747,7 +749,7 @@ export function createRenderer(canvas) {
     sample: () => RIP.water?.sample() ?? null,
     // The GPU solver against the CPU one (the one bots.mjs checks): one ring by a straight bank, 30 ticks. Returns the largest difference and the highest wave.
     agree: async () => {
-      const { createField } = await import('./ripples.js'), level = RIP.water?.level || 2, a = createWaterGL(gl, level), b = createField(level), river = () => [0.5, 0.3], d = [{ x: 0.55, y: 11, r: 0.04, a: 1 }], rock = [{ x: 0.42, y: 11.12, rad: 0.03, len: 0 }];
+      const { createField } = await import('./ripples.js?v=1'), level = RIP.water?.level || 2, a = createWaterGL(gl, level), b = createField(level), river = () => [0.5, 0.3], d = [{ x: 0.55, y: 11, r: 0.04, a: 1 }], rock = [{ x: 0.42, y: 11.12, rad: 0.03, len: 0 }];
       a.step(10, river, rock, d, 0); b.step(10, river, rock, d, 0); a.step(10, river, rock, [], 30); b.step(10, river, rock, [], 30);
       const x = a.sample(); a.dispose(); let diff = 0, top = 0; for (let k = 0; k < x.h.length; k++) { diff = Math.max(diff, Math.abs(x.h[k] - b.h[k])); top = Math.max(top, Math.abs(b.h[k])); }
       return { path: a.path, diff, top };
@@ -776,6 +778,7 @@ export function createRenderer(canvas) {
     if (u.uTime) gl.uniform1f(u.uTime, c.time);
     if (u.uLamp) gl.uniform3fv(u.uLamp, c.lamp);
     if (u.uLampCol) gl.uniform3fv(u.uLampCol, c.lampCol);
+    if (u.uPoolLead) gl.uniform1f(u.uPoolLead, c.poolLead);
     if (u.uR) gl.uniform1f(u.uR, c.R);
     if (u.uPt) gl.uniform4fv(u.uPt, c.pt);
     if (u.uPtCol) gl.uniform3fv(u.uPtCol, c.ptCol);
@@ -819,7 +822,7 @@ export function createRenderer(canvas) {
     const own = CAMS[f.cam], C = own || CAM, first = f.cam === 'first', sink = f.sink || 0;
     const mid = centre(s, s.y + 0.3), want = first ? s.x : own ? mid + (s.x - mid) * 0.35 : mid;
     camX += (want - camX) * Math.min(1, (f.dt || 0) * (first ? 14 : 2.5));
-    const sh = f.shake * (first ? 0.006 : 0.02), jx = sh * (Math.random() - 0.5), jy = sh * (Math.random() - 0.5);
+    const sh = f.shake * (first ? 0.006 : 0.02), jx = sh * (Math.random() - 0.5) + (f.recoilX || 0), jy = sh * (Math.random() - 0.5) + (f.recoilY || 0);
     const turn = own ? (centre(s, s.y + 1) - centre(s, s.y)) * (first ? 0.7 : 0.35) : 0; // the view turns with the river
     const swing = first ? turn / (C.look + C.back) : 0; // the eye stays behind the boat as the view turns
     const eye = [camX - swing * C.back + jx, C.h * (1 - 0.8 * sink) + jy, C.back], at = [camX + jx + turn, first ? 0.06 + 0.1 * sink : 0, -C.look];
@@ -834,6 +837,7 @@ export function createRenderer(canvas) {
     // the size ability makes the boat smaller or bigger, as the rules do
     const grow = boat(s) / BOAT; for (let i = 0; i < 12; i++) M[i] *= grow;
     const lamp = [M[0] * LAMP[0] + M[4] * LAMP[1] + M[8] * LAMP[2] + M[12], M[1] * LAMP[0] + M[5] * LAMP[1] + M[9] * LAMP[2] + M[13], M[2] * LAMP[0] + M[6] * LAMP[1] + M[10] * LAMP[2] + M[14]];
+    lampScreen = project(lamp[0], lamp[2], lamp[1] + 0.003);
     // the light's reach: the same circle the flat page draws, including fog, lightning and the ember glow
     const clock = RIP.still ? 1000 : f.now, flick = 1 + Math.sin(clock / 90) * 0.015 + Math.sin(clock / 37) * 0.01, R = (sight(s) + f.glow * 0.09) * flick, flash = dazzle(s) < 0;
     const lampCol = (f.fire ? f.fire.map(v => v * v * 2.4 * flick + 0.15) : [2.6 * flick, 1.55 * flick, 0.75 * flick]).map(v => v * (1 + f.glow * 0.4));
@@ -848,7 +852,7 @@ export function createRenderer(canvas) {
     const near = s.embers.filter(e => !e.got && e.y > s.y - 0.6 && e.y < s.y + 2.6).sort((a, b) => Math.abs(a.y - s.y) - Math.abs(b.y - s.y)).slice(0, 8);
     near.forEach((e, i) => { pt.set([e.x, 0.05, -(e.y - s.y), 0.2], i * 4); ptCol.set(glowCol(e).map(v => v * 0.55), i * 3); });
 
-    const c = { eye, sy: s.y, yb, time, lamp, lampCol, R, pt, ptCol, npt: near.length, amb, horizon, dawnHaze: morning * 0.8, expo: 1.6 + morning * 0.4, wet: f.wet || [0.04, 0.075, 0.09], tint: f.tint, haze: own ? 1 - morning : 0, reedK: first ? 0.6 : 1, stone: own && s.tower ? (s.climb > 50 ? 2 : 1) : 0 };
+    const c = { eye, sy: s.y, yb, time, lamp, lampCol, poolLead: poolLead(s), R, pt, ptCol, npt: near.length, amb, horizon, dawnHaze: morning * 0.8, expo: 1.6 + morning * 0.4, wet: f.wet || [0.04, 0.075, 0.09], tint: f.tint, haze: own ? 1 - morning : 0, reedK: first ? 0.6 : 1, stone: own && s.tower ? (s.climb > 50 ? 2 : 1) : 0 };
 
     const water = ripples(s, f), rip = water && !RIP.hide && water.place(s.y);
     const ground = rip ? PR.ground : P.ground, decal = rip ? PR.decal : P.decal;
@@ -925,8 +929,7 @@ export function createRenderer(canvas) {
     }
     // the lantern's own reflection
     dec(lamp[0], s.y - 0.09, 0.03, 0.08, 7, 0.012, 0, [1.2, 0.7, 0.32, 0]);
-    // the shield: a blue ring while it is held, blinking just after it breaks
-    if (s.shield || (s.safe > 0 && Math.floor(f.now / 90) % 2)) { const r = 0.06 * (1 + Math.sin(f.now / 240) * 0.05), a = s.shield ? 1 : 0.6; dec(s.x, s.y, r * 1.8, r * 1.8, 6, r, 0, [0.5 * a, 0.9 * a, 2.0 * a, 0]); }
+    if (s.shield) { const r = 0.06 * (1 + Math.sin(f.now / 240) * 0.05); dec(s.x, s.y, r * 1.8, r * 1.8, 6, r, 0, [0.5, 0.9, 2.0, 0]); }
     if (s.field && own) { const r = 0.062 * (1 + Math.sin(f.now / 160) * 0.04); dec(s.x, s.y, r * 1.8, r * 1.8, 6, r, 0, [0.9, 1.3, 2.0, 0]); }
     for (const p of f.sparks) spr(p.x, 0.03 + 0.06 * (0.7 - p.life), -(p.y - s.y), 0.008, p.blue ? [0.6, 0.9, 1.6].map(v => v * p.life * 2) : p.red ? [1.6, 0.3, 0.35].map(v => v * p.life * 2) : [1.8, 1.1, 0.5].map(v => v * p.life * 2), 3);
     // the flame and its halo
@@ -964,5 +967,5 @@ export function createRenderer(canvas) {
     gl.disable(gl.BLEND); gl.depthMask(true);
     gl.bindVertexArray(null);
   }
-  return { gl, errors, resize, draw, project, boatRow, camera: () => ({ ...CAM, x: camX }) };
+  return { gl, errors, resize, draw, project, boatRow, lampPosition: () => lampScreen, camera: () => ({ ...CAM, x: camX }) };
 }

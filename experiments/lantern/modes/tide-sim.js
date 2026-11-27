@@ -9,7 +9,7 @@
 // and relight before the step. After the step the layer clears rocks the stage does not have (and any in the first stretch),
 // thins Lantern's embers to the stage's share, and lays the ember path along the channel. It never draws from Lantern's random
 // streams (s.r, s.q), so a seed lays the same river as in Lantern before the layer thins it.
-import { create, step, centre, half, boat, progress, GOAL, DT } from '../sim.js?v=15';
+import { create, step, centre, half, boat, progress, GOAL, DT } from '../sim.js?v=16';
 export { centre, half, boat, progress, GOAL, DT };
 
 const clamp = (n, lo = 0, hi = 1) => Math.min(hi, Math.max(lo, n));

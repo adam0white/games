@@ -398,6 +398,7 @@ const GAMES = {
     await page.goto(`${base}/lantern/`);
     await page.evaluate(LAB_LOCAL);
     await page.evaluate(() => { localStorage.setItem('lantern:set:river', 'classic'); localStorage.setItem('lantern-night', '3'); localStorage.setItem('lantern-bank', '120'); localStorage.setItem('lantern-owned', '["red"]'); localStorage.setItem('lantern-worn', '{"boat":"red"}'); localStorage.setItem('lantern-best-3', '40'); localStorage.setItem('lantern-best-endless', '55'); localStorage.setItem('lantern-best-tower', '4'); localStorage.setItem('lantern-stats', '{"red":1}'); localStorage.setItem('lantern-off', '[]'); localStorage.setItem('lantern-best-level', '0'); localStorage.setItem('lantern-tower-at', '1'); localStorage.setItem('lantern-rebirths', '0'); localStorage.setItem('lantern-crash', '[]'); localStorage.setItem('lantern-hint', '1'); localStorage.setItem('notes.k', 'check'); localStorage.removeItem('lantern-start'); }); // the first visit above wrote a new player's lantern-start; this save is from before that key
+    await page.evaluate(() => { localStorage.setItem('lantern:set:outline', '1'); localStorage.setItem('lantern:set:haptics', '1'); });
     await page.reload();
     // One drawing error must not freeze the game: the next frame is asked for before this one draws.
     page.context().badFrame = true; // the error below is meant, so it is not a page error

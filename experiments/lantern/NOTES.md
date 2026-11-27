@@ -1050,3 +1050,20 @@ The lab asked whether tilting the phone should also steer in 2D and 3D. The answ
 
 **Not verified.** A real share sheet on a phone; how the link looks in a chat app before the page has link-preview tags; the Turkish lines (AI-written).
 
+
+## Lantern's first minute
+
+Gentle Night 1 starts with a reachable ember, introduces one outlined rock, then puts the second ember across from it. Every Gentle story night delays rock contact past eight seconds. Early Night 1 rows keep a route open for an idle boat. Later rows alternate the hazards and leave an ember on the safe side. The flame drains more slowly during the first stretch of Night 1. Gentle moves the light pool ahead and draws breaks in the water at threatening rocks and reeds in both renderers. Settings can turn off the outlines and hit vibration. Both default on, with outlines active on Gentle.
+
+The compact landing shows the recording switch before play and puts practice under More → How to play. Night 1 teaches steering in the run. The HUD shows fuel, restored fuel and the current result. A hit marks contact, removes a heart and shows how long protection lasts. Crash results can be opened after the first beat. Story retry can reuse the seed and the entire run's rules, including its one-use upgrades. New River uses a fresh seed and any upgrades waiting in the save. Story dare links carry the night, seed, abilities, upgrades, rebirth pace and river setting. Older endless links still open with Classic rules. Matching dawn ties a completed story dare. Dare runs still skip story unlocks and scoreboards.
+
+**Measured on seeds 1–300**, cycling the seven starter abilities, using `node experiments/lantern/first-minute.mjs --baseline=95095e1a` on the pre-change commit and the same command without the baseline flag after the change.
+
+| Gentle Night 1 | Before | After |
+| --- | ---: | ---: |
+| First rock reaches the boat's row, median | 3.40 s | 8.13 s |
+| Passive survival, minimum / median | 5.00 s / 13.27 s | 22.28 s / 30.43 s |
+| Exact-centre policy reaches dawn | 0/300 | 139/300 |
+| Ember-seeking policy with 250 ms delay and lateral noise reaches dawn | 13/300 | 300/300 |
+
+The policy test also checked 20 seeds on each of the 50 Gentle nights at maximum rebirth pace, contact coordinates, positive-clearance grazes, penalty floors, pickup restoration and dare link round trips. A local DOM smoke test exercised the landing, recording opt-out, direct start, touch and key input, HUD, retries and practice-to-dare routing with mocked browser APIs. The shared phone harness could not bind loopback in this session. It also still contains expectations for the superseded tutorial prompt, notice and dare copy. Real-phone input, audio, vibration, visual readability in WebGL and how quickly new players learn or reach dawn remain unverified.
