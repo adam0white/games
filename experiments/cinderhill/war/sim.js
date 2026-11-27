@@ -108,7 +108,7 @@ export const C = {
   SITE_R: 3, SITE_MIN: 3,
   EAT_EVERY: 1200, ADULTS_PER_SUGAR: 10, STARVE_AFTER: 1200, STARVE_EVERY: 200,
   // Rooms: a store cell holds eight loads of each food, a nursery cell one brood, a quarters cell four ants (adults and brood together; the queen stops laying at the cap).
-  STORE_MIN: 24, BROOD_MIN: 8, REST_BASE: 90, REST_MIN: 40, GARDEN_EVERY: 1200, HEAL_EVERY: 32, DIG_TICKS: 120, DIG_SUGAR: 1, DIG_KEEP: 3, DIG_CREW: 8, MARKS_MAX: 96, PLUGS_MAX: 3, DOOR_SUGAR: 12, DOOR_APART: 8, PLUG_SUGAR: 3, PLUG_SLOW: 5, PLUG_BREAK: 4, PLUG_CLEAR: 8,
+  STORE_MIN: 24, BROOD_MIN: 8, REST_BASE: 90, REST_MIN: 40, GARDEN_EVERY: 1200, MESS_FEEDS: 4, HEAL_EVERY: 32, DIG_TICKS: 120, DIG_SUGAR: 1, DIG_KEEP: 3, DIG_CREW: 8, MARKS_MAX: 96, PLUGS_MAX: 3, DOOR_SUGAR: 12, DOOR_APART: 8, PLUG_SUGAR: 3, PLUG_SLOW: 5, PLUG_BREAK: 4, PLUG_CLEAR: 8,
   QUEEN_HP: 800, BITE_EVERY: 10, BITE_R: 200, SEE: 3, PRESS_OPEN: 5, PRESS_TUNNEL: 2, WAIT_AT_END: 60, GUARD_R: 4,
 };
 
@@ -135,6 +135,7 @@ export class Sim {
     const L = (this.L = makeLayout(cfg)), n = L.n, A = cfg.maxAnts;
     this.stat = Array.from({ length: TEAMS }, (_, t) => statsFor(cfg.traits?.[t]));
     this.tick = 0;
+    this.mess = new Array(TEAMS).fill(0); // open mess cells, counted in recount()
     this.gardens = new Array(TEAMS).fill(0); // open fungus garden cells, counted in recount()
     this.result = 0; // 0: running; else 1 + the winning team
     this.why = 0; // how it ended (REASON)
@@ -279,7 +280,7 @@ export class Sim {
       const cap = { food: 0, brood: 0, ants: 0 };
       for (let r = 1; r < ROOMS.length; r++) if (ROOMS[r].cap) cap[ROOMS[r].cap] += this.stat[t].per[r] * n[t * 8 + r];
       this.floor[t] = Math.max(0, C.STORE_MIN - cap.food); // a hill with few store cells keeps this much in a heap on its founding cell
-      cg[o + CG.CAP_FOOD] = Math.max(C.STORE_MIN, cap.food); cg[o + CG.CAP_BROOD] = Math.max(C.BROOD_MIN, cap.brood); cg[o + CG.CAP_ADULTS] = Math.max(C.REST_MIN, C.REST_BASE + cap.ants); this.gardens[t] = n[t * 8 + ROOM.GARDEN];
+      cg[o + CG.CAP_FOOD] = Math.max(C.STORE_MIN, cap.food); cg[o + CG.CAP_BROOD] = Math.max(C.BROOD_MIN, cap.brood); cg[o + CG.CAP_ADULTS] = Math.max(C.REST_MIN, C.REST_BASE + cap.ants); this.gardens[t] = n[t * 8 + ROOM.GARDEN]; this.mess[t] = n[t * 8 + ROOM.MESS];
       cg[o + CG.MARKS] = marks[t];
     }
     // The cells that hold food stay in door order, so a meal or a cost paid before the fields are rebuilt comes from the same cells.
@@ -837,7 +838,7 @@ export class Sim {
       // Meals: a major eats as three.
       const eat = this.cfg.frostTick && this.tick >= this.cfg.frostTick ? this.cfg.frostEat : C.EAT_EVERY;
       if (this.tick % eat === eat - 1) {
-        const mouths = cg[o + CG.ADULTS] + 2 * cg[o + CG.MAJORS], per = this.stat[t].eatPer, need = Math.floor((mouths + per - 1) / per);
+        const mouths = cg[o + CG.ADULTS] + 2 * Math.max(0, cg[o + CG.MAJORS] - C.MESS_FEEDS * this.mess[t]), per = this.stat[t].eatPer, need = Math.floor((mouths + per - 1) / per);
         this.take(t, FOOD.SUGAR, need);
       }
       // Starving: after a minute at no sugar the oldest die, one in a hundred every ten seconds.

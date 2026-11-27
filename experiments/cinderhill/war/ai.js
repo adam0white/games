@@ -17,6 +17,7 @@ const SLOTS = [
   [ROOM.REST, 1, 7, 5, 8], [ROOM.REST, -5, 7, -1, 8], [ROOM.REST, 3, 14, 7, 15], [ROOM.REST, -7, 14, -3, 15], [ROOM.REST, 6, 7, 10, 8], [ROOM.REST, -10, 7, -6, 8],
   [ROOM.NURSERY, 6, 10, 9, 13], [ROOM.NURSERY, 10, 10, 13, 13],
   [ROOM.GARDEN, -10, 10, -7, 13], // off the far end of the first nursery, away from the shaft and the queen
+  [ROOM.MESS, -14, 10, -11, 12], // beyond the garden
   [ROOM.POST, 0, 2, 0, 3], [ROOM.POST, 0, 7, 0, 9], // the throat above the store, then the shaft below it
 ];
 
@@ -184,6 +185,8 @@ export function think(sim, t, mind = 1) {
     // Fungus gardens, once it has grown to them: food that needs no trail. Not past a third of what its quarters house.
     if (mind.garden !== false && may(ROOM.GARDEN) && sim.mayRoom(t, ROOM.GARDEN) && adults >= 40 && sim.gardens[t] < (mind.gardens ?? 16) && cg[o + CG.SUGAR] >= 14) wants.push(ROOM.GARDEN);
     // A guard post in the throat of the shaft, where a break-in must pass, once there is a guard worth posting.
+    // A mess, once its soldiers eat more than a few cells would save: four soldiers a cell.
+    if (mind.mess !== false && may(ROOM.MESS) && sim.mayRoom(t, ROOM.MESS) && majors >= 24 && sim.mess[t] * C.MESS_FEEDS + 8 <= majors && cg[o + CG.SUGAR] >= 16) wants.push(ROOM.MESS);
     if (may(ROOM.POST) && sim.mayRoom(t, ROOM.POST) && majors >= 4) wants.push(ROOM.POST);
     // An outpost: a tunnel along the top of its ground toward the middle of the map, a second door at its end, and a
     // store beside that door, so that what is carried in from that side has a shorter road.

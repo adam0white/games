@@ -23,8 +23,12 @@ export const ROOMS = [
   // A fungus garden grows food under ground with no trail to guard: each open cell pays a seed at every meal. Its
   // gardeners live in it, so each cell houses one ant fewer. It opens with the chamber's growth (TIERS.rooms).
   { id: 'garden', name: 'Fungus garden', cap: 'ants', per: -1 },
+  // A mess adds to no cap. A soldier eats as three ants; each open cell of a mess feeds four soldiers as one ant each,
+  // so a cell full of soldiers saves most of a seed at every meal. It houses nobody, and pays nothing to a hill with
+  // few soldiers.
+  { id: 'mess', name: 'Mess', cap: null, per: 0 },
 ];
-export const ROOM = { NONE: 0, STORE: 1, NURSERY: 2, REST: 3, POST: 4, GARDEN: 5 };
+export const ROOM = { NONE: 0, STORE: 1, NURSERY: 2, REST: 3, POST: 4, GARDEN: 5, MESS: 6 };
 
 /** Traits: a colony's standing changes to the rows above. set: [key, value] for a colony number (eatPer: adults a seed
  *  feeds at a meal; pupa: ticks a pupa takes), or [key, index, value] for one caste's or one room's number. needs: the
@@ -237,6 +241,6 @@ export const MISSIONS = {
     goals: { queen: true, dusk: 'adults' },
     deeds: [{ id: 'a', text: 'Win with two hundred ants or more.', won: true, min: { ADULTS: 200 }, opens: 'door' }, { id: 'b', text: 'Win by killing the rival queen.', won: true, why: 'QUEEN', opens: 'sappers' }, { id: 'c', text: 'Carry twenty stolen loads home.', min: { HAUL: 20 }, opens: 'raiders' }],
     picks: [CASTE.SPITTER, CASTE.WARDEN],
-    rooms: [ROOM.STORE, ROOM.NURSERY, ROOM.REST, ROOM.POST, ROOM.GARDEN],
+    rooms: [ROOM.STORE, ROOM.NURSERY, ROOM.REST, ROOM.POST, ROOM.GARDEN, ROOM.MESS],
   },
 };
