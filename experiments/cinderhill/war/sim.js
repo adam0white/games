@@ -27,7 +27,7 @@ export const CASTE_HP = CASTES.map(c => c.hp), CASTE_BITE = CASTES.map(c => c.bi
 const FIGHTS = CASTES.map(c => c.fights);
 /** One colony's numbers: the tables' rows, then its traits (`cfg.traits[team]`, ids of TRAITS) laid over them. */
 function statsFor(traits = [], grown = []) {
-  const st = { hp: CASTES.map(c => c.hp), bite: CASTES.map(c => c.bite), speed: CASTES.map(c => c.speed), food: CASTES.map(c => c.food), reach: CASTES.map(c => c.reach), per: ROOMS.map(r => (r ? r.per : 0)), eatPer: C.ADULTS_PER_SUGAR, garden: 1, pupa: C.PUPA_TICKS, room: ROOMS.map(() => 0), loot: 0, hold: 0, breach: 0, at: {} };
+  const st = { hp: CASTES.map(c => c.hp), bite: CASTES.map(c => c.bite), speed: CASTES.map(c => c.speed), food: CASTES.map(c => c.food), reach: CASTES.map(c => c.reach), per: ROOMS.map(r => (r ? r.per : 0)), eatPer: C.ADULTS_PER_SUGAR, garden: 1, pupa: C.PUPA_TICKS, room: ROOMS.map(() => 0), loot: 0, hold: 0, breach: 0, side: 0, at: {} };
   for (const id of traits) { const tr = TRAITS[id]; if (!tr) throw new Error(`no trait ${id}`); for (const [key, a, b] of tr.set) { if (b === undefined) st[key] = a; else st[key][a] = b; if (tr.at) st.at[b === undefined ? key : key + a] = tr.at; } }
   // What its chamber has grown into (TIERS): [key, per cent] or [key, index, per cent] of the number as it stands.
   for (const [key, a, b] of grown) { if (b === undefined) st[key] = Math.floor((st[key] * a) / 100); else st[key][a] = Math.floor((st[key][a] * b) / 100); }
@@ -43,7 +43,7 @@ export const KIND = { FORAGE: 0, RAID: 1 };
 // the store and carry a load home (the colony needs the Raiders node). HOLD: stand at the end and never go down a door
 // (the Hold fast node).
 export const MODE = { PRESS: 0, LOOT: 1, HOLD: 2 };
-export const CMD = { TRAIL: 1, ERASE: 2, CREW: 3, DIET: 4, RALLY: 5, RECALL: 6, DIG: 7, ROOM: 8, PICK: 9, FILL: 10, GROW: 11 };
+export const CMD = { TRAIL: 1, ERASE: 2, CREW: 3, DIET: 4, RALLY: 5, RECALL: 6, DIG: 7, ROOM: 8, PICK: 9, FILL: 10, GROW: 11, DOOR: 12 };
 /** A plug: an open tunnel cell packed shut again. It is clay with this in `room`, slow and dear to dig. */
 export const PLUG = 15;
 // Events: [type, a, b, c].
@@ -70,6 +70,7 @@ export const EVENT = {
   GARDEN: 21, // team, seeds its fungus gardens paid
   BEAST_BIT: 22, // the beast's cell, ants it bit this time, its health left
   BEAST_DEAD: 23, // the beast's cell, the colony that did it more harm
+  DOOR: 25, // team, its cell on the surface, the column of the nest it opens from
   PEST: 24, // the team whose nest it is in, what (PEST), a number: seeds eaten so far, or its health left
   BREACH: 18, // the team that dug the last cell, cell: the two nests are joined under ground
 };
@@ -106,7 +107,7 @@ export const C = {
   SITE_R: 3, SITE_MIN: 3,
   EAT_EVERY: 1200, ADULTS_PER_SUGAR: 10, STARVE_AFTER: 1200, STARVE_EVERY: 200,
   // Rooms: a store cell holds eight loads of each food, a nursery cell one brood, a quarters cell four ants (adults and brood together; the queen stops laying at the cap).
-  STORE_MIN: 24, BROOD_MIN: 8, REST_BASE: 90, REST_MIN: 40, GARDEN_EVERY: 1200, HEAL_EVERY: 32, DIG_TICKS: 120, DIG_SUGAR: 1, DIG_KEEP: 3, DIG_CREW: 8, MARKS_MAX: 96, PLUGS_MAX: 3, PLUG_SUGAR: 3, PLUG_SLOW: 5, PLUG_BREAK: 4, PLUG_CLEAR: 8,
+  STORE_MIN: 24, BROOD_MIN: 8, REST_BASE: 90, REST_MIN: 40, GARDEN_EVERY: 1200, HEAL_EVERY: 32, DIG_TICKS: 120, DIG_SUGAR: 1, DIG_KEEP: 3, DIG_CREW: 8, MARKS_MAX: 96, PLUGS_MAX: 3, DOOR_SUGAR: 12, DOOR_APART: 8, PLUG_SUGAR: 3, PLUG_SLOW: 5, PLUG_BREAK: 4, PLUG_CLEAR: 8,
   QUEEN_HP: 800, BITE_EVERY: 10, BITE_R: 200, SEE: 3, PRESS_OPEN: 5, PRESS_TUNNEL: 2, WAIT_AT_END: 60, GUARD_R: 4,
 };
 
@@ -170,7 +171,7 @@ export class Sim {
     this.homeF = Array.from({ length: TEAMS }, () => new Uint16Array(n)); this.doorF = Array.from({ length: TEAMS }, () => new Uint16Array(n));
     this.queenF = Array.from({ length: TEAMS }, () => new Uint16Array(n)); this.rallyF = Array.from({ length: TEAMS }, () => null);
     this.crew = new Int32Array(T); this.want = new Int32Array(T);
-    this.digF = Array.from({ length: TEAMS }, () => null); this.storeCells = [[], []]; this.nurseryCells = [[], []]; this.postCells = [[], []]; this.postF = [null, null]; this.dirty = false;
+    this.digF = Array.from({ length: TEAMS }, () => null); this.storeCells = [[], []]; this.nurseryCells = [[], []]; this.postCells = [[], []]; this.postF = [null, null]; this.side = new Int32Array(TEAMS).fill(-1); this.dirty = false; // side: a colony's second door, as its cell on the surface (-1 none)
     this.underF = [null, null]; this.linked = false; this.lastDug = null; this.plugTick = -1; this.plugHit = new Set(); // (the plugs struck this tick: within a tick only) // under ground only: steps to each queen with no door used, and whether the two nests are joined
     this.bins = [[], []]; this.floor = [0, 0]; this.dirtyStore = false; // bins: the nest cells that hold food, nearest the door first
     this.putF = Array.from({ length: TEAMS * 2 }, () => new Uint16Array(n)); this.lootF = Array.from({ length: TEAMS }, () => new Uint16Array(n)); this.putAny = new Uint8Array(TEAMS * 2); this.lootAny = new Uint8Array(TEAMS);
@@ -188,6 +189,13 @@ export class Sim {
     if (cfg.blank) { this.mat.fill(MAT.OPEN, 0, L.nestBase); this.mat.fill(MAT.CLAY, L.nestBase); }
     generate(this);
     if (cfg.nests) this.inherit(cfg.nests);
+    // Second doors kept from an earlier mission, as the surface column of each (or -1): open where the tunnel below still is.
+    if (cfg.sides) for (let t = 0; t < TEAMS; t++) {
+      const x = cfg.sides[t] | 0, L = this.L; if (!(x >= 2) || x >= L.nw - 2 || this.mat[L.nestBase + 2 * L.nw + x] !== MAT.OPEN) continue;
+      const up = Math.floor(this.door[t] / L.sw) * L.sw + x; if (this.mat[up] !== MAT.OPEN) continue;
+      for (let y = 0; y < 2; y++) this.mat[L.nestBase + y * L.nw + x] = MAT.OPEN;
+      this.side[t] = up; this.link[up] = L.nestBase + x; this.link[L.nestBase + x] = up;
+    }
     this.recount();
     for (let t = 0; t < TEAMS; t++) this.startColony(t);
     this.rebuildFields();
@@ -427,6 +435,8 @@ export class Sim {
   /** May this colony dig past its own ground, into the rival's? The mission says, or a node of its own. */
   mayBreach(t) { return !!this.mission.breach || !!this.has(t, 'breach'); }
   /** Where either colony may tunnel into the other, both may pack a tunnel shut. */
+  /** May this colony open a second door? By the mission's say (cfg.sideDoor) or by a trait (`side`). */
+  mayDoor(t) { return !!this.cfg.sideDoor || !!this.has(t, 'side'); }
   mayPlug() { return this.mayBreach(0) || this.mayBreach(1); }
 
   apply(o) {
@@ -494,6 +504,18 @@ export class Sim {
       }
       if (!done) return no(WHY.BLOCKED);
       this.recount(); this.dirty = true;
+    } else if (o.type === CMD.DOOR) {
+      // A second door: the shaft is opened from the tunnel below (row 2 of the nest, at column x) up to the surface.
+      const L = this.L, x = o.x | 0, dx = this.door[t] % L.sw, dy = Math.floor(this.door[t] / L.sw);
+      if (!this.mayDoor(t) || this.side[t] >= 0) return no(WHY.NONE);
+      if (x < 2 || x >= L.nw - 2 || Math.abs(x - dx) < C.DOOR_APART || this.owner(2 * L.nw + x) !== t) return no(WHY.BLOCKED);
+      const up = dy * L.sw + x;
+      if (this.mat[L.nestBase + 2 * L.nw + x] !== MAT.OPEN || this.mat[up] !== MAT.OPEN) return no(WHY.BLOCKED);
+      if (cg[base + CG.SUGAR] < C.DOOR_SUGAR + C.DIG_KEEP) return no(WHY.FULL);
+      this.take(t, FOOD.SUGAR, C.DOOR_SUGAR);
+      for (let y = 0; y < 2; y++) { const k = y * L.nw + x; this.mat[L.nestBase + k] = MAT.OPEN; this.mark[k] = 0; this.room[k] = 0; }
+      this.side[t] = up; this.link[up] = L.nestBase + x; this.link[L.nestBase + x] = up;
+      this.dirty = true; this.event(EVENT.DOOR, t, up, x);
     } else if (o.type === CMD.PICK) {
       // One caste beyond workers and soldiers, chosen once from the mission's list.
       if (cg[base + CG.PICK] || !this.mission.picks.includes(o.caste | 0) || !this.mayPick(t)) return no(WHY.NONE);
@@ -565,6 +587,11 @@ export class Sim {
   buildPath(t, points, at) {
     const P = this.trPath, sw = this.L.sw;
     let len = 0, prev = this.door[t];
+    // A colony with a second door starts the trail at whichever door is nearer its first point.
+    if (this.side[t] >= 0 && points.length >= 2) {
+      const far = c => Math.max(Math.abs((c % sw) - (points[0] | 0)), Math.abs(Math.floor(c / sw) - (points[1] | 0)));
+      if (far(this.side[t]) < far(prev)) prev = this.side[t];
+    }
     P[at + len++] = prev;
     for (let j = 0; j + 1 < points.length; j += 2) {
       const c = this.snap(points[j] | 0, points[j + 1] | 0);
@@ -657,7 +684,7 @@ export class Sim {
 
   rebuildFields() {
     for (let t = 0; t < TEAMS; t++) {
-      this.field(this.homeF[t], this.storeCells[t].length ? this.storeCells[t] : [this.store[t]]); this.field(this.doorF[t], [this.door[t]]); this.field(this.queenF[t], [this.queen[t]]);
+      this.field(this.homeF[t], this.storeCells[t].length ? this.storeCells[t] : [this.store[t]]); this.field(this.doorF[t], [this.door[t], this.side[t]]); this.field(this.queenF[t], [this.queen[t]]);
       this.postF[t] = this.postCells[t].length ? this.field(this.postF[t], this.postCells[t]) : null;
       const r = this.cg[t * CG.SIZE + CG.RALLY_CELL];
       this.rallyF[t] = r >= 0 ? this.field(this.rallyF[t], [r]) : null;
@@ -1346,7 +1373,7 @@ export class Sim {
   stateArrays() {
     const n = this.n, b = this.bn;
     return [
-      ['mat', this.mat], ['room', this.room], ['binS', this.binS], ['binP', this.binP], ['cache', this.cache], ['mark', this.mark], ['digLeft', this.digLeft], ['cg', this.cg], ['rng', this.rng], ['pileCell', this.pileCell], ['pileAmount', this.pileAmount], ['pileKind', this.pileKind], ['siteHold', this.siteHold], ['beast', this.beast], ['pest', this.pest],
+      ['mat', this.mat], ['room', this.room], ['binS', this.binS], ['binP', this.binP], ['cache', this.cache], ['mark', this.mark], ['digLeft', this.digLeft], ['cg', this.cg], ['rng', this.rng], ['pileCell', this.pileCell], ['pileAmount', this.pileAmount], ['pileKind', this.pileKind], ['siteHold', this.siteHold], ['beast', this.beast], ['pest', this.pest], ['side', this.side],
       ...['x', 'y', 'layer', 'heading', 'team', 'caste', 'hp', 'task', 'carry', 'tr', 'cool', 'press', 'to', 'tx', 'ty', 'since', 'inv', 'id'].map(k => [k, this[k], n]),
       ...['bTeam', 'bStage', 'bAge', 'bFed', 'bHunger', 'bCell', 'bMajor'].map(k => [k, this[k], b]),
       ['trLive', this.trLive], ['trKind', this.trKind], ['trLevel', this.trLevel], ['trDry', this.trDry], ['trMode', this.trMode], ['trLen', this.trLen], ['trSeq', this.trSeq], ['trPath', this.trPath],
@@ -1374,6 +1401,7 @@ export class Sim {
     generate(sim, true); // the fixed layout (doors, stores, rooms); the terrain itself comes from the save
     sim.tick = s.tick; sim.n = s.n; sim.bn = s.bn; sim.result = s.result; sim.why = s.why | 0; sim.nextId = s.nextId;
     for (const k of Object.keys(s.a)) sim[k].set(s.a[k]);
+    for (let t = 0; t < TEAMS; t++) if (sim.side[t] >= 0) { const up = sim.side[t], dn = sim.L.nestBase + (up % sim.L.sw); sim.link[up] = dn; sim.link[dn] = up; }
     for (let t = 0; t < TEAMS; t++) sim.restat(t);
     sim.recount(); sim.rebuildFields();
     return sim;
