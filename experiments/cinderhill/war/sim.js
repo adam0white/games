@@ -17,7 +17,7 @@ import { angleOf } from '../sim/math.js';
 import { hashArray, hashInt, finish } from '../sim/hash.js';
 import { generate } from './world.js';
 
-export const WAR_VERSION = 5;
+export const WAR_VERSION = 6;
 export const TICK_HZ = 20;
 export { MAT, SURFACE, NEST };
 
@@ -52,13 +52,14 @@ export const EVENT = {
   REJECTED: 6, // team, order id, why (WHY)
   TRAIL: 7, // team, trail, kind: a trail was laid
   QUEEN_HIT: 8, // team, hit points left
-  STOLEN: 9, // from team, by team, food kind
+  STOLEN: 9, // from team, by team, food kind + 2 * the cell it lay in
   DRY: 10, // team, trail: nothing left at its end
   RALLY: 11, // team, cell
   DUG: 12, // team, cell: a marked cell was dug open
   FULL: 13, // team, food kind: a load came home to full stores and was lost
   FROST: 14, // the frost came: the food outside is gone
   SITE: 15, // site, the team that holds it now (-1: no one), the team that held it
+  FOUND: 16, // team, cell, loads * 2 + food kind: a cache in the clay was dug open
 };
 export const REASON = { QUEEN: 1, DUSK: 2, STARVED: 3, POINTS: 4, HAUL: 5 };
 export const WHY = { FULL: 1, BLOCKED: 2, LONG: 3, NONE: 4 };
@@ -81,7 +82,8 @@ export const CG = {
   POINTS: 30, // paid by held sites, one a second each
   HAUL: 31, // loads taken from a rival's store and carried all the way home
   PICK: 27, DIET2: 28, SPECIALS: 29, // the caste this colony chose (0: none yet), its share of the brood in four, how many live
-  SIZE: 32,
+  FOUND: 32, // loads dug out of caches in the clay
+  SIZE: 40,
 };
 export const C = {
   LAY_EVERY: 14, EGG_TICKS: 300, LARVA_TICKS: 500, PUPA_TICKS: 400, LARVA_STARVE: 1200, MAJOR_WAIT: 600,
@@ -139,6 +141,9 @@ export class Sim {
     this.bFed = new Uint8Array(BROOD_MAX); this.bHunger = new Uint16Array(BROOD_MAX); this.bCell = new Int32Array(BROOD_MAX); this.bMajor = new Uint8Array(BROOD_MAX);
     // Trails: TEAMS * TRAILS slots.
     const T = TEAMS * TRAILS;
+    // Stores: the loads lying in each nest cell. The colony's totals in cg are their sums.
+    this.binS = new Uint8Array(L.nw * L.nh); this.binP = new Uint8Array(L.nw * L.nh);
+    this.cache = new Uint8Array(L.nw * L.nh); // a cache buried in a clay cell: loads * 2 + food kind
     this.trLive = new Uint8Array(T); this.trKind = new Uint8Array(T); this.trLevel = new Uint8Array(T); this.trDry = new Uint8Array(T); this.trMode = new Uint8Array(T);
     this.trLen = new Int32Array(T); this.trSeq = new Int32Array(T); this.trPath = new Int32Array(T * PATH_MAX);
     // Derived (rebuilt from the state above; not hashed): distance fields, counts, the spatial hash.
@@ -147,6 +152,8 @@ export class Sim {
     this.queenF = Array.from({ length: TEAMS }, () => new Uint16Array(n)); this.rallyF = Array.from({ length: TEAMS }, () => null);
     this.crew = new Int32Array(T); this.want = new Int32Array(T);
     this.digF = Array.from({ length: TEAMS }, () => null); this.storeCells = [[], []]; this.nurseryCells = [[], []]; this.postCells = [[], []]; this.postF = [null, null]; this.dirty = false;
+    this.bins = [[], []]; this.floor = [0, 0]; this.dirtyStore = false; // bins: the nest cells that hold food, nearest the door first
+    this.putF = Array.from({ length: TEAMS * 2 }, () => new Uint16Array(n)); this.lootF = Array.from({ length: TEAMS }, () => new Uint16Array(n)); this.putAny = new Uint8Array(TEAMS * 2); this.lootAny = new Uint8Array(TEAMS);
     this.head = new Int32Array(n).fill(-1); this.nextAnt = new Int32Array(A); this.occ = new Uint8Array(n);
     this.bq = new Int32Array(n); this.prev = new Int32Array(n);
     // Sites that pay while held (a mission's `sites`): their surface cells, fixed by the map, and who holds each (-1: no one).
@@ -181,10 +188,12 @@ export class Sim {
   /** Count each colony's open rooms into its caps and its lists of store and nursery cells. */
   recount() {
     const L = this.L, cg = this.cg, NN = this.room.length, n = new Array(TEAMS * 8).fill(0), marks = [0, 0];
-    for (let t = 0; t < TEAMS; t++) { this.storeCells[t].length = 0; this.nurseryCells[t].length = 0; this.postCells[t].length = 0; }
+    for (let t = 0; t < TEAMS; t++) { this.storeCells[t].length = 0; this.nurseryCells[t].length = 0; this.postCells[t].length = 0; this.bins[t].length = 0; }
     for (let k = 0; k < NN; k++) {
       if (this.mark[k]) marks[this.mark[k] - 1]++;
       const r = this.room[k];
+      const bin = (r === ROOM.STORE && this.mat[L.nestBase + k] === MAT.OPEN) || L.nestBase + k === this.store[0] || L.nestBase + k === this.store[1];
+      if (bin) this.bins[this.owner(k)].push(k); else if (this.binS[k] | this.binP[k]) this.binS[k] = this.binP[k] = 0; // food in a cell that is a store no longer: settle() finds it room or it spoils
       if (!r || this.mat[L.nestBase + k] !== MAT.OPEN) continue;
       const t = this.owner(k); n[t * 8 + r]++;
       if (r === ROOM.STORE) this.storeCells[t].push(L.nestBase + k); else if (r === ROOM.NURSERY) this.nurseryCells[t].push(L.nestBase + k); else if (r === ROOM.POST) this.postCells[t].push(L.nestBase + k);
@@ -193,13 +202,73 @@ export class Sim {
       const o = t * CG.SIZE;
       const cap = { food: 0, brood: 0, ants: 0 };
       for (let r = 1; r < ROOMS.length; r++) if (ROOMS[r].cap) cap[ROOMS[r].cap] += this.stat[t].per[r] * n[t * 8 + r];
+      this.floor[t] = Math.max(0, C.STORE_MIN - cap.food); // a hill with few store cells keeps this much in a heap on its founding cell
       cg[o + CG.CAP_FOOD] = Math.max(C.STORE_MIN, cap.food); cg[o + CG.CAP_BROOD] = Math.max(C.BROOD_MIN, cap.brood); cg[o + CG.CAP_ADULTS] = C.REST_BASE + cap.ants;
       cg[o + CG.MARKS] = marks[t];
     }
+    this.dirty = true; // the cells that hold food are in index order until the fields are rebuilt, which sorts them by the walk from the door
   }
 
-  /** Food with no store cell left to lie in spoils: called when a colony's rooms are repainted. */
-  spoil(t) { const cg = this.cg, o = t * CG.SIZE, cap = cg[o + CG.CAP_FOOD]; if (cg[o + CG.SUGAR] > cap) cg[o + CG.SUGAR] = cap; if (cg[o + CG.PROTEIN] > cap) cg[o + CG.PROTEIN] = cap; }
+  /** How many loads of one food a nest cell holds. */
+  binCap(t, k) { return (this.room[k] === ROOM.STORE && this.mat[this.L.nestBase + k] === MAT.OPEN ? this.stat[t].per[ROOM.STORE] : 0) + (this.L.nestBase + k === this.store[t] ? this.floor[t] : 0); }
+
+  /** Make the cells agree with the totals after the rooms change: food with no cell is carried to cells with room, nearest the door first; what finds none spoils. */
+  settle(t) {
+    const o = t * CG.SIZE, cg = this.cg, list = this.bins[t];
+    for (let kind = 0; kind < 2; kind++) {
+      const bin = kind === FOOD.PROTEIN ? this.binP : this.binS, slot = o + (kind === FOOD.PROTEIN ? CG.PROTEIN : CG.SUGAR);
+      let held = 0;
+      for (const k of list) { const cap = this.binCap(t, k); if (bin[k] > cap) bin[k] = cap; held += bin[k]; }
+      let loose = cg[slot] - held;
+      for (const k of list) { if (loose <= 0) break; const put = Math.min(this.binCap(t, k) - bin[k], loose); bin[k] += put; loose -= put; }
+      if (loose > 0) cg[slot] -= loose;
+    }
+  }
+
+  /** Put one load in a cell: the one she stands by if it has room, or the nearest to the door that has. False when the stores are full. */
+  put(t, kind, c) {
+    const L = this.L, bin = kind === FOOD.PROTEIN ? this.binP : this.binS, o = t * CG.SIZE;
+    let k = -1;
+    const fits = m => m >= L.nestBase && this.owner(m - L.nestBase) === t && bin[m - L.nestBase] < this.binCap(t, m - L.nestBase);
+    if (fits(c)) k = c - L.nestBase; else for (let j = 0; j < 4 && k < 0; j++) { const m = L.nb[c * 4 + j]; if (m >= 0 && fits(m)) k = m - L.nestBase; }
+    if (k < 0) for (const b of this.bins[t]) if (bin[b] < this.binCap(t, b)) { k = b; break; }
+    if (k < 0) return false;
+    if (!(this.binS[k] | this.binP[k])) this.dirtyStore = true;
+    if (++bin[k] >= this.binCap(t, k)) this.dirtyStore = true;
+    this.cg[o + (kind === FOOD.PROTEIN ? CG.PROTEIN : CG.SUGAR)]++;
+    return true;
+  }
+
+  /** Take up to n loads of a food for the colony's own use, from the cells nearest the door first (cfg.eatDeep: farthest first). Returns the loads taken. */
+  take(t, kind, n) {
+    const bin = kind === FOOD.PROTEIN ? this.binP : this.binS, list = this.bins[t], deep = this.cfg.eatDeep;
+    let got = 0;
+    for (let j = 0; j < list.length && got < n; j++) {
+      const k = list[deep ? list.length - 1 - j : j], d = Math.min(bin[k], n - got);
+      if (d) { bin[k] -= d; got += d; this.dirtyStore = true; }
+    }
+    this.cg[t * CG.SIZE + (kind === FOOD.PROTEIN ? CG.PROTEIN : CG.SUGAR)] -= got;
+    return got;
+  }
+
+  /** The fields that follow the food: to a cell with room for each food, and to a cell with anything to steal. */
+  rebuildStoreFields() {
+    this.dirtyStore = false;
+    const L = this.L, src = [];
+    for (let t = 0; t < TEAMS; t++) {
+      for (let kind = 0; kind < 2; kind++) {
+        const bin = kind === FOOD.PROTEIN ? this.binP : this.binS; src.length = 0;
+        for (const k of this.bins[t]) if (bin[k] < this.binCap(t, k)) src.push(L.nestBase + k);
+        this.putAny[t * 2 + kind] = src.length ? 1 : 0;
+        if (src.length) this.field(this.putF[t * 2 + kind], src);
+      }
+      src.length = 0;
+      for (const k of this.bins[t]) if (this.binS[k] | this.binP[k]) src.push(L.nestBase + k);
+      this.lootAny[t] = src.length ? 1 : 0;
+      if (src.length) this.field(this.lootF[t], src);
+    }
+  }
+
 
   nurseryCell(t) {
     const list = this.nurseryCells[t];
@@ -308,7 +377,7 @@ export class Sim {
         }
       }
       if (!done) return no(WHY.BLOCKED);
-      this.recount(); if (stores) this.spoil(t);
+      this.recount();
       // Marks change only where the diggers go; the way home changes only with the stores.
       if (stores) this.dirty = true; else this.rebuildDig();
     }
@@ -422,7 +491,9 @@ export class Sim {
       this.postF[t] = this.postCells[t].length ? this.field(this.postF[t], this.postCells[t]) : null;
       const r = this.cg[t * CG.SIZE + CG.RALLY_CELL];
       this.rallyF[t] = r >= 0 ? this.field(this.rallyF[t], [r]) : null;
+      const D = this.doorF[t], base = this.L.nestBase; this.bins[t].sort((a, b) => D[base + a] - D[base + b] || a - b); this.settle(t);
     }
+    this.rebuildStoreFields();
     for (let s = 0; s < TEAMS * TRAILS; s++) if (this.trLive[s]) this.buildTrailField(s); else this.trF[s] = null;
     this.rebuildDig();
   }
@@ -459,7 +530,7 @@ export class Sim {
 
   step() {
     while (this.queue.length && this.queue[0].tick <= this.tick) this.apply(this.queue.shift());
-    if (this.dirty) { this.dirty = false; this.rebuildFields(); }
+    if (this.dirty) { this.dirty = false; this.rebuildFields(); } else if (this.dirtyStore) this.rebuildStoreFields();
     this.census();
     this.stepColonies();
     this.buildBuckets();
@@ -467,7 +538,7 @@ export class Sim {
     for (let i = 0; i < this.n; i++) this.stepAnt(i);
     this.fight();
     if (this.anyDead) this.removeDead();
-    if (this.dirty) { this.dirty = false; this.rebuildFields(); }
+    if (this.dirty) { this.dirty = false; this.rebuildFields(); } else if (this.dirtyStore) this.rebuildStoreFields();
     if (this.tick % 50 === 49) this.checkTrails();
     if (this.sites.length && this.tick % TICK_HZ === TICK_HZ - 1) this.paySites();
     if (this.cfg.frostTick && this.tick + 1 === this.cfg.frostTick) this.frost();
@@ -519,7 +590,7 @@ export class Sim {
           const major = this.bMajor[k] && cg[o + CG.PROTEIN] >= this.stat[t].food[this.bMajor[k]];
           if (major || ((!this.bMajor[k] || this.bHunger[k] >= C.MAJOR_WAIT) && cg[o + CG.PROTEIN] > held[t])) {
             const meal = major ? this.stat[t].food[this.bMajor[k]] : 1;
-            cg[o + CG.PROTEIN] -= meal; this.bFed[k] = meal; this.bHunger[k] = 0; fedThisTick[t] = true;
+            this.take(t, FOOD.PROTEIN, meal); this.bFed[k] = meal; this.bHunger[k] = 0; fedThisTick[t] = true;
           } else this.bHunger[k]++;
         } else if (this.bFed[k] === 0 && this.bHunger[k] < 0xFFFF) this.bHunger[k]++;
         if (this.bHunger[k] >= C.LARVA_STARVE) keep = false;
@@ -546,7 +617,7 @@ export class Sim {
       const eat = this.cfg.frostTick && this.tick >= this.cfg.frostTick ? this.cfg.frostEat : C.EAT_EVERY;
       if (this.tick % eat === eat - 1) {
         const mouths = cg[o + CG.ADULTS] + 2 * cg[o + CG.MAJORS], per = this.stat[t].eatPer, need = Math.floor((mouths + per - 1) / per);
-        cg[o + CG.SUGAR] = Math.max(0, cg[o + CG.SUGAR] - need);
+        this.take(t, FOOD.SUGAR, need);
       }
       // Starving: after a minute at no sugar the oldest die, one in a hundred every ten seconds.
       if (cg[o + CG.SUGAR] > 0) cg[o + CG.STARVE] = 0;
@@ -643,7 +714,8 @@ export class Sim {
 
   /** Her next cell, by task. Called when she stands on her last target. */
   decide(i, c, t, o, s) {
-    const cg = this.cg, task = this.task[i], home = this.homeF[t];
+    // A carrier walks to a cell with room for her load; everyone else to the stores.
+    const cg = this.cg, task = this.task[i], load = this.carry[i] & CARRY.KIND, pf = load ? t * 2 + (load === CARRY.PROTEIN ? 1 : 0) : -1, home = pf >= 0 && this.putAny[pf] ? this.putF[pf] : this.homeF[t];
     const recall = cg[o + CG.RECALL] === 1;
     if (task === TASK.NURSE) return this.mill(i, c, m => m >= this.L.nestBase && this.room[m - this.L.nestBase] === ROOM.NURSERY, 24);
     if (task === TASK.DIG) {
@@ -657,8 +729,10 @@ export class Sim {
         if (m < L.nestBase || this.mark[k] !== t + 1) continue;
         this.to[i] = -1;
         // The opening stroke costs a seed: earth is carried out on food. The last few seeds are kept for the colony to eat: the cell waits.
-        if (this.digLeft[k] === 1) { if (cg[o + CG.SUGAR] < C.DIG_SUGAR + C.DIG_KEEP) return c; cg[o + CG.SUGAR] -= C.DIG_SUGAR; }
-        if (--this.digLeft[k] === 0) { this.mat[m] = MAT.OPEN; this.mark[k] = 0; this.recount(); this.dirty = true; this.event(EVENT.DUG, t, m); }
+        if (this.digLeft[k] === 1) { if (cg[o + CG.SUGAR] < C.DIG_SUGAR + C.DIG_KEEP) return c; this.take(t, FOOD.SUGAR, C.DIG_SUGAR); }
+        if (--this.digLeft[k] === 0) { this.mat[m] = MAT.OPEN; this.mark[k] = 0; this.recount(); this.dirty = true; this.event(EVENT.DUG, t, m);
+          // A cache: its loads join the stores (the next rebuild finds them cells; what finds no room spoils).
+          if (this.cache[k]) { const v = this.cache[k], slot = o + (v & 1 ? CG.PROTEIN : CG.SUGAR), got = Math.max(0, Math.min(v >> 1, cg[o + CG.CAP_FOOD] - cg[slot])); cg[slot] += got; cg[o + CG.FOUND] += got; this.cache[k] = 0; this.settle(t); this.dirtyStore = true; this.event(EVENT.FOUND, t, m, got * 2 + (v & 1)); } }
         return c;
       }
       this.task[i] = TASK.REST; return c;
@@ -678,10 +752,9 @@ export class Sim {
         if (kind) {
           if (this.carry[i] & CARRY.LOOT) cg[o + CG.HAUL]++; // counted here, at home: a thief who dies on the way hauls nothing
           const food = kind === CARRY.PROTEIN ? FOOD.PROTEIN : FOOD.SUGAR;
-          const slot = o + (food === FOOD.PROTEIN ? CG.PROTEIN : CG.SUGAR);
           this.carry[i] = 0;
-          if (cg[slot] >= cg[o + CG.CAP_FOOD]) this.event(EVENT.FULL, t, food); // no room in the stores: the load is lost
-          else { cg[slot]++; cg[o + (food === FOOD.PROTEIN ? CG.LOADS_P : CG.LOADS_S)]++; this.event(EVENT.HOME, t, food, this.tr[i]); }
+          if (!this.put(t, food, c)) this.event(EVENT.FULL, t, food); // no room in the stores: the load is lost
+          else { cg[o + (food === FOOD.PROTEIN ? CG.LOADS_P : CG.LOADS_S)]++; this.event(EVENT.HOME, t, food, this.tr[i]); }
         }
         // Home: she leaves her crew, so a trail's count is of ants at work and the next free ant can take the place.
         if (this.tr[i] >= 0) { const q = t * TRAILS + this.tr[i]; if (this.crew[q] > 0) this.crew[q]--; this.tr[i] = -1; }
@@ -765,14 +838,26 @@ export class Sim {
     const e = this.inv[i] - 1, eo = e * CG.SIZE, cg = this.cg, s = this.tr[i] >= 0 ? t * TRAILS + this.tr[i] : -1;
     if (s < 0 || !this.trLive[s] || cg[t * CG.SIZE + CG.RECALL] || cg[eo + CG.QUEEN_HP] <= 0) { this.inv[i] = 0; this.task[i] = TASK.BACK; return this.next(this.homeF[t], c); }
     if (this.caste[i] === CASTE.WORKER || this.trMode[s] === MODE.LOOT) { // a thief: a worker, or a fighter on a raid sent for the store
-      const F = this.homeF[e];
+      // She walks to the nearest cell with anything in it, so a store dug deep is a longer walk past the guard.
+      const F = this.lootF[e], L = this.L;
+      if (!this.lootAny[e]) { this.inv[i] = 0; this.task[i] = TASK.BACK; return this.next(this.homeF[t], c); }
       if (F[c] <= 1 && this.layer[i] === NEST) {
-        const kind = cg[eo + CG.PROTEIN] > cg[eo + CG.SUGAR] ? FOOD.PROTEIN : FOOD.SUGAR, k = eo + (kind === FOOD.PROTEIN ? CG.PROTEIN : CG.SUGAR);
-        if (cg[k] > 0) { cg[k]--; cg[eo + CG.LOST]++; cg[t * CG.SIZE + CG.STOLEN]++; this.carry[i] = (kind === FOOD.PROTEIN ? CARRY.PROTEIN : CARRY.SUGAR) | CARRY.LOOT; this.event(EVENT.STOLEN, e, t, kind); }
+        let m = F[c] === 0 ? c : -1;
+        for (let j = 0; j < 4 && m < 0; j++) { const a = L.nb[c * 4 + j]; if (a >= 0 && F[a] === 0) m = a; }
+        const k = m - L.nestBase;
+        // Another thief emptied it this tick: she waits a tick for the next nearest cell.
+        if (m < 0 || !(this.binS[k] | this.binP[k])) { if (cg[eo + CG.SUGAR] + cg[eo + CG.PROTEIN] > 0) return c; }
+        else {
+          const kind = this.binP[k] > this.binS[k] ? FOOD.PROTEIN : FOOD.SUGAR, bin = kind === FOOD.PROTEIN ? this.binP : this.binS;
+          bin[k]--; cg[eo + (kind === FOOD.PROTEIN ? CG.PROTEIN : CG.SUGAR)]--; this.dirtyStore = true;
+          cg[eo + CG.LOST]++; cg[t * CG.SIZE + CG.STOLEN]++; this.carry[i] = (kind === FOOD.PROTEIN ? CARRY.PROTEIN : CARRY.SUGAR) | CARRY.LOOT; this.event(EVENT.STOLEN, e, t, kind + 2 * m);
+        }
         this.inv[i] = 0; this.task[i] = TASK.BACK;
         return this.next(this.homeF[t], c);
       }
-      const m = this.next(F, c); return m < 0 ? c : m;
+      const m = this.next(F, c);
+      if (m < 0) { this.inv[i] = 0; this.task[i] = TASK.BACK; return this.next(this.homeF[t], c); } // no way to the food
+      return m;
     }
     // Where the stores are the goal, the fighters hold the store for the thieves and leave the queen be.
     const Q = this.mission.goals.haul ? this.homeF[e] : this.queenF[e];
@@ -953,7 +1038,7 @@ export class Sim {
   stateArrays() {
     const n = this.n, b = this.bn;
     return [
-      ['mat', this.mat], ['room', this.room], ['mark', this.mark], ['digLeft', this.digLeft], ['cg', this.cg], ['rng', this.rng], ['pileCell', this.pileCell], ['pileAmount', this.pileAmount], ['pileKind', this.pileKind], ['siteHold', this.siteHold],
+      ['mat', this.mat], ['room', this.room], ['binS', this.binS], ['binP', this.binP], ['cache', this.cache], ['mark', this.mark], ['digLeft', this.digLeft], ['cg', this.cg], ['rng', this.rng], ['pileCell', this.pileCell], ['pileAmount', this.pileAmount], ['pileKind', this.pileKind], ['siteHold', this.siteHold],
       ...['x', 'y', 'layer', 'heading', 'team', 'caste', 'hp', 'task', 'carry', 'tr', 'cool', 'press', 'to', 'tx', 'ty', 'since', 'inv', 'id'].map(k => [k, this[k], n]),
       ...['bTeam', 'bStage', 'bAge', 'bFed', 'bHunger', 'bCell', 'bMajor'].map(k => [k, this[k], b]),
       ['trLive', this.trLive], ['trKind', this.trKind], ['trLevel', this.trLevel], ['trDry', this.trDry], ['trMode', this.trMode], ['trLen', this.trLen], ['trSeq', this.trSeq], ['trPath', this.trPath],

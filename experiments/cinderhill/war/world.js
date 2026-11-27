@@ -3,7 +3,7 @@
 
 import { cellAt, MAT, SURFACE, NEST } from '../sim/grid.js';
 import { below, STREAM } from '../sim/rng.js';
-import { MAPS } from './tables.js';
+import { MAPS, CACHES } from './tables.js';
 
 export const FOOD_SUGAR = 0, FOOD_PROTEIN = 1;
 export const DOORS = [[36, 56], [124, 56]];
@@ -33,6 +33,12 @@ export function generate(sim, layoutOnly = false) {
   // Sites that pay while held: a mission's list, in cells of the 160 by 112 map.
   sim.sites = (sim.mission.sites ?? []).map(([x, y]) => S(Math.round((x * sw) / 160), Math.round((y * sh) / 112)));
   if (layoutOnly || cfg.blank) return;
+  // Caches in the clay: the left hill's lie as the table says, the right hill's as its mirror.
+  const count = Math.min(CACHES.length, sim.mission.caches ?? cfg.caches ?? 4);
+  for (let j = 0; j < count; j++) {
+    const [ox, y, kind, amount] = CACHES[(Math.abs(cfg.seed | 0) + j) % CACHES.length];
+    for (let t = 0; t < doors.length; t++) { const x = doors[t][0] + (doors[t][0] < sw >> 1 ? ox : -ox), c = N(x, y); if (c >= 0 && mat[c] === MAT.CLAY) sim.cache[c - L.nestBase] = amount * 2 + kind; }
+  }
   const mid = sw >> 1, mx = x => sw - 1 - x, M = MAPS[sim.mission.map] ?? MAPS.crossing, wall = M.wall === 'stone' ? MAT.STONE : MAT.WATER;
   const ford = y => M.gaps.some(f => Math.abs(y - Math.round((f * sh) / 112)) <= M.gapHalf);
   // The creek: four cells wide down the middle, a cell wider here and there, open at the fords.
