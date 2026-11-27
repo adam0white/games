@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Sim, CG, CMD, KIND, MODE, CASTE, TEAMS, ROOM, EVENT, MAT } from '../war/sim.js';
 import { Host } from '../war/host.js';
-import { think, THINK_EVERY, cacheRun } from '../war/ai.js';
+import { think, THINK_EVERY, cacheRun, breachRun, mouth } from '../war/ai.js';
 import { CAMPAIGN, TRAITS, MISSIONS, MAPS } from '../war/tables.js';
 
 test('an idle colony loses to the rival', () => {
@@ -357,4 +357,117 @@ test('stores: a save taken after a dig mark carries on the same', () => {
   s.take(0, 0, 1); b.take(0, 0, 1); assert.equal(b.hash(), s.hash(), 'the same cell gives up the load');
   for (let k = 0; k < 600; k++) { s.step(); b.step(); }
   assert.equal(b.hash(), s.hash());
+});
+
+// ---- The Wall: digging into the other nest ----
+const copyOf = s => Sim.load(JSON.parse(JSON.stringify(s.save(), (k, v) => (ArrayBuffer.isView(v) ? Array.from(v) : v))));
+const rowRun = (s, y) => { const L = s.L, cells = []; for (let x = (s.door[0] % L.sw) + 6; x <= (s.door[1] % L.sw) - 7; x++) cells.push(x, y); return cells; };
+
+test('outside The Wall no colony marks the rival\'s ground or sends a raid under ground', () => {
+  const s = new Sim({ seed: 2, mission: 'crossing' }), L = s.L, ex = s.door[1] % L.sw;
+  assert.equal(s.mayBreach(0), false);
+  s.order({ team: 0, type: CMD.DIG, cells: [ex + 3, 5, ex + 4, 5] }); s.step();
+  assert.equal(s.g(0, CG.MARKS), 0);
+  const q = s.queen[1] - L.nestBase;
+  s.order({ team: 0, type: CMD.TRAIL, kind: KIND.RAID, level: 2, under: [q % L.nw, Math.floor(q / L.nw)] }); s.step();
+  assert.equal(s.trLive.some(v => v), false);
+  assert.equal(s.underF[0], null, 'and nothing is worked out for it');
+});
+
+test('The Wall: the wall is whole, the hills stand close, and no trail crosses', () => {
+  const s = new Sim({ seed: 4, mission: 'wall' }), L = s.L, mid = L.sw >> 1;
+  for (let y = 0; y < L.sh; y++) assert.equal(s.mat[y * L.sw + mid], MAT.STONE);
+  assert.deepEqual([s.door[0] % L.sw, s.door[1] % L.sw], [58, 101]);
+  assert.equal(s.doorF[0][s.door[1]], 0xFFFF, 'no way from one door to the other');
+  assert.equal(s.linked, false);
+  s.order({ team: 0, type: CMD.TRAIL, kind: KIND.RAID, level: 2, points: [s.door[1] % L.sw, Math.floor(s.door[1] / L.sw)] }); s.step();
+  assert.equal(s.trLive.some(v => v), false);
+});
+
+test('The Wall: a tunnel dug across the border is heard, joins the nests, and a save in the middle carries on the same', () => {
+  const s = new Sim({ seed: 4, mission: 'wall', sugar: 60 }), L = s.L, cells = rowRun(s, 12);
+  s.order({ team: 0, type: CMD.DIG, cells });
+  s.step(); assert.equal(s.g(0, CG.MARKS), cells.length / 2, 'marks lie on both sides of the border');
+  let heard = -1, breach = -1, twin = null;
+  for (let j = 0; j < 6000 && breach < 0; j++) {
+    if (heard >= 0 && !twin) twin = copyOf(s);
+    s.step(); if (twin) twin.step();
+    const ev = s.drainEvents();
+    for (let e = 0; e < ev.length; e += 4) { if (ev[e] === EVENT.HEARD && heard < 0) { heard = s.tick; assert.equal(ev[e + 1], 1); assert.equal(ev[e + 3], 0); } if (ev[e] === EVENT.BREACH) breach = s.tick; }
+  }
+  assert.ok(heard > 0 && breach > heard, `heard at ${heard}, through at ${breach}`);
+  assert.equal(s.linked, true); assert.equal(twin.hash(), s.hash()); assert.equal(twin.linked, true);
+  assert.notEqual(s.queenF[0][s.queen[1]], 0xFFFF, 'and there is a way from queen to queen');
+  assert.equal(copyOf(s).linked, true, 'a loaded save knows the nests are joined');
+});
+
+test('The Wall: a raid sent under ground goes through the breach to the queen; before the breach it is refused', () => {
+  const s = new Sim({ seed: 6, mission: 'wall' }), L = s.L, q = s.queen[1] - L.nestBase, under = [q % L.nw, Math.floor(q / L.nw)];
+  s.order({ team: 0, type: CMD.TRAIL, kind: KIND.RAID, level: 3, under }); s.step();
+  assert.equal(s.trLive.some(v => v), false, 'no way yet');
+  { // its own tunnel, across the border but not through: no strike there, and the log keeps its own copy of the cell
+    const t2 = new Sim({ seed: 6, mission: 'wall' }), run = rowRun(t2, 12).slice(0, -8), tip = [run[run.length - 2], 12];
+    for (let j = 0; j < run.length; j += 2) t2.mat[L.nestBase + 12 * L.nw + run[j]] = MAT.OPEN;
+    t2.recount(); t2.rebuildFields(); assert.equal(t2.linked, false); assert.equal(t2.owner(12 * L.nw + tip[0]), 1);
+    t2.order({ team: 0, type: CMD.TRAIL, kind: KIND.RAID, level: 2, under: tip }); tip[0] = 0; assert.equal(t2.queue[t2.queue.length - 1].under[0], run[run.length - 2]);
+    t2.step(); assert.equal(t2.trLive.some(v => v), false, 'the tip is not through');
+    // and the rival does not count that tunnel as a place of its own to dig from
+    t2.cache[14 * L.nw + tip[0]] = 2 * 10; const cr = cacheRun(t2, 1); assert.ok(cr.length);
+    assert.ok([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([ax, ay]) => t2.underF[1][L.nestBase + (cr[1] + ay) * L.nw + cr[0] + ax] !== 0xFFFF), 'the dig for a cache starts beside a cell its own ants can reach');
+  }
+  const cells = rowRun(s, 12); for (let j = 0; j < cells.length; j += 2) s.mat[L.nestBase + cells[j + 1] * L.nw + cells[j]] = MAT.OPEN;
+  s.recount(); s.rebuildFields(); assert.equal(s.linked, true);
+  for (let j = 0; j < 12; j++) s.spawn(0, CASTE.MAJOR, s.store[0]);
+  s.order({ team: 0, type: CMD.TRAIL, kind: KIND.RAID, level: 3, under });
+  let inside = 0;
+  for (let j = 0; j < 3000 && !s.result; j++) { s.step(); let now = 0; for (let i = 0; i < s.n; i++) if (s.team[i] === 0 && s.hp[i] > 0 && s.layer[i] === 1 && s.caste[i] === CASTE.MAJOR && s.owner((s.y[i] >> 8) * L.nw + (s.x[i] >> 8)) === 1) now++; inside = Math.max(inside, now); }
+  assert.ok(inside >= 6, `${inside} soldiers were in the rival's ground under it`);
+  assert.equal(s.result, 1, 'and the queen fell');
+  assert.equal(s.why, 1);
+});
+
+test('The Wall: the rival digs for the other nest, and a guard post where a breach comes in decides the fight', { timeout: 120000 }, () => {
+  // Minds alone: two steady rivals join their nests.
+  const m = new Host({ seed: 2, mission: 'wall', ai: { 0: 1, 1: 1 } }); m.run(9600);
+  assert.equal(m.sim.linked, true);
+  // The same strike, with and without the answer: seat 0 digs and sends every soldier through at 6000.
+  const fight = guard => {
+    const meek = { mood: 0, meek: true, caches: false, breach: false };
+    const h = new Host({ seed: 3, mission: 'wall', ai: { 0: meek, 1: { ...meek, guard } } }), s = h.sim, L = s.L; let sent = false, posts = 0;
+    while (!s.result && s.tick < 9600) {
+      if (s.tick === 600) h.order({ team: 0, type: CMD.DIG, cells: rowRun(s, 12) });
+      if (s.linked && !sent && s.tick >= 6000) { sent = true; posts = s.postCells[1].length; const q = s.queen[1] - L.nestBase; h.order({ team: 0, type: CMD.TRAIL, kind: KIND.RAID, level: 3, under: [q % L.nw, Math.floor(q / L.nw)] }); }
+      h.run(1);
+    }
+    return { why: s.why, hp: s.g(1, CG.QUEEN_HP), posts };
+  };
+  const open = fight(false), held = fight(true);
+  // Both defenders keep the usual post in the throat of the shaft, by the door. Only one answers the breach.
+  assert.equal(open.hp, 0, 'a post by the door does not stop a strike that comes through the clay: the queen falls');
+  assert.equal(held.posts - open.posts, 6, 'the rival posts its guard on the six cells where the tunnel comes in');
+  assert.ok(held.hp > 0, 'and with it she lives');
+});
+
+test('The Wall: the rival\'s dig is a way through the clay, and the mouth is on the defender\'s side', () => {
+  const s = new Sim({ seed: 1, mission: 'wall' }), L = s.L;
+  for (const aim of [0, 1, 2]) { const run = breachRun(s, 0, 1, aim); assert.ok(run.length >= 40 && run.length <= 2 * 60, `aim ${aim}: ${run.length / 2} cells`); for (let j = 0; j < run.length; j += 2) assert.equal(s.mat[L.nestBase + run[j + 1] * L.nw + run[j]], MAT.CLAY); }
+  assert.deepEqual(mouth(s, 1, 0, 6), []);
+  { const run = breachRun(s, 0, 1), j = run.length - 6, k = run[j + 1] * L.nw + run[j]; s.mark[k] = 2; const round = breachRun(s, 0, 1); assert.ok(round.length); for (let i = 0; i < round.length; i += 2) assert.notEqual(round[i + 1] * L.nw + round[i], k, 'goes round clay the rival has marked'); s.mark[k] = 0; }
+  const cells = rowRun(s, 12); for (let j = 0; j < cells.length; j += 2) s.mat[L.nestBase + cells[j + 1] * L.nw + cells[j]] = MAT.OPEN;
+  s.recount(); s.rebuildFields();
+  const at = mouth(s, 1, 0, 6); assert.equal(at.length, 12);
+  for (let j = 0; j < at.length; j += 2) { assert.equal(at[j + 1], 12); assert.equal(s.owner(12 * L.nw + at[j]), 1); assert.equal(s.room[12 * L.nw + at[j]], 0); }
+  assert.deepEqual(breachRun(s, 0, 1), [], 'joined: nothing more to dig');
+});
+
+test('The Wall: on its own ground a colony takes a rival\'s dig mark over, so a mark cannot block its rooms', () => {
+  const s = new Sim({ seed: 1, mission: 'wall' }), L = s.L, ex = s.door[1] % L.sw, cells = [ex - 8, 12, ex - 9, 12];
+  s.order({ team: 0, type: CMD.DIG, cells }); s.step();
+  assert.equal(s.g(0, CG.MARKS), 2);
+  s.order({ team: 1, type: CMD.ROOM, kind: ROOM.NURSERY, dig: 1, cells }); s.step();
+  assert.equal(s.g(0, CG.MARKS), 0); assert.equal(s.g(1, CG.MARKS), 2);
+  assert.equal(s.room[12 * L.nw + ex - 8], ROOM.NURSERY);
+  // And the digger's own unmark takes off only its own marks, there or at home.
+  s.order({ team: 0, type: CMD.DIG, on: 0, cells }); s.step();
+  assert.equal(s.g(1, CG.MARKS), 2);
 });

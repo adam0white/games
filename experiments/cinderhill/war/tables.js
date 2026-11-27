@@ -60,6 +60,10 @@ export const MAPS = {
   flat: { wall: null, gaps: [], gapHalf: 0, clumps: 24,
     piles: [[22, 20, 0, 40], [20, 92, 0, 40], [44, 40, 1, 40], [46, 74, 0, 40], [60, 14, 1, 40], [62, 98, 0, 50], [70, 56, 1, 40], [56, 56, 0, 40]],
     mid: [[0, 20, 0, 80], [-1, 56, 1, 80], [0, 92, 0, 80]] },
+  // A wall of stone with no way through, and the two hills close under it. The only way to the other queen is to dig.
+  wall: { wall: 'stone', gaps: [], gapHalf: 0, clumps: 12, door: 58,
+    piles: [[40, 50, 0, 60], [44, 66, 1, 50], [30, 30, 0, 80], [28, 84, 1, 70], [14, 62, 0, 70], [18, 22, 1, 60], [68, 28, 0, 60], [70, 86, 1, 50]],
+    mid: [] },
 };
 
 /** The campaign, in order. A fork is a choice kept for the whole campaign; it opens when the mission before it has been
@@ -74,6 +78,7 @@ export const CAMPAIGN = [
   { fork: 'craft', by: { spitter: ['farspit', 'acid'], warden: ['iron', 'stride'] } },
   { mission: 'larder' },
   { mission: 'narrows' },
+  { mission: 'wall' },
 ];
 export const LOSS_ANTS = 8;
 
@@ -139,5 +144,15 @@ export const MISSIONS = {
     deeds: [{ id: 'a', text: 'Kill the queen inside five minutes.', won: true, by: 6000, opens: 'hold' }, { id: 'b', text: 'Kill the queen with fewer than sixty dead.', won: true, max: { DIED: 59 }, opens: 'post' }],
     picks: [CASTE.SPITTER, CASTE.WARDEN],
     rooms: [ROOM.STORE, ROOM.NURSERY, ROOM.REST],
+  },
+  // No way over: the wall is whole. Either hill may dig through the clay under it and into the other's nest. A dig on
+  // your side is heard. Soldiers sent through go for the queen; a guard post where the tunnel comes in stops them.
+  wall: {
+    id: 'wall', name: 'The Wall', map: 'wall', breach: true, rivalMood: 1,
+    kit: { ants: 30, sugar: 14, protein: 5, eggs: 20, larvae: 20, pupae: 12, duskTick: 9600 },
+    goals: { queen: true, dusk: 'adults' },
+    deeds: [{ id: 'a', text: 'Kill the queen inside six minutes.', won: true, why: 'QUEEN', by: 7200, opens: 'hold' }, { id: 'b', text: 'Win with fewer than forty dead.', won: true, max: { DIED: 39 }, opens: 'post' }],
+    picks: [CASTE.SPITTER, CASTE.WARDEN],
+    rooms: [ROOM.STORE, ROOM.NURSERY, ROOM.REST, ROOM.POST],
   },
 };
