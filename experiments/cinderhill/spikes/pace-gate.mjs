@@ -3,7 +3,7 @@
 // gives), and each line of the pace budget is read from what they did.
 //   median:  every 15 s a trail from the entrance to the nearest pile of the food the colony has less of in store
 //            (skipped when a live trail already ends there; the sim keeps four trails and reuses the oldest), Recall
-//            on at the spider's warning and off when it leaves, on at every dusk card.
+//            on at the spider's warning and off when it leaves, on at every dusk card. It leaves crew sizes alone, so each trail keeps its Steady crew (the default).
 //   passive: one trail at 1 s to the nearest pile, then no order.
 //   idle:    no order.
 // A line is read on the worst seed: "every line passes for the scripted bots on 20 seeds" (02 section 0).
@@ -33,8 +33,8 @@ const HZ = 20;
 const BASELINE = new URL('./pace-baseline.json', import.meta.url);
 
 /** Where the build is on the roadmap, and the order of the stages lines block from. */
-export const STAGES = ['R0', 'R1.2', 'R1.3', 'R1.5', 'R1', 'R2a', 'R2b'];
-export const STAGE = 'R1.2';
+export const STAGES = ['R0', 'R1.2', 'R1.3', 'R1.3b', 'R1.5', 'R1', 'R2a', 'R2b'];
+export const STAGE = 'R1.3';
 export const blocks = (line, stage = STAGE) => STAGES.indexOf(line.stage) <= STAGES.indexOf(stage);
 /** At R0 the roadmap says the build fails the gate: a failing blocking line is allowed by its baseline and may not
  *  get worse. From R1 step 2 (new starting values) every blocking line must pass. */
@@ -60,7 +60,7 @@ export const LINES = [
   { id: 'gap-0-10', stage: 'R1', horizon: 600, text: 'Longest gap between decision events, minutes 0 to 10, s', target: '<= 30', bot: 'median', get: r => r.gapEarly, ok: v => v <= 30, up: true },
   { id: 'gap-after-10', stage: 'R1', horizon: 720, text: 'Same gap after minute 10, s', target: '<= 45', bot: 'median', get: r => r.gapLate, ok: v => v <= 45, up: true },
   { id: 'idle-share', stage: 'R1.3', horizon: 720, text: 'Wasted labour: largest share of adults idle 10 s while a job has a gap', target: '<= 0.15', bot: 'median', get: r => r.idleMax, ok: v => v <= 0.15, up: true },
-  { id: 'queued-at-doors', stage: 'R1.3', text: 'Queued at doors outside a jam', target: '<= 0.10', bot: 'median', get: () => null },
+  { id: 'queued-at-doors', stage: 'R1.3b', text: 'Queued at doors outside a jam', target: '<= 0.10', bot: 'median', get: () => null },
   { id: 'chapter-1-length', stage: 'R1', text: 'Chapter 1 length, min', target: '4 to 6', bot: 'median', get: () => null },
   { id: 'passive-finishes', stage: 'R1', text: 'Passive bot finishes chapter 1', target: 'yes', bot: 'passive', get: () => null },
   { id: 'chapters-2-6-length', stage: 'R2a', text: 'Chapters 2 to 6 length, min', target: '6 to 12', bot: 'median', get: () => null },
@@ -279,7 +279,8 @@ if (isMainThread && import.meta.url === `file://${process.argv[1]}`) {
         if (old) problems.push(...slack(base, old).map(p => `baseline: ${p}`));
       }
       if (!quotaFails.length) problems.push('the quota opening fails no blocking line the current build passes: the table is too loose');
-      const broodBad = ratchet(brood, base).filter(p => !/passes now|in this run/.test(p));
+      // Only lines the short fixture run can read: a line past its horizon is "not read" there, and that is no catch.
+      const broodBad = ratchet(brood, base, block.filter(l => brood[l.id].status !== 'not read')).filter(p => !/passes now|in this run/.test(p));
       console.log(`Brood x10 plant: ${broodBad.length ? `caught (${broodBad.join('; ')})` : 'NOT caught'}.`);
       if (!broodBad.length) problems.push('the brood x10 plant passes the gate');
       const over = block.filter(l => res[l.id].status !== 'pass');

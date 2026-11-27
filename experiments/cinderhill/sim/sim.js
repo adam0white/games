@@ -20,7 +20,7 @@ import { LATE_FIND_AT, WINDFALL_AT, generate, lateFind, windfall } from './world
 import { stepSpider } from './spider.js';
 import { BROOD_MAX, C, CASTE, CASTE_HP, DAY_TICKS, FOOD, LOAD, STAGE, addBrood, fight, makeBrood, startColony, startDays, stepColony, stepDay } from './colony.js';
 
-export const SIM_VERSION = 8; // 2: trails keep their drawn shape (a path per trail, `via` per ant); 3: eight directions; 4: the colony (colony.js); 5: days; 6: the spider, and foragers stay in under Recall; 7: crews (CMD.CREW); 8: the spec's starting values (02-spec 3.2): a porch store, a 64-cell nursery, 30 ants, fast brood, no days
+export const SIM_VERSION = 9; // 2: trails keep their drawn shape (a path per trail, `via` per ant); 3: eight directions; 4: the colony (colony.js); 5: days; 6: the spider, and foragers stay in under Recall; 7: crews (CMD.CREW); 8: the spec's starting values (02-spec 3.2): a porch store, a 64-cell nursery, 30 ants, fast brood, no days; 9: who goes (02-spec 6.2): crew levels (Steady by default), free foragers on the nearest trail one in three at a time, the dig as an auto job, adult starvation
 export const TICK_HZ = 20;
 export { G, GOAL, SLOT, INF, STEP, DIAG, FIELD, MAT, SURFACE, NEST, SUB, SUBSYSTEMS, CASTE, CASTE_HP, FOOD, LOAD, STAGE, BROOD_MAX };
 
@@ -328,13 +328,13 @@ export class Sim {
     return n;
   }
 
-  /** Set trail k's crew level (1 Light, 2 Steady, 3 Surge) and its size from the workforce now. More than the whole
-   *  workforce over all crews: this crew gets what is left (its card says no free foragers). */
+  /** Set trail k's crew level (1 Light, 2 Steady, 3 Surge), and work out every level's size from the workforce now,
+   *  oldest trail first. More than the whole workforce over all crews: the newer crews get what is left (their cards
+   *  say no free foragers). */
   setLevel(k, level) {
-    const g = this.g, wf = this.workforce();
-    g[G.LEVEL0 + k] = level;
-    if (!g[G.WORKFORCE]) g[G.WORKFORCE] = wf;
-    g[G.WANT0 + k] = crewSize(this, k, g[G.WORKFORCE]) + 1;
+    this.g[G.LEVEL0 + k] = level;
+    this.g[G.WORKFORCE] = 0; // a level order works every level's size out again from the workforce now
+    this.resizeCrews();
   }
 
   /** Once a tick (colony games): when the outside workforce has changed by 10% since the levels' sizes were last
@@ -534,7 +534,7 @@ export class Sim {
       else if (this.mode[i] !== MODE.WORK && d !== INF && this.g[G.DIG_CREW] < cap) { this.setMode(i, MODE.WORK); this.g[G.DIG_CREW]++; }
       if (this.mode[i] !== MODE.WORK) {
         d = INF;
-        if (this.cfg.colony) { this.job[i] = JOB.FORAGE; this.setMode(i, MODE.REST); } // an auto job (sim 9): no work, she is free again
+        if (this.cfg.colony) { this.job[i] = JOB.FORAGE; this.setMode(i, MODE.REST); this.freeAll++; } // an auto job (sim 9): no work, she is free again
       }
       if (d === 0) { this.digAt(c); still = true; }
       else if (d !== INF) follow = SLOT.DIG;
@@ -655,7 +655,7 @@ export class Sim {
   /** Who goes (sim 9, 02-spec 6.2), for a colony game's forager that is not carrying home. In order: Recall (an ant in
    *  the nest stays in; one outside was sent home before this); a crew keeps its ants (one over its size leaves it); a
    *  free ant joins the nearest crew short of its size; a free ant in the nest takes the dig while marked cells lack
-   *  diggers; then free foraging: only on the nearest drawn trail, one free ant in three at a time (the rest rest by the
+   *  diggers (one resting outside walks in for it); then free foraging: only on the nearest drawn trail, one free ant in three at a time (the rest rest by the
    *  door), at off-trail speed. Not built yet: free ants turning back at a telegraphed threat (the bird, R1 step 5).
    *  Returns the scratch object `this.o`: { follow, want, still, wander, slow }. */
   whoGoes(i, c, layer, atHome) {
@@ -695,6 +695,7 @@ export class Sim {
       this.job[i] = JOB.DIG; this.setMode(i, MODE.WORK); g[G.DIG_CREW]++; this.via[i] = -1;
       o.follow = SLOT.DIG; return o;
     }
+    if (layer === SURFACE && resting && g[G.DIG_COUNT] > 0 && g[G.DIG_CREW] < cap) { o.follow = SLOT.HOME; return o; } // resting outside: walk in to the dig
     const quota = Math.floor((this.freeAll + 2) / 3);
     let trail = false;
     for (let s = SLOT.TRAIL0; s < SLOT.TRAIL0 + SLOT.TRAILS; s++) if (F.live[s]) trail = true;
@@ -711,7 +712,8 @@ export class Sim {
       if (!F.live[s]) continue;
       const d = distAt(this, s, c); if (d === INF) continue;
       const off = d < TRAIL_OFF ? 0 : d - TRAIL_OFF;
-      if (off < dt || (off === dt && t >= 0 && d < distAt(this, t, c))) { dt = off; t = s; }
+      // Equally near (trails drawn from the same door): the shorter trail, the nearer food.
+      if (off < dt || (off === dt && t >= 0 && F.pathLen[s - SLOT.TRAIL0] < F.pathLen[t - SLOT.TRAIL0])) { dt = off; t = s; }
     }
     if (t < 0) { this.setMode(i, MODE.RETURN); this.via[i] = -1; o.follow = SLOT.HOME; return o; }
     this.via[i] = FREE_VIA + t;
@@ -730,7 +732,7 @@ export class Sim {
       o.still = true; return o;
     }
     if (this.since[i] > SEEK_GIVE_UP || distAt(this, SLOT.HOME, c) > FAR) {
-      if (!free) this.crew[slot - SLOT.TRAIL0]--; // she leaves her crew now, not next tick (and rejoins at home)
+      if (!free) { this.crew[slot - SLOT.TRAIL0]--; this.freeAll++; this.freeOut++; } // she leaves her crew now, not next tick (and rejoins at home)
       this.setMode(i, MODE.RETURN); this.via[i] = -1; o.follow = SLOT.HOME; return o; // nothing found: home
     }
     if (distAt(this, slot, c) <= 1) { o.want = this.sense(i); if (o.want < 0) o.wander = true; } // at the trail's end: the food is near

@@ -67,7 +67,7 @@ jobs:
         if: steps.affected.outputs.cinderhill == 'true'
         env:
           BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
-        run: node experiments/cinderhill/spikes/pace-gate.mjs --minutes=3 ${BASE:+--base-ref=$BASE}
+        run: node experiments/cinderhill/spikes/pace-gate.mjs --minutes=12 ${BASE:+--base-ref=$BASE}
       - run: pnpm install --frozen-lockfile
       - name: Standalone Workers
         if: steps.affected.outputs.workers == 'true'

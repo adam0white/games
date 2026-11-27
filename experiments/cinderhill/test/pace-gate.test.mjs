@@ -6,7 +6,7 @@ import { LINES, blocks, play, ratchet, slack } from '../spikes/pace-gate.mjs';
 
 test('the ratchet on blocking lines: a pass that fails, a fail that gets worse by a twentieth or never happens, unrecorded progress and an unread line all fail', () => {
   const base = Object.fromEntries(LINES.map(l => [l.id, { status: 'not built', value: null }]));
-  Object.assign(base, { 'first-birth': { status: 'pass', value: 15 }, 'first-delivery': { status: 'fail', value: 16 }, 'first-delivery-passive': { status: 'fail', value: 13 }, 'minute-1-deliveries': { status: 'pass', value: 39 } });
+  Object.assign(base, { 'first-birth': { status: 'pass', value: 15 }, 'first-delivery': { status: 'fail', value: 16 }, 'first-delivery-passive': { status: 'fail', value: 13 }, 'minute-1-deliveries': { status: 'pass', value: 39 }, 'idle-share': { status: 'pass', value: 0.1 } });
   const now = JSON.parse(JSON.stringify(base)), r0 = (x, y) => ratchet(x, y, undefined, false); // R0: failing lines held by the baseline
   assert.deepEqual(r0(now, base), []);
   assert.equal(r0({ ...now, 'first-birth': { status: 'fail', value: 40 } }, base).length, 1, 'a passing line fails');
@@ -20,7 +20,7 @@ test('the ratchet on blocking lines: a pass that fails, a fail that gets worse b
   assert.deepEqual(slack({ ...now, 'first-delivery': { status: 'pass', value: 9 } }, base), [], 'a recorded improvement is fine');
   assert.equal(slack({ ...now, 'first-delivery': { status: 'fail', value: 30 } }, base).length, 1, 'a recorded regression is not');
   assert.equal(slack({ ...now, 'first-birth': { status: 'fail', value: 16 } }, base).length, 1, 'nor a recorded pass turned fail');
-  assert.deepEqual(LINES.filter(l => blocks(l)).map(l => l.id), ['first-delivery', 'first-delivery-passive', 'minute-1-deliveries', 'first-birth'], 'R0 and R1 step 2 block on these (02 section 3.1)');
+  assert.deepEqual(LINES.filter(l => blocks(l)).map(l => l.id), ['first-delivery', 'first-delivery-passive', 'minute-1-deliveries', 'first-birth', 'idle-share'], 'R0 to R1 step 3 block on these (02 section 3.1)');
 });
 
 test('the quota opening misses the first birth; brood ten times slower misses the first birth', () => {
@@ -54,4 +54,20 @@ test('a trail delivery on the tick an ant is born still counts as a trip', async
   assert.equal(o.trails[0].first, 1);
   assert.equal(o.firstTrailProtein, 1, 'a protein load by trail');
   assert.deepEqual(o.births, [1]);
+});
+
+test('wasted labour: crews that never draw on resting ants leave a gap while a third of the colony idles', async () => {
+  const { MODE, Sim } = await import('../sim/sim.js');
+  const ok = play('median', 1, { minutes: 3 });
+  assert.ok(ok.idleMax <= 0.15, `idle share ${ok.idleMax}`);
+  const who = Sim.prototype.whoGoes;
+  // The planted fault: a resting free ant stays resting, so a crew short of its size is never filled from the door.
+  Sim.prototype.whoGoes = function (i, c, layer, atHome) {
+    if (this.mode[i] === MODE.REST && this.via[i] < 0 && atHome) { const o = this.o ?? (this.o = {}); o.follow = -1; o.want = -1; o.still = true; o.wander = false; o.slow = false; return o; }
+    return who.call(this, i, c, layer, atHome);
+  };
+  try {
+    const bad = play('median', 1, { minutes: 3 });
+    assert.ok(bad.idleMax > 0.15, `planted fault: idle share ${bad.idleMax}`);
+  } finally { Sim.prototype.whoGoes = who; }
 });

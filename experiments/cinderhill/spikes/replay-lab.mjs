@@ -9,13 +9,13 @@
 // effect, brood and caste growth, deaths, and stalls (60 s with no delivery, no digging, no birth and no order).
 import { readFileSync, writeFileSync } from 'node:fs';
 import { Host } from '../host.js';
-import { CMD, EVENT, FOOD, G, JOB, MAT, MODE, NEST, SIM_VERSION, SLOT, STAGE, SURFACE } from '../sim/sim.js';
+import { CMD, EVENT, FOOD, FREE_VIA, G, JOB, MAT, MODE, NEST, SIM_VERSION, SLOT, STAGE, SURFACE } from '../sim/sim.js';
 import { SPIDER } from '../sim/spider.js';
 import { PATH_MAX } from '../sim/flow.js';
 import { cellAt } from '../sim/grid.js';
 import { FORMAT } from '../labrec.js';
 
-const MINUTE = 1200, STALL = 1200, AFTER = 200, LOOK_EVERY = 20, IDLE_FOR = 200; // IDLE_FOR: 10 s (02-spec 3.1, wasted labour)
+const MINUTE = 1200, STALL = 1200, AFTER = 200, LOOK_EVERY = 20, IDLE_FOR = 200, GAP_FOR = 5; // IDLE_FOR: 10 s (02-spec 3.1, wasted labour); GAP_FOR: a quarter second (the 1-tick refill is 1 to 2 ticks: NOTES, Who goes)
 
 /** Records (any of the shapes above) to the parts of each chain, in order. */
 export function parts(records) {
@@ -76,9 +76,10 @@ export function replayChain(chain, { stopAtDivergence = false } = {}) {
  *    the start, then each new pile), a source empty, a threat telegraphed (the spider's warning), a threat arrived (it hunts) and resolved
  *    (it leaves), and brood short of protein (larvae waiting and no protein in store, each time it starts).
  *    The spec's other kinds (room full, rain, route jammed, build offered, sprout) are not built.
- *  - idle: at each look, the share of adults that are idle while some job has a gap. Idle: a forager with no load,
- *    no trail route, no remembered pile and no find for IDLE_FOR ticks (her search timer), or a digger resting
- *    for IDLE_FOR ticks. A gap: a live trail
+ *  - idle: at each look, the share of adults that are idle while some job has a gap. Idle: a forager with no load
+ *    and no route (no crew trail, no free trail) who has rested, or searched with no remembered pile and no find,
+ *    for IDLE_FOR ticks (her search timer; resting does not reset it), or a digger resting
+ *    for IDLE_FOR ticks. A gap (hasGap), once it has lasted GAP_FOR ticks: a live trail
  *    with no crew size or short of it, or marked dig cells with room in the dig crew. */
 export class Observer {
   constructor(host) {
@@ -121,11 +122,12 @@ export class Observer {
     // Births append new ants after the old ones, so they renumber no one.
     if (g[G.DIED] === this.died && s.n >= this.prevN) {
       for (let i = 0; i < this.prevN; i++) if (this.prevCarry[i] && !s.carry[i]) {
-        const v = this.prevVia[i], t = v >= 0 ? this.liveTrail(v) : null;
+        const v = this.prevVia[i], t = v >= FREE_VIA ? this.liveTrail(v - FREE_VIA) : v >= 0 ? this.liveTrail(v) : null; // a free forager's load counts for the trail she worked
         if (t) { t.trips++; if (t.first < 0) t.first = this.steps - t.step; if (this.prevCarry[i] === 2 && this.firstTrailProtein < 0) this.firstTrailProtein = this.steps; }
       }
     } else this.unattributed = (this.unattributed ?? 0) + 1;
     for (const t of this.trails) if (t.end < 0 && (!s.flow.live[t.slot] || s.flow.seq[t.slot] !== t.seq)) { t.end = this.steps; t.how = s.flow.live[t.slot] ? 'replaced' : 'dropped'; }
+    this.gapRun = this.hasGap() ? (this.gapRun ?? 0) + 1 : 0;
     if (this.steps % LOOK_EVERY === 0) this.look();
     for (const d of this.digs) if (d.done < 0) { const open = d.cells.filter(c => s.mat[c] === MAT.OPEN).length; if (open > d.open) { d.open = open; if (d.first < 0) d.first = this.steps - d.step; } if (open === d.cells.length) d.done = this.steps - d.step; }
     for (const a of this.alarms) if (this.steps - a.step === AFTER && a.cell >= 0) a.near = this.near(a.cell, 6);
@@ -147,14 +149,22 @@ export class Observer {
     }
     this.cur.idle += idle; this.cur.working += working; this.cur.other += other; this.cur.looks++;
     // The pace gate's idle share (02-spec 3.1): idle for IDLE_FOR ticks while some job has a gap.
-    const F = s.flow; let gap = s.g[G.DIG_COUNT] > 0 && s.g[G.DIG_CREW] < Math.min(24, 4 * s.g[G.DIG_COUNT]);
-    for (let k = 0; k < SLOT.TRAILS && !gap; k++) if (F.live[SLOT.TRAIL0 + k]) { const w = s.g[G.WANT0 + k]; gap = w === 0 || s.crew[k] < w - 1; }
+    const gap = this.gapRun >= GAP_FOR;
     let wasted = 0;
-    if (gap) for (let i = 0; i < s.n; i++) if ((s.job[i] === JOB.FORAGE && !s.carry[i] && s.via[i] < 0 && s.mem[i] < 0 && s.mode[i] === MODE.SEEK && s.since[i] >= IDLE_FOR) || (s.job[i] === JOB.DIG && (s.mode[i] === MODE.REST || (s.mode[i] === MODE.SEEK && s.g[G.DIG_COUNT] === 0)) && s.since[i] >= IDLE_FOR)) wasted++;
+    if (gap) for (let i = 0; i < s.n; i++) if ((s.job[i] === JOB.FORAGE && !s.carry[i] && s.via[i] < 0 && (s.mode[i] === MODE.REST || (s.mode[i] === MODE.SEEK && s.mem[i] < 0)) && s.since[i] >= IDLE_FOR) || (s.job[i] === JOB.DIG && (s.mode[i] === MODE.REST || (s.mode[i] === MODE.SEEK && s.g[G.DIG_COUNT] === 0)) && s.since[i] >= IDLE_FOR)) wasted++;
     const share = s.n ? wasted / s.n : 0;
     if (share > this.idleMax) this.idleMax = share;
     this.idleSum += share; this.idleLooks++;
     for (const t of this.trails) if (t.end < 0) { const on = this.count(i => s.via[i] === t.slot); t.onSum += on; t.looks++; if (on > t.onMax) t.onMax = on; }
+  }
+  /** A job short of hands: a live trail with no crew size or short of it, or marked dig cells with room in the dig
+   *  crew. The idle line counts it once it has lasted GAP_FOR ticks: a crew member who gives up leaves her crew one
+   *  short until a resting ant takes her place on the next tick, and that is not a job waiting for hands. */
+  hasGap() {
+    const s = this.s, F = s.flow;
+    if (s.g[G.DIG_COUNT] > 0 && s.g[G.DIG_CREW] < Math.min(24, 4 * s.g[G.DIG_COUNT])) return true;
+    for (let k = 0; k < SLOT.TRAILS; k++) if (F.live[SLOT.TRAIL0 + k]) { const w = s.g[G.WANT0 + k]; if (w === 0 || s.crew[k] < w - 1) return true; }
+    return false;
   }
   closeMinute() {
     const s = this.s, g = s.g, c = this.cur, b = [0, 0, 0];

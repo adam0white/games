@@ -482,6 +482,30 @@ export const pageRuns = {
     await page.mouse.up();
     await until(page, () => /of/.test(document.querySelector('#crewWho').textContent), 'the panel shows on and wanted');
   },
+  async 'cinderhill crew levels'(page, { base, until }) {
+    // A colony game (sim 9): a new trail starts Steady (a quarter of the outside workforce), and Surge asks for half.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`${base}/notes/button.js`);
+    await page.evaluate(() => { localStorage.clear(); localStorage.setItem('cinderhill:hint', '1'); });
+    await page.goto(`${base}/cinderhill/?colony=1&lang=en&labRunSource=agent`);
+    await until(page, () => window.painter, 'painter script');
+    await page.click('#play');
+    await until(page, () => window.painter.state().screen === 'play', 'play');
+    await page.evaluate(() => {
+      const el = document.querySelector('#c'), x = innerWidth / 2, y = innerHeight / 2;
+      for (const [type, dx, dy] of [['pointerdown', 0, 0], ['pointermove', 30, -30], ['pointermove', 60, -60], ['pointerup', 60, -60]]) el.dispatchEvent(new PointerEvent(type, { pointerId: 1, pointerType: 'touch', isPrimary: true, clientX: x + dx, clientY: y + dy, pressure: type === 'pointerup' ? 0 : 0.5, bubbles: true, cancelable: true }));
+    });
+    await until(page, () => window.painter.stats().trails.length === 1 && window.painter.stats().trails[0].level === 2, 'a Steady crew on the new trail', 20000);
+    await until(page, () => getComputedStyle(document.querySelector('#crewLevels')).display !== 'none', 'the level buttons');
+    await until(page, () => document.querySelector('#crewLevels [data-level="2"]').getAttribute('aria-pressed') === 'true', 'Steady pressed');
+    const steady = await page.evaluate(() => window.painter.stats().trails[0].want);
+    await page.click('#crewLevels [data-level="3"]');
+    await until(page, () => window.painter.log().some(o => o.type === 'crew' && o.level === 3), 'a Surge order');
+    await until(page, () => window.painter.stats().trails[0].level === 3, 'the sim takes the level');
+    const surge = await page.evaluate(() => window.painter.stats().trails[0].want);
+    assert.ok(surge > steady, `Surge ${surge} over Steady ${steady}`);
+    await until(page, () => document.querySelector('#crewLevels [data-level="3"]').getAttribute('aria-pressed') === 'true', 'Surge pressed');
+  },
   async 'cinderhill speed'(page, { base, until }) {
     // 4x view speed runs about four times the ticks a second, and the game it makes is the one a 1x replay of the
     // same orders makes (Host in Node, here): the speed is the page's, not the sim's.
