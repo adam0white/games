@@ -8,7 +8,7 @@ import { C, DAY_TICKS, START } from '../sim/colony.js';
 import { LATE_FIND_AT, WINDFALL_AT } from '../sim/world.js';
 
 test('the start: 20 foragers by the entrance, 10 nurses, the porch store, and food 8 to 12 cells out', () => {
-  for (const seed of [1, 2, 3, 2026]) {
+  for (const seed of [1, 2, 3, 8, 2026]) {
     const s = new Host(0, seed, { colony: true }).sim, L = s.L, ex = L.sw >> 1, ey = L.sh >> 1;
     assert.equal(s.n, START.ants);
     let surface = 0;
@@ -20,10 +20,12 @@ test('the start: 20 foragers by the entrance, 10 nurses, the porch store, and fo
     assert.deepEqual([s.g[G.SUGAR], s.g[G.PROTEIN]], [10, 5]);
     assert.equal(s.home.y, 3, 'the porch store is 3 cells under the entrance');
     assert.equal(s.nursery.w * s.nursery.h, C.NURSERY);
+    const cells = Array.from(s.brood.cell.subarray(0, s.brood.n));
+    assert.equal(s.brood.n, 52); assert.equal(new Set(cells).size, 52, 'one brood per cell');
     for (const [p, kind, amount] of [[0, FOOD.SUGAR, 30], [1, FOOD.PROTEIN, 20]]) {
       const c = s.pileCell[p], d = Math.hypot(c % L.sw - ex, Math.floor(c / L.sw) - ey);
       assert.equal(s.pileKind[p], kind); assert.equal(s.pileAmount[p], amount);
-      assert.ok(d >= 6.5 && d <= 14, `seed ${seed} pile ${p} ${d.toFixed(1)} cells out`);
+      assert.ok(d >= 8 && d <= 13.5, `seed ${seed} pile ${p} ${d.toFixed(1)} cells out`);
     }
   }
 });

@@ -164,7 +164,7 @@ export class Host {
       if (s.job[i] === JOB.FORAGE) {
         foragers++;
         if (out && s.mode[i] === MODE.SEEK) { seeking++; if (s.since[i] >= 300) late++; } // past half of SEEK_GIVE_UP (sim.js): too late to take the newest trail
-      } else if (s.job[i] === JOB.GUARD) guards++; else diggers++;
+      } else if (s.job[i] === JOB.GUARD) guards++; else if (s.job[i] === JOB.DIG) diggers++;
     }
     const F = s.flow, trails = [];
     for (let k = 0; k < SLOT.TRAILS; k++) {
@@ -192,7 +192,7 @@ export class Host {
   inspect(i) {
     const s = this.sim;
     if (i < 0 || i >= s.n) return null;
-    const job = ['forager', 'digger', 'guard'][s.job[i]], goal = s.goal[i], layer = s.layer[i];
+    const job = ['forager', 'digger', 'guard', 'nurse'][s.job[i]], goal = s.goal[i], layer = s.layer[i];
     let to = 'none';
     if (goal === SLOT.HOME) to = 'home'; else if (goal === SLOT.EXIT) to = 'exit'; else if (goal === SLOT.DIG) to = 'dig';
     else if (goal === SLOT.ALARM) to = 'alarm'; else if (goal >= SLOT.TRAIL0 && goal < SLOT.TRAIL0 + SLOT.TRAILS) to = 'trail';
@@ -210,7 +210,8 @@ export class Host {
     } else if (s.job[i] === JOB.DIG) {
       if (s.mode[i] === MODE.WORK) why = to === 'dig' ? 'toDig' : 'digging';
       else why = s.g[G.DIG_COUNT] > 0 ? 'crewFull' : 'noDig';
-    } else {
+    } else if (s.job[i] === JOB.NURSE) why = 'nursing';
+    else {
       if (!s.flow.live[SLOT.ALARM]) why = 'noAlarm';
       else why = to === 'alarm' ? 'toAlarm' : 'atAlarm';
     }

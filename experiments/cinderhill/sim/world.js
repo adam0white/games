@@ -15,7 +15,7 @@ function disc(sim, layer, cx, cy, r, m, keep) {
 
 /** A colony game's nursery (sim 8, 02-spec 3.2: 10 to 16 cells down, 64 cells): 16 by 4, 12 cells down, under the
  *  shaft. Fixed by the nest's width, so a snapshot needs no field for it. */
-export const nurseryRect = L => ({ x: (L.nw >> 1) - 8, y: 12, w: 16, h: 4 });
+export const nurseryRect = L => ({ x: (L.nw >> 1) - 8, y: Math.max(6, Math.min(12, L.nh - 5)), w: 16, h: 4 }); // higher in a shallow test nest
 
 export function generate(sim) {
   const { L, rng } = sim, ex = L.sw >> 1, ey = L.sh >> 1, sx = L.nw >> 1;
@@ -90,8 +90,11 @@ const DIRS = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -
 function firstFood(sim) {
   const { L, rng } = sim, ex = L.sw >> 1, ey = L.sh >> 1, q0 = below(rng, W, 8);
   for (let p = 0; p < 2; p++) {
-    const d = 8 + below(rng, W, 5), [dx, dy] = DIRS[(q0 + p * (3 + below(rng, W, 3))) & 7], k = dx && dy ? 7 : 10;
-    const px = ex + Math.trunc((dx * d * k) / 10) + below(rng, W, 3) - 1, py = ey + Math.trunc((dy * d * k) / 10) + below(rng, W, 3) - 1;
+    // A diagonal steps round(d / sqrt 2) on each axis; a straight step is jittered a cell sideways. Either way the
+    // pile is d to d + 1 cells out, clamped inside a small map.
+    const d = 8 + below(rng, W, 5), [dx, dy] = DIRS[(q0 + p * (3 + below(rng, W, 3))) & 7], j = below(rng, W, 3) - 1;
+    const ax = dx && dy ? Math.round((dx * d * 707) / 1000) : dx * d + (dx ? 0 : j), ay = dx && dy ? Math.round((dy * d * 707) / 1000) : dy * d + (dy ? 0 : j);
+    const px = Math.max(3, Math.min(L.sw - 4, ex + ax)), py = Math.max(3, Math.min(L.sh - 4, ey + ay));
     disc(sim, SURFACE, px, py, 2, MAT.OPEN, () => false);
     sim.pileCell[p] = cellAt(L, SURFACE, px, py); sim.pileAmount[p] = p === 0 ? 30 : 20; sim.pileKind[p] = p; // 0 sugar, 1 protein
   }

@@ -61,7 +61,7 @@ export function findRooms(sim) {
 export function growth(B, k) {
   const age = B.age[k];
   if (B.stage[k] === STAGE.EGG) return Math.min(1, age / C.EGG_TICKS);
-  if (B.stage[k] === STAGE.LARVA) return Math.min(1, (B.fed[k] + (age % C.FEED_EVERY) / C.FEED_EVERY) / C.MAJOR_FEEDS);
+  if (B.stage[k] === STAGE.LARVA) return Math.min(1, Math.max(age / C.LARVA_TICKS, B.fed[k] / C.MAJOR_FEEDS));
   return Math.min(1, age / C.PUPA_TICKS);
 }
 
@@ -86,7 +86,8 @@ export function drawNest(v) {
   });
   // Stores in the store room (the porch in a colony game, sim 8; the queen's chamber when the porch is too small to be
   // a room, or in the sandbox): sugar as pale grains along the left wall, protein as red-brown bits along the right.
-  const qr = rooms.find(r => r.store) ?? rooms.find(r => r.queen);
+  const ph = sim.home, porch = sim.nursery ? { x0: ph.x, y0: ph.y, x1: ph.x + ph.w - 1, y1: ph.y + ph.h - 1, cx: ph.x + ph.w / 2 } : null;
+  const qr = rooms.find(r => r.store) ?? porch ?? rooms.find(r => r.queen);
   if (qr) {
     for (const [amount, x, col, rr] of [[sim.g[g.SUGAR], qr.x0 + 0.2, L.sugar, 0.16], [sim.g[g.PROTEIN], qr.x1 + 0.8, L.protein, 0.2]]) {
       const n = Math.min(60, amount); // a grain a load (sim 8: a load is a unit)

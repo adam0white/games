@@ -58,14 +58,16 @@ export const nursery = sim => sim.nursery ?? sim.home;
 /** A random open cell of the nursery, from the spare stream. */
 function chamberCell(sim) {
   const h = nursery(sim), r = sim.rng, S = STREAM.spare;
+  // One brood per cell (02-spec 3.2): a cell is free when it is open and holds no brood.
+  const B = sim.brood, free = c => { if (c < 0 || sim.mat[c] !== MAT.OPEN) return false; for (let k = 0; k < B.n; k++) if (B.cell[k] === c) return false; return true; };
   for (let tries = 0; tries < 8; tries++) {
     const c = cellAt(sim.L, NEST, h.x + below(r, S, h.w), h.y + below(r, S, h.h));
-    if (c >= 0 && sim.mat[c] === MAT.OPEN) return c;
+    if (free(c)) return c;
   }
-  // Unlucky draws: the first open cell of the chamber in reading order (part of it may be outside the nest).
+  // Unlucky draws: the first free cell of the nursery in reading order (part of it may be outside the nest).
   for (let y = h.y; y < h.y + h.h; y++) for (let x = h.x; x < h.x + h.w; x++) {
     const c = cellAt(sim.L, NEST, x, y);
-    if (c >= 0 && sim.mat[c] === MAT.OPEN) return c;
+    if (free(c)) return c;
   }
   return -1;
 }
@@ -91,7 +93,7 @@ export function startColony(sim) {
     if (due <= C.PUPA_TICKS) { if (addBrood(sim, STAGE.PUPA)) B.age[B.n - 1] = C.PUPA_TICKS - due; }
     else if (addBrood(sim, STAGE.LARVA)) { B.age[B.n - 1] = Math.max(0, C.LARVA_TICKS - (due - C.PUPA_TICKS)); B.fed[B.n - 1] = 1; }
   }
-  for (let k = 0; k < cfg.larvae; k++) if (addBrood(sim, STAGE.LARVA)) B.age[B.n - 1] = Math.floor((400 * k) / Math.max(1, cfg.larvae));
+  for (let k = 0; k < cfg.larvae; k++) if (addBrood(sim, STAGE.LARVA)) B.age[B.n - 1] = B.hunger[B.n - 1] = Math.floor((400 * k) / Math.max(1, cfg.larvae)); // unfed since they hatched
   for (let k = 0; k < cfg.eggs; k++) if (addBrood(sim, STAGE.EGG)) B.age[B.n - 1] = Math.floor((200 * k) / Math.max(1, cfg.eggs));
 }
 
@@ -116,7 +118,8 @@ export function stepColony(sim) {
       if (age >= C.EGG_TICKS) { stage = STAGE.LARVA; B.age[k] = 0; }
     } else if (stage === STAGE.LARVA) {
       // One meal a tick for the whole brood, in brood order: protein goes to the larvae that came first.
-      const wants = B.fed[k] === 0 || (B.fed[k] < C.MAJOR_FEEDS && g[G.PROTEIN] >= C.MAJOR_PROTEIN);
+      // A larva fed with MAJOR_PROTEIN in store at her first meal is fed on to MAJOR_FEEDS: each meal since took one.
+      const wants = B.fed[k] === 0 || (B.fed[k] < C.MAJOR_FEEDS && g[G.PROTEIN] >= C.MAJOR_PROTEIN - B.fed[k]);
       if (wants && !fedThisTick && g[G.PROTEIN] > 0) { g[G.PROTEIN]--; B.fed[k]++; B.hunger[k] = 0; fedThisTick = true; }
       else if (B.fed[k] === 0 && B.hunger[k] < 0xFFFF) B.hunger[k]++;
       if (B.hunger[k] >= C.LARVA_STARVE) { keep = false; g[G.BROOD_LOST]++; }

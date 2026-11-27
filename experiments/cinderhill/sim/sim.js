@@ -512,7 +512,7 @@ export class Sim {
       else if (c !== this.lastCell[i]) this.stall[i] = 0;
     }
     if (still) { this.stall[i] = 0; this.lastCell[i] = c; return; }
-    if (layer === SURFACE && speed === WALK && !isTrailSlot(follow)) speed = WALK_OFF; // off a trail on the surface: 2.5 cells a second
+    if (layer === SURFACE && speed === WALK && !(isTrailSlot(follow) && distAt(this, follow, c) < TRAIL_OFF)) speed = WALK_OFF; // off a trail's path on the surface: 2.5 cells a second
 
     // Stuck (no progress for STALL_KICK ticks): turn a random way and wander for KICK_FOR ticks, then steer
     // again; repeat every KICK_EVERY ticks while still stuck. Steering again between kicks lets an ant that a

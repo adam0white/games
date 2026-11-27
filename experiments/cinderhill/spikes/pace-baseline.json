@@ -1,11 +1,11 @@
 {
  "first-delivery": {
   "status": "pass",
-  "value": 7.35
+  "value": 6.55
  },
  "first-delivery-passive": {
   "status": "pass",
-  "value": 6.15
+  "value": 6
  },
  "minute-1-deliveries": {
   "status": "pass",
@@ -21,7 +21,7 @@
  },
  "quiet-2-min": {
   "status": "fail",
-  "value": 67.5
+  "value": 67
  },
  "first-choice": {
   "status": "not built",
@@ -45,15 +45,15 @@
  },
  "gap-0-10": {
   "status": "fail",
-  "value": 414.8
+  "value": 412.4
  },
  "gap-after-10": {
   "status": "fail",
   "value": 120
  },
  "idle-share": {
-  "status": "fail",
-  "value": 0.151
+  "status": "pass",
+  "value": 0.15
  },
  "queued-at-doors": {
   "status": "not built",
