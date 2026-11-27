@@ -38,9 +38,13 @@ export default mergeConfig(
         'test/next-edition.test.ts',
         'test/standing.test.ts',
         'test/goodhands-current.test.ts',
-        // The week-two browser flows took 16 min of the nightly run and pushed Murmur past its 45 min limit (2026-11-24, 2026-11-25).
+        // The week-two browser flows, one file per screen size, took 37 min of a 42 min nightly run (2026-11-26) and pushed
+        // Murmur past its 45 min limit (2026-11-24, 2026-11-25). They share test/week2-ui-shared.ts; run one by hand with
+        // `npx vitest run test/week2-ui.test.ts --exclude ''` if the week-two flow changes.
         'test/week2-ui.test.ts',
         'test/week2-ui-wide.test.ts',
+        'test/week2-ui-phone412.test.ts',
+        'test/week2-ui-mobile360.test.ts',
         'test/cast-ui.test.ts',
       ],
     },
