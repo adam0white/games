@@ -27,7 +27,7 @@ export const CASTE_HP = CASTES.map(c => c.hp), CASTE_BITE = CASTES.map(c => c.bi
 const FIGHTS = CASTES.map(c => c.fights);
 /** One colony's numbers: the tables' rows, then its traits (`cfg.traits[team]`, ids of TRAITS) laid over them. */
 function statsFor(traits = [], grown = []) {
-  const st = { hp: CASTES.map(c => c.hp), bite: CASTES.map(c => c.bite), speed: CASTES.map(c => c.speed), food: CASTES.map(c => c.food), reach: CASTES.map(c => c.reach), per: ROOMS.map(r => (r ? r.per : 0)), eatPer: C.ADULTS_PER_SUGAR, pupa: C.PUPA_TICKS, room: ROOMS.map(() => 0), loot: 0, hold: 0, breach: 0, at: {} };
+  const st = { hp: CASTES.map(c => c.hp), bite: CASTES.map(c => c.bite), speed: CASTES.map(c => c.speed), food: CASTES.map(c => c.food), reach: CASTES.map(c => c.reach), per: ROOMS.map(r => (r ? r.per : 0)), eatPer: C.ADULTS_PER_SUGAR, garden: 1, pupa: C.PUPA_TICKS, room: ROOMS.map(() => 0), loot: 0, hold: 0, breach: 0, at: {} };
   for (const id of traits) { const tr = TRAITS[id]; if (!tr) throw new Error(`no trait ${id}`); for (const [key, a, b] of tr.set) { if (b === undefined) st[key] = a; else st[key][a] = b; if (tr.at) st.at[b === undefined ? key : key + a] = tr.at; } }
   // What its chamber has grown into (TIERS): [key, per cent] or [key, index, per cent] of the number as it stands.
   for (const [key, a, b] of grown) { if (b === undefined) st[key] = Math.floor((st[key] * a) / 100); else st[key][a] = Math.floor((st[key][a] * b) / 100); }
@@ -460,7 +460,7 @@ export class Sim {
       if (may !== 0) return no(WHY.BLOCKED);
       this.take(t, FOOD.SUGAR, row.sugar); if (row.protein) this.take(t, FOOD.PROTEIN, row.protein);
       if (tier === 0) cg[base + CG.BRANCH] = br;
-      if (tier === 1) cg[base + CG.CRAFT] = TIERS.craft[o.craft | 0] ? o.craft | 0 : 0; // none asked for: none had
+      if (tier === 1) { const row = TIERS.craft[o.craft | 0]; cg[base + CG.CRAFT] = row && (!row.branch || row.branch === cg[base + CG.BRANCH]) ? o.craft | 0 : 0; } // none asked for: none had
       cg[base + CG.GROW] = row.ticks;
     } else if (o.type === CMD.RALLY) {
       const c = this.snap(o.x | 0, o.y | 0);
@@ -746,7 +746,7 @@ export class Sim {
       // A fungus garden pays a seed a cell, if there is a store cell with room for it.
       // It pays for the time its cells were gardens, so a room painted for the last tick before the harvest earns nothing.
       cg[o + CG.GROWN] += this.gardens[t];
-      if (this.tick % C.GARDEN_EVERY === C.GARDEN_EVERY - 2) { const due = Math.min(this.gardens[t], Math.floor(cg[o + CG.GROWN] / C.GARDEN_EVERY)); cg[o + CG.GROWN] = 0; let got = 0; for (let j = 0; j < due; j++) if (this.put(t, FOOD.SUGAR, this.store[t])) got++; if (got) this.event(EVENT.GARDEN, t, got); }
+      if (this.tick % C.GARDEN_EVERY === C.GARDEN_EVERY - 2) { const due = Math.min(this.gardens[t], Math.floor(cg[o + CG.GROWN] / C.GARDEN_EVERY)); cg[o + CG.GROWN] = 0; let got = 0; for (let j = 0; j < due * this.stat[t].garden; j++) if (this.put(t, FOOD.SUGAR, this.store[t])) got++; if (got) this.event(EVENT.GARDEN, t, got); }
       // A full-grown hill tends its wounded.
       if (this.cfg.tiers && cg[o + CG.TIER] + 1 >= TIERS.heal && this.tick % C.HEAL_EVERY === t) {
         const nw = this.L.nw, max = this.stat[t].hp;

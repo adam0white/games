@@ -147,7 +147,7 @@ export function think(sim, t, mind = 1) {
   // stores can pay with a meal to spare; the second growth when it can pay again.
   // (A mind that names no branch takes one by the seed and its seat; `grow: 0` never grows.)
   const grow = mind.grow ?? (mind.pick ? 1 : 1 + ((Math.abs(cfg.seed | 0) + t) & 1)); // a mind with a caste to raise goes to war for it; one that plans for a frost keeps its seeds
-  if (grow && !winter && sim.mayGrow(t) === 0 && (cg[o + CG.TIER] === 0 || mind.grow2 !== false) && adults >= (mind.growAt ?? 45) + 40 * cg[o + CG.TIER] && cg[o + CG.SUGAR] >= TIERS.grow[cg[o + CG.TIER]].sugar + (cg[o + CG.TIER] ? mind.spare2 ?? 60 : 6)) out.push({ team: t, type: CMD.GROW, branch: grow, craft: mind.craft ?? (mood === 2 ? 1 : mood === 1 ? 2 : 3) });
+  if (grow && !winter && sim.mayGrow(t) === 0 && (cg[o + CG.TIER] === 0 || mind.grow2 !== false) && adults >= (mind.growAt ?? 45) + 40 * cg[o + CG.TIER] && cg[o + CG.SUGAR] >= TIERS.grow[cg[o + CG.TIER]].sugar + (cg[o + CG.TIER] ? mind.spare2 ?? 60 : 6)) out.push({ team: t, type: CMD.GROW, branch: grow, craft: mind.craft ?? (cg[o + CG.BRANCH] === 1 ? (mood === 0 ? 3 : 1) : sim.gardens[t] >= 6 ? 4 : mood === 0 ? 3 : 2) });
   if (cg[o + CG.DIET] !== diet || (cg[o + CG.PICK] && cg[o + CG.DIET2] !== special)) out.push({ team: t, type: CMD.DIET, share: diet, special });
   const outnumbered = cg[(1 - t) * CG.SIZE + CG.MAJORS] * 2 > cg[o + CG.MAJORS] * 3 + 4; // the other hill has half as many soldiers again, and more
   // Building, one room at a time: a store when the stores are nearly full, quarters when the hill is, a nursery wing when the brood is.

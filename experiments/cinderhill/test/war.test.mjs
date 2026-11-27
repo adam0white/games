@@ -529,10 +529,11 @@ test('Growth: the chamber grows for seeds and a pause in laying; the first growt
   const again = copyOf(s); assert.equal(again.stat[0].pupa, s.stat[0].pupa, 'a save keeps what the colony grew into'); assert.equal(again.hash(), s.hash());
   // the second growth takes a craft and no branch, and there is no third
   const bite = s.stat[0].bite[CASTE.MAJOR];
-  s.order({ team: 0, type: CMD.GROW, craft: 1 }); s.step(); assert.equal(s.stat[0].bite[CASTE.MAJOR], bite, 'the craft is the hill\'s when the growth is done, not before');
-  for (let j = 0; j < TIERS.grow[1].ticks + 2; j++) s.step();
-  assert.equal(s.g(0, CG.CRAFT), 1); assert.ok(s.stat[0].bite[CASTE.MAJOR] > bite); assert.equal(s.stat[1].bite[CASTE.MAJOR], bite);
-  { const kept = copyOf(s); assert.equal(kept.stat[0].bite[CASTE.MAJOR], s.stat[0].bite[CASTE.MAJOR], 'a save keeps the craft'); assert.equal(kept.hash(), s.hash()); }
+  s.order({ team: 0, type: CMD.GROW, craft: 1 }); s.step(); for (let j = 0; j < TIERS.grow[1].ticks + 2; j++) s.step();
+  assert.equal(s.g(0, CG.CRAFT), 0, 'Legion is a War hill\'s craft: a Deep hill that asks for it has none'); assert.equal(s.stat[0].bite[CASTE.MAJOR], bite);
+  s.cg[CG.CRAFT] = 4; s.restat(0); assert.equal(s.stat[0].garden, 2, 'Granary: a garden cell pays two'); assert.equal(s.stat[1].garden, 1);
+  { const kept = copyOf(s); assert.equal(kept.stat[0].garden, 2, 'a save keeps the craft'); assert.equal(kept.hash(), s.hash()); }
+  s.cg[CG.CRAFT] = 2; s.restat(0); assert.ok(s.stat[0].speed[CASTE.WORKER] > s.stat[1].speed[CASTE.WORKER]);
   assert.equal(s.g(0, CG.TIER), 2); assert.equal(s.g(0, CG.BRANCH), BRANCH.DEEP);
   const left = s.g(0, CG.SUGAR); s.order({ team: 0, type: CMD.GROW }); s.step(); assert.equal(s.g(0, CG.SUGAR), left); assert.equal(s.g(0, CG.GROW), 0);
   // a poor hill cannot
