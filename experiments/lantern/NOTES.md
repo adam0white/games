@@ -1086,3 +1086,13 @@ The policy test also checked 20 seeds on each of the 50 Gentle nights at maximum
 - Spark's button sits further in and its ring grows less, so the ring stays on a Pixel 7 screen.
 
 **Not verified.** A real share sheet; the Turkish lines (AI-written); contrast on cards other than dawn (assumed no worse). Partly done: Send it back from the menu does not ask for a name; Duet's moving hint still draws one slider (its words now name both thumbs).
+
+## 2026-11-27: Lantern round 2
+
+Practice Skip clears pause and releases its hint. The arrow keys work in solo play, and first-person Press and Tilt dismiss the steering prompt. Race retires a countdown boat without paying embers or counting it as a played race. Dare replies use one optional name prompt and selectable link field on either card. The reader rejects zero scores and Tower scores below the starting floor. A dawn target is won by reaching dawn. The invitation, HUD and result name the scoring unit, and the HUD follows a language change during pause.
+
+Exposed rocks have slate facets and broken upstream edges. The existing Outline setting controls the edges, and the existing Haptics setting controls hit vibration. A blue wash follows the channel ahead in the main 2D and 3D views. Gentle Night 1 adds three embers before the first rock. The first prompt follows the visible amber ember and clears on collection or deliberate steering. The first-person projection shows that prompt earlier in screen space than the 2D view. The hand cue plays once. Runs start with a full fuel gauge and warn once below 25%. The main river and Duet show a spark, wick flare and restored fuel at pickup. Spark keeps its own refill effect for the spark tin.
+
+The compact menu shows the premise and keeps the recording controls together below the boat. The returning menu places Game mode and Shop under Play, with practice, Settings, Music and Credits under More. Story losses lead with progress, cause and action, and the banked amount. Their primary action retries the same seed. Melody progress is in Details.
+
+The 300-seed first-minute check measured a median first rock of 8.13 s and median passive survival of 32.68 s. Its delayed steering policy reached dawn 300/300 times. The eight-second gate passed across all 50 Gentle nights at maximum rebirth pace. A mocked DOM covered pause-to-Skip, arrow keys, Press and Tilt input, zero countdown payout, dawn dares, language switching and the menu link fallback. The canvas command check found the pickup spark, flare and gain at 150 ms. Chromium and WebKit phone checks stopped at the sandbox's loopback restriction. The 150 ms screenshot and rendered visual checks remain open.

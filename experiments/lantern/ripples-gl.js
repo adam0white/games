@@ -2,7 +2,7 @@
 // browser cannot draw into those, and the height texture the 3D view samples for its normals. See ripples.js for the rules.
 // Each frame: a pass that marks the banks and rocks (walls), a pass that moves the field with the boat and lets the drops in,
 // then grid.steps solver passes a game tick. Nothing here reads pixels back, except sample(), which only the checks call.
-import { grid, createField, firstRow, sponge, X0, SPONGE, MAX_ROCKS, MAX_DROPS, CLAMP } from './ripples.js?v=1';
+import { grid, createField, firstRow, sponge, X0, SPONGE, MAX_ROCKS, MAX_DROPS, CLAMP } from './ripples.js?v=2';
 
 const QUAD = `#version 300 es
 void main() { gl_Position = vec4(gl_VertexID == 1 ? 3. : -1., gl_VertexID == 2 ? 3. : -1., 0., 1.); }`;

@@ -1,4 +1,4 @@
-import { NIGHTS, REBORN_PACE, STATS, LEVELS, SECTORS, FLOORS } from './sim.js?v=16';
+import { NIGHTS, REBORN_PACE, STATS, LEVELS, SECTORS, FLOORS } from './sim.js?v=17';
 
 // The original link uses bits 0–6 for abilities. Zero in the remaining bits
 // means a Classic endless river. Bits 7–12 name a story night when nonzero,
@@ -36,14 +36,14 @@ export function riverBits(s, from = 0) { // from: the tower floor the run starte
 }
 
 export function readRiver(dare) {
-  if (!dare || !(dare.score > 0)) return null;
+  if (!dare || !Number.isInteger(dare.score) || dare.score <= 0) return null;
   const { extra } = dare;
   const stats = Object.fromEntries(LINK_STATS.map((id, i) => [id, (extra >>> (STATS_BIT + i * 2)) & 3]));
   if (LINK_STATS.some(id => stats[id] > STATS[id])) return null;
   const abilities = LINK_ABILITIES.filter((id, i) => extra & (1 << i));
   if (extra & (1 << TOWER_BIT)) {
     const climb = ((extra >>> ABILITY_BITS) & ((1 << LEVEL_BITS) - 1)) + 1, floor = (extra >>> FLOOR_BIT) & 7;
-    if (extra >>> (TOWER_BIT + 1) || climb > LEVELS * SECTORS || floor >= FLOORS || dare.score > 100) return null;
+    if (extra >>> (TOWER_BIT + 1) || climb > LEVELS * SECTORS || floor >= FLOORS || dare.score < Math.floor(floor * 100 / FLOORS) || dare.score > 100) return null;
     return { ...dare, tower: true, climb, floor, night: 0, gentle: false, reborn: 0, stats, abilities };
   }
   const night = (extra >>> ABILITY_BITS) & ((1 << NIGHT_BITS) - 1);

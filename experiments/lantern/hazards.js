@@ -1,4 +1,4 @@
-import { boat, centre, half, sight, speed, wind } from './sim.js?v=16';
+import { boat, centre, half, sight, speed, wind } from './sim.js?v=17';
 
 const LOOKAHEAD = 0.9;
 const clamp01 = n => Math.min(1, Math.max(0, n));

@@ -64,10 +64,37 @@ const HULL = {
 };
 // Draws boat `id` at the origin. t is seconds, for the few parts that move.
 export function hull(g, id, u, col, t = 0) { (HULL[id] ?? HULL.oak)(g, u, col, t); }
+const STONE_POINTS = [[-1, .22], [-.81, -.40], [-.25, -.79], [.58, -.67], [1, -.10], [.78, .51], [.19, .76], [-.58, .62]];
+const stoneRadius = (radius, dpr) => Math.max(18 * dpr, Math.min(22 * dpr, radius));
+function stonePath(g, x, y, r, flip, face) {
+  g.beginPath();
+  for (const [dx, dy] of face) g.lineTo(x + dx * r * flip, y + dy * r);
+}
+export function stoneRim(g, x, y, radius, dpr, flip) {
+  const r = stoneRadius(radius, dpr), [, left, peak, right] = STONE_POINTS;
+  g.strokeStyle = '#B4C8D0'; g.lineWidth = 2 * dpr;
+  stonePath(g, x, y, r, flip, [left, peak, [.14, -.73]]); g.stroke();
+  stonePath(g, x, y, r, flip, [[.37, -.70], right, [.79, -.40]]); g.stroke();
+}
+// Slate faces with a separate wake in the water.
+export function stone(g, x, y, radius, dpr, rim = true, flip = 1) {
+  const r = stoneRadius(radius, dpr), points = STONE_POINTS;
+  const paint = (face, fill) => {
+    stonePath(g, x, y, r, flip, face);
+    g.closePath(); g.fillStyle = fill; g.fill();
+  };
+  paint(points, '#303e4a');
+  const crown = [-.23, -.22], shoulder = [.48, .10];
+  paint([points[0], points[1], points[2], crown, points[7]], '#4c5e6d');
+  paint([points[2], points[3], points[4], shoulder, crown], '#65798A');
+  paint([crown, shoulder, points[5], points[6], points[7]], '#3d4e5d');
+  if (rim) stoneRim(g, x, y, radius, dpr, flip);
+}
+
 // The wake behind a moving boat: two lines of foam that open and fade.
-export function wake(g, u, t) {
+export function wake(g, u, t, lean = 0) {
   g.strokeStyle = '#dff1ff'; g.lineWidth = 0.003 * u; g.lineCap = 'round';
-  for (let i = 0; i < 3; i++) { const k = (t * 1.3 + i / 3) % 1, y = (0.04 + 0.1 * k) * u, w = (0.012 + 0.03 * k) * u; g.globalAlpha = 0.3 * (1 - k); for (const d of [-1, 1]) { g.beginPath(); g.moveTo(d * w, y); g.lineTo(d * (w + 0.008 * u), y + 0.016 * u); g.stroke(); } }
+  for (let i = 0; i < 3; i++) { const k = (t * 1.3 + i / 3) % 1, y = (0.04 + 0.1 * k) * u, w = (0.012 + 0.03 * k) * u; g.globalAlpha = 0.3 * (1 - k); for (const d of [-1, 1]) { g.beginPath(); g.moveTo(d * w - lean * y * k, y); g.quadraticCurveTo(d * (w + 0.002 * u) - lean * y * (k + 0.13), y + 0.012 * u, d * (w + 0.008 * u) - lean * y * (k + 0.32), y + 0.024 * u); g.stroke(); } }
   g.globalAlpha = 1; g.lineCap = 'butt';
 }
 

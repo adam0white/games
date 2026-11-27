@@ -3,12 +3,12 @@
 // (./duet-sim.js, a byte-for-byte copy of archive/lab/lantern-duet/sim.js). This file draws them as the lab page did, with its own
 // camera, steers each boat from its own half of the screen, and keeps Duet's own save. How a mode plugs in is in ../NOTES.md
 // ("How a mode plugs in"); why Duet is built this way is under "Duet is a mode inside Lantern".
-import { create, step, centre, half, fall, progress, speed, NIGHTS } from './duet-sim.js';
-import { hull, wake, reeds } from '../looks.js?v=4';
+import { create, step, centre, half, fall, progress, speed, NIGHTS } from './duet-sim.js?v=2';
+import { hull, wake, reeds, stone, stoneRim } from '../looks.js?v=5';
 import { drag } from '../../kit/drag.js';
-import { hint } from '../../kit/hint.js';
+import { hint } from '../../kit/hint.js?v=3';
 import { read, readJson, writeJson } from '../../kit/save.js';
-import { t } from '../words.js?v=2';
+import { t } from '../words.js?v=3';
 
 // Save. lantern-mode-duet:save is { v: 1, best: { night, pct }, unlocked: nights open, played: runs }.
 // The lab page's save (lantern-duet:v1, { best, unlocked, sound }) is read once for its best and its nights, and never written.
@@ -62,7 +62,7 @@ export function mode(page) {
   const pad = id => { const el = document.createElement('div'); el.className = 'duetPad'; el.id = id; return el; };
   const pads = [pad('duetL'), pad('duetR')], split = document.createElement('div'), labels = document.createElement('div');
   split.id = 'duetSplit'; labels.id = 'duetKeys'; labels.innerHTML = '<span></span><span></span>';
-  document.getElementById('hud').before(...pads, split, labels); // before the HUD, the pause button and every card, and after the page's own hint (its label is the first .kit-hint the page renames)
+  document.getElementById('hud').before(...pads, split, labels); // before the HUD, pause button and cards
   const clampToRiver = x => Math.max(centre(s, s.y) - half(s, s.y), Math.min(centre(s, s.y) + half(s, s.y), x));
   const steer = pads.map((el, i) => drag(el, {
     playing: () => page.live(), paused: () => page.paused(), resume: () => page.resume(),
@@ -197,6 +197,8 @@ export function mode(page) {
     const gone = s.over && s.over !== 'dawn' ? Math.min(1, (now - overAt) / 900) : 0; // after a crash both boats sink and fade, and the rope with them
     g.globalAlpha = 1 - gone; rope(g, tt); g.globalAlpha = 1;
     boats(g, now, gone);
+    if (gone < 1) page.pickup(now, (x, y) => [sx(x), sy(y)],
+      from => [sx(from < s.x ? s.left : s.right), sy(s.y)]);
     if (day > 0) { const dg = g.createLinearGradient(0, 0, 0, H * 0.8); dg.addColorStop(0, `rgba(255,170,110,${0.35 * day})`); dg.addColorStop(1, 'rgba(255,170,110,0)'); g.fillStyle = dg; g.fillRect(0, 0, W, H); }
     page.win(now);
     g.fillStyle = 'rgba(255,217,160,.5)'; g.fillRect(0, 0, W * progress(s), 3 * dpr); // how far to dawn, as on a story night
@@ -229,8 +231,7 @@ export function mode(page) {
   }
   function rockBody(g, k) {
     const x = sx(k.x), y = sy(k.y), r = k.rad * unit;
-    g.fillStyle = '#2b3a44'; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill();
-    g.fillStyle = '#4a5c68'; g.beginPath(); g.arc(x - r * 0.25, y - r * 0.25, r * 0.55, 0, 7); g.fill();
+    stone(g, x, y, r, dpr, false, Math.sin(k.y * 17) > 0 ? 1 : -1);
   }
   // The dark, drawn at half CSS resolution, with a hole of light round each lantern.
   function darkness(g, dawn) {
@@ -256,7 +257,14 @@ export function mode(page) {
     else if (k === s.danger) {
       g.strokeStyle = `rgba(${WARN},${0.75 + 0.25 * Math.sin(tt * 14)})`; g.lineWidth = 3.5 * dpr; g.stroke();
       g.beginPath(); g.arc(x, y, r + (6 + 2 * Math.sin(tt * 14)) * dpr, 0, 7); g.lineWidth = 1.5 * dpr;
-    } else { g.strokeStyle = k.spent ? 'rgba(159,180,194,.25)' : 'rgba(170,192,206,.7)'; g.lineWidth = 1.5 * dpr; }
+    } else {
+      if (page.outline()) {
+        g.globalAlpha = k.spent ? 0.25 : 0.7;
+        stoneRim(g, x, y, r, dpr, Math.sin(k.y * 17) > 0 ? 1 : -1);
+        g.globalAlpha = 1;
+      }
+      return;
+    }
     g.stroke();
   }
   function narrowWarning(g, n, tt) {

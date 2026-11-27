@@ -9,7 +9,7 @@
 // back off them the right way up. The grid is fixed to the river, not to the boat: as the boat moves on, whole rows leave
 // behind and still rows come in ahead, so the waves are never smeared. The first and last rows soak waves up (a sponge),
 // so the grid's own ends do not throw back rings that nothing on screen made.
-import { centre, half, rain, DT } from './sim.js?v=16';
+import { centre, half, rain, DT } from './sim.js?v=17';
 
 export const X0 = -0.02, SPAN = 1.04; // the grid across: river x from X0, SPAN wide (the river never leaves 0 to 1)
 export const BACK = 0.45, AHEAD = 2.3; // the grid along: from BACK behind the boat to AHEAD in front (the 3D camera sees 0.34 behind)

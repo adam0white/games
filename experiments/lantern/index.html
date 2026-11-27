@@ -20,7 +20,7 @@
   body { font: 16px/1.5 Georgia, 'Times New Roman', serif; color: #f3e6cf; }
   canvas { display: block; width: 100vw; height: 100dvh; } #c3 { position: fixed; inset: 0; } #c3[hidden] { display: none; } #c { position: relative; }
   #menu > div { max-height: 100dvh; box-sizing: border-box; overflow-y: auto; touch-action: pan-y; } #menu p { margin: .2em 0; } #menu button:not(.small) { margin: .15em; min-height: 42px; padding: .35em 1em; } #menu h1 { font-size: 2.2em; margin: 0; } /* a full menu fits a phone, and scrolls on the smallest */
-  .groups { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: .35em 0; } #menu .groups button { width: 15em; max-width: 100%; min-height: 54px; margin: 0; padding: .3em 1em; border-radius: 18px; background: #ffffff18; } .groups b { display: block; font-weight: normal; font-size: 1.1em; color: #ffd9a0; } .groups small { display: block; font-size: .72em; opacity: .75; line-height: 1.2; }
+  .groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: .35em 0; } #menu .groups button { width: 100%; min-width: 0; max-width: 100%; min-height: 54px; margin: 0; padding: .3em 1em; border-radius: 18px; background: #ffffff18; } .groups b { display: block; font-weight: normal; font-size: 1.1em; color: #ffd9a0; } .groups small { display: block; font-size: .72em; opacity: .75; line-height: 1.2; }
   #menu .foot button { min-width: 7.6em; font-size: .85em; border-color: #ffd9a044; }
   .opt { margin: .55em 0; } .opt button, .opt a.mode { display: inline-block; box-sizing: border-box; width: 100%; max-width: 17em; margin: 0; } .opt a.mode { font-size: 1em; color: #ffe6bd; background: #ffffff10; border: 1.5px solid #ffd9a088; padding: .55em 1.2em; } .opt small { display: block; font-size: .78em; opacity: .75; line-height: 1.25; margin: .2em auto 0; max-width: 20em; } .opt #anew { margin-top: .3em; font-size: .85em; min-height: 40px; } .opt button[hidden] { display: none; }
   .more { display: grid; grid-template-columns: 1fr 1fr; gap: .45em .5em; margin: .55em auto 0; max-width: var(--opt-w, 17em); align-items: start; } .more .opt { margin: 0; min-width: 0; } .more .opt button, .more .opt a.mode { display: flex; align-items: center; justify-content: center; } .more .opt button, .more .opt a.mode { padding: .5em .25em; font-size: .92em; min-height: 44px; } .more .opt small { font-size: .72em; } /* the modes inside Lantern, two to a row so the card fits a small phone; as wide as the buttons above */
@@ -36,14 +36,24 @@
   #card > div { pointer-events: none; } #card button, #card input { pointer-events: auto; }
   #card { background: #05080fd9; -webkit-backdrop-filter: blur(6px) brightness(.45); backdrop-filter: blur(6px) brightness(.45); } #card .hint { opacity: .85; } /* every card dims and blurs the river behind it, so its words pass contrast over a bright dawn (measured on the dawn card, 2026-11-27: NOTES.md) */
   .veil { background: #05080fd9; } #menu.veil { background: #05080f99; }
-  #menu.compact { align-items: start; background: linear-gradient(#05080fc9, #05080f2a 54%, transparent 72%); }
-  #menu.compact > div { margin-top: max(12px, min(12dvh, 96px)); }
+  #menu.on { grid-template-rows: minmax(0, 1fr) auto; align-items: start; }
+  #menu > div:first-child { max-height: min(100%, 69dvh); padding-top: min(5dvh, 36px); }
+  #menu.compact { background: linear-gradient(#05080fc9, #05080f2a 54%, transparent 72%); }
+  #menu.compact > div:first-child { padding-top: min(8dvh, 58px); }
+  #menu #recordMenu { box-sizing: border-box; width: min(calc(100% - 24px), 21em); padding: 0 .7em env(safe-area-inset-bottom); margin: 0 0 8px; background: #0b1421; color: #d5cabb; border-radius: 12px; }
+  #recordMenu:empty { display: none; }
+  #menuOptions { padding: .2em; background: #0b1421; border-radius: 12px; }
+  #menu [hidden], #card [hidden] { display: none !important; }
+  #card.story-loss #sameRiver { background: #ffb45a; color: #2a1606; border-color: #ffb45a; font-size: 1.12em; }
+  #card.story-loss #go { background: #ffffff10; color: #ffe6bd; border-color: #ffd9a088; font-size: 1em; }
+  #card.story-loss #primaryRetry { flex-direction: column; align-items: center; }
+
   #menu.compact .menuOption, #dareCard[hidden], #storyStart[hidden] { display: none; }
   #menu .language { top: .8em; right: .2em; }
   #menu.compact h1 { margin-bottom: .5em; }
   #menu .lab-toggle { font-size: .82em; }
   #menu .lab-notice a { display: inline-block; padding: .15em .35em; }
-  #ordinaryPlay { color: #ffe6bd; display: inline-flex; align-items: center; min-height: 44px; padding: 0 .5em; touch-action: manipulation; }
+  #ordinaryPlay { color: #ffe6bd; display: flex; width: fit-content; margin: auto; align-items: center; min-height: 44px; padding: 0 .5em; touch-action: manipulation; }
   #skipCrash { position: fixed; bottom: calc(16px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); }
   #card.on { background: radial-gradient(ellipse at center, #05080fee 0%, #05080fd9 64%, #05080fc8 100%); } /* WebKit draws no backdrop filter over the 3D canvas, so the colour alone must dim it */
   #card > div { max-height: 100dvh; box-sizing: border-box; overflow-y: auto; touch-action: pan-y; }
@@ -54,7 +64,7 @@
   #primaryRetry, #riverRetries:not([hidden]) { display: flex; justify-content: center; }
   #primaryRetry #go { min-width: min(9.5em, 50%); }
   #riverRetries button, #sameRiver { min-width: 0; padding-inline: 1em; }
-  #dareUrl { box-sizing: border-box; width: 100%; max-width: 20em; padding: .5em; color: inherit; background: #070b14; border: 1px solid #ffd9a088; border-radius: 8px; pointer-events: auto; }
+  #dareUrl { touch-action: manipulation; -webkit-user-select: text; user-select: text; box-sizing: border-box; width: 100%; max-width: 20em; padding: .5em; color: inherit; background: #070b14; border: 1px solid #ffd9a088; border-radius: 8px; pointer-events: auto; }
   h1 { font-weight: normal; font-size: 2.6em; letter-spacing: .12em; margin: 0 0 .2em; color: #ffd9a0; text-shadow: 0 0 28px #ff9a3c88; }
   h2 { font-weight: normal; font-size: 1.7em; letter-spacing: .1em; margin: 0 0 .4em; color: #ffd9a0; }
   p { margin: .4em 0; opacity: .88; }
@@ -96,25 +106,30 @@
   #hearts { font: 26px/1 sans-serif; color: #ffd5ac; letter-spacing: 2px; }
   #hearts .empty { color: #b8b1aa; }
   #hearts.hit .empty { color: #ff5c64; }
-  #fuel { position: relative; width: 58px; height: 6px; overflow: hidden; margin: 6px 0 3px; border: 1px solid #ffd9a066; border-radius: 8px; background: #100f13; }
+  #fuelRow { display: flex; align-items: center; gap: 5px; margin: 4px 0 2px; }
+  #fuelIcon { width: 13px; height: 16px; fill: #ffbc6d; }
+  #fuelRow.low #fuelIcon { animation: pulse .65s infinite alternate; fill: #ffe9b2; }
+  @media (prefers-reduced-motion: reduce) { #fuelRow.low #fuelIcon { animation: none; } }
+  #fuel { position: relative; width: 72px; height: 8px; overflow: hidden; border: 1px solid #ffd9a066; border-radius: 8px; background: #100f13; }
   #fuel::before, #fuel::after { content: ''; position: absolute; inset: 0 auto 0 0; background: #ffbc6d; }
-  #fuel::before { width: var(--level, 0%); }
+  #fuel::before { width: var(--level, 100%); }
   #fuel::after { left: var(--restored-from, 0%); width: var(--restored-size, 0%); background: #fff2bb; opacity: var(--restored-alpha, 0); }
   #fuel.low::before { background: #ffe9b2; }
   #fuel.low { outline: 1px dashed #ffe9b2; outline-offset: 2px; }
   #embers { font-size: 26px; line-height: 1.3; color: #ffd9a0; }
   #count { display: inline-block; }
-  #rival { position: fixed; top: calc(6px + clamp(22px, 7vw, 36px) * 1.15 + env(safe-area-inset-top)); left: 0; right: 0; text-align: center; font-size: 15px; color: #ffd9a0; pointer-events: none; text-shadow: 0 1px 6px #000; font-variant-numeric: tabular-nums; } #rival.passed { color: #b8f0c0; } #rival.passed::before { content: '✓ '; }
-  #tutSkip { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translateX(-50%); }
+  #rival { position: fixed; top: calc(6px + clamp(22px, 7vw, 36px) * 1.15 + env(safe-area-inset-top)); left: calc(108px + env(safe-area-inset-left)); right: calc(60px + env(safe-area-inset-right)); text-align: center; font-size: 15px; line-height: 1.2; color: #ffd9a0; pointer-events: none; text-shadow: 0 1px 6px #000; font-variant-numeric: tabular-nums; } #rival.passed { color: #b8f0c0; } #rival.passed::before { content: '✓ '; }
+  #tutSkip { position: fixed; z-index: 2; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translateX(-50%); }
   #toView b, #toView small { display: block; } /* in Settings, as it was in the menu's row: the name over what is chosen */
   #dareAsk input { box-sizing: border-box; width: 100%; max-width: 14em; padding: .5em; color: inherit; background: #070b14; border: 1px solid #ffd9a088; border-radius: 8px; }
   #big { position: fixed; top: calc(6px + env(safe-area-inset-top)); left: 0; right: 0; display: none; text-align: center; font-size: clamp(22px, 7vw, 36px); line-height: 1.1; color: #fff3dc; pointer-events: none; text-shadow: 0 1px 8px #000; font-variant-numeric: tabular-nums; }
   #warn, #say { position: fixed; left: 0; right: 0; text-align: center; pointer-events: none; opacity: 0; transition: opacity .3s; text-shadow: 0 1px 8px #000; padding: 0 1em; }
   #warn { top: 24%; font-size: 18px; line-height: 1.2; color: #ffe9b2; }
-  .kit-hint[data-kind="fingertip"].still .label { top: 24px !important; } /* with reduced motion the words go under the fingertip, clear of the ghost boat drawn above it */
-  #warn.on { opacity: 1; animation: pulse .9s infinite alternate; }
+  .ember-instruction .kit-hint .label { visibility: hidden; }
+  #warn.on { opacity: 1; }
   @keyframes pulse { to { opacity: .7; } }
   #tip { position: fixed; top: 17%; left: 1em; right: 1em; display: none; text-align: center; font-size: 22px; line-height: 1.3; color: #ffe6bd; text-shadow: 0 1px 8px #000, 0 0 16px #000; pointer-events: none; }
+  #tip.ember { top: var(--tip-y); left: var(--tip-x); right: auto; transform: translate(-50%, -100%); width: min(13em, 90vw); font-size: 17px; padding: .2em .35em; border-radius: 8px; background: #0b1421d9; }
   #say { top: 31%; font-size: 22px; color: #ffe6bd; }
   #pause { position: fixed; top: calc(10px + env(safe-area-inset-top)); right: calc(10px + env(safe-area-inset-right)); width: 44px; height: 44px; min-width: 0; min-height: 0; margin: 0; padding: 0; border: 0; border-radius: 50%; background: #ffffff14; display: none; place-items: center; touch-action: none; }
   #pause::before { content: ''; width: 4px; height: 16px; border: solid #ffd9a0aa; border-width: 0 5px; }
@@ -127,9 +142,9 @@
 <body>
 <canvas id="c3" hidden></canvas>
 <canvas id="c"></canvas>
-<div id="hud"><div id="hearts"></div><div id="fuel" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" data-i18n-aria="fuel"></div><div id="embers"><span class="dot"></span><span id="count">0</span></div></div>
+<div id="hud"><div id="hearts"></div><div id="fuelRow"><svg id="fuelIcon" viewBox="0 0 16 20" aria-hidden="true"><path d="M9 0c1 5 6 8 6 12a7 7 0 1 1-14 0c0-3 2-5 4-7 0 2 1 4 2 4C9 6 9 3 9 0z"/></svg><div id="fuel" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100" data-i18n-aria="fuel"></div></div><div id="embers"><span class="dot"></span><span id="count">0</span></div></div>
 <div id="big"></div><div id="rival" hidden></div><button id="tutSkip" hidden data-i18n="tutSkip">Skip</button>
-<div id="warn" data-i18n="fade">The lantern is beginning to fade</div>
+<div id="warn" role="status"></div>
 <div id="say"></div>
 <div id="tip" aria-live="polite"></div>
 <div id="flash"></div>
@@ -139,20 +154,20 @@
 <div id="menu" class="screen veil on"><div>
   <button id="menuLanguage" class="language"></button>
   <h1 data-i18n="title">Lantern</h1>
-  <p class="menuOption" data-i18n="tagline">Carry the light down the river to dawn.</p>
+  <p data-i18n="tagline">Carry the light down the river to dawn.</p>
   <p class="bank menuOption"><span class="dot"></span><span id="bank">0</span> <span data-i18n="embers">embers</span><span id="stars"></span></p>
   <p id="storyStart"><button id="less" class="small menuOption" aria-label="Earlier night" data-i18n-aria="earlier">&lsaquo;</button><button id="play" class="main">Play</button><button id="more" class="small menuOption" aria-label="Later night" data-i18n-aria="later">&rsaquo;</button></p>
-  <p id="dareCard" hidden><span id="dareText" hidden></span><button id="dareGo" class="main"></button><br><button id="dareAgain" hidden data-i18n="dareAgain">Play the dare again</button><br><a id="ordinaryPlay" href="./" data-i18n="ordinaryPlay">Play Lantern</a></p>
+  <div id="dareCard" hidden><p id="dareText"></p><div id="menuDareAsk"></div><button id="dareGo" class="main"></button><button id="dareAgain" class="main" hidden data-i18n="dareAgain">Play the dare again</button><div id="menuDareShare"></div><a id="ordinaryPlay" href="./" data-i18n="ordinaryPlay">Play Lantern</a></div>
+  <p class="groups menuOption"><button id="toModes"><b data-i18n="modes">Game mode</b><small id="modesNow"></small></button><button id="toShop"><b data-i18n="shop">Shop</b><small id="shopNow"></small></button></p>
+  <p id="about" class="menuOption"></p>
+  <p id="ready" class="menuOption"></p>
+  <p class="foot menuOption"><button id="toBoard" data-i18n="board">Leaderboard</button></p>
   <p><button id="moreOptions" aria-controls="menuOptions" aria-expanded="false" data-i18n="moreOptions">More</button></p>
-  <div id="menuOptions" class="menuOption">
-    <p id="about"></p>
-    <p id="ready"></p>
-    <p class="groups"><button id="toModes"><b data-i18n="modes">Game mode</b><small id="modesNow"></small></button><button id="toShop"><b data-i18n="shop">Shop</b><small id="shopNow"></small></button></p>
-    <p class="foot"><button id="toBoard" data-i18n="board">Leaderboard</button><button id="toTutor" data-i18n="howTo">How to play</button><button id="toSettings" data-i18n="settings">Settings</button><button class="music"></button><button id="toCredits" data-i18n="credits">Credits</button></p>
+  <div id="menuOptions" class="menuOption" hidden>
+    <p class="foot"><button id="toTutor" data-i18n="howTo">How to play</button><button id="toSettings" data-i18n="settings">Settings</button><button class="music"></button><button id="toCredits" data-i18n="credits">Credits</button></p>
     <p class="hint viewNote" id="viewNote" hidden></p>
   </div>
-  <div id="recordMenu"></div>
-</div></div>
+</div><div id="recordMenu"></div></div>
 <div id="shop" class="screen veil"><div>
   <h2 data-i18n="shop">Shop</h2>
   <p class="bank"><span class="dot"></span><span id="bank2">0</span> <span data-i18n="embers">embers</span></p>
@@ -217,13 +232,14 @@
   <p><button class="back" data-i18n="back">Back</button></p>
 </div></div>
 <div id="card" class="screen"><div><button id="pauseLanguage" class="language" hidden></button><h1 id="title"></h1><p id="line"></p><p id="sub"></p>
-  <p id="primaryRetry"><button id="go" class="main">Play again</button><button id="sameRiver" hidden data-i18n="sameRiver">Same river</button></p>
+  <p id="primaryRetry"><button id="sameRiver" hidden data-i18n="sameRiver">Same river</button><button id="go" class="main">Play again</button></p>
   <p id="riverRetries" hidden><button id="wonNewRiver" data-i18n="newRiver">New river</button><button id="wonSameRiver" data-i18n="sameRiver">Same river</button></p>
-  <p id="dareRow" hidden><span id="dareAsk" hidden><label for="dareName" data-i18n="dareYou">Your name (optional)</label><br><input id="dareName" maxlength="16" autocomplete="nickname" enterkeyhint="send"><br></span><button id="dareSend">Dare a friend</button><br><span class="hint" id="dareSame" data-i18n="dareSame">Same river, same hearts.</span><br><span class="hint" id="dareNote" aria-live="polite"></span><input id="dareUrl" readonly hidden aria-label="Dare link" data-i18n-aria="dareLinkLabel"></p>
+  <details id="resultDetails" hidden><summary data-i18n="resultDetails">Details</summary><p id="resultMelody"></p></details>
+  <p id="dareRow" hidden><span id="resultDareAsk"></span><span id="dareAsk" hidden><label for="dareName" data-i18n="dareYou">Your name (optional)</label><br><input id="dareName" maxlength="16" autocomplete="nickname" enterkeyhint="send"><br></span><button id="dareSend" aria-describedby="dareSame">Dare a friend</button><br><span class="hint" id="dareSame" data-i18n="dareSame">Same river, same hearts.</span><br><span id="resultDareShare"></span><span class="hint" id="dareNote" aria-live="polite"></span><input id="dareUrl" readonly hidden aria-label="Dare link" data-i18n-aria="dareLinkLabel"></p>
   <div id="ask" hidden><p data-i18n="ask">Show your endless scores to everyone on the leaderboard? After a yes, every run from the next one goes up by itself.</p><p><input id="askName" maxlength="16" autocomplete="nickname" enterkeyhint="done" placeholder="Type a name"></p><p class="hint" id="askNote">Your name and your score are sent, and a signal when a run starts. Nothing else.</p><p><button id="askYes" data-i18n="askYes">Yes, show them</button><button id="askNo" data-i18n="askNo">No</button></p></div>
   <p><button id="toMenu">Menu</button><button class="music"></button></p><p><button id="viewNext" hidden></button></p><p class="steerRow" hidden><button class="steer"></button></p><div id="recordCard"></div></div></div>
 <script type="module">
-import { create, step, centre, half, sight, fall, fog, wind, rain, dazzle, level, score, boat, progress, DT, GOAL, BOAT, NIGHTS, STATS, POWERS, LAST, FLOORS, LEVELS, SECTORS, towerStage, climbPace, FIELD, REBORN_PACE, GIFTS, ABILITIES, startAt, pace } from './sim.js?v=16'; // raise v when sim.js changes its exports, so a cached copy cannot break the page
+import { create, step, centre, half, sight, fall, fog, wind, rain, dazzle, level, score, boat, progress, DT, GOAL, BOAT, NIGHTS, STATS, POWERS, LAST, FLOORS, LEVELS, SECTORS, towerStage, climbPace, FIELD, REBORN_PACE, GIFTS, ABILITIES, startAt, pace } from './sim.js?v=17'; // raise v when sim.js changes its exports, so a cached copy cannot break the page
 import { read, readNumber, readJson, write } from '../kit/save.js';
 import { sound } from '../kit/audio.js';
 import { music } from './music.js';
@@ -232,16 +248,16 @@ import { screens } from '../kit/screens.js';
 import { drag } from '../kit/drag.js';
 import { sides } from '../kit/sides.js';
 import { tiltSteer } from '../kit/tilt.js';
-import { hint } from '../kit/hint.js?v=2';
+import { hint } from '../kit/hint.js?v=3';
 import { feedback } from '../kit/fx.js';
 import { dareLink, dareRead, shareLink } from '../kit/dare.js?v=2'; // a dare by link: the same river for a friend, no account (dare below)
-import { readRiver, riverBits, ENDLESS_TOP } from './dare-river.js?v=2';
-import { drawHazards, poolLead } from './hazards.js?v=1';
+import { readRiver, riverBits } from './dare-river.js?v=3';
+import { drawHazards, poolLead } from './hazards.js?v=2';
 import { lab } from '../kit/lab.js'; // lab recording: the rec lines below
 import { settings } from '../kit/settings.js'; // options with a default, and a record of each change: opts below
 import { noZoom } from '../kit/zoom.js'; noZoom(); // no double-tap or pinch zoom (note #74)
-import { hull, wake, flame, burn, glow as flameGlow, mark, TINT, reeds, shine, halo, flood } from './looks.js?v=4';
-import { t, lang, setLang, apply, langs } from './words.js?v=2'; // every word the player sees, in English and Turkish
+import { hull, wake, stone as drawStone, flame, burn, glow as flameGlow, mark, TINT, reeds, shine, halo, flood } from './looks.js?v=5';
+import { t, lang, setLang, apply, langs } from './words.js?v=3'; // every word the player sees, in English and Turkish
 
 const query = new URLSearchParams(location.search);
 const dare = readRiver(dareRead());
@@ -250,9 +266,20 @@ const pctDare = d => Boolean(d.night || d.tower);
 const dareKey = d => `${d.seed}.${d.score}.${d.extra}.${d.name}`;
 // lantern-dare-done: { k, n, seed, extra } once this phone has played the dare in the link k (dareKey) to an end, n its best score there.
 // The menu then shows that result and Send it back, not the dare it already took.
-const dareDone = () => { const d = plain(readJson('lantern-dare-done', {})); return dare && d.k === dareKey(dare) && Number.isInteger(d.n) && Number.isInteger(d.seed) && Number.isInteger(d.extra) ? d : null; };
-const dareGap = (n, d) => { const name = d.name || t('dareAnon'), pc = pctDare(d); return n > d.score ? t(pc ? 'dareByPct' : 'dareBy', { name, d: n - d.score }) : n === d.score ? t('dareTied', { name }) : t(pc ? 'dareShortPct' : 'dareShort', { name, d: d.score - n + 1 }); };
-let landingMore = false;
+const dareDone = () => { const d = plain(readJson('lantern-dare-done', {})); return dare && d.k === dareKey(dare) && Number.isInteger(d.n) && d.seed === dare.seed && Number.isInteger(d.extra) && d.extra >= 0 && d.extra < 2 ** 31 ? d : null; };
+const dawnTarget = d => pctDare(d) && d.score === 100;
+const meetsDare = (n, d) => n > d.score || (dawnTarget(d) && n === 100);
+const dareName = d => d.name || t('dareAnon');
+function dareCaption(d) {
+  return t(d.tower ? 'dareRivalTower' : d.night ? 'dareRivalNight' : 'dareRival', { name: dareName(d), n: d.score, night: d.night, level: d.climb });
+}
+function dareGap(n, d) {
+  const name = dareName(d), pc = pctDare(d);
+  if (dawnTarget(d)) return t(meetsDare(n, d) ? 'dareMatched' : 'dareMatch', { name });
+  if (n === d.score) return t('dareTied', { name });
+  return t(n > d.score ? (pc ? 'dareByPct' : 'dareBy') : (pc ? 'dareShortPct' : 'dareShort'), { name, d: n > d.score ? n - d.score : d.score - n + 1 });
+}
+let landingMore = false, moreOpen = false;
 // A portal copy (scripts/portal-zip.mjs sets window.PORTAL before this script): the page runs inside another site's frame, so it
 // asks this site for nothing: no shared board, no lab recording (kit/lab.js), no tester notes, no Race rooms. 'itch' may link out,
 // so a dare link points at HOME; 'strict' is for portals that allow no links out, and has no dare.
@@ -373,7 +400,7 @@ function resize() {
 addEventListener('resize', () => { resize(); size3(); }); resize();
 
 let s = create(1, stage), playing = false, paused = false, target = 0.5, acc = 0, last = 0, shake = 0, glow = 0, sparks = [], ended = -1e9, screen = 'menu', lastLevel = 1, nearFall = false, sayTimer = 0, shown = '', weather = '';
-const sx = x => left + x * unit, sy = y => H * 0.74 - (y - s.y) * unit;
+const sx = x => left + x * unit, sy = y => H * 0.76 - (y - s.y) * unit;
 window.lanternState = () => ({ tutor: tutor ? tutor.at : -1, steering, pressing: steering === 'press', tilting: tilting(), lean: tilt.lean(), slide, music: musicOn, songStep: song ? song.step : -1, daily, view, viewReady: !!R3, sharing, tab, asked, shared: shared ? shared.length : -1, x: s.x, y: s.y, t: s.t, over: s.over, target, playing, paused, stage, opened, endless, tower, climb, screen, hearts: s.hearts, shield: s.shield, light: s.light, taken: s.taken, stats, on: s.on, busy, boost: s.boost, slow: s.slow, size: s.size, big: s.big, progress: progress(s), score: score(s), bank, owned: [...owned], worn, looking, towerAt: towerAt(), reborn, peek: peek && peek[0], field: s.field, crashOn, crash: crash && crash.how, winOn, win: victory && victory.how, name: playerName(), board, unit: unit / dpr, start, magnet: s.magnet, flare: s.flare, scene: scene && scene.kind }); // read by the browser checks
 window.lanternCentre = () => centre(s, s.y);
 window.lanternTicks = plan => { // the checks steer some ticks by real presses, [ticks, side] each: how far the boat went from the middle, its last tick's move, hearts lost
@@ -387,12 +414,12 @@ window.lanternSim = () => s; // the browser checks use this to reach late stretc
 const cards = screens(['menu', 'shop', 'credits', 'card', 'board', 'modes', 'perspective', 'tutor', 'mode', 'settings']);
 // More modes (NOTES.md, "How a mode plugs in"): a mode is a module in modes/ that index.html loads when it is chosen. mod is the mode
 // chosen, or null; with null, every line below runs as before modes. A mode is drawn flat: the view the player chose comes back after.
-const MODES = { spark: () => import('./modes/spark.js?v=2'), tide: () => import('./modes/tide.js?v=2'), duet: () => import('./modes/duet.js?v=2'), race: () => import('./modes/race.js?v=2') }, made = {};
+const MODES = { spark: () => import('./modes/spark.js?v=3'), tide: () => import('./modes/tide.js?v=3'), duet: () => import('./modes/duet.js?v=3'), race: () => import('./modes/race.js?v=3') }, made = {};
 let mod = null;
 const pct = () => mod ? mod.reach() : progress(s);
 async function chooseMode(id) {
   if (!Object.hasOwn(MODES, id ?? '')) return;
-  const m = made[id] ??= (await MODES[id]()).mode({ canvas, g: () => g, size: () => ({ W, H, unit, left, dpr }), skin, live: () => playing && !paused, paused: () => paused, resume: () => resume(), play: () => begin(), card: () => show('mode'), screen: () => screen, unlock: () => audio(), say, tone, noise: (...a) => snd.ctx && snd.noise(...a), ctx: () => snd.ctx, boat: now => boatAt(now, sx(s.x), sy(s.y)), crashed: () => !!crash, win: now => { if (victory) winDraw(now); } });
+  const m = made[id] ??= (await MODES[id]()).mode({ canvas, g: () => g, size: () => ({ W, H, unit, left, dpr }), skin, outline: () => opts.get('outline') === '1', pickup: (now, project, wick) => { if (pickupFx) drawPickup(now, project, wick(pickupFx.x)); }, live: () => playing && !paused, paused: () => paused, resume: () => resume(), play: () => begin(), card: () => show('mode'), screen: () => screen, unlock: () => audio(), say, tone, noise: (...a) => snd.ctx && snd.noise(...a), ctx: () => snd.ctx, boat: now => boatAt(now, sx(s.x), sy(s.y)), crashed: () => !!crash, win: now => { if (victory) winDraw(now); } });
   mod = m; endless = tower = daily = false; tutor = null; setView('2d', false); show('mode'); // a mode is never the endless river, a climb or the tutorial, so it never takes a board ticket
 }
 window.lanternMode = () => mod ? { id: mod.id, ...mod.state() } : null; window.lanternSpark = () => mod?.game(); // read by the browser checks
@@ -402,10 +429,21 @@ function show(name) {
   cards(name);
   $('skipCrash').hidden = true;
   $('card').classList.toggle('result', name === 'card' && !paused);
+  if (name !== 'card' || paused) { $('resultDetails').hidden = true; $('resultDetails').open = false; }
   if (recording) $(name === 'card' && paused ? 'recordCard' : 'recordMenu').append(recording);
+  const menuDare = name === 'menu' && dare;
+  if (menuDare) {
+    $('menuDareAsk').append($('dareAsk'));
+    $('menuDareShare').append($('dareNote'), $('dareUrl'));
+  } else {
+    $('resultDareAsk').append($('dareAsk'));
+    $('resultDareShare').append($('dareNote'), $('dareUrl'));
+  }
+  resetDareShare();
+
   const play = name === 'play';
   $('hud').style.display = $('big').style.display = play ? 'block' : 'none'; pauseButton.style.display = play ? 'grid' : 'none';
-  if (!play) $('warn').classList.remove('on'); $('tip').style.display = play ? 'block' : 'none';
+  if (!play) { $('warn').classList.remove('on'); $('warn').textContent = ''; document.body.classList.remove('ember-instruction'); } $('tip').style.display = play ? 'block' : 'none';
   $('pauseLanguage').hidden = !paused; // the card is also the end of a run, which has no language button
   mod?.screen(name, $('modePanel')); if (name === 'menu' && mod) { if (mod.own) { s = create(1, stage); target = s.x; } mod = null; if (read('lantern-view', '2d') !== '2d') setView(read('lantern-view'), false); }
   if (name === 'menu' || name === 'modes') menu(); if (name === 'perspective') views(); if (name === 'shop') shop(); if (name === 'board') boardShow(); if (name === 'settings') setDraw();
@@ -421,7 +459,7 @@ function size3() { if (R3) { const k = Math.min(1.5, dpr) / dpr; R3.resize(Math.
 async function setView(v, keep = true) {
   if (!VIEWS.includes(v)) v = '2d';
   if (v !== '2d' && !R3) {
-    loading3 ??= import('./view3d.js?v=4').then(m => m.createRenderer(canvas3)).catch(() => null);
+    loading3 ??= import('./view3d.js?v=5').then(m => m.createRenderer(canvas3)).catch(() => null);
     const made = await loading3;
     if (!made || made.errors.length) { v = '2d'; loading3 = null; noteView('viewNoStart'); }
     else if (!R3) { R3 = made; canvas3.addEventListener('webglcontextlost', () => { setView('2d', false); R3 = null; noteView('viewStopped'); }); size3(); }
@@ -431,23 +469,24 @@ async function setView(v, keep = true) {
 function menu() {
   const compact = !landingMore && (Boolean(dare) || newcomer());
   $('menu').classList.toggle('compact', compact);
-  $('moreOptions').hidden = !compact;
-  $('moreOptions').setAttribute('aria-expanded', String(!compact));
+  $('moreOptions').setAttribute('aria-expanded', String(moreOpen));
+  $('menuOptions').hidden = !moreOpen;
   $('dareCard').hidden = !dare;
   $('storyStart').hidden = Boolean(dare);
   if (dare) {
-    const name = dare.name || t('dareAnon');
-    const dawn = dare.night && dare.score === 100;
     const done = dareDone();
-    $('dareGo').textContent = done ? t('dareSendBack') : t(dawn ? 'dareMatch' : pctDare(dare) ? 'dareBeatNight' : 'dareBeat', { name, n: dare.score });
-    // The recording trace uses the accessible label. Keep the sender's name on the page.
-    $('dareGo').setAttribute('aria-label', done ? t('dareSendBack') : t(dawn ? 'dareAriaMatch' : pctDare(dare) ? 'dareAriaNight' : 'dareAria', { n: dare.score }));
-    $('dareText').textContent = done ? dareGap(done.n, dare) : t(pctDare(dare) ? 'dareRivalNight' : 'dareRival', { name, n: dare.score });
-    $('dareText').hidden = $('dareAgain').hidden = !done;
+    const reply = done && readRiver({ score: done.n, extra: done.extra }) && PORTAL !== 'strict';
+    $('dareGo').hidden = Boolean(done && !reply);
+    $('dareGo').classList.toggle('main', !done);
+    $('dareGo').textContent = t(done ? 'dareSendBack' : 'darePlayNamed', { name: dareName(dare) });
+    $('dareGo').setAttribute('aria-label', done ? t('dareSendBack') : t(dawnTarget(dare) ? 'dareAriaMatch' : pctDare(dare) ? 'dareAriaNight' : 'dareAria', { n: dare.score }));
+    $('dareText').textContent = [dareCaption(dare), !done && dawnTarget(dare) ? t('dareMatch', { name: dareName(dare) }) : '', done ? ownDareScore(done.n, dare) + ' ' + dareGap(done.n, dare) : ''].filter(Boolean).join(' ');
+    $('dareAgain').hidden = !done;
   }
   $('rival').hidden = $('tutSkip').hidden = true;
   $('stars').textContent = reborn ? ` · ${'★'.repeat(Math.min(5, reborn))}${reborn > 5 ? reborn : ''}` : '';
   $('modesNow').textContent = t('modesNow'); $('shopNow').textContent = t('shopNow'); $('bank').textContent = bank; $('play').textContent = t('playNight', { n: stage });
+  $('less').hidden = $('more').hidden = opened < 2;
   $('less').disabled = stage <= 1; $('more').disabled = stage >= opened;
   const best = store.get(`lantern-best-${stage}`), top = store.get('lantern-best-endless');
   $('about').textContent = [reborn ? t('rebornNight', { pct: Math.round(REBORN_PACE * Math.min(5, reborn) * 100), k: 10 * Math.min(5, reborn) }) : '', ahead(stage), best ? t('bestPct', { n: best }) : ''].filter(Boolean).join(' ');
@@ -658,7 +697,15 @@ function playScene() {
   }
   hud();
 }
-function say(text, ms = 2200) { const el = $('say'); el.textContent = text; el.style.opacity = 1; clearTimeout(sayTimer); sayTimer = setTimeout(() => { el.style.opacity = 0; }, ms); }
+function say(text, ms = 2200) {
+  $('warn').classList.remove('on');
+  if (!tutor) $('tip').textContent = '';
+  const el = $('say');
+  el.textContent = text;
+  el.style.opacity = 1;
+  clearTimeout(sayTimer);
+  sayTimer = setTimeout(() => { el.style.opacity = 0; }, ms);
+}
 
 // Sound: all synthesized, started by the first touch.
 // Music (kit/music.js through music.js, from the lab's Lantern Song): a score made as the run goes, a new tune for each river from its seed.
@@ -699,10 +746,10 @@ const TUTOR = [
   { say: () => 'tutRock', lay() { if (tutor.age > 1 && tutor.laid < 3 && !s.rocks.some(k => k.y > s.y)) { tutor.laid++; const c = centre(s, s.y); stone(Math.max(-0.8, Math.min(0.8, (s.x - c) / half(s, s.y))), 1.5); } }, done: () => tutor.laid >= 3 && !s.rocks.some(k => k.y > s.y - 0.1) },
   { say: () => 'tutField', lay() { if (!s.field && !waiting1('shield')) lay('shield', side1()); if (s.field && tutor.laid < 4 && !s.rocks.some(k => k.y > s.y + 0.7)) { tutor.laid++; stone(0, 1.3); stone(0.7, 1.45); stone(-0.7, 1.45); } }, done: () => s.events.includes('fieldEnd') },
 ];
-// How to play waits on the player at each step. After 6 s with no steering on the first step a fingertip shows how to slide
-// (kit/hint.js, made only then, under its own key lantern-tutor-hint, set back to '0' first so each page's first stalled tutorial shows it; no other run has a second hint); after 20 s on any step, Skip.
+// Practice shows one drag after six seconds of inactivity on its first step. Skip becomes available after 20 seconds on a step.
 let tutorHelp = null;
-function tutorFinger() { write('lantern-tutor-hint', '0'); tutorHelp = hint(canvas, { kind: 'fingertip', label: t('hint'), key: 'lantern-tutor-hint', delay: 100, reach: 35, bottom: demoBottom, played: false, when: () => playing && !paused && tutor?.at === 0 && dragging() }); }
+function clearTutorHelp() { tutorHelp?.dispose(); tutorHelp = null; }
+function tutorFinger() { write('lantern-tutor-hint', '0'); tutorHelp = hint(canvas, { kind: 'hand-drag', once: true, key: 'lantern-tutor-hint', delay: 100, reach: 35, bottom: demoBottom, played: false, when: () => playing && !paused && tutor?.at === 0 && dragging() }); }
 function tutorial() {
   store.set('lantern-tutorial', '1'); endless = tower = daily = false;
   tutor = { at: 0, age: 0, moved: 0, from: 0, laid: 0 };
@@ -715,12 +762,16 @@ function tutorTick(was) {
   if (tutor.at === 0 && tutor.age > 6 && !tutorHelp && dragging() && !steerHint.shown) tutorFinger();
   if (tutor.age > 20) $('tutSkip').hidden = false;
   if (step1.done()) {
+    $('tutSkip').hidden = true;
+    clearTutorHelp();
     tutor.at++; tutor.age = 0; tutor.laid = 0; tutor.from = s.taken; s.rocks = []; s.embers = s.embers.filter(e => e.got); tone(660, 0.25, 0.09, 'triangle'); setTimeout(() => tone(990, 0.4, 0.09, 'triangle'), 110);
     if (tutor.at >= TUTOR.length) { tutorEnd(); return; }
   }
   const words = t(TUTOR[tutor.at].say()); if ($('tip').textContent !== words) $('tip').textContent = words;
 }
 function tutorEnd(why = 'done') {
+  if (paused) snd.release();
+  paused = false; keys.clear(); clearTutorHelp();
   playing = false; ended = performance.now(); tutor = null; steer.drop(); pads.drop(); $('tip').textContent = ''; $('tutSkip').hidden = true; rec.end(why, { mode: 'tutorial', night: 0 });
   $('toMenu').textContent = t('menu'); $('ask').hidden = $('viewNext').hidden = true; $('title').textContent = t('tutDone');
   $('line').textContent = t(dare ? 'tutDoneDare' : 'tutDoneLine'); $('sub').textContent = '';
@@ -748,8 +799,9 @@ function begin({ replay, challenge = null } = {}) {
   if (challenge) s.dare = challenge;
   s.fromFloor = tower ? fromFloor : 0; rivalPassed = false; $('tutSkip').hidden = true;
   $('rival').hidden = !challenge; $('rival').classList.remove('passed');
-  if (challenge) $('rival').textContent = t(pctDare(challenge) ? 'dareHudPct' : 'dareHud', { name: challenge.name || t('dareAnon'), n: challenge.score });
+  drawRival();
   practiceFinished = false;
+  $('card').classList.remove('story-loss');
   $('sameRiver').hidden = $('riverRetries').hidden = $('dareRow').hidden = true;
   if (!tower) fromFloor = 0; else if (fromFloor) startAt(s, fromFloor); // part-way up the level (note #142)
   song?.start(s.seed); // a new tune for each river; today's river has the same tune for everyone
@@ -758,11 +810,14 @@ function begin({ replay, challenge = null } = {}) {
   target = s.x; crash = null; victory = null; playing = true; paused = false; acc = 0; streak = 0; sparks = []; lastLevel = 1; size = 1; fire0 = flame(); nearFall = false; weather = ''; steer.reset(); pads.drop(); snap3 = true; slide = 0; tilt.zero();
   if (tutor) { s.next = Infinity; s.rocks = []; s.embers = []; s.powers = []; s.calm = 0.75; s.hearts = 2; } // an empty, slow river
   if (challenge?.gentle ?? (replay ? Boolean(replay.gentle) : gentleRun())) { s.gentle = true; s.hearts = Math.max(s.hearts, 2); }
+  lowSaid = false;
+  clearTimeout(lowTimer);
+  $('warn').classList.remove('on');
   impactFx = pickupFx = null; maxHearts = s.hearts; keys.clear();
   fuel.style.setProperty('--restored-alpha', 0);
-  $('tip').textContent = ''; shown = ''; show('play'); introTick(); hud();
+  $('tip').textContent = ''; shown = ''; show('play'); hud();
   if (tutor) { floor = 0; rec.start({ ...opts.snapshot(), view, mode: 'tutorial', night: 0 }); return; }
-  if ($('tip').textContent) $('say').style.opacity = 0;
+  if (s.gentle && s.stage === 1 && !introDone) $('say').style.opacity = 0;
   else say(mod ? mod.hello() : (tower ? t(climb > LEVELS ? (fromFloor ? 'saySectorFloor' : 'saySector') : (fromFloor ? 'sayTowerFloor' : 'sayTower'), { n: climb > LEVELS ? climb - LEVELS : climb, of: LEVELS, f: fromFloor }) : endless ? t(daily && !challenge ? 'daily' : 'endless') : t('sayNight', { n: runNight })) + (boosted && !challenge ? '. ' + t('statsOn') : waiting ? '. ' + t('statsWait') : ''), waiting ? 2800 : 1800);
   floor = fromFloor;
   const river = challenge || replay ? (s.gentle ? 'gentle' : 'classic') : opts.get('river');
@@ -774,7 +829,9 @@ function begin({ replay, challenge = null } = {}) {
 const gentleRun = () => !tutor && !endless && !tower && !daily && !mod && opts.get('river') === 'gentle';
 const mode = () => mod ? mod.id : tutor ? 'tutorial' : s.dare ? 'dare' : tower ? 'tower' : endless ? 'endless' : 'night';
 const runNightNumber = () => mod ? mod.night() : tower || endless || tutor ? 0 : s.stage;
-const dareResult = state => state.endless ? score(state) : Math.floor(progress(state) * 100);
+const dareResult = state => state.endless ? score(state) : state.over === 'dawn' ? 100 : Math.min(99, Math.floor(progress(state) * 100));
+const ownDareScore = (n, d) => t(pctDare(d) ? 'riverResult' : 'pointsResult', { n });
+function drawRival() { if (s.dare) $('rival').textContent = dareCaption(s.dare); }
 function playDare(challenge = dare) {
   endless = !challenge.night && !challenge.tower;
   tower = Boolean(challenge.tower); daily = false;
@@ -791,37 +848,66 @@ async function dareShare(url, words) {
   return [how, t(how === 'copied' ? 'dareCopied' : how === 'shown' ? 'dareShown' : 'dareShared') + ' ' + t(playerName() ? 'dareHasName' : 'dareHasNoName')];
 }
 const dareWords = (ran, pts) => t(ran.endless ? 'dareWords' : ran.tower ? 'dareWordsTower' : pts === 100 ? 'dareWordsDawn' : 'dareWordsNight', { n: pts, night: ran.stage, level: ran.climb });
-async function dareSend() {
-  const ran = s, pts = dareResult(ran);
-  if ($('dareAsk').hidden && askDareName()) { $('ask').hidden = true; $('dareAsk').hidden = false; $('dareName').value = ''; $('dareSend').textContent = t('dareSendNow'); $('dareName').focus(); return; }
-  if (!$('dareAsk').hidden) { const n = boardName($('dareName').value); if (n) store.set('lantern-name', n); store.set('lantern-dare-asked', '1'); $('dareAsk').hidden = true; $('dareSend').textContent = t(ran.dare && pts > ran.dare.score ? 'dareBack' : 'dareFriend'); }
-  const url = dareUrlFor(ran.seed, pts, riverBits(ran, ran.fromFloor));
+let shareGeneration = 0;
+function resetDareShare() {
+  shareGeneration++;
+  $('dareAsk').hidden = $('dareUrl').hidden = true;
+  $('dareNote').textContent = $('dareName').value = $('dareUrl').value = '';
+}
+function resultDareLabel() {
+  return s.dare && meetsDare(dareResult(s), s.dare) ? 'dareBack' : 'dareFriend';
+}
+async function dareSend(fromMenu = false) {
+  const ran = s, done = fromMenu ? dareDone() : null;
+  if (fromMenu && !done) { playDare(); return; }
+  const pts = done?.n ?? dareResult(ran), seed = done?.seed ?? ran.seed, extra = done?.extra ?? riverBits(ran, ran.fromFloor);
+  if (!readRiver({ score: pts, extra }) || PORTAL === 'strict') return;
+  const button = $(fromMenu ? 'dareGo' : 'dareSend');
+  if ($('dareAsk').hidden && askDareName()) {
+    $('ask').hidden = true;
+    $('dareAsk').hidden = false;
+    button.textContent = t('dareSendNow');
+    button.removeAttribute('aria-label');
+    $('dareName').focus();
+    return;
+  }
+  if (!$('dareAsk').hidden) {
+    const name = boardName($('dareName').value);
+    if (name) store.set('lantern-name', name);
+    store.set('lantern-dare-asked', '1');
+    $('dareAsk').hidden = true;
+    button.textContent = t(fromMenu ? 'dareSendBack' : resultDareLabel());
+  }
+  const url = dareUrlFor(seed, pts, extra);
   if (!url) return;
-  const [how, note] = await dareShare(url, dareWords(ran, pts));
-  if (s !== ran || screen !== 'card') return;
-  rec.event('dare_send', { how, score: pts, back: !!ran.dare, named: !!playerName() });
+  const generation = ++shareGeneration;
+  const context = fromMenu ? { endless: !pctDare(dare), tower: dare.tower, stage: dare.night, climb: dare.climb } : ran;
+  const [how, note] = await dareShare(url, dareWords(context, pts));
+  if (generation !== shareGeneration) return;
+  rec.event('dare_send', { how, score: pts, back: fromMenu || !!ran.dare, named: !!playerName(), ...(fromMenu ? { from: 'menu' } : {}) });
   $('dareNote').textContent = note;
   $('dareUrl').hidden = how !== 'shown';
   $('dareUrl').value = url;
   if (how === 'shown') { $('dareUrl').focus(); $('dareUrl').select(); }
 }
-// Every run that ends pays at least LEAST embers (share loop, 2026-11-27), so a run lost on the first rock still moves the shop on.
-// A run left from the pause card pays what it took. One fixed floor, not a setting: no player would want a run to pay less.
+// Finished runs pay at least LEAST once the boat starts moving. Leaving from a pause pays only what the boat collected.
 const LEAST = 3;
 function bankRun(least = 0) { const got = Math.round(s.taken * boon() * (mod?.share ?? 1)); s.banked = Math.max(least, got); s.least = s.banked > got; bank += s.banked; store.set('lantern-bank', bank); } // a rebirth's bonus is added as the run banks; a mode can bank a share (Duet's rope takes about twice a night's embers)
 function finish() {
   const paid = s.over === 'dawn' && !tower && !endless && !mod && !s.dare && reborn ? 10 * Math.min(5, reborn) : 0; s.taken += paid; // a reborn night pays more at dawn
-  playing = false; ended = performance.now(); steer.drop(); pads.drop(); bankRun(LEAST); $('rival').hidden = true;
+  playing = false; ended = performance.now(); steer.drop(); pads.drop();
+  if (mod?.started?.() === false) s.banked = 0; else bankRun(LEAST);
+  $('rival').hidden = true;
   rec.end(s.over, { mode: mode(), night: runNightNumber(), reached: Math.floor(pct() * 100), score: endless ? score(s) : null, embers: s.taken, hearts: s.hearts, bank });
   pauseButton.style.display = 'none';
   if (!crash) $('hud').style.display = $('big').style.display = 'none';
   $('warn').classList.remove('on');
   const won = s.over === 'dawn', why = !won && t(['dark', 'bank', 'ice', 'log', 'pool', 'geyser', 'isle'].includes(s.over) ? `why_${s.over}` : 'why_rock');
   const gained = t(s.least ? 'gainedLeast' : s.banked > s.taken ? 'gainedBonus' : s.banked === 1 ? 'gained1' : 'gained', { n: s.banked, taken: s.taken, bank, least: LEAST });
-  const reached = Math.floor(pct() * 100);
   const story = !mod && !tower && !endless && !s.dare;
   const nextNight = story && won && s.stage < NIGHTS ? s.stage + 1 : 0;
   $('toMenu').textContent = t('menu'); $('ask').hidden = $('viewNext').hidden = true;
+  $('card').classList.toggle('story-loss', story && !won);
   if (mod) { const c = mod.end(); $('title').textContent = c.title; $('line').textContent = c.line; $('go').textContent = c.go; } // a mode keeps its own save: no board, no night, no best
   else if (tower && !s.dare) { // after each level: climb on to a harder one, or stop. The next climb goes on where this one left off (tester t1, note #73)
     const at = Math.min(FLOORS, Math.floor(progress(s) * FLOORS)); store.set('lantern-best-tower', Math.max(at, store.get('lantern-best-tower'))); // the old best floor, still kept
@@ -837,8 +923,8 @@ function finish() {
     } else { $('title').textContent = t('floorResult', { n: at, of: FLOORS }); $('line').textContent = t(back ? 'towerLostFloor' : 'towerLost', { why, best: best > LEVELS ? tag(best) : t('nOf', { n: best, of: LEVELS }), tag: tag(climb), back, at }); $('go').textContent = back ? t('tryFloor', { n: back }) : t('tryLevel', { tag: tag(climb) }); }
   } else if (s.dare) {
     const n = dareResult(s);
-    $('title').textContent = endless ? String(n) : t(won ? 'dawn' : 'dawnResult', { n });
-    $('line').textContent = [why, dareGap(n, s.dare)].filter(Boolean).join(' ');
+    $('title').textContent = ownDareScore(n, s.dare);
+    $('line').textContent = [dareCaption(s.dare), dareGap(n, s.dare), why].filter(Boolean).join(' ');
     $('go').textContent = t('sameRiver');
     if (dare && dareKey(s.dare) === dareKey(dare)) store.set('lantern-dare-done', JSON.stringify({ k: dareKey(dare), n: Math.max(n, dareDone()?.n ?? 0), seed: s.seed, extra: riverBits(s, s.fromFloor) }));
   } else if (endless && daily) {
@@ -856,23 +942,27 @@ function finish() {
     $('title').textContent = pts > prior ? t('scorePersonalBest', { n: pts }) : String(pts);
     $('line').textContent = t(place === 1 && board.length === 1 ? 'endlessFirst' : place ? 'endlessPlace' : 'endlessLine', { why, best, place }); $('go').textContent = t('playAgain');
   } else {
-    const night = s.stage, key = `lantern-best-${night}`;
+    const night = s.stage, key = `lantern-best-${night}`, reached = dareResult(s);
     store.set(key, Math.max(reached, store.get(key)));
-    $('title').textContent = t(won ? 'dawn' : 'dawnResult', { n: reached });
-    $('line').textContent = won ? t(night >= NIGHTS ? 'allNights' : 'clearedNight', { n: night }) : why;
+    $('title').textContent = t('riverResult', { n: reached });
+    const action = ['dark', 'bank', 'ice', 'log', 'pool', 'geyser', 'isle'].includes(s.over) ? s.over : 'rock';
+    $('line').textContent = won ? t(night >= NIGHTS ? 'allNights' : 'clearedNight', { n: night }) : why + ' ' + t(`next_${action}`);
     if (nextNight) {
       opened = Math.max(opened, nextNight); stage = nextNight; store.set('lantern-night', opened);
       $('go').textContent = t('playNight', { n: nextNight });
     } else $('go').textContent = t('newRiver');
   }
+  $('sameRiver').textContent = t(won ? 'sameRiver' : 'retryRiver');
   $('sameRiver').hidden = !story || Boolean(nextNight);
   $('riverRetries').hidden = !story || !nextNight;
   // A dare on every card a link can carry (story nights, today's river, the tower, the endless river), and none for a result its reader would refuse (dare-river.js).
-  $('dareRow').hidden = Boolean(mod || PORTAL === 'strict' || !(dareResult(s) > 0) || (endless && dareResult(s) > ENDLESS_TOP)); $('dareAsk').hidden = true;
-  $('dareSend').textContent = t(s.dare && dareResult(s) > s.dare.score ? 'dareBack' : 'dareFriend');
+  $('dareRow').hidden = Boolean(mod || PORTAL === 'strict' || !readRiver({ score: dareResult(s), extra: riverBits(s, s.fromFloor) })); $('dareAsk').hidden = true;
+  $('dareSend').textContent = t(resultDareLabel());
   $('dareUrl').hidden = true; $('dareNote').textContent = '';
-  const tune = song && song.melody, laid = tune ? tune.played + tune.missed : 0; // the share of tonight's melody the embers played
-  $('sub').textContent = gained + (musicOn && laid >= 4 ? ' ' + t('melodyPlayed', { pct: Math.round(tune.share * 100) }) : '');
+  $('sub').textContent = story || s.banked === 0 ? t(s.banked === 1 ? 'bankLine1' : 'bankLine', { n: s.banked, bank }) : gained;
+  const tune = song?.melody;
+  $('resultDetails').hidden = !musicOn || !tune || tune.played + tune.missed < 4;
+  $('resultMelody').textContent = $('resultDetails').hidden ? '' : t('melodyPlayed', { pct: Math.round(tune.share * 100) });
   const ran = s;
   const isEnding = () => s === ran && !playing && screen === 'play';
   if (crash) setTimeout(() => { if (isEnding()) $('skipCrash').hidden = false; }, 260);
@@ -1038,23 +1128,32 @@ function crashFx(cause, shown = '') { // shown: a crash effect previewed in the 
 const { bump } = feedback();
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const fuel = $('fuel');
-let maxHearts = 0, impactFx = null, pickupFx = null;
+let maxHearts = 0, impactFx = null, pickupFx = null, lowSaid = false, lowTimer;
 function hud() {
   const flame = Math.max(0, Math.min(100, s.light * 100));
   const flamePct = Math.round(flame);
   if (fuel.getAttribute('aria-valuenow') !== String(flamePct)) fuel.setAttribute('aria-valuenow', flamePct);
   fuel.style.setProperty('--level', `${flame}%`);
-  fuel.classList.toggle('low', flame < 16);
+  $('fuelRow').classList.toggle('low', flame < 25);
+  fuel.classList.toggle('low', flame < 25);
+  if (!lowSaid && playing && !paused && !tutor && flame < 25) {
+    lowSaid = true;
+    $('tip').textContent = '';
+    $('say').style.opacity = 0;
+    $('warn').textContent = t('fade');
+    $('warn').classList.add('on');
+    lowTimer = setTimeout(() => $('warn').classList.remove('on'), 2400);
+  }
   maxHearts = Math.max(maxHearts, s.hearts);
-  if (s.dare && playing && !rivalPassed && dareResult(s) > s.dare.score) { rivalPassed = true; $('rival').classList.add('passed'); say(t('darePassed', { name: s.dare.name || t('dareAnon') }), 1600); tone(880, 0.3, 0.08, 'triangle'); }
+  if (s.dare && playing && !rivalPassed && meetsDare(dareResult(s), s.dare)) { rivalPassed = true; $('rival').classList.add('passed'); say(t(dawnTarget(s.dare) ? 'dareMatched' : 'darePassed', { name: dareName(s.dare) }), 1600); tone(880, 0.3, 0.08, 'triangle'); }
   const big = tutor ? '' : t(endless ? 'hudScore' : 'hudDawn', { n: endless ? score(s) : Math.floor(pct() * 100) });
-  const low = playing && !paused && !tutor && flame < 16, now = `${s.hearts}|${maxHearts}|${s.taken}|${big}|${low}`;
+  const now = `${s.hearts}|${maxHearts}|${s.taken}|${big}`;
   if (now === shown) return; shown = now; // touch the page only when a number changes
   const empty = document.createElement('span');
   empty.className = 'empty'; empty.textContent = '♡'.repeat(maxHearts - s.hearts);
   $('hearts').replaceChildren('♥'.repeat(s.hearts), empty);
   $('count').textContent = s.taken; $('big').textContent = big;
-  $('warn').classList.toggle('on', low);
+
 }
 
 // Steering. A finger steers by how far it has moved since it touched down, never by where it is,
@@ -1087,57 +1186,67 @@ function glide() { if (steering === 'slide') { slide = 0; aim(target); return; }
   // first person: the next target, a little to one side; steering into a bank slides along it, so a held press never drives the boat through (a boat nobody steers can still drift into a bend)
   const lean = tilting() ? tilt.lean() : 0, push = Math.min(1, Math.max(0, Math.abs(lean) - REST) / (FULL - REST)), side = tilting() ? 0 : pads.side();
   const want = (tilting() ? Math.sign(lean) * push ** 1.3 * TILT : side * PRESS) * pace(s);
+  if (want) deliberateSteer();
   slide += (want - slide) * (want ? (tilting() ? 0.3 : 0.1) : 0.3); // a press builds up over about a quarter of a second
   if (Math.abs(slide) < 0.01) slide = 0;
   const room = Math.max(0, half(s, s.y) - boat(s) - 0.01), c = centre(s, s.y), to = s.x + slide * DT;
   target = slide > 0 ? Math.min(to, c + room) : slide < 0 ? Math.max(to, c - room) : s.x;
 }
 const introAtLoad = read('lantern-bank') === null && read('lantern-hint') !== '1';
-let introDone = !introAtLoad, demoOffset = 0, demoOpacity = 0;
-const demoBottom = () => innerHeight * 0.19;
+let introDone = !introAtLoad;
+const demoBottom = () => innerHeight * 0.12;
 const steerHint = hint(canvas, {
-  kind: 'fingertip', label: t('hint'), key: 'lantern-hint', delay: 1000, reach: 35, manual: true, bottom: demoBottom,
-  when: () => playing && !paused && screen === 'play' && dragging() && !mod?.steers && !introDone,
+  kind: 'hand-drag', once: true, label: t('hint'), key: 'lantern-hint', delay: 1000, reach: 35, manual: true, bottom: demoBottom,
+  when: () => playing && !paused && screen === 'play' && dragging() && !tutor && !mod && !introDone,
   played: !introAtLoad,
-  follow: (x, opacity) => { demoOffset = x; demoOpacity = opacity; },
 });
-function deliberateSteer() { introDone = true; steerHint.done(); }
-function introTick() {
-  const on = !introDone && playing && !tutor && !mod && !endless && !tower && s.stage === 1;
-  document.body.classList.toggle('ember-intro', on);
-  if (tutor) return;
-  const line = on ? t(dragging() ? 'slideEmber' : tilting() ? 'tiltEmber' : 'pressEmber') : '';
-  if ($('tip').textContent !== line) $('tip').textContent = line;
+function deliberateSteer() {
+  if (introDone || mod) return;
+  introDone = true;
+  steerHint.dispose();
+  write('lantern-hint', '1');
+  if (!tutor) $('tip').textContent = '';
 }
-function drawSteerDemo() {
-  if (!steerHint.shown || !demoOpacity) return;
-  g.save();
-  g.translate(W / 2 + demoOffset * dpr, H - (demoBottom() + 32) * dpr);
-  g.globalAlpha = demoOpacity * 0.72;
-  hull(g, skin('boat')[0], 220 * dpr, '#c9c1ac', 0);
-  g.restore();
+canvas.addEventListener('pointerdown', () => { if (!playing || paused || tutor) return;
+  steerHint.dispose();
+  if (view === 'first' && !dragging() && !tilting()) deliberateSteer(); });
+function introTick(project, bowY) {
+  if (tutor) return;
+  const tip = $('tip');
+  const teaching = !introDone && playing && !paused && !mod && !endless && !tower && s.stage === 1
+    && $('say').style.opacity !== '1' && !$('warn').classList.contains('on');
+  const e = teaching ? s.embers.find(e => e.opening && !e.got && e.y > s.y) : null;
+  let words = '';
+  if (e) {
+    const [x, y] = project(e.x, e.y);
+    const ahead = (bowY - y) / dpr;
+    const inReach = view === 'first' ? e.y - s.y <= 0.75 : ahead <= 110;
+    if (inReach && ahead >= 0 && x > 16 * dpr && x < W - 16 * dpr && y > 80 * dpr) {
+      tip.style.setProperty('--tip-x', `${Math.max(110, Math.min(W / dpr - 110, x / dpr))}px`);
+      tip.style.setProperty('--tip-y', `${y / dpr - 16}px`);
+      words = t(dragging() ? 'slideEmber' : tilting() ? 'tiltEmber' : 'pressEmber');
+    }
+  }
+  tip.classList.toggle('ember', Boolean(words));
+  if (!words && teaching && !s.gentle && !dragging()) words = t(tilting() ? 'tutTilt' : 'tutPress');
+  document.body.classList.toggle('ember-instruction', Boolean(words));
+  if (tip.textContent !== words) tip.textContent = words;
 }
 
 // Buttons.
 function playStory() { endless = tower = daily = false; begin(); }
 $('play').addEventListener('click', playStory);
-$('dareGo').addEventListener('click', async () => {
-  const done = dareDone(); if (!done) { playDare(); return; }
-  const url = dareUrlFor(done.seed, done.n, done.extra); if (!url) return;
-  const [how, note] = await dareShare(url, dareWords({ endless: !pctDare(dare), tower: dare.tower, stage: dare.night, climb: dare.climb }, done.n));
-  rec.event('dare_send', { how, score: done.n, back: true, named: !!playerName(), from: 'menu' });
-  $('dareText').textContent = how === 'shown' ? `${note} ${url}` : note;
-});
+$('dareGo').addEventListener('click', () => dareSend(true));
 $('dareAgain').addEventListener('click', () => playDare());
 $('tutSkip').addEventListener('click', () => { if (tutor) tutorEnd('skip'); });
-$('dareName').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') dareSend(); });
-$('dareSend').addEventListener('click', dareSend);
+$('dareName').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); dareSend(screen === 'menu'); } });
+$('dareSend').addEventListener('click', () => dareSend());
 $('ordinaryPlay').addEventListener('click', e => {
   if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
   e.preventDefault();
   playStory();
 });
-$('moreOptions').addEventListener('click', () => { landingMore = true; menu(); $('toModes').focus(); });
+$('moreOptions').addEventListener('click', () => { landingMore = true; moreOpen = !moreOpen; menu(); });
 $('toTutor').addEventListener('click', () => tutorial());
 $('tutorYes').addEventListener('click', () => tutorial());
 $('tutorNo').addEventListener('click', () => { if (dare) playDare(); else playStory(); });
@@ -1182,6 +1291,7 @@ for (const b of document.querySelectorAll('.back')) b.addEventListener('click', 
 $('go').addEventListener('click', () => {
   if (screen !== 'card') return;
   if (paused) { resume(); return; }
+  if ($('card').classList.contains('story-loss')) { retryStory(false); return; }
   if (practiceFinished && dare) { playDare(); return; }
   if (s.dare) { playDare(s.dare); return; }
   if (mod?.go?.()) return;
@@ -1227,7 +1337,7 @@ window.lanternSet = () => ({ ...opts.snapshot(), changed: opts.changed(), defaul
 if (notice) { const link = notice.querySelector('a'), copy = document.createElement('span'); copy.dataset.i18n = 'notice'; link.dataset.i18n = 'privacy'; notice.replaceChildren(copy, ' ', link); }
 if (recording) { const input = recording.querySelector('input'), copy = document.createElement('span'); copy.dataset.i18n = 'record'; recording.replaceChildren(input, ' ', copy); }
 // Leaving a paused run for the menu ends it and keeps its embers.
-$('toMenu').addEventListener('click', () => { if (paused) { rec.end('quit', { mode: mode(), night: runNightNumber(), reached: Math.floor(pct() * 100), embers: s.taken, hearts: s.hearts }); } if (paused) { paused = false; playing = false; if (!tutor) bankRun(); snd.release(); } tutor = null; $('tip').textContent = ''; show(mod ? 'mode' : 'menu'); });
+$('toMenu').addEventListener('click', () => { if (paused) { rec.end('quit', { mode: mode(), night: runNightNumber(), reached: Math.floor(pct() * 100), embers: s.taken, hearts: s.hearts }); } if (paused) { paused = false; playing = false; if (!tutor && mod?.started?.() !== false) bankRun(); snd.release(); } clearTutorHelp(); tutor = null; $('tip').textContent = ''; show(mod ? 'mode' : 'menu'); });
 
 // Pause: the button, P or Escape, and whenever the page loses the screen (a phone call, another app).
 function pauseText() { // the pause card's words; the language button draws them again
@@ -1235,6 +1345,7 @@ function pauseText() { // the pause card's words; the language button draws them
 }
 function pause(why) { // why: 'button', 'key', or nothing (the page lost the screen)
   if (!playing || paused) return; if (mod?.pause?.(why)) return; // a mode may take the pause (Race: a live race cannot stop its clock, so the boat retires)
+  $('card').classList.remove('story-loss');
   paused = true; steer.drop(); pads.drop(); keys.clear(); $('viewNext').hidden = !!mod;
   pauseText();
   $('ask').hidden = true; $('say').style.opacity = 0; show('card'); snd.hold();
@@ -1246,13 +1357,13 @@ function resume() {
 pauseButton.addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); pause('button'); });
 onLeave(pause);
 const keys = new Set();
-const KEY_SIDE = new Map([['ArrowLeft', -1], ['a', -1], ['ArrowRight', 1], ['d', 1]]);
+const KEY_SIDE = new Map([['arrowleft', -1], ['a', -1], ['arrowright', 1], ['d', 1]]);
 addEventListener('keydown', e => {
   if (looking) { unlook(); return; }
   if (isPauseKey(e)) { paused ? resume() : pause('key'); return; }
   if (paused) { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); resume(); } return; }
   const key = e.key.toLowerCase();
-  if (playing && KEY_SIDE.has(key)) { e.preventDefault(); keys.add(key); }
+  if (playing && KEY_SIDE.has(key)) { e.preventDefault(); keys.add(key); deliberateSteer(); }
 });
 addEventListener('keyup', e => {
   if (keys.delete(e.key.toLowerCase()) && !keys.size) { target = s.x; slide = 0; steer.rebase(); }
@@ -1270,6 +1381,7 @@ function markImpact() {
 function react(e) {
   // With the music on in a run, an ember plays the next note of tonight's melody (kit/music.js); elsewhere (the shop's showings) a chime as before.
   if (e === 'ember') {
+    if (playing && !tutor && !mod && !endless && !tower && s.stage === 1) deliberateSteer();
     tone(1500, 0.055, 0.08, 'triangle', -620);
     const n = streak++;
     if (!(song && musicOn && song.ember())) tone(song && musicOn ? song.chime(Math.min(n, 7)) : scale[Math.min(n, scale.length - 1)], 0.5, 0.12, 'triangle');
@@ -1314,7 +1426,6 @@ function tick() {
   const keyed = keys.size > 0;
   if (view === 'first' && !keyed) glide(); else slide = 0;
   if (keyed) { deliberateSteer(); target = s.x + 0.1 * KEY_SIDE.get([...keys].at(-1)); }
-  introTick();
   const was = s.x; if (tutor) { s.light = Math.max(s.light, tutor.at === 2 ? 0.2 : 0.45); s.hearts = Math.max(2, s.hearts); }
   const events = mod ? mod.step(target) : (step(s, target), s.events);
   for (const e of events) { react(e); mod?.react(e); }
@@ -1412,9 +1523,30 @@ function drawContact(now, project, fx, radius) {
     g.ellipse(x, y, radius, radius * 0.72, 0, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * left);
     g.stroke();
   }
+  g.restore();
+  drawPickup(now, project, fx);
+}
+function drawPickup(now, project, fx) {
   const pickupAge = fxAge(pickupFx, now);
-  if (pickupAge < 0.24 && !reducedMotion.matches) {
-    const p = (pickupAge / 0.24) ** 1.6;
+  if (pickupAge >= 0.46) return;
+  g.save();
+  const [x, y] = fx;
+  const flare = g.createRadialGradient(x, y, 1 * dpr, x, y, 21 * dpr);
+  flare.addColorStop(0, '#fff8cb'); flare.addColorStop(.32, '#ffc257c9'); flare.addColorStop(1, '#ff9a3c00');
+  g.globalAlpha = Math.min(1, 1.45 * (1 - pickupAge / 0.46));
+  g.globalCompositeOperation = 'lighter';
+  g.fillStyle = flare; g.fillRect(x - 21 * dpr, y - 21 * dpr, 42 * dpr, 42 * dpr);
+  g.globalCompositeOperation = 'source-over';
+  const gain = Math.round((pickupFx.after - pickupFx.before) * 100);
+  if (gain > 0) {
+    g.font = `bold ${13 * dpr}px system-ui, sans-serif`;
+    g.textBaseline = 'middle'; g.textAlign = 'center'; g.lineWidth = 3 * dpr;
+    g.strokeStyle = '#0b1421'; g.fillStyle = '#ffe39a';
+    const label = t('fuelGain', { n: gain });
+    g.strokeText(label, x, y - 27 * dpr); g.fillText(label, x, y - 27 * dpr);
+  }
+  if (pickupAge < 0.32 && !reducedMotion.matches) {
+    const p = (pickupAge / 0.32) ** 1.3;
     const [x, y] = project(pickupFx.x, pickupFx.y, 0.045);
     const dx = fx[0] - x, dy = fx[1] - y;
     for (let i = 3; i >= 0; i--) {
@@ -1422,7 +1554,7 @@ function drawContact(now, project, fx, radius) {
       g.globalAlpha = 1 - i * 0.23;
       g.fillStyle = i ? '#ffb563' : '#fff2c1';
       g.beginPath();
-      g.arc(x + dx * f, y + dy * f - 8 * Math.sin(Math.PI * f) * dpr, (3.7 - i * 0.7) * dpr, 0, Math.PI * 2);
+      g.arc(x + dx * f + 20 * Math.sin(Math.PI * f) * dpr, y + dy * f - 16 * Math.sin(Math.PI * f) * dpr, (4.4 - i * 0.8) * dpr, 0, Math.PI * 2);
       g.fill();
     }
   }
@@ -1431,7 +1563,7 @@ function drawContact(now, project, fx, radius) {
 function draw3(now, dt, dawn, day) {
   const first = view === 'first', e = crash ? Math.max(0, Math.min(1, (now - crash.t0) / 900)) : 0;
   const kick = recoil(now);
-  R3.draw(s, { now, dt, target: first ? s.x + slide * 0.12 : target, shake: reducedMotion.matches ? 0 : shake, recoilX: kick * (impactFx?.side || 0) * 0.016, recoilY: kick * 0.012, glow, sparks, dawn, day, playing, snap: snap3, cam: view, fire: rgb(skin('flame')[2]), wet: hex(skin('water')[2]).map(v => 0.02 + 0.5 * v), tint: skin('boat')[0] === 'oak' ? null : hex(skin('boat')[2]), hideBoat: !!crash && !first, sink: first ? e : 0 });
+  R3.draw(s, { now, dt, target: first ? s.x + slide * 0.12 : target, shake: reducedMotion.matches ? 0 : shake, outline: opts.get('outline') === '1', recoilX: kick * (impactFx?.side || 0) * 0.016, recoilY: kick * 0.012, glow, sparks, dawn, day, playing, snap: snap3, cam: view, fire: rgb(skin('flame')[2]), wet: hex(skin('water')[2]).map(v => 0.02 + 0.5 * v), tint: skin('boat')[0] === 'oak' ? null : hex(skin('boat')[2]), hideBoat: !!crash && !first, sink: first ? e : 0 });
   snap3 = false;
   const k = W / canvas3.width, at = (x, y, h = 0) => R3.project(x, -(y - s.y), h).map(v => v * k), row = R3.boatRow().unit * k;
   g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; g.clearRect(0, 0, W, H);
@@ -1449,6 +1581,14 @@ function draw3(now, dt, dawn, day) {
     g.fillStyle = '#d9d9ea'; g.font = `${Math.max(14 * dpr, (b[0] - a[0]) * 0.12)}px Georgia, serif`; g.textAlign = 'center'; g.textBaseline = 'bottom'; g.fillText(`${f}`, (a[0] + b[0]) / 2, a[1] - 4 * dpr); g.globalAlpha = 1;
   }
   for (const e of s.powers) if (!e.got && e.y - s.y > 0.12 && e.y - s.y < 2.4) { const [x, y] = at(e.x, e.y, 0.07), u = R3.project(e.x + 0.1, -(e.y - s.y), 0.07)[0] * k - x; mark(g, e.kind, x, y, Math.max(3 * dpr, u * 0.14), 2 * dpr, now / 1000); }
+  const opening = s.embers.find(e => e.opening && !e.got && e.y > s.y);
+  if (opening) {
+    const [x, y] = at(opening.x, opening.y, 0.045);
+    const halo = g.createRadialGradient(x, y, 0, x, y, 12 * dpr);
+    halo.addColorStop(0, '#ffc54e'); halo.addColorStop(0.52, '#ffab4a9c'); halo.addColorStop(1, '#ff9a3c00');
+    g.fillStyle = halo; g.fillRect(x - 12 * dpr, y - 12 * dpr, 24 * dpr, 24 * dpr);
+    g.fillStyle = '#ffe39a'; g.beginPath(); g.arc(x, y, 5 * dpr, 0, 7); g.fill();
+  }
   const [bx, by] = first ? [W / 2, H * 0.86] : at(s.x, s.y);
   if (crash && !first) { g.save(); g.translate(bx, by); const z = row / unit; g.scale(z, z); wreck(now); g.restore(); }
   if (crash && first && e < 0.35) { g.fillStyle = `rgba(255,235,215,${0.5 * (1 - e / 0.35)})`; g.fillRect(0, 0, W, H); }
@@ -1461,20 +1601,20 @@ function draw3(now, dt, dawn, day) {
   if (first && playing && !paused && tilting()) { // a level: the bead shows which way and how much the phone leans
     const y = H * 0.77, w = W * 0.22, k = Math.max(-1, Math.min(1, tilt.lean() / FULL)); g.lineCap = 'round'; g.strokeStyle = 'rgba(255,217,160,.3)'; g.lineWidth = 4 * dpr; g.beginPath(); g.moveTo(W / 2 - w, y); g.lineTo(W / 2 + w, y); g.stroke();
     g.fillStyle = `rgba(255,217,160,${0.5 + 0.45 * Math.abs(k)})`; g.beginPath(); g.arc(W / 2 + k * w, y, 8 * dpr, 0, 7); g.fill();
-    if (s.t < 4) { g.fillStyle = `rgba(255,230,189,${Math.min(0.9, 4 - s.t)})`; g.font = `${16 * dpr}px Georgia, serif`; g.textAlign = 'center'; g.textBaseline = 'bottom'; g.fillText(t('tiltHint'), W / 2, y - 16 * dpr); }
+    if (s.t < 4 && !introDone && !s.gentle && !$('tip').textContent) { g.fillStyle = `rgba(255,230,189,${Math.min(0.9, 4 - s.t)})`; g.font = `${16 * dpr}px Georgia, serif`; g.textAlign = 'center'; g.textBaseline = 'bottom'; g.fillText(t('tiltHint'), W / 2, y - 16 * dpr); }
   }
   else if (first && playing && !paused && !dragging()) for (const d of [-1, 1]) { // the two halves to press
     const on = pads.side() === d, x = W / 2 + d * W * 0.38, y = H * 0.9, r = 12 * dpr; g.strokeStyle = `rgba(255,217,160,${on ? 0.95 : 0.4})`; g.lineWidth = (on ? 5 : 3.5) * dpr; g.lineCap = 'round'; g.lineJoin = 'round'; g.beginPath(); g.moveTo(x - d * r * 0.5, y - r); g.lineTo(x + d * r * 0.5, y); g.lineTo(x - d * r * 0.5, y + r); g.stroke();
   }
   if (victory) winDraw(now);
   drawContact(now, at, R3.lampPosition().map(v => v * k), 0.06 * row);
-  drawSteerDemo();
+  introTick((x, y) => at(x, y, 0.045), R3.lampPosition()[1] * k);
   if (!s.endless) { g.fillStyle = 'rgba(255,217,160,.5)'; g.fillRect(0, 0, W * progress(s), 3 * dpr); }
 }
 function boatAt(now, bx, by) { // the boat in its looks, or its crash; a mode draws it with this too
   const lean = Math.max(-0.5, Math.min(0.5, (target - s.x) * 4));
   g.save(); g.translate(bx, by); g.rotate(lean * 0.5); size += ((looking && looking !== 'power' ? (s.size ? 1.3 : 2.2) : boat(s) / BOAT) - size) * 0.2; g.scale(size * 1.2, size * 1.2); // drawn a little larger than it collides; a look in the shop shows it larger still
-  if (crash) wreck(now); else { if (playing || looking) wake(g, unit, now / 1000); hull(g, skin('boat')[0], unit, skin('boat')[2], now / 1000); }
+  if (crash) wreck(now); else { if (playing || looking) wake(g, unit, now / 1000, lean); hull(g, skin('boat')[0], unit, skin('boat')[2], now / 1000); }
   g.restore();
 }
 let lastDraw = 0;
@@ -1537,7 +1677,9 @@ function draw(now) {
     }
     if (wd) { const k = ((i * 0.37 + now / 500 * wd) % 1 + 1) % 1, x = c - h + 2 * h * k; g.strokeStyle = 'rgba(220,235,245,.45)'; g.lineWidth = 1.5 * dpr; g.beginPath(); g.moveTo(sx(x), sy(y)); g.lineTo(sx(x + 0.09 * wd), sy(y + 0.01)); g.stroke(); }
   }
-  // rocks and the other things in the water
+  // Rock silhouettes are drawn under the light pass below.
+  const stones = [];
+  // Rocks and the other things in the water
   for (const k of s.rocks) {
     const x = sx(k.x), y = sy(k.y), R = k.rad * unit;
     if (k.kind === 'log') { g.fillStyle = '#7a5632'; g.beginPath(); if (g.roundRect) g.roundRect(x - (k.len + k.rad) * unit, y - R, 2 * (k.len + k.rad) * unit, 2 * R, R); else g.rect(x - (k.len + k.rad) * unit, y - R, 2 * (k.len + k.rad) * unit, 2 * R); g.fill(); g.fillStyle = '#b08a5a'; g.fillRect(x - k.len * unit, y - R * 0.35, 2 * k.len * unit, R * 0.3); continue; }
@@ -1549,10 +1691,10 @@ function draw(now) {
     }
     if (k.kind === 'hidden' && k.y - s.y > 0.45) { g.strokeStyle = 'rgba(159,198,224,.3)'; g.lineWidth = 1.5 * dpr; g.beginPath(); g.arc(x, y, R * 0.8, 0, 7); g.stroke(); continue; }
     if (k.kind === 'spinner') { g.strokeStyle = 'rgba(159,198,224,.25)'; g.lineWidth = 1.5 * dpr; g.beginPath(); g.arc(sx(k.x0), sy(k.y0), k.a * unit, 0, 7); g.stroke(); }
+    if (!k.ice && k.kind !== 'isle') { stones.push(k); continue; }
     g.fillStyle = k.ice ? '#a9c9dc' : '#2b2f36'; g.beginPath(); g.ellipse(x, y, R, R * 0.86, 0, 0, 7); g.fill();
     g.fillStyle = k.ice ? '#e8f4fa' : k.kind === 'isle' ? '#4f8f5a' : '#59606b'; g.beginPath(); g.ellipse(sx(k.x - k.rad * 0.25), sy(k.y + k.rad * 0.3), R * 0.45, R * 0.3, -0.5, 0, 7); g.fill();
     g.strokeStyle = '#9fc6e0'; g.globalAlpha = 0.35; g.lineWidth = 2 * dpr; g.beginPath(); g.arc(x, y, R * 1.18, 0.2, 2.9); g.stroke(); g.globalAlpha = 1;
-    if (k.kind === 'chaser') { g.fillStyle = '#ff4030'; for (const e of [-0.35, 0.35]) { g.beginPath(); g.arc(x + e * R, y + R * 0.2, R * 0.16, 0, 7); g.fill(); } }
   }
   // boat
   const bx = sx(s.x), by = sy(s.y); boatAt(now, bx, by);
@@ -1563,6 +1705,32 @@ function draw(now) {
   const m = g.createRadialGradient(bx, ly - 0.05 * unit, r * 0.15, bx, ly - 0.05 * unit, r);
   m.addColorStop(0, 'rgba(4,6,12,0)'); m.addColorStop(0.7, `rgba(4,6,12,${dark * 0.55})`); m.addColorStop(1, `rgba(4,6,12,${dark})`);
   g.fillStyle = m; g.fillRect(-20, -20, W + 40, H + 40);
+  const routeEnd = s.y + (by - H * 0.21) / unit;
+  if (!looking && s.light > 0) {
+    const blue = g.createLinearGradient(0, H * 0.21, 0, by);
+    blue.addColorStop(0, '#20364900'); blue.addColorStop(0.24, '#203649');
+    blue.addColorStop(0.73, '#203649c0'); blue.addColorStop(1, '#20364900');
+    g.beginPath();
+    for (let y = s.y; y < routeEnd; y += 0.035) g.lineTo(edge(y, -1), sy(y));
+    for (let y = routeEnd; y > s.y; y -= 0.035) g.lineTo(edge(y, 1), sy(y));
+    g.closePath(); g.fillStyle = blue;
+    g.globalAlpha = Math.min(1, s.light * 3) * (1 - 0.65 * day); g.fill(); g.globalAlpha = 1;
+  }
+  for (const k of stones) {
+    const x = sx(k.x), y = sy(k.y), R = k.rad * unit;
+    const lamp = Math.max(0, 1 - Math.hypot(x - bx, y - ly) / Math.max(r, 1));
+    const route = k.y >= s.y && k.y <= routeEnd ? Math.min(1, (routeEnd - k.y) / 0.38) * Math.min(1, s.light * 3) : 0;
+    g.globalAlpha = Math.min(1, 0.08 + lamp * 1.8 + route * 0.86 + day);
+    const rim = opts.get('outline') === '1';
+    g.strokeStyle = '#9fc6e066'; g.lineWidth = 1.5 * dpr;
+    g.beginPath(); g.ellipse(x, y + 12 * dpr, Math.max(22 * dpr, R + 4 * dpr), 10 * dpr, 0, 0.13, 3.0); g.stroke();
+    drawStone(g, x, y, R, dpr, rim, Math.sin(k.y0 * 17 + k.x0 * 63) > 0 ? 1 : -1);
+    if (k.kind === 'chaser') {
+      g.fillStyle = '#ff4030';
+      for (const side of [-1, 1]) { g.beginPath(); g.arc(x + side * 6 * dpr, y + 4 * dpr, 2.5 * dpr, 0, 7); g.fill(); }
+    }
+  }
+  g.globalAlpha = 1;
   if (markHazards()) drawHazards(g, s, (x, y) => [sx(x), sy(y)], dpr);
   // warm wash inside the light
   g.globalCompositeOperation = 'lighter';
@@ -1572,13 +1740,16 @@ function draw(now) {
   if (!s.tower) reeds(g, edge, sy, unit, s.y + lead - sight(s) - 0.1, s.y + lead + sight(s) + 0.2, now / 1000, { x: bx, y: ly, r, rgb: fire, a: dark }); // the lantern lights the reed tips
   // embers show through the dark: you can see where light is before you can see what guards it
   for (const e of s.embers) if (!e.got) {
-    const ex = sx(e.x), ey = sy(e.y) + Math.sin(now / 300 + e.y * 9) * 2 * dpr, er = 0.05 * unit;
+    const ex = sx(e.x), ey = sy(e.y) + Math.sin(now / 300 + e.y * 9) * 2 * dpr, er = e.opening ? 12 * dpr : 0.05 * unit;
     const eg = g.createRadialGradient(ex, ey, 0, ex, ey, er);
     if (e.kind === 'wisp') { const f = 0.45 + 0.5 * Math.abs(Math.sin(now / 70 + e.y * 5)); eg.addColorStop(0, `rgba(225,255,200,${f})`); eg.addColorStop(0.3, `rgba(150,235,110,${f * 0.6})`); eg.addColorStop(1, 'rgba(120,220,90,0)'); }
     else if (e.kind === 'heart') { eg.addColorStop(0, 'rgba(255,225,225,.95)'); eg.addColorStop(0.3, 'rgba(255,60,80,.7)'); eg.addColorStop(1, 'rgba(255,30,60,0)'); }
     else if (e.kind === 'shield') { eg.addColorStop(0, 'rgba(210,240,255,.95)'); eg.addColorStop(0.3, 'rgba(90,170,255,.6)'); eg.addColorStop(1, 'rgba(60,120,255,0)'); }
     else { eg.addColorStop(0, 'rgba(255,214,140,.95)'); eg.addColorStop(0.25, 'rgba(255,150,60,.55)'); eg.addColorStop(1, 'rgba(255,120,40,0)'); }
     g.fillStyle = eg; g.fillRect(ex - er, ey - er, er * 2, er * 2);
+    if (e.opening) {
+      g.fillStyle = '#ffe39a'; g.beginPath(); g.arc(ex, ey, 5 * dpr, 0, 7); g.fill();
+    }
     shine(g, ex, ey, unit, e.kind === 'wisp' ? '150,235,110' : e.kind === 'heart' ? '255,60,80' : e.kind === 'shield' ? '90,170,255' : '255,150,60', e.kind === 'wisp' ? 0.25 : 0.45, now / 1000, e.y); // its light lies on the water
     if (e.kind === 'heart') { g.fillStyle = '#ff4d5e'; g.font = `${0.05 * unit}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('♥', ex, ey); }
   }
@@ -1630,7 +1801,7 @@ function draw(now) {
   if (victory) winDraw(now);
   if (!looking) {
     drawContact(now, (x, y) => [sx(x), sy(y)], [bx, by], 0.06 * unit);
-    drawSteerDemo();
+    introTick((x, y) => [sx(x), sy(y)], by - 0.04 * unit);
   }
   // progress: a thin line at the top edge on a story night
   if (!s.endless && !looking) { g.fillStyle = 'rgba(255,217,160,.5)'; g.fillRect(0, 0, W * progress(s), 3 * dpr); }
@@ -1666,8 +1837,13 @@ function redraw() {
   if (viewNote) noteView(viewNote);
   $('name').placeholder = $('askName').placeholder = t('typeName'); $('got').textContent = t('got');
   for (const id of ['menuLanguage', 'pauseLanguage']) { $(id).innerHTML = GLOBE + `<span aria-hidden="true">${t('langCode')}</span>`; $(id).setAttribute('aria-label', t('switchLanguage')); }
-  const label = document.querySelector('.kit-hint .label'); if (label) label.textContent = t('hint');
-  if (screen === 'menu') menu(); if (paused) pauseText(); if (screen === 'mode') mod?.card($('modePanel'));
+  const label = document.querySelector('.kit-hint[data-kind="hand-drag"] .label'); if (label && label.textContent) label.textContent = t('hint');
+  if (screen === 'menu') {
+    menu();
+    if (!$('dareAsk').hidden) { $('dareGo').textContent = t('dareSendNow'); $('dareGo').removeAttribute('aria-label'); }
+  }
+  drawRival();
+  if (paused) pauseText(); if (screen === 'mode') mod?.card($('modePanel'));
 }
 for (const id of ['menuLanguage', 'pauseLanguage']) $(id).addEventListener('click', () => {
   setLang(langs[(langs.indexOf(lang()) + 1) % langs.length]);

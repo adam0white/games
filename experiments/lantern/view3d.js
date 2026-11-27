@@ -1,10 +1,10 @@
 // Lantern 3D renderer: draws one frame of the Lantern simulation with WebGL2.
 // It reads the simulation and never changes it. World axes: x is the sim's x (river units),
 // y is up, z points back toward the camera; the boat's row is always z = 0, so z = -(y - s.y).
-import { centre, half, fall, fog, wind, rain, sight, dazzle, boat, BOAT, DT } from './sim.js?v=16';
-import { poolLead } from './hazards.js?v=1';
-import { disturb, solids, riverOf, SPONGE } from './ripples.js?v=1';
-import { createWaterGL } from './ripples-gl.js?v=1';
+import { centre, half, fall, fog, wind, rain, sight, dazzle, boat, BOAT, DT } from './sim.js?v=17';
+import { poolLead } from './hazards.js?v=2';
+import { disturb, solids, riverOf, SPONGE } from './ripples.js?v=2';
+import { createWaterGL } from './ripples-gl.js?v=2';
 
 const ROWS = 256, DY = 0.05, BEHIND = 40; // river table: 256 rows, 0.05 apart, from 2 units behind the boat
 const NEAR = -1.2, FAR = 4.2, ROW_STEP = 0.025; // ground mesh rows, boat-relative
@@ -37,6 +37,8 @@ uniform float uExpo;
 uniform vec3 uWet; // the water's own colour
 uniform float uHaze; // 1: the far end of the river fades into the night (Lantern's own views)
 uniform float uReedK; // reed height, 1 on the lab page
+uniform float uRoute;
+uniform float uOutline;
 uniform float uStone; // 0 river banks, 1 the tower's stone, 2 the second sector's violet stone
 uniform vec3 uTint; uniform float uTintK; // the boat's colour
 // A hash without sine (after Dave Hoskins); inputs are wrapped so large river y keeps full precision.
@@ -80,6 +82,10 @@ vec3 shade(vec3 p, vec3 n, vec3 v, vec3 alb, float shin, float ks, float wrap) {
     col += uPtCol[i] * wi * (alb * nli + spi);
   }
   return col;
+}
+float routeLight(vec3 p) {
+  float ahead = -p.z;
+  return uRoute * smoothstep(0., 0.28, ahead) * (1. - smoothstep(1.65, 3.45, ahead));
 }
 // Fog stretches and the dawn haze in the distance.
 vec3 atmos(vec3 col, vec3 p) {
@@ -202,6 +208,8 @@ void main() {
     }
     vec3 alb = uWet;
     col = shade(vW, n, v, alb, 160., 0.32, 0.6);
+    // The moon picks out the channel through the bend. Banks receive no wash.
+    col += vec3(0.007, 0.017, 0.032) * routeLight(vW);
     // the sky in the water
     float fres = 0.02 + 0.98 * pow(1. - max(dot(n, v), 0.), 5.);
     vec3 rd = reflect(-v, n);
@@ -310,8 +318,17 @@ void main() {
     vec3 alb = vKind == 4. ? vec3(0.24, 0.15, 0.13) : vec3(0.24, 0.23, 0.24);
     alb *= 0.75 + 0.5 * m;
     if (vKind == 3. && fn.y > 0.55) alb = mix(vec3(0.1, 0.2, 0.08), vec3(0.18, 0.3, 0.1), m);
+    if (vKind != 3.) alb = mix(alb, vec3(0.33, 0.43, 0.51), smoothstep(0.26, 0.89, fn.y));
     alb *= 1. - 0.45 * wetBand;
     col = shade(vW, fn, v, alb, 45., 0.25 + 1.2 * wetBand, 0.15);
+    if (vKind != 3.) {
+      float light = max(lampW(vW), routeLight(vW));
+      float broken = smoothstep(0.35, 0.6, vnoise(vL.xz * 4. + vSeed));
+      float upstream = smoothstep(0.22, 0.72, -vL.z);
+      float rim = upstream * (1. - smoothstep(0.22, 0.54, vL.y)) * broken;
+      col += light * (vec3(0.035, 0.047, 0.058) * smoothstep(0.12, 0.85, fn.y)
+          + uOutline * vec3(0.20, 0.26, 0.29) * rim);
+    }
   }
   o = vec4(post(atmos(col, vW)), 1.);
 }`;
@@ -749,7 +766,7 @@ export function createRenderer(canvas) {
     sample: () => RIP.water?.sample() ?? null,
     // The GPU solver against the CPU one (the one bots.mjs checks): one ring by a straight bank, 30 ticks. Returns the largest difference and the highest wave.
     agree: async () => {
-      const { createField } = await import('./ripples.js?v=1'), level = RIP.water?.level || 2, a = createWaterGL(gl, level), b = createField(level), river = () => [0.5, 0.3], d = [{ x: 0.55, y: 11, r: 0.04, a: 1 }], rock = [{ x: 0.42, y: 11.12, rad: 0.03, len: 0 }];
+      const { createField } = await import('./ripples.js?v=2'), level = RIP.water?.level || 2, a = createWaterGL(gl, level), b = createField(level), river = () => [0.5, 0.3], d = [{ x: 0.55, y: 11, r: 0.04, a: 1 }], rock = [{ x: 0.42, y: 11.12, rad: 0.03, len: 0 }];
       a.step(10, river, rock, d, 0); b.step(10, river, rock, d, 0); a.step(10, river, rock, [], 30); b.step(10, river, rock, [], 30);
       const x = a.sample(); a.dispose(); let diff = 0, top = 0; for (let k = 0; k < x.h.length; k++) { diff = Math.max(diff, Math.abs(x.h[k] - b.h[k])); top = Math.max(top, Math.abs(b.h[k])); }
       return { path: a.path, diff, top };
@@ -790,6 +807,8 @@ export function createRenderer(canvas) {
     if (u.uWet) gl.uniform3fv(u.uWet, c.wet);
     if (u.uHaze) gl.uniform1f(u.uHaze, c.haze);
     if (u.uReedK) gl.uniform1f(u.uReedK, c.reedK);
+    if (u.uRoute) gl.uniform1f(u.uRoute, c.route);
+    if (u.uOutline) gl.uniform1f(u.uOutline, c.outline);
     if (u.uStone) gl.uniform1f(u.uStone, c.stone);
     if (u.uTint) { gl.uniform3fv(u.uTint, c.tint || [1, 1, 1]); gl.uniform1f(u.uTintK, c.tint ? 0.85 : 0); }
   }
@@ -852,7 +871,7 @@ export function createRenderer(canvas) {
     const near = s.embers.filter(e => !e.got && e.y > s.y - 0.6 && e.y < s.y + 2.6).sort((a, b) => Math.abs(a.y - s.y) - Math.abs(b.y - s.y)).slice(0, 8);
     near.forEach((e, i) => { pt.set([e.x, 0.05, -(e.y - s.y), 0.2], i * 4); ptCol.set(glowCol(e).map(v => v * 0.55), i * 3); });
 
-    const c = { eye, sy: s.y, yb, time, lamp, lampCol, poolLead: poolLead(s), R, pt, ptCol, npt: near.length, amb, horizon, dawnHaze: morning * 0.8, expo: 1.6 + morning * 0.4, wet: f.wet || [0.04, 0.075, 0.09], tint: f.tint, haze: own ? 1 - morning : 0, reedK: first ? 0.6 : 1, stone: own && s.tower ? (s.climb > 50 ? 2 : 1) : 0 };
+    const c = { eye, route: Math.min(1, s.light * 3) * (1 - morning * 0.65), outline: f.outline ? 1 : 0, sy: s.y, yb, time, lamp, lampCol, poolLead: poolLead(s), R, pt, ptCol, npt: near.length, amb, horizon, dawnHaze: morning * 0.8, expo: 1.6 + morning * 0.4, wet: f.wet || [0.04, 0.075, 0.09], tint: f.tint, haze: own ? 1 - morning : 0, reedK: first ? 0.6 : 1, stone: own && s.tower ? (s.climb > 50 ? 2 : 1) : 0 };
 
     const water = ripples(s, f), rip = water && !RIP.hide && water.place(s.y);
     const ground = rip ? PR.ground : P.ground, decal = rip ? PR.decal : P.decal;

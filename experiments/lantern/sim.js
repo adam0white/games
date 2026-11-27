@@ -87,7 +87,7 @@ export function create(seed, stage = 1, mode = false, powers = ABILITIES, stats 
   const endless = mode === true, tower = mode === 'tower';
   const st = Object.fromEntries(Object.entries(STATS).map(([k, top]) => [k, Math.max(0, Math.min(top, Math.floor(stats[k] || 0)))]));
   const r = rng(seed), q = rng(seed ^ 0x9e3779b9); // powers draw from their own stream, so the rocks and embers of a seed never change
-  const s = { seed, stage, endless, tower, climb: Math.max(1, Math.min(LEVELS * SECTORS, Math.floor(climb) || 1)), q, st, calm: 1 - 0.04 * st.calm, take: 0.05 + 0.012 * st.pull, on: powers.filter(k => POWERS.includes(k)), gifts: powers.filter(k => GIFTS.includes(k)), powers: [], nextPower: 10 + q() * 10, boost: 0, slow: 0, size: 0, magnet: 0, flare: 0, big: false, bonus: 0, extra: 0, hearts: 1 + st.hearts, ice: -9, iceSide: 1, isle: -9, warm: 0, shield: 0, field: 0, hard: mode ? 1 : 1 + REBORN_PACE * Math.max(0, Math.min(5, Math.floor(reborn) || 0)), safe: 0, nextGift: 9 + r() * 5, r, p1: r() * 6.28, p2: r() * 6.28, t: 0, y: 0, x: 0.5, light: 0.8, rocks: [], embers: [], next: FIRST_ROW, events: [], over: null, taken: 0, grazes: 0 };
+  const s = { seed, stage, endless, tower, climb: Math.max(1, Math.min(LEVELS * SECTORS, Math.floor(climb) || 1)), q, st, calm: 1 - 0.04 * st.calm, take: 0.05 + 0.012 * st.pull, on: powers.filter(k => POWERS.includes(k)), gifts: powers.filter(k => GIFTS.includes(k)), powers: [], nextPower: 10 + q() * 10, boost: 0, slow: 0, size: 0, magnet: 0, flare: 0, big: false, bonus: 0, extra: 0, hearts: 1 + st.hearts, ice: -9, iceSide: 1, isle: -9, warm: 0, shield: 0, field: 0, hard: mode ? 1 : 1 + REBORN_PACE * Math.max(0, Math.min(5, Math.floor(reborn) || 0)), safe: 0, nextGift: 9 + r() * 5, r, p1: r() * 6.28, p2: r() * 6.28, t: 0, y: 0, x: 0.5, light: 1, rocks: [], embers: [], next: FIRST_ROW, events: [], over: null, taken: 0, grazes: 0 };
   s.x = centre(s, 0);
   return s;
 }
@@ -176,11 +176,16 @@ function gentleOpening(s) {
   const y = openingDistance(s, 2.3), c = centre(s, y), h = half(s, y);
   const start = centre(s, 0), toward = Math.sign(c - start) || 1;
   const x = gentleFirst(s) ? Math.max(c - h + 0.08, Math.min(c + h - 0.08, start + toward * 0.095)) : c;
-  s.embers.push({ x, y, got: false, kind: 'ember' });
+  s.embers.push({ x, y, got: false, kind: 'ember', opening: gentleFirst(s) });
   // The extra clearance accounts for rocks that swing along the river.
   s.next = openingDistance(s, 8) + 0.36;
   if (!gentleFirst(s)) return;
 
+  // A bend of embers before the first hazard. This pattern consumes no random numbers.
+  for (const [seconds, offset] of [[3.4, 0.075], [4.65, 0.015], [5.9, -0.075]]) {
+    const ey = openingDistance(s, seconds);
+    s.embers.push({ x: centre(s, ey) + toward * offset, y: ey, got: false, kind: 'ember' });
+  }
   const ry = openingDistance(s, 8.12) + 0.07, rc = centre(s, ry);
   const side = rc >= start ? 1 : -1;
   s.rocks.push({ ...rock(rc + side * 0.12, ry, 0.045), opening: true });

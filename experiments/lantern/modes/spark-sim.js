@@ -7,7 +7,7 @@
 // (the run cannot end 'dark'); and on the short early nights `s.over` is set to 'dawn' when the boat has come the night's
 // share of the river (config().length). Everything else is Lantern's own step. The layer never draws from Lantern's random streams
 // (s.r, s.q), so a seed gives the same river here as in Lantern.
-import { create, step, centre, half, boat, progress, GOAL, DT } from '../sim.js?v=16';
+import { create, step, centre, half, boat, progress, GOAL, DT } from '../sim.js?v=17';
 export { centre, half, boat, progress, GOAL, DT };
 
 export const NIGHTS = 6;

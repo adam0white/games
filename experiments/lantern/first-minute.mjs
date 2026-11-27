@@ -108,6 +108,15 @@ if (!baseline) {
       }
     }
   }
+  const opening = night(1, 1);
+  step(opening, opening.x);
+  const firstRock = opening.rocks[0];
+  const trail = opening.embers.filter(e => e.y < firstRock.y);
+  assert.equal(trail.length, 4, 'the opening ember is followed by a line of three embers before the rock');
+  assert.equal(trail[0].opening, true);
+  assert.ok(trail.every((e, i) => !i || trail[i - 1].y < e.y), 'the line leads downriver');
+  assert.ok((trail[1].x - centre(opening, trail[1].y)) * (trail[3].x - centre(opening, trail[3].y)) < 0,
+    'the line of embers crosses the middle of the river');
   console.log('No Gentle rock reaches the boat in the first eight seconds across all nights and twenty seeds, at maximum rebirth pace.');
 
   const bare = () => { const s = night(1); s.next = Infinity; s.warm = 9; return s; };
@@ -176,5 +185,10 @@ if (!baseline) {
     }
   }
   assert.equal(readRiver({ ...legacy, extra: 1 << 30 }), null);
+  const tower = create(99, 2, 'tower', [], {}, 12);
+  const towerDare = { seed: tower.seed, extra: riverBits(tower, 2), name: 'Sam' };
+  assert.equal(readRiver({ ...towerDare, score: 19 }), null);
+  assert.equal(readRiver({ ...towerDare, score: 20 }).floor, 2);
+
   console.log('Legacy and story dare links preserve the seed, abilities, river rules and upgrades.');
 }

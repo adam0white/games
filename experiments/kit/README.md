@@ -58,17 +58,20 @@ hint(canvas, { kind: 'stick', key: '<slug>:hint', when: () => mode === 'play', p
 
   - `fingertip`: one translucent contact slides side to side. A `follow(offset, opacity)` callback can draw the response. With `manual: true`, the game calls `done()` once the player deliberately steers.
 
+  - `hand-drag`: a pointing hand slides once when `once: true` is set. The still hand uses the supplied reduced-motion label.
+
   A new kind is a new entry in `KINDS` in `hint.js`; callers do not change.
 - The look is a constructed stylesheet (`adoptedStyleSheets`), with a `<style>` element where the browser has none, so a page whose policy is `style-src 'self'` (Crumbwar) still gets it.
 - `key`: a new key, never an existing one. It is `'1'` once the player has given input in play, and then the hint never shows again on that device. Add it to the game's seed in `check/phone.mjs`.
 - `when`: true only while a run is in play with no card over it. Idle time counts only then, and adds up across runs, so a run that ends quickly still leads to the hint in the next one. A tap on Play or on a card is not counted as input.
 - `played`: true when the game's own save, read at load, shows the player has played. Without it, every current player would see the hint once after it ships. A page with no save (lab/lantern-3d) has only the hint's key.
 - `delay` (3000 ms), `bottom` (120 px above the safe area, to the middle of the copy; or a function, asked each time the copy appears), `reach` (55 px, the stick's reach, so the copy is the size of the real stick), `label` (words for reduced motion), `look` (`hand`, the default, a pointing hand; `ring`, the knob alone with a press ring).
+- `done()` dismisses the hint and saves that the player used the control. `dispose()` cancels the frame and listeners without changing the save.
 - It never takes input (`pointer-events: none` on all of it) and never cancels an event. It is placed right after `el`, so every card later in the page covers it.
 - With `prefers-reduced-motion: reduce` it shows a still copy with a short line of words instead of motion.
 - `?hint=hand` or `?hint=ring` on any page that uses it shows it whatever the save says, with that look; `?hint=0` turns it off. This is how to see it on a phone that has played already.
 
-Used by: `ant-promotion` (stick, 3 s), `lantern` (fingertip, 1 s, over open water), `lab/ant-nemesis`, `lab/ant-wilds` (stick), `lab/lantern-3d` (drag), `borrowed` (tap, `bottom` as a function that finds a clear tile above the player), `ducklings` (hold-and-move, above Quack), `grapevine` (path, between the teller's row and the next) and Crumbwar (`workers/crumbwar`, stick, loaded from `/kit/hint.js` on the same origin, so it shows only once this site serves that file). In Borrowed, Follow Me and Grapevine the game's own first-level ghost finger waits while the shared hint shows. Not verified on a real phone.
+Used by: `ant-promotion` (stick, 3 s), `lantern` (one hand drag after 1 s), `lab/ant-nemesis`, `lab/ant-wilds` (stick), `lab/lantern-3d` (drag), `borrowed` (tap, `bottom` as a function that finds a clear tile above the player), `ducklings` (hold-and-move, above Quack), `grapevine` (path, between the teller's row and the next) and Crumbwar (`workers/crumbwar`, stick, loaded from `/kit/hint.js` on the same origin, so it shows only once this site serves that file). In Borrowed, Follow Me and Grapevine the game's own first-level ghost finger waits while the shared hint shows. Not verified on a real phone.
 
 ## Music (`music.js`)
 

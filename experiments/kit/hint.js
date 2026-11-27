@@ -18,6 +18,8 @@
 //           A function is asked again each time the copy appears, for a game whose clear spot moves.
 //   help.shown   true while it is on screen
 //   help.done()  put it away for good and remember the player (the game saw input some other way)
+//   help.dispose()  cancel its frame and input listeners without changing the save
+//   once  dispose the hint after it finishes its first demonstration
 //   manual  leave dismissal to help.done(), after the game detects deliberate steering
 //   follow  optional drawing callback with the delayed lateral offset in CSS px and the fingertip opacity
 // Input that ends it: a pointer going down on `el`, or a key that is not a pause key, while `when()` is true (for `drag`, a
@@ -35,6 +37,7 @@ const CSS = `
 .kit-hint .ring { position: absolute; border-radius: 50%; border: 3px solid #ffffff66; box-sizing: border-box; background: #ffffff0f; }
 .kit-hint .knob { position: absolute; left: -22px; top: -22px; width: 44px; height: 44px; border-radius: 50%; background: #ffffff70; box-shadow: 0 1px 6px #0006; }
 .kit-hint .knob::after { content: ''; position: absolute; inset: -9px; border-radius: 50%; border: 2px solid #fff; opacity: var(--press, 0); transform: scale(calc(1.25 - .25 * var(--press, 0))); }
+.kit-hint[data-kind="hand-drag"] .knob { display: none; }
 .kit-hint[data-kind="fingertip"] .knob { width: 22px; height: 22px; left: -11px; top: -11px; background: #fff5dc48; }
 .kit-hint[data-kind="fingertip"] .knob::after { inset: -4px; border-width: 1px; }
 .kit-hint .hand { position: absolute; left: -17px; top: -3px; width: 40px; height: 52px; transform-origin: 17px 3px; filter: drop-shadow(0 1px 2px #000c); opacity: .92; }
@@ -54,6 +57,14 @@ const ease = t => t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t);
 // Each kind draws its control into `box` and returns where the label goes (px from the middle; above, clear of the hand), and place(t, still): where the finger is (px from the centre), how hard it presses (0 to 1) and, optionally, how far it is lifted
 // off the screen (lift, px). place may also move the kind's own parts.
 const KINDS = {
+  'hand-drag': {
+    label: '',
+    build(_box, { reach }) {
+      return { cycle: 1400, labelAt: -38, place(t, still) {
+        return { x: reach * (2 * (still ? 0.5 : ease(t / 850)) - 1), y: 0, press: 1 };
+      } };
+    },
+  },
   fingertip: {
     label: 'Slide your finger sideways to steer',
     build(box, { reach }) {
@@ -173,12 +184,13 @@ function style() {
   const st = document.createElement('style'); st.id = 'kit-hint-css'; st.textContent = CSS; document.head.append(st);
 }
 
-export function hint(el, { kind = 'stick', key, when, played = false, delay = 3000, look = 'hand', label, reach = 55, bottom = 120, manual = false, follow }) {
+export function hint(el, { kind = 'stick', key, when, played = false, delay = 3000, look = 'hand', label, reach = 55, bottom = 120, manual = false, follow, once = false }) {
   const asked = new URLSearchParams(location.search).get('hint'), forced = asked === 'hand' || asked === 'ring';
   if (forced) look = asked;
   if (kind === 'fingertip') look = 'ring';
+  if (kind === 'hand-drag') look = 'hand';
   let over = asked === '0' || (!forced && (played || read(key) === '1'));
-  const handle = { get shown() { return !over && box?.classList.contains('on'); }, done: () => finish() };
+  const handle = { get shown() { return !over && box?.classList.contains('on'); }, done: () => finish(true), dispose: () => finish(false) };
   if (over || !KINDS[kind]) { over = true; return handle; }
   if (!styled) { styled = true; style(); }
   const box = document.createElement('div'); box.className = 'kit-hint'; box.dataset.kind = kind; box.dataset.look = look;
@@ -198,6 +210,7 @@ export function hint(el, { kind = 'stick', key, when, played = false, delay = 30
       box.classList.toggle('on', on); from = now;
     }
     if (on) {
+      if (once && now - from >= k.cycle) { finish(false); return; }
       const still = calm.matches, p = k.place(still ? 0 : (now - from) % k.cycle, still);
       box.classList.toggle('still', still);
       const lift = p.lift ?? 0; // px the finger is off the screen: the hand stands back from the knob
@@ -207,13 +220,14 @@ export function hint(el, { kind = 'stick', key, when, played = false, delay = 30
     } else follow?.(0, 0);
     frame = requestAnimationFrame(tick);
   }
-  function finish() {
+  function finish(remember) {
     if (over) return; over = true;
-    write(key, '1'); cancelAnimationFrame(frame); box.remove();
+    if (remember) write(key, '1');
+    cancelAnimationFrame(frame); box.remove();
     el.removeEventListener('pointerdown', touched, true); el.removeEventListener('pointermove', hovered, true); removeEventListener('keydown', pressed, true);
   }
-  const touched = () => { if (when()) finish(); };
-  const pressed = e => { if (when() && !isPauseKey(e) && !['Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) finish(); };
+  const touched = () => { if (when()) finish(true); };
+  const pressed = e => { if (when() && !isPauseKey(e) && !['Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) finish(true); };
   const hovered = e => { if (e.pointerType === 'mouse') touched(); };
   if (!manual) {
     el.addEventListener('pointerdown', touched, true);
