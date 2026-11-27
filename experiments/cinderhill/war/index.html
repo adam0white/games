@@ -35,6 +35,8 @@
   #versus .names { display: flex; justify-content: space-between; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
   #versus .names span:last-child { color: var(--foe); }
   #bar2 { height: 7px; border-radius: 4px; background: #33466f; overflow: hidden; }
+  #queens { display: block; font-size: 12px; color: #ffd0c4; white-space: nowrap; }
+  #queens:empty { display: none; }
   #bar2 i { display: block; height: 100%; width: 50%; background: linear-gradient(90deg, #e06a1c, #ffb057); transition: width 0.4s; }
   #dusk { display: block; margin-top: 4px; color: var(--dim); font-weight: 600; }
   #mini { position: fixed; top: calc(48px + env(safe-area-inset-top)); right: 8px; width: 120px; height: 84px; border-radius: 10px; display: none; overflow: hidden; z-index: 4; }
@@ -157,7 +159,7 @@
   <div class="chip glass" id="chipBrood" data-say="Eggs and young growing in the nest"><i class="i-brood"></i><span>0</span></div>
   <button class="glass" id="pause" aria-label="Pause"></button>
 </div>
-<div id="versus" class="glass"><div class="names"><span id="vsUs">You 0</span><span id="vsThem">0 Rival</span></div><div id="bar2"><i></i></div><span id="dusk"></span></div>
+<div id="versus" class="glass"><div class="names"><span id="vsUs">You 0</span><span id="vsThem">0 Rival</span></div><div id="bar2"><i></i></div><span id="dusk"></span><span id="queens"></span></div>
 <div id="mini" class="glass"><canvas id="miniC" width="160" height="112"></canvas></div>
 <div id="toast" class="glass"></div>
 
