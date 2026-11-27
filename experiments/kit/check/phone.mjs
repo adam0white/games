@@ -414,6 +414,8 @@ const GAMES = {
     assert.equal(await page.textContent('#play'), 'Play night 3'); assert.match(await page.textContent('#about'), /Best 40%/);
     assert.deepEqual(st.board.map(r => r.s), [55], 'old save: the endless best starts the leaderboard'); assert.deepEqual(st.winOn, []);
     assert.equal(st.start, 'boost', 'old save: a player from before lantern-start keeps Boost'); assert.ok(st.owned.includes('boost')); assert.equal((await saved())['lantern-start'], 'boost');
+    // Settings (kit/settings.js, 2026-11-27): the river option's default was decided on the first visit above, when there was no save (gentle), and stays; nothing is changed yet.
+    { const set = await page.evaluate(() => window.lanternSet()); assert.equal(set.defaults.river, 'gentle', 'settings: a default decided once'); assert.equal(set.river, 'gentle'); assert.deepEqual(set.changed, [], 'settings: nothing changed'); assert.equal(set.gain, 1.3); }
     await until(page, () => document.getElementById('notes-button'), 'notes button');
     await noZoomed(page);
     // Play, steer by a relative drag, and a tap alone does not steer.
