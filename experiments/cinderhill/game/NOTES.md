@@ -30,3 +30,25 @@ ratio in steps (2, 1.5, 1) when the mean frame goes over 24 ms, and records a `d
 
 The bird, the husk, sprouts, the chapter script and its end card, the ledger and saved games: the page will draw
 them from sim state and events once the sim has them.
+
+## Round 2 (after the first review round)
+
+Decisions taken:
+- One perspective camera serves every view. `View` is a setting with `tilt` (default), `top` and `low`; the low view
+  shows the sky, a far ridge and distance fog. The menu uses the low view. The same arithmetic lives in the GLSL
+  `CAM` snippet (gl.js) and in `pose/toWorld/toScreen` (main.js); change both together.
+- Each trail slot has its own colour (ribbon, badge, route dot).
+- An order gets its success feedback only after the sim applies it. A refused or late trail gets a red dashed
+  pulse, a low tone and one line of text; the first-run ghost finger stays until a trail is accepted.
+- The route card hides itself after a few seconds. Level labels read "a few / more / most".
+- The first-run hint is the game's own ghost drag; it keeps the kit hint's key and format (`cinderhill:game:hint`).
+- The recording switch shows on the menu as well as the pause card.
+- The alarm renews itself from the game loop on sim ticks, so it holds at 4x speed.
+
+Checked on an emulated phone (desktop GPU): refused trail, accepted trail, nest, low view at night, 2000 and 5000
+free ants at 4x CPU throttle hold 16.7 ms frames. Not checked: a real phone GPU with the per-pixel sky and fog,
+alarm hold at 4x, context loss, picking against raised stones (a tap on a stone's side picks the ground behind it).
+
+Deferred (tracked in beads under the Cinderhill item): dusk time-lapse replay, GPU nest, ambient sound bed, births
+shown in the nest, nest cutaway over the door, double-tap to centre and pan inertia, baked ash textures, i18n,
+and everything the sim does not emit yet (bird, husk, sprouts, chapter card, ledger, saves).

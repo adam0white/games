@@ -8,6 +8,19 @@ import { NEST, G } from '../host.js';
 const hash = (x, y) => { let h = (x * 374761393 + y * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177 | 0; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
 const SOIL = { [MAT.ASH]: [58, 52, 48], [MAT.TOPSOIL]: [92, 66, 44], [MAT.CLAY]: [122, 72, 48], [MAT.STONE]: [84, 82, 84], [MAT.ROOT]: [70, 52, 30], [MAT.WATER]: [40, 70, 92] };
 
+const soil = { canvas: null, host: null, version: -1 };
+function paintSoil(host, sim, w, h, base) {
+  const S = 4, c = soil.canvas ?? (soil.canvas = document.createElement('canvas')); c.width = w * S; c.height = h * S;
+  const g = c.getContext('2d'), img = g.createImageData(w * S, h * S), d = img.data;
+  for (let py = 0; py < h * S; py++) for (let px = 0; px < w * S; px++) {
+    const x = Math.min(w - 1, Math.floor((px + (hash(px, py) - 0.5) * 3) / S)), y = Math.min(h - 1, Math.max(0, Math.floor((py + (hash(py, px) - 0.5) * 3) / S)));   // a ragged edge between kinds of earth
+    const m = sim.mat[base + y * w + Math.max(0, x)], col = SOIL[m === MAT.OPEN ? MAT.TOPSOIL : m] ?? SOIL[MAT.TOPSOIL];
+    const k = 0.94 + 0.12 * hash(px >> 1, py >> 1) + 0.06 * Math.sin(py / S * 1.7 + px / S * 0.21) + 0.05 * Math.sin(px / S * 0.37 - py / S * 0.6) - Math.min(0.38, py / S * 0.0065), o = (py * w * S + px) * 4;
+    d[o] = col[0] * k; d[o + 1] = col[1] * k; d[o + 2] = col[2] * k; d[o + 3] = 255;
+  }
+  g.putImageData(img, 0, 0); soil.host = host; soil.version = host.terrainVersion;
+}
+
 /** v: { ctx, host, W, H, cam: { x, y, z }, now, night (0..1), dig: preview cells or null } in CSS px. */
 export function drawCutaway(v) {
   const { ctx, host, W, H, cam, now, night = 0 } = v, sim = host.sim, L = sim.L, w = L.nw, h = L.nh, base = L.nestBase, z = cam.z;
@@ -18,18 +31,16 @@ export function drawCutaway(v) {
   const sky = ctx.createLinearGradient(0, 0, 0, 26);
   sky.addColorStop(0, night > 0.5 ? '#0b0d18' : '#6f7f8f'); sky.addColorStop(1, night > 0.5 ? '#241a1c' : '#c9b59a');
   ctx.fillStyle = sky; ctx.fillRect(0, 0, W, 26);
-  // Soil, a cell at a time, a little lighter or darker by a hash so it reads as earth and not as a flat fill.
-  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
-    const m = sim.mat[base + y * w + x], c = SOIL[m === MAT.OPEN ? MAT.TOPSOIL : m] ?? SOIL[MAT.TOPSOIL];
-    const k = 0.98 + 0.035 * hash(x, y) + 0.05 * Math.sin(y * 1.7 + x * 0.21) + 0.04 * Math.sin(x * 0.37 - y * 0.6) - Math.min(0.35, y * 0.006);
-    ctx.fillStyle = `rgb(${c[0] * k | 0}, ${c[1] * k | 0}, ${c[2] * k | 0})`;
-    ctx.fillRect(Math.floor(sx(x)), Math.floor(sy(y)), Math.ceil(z) + 1, Math.ceil(z) + 1);
-  }
-  // Pebbles and root hairs in the soil.
-  ctx.fillStyle = 'rgba(20, 14, 10, 0.35)';
+  // Soil: painted once a terrain version into a small picture (4 px a cell) and stretched smooth, so the bands of
+  // earth blend and no cell shows as a square; then grit and pebbles on top, fixed to the ground.
+  if (soil.host !== host || soil.version !== host.terrainVersion) paintSoil(host, sim, w, h, base);
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(soil.canvas, sx(0), sy(0), w * z, h * z);
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
     if (sim.mat[base + y * w + x] === MAT.OPEN) continue;
-    const r = hash(x + 91, y + 17); if (r > 0.82) { ctx.beginPath(); ctx.ellipse(sx(x + r), sy(y + hash(x, y + 5)), z * 0.2, z * 0.13, r * 6, 0, 7); ctx.fill(); }
+    const r = hash(x + 91, y + 17);
+    if (r > 0.8) { ctx.fillStyle = 'rgba(20, 14, 10, 0.32)'; ctx.beginPath(); ctx.ellipse(sx(x + r), sy(y + hash(x, y + 5)), z * 0.2, z * 0.13, r * 6, 0, 7); ctx.fill(); }
+    else if (r < 0.14) { ctx.fillStyle = 'rgba(255, 226, 190, 0.10)'; ctx.beginPath(); ctx.ellipse(sx(x + r * 5), sy(y + hash(x + 3, y)), z * 0.12, z * 0.08, r * 40, 0, 7); ctx.fill(); }
   }
   // Hollows: each open cell a disc; the union reads as rounded tunnels. First a dark rim, then the floor.
   const open = (x, y) => x >= 0 && y >= 0 && x < w && y < h && sim.mat[base + y * w + x] === MAT.OPEN;
@@ -70,17 +81,18 @@ export function drawCutaway(v) {
     const breathe = 1 + 0.06 * Math.sin(now / 400 + k);
     ctx.beginPath();
     if (s === STAGE.EGG) { ctx.fillStyle = '#f4efe2'; ctx.ellipse(bx, by, Math.max(1.4, z * 0.15), Math.max(1.1, z * 0.11), 0.5, 0, 7); }
-    else if (s === STAGE.LARVA) { ctx.fillStyle = B.fed?.[k] ? '#f0e2b8' : '#d9d2c4'; ctx.arc(bx, by, Math.max(2.2, z * 0.3) * breathe, 0.5, 0.5 + Math.PI * 1.6); ctx.lineTo(bx, by); }
+    else if (s === STAGE.LARVA) { ctx.fillStyle = B.fed?.[k] ? '#f3e4b4' : '#ddd5c6'; const r = Math.max(1.3, z * 0.17) * breathe, bend = 0.9 + (k % 5) * 0.25; for (let j = 0; j < 4; j++) { const a = bend + j * 0.62, gx = bx + Math.cos(a) * r * 1.25, gy = by + Math.sin(a) * r * 1.25; ctx.moveTo(gx + r * (1 - j * 0.1), gy); ctx.arc(gx, gy, r * (1 - j * 0.1), 0, 7); } }
     else { ctx.fillStyle = '#c59a62'; ctx.ellipse(bx, by, Math.max(2, z * 0.4), Math.max(1.5, z * 0.25), 0.6, 0, 7); }
     ctx.fill();
   }
   // The queen: a long abdomen that pulses as she lays.
   if (host.colony && g[G.QUEEN]) {
-    const u = Math.max(5, z * 1.1), pulse = 1 + 0.06 * Math.sin(now / 300);
+    const u = Math.max(8, z * 1.75), pulse = 1 + 0.06 * Math.sin(now / 300);
     ctx.strokeStyle = '#1a0d08'; ctx.lineWidth = Math.max(1, u * 0.1); ctx.lineCap = 'round';
     for (let l = 0; l < 3; l++) for (const s of [-1, 1]) { const lx = qx + (l - 1) * u * 0.35; ctx.beginPath(); ctx.moveTo(lx, qy); ctx.lineTo(lx + (l - 1) * u * 0.3, qy + s * u * 0.75); ctx.stroke(); }
-    ctx.fillStyle = '#5a2414'; ctx.strokeStyle = '#f0b060'; ctx.lineWidth = 1.2;
+    ctx.fillStyle = '#6a2a16'; ctx.strokeStyle = '#ffc070'; ctx.lineWidth = 1.5; ctx.shadowColor = '#ff9a3c'; ctx.shadowBlur = 14;
     for (const [dx, rx, ry] of [[-1.25, 0.95 * pulse, 0.6 * pulse], [0, 0.42, 0.32], [0.85, 0.34, 0.3]]) { ctx.beginPath(); ctx.ellipse(qx + dx * u, qy, rx * u, ry * u, 0, 0, 7); ctx.fill(); ctx.stroke(); }
+    ctx.shadowBlur = 0;
   }
   // The ants inside, between ticks.
   const a = host.alpha, n = sim.n;
