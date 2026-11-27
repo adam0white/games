@@ -472,7 +472,12 @@ export class Sim {
     // Fighters go straight at an enemy they can see, unless they carry something home.
     if (fighter && !this.carry[i]) {
       const e = this.enemyNear(i, C.SEE);
-      if (e >= 0) { this.to[i] = -1; this.since[i] = 0; this.steer(i, this.x[e], this.y[e], C.BITE_R - 40); return; }
+      if (e >= 0 && !(cg[o + CG.RECALL] && this.layer[i] === SURFACE)) {
+        // Straight at her, unless a stone is in the way: then she walks on by her task and meets her round it.
+        const x0 = this.x[i], y0 = this.y[i];
+        this.steer(i, this.x[e], this.y[e], C.BITE_R - 40);
+        if (this.x[i] !== x0 || this.y[i] !== y0 || est(this.x[e] - x0, this.y[e] - y0) <= C.BITE_R) { this.to[i] = -1; this.since[i] = 0; return; }
+      }
     }
     if (this.to[i] >= 0 && this.mat[this.to[i]] !== MAT.OPEN) this.to[i] = -1;
     if (this.to[i] < 0 || (this.x[i] === this.tx[i] && this.y[i] === this.ty[i])) {
@@ -518,7 +523,7 @@ export class Sim {
     if (task === TASK.NURSE) { const h = this.nursery[t]; return this.mill(i, c, m => { const k = m - this.L.nestBase, x = k % this.L.nw, y = Math.floor(k / this.L.nw); return m >= this.L.nestBase && x >= h.x && x < h.x + h.w && y >= h.y && y < h.y + h.h; }, 24); }
     if (this.inv[i]) return this.invade(i, c, t);
     if (task === TASK.OUT) {
-      if (s < 0 || !this.trLive[s] || recall) { this.task[i] = TASK.BACK; this.tr[i] = recall ? -1 : this.tr[i]; return this.next(home, c); }
+      if (s < 0 || !this.trLive[s] || recall) { this.task[i] = TASK.BACK; this.tr[i] = -1; return this.next(home, c); }
       const F = this.trF[s], v = F[c];
       if (v === 0) return this.atEnd(i, c, t, s);
       const m = this.next(F, c);
@@ -533,6 +538,8 @@ export class Sim {
           cg[o + (food === FOOD.PROTEIN ? CG.PROTEIN : CG.SUGAR)]++; cg[o + (food === FOOD.PROTEIN ? CG.LOADS_P : CG.LOADS_S)]++;
           this.carry[i] = 0; this.event(EVENT.HOME, t, food, this.tr[i]);
         }
+        // Home: she leaves her crew, so a trail's count is of ants at work and the next free ant can take the place.
+        if (this.tr[i] >= 0) { const q = t * TRAILS + this.tr[i]; if (this.crew[q] > 0) this.crew[q]--; this.tr[i] = -1; }
         this.task[i] = this.caste[i] === CASTE.MAJOR ? TASK.GUARD : TASK.REST; this.since[i] = 0;
         return this.assign(i, c, t, o);
       }
@@ -586,7 +593,7 @@ export class Sim {
   /** At her trail's end. A forager takes a load; a raider holds, or goes in through an enemy door close by. */
   atEnd(i, c, t, s) {
     const raid = this.trKind[s] === KIND.RAID;
-    if (this.crew[s] > this.want[s] + 1 && !raid) { this.crew[s]--; this.tr[i] = -1; this.task[i] = TASK.BACK; return this.next(this.homeF[t], c); }
+    if (this.crew[s] > this.want[s] + 1) { this.crew[s]--; this.tr[i] = -1; this.task[i] = TASK.BACK; return this.next(this.homeF[t], c); }
     if (this.caste[i] === CASTE.WORKER) {
       const p = this.pileNear(c);
       if (p >= 0) {

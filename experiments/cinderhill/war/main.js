@@ -174,7 +174,7 @@ function setTool(next) {
   if (next === tool) return;
   run(Gs.reset('tool')); tool = next;
   for (const b of document.querySelectorAll('[data-tool]')) b.setAttribute('aria-pressed', String(b.dataset.tool === tool));
-  if (tool === 'raid') toast(g(ME, CG.MAJORS) ? 'Tap where the soldiers should go. Tap the rival door to break in.' : 'You have no soldiers yet. Open Nest and raise some.', 3600);
+  if (tool === 'raid') toast(g(ME, CG.MAJORS) ? 'Tap where the soldiers should go. Tap the rival door to break in.' : 'You have no soldiers yet. Open Nest and raise some.', 2600);
   else if (tool === 'rally') toast('Hold a finger down: guards and resting ants gather there', 3000);
   else if (tool === 'camera') toast('Drag to move the view. Pinch to zoom.');
   tone(520, 0.05, 0.03, 'triangle');
@@ -209,7 +209,9 @@ function pickTrailAt(sx, sy) {
     // A tap is a short order: Raid sends the soldiers to that spot, Forage sends workers to a food pile under the finger.
     routeUntil = 0;
     const w = toWorld(sx, sy), x = Math.floor(w.x), y = Math.floor(w.y);
-    if (tool === 'raid') pending.push({ id: order({ type: CMD.TRAIL, kind: KIND.RAID, level: 2, points: [x, y] }), points: [x, y], kind: KIND.RAID });
+    const fd = doorXY(FOE), nearDoor = Math.abs(w.x - fd.x) <= 6 && Math.abs(w.y - fd.y) <= 6 || (() => { const b = toScreen(fd.x, fd.y, 3.2); return Math.abs(b.x - sx) < 34 && Math.abs(b.y - sy) < 20; })();
+    if (tool === 'raid' && nearDoor) { const p2 = [Math.floor(fd.x), Math.floor(fd.y)]; pending.push({ id: order({ type: CMD.TRAIL, kind: KIND.RAID, level: 2, points: p2 }), points: p2, kind: KIND.RAID }); }
+    else if (tool === 'raid') pending.push({ id: order({ type: CMD.TRAIL, kind: KIND.RAID, level: 2, points: [x, y] }), points: [x, y], kind: KIND.RAID });
     else if (tool === 'trail') for (let p = 0; p < MAX_PILES; p++) { if (sim.pileAmount[p] <= 0) continue; const c = sim.pileCell[p], px = c % L0.sw, py = Math.floor(c / L0.sw); if (Math.abs(px - x) <= 2 && Math.abs(py - y) <= 2) { pending.push({ id: order({ type: CMD.TRAIL, kind: KIND.FORAGE, level: 2, points: [px, py] }), points: [px, py], kind: KIND.FORAGE }); break; } }
     return;
   }
@@ -311,7 +313,8 @@ function finish(w, reason) {
   const v = set.get('rival');
   $('harder').textContent = w ? (v === 'bold' ? 'Play the bold rival again' : `Play a ${v === 'timid' ? 'steady' : 'bold'} rival`) : v === 'timid' ? 'Play the timid rival again' : `Play a ${v === 'bold' ? 'steady' : 'timid'} rival`;
   running = false; dropTouches(); if (nestOpen) setNest(false);
-  setTimeout(() => { setScreen('over'); (w ? [523, 659, 784, 1047] : [392, 330, 262, 196]).forEach((f, i) => setTimeout(() => tone(f, 0.5, 0.06, 'triangle'), i * 160)); }, 900);
+  const mine = host;
+  setTimeout(() => { if (host !== mine) return; setScreen('over'); (w ? [523, 659, 784, 1047] : [392, 330, 262, 196]).forEach((f, i) => setTimeout(() => tone(f, 0.5, 0.06, 'triangle'), i * 160)); }, 900);
 }
 function bump(id, value) { const el = $(id), span = el.querySelector('span'), text = String(value); if (span.textContent === text) return; const up = Number(text) > Number(span.textContent); span.textContent = text; if (up) { el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); } }
 function hud() {
@@ -334,7 +337,7 @@ function hud() {
   }
   const diet = g(ME, CG.DIET);
   for (const b of document.querySelectorAll('#diets [data-diet]')) b.setAttribute('aria-pressed', String(Number(b.dataset.diet) === diet));
-  $('dietInfo').textContent = g(ME, CG.PROTEIN) === 0 ? 'no meat: bring red food' : `${g(ME, CG.PROTEIN)} meat in store`;
+  $('dietInfo').textContent = g(ME, CG.PROTEIN) === 0 ? 'no meat: bring red food' : `${g(ME, CG.PROTEIN)} meat in store · a soldier eats 3`;
   $('recall').setAttribute('aria-pressed', String(!!g(ME, CG.RECALL)));
   drawMini(); tuneSong();
 }
@@ -510,6 +513,7 @@ function frame(now) {
   let stepped = 0;
   if (screen === 'play') stepped = host.advance(lastT ? Math.min(100, now - lastT) : 0, speed);
   if (stepped) { news(); uploadAnts(); }
+  if (sim.result && running) finish(sim.result - 1 === ME, g(ME, CG.QUEEN_HP) <= 0 || g(FOE, CG.QUEEN_HP) <= 0 ? REASON.QUEEN : REASON.DUSK); // the result event was lost in a full buffer
   light = lightNow(now);
   const want = screen === 'menu' ? VIEW.low : VIEW[set.get('view')], e = Math.min(1, dt * 3.5); lens.pitch += (want.pitch - lens.pitch) * e; lens.fk += (want.fk - lens.fk) * e;
   if (screen === 'menu') { const en = doorXY(ME); cam.x = en.x + 6 + 5 * Math.sin(now / 7000); cam.y = en.y + 3; cam.z = startZoom(); }
