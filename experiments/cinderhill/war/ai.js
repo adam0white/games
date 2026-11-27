@@ -22,7 +22,7 @@ export function buildNext(sim, t, kind) {
     if (k !== kind || sim.room[y0 * L.nw + dx + x0] === kind) continue;
     const cells = [];
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) cells.push(dx + x, y);
-    return [{ team: t, type: CMD.DIG, cells }, { team: t, type: CMD.ROOM, cells, kind }];
+    return [{ team: t, type: CMD.ROOM, cells, kind, dig: 1 }];
   }
   return [];
 }
@@ -62,11 +62,20 @@ export function think(sim, t, mind = 1) {
   const diet = adults < 36 ? 0 : adults < 60 ? 1 : 2;
   if (cg[o + CG.DIET] !== diet) out.push({ team: t, type: CMD.DIET, share: diet });
   // Building, one room at a time: a store when the stores are nearly full, quarters when the hill is, a nursery wing when the brood is.
+  if (build && cg[o + CG.MARKS] > 0 && !sim.digF[t]) {
+    // Marks no worker can reach would stall it for good: take them off.
+    const cells = []; for (let k = 0; k < sim.mark.length; k++) if (sim.mark[k] === t + 1) cells.push(k % L.nw, Math.floor(k / L.nw));
+    out.push({ team: t, type: CMD.ROOM, cells, kind: ROOM.NONE });
+  }
   if (build && cg[o + CG.MARKS] === 0) {
     let brood = 0; for (let b = 0; b < sim.bn; b++) if (sim.bTeam[b] === t) brood++;
     const capF = cg[o + CG.CAP_FOOD];
-    const kind = may(ROOM.STORE) && Math.max(cg[o + CG.SUGAR], cg[o + CG.PROTEIN]) * 5 >= capF * 4 ? ROOM.STORE : may(ROOM.REST) && adults + brood >= cg[o + CG.CAP_ADULTS] - 10 ? ROOM.REST : may(ROOM.NURSERY) && brood >= cg[o + CG.CAP_BROOD] - 4 ? ROOM.NURSERY : 0;
-    if (kind) for (const b of buildNext(sim, t, kind)) out.push(b);
+    // Every kind it wants now, most pressing first; it digs the first that still has a slot.
+    const wants = [];
+    if (may(ROOM.STORE) && Math.max(cg[o + CG.SUGAR], cg[o + CG.PROTEIN]) * 5 >= capF * 4) wants.push(ROOM.STORE);
+    if (may(ROOM.REST) && adults + brood >= cg[o + CG.CAP_ADULTS] - 10) wants.push(ROOM.REST);
+    if (may(ROOM.NURSERY) && brood >= cg[o + CG.CAP_BROOD] - 4) wants.push(ROOM.NURSERY);
+    for (const kind of wants) { const b = buildNext(sim, t, kind); if (b.length) { out.push(...b); break; } }
   }
   // Defence: enemies by the door call the guard and the resting to it.
   let foes = 0;

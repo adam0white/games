@@ -170,6 +170,9 @@ export class Sim {
     }
   }
 
+  /** Food with no store cell left to lie in spoils: called when a colony's rooms are repainted. */
+  spoil(t) { const cg = this.cg, o = t * CG.SIZE, cap = cg[o + CG.CAP_FOOD]; if (cg[o + CG.SUGAR] > cap) cg[o + CG.SUGAR] = cap; if (cg[o + CG.PROTEIN] > cap) cg[o + CG.PROTEIN] = cap; }
+
   nurseryCell(t) {
     const list = this.nurseryCells[t];
     return list.length ? list[below(this.rng, STREAM.spare, list.length)] : this.store[t];
@@ -202,6 +205,7 @@ export class Sim {
   /** Queue an order: { team, type, id?, tick?, ... }. It applies at the start of its tick (the next one by default). */
   order(o) {
     const e = { ...o, tick: Math.max(o.tick ?? this.tick, this.tick) };
+    if (o.points) e.points = Array.from(o.points); if (o.cells) e.cells = Array.from(o.cells); // the log keeps its own copy
     let at = this.queue.length;
     while (at > 0 && this.queue[at - 1].tick > e.tick) at--;
     this.queue.splice(at, 0, e);
@@ -241,22 +245,30 @@ export class Sim {
       this.event(EVENT.RALLY, t, c);
     } else if (o.type === CMD.RECALL) cg[base + CG.RECALL] = o.on ? 1 : 0;
     else if (o.type === CMD.DIG || o.type === CMD.ROOM) {
-      // cells: nest [x, y, ...]. DIG marks clay to be dug (on: 0 takes the mark off); ROOM paints a use on open or marked cells.
+      // cells: nest [x, y, ...]. DIG marks clay to be dug (on: 0 takes the mark off). ROOM paints a use on open or marked cells;
+      // with dig: 1 it marks clay first, and with kind NONE it also takes marks off, so one stroke is one order.
       const L = this.L, pts = o.cells || [], dig = o.type === CMD.DIG, kind = o.kind | 0;
       if (!dig && !(kind >= 0 && kind <= 3)) return no(WHY.NONE);
-      let done = 0, marks = cg[base + CG.MARKS];
+      let done = 0, marks = cg[base + CG.MARKS], stores = false;
+      const use = (k, to) => { if (this.room[k] === ROOM.STORE || to === ROOM.STORE) stores = true; this.room[k] = to; done++; };
       for (let j = 0; j + 1 < pts.length && j < 512; j += 2) {
         const x = pts[j] | 0, y = pts[j + 1] | 0;
         if (x < 1 || x >= L.nw - 1 || y < 2 || y >= L.nh - 1) continue;
         const k = y * L.nw + x, m = this.mat[L.nestBase + k];
         if (this.owner(k) !== t) continue;
         if (dig) {
-          if (o.on === 0 || o.on === false) { if (this.mark[k] === t + 1) { this.mark[k] = 0; marks--; done++; } }
+          if (o.on === 0 || o.on === false) { if (this.mark[k] === t + 1) { this.mark[k] = 0; marks--; done++; if (this.room[k]) use(k, ROOM.NONE); } }
           else if (m === MAT.CLAY && !this.mark[k] && marks < C.MARKS_MAX) { this.mark[k] = t + 1; this.digLeft[k] = C.DIG_TICKS; marks++; done++; }
-        } else if ((m === MAT.OPEN || this.mark[k] === t + 1) && this.room[k] !== kind) { this.room[k] = kind; done++; }
+        } else {
+          if (o.dig && kind && m === MAT.CLAY && !this.mark[k] && marks < C.MARKS_MAX) { this.mark[k] = t + 1; this.digLeft[k] = C.DIG_TICKS; marks++; done++; }
+          if (!kind && this.mark[k] === t + 1) { this.mark[k] = 0; marks--; done++; }
+          if ((m === MAT.OPEN || this.mark[k] === t + 1 || !kind) && this.room[k] !== kind) use(k, kind);
+        }
       }
       if (!done) return no(WHY.BLOCKED);
-      this.recount(); this.dirty = true;
+      this.recount(); if (stores) this.spoil(t);
+      // Marks change only where the diggers go; the way home changes only with the stores.
+      if (stores) this.dirty = true; else this.rebuildDig();
     }
   }
 
@@ -379,7 +391,8 @@ export class Sim {
       const src = [];
       if (this.cg[t * CG.SIZE + CG.MARKS] > 0) for (let k = 0; k < NN; k++) {
         if (this.mark[k] !== t + 1) continue;
-        for (let d = 0; d < 4; d++) { const m = L.nb[(L.nestBase + k) * 4 + d]; if (m >= L.nestBase && this.mat[m] === MAT.OPEN) src.push(m); }
+        // Only from its own earth: a mark on the border is not a way into the rival's nest.
+        for (let d = 0; d < 4; d++) { const m = L.nb[(L.nestBase + k) * 4 + d]; if (m >= L.nestBase && this.mat[m] === MAT.OPEN && this.owner(m - L.nestBase) === t) src.push(m); }
       }
       this.digF[t] = src.length ? this.field(this.digF[t], src) : null;
     }
@@ -587,11 +600,11 @@ export class Sim {
     const recall = cg[o + CG.RECALL] === 1;
     if (task === TASK.NURSE) return this.mill(i, c, m => m >= this.L.nestBase && this.room[m - this.L.nestBase] === ROOM.NURSERY, 24);
     if (task === TASK.DIG) {
-      const F = this.digF[t];
+      const F = this.digF[t], L0 = this.L;
       if (!F || recall || F[c] === FAR) { this.task[i] = TASK.REST; return c; }
-      if (F[c] > 0) { const m = this.next(F, c); if (m >= 0) return m; this.task[i] = TASK.REST; return c; }
+      if (F[c] > 0) { const m = this.next(F, c); if (m >= L0.nestBase) return m; this.task[i] = TASK.REST; return c; } // a digger never leaves the nest
       // Beside a marked cell: dig it. The last stroke opens it.
-      const L = this.L;
+      const L = L0;
       for (let d = 0; d < 4; d++) {
         const m = L.nb[c * 4 + d], k = m - L.nestBase;
         if (m < L.nestBase || this.mark[k] !== t + 1) continue;
@@ -658,7 +671,7 @@ export class Sim {
   assign(i, c, t, o) {
     if (this.cg[o + CG.RECALL]) return c;
     const major = this.caste[i] === CASTE.MAJOR;
-    if (!major && this.digF[t] && this.cg[o + CG.DIGGERS] < Math.min(C.DIG_CREW, 2 * this.cg[o + CG.MARKS])) { this.cg[o + CG.DIGGERS]++; this.task[i] = TASK.DIG; this.since[i] = 0; return this.next(this.digF[t], c); }
+    if (!major && this.digF[t] && this.layer[i] === NEST && this.digF[t][c] !== FAR && this.cg[o + CG.DIGGERS] < Math.min(C.DIG_CREW, 2 * this.cg[o + CG.MARKS])) { this.cg[o + CG.DIGGERS]++; this.task[i] = TASK.DIG; this.since[i] = 0; return this.next(this.digF[t], c); }
     let best = -1, gap = 0;
     for (let k = 0; k < TRAILS; k++) {
       const s = t * TRAILS + k;

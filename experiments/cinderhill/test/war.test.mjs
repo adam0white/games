@@ -113,3 +113,15 @@ test('a mind that builds beats the same mind that does not', () => {
   for (const seed of [2, 5, 8]) { const h = new Host({ seed, ai: { 0: 1, 1: { mood: 1, build: false } } }).run(9600); if (h.sim.result === 1) wins++; }
   assert.equal(wins, 3);
 });
+
+test('clearing takes the mark and the room off; repainting the stores spoils what no longer fits', () => {
+  const s = new Sim({ seed: 4, sugar: 110 }), dx = s.door[0] % s.L.sw, k = 5 * s.L.nw + dx + 3;
+  s.order({ team: 0, type: CMD.ROOM, cells: [dx + 3, 5], kind: ROOM.STORE, dig: 1 }); s.step(); s.step();
+  assert.deepEqual([s.mark[k], s.room[k]], [1, ROOM.STORE]);
+  s.order({ team: 0, type: CMD.ROOM, cells: [dx + 3, 5], kind: ROOM.NONE }); s.step(); s.step();
+  assert.deepEqual([s.mark[k], s.room[k], s.g(0, CG.MARKS)], [0, 0, 0]);
+  const porch = []; for (let y = 4; y <= 6; y++) for (let x = -2; x <= 2; x++) porch.push(dx + x, y);
+  s.order({ team: 0, type: CMD.ROOM, cells: porch, kind: ROOM.REST }); s.step(); s.step();
+  assert.equal(s.g(0, CG.CAP_FOOD), 24);
+  assert.ok(s.g(0, CG.SUGAR) <= 24, `sugar ${s.g(0, CG.SUGAR)}`);
+});
