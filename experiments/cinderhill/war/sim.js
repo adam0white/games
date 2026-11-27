@@ -92,7 +92,7 @@ export const CG = {
   CAP_FOOD: 22, CAP_BROOD: 23, CAP_ADULTS: 24, MARKS: 25, DIGGERS: 26,
   POINTS: 30, // paid by held sites, one a second each
   HAUL: 31, // loads taken from a rival's store and carried all the way home
-  TIER: 33, GROW: 34, BRANCH: 35, // with cfg.tiers: chamber growths done (0 to 2), ticks left of one under way, the branch taken at the first
+  TIER: 33, GROW: 34, BRANCH: 35, GROWN: 37, // with cfg.tiers: chamber growths done (0 to 2), ticks left of one under way, the branch taken at the first
   PICK: 27, DIET2: 28, SPECIALS: 29, // the caste this colony chose (0: none yet), its share of the brood in four, how many live
   FOUND: 32, // loads dug out of caches in the clay
   HARM: 36, // harm this colony's ants have done to the mission's beast
@@ -195,6 +195,7 @@ export class Sim {
       const i = this.spawn(t, CASTE.WORKER, k % 10 === 9 ? this.nurseryCell(t) : this.store[t]);
       if (i >= 0 && k % 10 === 9) this.task[i] = TASK.NURSE;
     }
+    for (let k = 0; k < (cfg.majors | 0); k++) this.spawn(t, CASTE.MAJOR, this.store[t]);
     for (let k = 0; k < cfg.pupae; k++) { const b = this.addBrood(t, STAGE.PUPA); if (b >= 0) this.bAge[b] = Math.max(0, this.stat[t].pupa - 20 * (8 + 3 * k)); }
     for (let k = 0; k < cfg.larvae; k++) { const b = this.addBrood(t, STAGE.LARVA); if (b >= 0) this.bAge[b] = this.bHunger[b] = Math.floor((400 * k) / Math.max(1, cfg.larvae)); }
     for (let k = 0; k < cfg.eggs; k++) { const b = this.addBrood(t, STAGE.EGG); if (b >= 0) this.bAge[b] = Math.floor((200 * k) / Math.max(1, cfg.eggs)); }
@@ -741,7 +742,9 @@ export class Sim {
       if (cg[o + CG.LAY] > 0) cg[o + CG.LAY]--;
       if (cg[o + CG.LAY] === 0 && cg[o + CG.GROW] === 0 && cg[o + CG.SUGAR] > 0 && count[t] < cg[o + CG.CAP_BROOD] && cg[o + CG.ADULTS] + count[t] < cg[o + CG.CAP_ADULTS] && this.n + this.bn < this.cfg.maxAnts) { if (this.addBrood(t, STAGE.EGG) >= 0) cg[o + CG.LAY] = C.LAY_EVERY; }
       // A fungus garden pays a seed a cell, if there is a store cell with room for it.
-      if (this.gardens[t] && this.tick % C.GARDEN_EVERY === C.GARDEN_EVERY - 2) { let got = 0; for (let j = 0; j < this.gardens[t]; j++) if (this.put(t, FOOD.SUGAR, this.store[t])) got++; if (got) this.event(EVENT.GARDEN, t, got); }
+      // It pays for the time its cells were gardens, so a room painted for the last tick before the harvest earns nothing.
+      cg[o + CG.GROWN] += this.gardens[t];
+      if (this.tick % C.GARDEN_EVERY === C.GARDEN_EVERY - 2) { const due = Math.min(this.gardens[t], Math.floor(cg[o + CG.GROWN] / C.GARDEN_EVERY)); cg[o + CG.GROWN] = 0; let got = 0; for (let j = 0; j < due; j++) if (this.put(t, FOOD.SUGAR, this.store[t])) got++; if (got) this.event(EVENT.GARDEN, t, got); }
       // A full-grown hill tends its wounded.
       if (this.cfg.tiers && cg[o + CG.TIER] + 1 >= TIERS.heal && this.tick % C.HEAL_EVERY === t) {
         const nw = this.L.nw, max = this.stat[t].hp;
@@ -1096,13 +1099,12 @@ export class Sim {
   /** The beast bites the ants nearest it, of either colony: `hits` of them within `range` cells, `bite` each. */
   beastBites() {
     const B = this.mission.beast, L = this.L, bc = this.beast[1], cx = bc % L.sw, cy = Math.floor(bc / L.sw), bx = (cx << 8) + 128, by = (cy << 8) + 128, R = B.range;
-    const near = [];
+    const near = [], d = j => est(this.x[j] - bx, this.y[j] - by);
     for (let oy = -R; oy <= R; oy++) for (let ox = -R; ox <= R; ox++) {
       const cc = cellAt(L, SURFACE, cx + ox, cy + oy); if (cc < 0) continue;
-      for (let j = this.head[cc]; j >= 0; j = this.nextAnt[j]) if (this.hp[j] > 0) near.push(j);
+      for (let j = this.head[cc]; j >= 0; j = this.nextAnt[j]) if (this.hp[j] > 0 && d(j) <= R * 256 + 128) near.push(j);
     }
     if (!near.length) return;
-    const d = j => est(this.x[j] - bx, this.y[j] - by);
     near.sort((a, b) => d(a) - d(b) || this.id[a] - this.id[b]);
     const n = Math.min(B.hits, near.length);
     for (let k = 0; k < n; k++) this.hurt(near[k], B.bite, -1);
@@ -1112,10 +1114,11 @@ export class Sim {
   /** The beast is dead: its body is meat where it fell, and where the mission says so the colony that did it more harm wins. */
   beastFalls() {
     const cg = this.cg, B = this.mission.beast;
-    let best = 0; for (let t = 1; t < TEAMS; t++) if (cg[t * CG.SIZE + CG.HARM] > cg[best * CG.SIZE + CG.HARM]) best = t;
+    const score = t => cg[t * CG.SIZE + CG.HARM] * 4096 + cg[t * CG.SIZE + CG.ADULTS]; // equal harm: the larger hill, as at dusk
+    let best = 0; for (let t = 1; t < TEAMS; t++) if (score(t) > score(best)) best = t;
     this.drop(this.beast[1], FOOD.PROTEIN, B.meat);
     this.event(EVENT.BEAST_DEAD, this.beast[1], best);
-    if (this.mission.goals.beast && !this.result) { this.result = 1 + best; this.why = REASON.BEAST; this.event(EVENT.RESULT, best, REASON.BEAST); }
+    if (this.mission.goals.beast && !this.result && cg[best * CG.SIZE + CG.QUEEN_HP] > 0) { this.result = 1 + best; this.why = REASON.BEAST; this.event(EVENT.RESULT, best, REASON.BEAST); }
   }
 
   /** No clay or stone on the straight line from a cell to the cell (ox, oy) away. */

@@ -144,7 +144,7 @@ export const MISSIONS = {
   // wins; at dusk, more harm. Its body is meat for whoever carries it.
   hunt: {
     id: 'hunt', name: 'The Hunt', map: 'flat',
-    kit: { ants: 30, sugar: 10, protein: 5, eggs: 20, larvae: 20, pupae: 12, duskTick: 9600, queenHp: 6000 },
+    kit: { ants: 30, majors: 3, sugar: 10, protein: 5, eggs: 20, larvae: 20, pupae: 12, duskTick: 9600, queenHp: 6000 },
     goals: { queen: true, beast: true, dusk: 'harm' },
     beast: { at: [80, 38], hp: 2800, bite: 8, hits: 2, every: 20, range: 2, press: 12, girth: 384, meat: 120 },
     deeds: [{ id: 'a', text: 'Bring the beetle down with the greater harm.', won: true, why: 'BEAST', opens: 'hold' }, { id: 'b', text: 'Win with fewer than seventy dead.', won: true, max: { DIED: 69 }, opens: 'post' }],

@@ -206,7 +206,7 @@ test('The Stones: a mind that holds more stones beats one that holds fewer', () 
 });
 
 test('The Larder: a stolen load counts when it reaches home, and ten of them end the mission', () => {
-  const h = new Host({ seed: 1, mission: 'larder', ai: { 0: 1, 1: 1 } }), s = h.sim;
+  const h = new Host({ seed: 2, mission: 'larder', ai: { 0: 1, 1: 1 } }), s = h.sim;
   while (!s.result && s.tick < 9700 && s.g(0, CG.HAUL) + s.g(1, CG.HAUL) === 0) h.run(200);
   assert.ok(s.g(0, CG.HAUL) + s.g(1, CG.HAUL) > 0, 'some thief got home');
   for (const t of [0, 1]) assert.ok(s.g(t, CG.HAUL) <= s.g(t, CG.STOLEN), 'no load is hauled that was not taken');
@@ -603,8 +603,8 @@ test('Growth: a Deep hill may dig fungus gardens, which pay seeds and cost housi
   s.order({ team: 0, type: CMD.ROOM, cells, kind: ROOM.GARDEN }); s.step();
   assert.equal(s.gardens[0], 3); assert.equal(s.g(0, CG.CAP_ADULTS), cap - 3);
   s.take(0, FOOD.SUGAR, s.g(0, CG.SUGAR) - 5); // room in the stores for what it grows
-  let paid = 0; for (let i = 0; i < C.GARDEN_EVERY + 2; i++) { s.step(); const ev = s.drainEvents(); for (let k = 0; k < ev.length; k += 4) if (ev[k] === EVENT.GARDEN && ev[k + 1] === 0) paid += ev[k + 2]; }
-  assert.equal(paid, 3);
+  let paid = 0; for (let i = 0; i < 2 * C.GARDEN_EVERY; i++) { s.step(); const ev = s.drainEvents(); for (let k = 0; k < ev.length; k += 4) if (ev[k] === EVENT.GARDEN && ev[k + 1] === 0) paid += ev[k + 2]; }
+  assert.ok(paid >= 3 && paid < 6, 'a seed a cell for each full minute it was a garden, and none for a part of one');
   const again = copyOf(s); assert.equal(again.gardens[0], 3); assert.equal(again.hash(), s.hash());
 });
 

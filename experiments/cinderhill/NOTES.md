@@ -750,3 +750,11 @@ dead a side and both hills starved.
 
 Known and accepted: a player part way through the campaign now needs The Hunt before The Stones. Bold loses to
 steady here more often than it wins, because it sends soldiers before it has enough. No person has played it yet.
+
+Review fixes (outside adversarial review, same pull request): a garden pays only for full minutes its cells were
+gardens (`CG.GROWN` accrues; painting a room for the last tick before the harvest earned a full harvest before).
+The beetle's reach is a circle, the one drawn. Equal harm goes to the larger hill, as at dusk. A hill whose queen
+is dead cannot win by the beetle. Each hill starts The Hunt with three soldiers (`kit.majors`). A Raid tap near
+the beetle snaps to it. The harm bar is labelled. Open from that review, not built: array order decides who gets
+the beetle's twelve bites a window when both hills crowd it; workers can be parked as bait; the carcass has no
+use because the mission ends at the fall (a kill, recover, deliver phase is the proposed fix).
