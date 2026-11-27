@@ -59,6 +59,7 @@ const signal = () => navigator.globalPrivacyControl === true || navigator.doNotT
 export function lab(game, options = {}) {
   const none = { notice() {}, toggle() {}, retext() {}, start() {}, event() {}, end() {}, get on() { return false; }, sent: 0 };
   try { if (!/^[a-z0-9-]{1,40}$/.test(game) || !globalThis.crypto?.getRandomValues) return none; } catch { return none; }
+  if (typeof globalThis.PORTAL === 'string' && globalThis.PORTAL) return none; // a copy on another site (scripts/portal-zip.mjs): nothing is recorded, so there is no notice
   const send = options.fetch ?? ((...a) => fetch(...a));
   const endpoint = options.endpoint ?? ENDPOINT;
   const build = /^[0-9A-Za-z.+-]{1,20}$/.test(options.version ?? '') ? { a: options.version } : {};

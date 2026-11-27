@@ -1349,6 +1349,26 @@ const GAMES = {
   // Lantern's 3D water (experiments/lantern/ripples.js, ripples-gl.js): the rippled view runs, the GPU field matches the CPU one
   // that bots.mjs checks, a ring shows on the screen, long frames step it down and never back up, and less motion turns it off.
   // With --mutate the field is computed but not drawn, and the ring check must fail.
+  // Lantern's dare by link (experiments/kit/dare.js): the menu shows a friend's dare, the run is the friend's river with the same
+  // abilities in it, a player who shares scores sends nothing to the board from it, and the card makes a link back.
+  async 'lantern dare'(page) {
+    let posts = 0; await page.route('**/lab-api/board/**', r => { if (r.request().method() === 'POST') posts++; return r.fulfill({ status: 200, contentType: 'application/json', body: '{"rows":[],"place":0}' }); });
+    await page.goto(`${base}/lantern/?lang=en&dare=bad.link`);
+    assert.ok(await page.isHidden('#dareCard'), 'a broken dare link shows no dare');
+    await page.evaluate(() => { for (const [k, v] of Object.entries({ 'lantern:set:river': 'classic', 'lantern-tutorial': '1', 'lantern-hint': '1', 'lantern-name': 'Ada', 'lantern-share': '1', 'lantern-board-id': '11111111-2222-4333-8444-555555555555' })) localStorage.setItem(k, v); });
+    await page.goto(`${base}/lantern/?lang=en&dare=k2j9x.7.1.Sam`);
+    await until(page, () => !document.getElementById('dareCard').hidden, 'the dare is on the menu'); assert.match(await page.textContent('#dareText'), /^Sam scored 7 on this river/);
+    await page.click('#dareGo'); await until(page, () => window.lanternState().playing, 'the dare starts');
+    const run = await page.evaluate(() => { const s = window.lanternSim(); return { seed: s.seed, their: s.dare && s.dare.score, things: [...s.on, ...s.gifts], endless: s.endless, gentle: !!s.gentle }; });
+    assert.deepEqual(run, { seed: parseInt('k2j9x', 36), their: 7, things: ['boost'], endless: true, gentle: false }, 'the same river with the same abilities; the banks follow the River setting, Classic here');
+    await page.evaluate(() => { const s = window.lanternSim(); s.rocks = []; s.next = Infinity; s.safe = 60; }); await until(page, () => window.lanternState().score > 7, 'a score past the dare', 30000);
+    await page.evaluate(() => { const s = window.lanternSim(); s.safe = 0; s.hearts = 1; s.shield = 0; s.field = 0; s.x = 5; }); await until(page, () => window.lanternState().screen === 'card', 'the dare ends', 15000);
+    assert.match(await page.textContent('#line'), /You beat Sam: \d+ against 7/); assert.equal(await page.textContent('#dareSend'), 'Send your score back');
+    assert.equal(posts, 0, 'a dare takes no board ticket and sends no score'); assert.equal(await page.evaluate(() => localStorage.getItem('lantern-best-endless')), null, 'a dare is not a best endless score');
+    await page.evaluate(() => { Object.defineProperty(navigator, 'share', { value: undefined, configurable: true }); Object.defineProperty(navigator, 'clipboard', { value: { writeText: async () => { throw new Error('none'); } }, configurable: true }); });
+    await page.click('#dareSend'); await until(page, () => !document.getElementById('dareUrl').hidden, 'with no share sheet and no clipboard the link is shown');
+    assert.match(await page.inputValue('#dareUrl'), /\/lantern\/\?dare=k2j9x\.\d+\.1\.Ada$/, 'the link back: the same river, this score, this name');
+  },
   async 'lantern ripples'(page) {
     if (MUTATE) await page.route(/\/lantern\/view3d\.js/, async route => { const r = await route.fetch(), body = (await r.text()).replace('* uRip.w, c) * k;', '* uRip.w, c) * 0.;'); return route.fulfill({ response: r, body }); });
     await page.goto(`${base}/lantern/`);
@@ -1455,7 +1475,7 @@ const MUTATE = process.argv.includes('--mutate'); // only 'lantern ripples' read
 const [onlyGame, onlyPhone] = process.argv.slice(2).filter(a => a !== '--mutate');
 // The first argument is 'all' or a comma list of experiments. An experiment's name picks its own check, its
 // first-time help check, and for Lantern the three checks below that play Lantern.
-const WITH = { lantern: ['old links', 'lab down', 'leaving mid-run', 'lantern ripples'], duel: ['duel friend'], cinderhill: ['cinderhill check', 'cinderhill orders', 'cinderhill hud', 'cinderhill colony', 'cinderhill days', 'cinderhill looks', 'cinderhill crews', 'cinderhill crew levels', 'cinderhill speed'] };
+const WITH = { lantern: ['old links', 'lab down', 'leaving mid-run', 'lantern ripples', 'lantern dare'], duel: ['duel friend'], cinderhill: ['cinderhill check', 'cinderhill orders', 'cinderhill hud', 'cinderhill colony', 'cinderhill days', 'cinderhill looks', 'cinderhill crews', 'cinderhill crew levels', 'cinderhill speed'] };
 // PHONE_QUICK=1 (pull requests) runs only each named experiment's own check: no help checks and no WITH extras.
 // Those run nightly and by hand, where the first argument is 'all'.
 const QUICK = process.env.PHONE_QUICK === '1' && onlyGame && onlyGame !== 'all';

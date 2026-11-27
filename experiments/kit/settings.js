@@ -11,16 +11,16 @@
 //   set.get('river')                               the value in use: the saved one if it is still offered, else the default
 //   set.set('river', 'classic')                    saves it; a real change is recorded (below) and passed to onChange
 //   set.track('view', '3d')                        for an option the game saves itself: only the record
-//   set.snapshot()                                 { river: 'gentle', view: '2d', gain: '1.3' } — put it in rec.start
+//   set.snapshot()                                 { river: 'gentle', view: '2d', gain: '1.3' } — spread it into rec.start
 //   set.changed()                                  ['view'] — the options that differ from their default
 //   set.panel(el, { label, name, onChange })       a row of buttons per option inside el; returns a redraw function
 //
 // What is saved: values are strings. An option without `key` is kept under '<slug>:set:<id>'. `def` may be a function;
 // it is asked once, on the first visit that meets the option, and its answer is kept under '<key>~def', so a default
 // that depends on who the player is (new or returning) stays the same on later visits.
-// What is recorded: on a change, rec.event('setting', { id, value, from, def }) — outside a run the lab gets it at once.
-// Put snapshot() in rec.start to see the share of runs played on each value, including by players who never opened
-// the settings. Nothing here reads or writes anything but the options named.
+// What is recorded: on a change, rec.event('setting', { name, from, to, def }) — outside a run the lab gets it at once.
+// Spread snapshot() into rec.start (rec.start({ ...set.snapshot(), mode })) to see the share of runs played on each
+// value, including by players who never opened the settings. scripts/lab-mine.mjs reads both in its Settings section. Nothing here reads or writes anything but the options named.
 import { read, write } from './save.js';
 
 export function settings(slug, defs, { rec = null } = {}) {
@@ -36,7 +36,7 @@ export function settings(slug, defs, { rec = null } = {}) {
     } else defaults[id] = vals.includes(String(d.def)) ? String(d.def) : vals[0];
   }
   const get = id => { const v = read(keyOf(id)); return v !== null && defs[id].values.map(String).includes(v) ? v : defaults[id]; };
-  const track = (id, value, from = null) => { try { rec?.event('setting', { id, value: String(value), from: from === null ? null : String(from), def: defaults[id] ?? null }); } catch { /* recording never breaks a game */ } };
+  const track = (id, value, from = null) => { try { rec?.event('setting', { name: id, from: from === null ? null : String(from), to: String(value), def: defaults[id] ?? null }); } catch { /* recording never breaks a game */ } };
   function set(id, value) {
     value = String(value);
     if (!defs[id] || !defs[id].values.map(String).includes(value)) return get(id);

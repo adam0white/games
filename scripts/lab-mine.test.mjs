@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { settings } from './lab-mine.mjs';
+import { settings, firstSessions } from './lab-mine.mjs';
 
 const run = (player, started, events, start = null) => ({ player, at: started, data: { started, start, events } });
 const set = (t, name, from, to) => ({ t, type: 'setting', data: { name, from, to } });
@@ -24,4 +24,17 @@ test('settings: changers, changes, last pick per player, runs per value', () => 
 
 test('settings: nothing to report without setting events', () => {
   assert.deepEqual(settings([run('a', 0, [{ t: 0, type: 'serve', data: {} }])], []), []);
+});
+
+test('firstSessions: the earliest session of each player id, outcomes reached once each', () => {
+  const r = (started, outcome, mode = 'night') => ({ data: { started, outcome, start: { mode } } });
+  const out = firstSessions([
+    { player: 'a', runs: [r(500, 'bank'), r(600, 'bank'), r(700, 'dawn')] },
+    { player: 'a', runs: [r(100, 'rock')] },
+    { player: 'b', runs: [r(200, 'bank', 'dare'), r(300, null)] },
+    { player: 'c', runs: [] },
+  ]);
+  assert.equal(out.players, 2); assert.equal(out.oneRun, 1);
+  assert.deepEqual(Object.fromEntries(out.reached), { rock: 1, bank: 1, unfinished: 1 });
+  assert.deepEqual(Object.fromEntries(out.byMode), { night: 1, dare: 1 });
 });

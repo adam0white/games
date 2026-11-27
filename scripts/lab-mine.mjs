@@ -122,6 +122,18 @@ export function settings(runs, between) {
   });
 }
 
+// The first session of each player id in the range: how many runs it had and which outcomes it reached at least once.
+// It answers "do new players get anywhere without help". A player id that played before the range looks new here, so
+// start the range early enough. sessions: [{ player, runs }] with runs in time order.
+export function firstSessions(sessions) {
+  const first = new Map();
+  for (const s of sessions) { if (!s.runs.length) continue; const had = first.get(s.player); if (!had || s.runs[0].data.started < had.runs[0].data.started) first.set(s.player, s); }
+  const list = [...first.values()];
+  return { players: list.length, oneRun: list.filter(s => s.runs.length === 1).length, runsP50: q(list.map(s => s.runs.length), 0.5),
+    reached: count(list.flatMap(s => [...new Set(s.runs.map(r => String(r.data.outcome ?? 'unfinished')))]), v => v),
+    byMode: count(list.map(s => String(s.runs[0].data.start?.mode ?? '-')), v => v) };
+}
+
 export function analyse(records) {
   const games = new Map();
   const of = g => { if (!games.has(g)) games.set(g, { records: [], runs: [], between: [], other: [] }); return games.get(g); };
@@ -180,6 +192,7 @@ export function analyse(records) {
         worstFrame: q(fps.map(f => f.worst), 1), slowWindows: fps.filter(f => f.p95 > 33.4).length } : null,
       errors: count(trace.filter(({ x }) => x[1] === 'err'), ({ x }) => `${x[2]}: ${x[3]}`),
       settings: settings(runs, g.between),
+      first: firstSessions([...sessions.values()]),
       other: count(g.other, r => `${r.kind} ${r.data?.format ?? ''}`.trim()),
     };
   }
@@ -206,6 +219,8 @@ function gameReport(game, r) {
   if (r.idle.top.length) L.push('', table(['run', 'from', 'idle', 'last game event before'], r.idle.top.map(x => [x.runId.slice(0, 8), secs(x.from), secs(x.ms), x.before])));
   L.push('', '## Game events', '', table(['event', 'times'], r.events.slice(0, 30)));
   if (r.between.length) L.push('', '**Outside a run:**', '', table(['event', 'times'], r.between));
+  if (r.first?.players) L.push('', '## First session of each player id', '', `${r.first.players} player id(s) have a first session in this range; ${r.first.oneRun} played one run and stopped; runs in a first session (median): ${r.first.runsP50}. First run's mode: ${r.first.byMode.map(([k, n]) => `${k} ×${n}`).join(', ')}.`,
+    '', 'Outcomes reached at least once in that first session (player ids):', '', table(['outcome', 'player ids'], r.first.reached));
   if (r.settings?.length) {
     L.push('', '## Settings', '', `Of ${r.players} player id(s): who changed each setting, and to what.`, '');
     L.push(table(['setting', 'players who changed it', 'changes', 'their last pick', 'runs played with'], r.settings.map(x => [x.name, x.changers, x.changes,
