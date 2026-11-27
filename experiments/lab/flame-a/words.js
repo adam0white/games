@@ -1,0 +1,36 @@
+import { words } from '../../kit/i18n.js';
+
+export const { t, lang, setLang, apply } = words({
+  en: {
+    gameTitle: 'Pass the Flame', virginTitle: 'Pass the Flame', virginStory: 'A flame nobody has carried yet.',
+    linkedTitle: 'Flame {count}.', linkedStory: '{name} carried it {distance} m.',
+    steer: 'Touch and slide to steer', steerLabel: 'River. Touch and slide to steer.', progressLabel: 'Distance to the buoy',
+    handoffTitle: 'Your flame is ready.', dropTitle: 'The flame went out.', dimTitle: 'One ember remains.',
+    stats: '{distance} m carried · {flame}% light', carrierList: 'The carriers, in order', you: 'You', anonymous: 'Anonymous',
+    older: 'Earlier carriers ({n})', pass: 'Pass the flame', newFlame: 'Light a new flame', retry: 'Try again',
+    name: 'First name or nickname (optional)', shared: 'Flame shared.', copied: 'Link copied.',
+    manual: 'Copy this link to pass the flame.', invalidName: 'Use up to 16 letters, digits, spaces, underscores, dots or hyphens.',
+    shareText: 'Flame {count}. I just carried it {distance} m. It’s yours now.',
+    settings: 'Settings', close: 'Close settings', language: 'Language', paused: 'Paused', resume: 'Resume',
+    look: 'River', paper: 'Cut paper', thermal: 'Thermal', storm: 'Storm',
+    drop: 'When the flame goes out', ends: 'End the chain', dims: 'Pass an ember',
+    retryRule: 'After a drop', allow: 'Allow a retry', once: 'One attempt',
+    sound: 'Sound', haptics: 'Vibration', on: 'On', off: 'Off',
+  },
+  tr: {
+    gameTitle: 'Alevi devret', virginTitle: 'Alevi devret', virginStory: 'Bu alevi henüz kimse taşımadı.',
+    linkedTitle: '{count}. alev', linkedStory: '{name} alevi {distance} m taşıdı.',
+    steer: 'Yön vermek için dokun ve kaydır', steerLabel: 'Nehir. Yön vermek için dokun ve kaydır.', progressLabel: 'Şamandıraya kalan mesafe',
+    handoffTitle: 'Alevin hazır.', dropTitle: 'Alev söndü.', dimTitle: 'Geriye bir kor kaldı.',
+    stats: '{distance} m taşıdın · Işık %{flame}', carrierList: 'Sırasıyla alevi taşıyanlar', you: 'Sen', anonymous: 'İsimsiz',
+    older: 'Önceki taşıyıcılar ({n})', pass: 'Alevi devret', newFlame: 'Yeni bir alev yak', retry: 'Tekrar dene',
+    name: 'Adın veya takma adın (isteğe bağlı)', shared: 'Alev paylaşıldı.', copied: 'Bağlantı kopyalandı.',
+    manual: 'Alevi devretmek için bu bağlantıyı kopyala.', invalidName: 'En fazla 16 harf, rakam, boşluk, alt çizgi, nokta veya kısa çizgi kullan.',
+    shareText: '{count}. alev. Onu {distance} m taşıdım. Şimdi sıra sende.',
+    settings: 'Ayarlar', close: 'Ayarları kapat', language: 'Dil', paused: 'Duraklatıldı', resume: 'Devam et',
+    look: 'Nehir', paper: 'Kesme kâğıt', thermal: 'Termal', storm: 'Fırtına',
+    drop: 'Alev sönünce', ends: 'Zincir bitsin', dims: 'Koru devret',
+    retryRule: 'Alev düşerse', allow: 'Tekrar denenebilir', once: 'Tek deneme',
+    sound: 'Ses', haptics: 'Titreşim', on: 'Açık', off: 'Kapalı',
+  },
+});
