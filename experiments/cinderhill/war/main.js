@@ -1,7 +1,7 @@
 // Cinderhill: The Crossing. The page for the war sim (./sim.js): two colonies on one hill. No game rule lives here:
 // everything on screen is read from the sim or its events, and every order goes through host.order() under seat 0.
 import { Host } from './host.js';
-import { CMD, KIND, MODE, CG, EVENT, REASON, TASK, CASTE, STAGE, MAT, ROOM, TRAILS, PATH_MAX, MAX_PILES, C, LEVEL_SHARE, RAID_SHARE } from './sim.js';
+import { CMD, KIND, MODE, CG, EVENT, REASON, TASK, CASTE, STAGE, MAT, ROOM, TRAILS, PATH_MAX, MAX_PILES, C, LEVEL_SHARE, RAID_SHARE, PLUG } from './sim.js';
 import { CAMPAIGN, LINEAGE, LOSS_ANTS, MISSIONS, TRAITS } from './tables.js';
 import { makeGestures } from '../gestures.js';
 import { GameRenderer, sky } from '../game/gl.js';
@@ -29,11 +29,12 @@ const set = settings('cinderhill', {
   size: { values: ['1', '1.5'], def: '1.5', key: 'cinderhill:war:size' },
   sound: { values: ['all', 'fx', 'off'], def: 'all', key: 'cinderhill:war:sound' },
   finger: { values: ['hill', 'draw'], def: 'hill', key: 'cinderhill:war:finger' },
+  forks: { values: ['kept', 'free'], def: 'kept', key: 'cinderhill:war:forks' },
 }, { rec });
-const LABEL = { caste: 'Your third caste', rival: 'Rival', view: 'View', light: 'Light', style: 'Style', size: 'Ants', sound: 'Sound', finger: 'One finger' };
-const NAME = { spitter: 'Spitters', warden: 'Wardens', timid: 'Timid', steady: 'Steady', bold: 'Bold', tilt: 'Tilted', top: 'Top down', low: 'Low', cycle: 'Day to dusk', day: 'Day', ember: 'Ember', relief: 'Painted', ink: 'Ink', 1: 'True size', 1.5: 'Larger', hill: 'Draws from your hill, moves the view elsewhere', draw: 'Always draws', all: 'Music & effects', fx: 'Effects', off: 'Off' };
+const LABEL = { caste: 'Your third caste', rival: 'Rival', view: 'View', light: 'Light', style: 'Style', size: 'Ants', sound: 'Sound', finger: 'One finger', forks: 'Forks' };
+const NAME = { spitter: 'Spitters', warden: 'Wardens', timid: 'Timid', steady: 'Steady', bold: 'Bold', tilt: 'Tilted', top: 'Top down', low: 'Low', cycle: 'Day to dusk', day: 'Day', ember: 'Ember', relief: 'Painted', ink: 'Ink', 1: 'True size', 1.5: 'Larger', hill: 'Draws from your hill, moves the view elsewhere', draw: 'Always draws', kept: 'Kept for the campaign', free: 'Can be changed between missions', all: 'Music & effects', fx: 'Effects', off: 'Off' };
 const MOOD = { timid: 0, steady: 1, bold: 2 };
-const redraw = set.panel($('settings'), { only: set.ids.filter(id => id !== 'caste'), label: id => LABEL[id], name: (id, v) => NAME[v] ?? v, what: (id, v) => (id === 'caste' ? (v === 'spitter' ? 'Frail, but they spit from two cells away, over the front line. Applies from the next start.' : 'Slow and very hard to kill: they hold a tunnel. Applies from the next start.') : id === 'rival' ? (v === 'timid' ? 'It never attacks your hill. Applies from the next start.' : v === 'bold' ? 'It raids early, even at even odds. Applies from the next start.' : 'It holds the fords, and raids when it has the numbers. Applies from the next start.') : null), onChange: (id, v) => { if (id === 'sound') { if (v === 'off') snd.hold(); else { snd.release(); startSong(); } } tone(660, 0.06, 0.03, 'triangle', 80); } });
+const redraw = set.panel($('settings'), { only: set.ids.filter(id => id !== 'caste'), label: id => LABEL[id], name: (id, v) => NAME[v] ?? v, what: (id, v) => (id === 'caste' ? (v === 'spitter' ? 'Frail, but they spit from two cells away, over the front line. Applies from the next start.' : 'Slow and very hard to kill: they hold a tunnel. Applies from the next start.') : id === 'rival' ? (v === 'timid' ? 'It never attacks your hill. Applies from the next start.' : v === 'bold' ? 'It raids early, even at even odds. Applies from the next start.' : 'It holds the fords, and raids when it has the numbers. Applies from the next start.') : null), onChange: (id, v) => { if (id === 'forks') renderPath(); if (id === 'sound') { if (v === 'off') snd.hold(); else { snd.release(); startSong(); } } tone(660, 0.06, 0.03, 'triangle', 80); } });
 
 // ---- the game ----
 const qSeed = Math.floor(Number(query.get('seed')));
@@ -209,16 +210,16 @@ function renderPath() {
       b.append(i, name, em); b.addEventListener('click', () => { missionId = s.mission; renderPath(); tone(560, 0.06, 0.03, 'triangle'); });
       el.append(b);
     } else if (s.fork) {
-      const open = !!camp.done[STEPS[n - 1]], mine = taken(s.fork), box = document.createElement('div'), head = document.createElement('b'), row = document.createElement('div'), note = document.createElement('p');
+      const open = !!camp.done[STEPS[n - 1]], mine = taken(s.fork), free = set.get('forks') === 'free', box = document.createElement('div'), head = document.createElement('b'), row = document.createElement('div'), note = document.createElement('p');
       box.className = 'fork'; head.textContent = FORK_HEAD[s.fork];
       for (const v of optionsOf(s)) {
         const b = document.createElement('button'), small = document.createElement('small'), [name, what] = optionText(v);
         b.textContent = name; small.textContent = what; b.append(small);
-        b.setAttribute('aria-pressed', String(mine === v)); b.disabled = !open || !!mine;
-        b.addEventListener('click', () => { if (s.fork === 'caste') { camp.caste = v; set.set('caste', v); } else camp.forks[s.fork] = v; saveCamp(); rec.event('fork', { fork: s.fork, pick: v }); missionId = firstOpen(); renderPath(); tone(700, 0.2, 0.05, 'triangle', 120); });
+        b.setAttribute('aria-pressed', String(mine === v)); b.disabled = !open || (!!mine && !free);
+        b.addEventListener('click', () => { if (mine === v) return; if (mine) rec.event('refork', { fork: s.fork, from: mine, to: v }); if (s.fork === 'caste') { camp.caste = v; set.set('caste', v); for (const c of CAMPAIGN) if (c.by) delete camp.forks[c.fork]; /* a craft belongs to its caste */ } else camp.forks[s.fork] = v; saveCamp(); rec.event('fork', { fork: s.fork, pick: v }); missionId = firstOpen(); renderPath(); tone(700, 0.2, 0.05, 'triangle', 120); });
         row.append(b);
       }
-      note.textContent = s.by ? (mine ? 'Chosen for this campaign. The rival takes a craft for its own caste.' : open ? 'Choose one. It is kept for the whole campaign. The rival takes a craft for its own caste.' : `Opens when ${MISSIONS[STEPS[n - 1]].name} has been played to its end.`) : mine ? 'Chosen for this campaign. The rival has the other.' : open ? 'Choose one. It is kept for the whole campaign, and the rival has the other.' : `Opens when ${MISSIONS[STEPS[n - 1]].name} has been played to its end.`;
+      note.textContent = s.by ? (mine ? (free ? 'Yours for now: tap the other to change. The rival takes a craft for its own caste.' : 'Chosen for this campaign. The rival takes a craft for its own caste.') : open ? 'Choose one. It is kept for the whole campaign. The rival takes a craft for its own caste.' : `Opens when ${MISSIONS[STEPS[n - 1]].name} has been played to its end.`) : mine ? (free ? 'Yours for now: tap the other to change. The rival has the other.' : 'Chosen for this campaign. The rival has the other.') : open ? 'Choose one. It is kept for the whole campaign, and the rival has the other.' : `Opens when ${MISSIONS[STEPS[n - 1]].name} has been played to its end.`;
       box.append(head, row, note); el.append(box);
     }
   }
@@ -411,8 +412,8 @@ function paintAt(e) {
 }
 function setNestTab(t) { $('diet').dataset.tab = t; for (const b of document.querySelectorAll('#diet .tabs [data-tab]')) b.setAttribute('aria-pressed', String(b.dataset.tab === t)); if (t !== 'dig' && nestTool !== 'look') setNestTool('look'); }
 for (const b of document.querySelectorAll('#diet .tabs [data-tab]')) b.addEventListener('click', () => { setNestTab(b.dataset.tab); tone(480, 0.05, 0.03, 'triangle'); });
-const DIG_HELP = { look: 'Pick a room, then drag in the earth beside a tunnel.', tunnel: 'Tunnel: drag through the earth, a seed to dig a cell. Seeds showing in the clay are an old cache: dig to it and it is carried to your stores.', store: 'Store: each cell holds 8 more seeds and 8 more meat. Drag in the earth: a seed to dig a cell.', nursery: 'Nursery: each cell holds one more egg or grub. Drag in the earth: a seed to dig a cell.', rest: 'Quarters: each cell houses 4 more ants. Drag in the earth: a seed to dig a cell.', post: 'Guard post: each cell keeps one in eight of your idle soldiers standing here, inside, and not out by the door.', clear: 'Drag over marks or rooms to take them off. Dug earth stays dug.', strike: 'Strike: tap an open cell in the rival nest. Half your soldiers go there under ground and on to the queen. Tap the mark again to send them all, and again to call them back.' };
-function roomButtons() { for (const b of document.querySelectorAll('#rooms [data-room]')) b.hidden = b.dataset.room === 'strike' ? !sim.mayBreach(ME) : !!ROOM_OF[b.dataset.room] && !sim.mayRoom(ME, ROOM_OF[b.dataset.room]); if (nestTool === 'strike' && !sim.mayBreach(ME)) setNestTool('look'); if (ROOM_OF[nestTool] && !sim.mayRoom(ME, ROOM_OF[nestTool])) setNestTool('look'); }
+const DIG_HELP = { plug: `Plug: tap an open tunnel of yours to pack it shut, ${C.PLUG_SUGAR} seeds. It takes five times as long to dig out. Not in a room, not with the rival near, and no more than ${C.PLUGS_MAX} at once.`, look: 'Pick a room, then drag in the earth beside a tunnel.', tunnel: 'Tunnel: drag through the earth, a seed to dig a cell. Seeds showing in the clay are an old cache: dig to it and it is carried to your stores.', store: 'Store: each cell holds 8 more seeds and 8 more meat. Drag in the earth: a seed to dig a cell.', nursery: 'Nursery: each cell holds one more egg or grub. Drag in the earth: a seed to dig a cell.', rest: 'Quarters: each cell houses 4 more ants. Drag in the earth: a seed to dig a cell.', post: 'Guard post: each cell keeps one in eight of your idle soldiers standing here, inside, and not out by the door.', clear: 'Drag over marks or rooms to take them off. Dug earth stays dug.', strike: 'Strike: tap an open cell in the rival nest. Half your soldiers go there under ground and on to the queen. Tap the mark again to send them all, and again to call them back.' };
+function roomButtons() { for (const b of document.querySelectorAll('#rooms [data-room]')) b.hidden = b.dataset.room === 'strike' ? !sim.mayBreach(ME) : b.dataset.room === 'plug' ? !sim.mayPlug() : !!ROOM_OF[b.dataset.room] && !sim.mayRoom(ME, ROOM_OF[b.dataset.room]); if (nestTool === 'strike' && !sim.mayBreach(ME)) setNestTool('look'); if (nestTool === 'plug' && !sim.mayPlug()) setNestTool('look'); if (ROOM_OF[nestTool] && !sim.mayRoom(ME, ROOM_OF[nestTool])) setNestTool('look'); }
 roomButtons();
 function setNestTool(t) { nestTool = t; $('digHelp').textContent = DIG_HELP[t]; if (t !== 'look' && $('diet').dataset.tab !== 'dig') setNestTab('dig'); for (const b of document.querySelectorAll('#rooms [data-room]')) b.setAttribute('aria-pressed', String(b.dataset.room === t)); }
 for (const b of document.querySelectorAll('#rooms [data-room]')) b.addEventListener('click', () => { setNestTool(b.dataset.room); tone(500, 0.06, 0.03, 'triangle'); });
@@ -432,7 +433,7 @@ nestCanvas.addEventListener('pointerup', e => {
   if (!nestDrag || e.pointerId !== nestDrag.id) return;
   if (paint && paint.cells.length) {
     const cells = paint.cells, nestTool = paint.tool; // the tool the stroke began with
-    builds.add(order(nestTool === 'tunnel' ? { type: CMD.DIG, cells } : { type: CMD.ROOM, cells, kind: nestTool === 'clear' ? ROOM.NONE : ROOM_OF[nestTool], dig: 1 }));
+    builds.add(order(nestTool === 'plug' ? { type: CMD.FILL, cells: cells.slice(0, 2 * C.PLUGS_MAX) } : nestTool === 'tunnel' ? { type: CMD.DIG, cells } : { type: CMD.ROOM, cells, kind: nestTool === 'clear' ? ROOM.NONE : ROOM_OF[nestTool], dig: 1 }));
     rec.event('build', { tool: nestTool, cells: cells.length / 2, at: sim.tick }); tone(380, 0.1, 0.04, 'triangle', 90); navigator.vibrate?.(8);
   }
   if (nestTool === 'strike' && running && (nestDrag.far | 0) < 10) strikeAt(...nestCell(e));
@@ -485,6 +486,8 @@ function news() {
     else if (type === EVENT.HEARD) {
       if (a === ME) heard.push({ k: b - L0.nestBase, at: now });
       if (a === ME && now - (told.heardAt ?? 0) > 15000) { told.heardAt = now; if (!told.has('heard')) { told.add('heard'); rec.event('heard', { at: sim.tick }); } toast('Digging under your hill. Open Nest and look toward the rival.', 4200, true); tone(140, 0.5, 0.06, 'square', -20); navigator.vibrate?.([10, 40, 10]); }
+    } else if (type === EVENT.PLUG) {
+      if (a === ME) { toast('Packed shut'); tone(180, 0.25, 0.06, 'square', -60); rec.event('plug', { at: sim.tick }); } else if (sim.owner(b - L0.nestBase) !== ME && underTrail(ME) >= 0) toast('They have packed the tunnel shut. Mark it with Tunnel to dig it out.', 4200, true);
     } else if (type === EVENT.BREACH) {
       rec.event('breach', { by: a === ME ? 'me' : 'rival', at: sim.tick }); shake = 0.3; roomButtons();
       toast(a === ME ? 'You are through! Pick Strike in the Nest and tap where your soldiers should go.' : 'The rival has broken into your nest. A Guard post where it comes in holds them.', 6000, a !== ME);
@@ -493,7 +496,7 @@ function news() {
     else if (type === EVENT.DUG && a === ME) { if (nestOpen) tone(210 + Math.random() * 60, 0.05, 0.03, 'square', -60); }
     else if (type === EVENT.FULL && a === ME) { if (now - (told.fullAt ?? 0) > 20000) { told.fullAt = now; toast(`No room for more ${b ? 'meat' : 'seeds'}. Dig a store in the Nest.`, 3600, true); } }
     else if (type === EVENT.REJECTED && a === ME) {
-      if (builds.has(b)) { builds.delete(b); tone(150, 0.12, 0.05, 'sawtooth', -40); toast(nestTool === 'clear' ? 'Nothing to clear there.' : 'Nothing to dig or change there.', 2200); continue; }
+      if (builds.has(b)) { builds.delete(b); tone(150, 0.12, 0.05, 'sawtooth', -40); toast(nestTool === 'clear' ? 'Nothing to clear there.' : nestTool === 'plug' ? 'No plug there: it needs an open tunnel of yours, no rival near, seeds to spare, and a way left to your door.' : 'Nothing to dig or change there.', nestTool === 'plug' ? 3600 : 2200); continue; }
       const q = pending.find(q => q.id === b); if (q) { pulses.push({ pts: q.points, at: now, bad: true }); q.done = true; }
       tone(150, 0.22, 0.07, 'sawtooth', -40); toast(c === 1 ? 'Six trails is the most. Erase one first.' : 'No ant can walk that.', 2600, true);
     } else if (type === EVENT.TRAIL) {
@@ -730,6 +733,8 @@ function drawNest(now) {
       if (r === ROOM.STORE) c.arc(px + z * 0.22, py + z * 0.22, z * 0.09, 0, 7); else if (r === ROOM.NURSERY) c.ellipse(px + z * 0.22, py + z * 0.22, z * 0.11, z * 0.07, 0.6, 0, 7); else if (r === ROOM.POST) { c.moveTo(px + z * 0.12, py + z * 0.3); c.lineTo(px + z * 0.23, py + z * 0.1); c.lineTo(px + z * 0.34, py + z * 0.3); } else c.rect(px + z * 0.12, py + z * 0.17, z * 0.22, z * 0.09);
       c.fill();
     }
+    // A plug: packed earth, drawn as a block of cross-hatched clay.
+    if (r === PLUG && !open(x, y)) { c.fillStyle = 'rgba(214, 178, 120, 0.3)'; c.fillRect(px + 1, py + 1, z - 2, z - 2); c.strokeStyle = 'rgba(240, 214, 160, 0.85)'; c.lineWidth = 1.2; c.beginPath(); for (let j = 1; j < 4; j++) { c.moveTo(px + z * j / 4, py + 1); c.lineTo(px + z * j / 4, py + z - 1); c.moveTo(px + 1, py + z * j / 4); c.lineTo(px + z - 1, py + z * j / 4); } c.stroke(); }
     // A cache in the clay: a few seeds or a scrap of meat showing in the earth.
     if (sim.cache[k]) { const v = sim.cache[k], big = v >> 1 >= 18; c.fillStyle = `rgba(${v & 1 ? '224, 96, 60' : '243, 215, 122'}, ${0.13 + 0.05 * Math.sin(now / 420 + x)})`; c.beginPath(); c.arc(sx(x + 0.5), sy(y + 0.5), z * 0.7, 0, 7); c.fill(); c.fillStyle = v & 1 ? 'rgba(224, 96, 60, 0.85)' : 'rgba(243, 215, 122, 0.85)'; c.beginPath(); for (const [ax, ay] of big ? [[0.3, 0.38], [0.6, 0.34], [0.45, 0.6], [0.72, 0.62], [0.26, 0.7]] : [[0.35, 0.4], [0.62, 0.45], [0.48, 0.66]]) { c.moveTo(sx(x) + z * (ax + 0.09), sy(y) + z * ay); c.arc(sx(x) + z * ax, sy(y) + z * ay, z * 0.09, 0, 7); } c.fill(); }
     // What lies in a store cell: one seed drawn for a load, sugar pale along the floor, meat red above it.
