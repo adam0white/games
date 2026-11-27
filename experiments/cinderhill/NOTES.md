@@ -433,3 +433,15 @@ Owner direction: the game should be of the colony-strategy genre in full (missio
 - The moods' order moved with the larger hills: bold now loses to steady (27 to 73), steady beats timid 93 to 7. The novice (three trails, no rooms) loses every match to every mood.
 - Page: the Nest sheet has Look, Store, Nursery, Quarters and Clear; a drag in the cutaway paints cells; marks are hatched and fill as they are dug; the sheet shows stores, young and ants against their caps. No setting was added.
 - Not verified: no person has dug a room on a phone. The scripted browser check drew quarters with the mouse and the cap rose from 90 to 130.
+
+## Tables, a caste pick and a price to dig (2026-11-27)
+
+- `war/tables.js` holds the castes, rooms and missions. The sim reads them: a caste is a row (hp, bite, speed, meat to raise, reach, fights), a room is a row (which cap, how much a cell), a mission is a row (map, starting kit, goals, castes to pick from, rooms allowed). The Crossing is the one mission. Moving it into the table left four seeded bot runs with the same hashes.
+- Two new castes. Spitters: 14 hp, bite 3, reach 2.5 cells, need a clear line, are not crowded out of a target, stop at their reach. Wardens: 96 hp, bite 3, slow. A colony picks one, once (`CMD.PICK`), from the mission's list. `CMD.DIET` takes `special`: its share of the brood in four, beside the soldiers' share.
+- On the page the pick is a player setting (`cinderhill:war:caste`, default spitters). A rival that fights takes the other caste. The Nest sheet has two tabs, Young and Dig rooms.
+- Digging costs a seed a cell, paid at the opening stroke; the last three seeds are never spent on earth.
+- Bold now raises soldiers from the first brood and may strike from tick 1,600 with eight.
+- Sweeps swap sides on even seeds (`cfg.swap`), so a bias of the side cancels: steady against steady is 53 to 47, bold against bold 50 to 50.
+- Sweep, 30 seeds a pairing: spitters against wardens 47 to 53 (steady minds) and 33 to 67 (bold minds). A mind with either caste beats the same mind with none 97 to 100 in 100: a pick is a plain gain, the choice is which. Bold against steady moved between 47 and 20 across two small changes to digging, so that pairing is noisy and not settled. Timid loses to both (7 in 100). The builder still beats every partial build except nursery and quarters (50 to 50): stores still do not matter.
+- A blind read of the nest screens (an outside model as a first-time player) led to: "housing" for the hill's cap, a line under the room tools saying what the chosen room does and costs, a small sign in each room cell, "Unmark" for Clear. Not done from that read: a hint for how to feed a starving hill beside the food counter, queued against digging marks, tap a room to see what it holds.
+- Not verified: no person has picked a caste or dug on a phone.

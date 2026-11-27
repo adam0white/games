@@ -13,6 +13,7 @@ export function generate(sim, layoutOnly = false) {
   const L = sim.L, cfg = sim.cfg, mat = sim.mat, sw = L.sw, sh = L.sh;
   const S = (x, y) => cellAt(L, SURFACE, x, y), N = (x, y) => cellAt(L, NEST, x, y);
   const doors = [[Math.round((sw * 36) / 160), sh >> 1], [sw - 1 - Math.round((sw * 36) / 160), sh >> 1]];
+  if (cfg.swap) doors.reverse(); // seats change sides: for telling a bias of the side from a bias of the seat
   if (!layoutOnly) { mat.fill(MAT.OPEN, 0, L.nestBase); mat.fill(MAT.CLAY, L.nestBase); }
   for (let t = 0; t < doors.length; t++) {
     const [dx, dy] = doors[t];

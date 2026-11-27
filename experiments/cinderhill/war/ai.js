@@ -28,7 +28,8 @@ export function buildNext(sim, t, kind) {
 }
 
 /** The orders this seat gives now. `mood`: 0 timid (never raids), 1 steady, 2 bold (raids early); or { mood, build: false }
- *  for a mind that never digs, or { mood, rooms: [kinds] } for one that digs only those. */
+ *  for a mind that never digs, or { mood, rooms: [kinds] } for one that digs only those;
+ *  { mood, pick, special } chooses a caste and its share of the brood in four. */
 export function think(sim, t, mind = 1) {
   const mood = typeof mind === 'number' ? mind : mind.mood ?? 1, build = typeof mind === 'number' ? true : mind.build !== false;
   const may = k => typeof mind === 'number' || !mind.rooms || mind.rooms.includes(k); // rooms: the only kinds this mind digs
@@ -59,8 +60,12 @@ export function think(sim, t, mind = 1) {
   }
   // Diet: workers first, then one in four a major, then two in four.
   const adults = cg[o + CG.ADULTS], majors = cg[o + CG.MAJORS];
-  const diet = adults < 36 ? 0 : adults < 60 ? 1 : 2;
-  if (cg[o + CG.DIET] !== diet) out.push({ team: t, type: CMD.DIET, share: diet });
+  // Bold raises soldiers from the first brood: it means to strike before a growing hill's rooms have paid.
+  const diet = mood === 2 ? (adults < 34 ? 1 : 2) : adults < 36 ? 0 : adults < 60 ? 1 : 2;
+  // Its chosen caste (mind.pick), if the mission allows one: picked at the start, then raised beside the soldiers.
+  const pick = typeof mind === 'number' ? 0 : mind.pick | 0, special = pick && diet ? Math.min(4 - diet, mind.special ?? 1) : 0;
+  if (pick && !cg[o + CG.PICK]) out.push({ team: t, type: CMD.PICK, caste: pick });
+  if (cg[o + CG.DIET] !== diet || (cg[o + CG.PICK] && cg[o + CG.DIET2] !== special)) out.push({ team: t, type: CMD.DIET, share: diet, special });
   // Building, one room at a time: a store when the stores are nearly full, quarters when the hill is, a nursery wing when the brood is.
   if (build && cg[o + CG.MARKS] > 0 && !sim.digF[t]) {
     // Marks no worker can reach would stall it for good: take them off.
@@ -85,7 +90,7 @@ export function think(sim, t, mind = 1) {
   // raid into an equal guard is thrown away. Short of that, its soldiers hold the richest food on the fords.
   let foeMajors = 0, foe = -1;
   for (let e = 0; e < TEAMS; e++) if (e !== t && cg[e * CG.SIZE + CG.QUEEN_HP] > 0) { foe = e; foeMajors = Math.max(foeMajors, cg[e * CG.SIZE + CG.MAJORS]); }
-  const need = mood === 2 ? 6 : 10, from = mood === 2 ? 2400 : 4200;
+  const need = mood === 2 ? 8 : 10, from = mood === 2 ? 1600 : 4200;
   const strike = mood > 0 && foe >= 0 && majors >= need && sim.tick >= from && (mood === 2 ? majors >= foeMajors : majors * 4 >= foeMajors * 5);
   const atDoor = k => { const s2 = t * TRAILS + k, e = sim.trPath[s2 * PATH_MAX + sim.trLen[s2] - 1]; return foe >= 0 && sim.doorF[foe][e] <= 4; };
   if (raids.length && (majors < 3 || (strike && !atDoor(raids[0])) || (!strike && atDoor(raids[0]) && majors * 2 < foeMajors))) for (const k of raids) out.push({ team: t, type: CMD.ERASE, trail: k });

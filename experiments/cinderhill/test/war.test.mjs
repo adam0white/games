@@ -80,7 +80,7 @@ test('a fight ends the same whichever colony was spawned first', () => {
 });
 
 test('workers dig what is marked and the rooms raise the caps; a save mid-dig carries on', () => {
-  const s = new Sim({ seed: 4 }), dx = s.door[0] % s.L.sw, cells = [];
+  const s = new Sim({ seed: 4, sugar: 60 }), dx = s.door[0] % s.L.sw, cells = [];
   for (let y = 7; y <= 8; y++) for (let x = 1; x <= 5; x++) cells.push(dx + x, y);
   const cap0 = s.g(0, CG.CAP_ADULTS), food0 = s.g(0, CG.CAP_FOOD), brood0 = s.g(0, CG.CAP_BROOD);
   assert.deepEqual([food0, brood0], [120, 48]);
@@ -124,4 +124,33 @@ test('clearing takes the mark and the room off; repainting the stores spoils wha
   s.order({ team: 0, type: CMD.ROOM, cells: porch, kind: ROOM.REST }); s.step(); s.step();
   assert.equal(s.g(0, CG.CAP_FOOD), 24);
   assert.ok(s.g(0, CG.SUGAR) <= 24, `sugar ${s.g(0, CG.SUGAR)}`);
+});
+
+test('a colony picks one caste, once, from the mission list, and raises it', () => {
+  const s = new Sim({ seed: 4, protein: 60 });
+  s.order({ team: 0, type: CMD.PICK, id: 1, caste: CASTE.MAJOR }); // not on the list
+  s.order({ team: 0, type: CMD.PICK, id: 2, caste: CASTE.SPITTER });
+  s.order({ team: 0, type: CMD.PICK, id: 3, caste: CASTE.WARDEN }); // already chosen
+  s.order({ team: 0, type: CMD.DIET, share: 1, special: 2 });
+  s.order({ team: 1, type: CMD.DIET, share: 1, special: 2 }); // no caste chosen: no share
+  for (let k = 0; k < 2400; k++) s.step();
+  const ev = s.drainEvents(), refused = [];
+  for (let k = 0; k < ev.length; k += 4) if (ev[k] === 6) refused.push(ev[k + 2]);
+  assert.deepEqual(refused, [1, 3]);
+  assert.deepEqual([s.g(0, CG.PICK), s.g(0, CG.DIET2), s.g(1, CG.DIET2)], [CASTE.SPITTER, 2, 0]);
+  let spitters = 0; for (let i = 0; i < s.n; i++) if (s.team[i] === 0 && s.caste[i] === CASTE.SPITTER) spitters++;
+  assert.ok(spitters > 0 && spitters === s.g(0, CG.SPECIALS), `spitters ${spitters}`);
+  assert.equal(s.g(1, CG.SPECIALS), 0);
+});
+
+test('a spitter hits from two cells away, and not through earth', () => {
+  const fight = wall => {
+    const s = new Sim({ seed: 1, blank: true, ants: 0, eggs: 0, larvae: 0, pupae: 0, duskTick: 0 }), row = s.L.sw * 20;
+    if (wall) s.mat[row + 71] = 4; // a stone between them
+    const a = s.spawn(0, CASTE.SPITTER, row + 70), b = s.spawn(1, CASTE.WORKER, row + 72);
+    s.task[a] = s.task[b] = 0; s.buildBuckets(); s.fight();
+    return s.hp[b];
+  };
+  assert.ok(fight(false) < 12, 'the spit should land');
+  assert.equal(fight(true), 12);
 });

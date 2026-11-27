@@ -61,6 +61,9 @@
   .opts button[aria-pressed="true"] { background: linear-gradient(#ffb057, #e06a1c); color: #1b0f08; }
   .opts button.danger { color: #ff9a8a; }
   #caps span { margin-left: 6px; white-space: nowrap; } #caps b { font-weight: 800; font-size: inherit; } #caps .tight { color: #ff9a8a; }
+  .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 8px; } .tabs button { height: 30px; border-radius: 10px; background: rgba(255, 255, 255, 0.07); font-weight: 800; font-size: 13px; } .tabs button[aria-pressed="true"] { background: rgba(255, 176, 87, 0.3); color: #ffd9a8; }
+  #diet[data-tab="young"] [data-pane="dig"], #diet[data-tab="dig"] [data-pane="young"] { display: none; }
+  #digHelp { margin: 7px 2px 0; font-size: 12px; color: var(--dim); min-height: 15px; }
   #rooms button { font-size: 12px; } #rooms button small { font-size: 9px; }
 
   #nestWrap { position: fixed; left: 0; right: 0; bottom: 0; height: calc(44vh + 70px + env(safe-area-inset-bottom)); transform: translateY(102%); transition: transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1); border-top: 2px solid rgba(255, 180, 100, 0.5); box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.55); z-index: 3; background: #1b130f; }
@@ -126,7 +129,9 @@
     <button id="erase" class="danger">Erase<small>send home</small></button>
   </div>
 </div>
-<div id="diet" class="sheet glass">
+<div id="diet" class="sheet glass" data-tab="young">
+  <div class="tabs"><button data-tab="young" aria-pressed="true">Young</button><button data-tab="dig">Dig rooms</button></div>
+  <div data-pane="young">
   <div class="head"><i style="background:#e9e0cc"></i><b>Raise the young as</b><span id="dietInfo"></span></div>
   <div class="opts" id="diets">
     <button data-diet="0">Workers<small>1 meat each</small></button>
@@ -134,14 +139,24 @@
     <button data-diet="2">Half<small>soldiers</small></button>
     <button data-diet="3">3 in 4<small>soldiers</small></button>
   </div>
-  <div class="head" style="margin-top:8px"><i style="background:#8cd696"></i><b>Dig</b><span id="caps"><span>stores <b id="capFood">0</b></span> <span>young <b id="capBrood">0</b></span> <span>ants <b id="capAnts">0</b></span></span></div>
+  <div class="head" style="margin-top:8px"><i style="background:#c98a3a"></i><b id="specialName">Spitters</b><span>raised beside the soldiers</span></div>
+  <div class="opts" id="specials">
+    <button data-special="0" aria-pressed="true">None</button>
+    <button data-special="1">1 in 4<small>spitters</small></button>
+    <button data-special="2">Half<small>spitters</small></button>
+  </div>
+  </div>
+  <div data-pane="dig">
+  <div class="head"><i style="background:#8cd696"></i><b id="digHead">Rooms</b><span id="caps"><span>stores <b id="capFood">0</b></span> <span>young <b id="capBrood">0</b></span> <span>housing <b id="capAnts">0</b></span></span></div>
   <div class="opts" id="rooms">
     <button data-room="look" aria-pressed="true">Look<small>drag to move</small></button>
     <button data-room="store">Store<small>8 food each</small></button>
     <button data-room="nursery">Nursery<small>1 young each</small></button>
     <button data-room="rest">Quarters<small>4 ants each</small></button>
-    <button data-room="clear" class="danger">Clear<small>unmark</small></button>
+    <button data-room="clear" class="danger">Unmark<small>marks, rooms</small></button>
   </div>
+  <div id="digHelp">Pick a room, then drag in the earth beside a tunnel.</div>
+</div>
 </div>
 
 <div id="bar" class="glass">
