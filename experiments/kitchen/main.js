@@ -37,6 +37,16 @@ const save = sim.newSave();
 const STORY_KEY = 'kitchen-story';
 { const st = readJson(STORY_KEY, null); if (st && typeof st === 'object' && Array.isArray(st.seen)) save.story = st; }
 const store = () => { writeJson(KEY, { ...save, story: undefined }); if (save.story) writeJson(STORY_KEY, save.story); };
+// Tool skins (cosmetic; their own key): what the glove holds when chopping, and the sound it makes.
+const TOOLS_KEY = 'kitchen-tools';
+const TOOLS = [
+  { id: 'chef', cost: 0, tier: 0, icon: '🔪' }, { id: 'chopsticks', cost: 30, tier: 0, icon: '🥢' },
+  { id: 'spatula', cost: 60, tier: 1, icon: '🍳' }, { id: 'cleaver', cost: 150, tier: 2, icon: '🪓' },
+  { id: 'fish', cost: 220, tier: 3, icon: '🐟' }, { id: 'machete', cost: 400, tier: 4, icon: '🗡️' },
+  { id: 'golden', cost: 900, tier: 5, icon: '✨' },
+];
+const tools = (() => { const o = readJson(TOOLS_KEY, null), ids = TOOLS.map(x => x.id); const own = Array.isArray(o?.own) ? o.own.filter(x => ids.includes(x)) : []; if (!own.includes('chef')) own.unshift('chef'); return { own, use: ids.includes(o?.use) && own.includes(o.use) ? o.use : 'chef' }; })();
+const storeTools = () => writeJson(TOOLS_KEY, tools);
 let lookId = LOOK_IDS.includes(query.get('look')) ? query.get('look') : LOOK_IDS.includes(read(LOOK_KEY)) ? read(LOOK_KEY) : 'diner';
 
 // ---------- sound: made in code (kit/audio.js); music from kit/music.js
@@ -53,6 +63,8 @@ const SFX = {
   whoosh() { noise(0.18, 0.05, 2600); },
   chop() { noise(0.06, 0.16, 2400); tone(160, 0.07, 0.1, 'triangle', -80); },
   thunk() { noise(0.05, 0.12, 500); tone(110, 0.08, 0.08, 'triangle', -40); },
+  // Each tool's own cut sound, on top of the chop.
+  toolCut() { const u = tools.use; if (u === 'chopsticks') { tone(2400, 0.03, 0.05, 'square'); later(40, () => tone(2600, 0.03, 0.04, 'square')); } else if (u === 'fish') { noise(0.09, 0.14, 700); tone(140, 0.12, 0.06, 'sine', -60); } else if (u === 'cleaver') { tone(80, 0.12, 0.12, 'square', -30); } else if (u === 'machete') { noise(0.14, 0.06, 6500); } else if (u === 'golden') { tone(2093, 0.25, 0.04); } else if (u === 'spatula') { tone(700, 0.08, 0.05, 'triangle', -300); } },
   swish() { noise(0.12, 0.04, 5200); },
   sizzle() { noise(0.09, 0.035, 6000 + Math.random() * 2000); },
   hum() { tone(120, 0.12, 0.025, 'sawtooth'); },
@@ -63,6 +75,8 @@ const SFX = {
   // The register: a bright bell and coins as the drawer opens; a heavy clunk as it closes.
   open() { tone(2637, 0.9, 0.09); tone(3520, 0.7, 0.04); later(70, () => tone(2637, 0.7, 0.05)); noise(0.06, 0.08, 1800); for (let i = 0; i < 6; i++) later(120 + i * 55, () => tone(3000 + Math.random() * 1600, 0.06, 0.025, 'square')); },
   coin() { tone(1900 + Math.random() * 500, 0.07, 0.03, 'square'); },
+  key() { tone(1200 + Math.random() * 200, 0.03, 0.035, 'square'); noise(0.02, 0.04, 3000); },
+  bill() { noise(0.07, 0.05, 4200); tone(600, 0.04, 0.015, 'triangle', 200); },
   clunk() { noise(0.09, 0.18, 380); tone(95, 0.16, 0.14, 'square', -40); later(60, () => noise(0.05, 0.08, 900)); },
   build() { [392, 523, 659, 784].forEach((f, i) => later(i * 80, () => tone(f, 0.2, 0.07, 'triangle'))); noise(0.2, 0.05, 1200); },
   star() { [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => later(i * 110, () => { tone(f, 0.4, 0.08, 'triangle'); tone(f / 2, 0.35, 0.04); })); },
@@ -118,7 +132,8 @@ function labels() {
   $('chopBtnText').textContent = t('chop');
 }
 const rankName = tier => t('rank_' + TIERS[tier].name);
-const starText = tier => '★'.repeat(tier) + '☆'.repeat(5 - tier);
+// Five stars, then a moon for each rank above the clouds.
+const starText = tier => '★'.repeat(Math.min(5, tier)) + '☆'.repeat(Math.max(0, 5 - tier)) + '☾'.repeat(Math.max(0, tier - 5));
 function hud() {
   $('coinText').textContent = save.coins;
   $('rankStars').textContent = starText(save.tier);
@@ -134,7 +149,7 @@ function menu() {
 // ---------- the 3D view
 const canvas = $('c');
 ready = createView(canvas, lookId).then(v => {
-  art = v; art.setRestaurant(save); art.view('menu', true);
+  art = v; art.setRestaurant(save); art.view('menu', true); art.knife.setSkin(tools.use);
   // A guest at the counter on the menu: the restaurant is open.
   art.peopleReady.then(() => { peopleIn = true; $('play').disabled = false; $('play').classList.remove('loading'); });
   art.peopleReady.then(async () => { if (screen === 'menu' && !g) { const m = await art.guest(2); if (m) { m.g.position.set(1.6, 0, 1.7); m.play('idle'); m.face = 0.3; menuGuest = m; } } });
@@ -144,6 +159,7 @@ let menuGuest = null;
 
 // ---------- a day
 function beginDay() {
+  art.register.reset?.();
   if (menuGuest) { menuGuest.gone = true; menuGuest = null; }
   for (const m of art.guests) m.gone = true;
   const seed = query.has('seed') ? Number(query.get('seed')) >>> 0 : (Date.now() ^ save.day * 7919) >>> 0;
@@ -198,7 +214,7 @@ const itemModel = id => (ING[id] ?? JUNK[id]).model;
 function startCatch() {
   phase = 'catch'; art.view('catch');
   const tutorial = g.tut === 0 ? 'first' : g.tut >= 1 ? true : false;
-  g.catch = sim.newCatch({ need: g.need, hard: sim.hardness(save) + (g.golden ? 2.5 : 0), trayLevel: save.built.tray, seed: day.seed + day.i * 101 + g.restarts * 7, tutorial });
+  g.catch = sim.newCatch({ need: g.need, hard: sim.hardness(save) + (g.golden ? 2.5 : 0), trayLevel: save.built.tray, twist: sim.twistFor(save.tier), seed: day.seed + day.i * 101 + g.restarts * 7, tutorial });
   g.catchT0 = clock;
   banner(g.golden ? t('golden') : t('catch'), g.golden ? t('goldenSub') : '');
   if (g.tut === 0) coach(t('t2'), 4); else if (g.tut === 1) coach(t('t6'), 6); else coach(null);
@@ -332,7 +348,7 @@ function startChop() {
     art.popIn(m, false);
     return { id, m, cuts: 0, x, z0: m.position.z, ph: Math.random() * 6.28, hw, s0 };
   });
-  cook = { kind: 'chop', pieces, t0: clock, cuts: sim.chopCuts(save), slide: sim.chopSlide(save), bits: [] };
+  cook = { kind: 'chop', pieces, t0: clock, cuts: sim.chopCuts(save), slide: sim.chopSlide(save) * sim.knifeCalm(save.built.knife), reach: sim.knifeReach(save.built.knife), bits: [] };
   banner(t('chop'), t('chopSub'));
   aim = 0; art.knife.position.x = 0.45;
   if (g.tut === 0) { coach(t('t3')); fingerTap(pieces[0].m.position.clone().add(new art.THREE.Vector3(0, 0.05, 0))); }
@@ -346,7 +362,7 @@ function lie(g) {
 }
 function cutAt(p, x = p.m.position.x) {
   p.cuts++;
-  SFX.chop(); buzz(15); art.shake(0.4);
+  SFX.chop(); SFX.toolCut(); buzz(15); art.shake(0.4);
   const pos = new art.THREE.Vector3(x, TOP + 0.08, p.m.position.z);
   art.burst(pos, { n: 12, color: juice(p.id), speed: 1.1, up: 1.3, size: 0.022, life: 0.55 });
   if (p.cuts < cook.cuts) {
@@ -396,7 +412,7 @@ function stepKnife(dt) {
 function land(x) {
   if (!cook || cook.kind !== 'chop' || cook.over) return;
   // The blade cuts what is under it: half the piece's width (it shrinks with each slice), plus a little.
-  const hits = cook.pieces.filter(p => !p.done && Math.abs(p.m.position.x - x) < p.hw * p.m.scale.x / p.s0 + KNIFE.hitW);
+  const hits = cook.pieces.filter(p => !p.done && Math.abs(p.m.position.x - x) < p.hw * p.m.scale.x / p.s0 + (cook.reach ?? KNIFE.hitW));
   if (!hits.length) { SFX.thunk(); art.shake(0.15); buzz(6); cook.misses = (cook.misses ?? 0) + 1; return; }
   if (hits.length >= 2) combo(hits.length, art.toScreen(hits[0].m.position.clone().add(new art.THREE.Vector3(0, 0.1, 0))));
   for (const p of hits) { cutAt(p, x); if (cook?.over) break; }
@@ -568,7 +584,9 @@ function serve() {
     g.model?.play('emote-yes', true); g.model?.bubble.show(null, 'happy'); SFX.happy();
     floater(worldPx(3.25, 1.9, 0.95), '★'.repeat(g.bill.stars), 'gold');
     if (g.golden) { banner(t(g.goldenWon ? 'goldenWon' : 'goldenLost')); if (g.goldenWon) { flash(); SFX.star(); } }
-    art.register.display(String(g.bill.total));
+    // The total is keyed in digit by digit, a click a key.
+    const digits = String(g.bill.total);
+    for (let i = 1; i <= digits.length; i++) later(i * 85, () => { if (!g) return; art.register.press(i * 5 + (+digits[i - 1])); art.register.display(digits.slice(0, i)); SFX.key(); });
     wait(0.8, ringUp);
   });
 }
@@ -584,19 +602,22 @@ function openRegister() {
   phase = 'open';
   art.register.open(); SFX.open(); buzz(20); fingerOff();
   const b = g.bill; let given = 0;
+  art.register.display(String(b.total));
+  // The guest pays in bills and coins; they flutter into their slots in the drawer.
+  art.register.pay(b.total, new art.THREE.Vector3(3.05, TOP + 0.45, 0.85), kind => (kind === 'coin' ? SFX.coin() : SFX.bill()));
   const from = art.toScreen(art.register.drawerWorld()), to = $('coins').getBoundingClientRect();
   const n = Math.min(14, 3 + Math.round(b.total / 4));
   for (let i = 0; i < n; i++) {
     const share = Math.round(b.total * (i + 1) / n) - Math.round(b.total * i / n);
-    later(140 + i * 70, () => flyCoin(from, { x: to.left + 16, y: to.top + 14 }, () => { given += share; save.coins += share; hud(); SFX.coin(); $('coins').firstElementChild.classList.remove('bump'); void $('coins').offsetWidth; $('coins').firstElementChild.classList.add('bump'); }));
+    later(380 + i * 60, () => flyCoin(from, { x: to.left + 16, y: to.top + 14 }, () => { given += share; save.coins += share; hud(); SFX.coin(); $('coins').firstElementChild.classList.remove('bump'); void $('coins').offsetWidth; $('coins').firstElementChild.classList.add('bump'); }));
   }
   floater(from, `+${b.total}`, 'gold');
   // The coins are the guest's: count them as served now, whatever happens next.
   save.served++; day.served++; day.earned += b.price; day.tips += b.tip; day.stars.push(b.stars);
   tally({ type: 'serve', recipe: g.recipe, stars: b.stars, tip: b.tip, coins: b.total, quick: g.wait <= TUNE.patience });
-  setTimeout(() => { if (given < b.total) { save.coins += b.total - given; given = b.total; hud(); } store(); }, 140 + n * 70 + 900);
+  setTimeout(() => { if (given < b.total) { save.coins += b.total - given; given = b.total; hud(); } store(); }, 380 + n * 60 + 900);
   rec.event('serve', { recipe: g.recipe, stars: b.stars, coins: b.total });
-  wait(0.75, () => { phase = 'close'; closeRegister(); });
+  wait(0.95, () => { phase = 'close'; closeRegister(); });
 }
 function closeRegister() {
   if (phase !== 'close') return;
@@ -649,14 +670,14 @@ function shop(fresh = null) {
   art?.view('room');
   $('shopCoins').textContent = save.coins;
   const next = TIERS[save.tier + 1];
-  if (!next) $('starBox').innerHTML = `<div class="title">${starText(5)}</div><div>${t('starDone')}</div>`;
+  if (!next) $('starBox').innerHTML = `<div class="title">${starText(save.tier)}</div><div>${t('starDone')}</div>`;
   else {
     const c = sim.canStar(save);
     const needs = Object.entries(next.needs).map(([k, v]) => `<span class="${save.built[k] >= v ? 'ok' : ''}">${t('b_' + k)} ${t('lv', { n: v })}${save.built[k] >= v ? ' ✓' : ''}</span>`).join('');
     // One clear next step: the cheapest building the next rank still needs, else the coins to save, else the rank itself.
     const missing = Object.entries(next.needs).filter(([k, v]) => save.built[k] < v).map(([k]) => ({ k, cost: sim.canBuild(save, k).cost ?? 1e9 })).sort((a, b) => a.cost - b.cost);
     const step = c.ok ? t('rankReady') : missing.length ? t('nextUp', { what: `${t('b_' + missing[0].k)} ${t('lv', { n: save.built[missing[0].k] + 1 })}` }) : t('saveFor', { n: next.cost - save.coins });
-    $('starBox').innerHTML = `<div class="title">${starText(save.tier + 1)} ${t('starUp', { rank: rankName(save.tier + 1) })}</div><div class="need">${needs}</div><div class="nextStep">➜ ${step}</div><button id="starGo" class="main${c.ok ? ' ready' : ''}" ${c.ok ? '' : 'disabled'}><i class="coin"></i> ${next.cost}</button>`;
+    $('starBox').innerHTML = `<div class="title">${starText(save.tier + 1)} ${t('starUp', { rank: rankName(save.tier + 1) })}</div><div class="need">${needs}</div><div class="nextStep">➜ ${step}</div>${sim.twistFor(save.tier + 1) && sim.twistFor(save.tier + 1) !== sim.twistFor(save.tier) ? `<div class="twist">🌬 ${t('twistNew')}: ${t('tw_' + sim.twistFor(save.tier + 1).id)}</div>` : ''}<button id="starGo" class="main${c.ok ? ' ready' : ''}" ${c.ok ? '' : 'disabled'}><i class="coin"></i> ${next.cost}</button>`;
     $('starGo').addEventListener('click', starUp);
   }
   const goal = id => TIERS[save.tier + 1] && save.built[id] < (TIERS[save.tier + 1].needs[id] ?? 0);
@@ -668,6 +689,20 @@ function shop(fresh = null) {
     return `<div class="bld${fresh === id ? ' new' : ''}${goal(id) ? ' goal' : ''}">${pic}<div class="name">${t('b_' + id)}${goal(id) ? ` <small class="for">${t('forRank', { rank: rankName(save.tier + 1) })}</small>` : ''}</div><div class="lv">${lv ? t('lv', { n: lv }) : t('notBuilt')}</div><div class="what">${t('w_' + id)}</div><button data-b="${id}" ${c.ok ? '' : 'disabled'}>${lv ? '' : t('build') + ' '}${label}</button></div>`;
   }).join('');
   for (const b of $('builds').querySelectorAll('button[data-b]')) b.addEventListener('click', () => buildIt(b.dataset.b));
+  // Tools: pick what the glove holds. Buy once, switch any time.
+  $('builds').insertAdjacentHTML('beforeend', `<div class="toolsBox"><div class="name">${t('toolsTitle')}</div><div class="tools">${TOOLS.map(x => {
+    const own = tools.own.includes(x.id), on = tools.use === x.id, locked = save.tier < x.tier;
+    const label = on ? t('toolOn') : own ? t('toolUse') : locked ? t('needStar', { stars: rankName(x.tier) }) : `<i class="coin"></i>${x.cost}`;
+    return `<button class="tool${on ? ' on' : ''}" data-tool="${x.id}" ${on || (!own && (locked || save.coins < x.cost)) ? 'disabled' : ''}><span class="ic">${x.icon}</span><span>${t('tool_' + x.id)}</span><small>${label}</small></button>`;
+  }).join('')}</div></div>`);
+  for (const b of $('builds').querySelectorAll('button[data-tool]')) b.addEventListener('click', () => toolIt(b.dataset.tool));
+}
+function toolIt(id) {
+  const x = TOOLS.find(k => k.id === id); if (!x) return;
+  if (!tools.own.includes(id)) { if (save.tier < x.tier || save.coins < x.cost) return; save.coins -= x.cost; tools.own.push(id); store(); SFX.build(); rec.event('tool', { id, cost: x.cost }); }
+  else SFX.tap();
+  tools.use = id; storeTools(); art.knife.setSkin(id); hud();
+  const sc = $('builds').scrollTop; shop(); $('builds').scrollTop = sc;
 }
 function buildIt(id) {
   if (!sim.build(save, id)) return;
@@ -687,6 +722,8 @@ function starUp() {
   shop(); hud();
   flash();
   if (added.length) floater({ x: innerWidth / 2, y: innerHeight * 0.3 }, t('unlocked', { what: added.join(', ') }), 'gold');
+  const tw = sim.twistFor(save.tier);
+  if (tw) floater({ x: innerWidth / 2, y: innerHeight * 0.38 }, `${t('twistNew')}: ${t('tw_' + tw.id)}`, 'gold');
 }
 
 // ---------- the story: cards before the first catch, toasts, missions
