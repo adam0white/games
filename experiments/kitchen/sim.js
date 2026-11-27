@@ -118,9 +118,9 @@ export const TWISTS = [null, null, null, null, null, null,
 export const twistFor = tier => TWISTS[Math.min(tier, TWISTS.length - 1)] ?? null;
 // Buildings: level 0 means not built. max: highest level at each star tier. cost(level) is the price of reaching it.
 export const BUILDINGS = {
-  tray: { max: [2, 3, 4, 5, 5, 6, 7, 7, 8, 8, 9], cost: l => [0, 0, 20, 45, 90, 160, 260, 380, 520, 700][l] },
+  tray: { max: [2, 3, 4, 5, 5, 7, 7, 8, 8, 9, 9], cost: l => [0, 0, 20, 45, 90, 160, 260, 380, 520, 700][l] },
   knife: { max: [1, 2, 3, 4, 5, 5, 6, 6, 7, 7, 8], cost: l => [0, 0, 25, 50, 90, 150, 320, 480, 650][l] },
-  stove: { max: [1, 2, 3, 3, 4, 5, 6, 6, 7, 7, 7], cost: l => [0, 40, 60, 100, 150, 220, 340, 500][l] },
+  stove: { max: [1, 2, 3, 3, 4, 6, 6, 6, 7, 7, 7], cost: l => [0, 40, 60, 100, 150, 220, 340, 500][l] },
   micro: { max: [0, 1, 2, 3, 4, 5, 6, 6, 6, 7, 7], cost: l => [0, 70, 90, 130, 180, 240, 360, 520][l] },
   blender: { max: [0, 0, 1, 2, 3, 4, 4, 5, 5, 6, 6], cost: l => [0, 110, 140, 180, 230, 400, 560][l] },
   tables: { max: [1, 2, 3, 4, 5, 6, 6, 6, 6, 6, 6], cost: l => [0, 0, 35, 70, 120, 180, 260][l] },
@@ -272,7 +272,7 @@ export const chopCuts = save => (save.tier >= 2 ? 3 : save.tier >= 1 ? 2 : 1);
 export const chopSlide = save => (save.tier >= 1 ? Math.min(0.4, 0.12 + 0.05 * save.tier) : 0);
 // Par counts strikes (pieces x cuts): about half a second each to aim and drop the knife. A better knife does not
 // change par; it has a wider edge (knifeReach) and steadies the pieces (knifeCalm), so the same par is easier to make.
-export const knifeReach = knife => 0.015 + 0.005 * knife;
+export const knifeReach = knife => 0.02 + 0.005 * knife;
 export const knifeCalm = knife => Math.max(0.6, 1 - 0.05 * (knife - 1));
 export function chopQuality(seconds, strikes, knife) { const par = strikes * 0.52 + 0.8; return seconds <= par ? 1 : Math.max(0.4, 1 - (seconds - par) / (par * 1.5)); }
 // Fry: hold to heat; doneness grows while held; let go inside the golden band.

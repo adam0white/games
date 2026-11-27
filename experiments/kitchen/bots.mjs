@@ -122,3 +122,11 @@ console.log('bots: ok');
   assert.ok(sp && story.COUNTABLE.has(sp.goal.type) && sp.pay > 0);
   console.log('story: ok');
 }
+
+// Every rank must be reachable: what rank t needs must be buildable at rank t-1, at a real price.
+for (let t = 1; t < sim.TIERS.length; t++) for (const [k, v] of Object.entries(sim.TIERS[t].needs ?? {})) {
+  assert.ok(v <= sim.BUILDINGS[k].max[t - 1], `rank ${sim.TIERS[t].name} needs ${k} ${v}, but rank ${sim.TIERS[t - 1].name} caps it at ${sim.BUILDINGS[k].max[t - 1]}`);
+  for (let l = 1; l <= v; l++) assert.ok(Number.isFinite(sim.BUILDINGS[k].cost(l)), `${k} level ${l} has no price`);
+}
+for (const k of sim.BUILDING_IDS) for (let l = 1; l <= sim.BUILDINGS[k].max.at(-1); l++) assert.ok(Number.isFinite(sim.BUILDINGS[k].cost(l)), `${k} level ${l} has no price`);
+console.log('ranks reachable: ok');

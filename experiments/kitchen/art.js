@@ -181,7 +181,7 @@ export async function createView(canvas, lookId) {
     else if (id === 'chopsticks') { for (const x of [-0.012, 0.012]) { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.008, 0.46, 8), mat('#c9894b', 0.6)); c.rotation.x = Math.PI / 2 - 0.12; c.position.set(x, 0.03, -0.16); c.castShadow = true; g.add(c); } }
     else if (id === 'fish') g.add(alongZ(item('fish', 1), 0.42, -0.2));
     else if (id === 'spatula') g.add(alongZ(item('cooking-spatula', 1), 0.48, -0.2));
-    else if (id === 'golden') { const k = bladeG.clone(true); const gm2 = mat('#ffc531', 0.25, 0.9); k.traverse(o => { if (o.isMesh) o.material = gm2; }); g.add(k); }
+    else if (id === 'golden') { const k = bladeG.clone(true); k.visible = true; const gm2 = mat('#ffc531', 0.35, 0.35); gm2.emissive = new THREE.Color('#7a5200'); gm2.emissiveIntensity = 0.35; k.traverse(o => { if (o.isMesh) o.material = gm2; }); g.add(k); }
     return g;
   }
   knife.setSkin = id => {
