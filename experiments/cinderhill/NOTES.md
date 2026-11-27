@@ -932,3 +932,23 @@ From the third outside review (bead lab-5w7.75), items 1 to 3:
 - The trail panel says "13 on it, 15 wanted", and the three sizes say what they are a share of ("1 worker in 4", "half the soldiers").
 
 Seen in a phone browser on The Crossing: button shown at 0 soldiers, hidden on The Hunt with 2; the tap opened the Nest on Young; no page errors. Not tested by a person.
+
+## The home hill: a mission starts in the nest the last one left (war build)
+
+Measured against `docs/design/colony/13-full-game.md` section 1, the weakest of the six rows was the last: nothing a player did in one mission changed the next, beyond eight workers lost with a lost mission. Four missions are fought on the same map (The Crossing, First Frost, The Stones, The Larder), so they are now one hill.
+
+- **Rule.** A mission with `from` in `MISSIONS` starts in both nests as they stood at the end of that mission: the player in theirs, the rival in the one it dug in the player's own game. Tunnels, stores, nurseries and quarters are kept. Gardens and guard posts come back as bare tunnels, since they must be earned in each mission. Nothing is kept within four cells of the line between the hills, so joined nests start apart. Ants, food and brood are the mission's own. Chain: Frost from Crossing, Stones from Frost, Larder from Stones; where a link was never finished on this device, the one before it is used. The Hunt, The Narrows and The Wall are other ground and start bare.
+- **Sim.** `sim.nests()` gives each colony's open cells as offsets from its door (mirrored for the right hill, so seats that change sides keep their own). The option `nests` applies them after the map is laid (`inherit`). No save format change: it only sets `mat`, `room` and `cache` before the first tick.
+- **Page.** A new storage key, `cinderhill:war:hills`, written at a mission's end. The mission card says what is kept ("219 cells dug, 27 of them stores, 80 nursery, 40 quarters"). New campaign clears it. Setting "The home hill": kept (default) or a new hill every mission. The record's start carries `hill` (the mission it came from, or `new`) and `dug`.
+
+Bots, steady v steady, ten seeds. The nests come from a bot game on The Crossing with the same seed; wins are seat 0 v seat 1.
+
+| Mission | Neither kept | Both kept | Only seat 0 | Only seat 1 |
+| --- | --- | --- | --- | --- |
+| First Frost | 8 v 2 | 7 v 3 | 10 v 0 | 0 v 10 |
+| The Stones | 9 v 1 | 8 v 2 | 10 v 0 | 3 v 7 |
+| The Larder | 5 v 5 | 5 v 5 | 1 v 9 | 5 v 5 |
+
+Read: on Frost and The Stones a kept nest decides the game when only one hill has it, and overturns the seat lean (bead lab-5w7.74). With both kept the split is as before. On The Larder a kept nest did not help, and seat 0 with it lost 9 of 10: unexplained. A guess, not checked: a bot with room to grow keeps growing and raids for loads later. In play both hills always keep their nests, so what differs is how much each dug.
+
+Not known: how far a person's nest differs from the bot's at the end of a mission, so how large the lead is in play. A phone browser run played The Crossing by bot to its end, then opened First Frost: the card named the kept nest and the Nest view showed it (stores 216, housing 250, against 120 and 90 bare). No person has played it.

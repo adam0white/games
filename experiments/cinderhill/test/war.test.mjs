@@ -673,3 +673,18 @@ test('The Narrows has soft ground: a cell of clay takes half the time and no see
   assert.deepEqual([a.cfg.digTicks, a.cfg.digSugar], [60, 0]);
   assert.deepEqual([b.cfg.digTicks, b.cfg.digSugar], [C.DIG_TICKS, C.DIG_SUGAR]);
 });
+
+test('a mission starts in the nests an earlier one left: rooms kept, nothing near the line between the hills', () => {
+  const a = new Host({ seed: 4, ai: { 0: 1, 1: 1 }, mission: 'crossing' }).run(3000).sim, nests = a.nests();
+  assert.ok(nests[0].length / 3 > 80 && nests[1].length / 3 > 80, 'both bots dug');
+  const fresh = new Sim({ seed: 4, mission: 'frost' }), b = new Sim({ seed: 4, mission: 'frost', nests });
+  for (let t = 0; t < TEAMS; t++) {
+    assert.ok(b.g(t, CG.CAP_ADULTS) + b.g(t, CG.CAP_FOOD) > fresh.g(t, CG.CAP_ADULTS) + fresh.g(t, CG.CAP_FOOD), 'the kept rooms count');
+    assert.deepEqual(b.nests()[t], nests[t].map((v, j) => (j % 3 === 2 && v > ROOM.REST ? 0 : v)), 'the same nest, but for rooms that must be earned');
+  }
+  assert.equal(b.g(0, CG.ADULTS), fresh.g(0, CG.ADULTS)); assert.equal(b.g(0, CG.SUGAR), fresh.g(0, CG.SUGAR)); // ants and food are the mission's own
+  // Seats that change sides keep their own nests; a cell near the line between the hills is not kept.
+  const mid = b.L.sw >> 1, far = mid - (b.door[0] % b.L.sw) - 2, c = new Sim({ seed: 4, mission: 'frost', nests: [[far, 20, 0], null] });
+  assert.equal(c.mat[c.L.nestBase + 20 * c.L.nw + mid - 2], MAT.CLAY);
+  assert.equal(MISSIONS.frost.from, 'crossing'); assert.equal(MISSIONS.hunt.from, undefined);
+});

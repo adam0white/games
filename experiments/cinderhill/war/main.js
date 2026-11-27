@@ -31,11 +31,12 @@ const set = settings('cinderhill', {
   finger: { values: ['hill', 'draw'], def: 'hill', key: 'cinderhill:war:finger' },
   forks: { values: ['kept', 'free'], def: 'kept', key: 'cinderhill:war:forks' },
   growth: { values: ['mission', 'deeds'], def: 'mission', key: 'cinderhill:war:growth' },
+  home: { values: ['carried', 'bare'], def: 'carried', key: 'cinderhill:war:home' },
 }, { rec });
-const LABEL = { caste: 'Your third caste', rival: 'Rival', view: 'View', light: 'Light', style: 'Style', size: 'Ants', sound: 'Sound', finger: 'One finger', forks: 'Forks', growth: 'The tree' };
-const NAME = { mission: 'Grow the hill in each mission', deeds: 'Deeds alone open tools (no growth)', spitter: 'Spitters', warden: 'Wardens', timid: 'Timid', steady: 'Steady', bold: 'Bold', tilt: 'Tilted', top: 'Top down', low: 'Low', cycle: 'Day to dusk', day: 'Day', ember: 'Ember', relief: 'Painted', ink: 'Ink', 1: 'True size', 1.5: 'Larger', hill: 'Draws from your hill, moves the view elsewhere', draw: 'Always draws', kept: 'Kept for the campaign', free: 'Can be changed between missions', all: 'Music & effects', fx: 'Effects', off: 'Off' };
+const LABEL = { caste: 'Your third caste', rival: 'Rival', view: 'View', light: 'Light', style: 'Style', size: 'Ants', sound: 'Sound', finger: 'One finger', forks: 'Forks', growth: 'The tree', home: 'The home hill' };
+const NAME = { carried: 'Kept from mission to mission', bare: 'A new hill every mission', mission: 'Grow the hill in each mission', deeds: 'Deeds alone open tools (no growth)', spitter: 'Spitters', warden: 'Wardens', timid: 'Timid', steady: 'Steady', bold: 'Bold', tilt: 'Tilted', top: 'Top down', low: 'Low', cycle: 'Day to dusk', day: 'Day', ember: 'Ember', relief: 'Painted', ink: 'Ink', 1: 'True size', 1.5: 'Larger', hill: 'Draws from your hill, moves the view elsewhere', draw: 'Always draws', kept: 'Kept for the campaign', free: 'Can be changed between missions', all: 'Music & effects', fx: 'Effects', off: 'Off' };
 const MOOD = { timid: 0, steady: 1, bold: 2 };
-const redraw = set.panel($('settings'), { only: set.ids.filter(id => id !== 'caste'), label: id => LABEL[id], name: (id, v) => NAME[v] ?? v, what: (id, v) => (id === 'caste' ? (v === 'spitter' ? 'Frail, but they spit from two cells away, over the front line. Applies from the next start.' : 'Slow and very hard to kill: they hold a tunnel. Applies from the next start.') : id === 'rival' ? (v === 'timid' ? 'It never attacks your hill. Applies from the next start.' : v === 'bold' ? 'It raids early, even at even odds. Applies from the next start.' : 'It holds the fords, and raids when it has the numbers. Applies from the next start.') : id === 'growth' ? (v === 'mission' ? 'Each mission you widen the queen\'s chamber, choose a War hill or a Deep hill, and grow into your tools. Applies from the next start.' : 'No growth: what your deeds have opened is yours from the first minute. Applies from the next start.') : null), onChange: (id, v) => { if (id === 'forks') renderPath(); if (id === 'sound') { if (v === 'off') snd.hold(); else { snd.release(); startSong(); } } tone(660, 0.06, 0.03, 'triangle', 80); } });
+const redraw = set.panel($('settings'), { only: set.ids.filter(id => id !== 'caste'), label: id => LABEL[id], name: (id, v) => NAME[v] ?? v, what: (id, v) => (id === 'caste' ? (v === 'spitter' ? 'Frail, but they spit from two cells away, over the front line. Applies from the next start.' : 'Slow and very hard to kill: they hold a tunnel. Applies from the next start.') : id === 'rival' ? (v === 'timid' ? 'It never attacks your hill. Applies from the next start.' : v === 'bold' ? 'It raids early, even at even odds. Applies from the next start.' : 'It holds the fords, and raids when it has the numbers. Applies from the next start.') : id === 'growth' ? (v === 'mission' ? 'Each mission you widen the queen\'s chamber, choose a War hill or a Deep hill, and grow into your tools. Applies from the next start.' : 'No growth: what your deeds have opened is yours from the first minute. Applies from the next start.') : id === 'home' ? (v === 'carried' ? 'First Frost, The Stones and The Larder are fought on the hill of The Crossing. Each starts in the nest as you left it, tunnels, stores, nurseries and quarters, and the rival starts in its own. Applies from the next start.' : 'Every mission starts in the same small nest. Applies from the next start.') : null), onChange: (id, v) => { if (id === 'forks' || id === 'home') renderPath(); if (id === 'sound') { if (v === 'off') snd.hold(); else { snd.release(); startSong(); } } tone(660, 0.06, 0.03, 'triangle', 80); } });
 
 // ---- the game ----
 const qSeed = Math.floor(Number(query.get('seed')));
@@ -65,6 +66,13 @@ const saveLine = () => { try { localStorage.setItem(LINE_KEY, JSON.stringify(lin
 const deedsFor = node => Object.values(MISSIONS).flatMap(m => m.deeds.filter(d => d.opens === node).map(d => ({ ...d, mission: m })));
 const hasNode = node => deedsFor(node).some(d => line.deeds[`${d.mission.id}.${d.id}`]);
 const nodesNow = () => LINEAGE.flatMap(b => b.nodes).filter(n => n.node && hasNode(n.node)).map(n => n.node);
+// The home hill: both nests as they stood at the end of each mission fought on it. Its own key. A mission with `from`
+// starts in the nests of that mission, or of the one before it on the same hill when that one was never finished here.
+const HILL_KEY = 'cinderhill:war:hills';
+function loadHills() { try { const c = JSON.parse(localStorage.getItem(HILL_KEY)); if (c && c.v === 1 && c.after) return c; } catch { /* none yet */ } return { v: 1, after: {} }; }
+let hills = loadHills();
+const saveHills = () => { try { localStorage.setItem(HILL_KEY, JSON.stringify(hills)); } catch { /* private mode */ } };
+const hillOf = id => { if (set.get('home') !== 'carried') return null; for (let f = MISSIONS[id].from; f; f = MISSIONS[f].from) if (hills.after[f]) return { from: f, nests: hills.after[f].nests }; return null; };
 const STEPS = CAMPAIGN.filter(s => s.mission).map(s => s.mission);
 const before = id => STEPS[STEPS.indexOf(id) - 1];
 /** A mission is open when the one before it was played to its end and every fork before it is taken. */
@@ -85,7 +93,7 @@ let missionId = MISSIONS[qMission] ? qMission : firstOpen();
 const rivalMind = () => { const mood = MOOD[set.get('rival')]; return mood && camp.caste ? { mood, pick: camp.caste === 'spitter' ? CASTE.WARDEN : CASTE.SPITTER } : mood; };
 // A mission lost costs the next one some of its first workers: the colony carries on smaller.
 const startAnts = () => { const prev = before(missionId), ants = MISSIONS[missionId].kit.ants; return prev && camp.done[prev] && !camp.done[prev].won ? [Math.max(10, ants - LOSS_ANTS), MISSIONS[missionId].kit.foeAnts ?? ants] : [ants, MISSIONS[missionId].kit.foeAnts ?? ants]; };
-const newHost = () => new Host({ seed, mission: missionId, antsBy: startAnts(), traits: traitsNow(), tiers: set.get('growth') !== 'deeds', ai: { [FOE]: MOOD[set.get('rival')] } });
+const newHost = () => new Host({ seed, mission: missionId, ...(hillOf(missionId) ? { nests: hillOf(missionId).nests } : {}), antsBy: startAnts(), traits: traitsNow(), tiers: set.get('growth') !== 'deeds', ai: { [FOE]: MOOD[set.get('rival')] } });
 let host = newHost(), sim = host.sim;
 let screen = 'menu', tool = 'trail', nestOpen = false, running = false, speed = 1, lastT = 0;
 const Gs = makeGestures();
@@ -233,7 +241,7 @@ function growPane() {
   if (can && tier === 0 && sim.tick > 400 && !(nestOpen && $('diet').dataset.tab === 'grow')) once('grow', 'Seeds to spare. Open Nest, then Grow: the queen\'s chamber can be widened.', 4200);
 }
 function startRun() {
-  rec.start({ ...set.snapshot(), caste: camp.caste ?? 'none', way: camp.forks.way ?? 'none', craft: camp.forks.craft ?? 'none', nodes: nodesNow().join('+') || 'none', mode: 'war', mission: missionId, ants: sim.cfg.antsBy[ME], look: `war:${set.get('view')}/${set.get('light')}/${set.get('style')}`, seed, v: 1 });
+  rec.start({ ...set.snapshot(), caste: camp.caste ?? 'none', way: camp.forks.way ?? 'none', craft: camp.forks.craft ?? 'none', nodes: nodesNow().join('+') || 'none', mode: 'war', mission: missionId, ants: sim.cfg.antsBy[ME], hill: hillOf(missionId)?.from ?? 'new', dug: sim.cfg.nests ? sim.cfg.nests[ME].length / 3 : 0, look: `war:${set.get('view')}/${set.get('light')}/${set.get('style')}`, seed, v: 1 });
   host.ai[FOE] = rivalMind(); pickCaste();
   running = true; opening();
 }
@@ -266,7 +274,8 @@ function renderPath() {
   }
   const m = MISSIONS[missionId], t = TEXT[missionId], lost = startAnts()[0] < m.kit.ants;
   $('mKicker').textContent = m.name; $('mSub').textContent = t.sub;
-  $('mGoals').textContent = ''; for (const line of lost ? [...t.goals, `The last mission was lost: you start with ${startAnts()[0]} workers, not ${m.kit.ants}.`] : t.goals) { const p = document.createElement('p'); p.textContent = line; $('mGoals').append(p); }
+  $('mGoals').textContent = ''; const hill = hillOf(missionId), kept = hill ? (() => { const n = [0, 0, 0, 0], l = hill.nests[ME] ?? []; for (let j = 2; j < l.length; j += 3) n[l[j] < 4 ? l[j] : 0]++; return `You start in your hill as you left it at ${MISSIONS[hill.from].name}: ${l.length / 3} cells dug, ${n[ROOM.STORE]} of them stores, ${n[ROOM.NURSERY]} nursery, ${n[ROOM.REST]} quarters. The rival starts in its own.`; })() : m.from && set.get('home') === 'carried' ? `This is the hill of ${MISSIONS[m.from].name}. Finish that mission and you start here in the nest you dug there.` : Object.values(MISSIONS).some(x => x.from === missionId) && set.get('home') === 'carried' ? 'What you dig here stays: the next mission on this hill starts in this nest.' : null;
+  for (const line of [...t.goals, ...(lost ? [`The last mission was lost: you start with ${startAnts()[0]} workers, not ${m.kit.ants}.`] : []), ...(kept ? [kept] : [])]) { const p = document.createElement('p'); p.textContent = line; $('mGoals').append(p); }
   $('play').textContent = running && host.sim.mission.id === missionId ? 'Resume' : 'Play'; $('play').disabled = !isOpen(missionId);
   $('fresh').hidden = !Object.keys(camp.done).length; $('fresh').textContent = 'New campaign'; freshArmed = false;
   renderDeeds($('mDeeds'), missionId, []); renderTree();
@@ -339,7 +348,7 @@ $('restart').addEventListener('click', () => restart());
 $('again').addEventListener('click', () => restart());
 $('toMenu').addEventListener('click', toMenu);
 $('next').addEventListener('click', () => { missionId = firstOpen(); toMenu(); });
-$('fresh').addEventListener('click', () => { if (!freshArmed) { freshArmed = true; $('fresh').textContent = 'Tap again to erase the campaign'; return; } camp = { v: 1, done: {}, caste: null, forks: {} }; saveCamp(); line = { v: 1, deeds: {} }; saveLine(); rec.event('campaign', { fresh: 1 }); missionId = STEPS[0]; renderPath(); });
+$('fresh').addEventListener('click', () => { if (!freshArmed) { freshArmed = true; $('fresh').textContent = 'Tap again to erase the campaign'; return; } camp = { v: 1, done: {}, caste: null, forks: {} }; saveCamp(); line = { v: 1, deeds: {} }; saveLine(); hills = { v: 1, after: {} }; saveHills(); rec.event('campaign', { fresh: 1 }); missionId = STEPS[0]; renderPath(); });
 $('harder').addEventListener('click', () => { const v = set.get('rival'); set.set('rival', won ? (v === 'timid' ? 'steady' : 'bold') : v === 'bold' ? 'steady' : 'timid'); restart(); });
 onLeave(pauseGame);
 addEventListener('keydown', e => { if (isPauseKey(e)) { if (screen === 'play') pauseGame(); else if (screen === 'paused') resume(); e.preventDefault(); } });
@@ -585,6 +594,7 @@ function finish(w, reason) {
   rec.end(w ? 'won' : 'lost', { ...s, reason });
   const text = TEXT[missionId], was = camp.done[missionId];
   camp.done[missionId] = { won: w || !!was?.won, best: Math.max(was?.best ?? 0, w ? s.adults : 0) }; saveCamp();
+  if (sim.mission.from || Object.values(MISSIONS).some(x => x.from === missionId)) { hills.after[missionId] = { nests: sim.nests() }; saveHills(); }
   // Deeds: the sim judges them; the page only keeps which were done, and which are new this time.
   const did = sim.deeds(ME), fresh = [];
   sim.mission.deeds.forEach((d, i) => { const key = `${missionId}.${d.id}`; if (did[i] && !line.deeds[key]) { const had = hasNode(d.opens); line.deeds[key] = 1; fresh.push(d.id); rec.event('deed', { deed: key, opens: had ? 'had' : d.opens }); } });

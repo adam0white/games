@@ -181,12 +181,44 @@ export class Sim {
     if (options.restoring) return;
     if (cfg.blank) { this.mat.fill(MAT.OPEN, 0, L.nestBase); this.mat.fill(MAT.CLAY, L.nestBase); }
     generate(this);
+    if (cfg.nests) this.inherit(cfg.nests);
     this.recount();
     for (let t = 0; t < TEAMS; t++) this.startColony(t);
     this.rebuildFields();
   }
 
   g(t, k) { return this.cg[t * CG.SIZE + k]; }
+
+  /** Each colony's nest as dug: [cells out from its door towards the middle of the map, depth, room] for every open cell
+   *  it owns. A page keeps this at a mission's end so that a later mission on the same hill starts in it (`nests`). */
+  nests() {
+    const L = this.L, out = [[], []], mid = ((this.door[0] % L.sw) + (this.door[1] % L.sw)) >> 1;
+    for (let k = 0; k < this.room.length; k++) {
+      if (this.mat[L.nestBase + k] !== MAT.OPEN) continue;
+      const t = this.owner(k), dx = this.door[t] % L.sw;
+      out[t].push(((k % L.nw) - dx) * (dx < mid ? 1 : -1), Math.floor(k / L.nw), this.room[k]);
+    }
+    return out;
+  }
+
+  /** Start in nests dug earlier (the lists `nests()` gives, one per colony). Only tunnels, stores, nurseries and quarters
+   *  are kept: a room that needs a growth or a deed comes back as a bare tunnel. Nothing is kept within four cells of the
+   *  line between the hills, so two nests that were joined start apart. A cache where a kept cell lies is gone. */
+  inherit(nests) {
+    const L = this.L, mid = ((this.door[0] % L.sw) + (this.door[1] % L.sw)) >> 1;
+    for (let t = 0; t < TEAMS; t++) {
+      const list = nests[t]; if (!list) continue;
+      const dx = this.door[t] % L.sw, side = dx < mid ? 1 : -1;
+      for (let j = 0; j + 2 < list.length; j += 3) {
+        const x = dx + side * (list[j] | 0), y = list[j + 1] | 0, r = list[j + 2] | 0;
+        if (x < 0 || x >= L.nw || y < 0 || y >= L.nh || Math.abs(x - mid) < 4) continue;
+        const k = y * L.nw + x, m = L.nestBase + k;
+        if (this.owner(k) !== t || (this.mat[m] !== MAT.CLAY && this.mat[m] !== MAT.OPEN)) continue;
+        this.mat[m] = MAT.OPEN; this.cache[k] = 0;
+        this.room[k] = r === ROOM.STORE || r === ROOM.NURSERY || r === ROOM.REST ? r : 0;
+      }
+    }
+  }
 
   startColony(t) {
     const cfg = this.cfg, o = t * CG.SIZE, cg = this.cg;
