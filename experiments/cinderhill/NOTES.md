@@ -761,3 +761,16 @@ is dead cannot win by the beetle. Each hill starts The Hunt with three soldiers 
 the beetle snaps to it. The harm bar is labelled. Open from that review, not built: array order decides who gets
 the beetle's twelve bites a window when both hills crowd it; workers can be parked as bait; the carcass has no
 use because the mission ends at the fall (a kill, recover, deliver phase is the proposed fix).
+
+## Crafts: a second fork at the second growth (war build)
+
+The first growth takes a branch (War or Deep). The second growth now takes a craft, one of three, kept for the
+mission: Legion (fighters bite a third harder), Swift (every ant a fifth faster), Thrift (a seed feeds half as many
+again). Any hill may take any craft, so there are six full-grown hills. `TIERS.craft` holds them as rows of `set`,
+like a branch. `CG.CRAFT` holds the pick; the numbers are the hill's when the growth is done. A GROW order with no
+craft at the second growth takes none. The rival takes Legion when bold, Swift when steady, Thrift when timid
+(`mind.craft` overrides).
+
+Numbers, steady v steady on The Crossing, 6 seeds both seats: Legion v none 8 to 4, Swift v none 7 to 5, Thrift v
+none 6 to 6, Legion v Swift 8 to 4, Legion v Thrift 8 to 4, Swift v Thrift 7 to 5. Twelve games a row is a small
+sample. Not run: First Frost, where Thrift should matter most, and the other missions.

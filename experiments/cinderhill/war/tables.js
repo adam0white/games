@@ -55,6 +55,11 @@ export const TIERS = {
   branch: [null,
     { id: 'war', name: 'War hill', text: 'Soldiers a quarter tougher', set: [['hp', 1, 125]] },
     { id: 'deep', name: 'Deep hill', text: 'Stores and quarters hold half as much again, pupae hatch sooner, and it may dig fungus gardens', set: [['pupa', 87], ['per', 1, 150], ['per', 3, 150]] }],
+  // The second growth takes a craft, one of three, for the rest of the mission. Any hill may take any of them.
+  craft: [null,
+    { id: 'legion', name: 'Legion', text: 'soldiers and your third caste bite a third harder', set: [['bite', 1, 134], ['bite', 2, 134], ['bite', 3, 134]] },
+    { id: 'swift', name: 'Swift', text: 'every ant walks a fifth faster, so trails pay more and soldiers arrive sooner', set: [['speed', 0, 120], ['speed', 1, 120], ['speed', 2, 120], ['speed', 3, 120]] },
+    { id: 'thrift', name: 'Thrift', text: 'a seed feeds half as many ants again at every meal', set: [['eatPer', 150]] }],
   pick: [2, 1],
   // Rooms a growth opens, as [tier, branch]: the fungus garden for a Deep hill at its first growth, for any hill at its second.
   rooms: { 5: [2, 2] },
