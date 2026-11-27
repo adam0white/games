@@ -108,6 +108,10 @@ export function drawCutaway(v) {
     ctx.beginPath(); ctx.arc(ax + c * u * 0.55, ay + s * u * 0.55, u * 0.27, 0, 7); ctx.fill();
     if (sim.carry[i]) { ctx.fillStyle = sim.carry[i] > 1 ? '#b0452f' : '#f3d77a'; ctx.beginPath(); ctx.arc(ax + c * u * 0.95, ay + s * u * 0.95, u * 0.26, 0, 7); ctx.fill(); }
   }
+  if (v.mark >= 0 && v.mark < sim.n && sim.layer[v.mark] === NEST) {     // the ant the player is following
+    const i = v.mark, a = host.alpha ?? 1, ax = sx((host.px[i] + (sim.x[i] - host.px[i]) * a) / 256), ay = sy((host.py[i] + (sim.y[i] - host.py[i]) * a) / 256);
+    ctx.strokeStyle = 'rgba(255, 226, 150, 0.9)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(ax, ay, z * 1.1 + 2 * Math.sin(now / 200), 0, 7); ctx.stroke();
+  }
   // The surface: a line of ash with the door in it.
   ctx.fillStyle = night > 0.5 ? '#1c1614' : '#4a4340'; ctx.fillRect(0, 22, W, 5);
   const door = sx(w / 2 + 0.5); ctx.fillStyle = '#120c09'; ctx.fillRect(door - z * 1.5, 22, z * 3, 6);
