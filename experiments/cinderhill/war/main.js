@@ -46,6 +46,7 @@ const PICK = { spitter: CASTE.SPITTER, warden: CASTE.WARDEN };
 const CAMP_KEY = 'cinderhill:war:campaign';
 const TEXT = {
   crossing: { sub: 'Two hills. One creek. Not enough food for both.', goals: ['Have the larger colony at dusk, or kill the rival queen.', 'Lose your queen and the hill is lost.', 'The big food lies on the two fords. So does the rival.'], clock: ['Dusk'], won: 'The crossing is yours', end: 'dusk' },
+  hunt: { sub: 'Open ground. A great beetle on a dead vole. Two hungry hills.', goals: ['Do the beetle more harm than the rival does. When it falls, the hill that hurt it more has won. At dusk, more harm wins.', 'It bites whatever comes within two cells, two ants at a time, and it never leaves the body. Workers die at one bite. Keep your forage trails clear of it.', 'Tap Raid, then tap the beetle. Your soldiers go and bite it. The rival\'s soldiers will be there too.', 'There is no wall here and no ford. Every side of your hill is open.'], clock: ['Dusk'], won: 'The beetle is yours', end: 'dusk' },
   stones: { sub: 'Four standing stones. Stand by them longer than the rival does.', goals: ['A stone pays a point a second to the colony with more ants beside it. It takes three ants at least.', 'First to 400 points wins. At dusk, more points wins.', 'Draw a raid trail to a stone and your soldiers stand there.', 'Two stones stand on the fords. One stands on each far flank.'], clock: ['Dusk'], won: 'The stones are yours', end: 'dusk' },
   larder: { sub: 'A lean season. Their stores are full. So are yours.', goals: ['Carry ten loads home from the rival\'s store. A load counts when the thief reaches your own store with it.', 'Tap Raid, then tap the rival door. Every soldier goes, and workers go along to carry. The soldiers hold the store while the workers take from it.', 'Half the rival\'s soldiers stand on a ford. Strike while they are away, and mind your own door.', 'At dusk, more loads carried home wins.'], clock: ['Dusk'], won: 'Their larder is yours', end: 'dusk' },
   narrows: { sub: 'A ridge of stone. One pass. Their queen is frail, and dusk is on her side.', goals: ['Kill the rival queen before dusk. If she lives to see it, you have lost.', 'There is one way through the ridge, and the rich food lies in it.', 'The rival will not march on your hill. It will hold the pass and its own door.', 'Grow, raise soldiers, then draw a raid to the rival door.'], clock: ['Dusk'], won: 'The ridge is yours', end: 'dusk' },
@@ -495,8 +496,8 @@ for (const n of ['pointercancel', 'lostpointercapture']) nestCanvas.addEventList
 const told = new Set();
 let heard = []; // cells a colony opened in the other's ground, lately: drawn as rings in the nest view
 const once = (key, text, ms, bad) => { if (told.has(key)) return; told.add(key); toast(text, ms, bad); };
-let won = false;
-const summary = () => ({ tick: sim.tick, haul: g(ME, CG.HAUL), foeHaul: g(FOE, CG.HAUL), points: g(ME, CG.POINTS), foePoints: g(FOE, CG.POINTS), adults: g(ME, CG.ADULTS), majors: g(ME, CG.MAJORS), foe: g(FOE, CG.ADULTS), born: g(ME, CG.BORN), died: g(ME, CG.DIED), kills: g(ME, CG.KILLS), loads: g(ME, CG.LOADS_S) + g(ME, CG.LOADS_P), stolen: g(ME, CG.STOLEN), lost: g(ME, CG.LOST), queen: g(ME, CG.QUEEN_HP), foeQueen: g(FOE, CG.QUEEN_HP), orders: host.log.filter(o => o.team === ME).length });
+let won = false, beastBit = -1e9, beastTold = false;
+const summary = () => ({ tick: sim.tick, harm: g(ME, CG.HARM), foeHarm: g(FOE, CG.HARM), haul: g(ME, CG.HAUL), foeHaul: g(FOE, CG.HAUL), points: g(ME, CG.POINTS), foePoints: g(FOE, CG.POINTS), adults: g(ME, CG.ADULTS), majors: g(ME, CG.MAJORS), foe: g(FOE, CG.ADULTS), born: g(ME, CG.BORN), died: g(ME, CG.DIED), kills: g(ME, CG.KILLS), loads: g(ME, CG.LOADS_S) + g(ME, CG.LOADS_P), stolen: g(ME, CG.STOLEN), lost: g(ME, CG.LOST), queen: g(ME, CG.QUEEN_HP), foeQueen: g(FOE, CG.QUEEN_HP), orders: host.log.filter(o => o.team === ME).length });
 function news() {
   const ev = host.drain(), now = performance.now(), sw = L0.sw;
   let deaths = 0;
@@ -555,6 +556,8 @@ function news() {
       if (a === ME) { shake = 0.3; danger = 1; if (!told.has('qhit') || now - (told.qAt ?? 0) > 6000) { told.add('qhit'); told.qAt = now; toast('Your queen is being bitten!', 3200, true); tone(120, 0.4, 0.08, 'sawtooth'); } }
       else once('fqhit', 'Your soldiers have reached the rival queen', 3200);
     } else if (type === EVENT.STOLEN) { if (a === ME) once('robbed', 'Raiders are carrying off your stores', 3200, true); else once('stole', 'Your raiders are bringing home their stores', 3200); }
+    else if (type === EVENT.BEAST_BIT) { beastBit = now; if (!beastTold) { let mine = false; const bx = a % L0.sw, by = Math.floor(a / L0.sw); for (let i = 0; i < sim.n && !mine; i++) if (sim.team[i] === ME && sim.layer[i] === 0 && Math.abs((sim.x[i] >> 8) - bx) <= 3 && Math.abs((sim.y[i] >> 8) - by) <= 3) mine = true; if (mine) { beastTold = true; toast('The beetle bites. Workers die at one bite: send soldiers, and keep trails clear of it.', 4200, true); tone(120, 0.3, 0.06, 'sawtooth', -40); } } }
+    else if (type === EVENT.BEAST_DEAD) { toast(b === ME ? 'The beetle is down, and yours was the greater harm.' : 'The beetle is down. The rival hurt it more.', 4200, b !== ME); tone(b === ME ? 520 : 180, 0.5, 0.06, 'triangle', b === ME ? 260 : -60); shake = 0.4; }
     else if (type === EVENT.SITE) { if (b === ME) { toast('A stone is yours. It pays while you outnumber the rival there.', 2800); tone(660, 0.25, 0.05, 'triangle', 200); } else if (c === ME) { toast(b === FOE ? 'The rival has taken a stone from you' : 'You no longer hold that stone', 3000, true); tone(240, 0.3, 0.05, 'sawtooth', -60); } }
     else if (type === EVENT.FROST) { document.body.classList.add('frost'); toast('The frost has come. Nothing is left outside: the hill lives on its stores.', 5200, true); tone(1200, 0.9, 0.05, 'sine', -500); }
     else if (type === EVENT.RESULT) finish(a === ME, b);
@@ -576,10 +579,10 @@ function finish(w, reason) {
   renderDeeds($('overDeeds'), missionId, fresh);
   const upNext = CAMPAIGN[CAMPAIGN.findIndex(c => c.mission === missionId) + 1];
   $('next').hidden = !upNext; $('next').textContent = upNext?.fork && !taken(upNext.fork) ? (upNext.fork === 'caste' ? 'Choose a third caste' : upNext.fork === 'craft' ? 'Choose a craft' : 'Choose a way of living') : upNext ? `Next: ${MISSIONS[upNext.mission ?? STEPS[STEPS.indexOf(missionId) + 1]]?.name ?? 'the missions'}` : '';
-  $('overKicker').textContent = reason === REASON.POINTS ? 'The stones have chosen' : reason === REASON.HAUL ? 'The larder is bare' : reason === REASON.QUEEN ? (w ? 'The rival queen is dead' : 'Your queen is dead') : text.end === 'dusk' ? 'Dusk' : 'The thaw';
-  $('overTitle').textContent = w ? text.won : 'The hill is lost'; $('overTitle').classList.toggle('lost', !w);
-  $('overWhy').textContent = reason === REASON.QUEEN ? (w ? (sim.mission.breach ? 'Her colony scatters. The wall did not save her.' : 'Her colony scatters. Both fords are yours now.') : 'Without her the colony has no tomorrow.') : sim.mission.goals.points ? `${T(ME, CG.POINTS)} points to the rival's ${T(FOE, CG.POINTS)}.` : sim.mission.goals.dusk === 'holder' ? 'Dusk fell and their queen still lives.' : sim.mission.goals.haul ? `You carried home ${T(ME, CG.HAUL)} of their loads. They carried home ${T(FOE, CG.HAUL)} of yours.` : w ? `At ${text.end} you stood ${s.adults} to ${s.foe}.` : `At ${text.end} the rival stood ${s.foe} to your ${s.adults}.`;
-  const rows = [['', 'You', 'Rival'], ['Ants at the end', T(ME, CG.ADULTS), T(FOE, CG.ADULTS)], ['Soldiers', T(ME, CG.MAJORS), T(FOE, CG.MAJORS)], ['Born', T(ME, CG.BORN), T(FOE, CG.BORN)], ['Fallen', T(ME, CG.DIED), T(FOE, CG.DIED)], ['Loads carried home', T(ME, CG.LOADS_S) + T(ME, CG.LOADS_P), T(FOE, CG.LOADS_S) + T(FOE, CG.LOADS_P)], ['Loads stolen', T(ME, CG.STOLEN), T(FOE, CG.STOLEN)]];
+  $('overKicker').textContent = reason === REASON.BEAST ? 'The beetle is dead' : reason === REASON.POINTS ? 'The stones have chosen' : reason === REASON.HAUL ? 'The larder is bare' : reason === REASON.QUEEN ? (w ? 'The rival queen is dead' : 'Your queen is dead') : text.end === 'dusk' ? 'Dusk' : 'The thaw';
+  $('overTitle').textContent = w ? text.won : sim.mission.goals.beast && g(ME, CG.QUEEN_HP) > 0 ? 'The rival took the beetle' : 'The hill is lost'; $('overTitle').classList.toggle('lost', !w);
+  $('overWhy').textContent = reason === REASON.QUEEN ? (w ? (sim.mission.breach ? 'Her colony scatters. The wall did not save her.' : 'Her colony scatters. Both fords are yours now.') : 'Without her the colony has no tomorrow.') : sim.mission.goals.beast ? `Your ants did it ${T(ME, CG.HARM)} harm. The rival's did it ${T(FOE, CG.HARM)}.` : sim.mission.goals.points ? `${T(ME, CG.POINTS)} points to the rival's ${T(FOE, CG.POINTS)}.` : sim.mission.goals.dusk === 'holder' ? 'Dusk fell and their queen still lives.' : sim.mission.goals.haul ? `You carried home ${T(ME, CG.HAUL)} of their loads. They carried home ${T(FOE, CG.HAUL)} of yours.` : w ? `At ${text.end} you stood ${s.adults} to ${s.foe}.` : `At ${text.end} the rival stood ${s.foe} to your ${s.adults}.`;
+  const rows = [['', 'You', 'Rival'], ['Ants at the end', T(ME, CG.ADULTS), T(FOE, CG.ADULTS)], ['Soldiers', T(ME, CG.MAJORS), T(FOE, CG.MAJORS)], ['Born', T(ME, CG.BORN), T(FOE, CG.BORN)], ['Fallen', T(ME, CG.DIED), T(FOE, CG.DIED)], ['Loads carried home', T(ME, CG.LOADS_S) + T(ME, CG.LOADS_P), T(FOE, CG.LOADS_S) + T(FOE, CG.LOADS_P)], ['Loads stolen', T(ME, CG.STOLEN), T(FOE, CG.STOLEN)]]; if (sim.mission.beast) rows.splice(1, 0, ['Harm to the beetle', T(ME, CG.HARM), T(FOE, CG.HARM)]);
   $('tally').textContent = '';
   rows.forEach((r, i) => r.forEach((v, j) => { const el = document.createElement(j ? 'b' : 'span'); el.textContent = v; if (!i) el.className = 'h'; if (j === 2) el.classList.add('foe'); $('tally').append(el); }));
   const v = set.get('rival');
@@ -592,7 +595,7 @@ function bump(id, value) { const el = $(id), span = el.querySelector('span'), te
 function hud() {
   let brood = 0; for (let k = 0; k < sim.bn; k++) if (sim.bTeam[k] === ME) brood++;
   bump('chipAnts', g(ME, CG.ADULTS) - g(ME, CG.MAJORS)); bump('chipMajors', g(ME, CG.MAJORS)); bump('chipSugar', g(ME, CG.SUGAR)); bump('chipProtein', g(ME, CG.PROTEIN)); bump('chipBrood', brood);
-  const G2 = sim.mission.goals, goal = (G2.points | 0) || (G2.haul | 0), slot = G2.points ? CG.POINTS : G2.haul ? CG.HAUL : CG.ADULTS, us = g(ME, slot), them = g(FOE, slot);
+  const G2 = sim.mission.goals, goal = (G2.points | 0) || (G2.haul | 0), slot = G2.points ? CG.POINTS : G2.haul ? CG.HAUL : G2.beast ? CG.HARM : CG.ADULTS, us = g(ME, slot), them = g(FOE, slot);
   $('vsUs').textContent = goal ? `You ${us} / ${goal}` : `You ${us}`; $('vsThem').textContent = `${them} Rival`; $('bar2').firstElementChild.style.width = `${(100 * us / Math.max(1, us + them)).toFixed(1)}%`;
   if (G2.dusk === 'holder') { const pct = Math.max(0, Math.ceil(100 * g(FOE, CG.QUEEN_HP) / sim.cfg.queenHp)); $('vsUs').textContent = `You ${us}`; $('vsThem').textContent = `Rival queen ${pct}%`; $('bar2').firstElementChild.style.width = `${100 - pct}%`; }
   const toFrost = sim.cfg.frostTick > sim.tick, left = Math.max(0, (toFrost ? sim.cfg.frostTick : sim.cfg.duskTick) - sim.tick) / 20; $('dusk').textContent = `${TEXT[sim.mission.id].clock[toFrost ? 0 : TEXT[sim.mission.id].clock.length - 1]} in ${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}`;
@@ -668,6 +671,7 @@ function drawMini() {
   mctx.putImageData(miniBase.img, 0, 0);
   for (let p = 0; p < MAX_PILES; p++) if (sim.pileAmount[p] > 0) { const c = sim.pileCell[p], r = sim.pileAmount[p] > 40 ? 2.4 : 1.4; mctx.fillStyle = sim.pileKind[p] ? '#e0603c' : '#f3d77a'; mctx.beginPath(); mctx.arc(c % w + 0.5, Math.floor(c / w) + 0.5, r, 0, 7); mctx.fill(); }
   for (let i = 0; i < sim.n; i++) if (sim.layer[i] === 0) { mctx.fillStyle = sim.team[i] ? '#8fb0ff' : '#ffb057'; mctx.fillRect(sim.x[i] >> 8, sim.y[i] >> 8, 1.4, 1.4); }
+  if (sim.beast[1] >= 0 && sim.beast[0] > 0) { mctx.fillStyle = '#ff6048'; mctx.beginPath(); mctx.arc(sim.beast[1] % w, Math.floor(sim.beast[1] / w), 3, 0, 7); mctx.fill(); }
   for (let k = 0; k < sim.sites.length; k++) { const c = sim.sites[k], hold = sim.siteHold[k]; mctx.fillStyle = hold === ME ? '#ffb057' : hold === FOE ? '#8fb0ff' : '#e8e0d6'; mctx.fillRect(c % w - 2, Math.floor(c / w) - 4, 4, 8); }
   for (const t of [ME, FOE]) { const d = doorXY(t); mctx.strokeStyle = t ? '#8fb0ff' : '#ffb057'; mctx.lineWidth = 1.5; mctx.beginPath(); mctx.arc(d.x, d.y, 3.5, 0, 7); mctx.stroke(); }
   if (eye) { const a = toWorld(0, 0), b = toWorld(W, H), c = toWorld(W, 0), d = toWorld(0, H); mctx.strokeStyle = 'rgba(255,255,255,0.8)'; mctx.lineWidth = 1; mctx.beginPath(); mctx.moveTo(a.x, a.y); mctx.lineTo(c.x, c.y); mctx.lineTo(b.x, b.y); mctx.lineTo(d.x, d.y); mctx.closePath(); mctx.stroke(); }
@@ -697,6 +701,27 @@ function drawOverlay(now) {
       ctx.fillStyle = s === shown ? '#1b0f08' : '#f3e6d6';
       const ax = p.x - w / 2 + 12; for (const [dx, r] of raid ? [[-3.6, 2.8], [0, 2.1], [3.6, 3.2]] : [[-3.6, 2.6], [0, 1.9], [3.2, 2.2]]) { ctx.beginPath(); ctx.arc(ax + dx, p.y - 1, r, 0, 7); ctx.fill(); }
       ctx.font = '700 12px ui-rounded, system-ui, sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(label, ax + 9, p.y - 0.5);
+    }
+    // The beast: a great beetle that never leaves its cell, the ground it can reach, and its health over it.
+    if (sim.beast[1] >= 0 && sim.beast[0] > 0) {
+      const bc = sim.beast[1], B = sim.mission.beast, x = bc % L0.sw + 0.5, y = Math.floor(bc / L0.sw) + 0.5, p = toScreen(x, y, 0.6), q = toScreen(x + 1, y, 0.6), r2 = toScreen(x, y + 1, 0.6);
+      if (p.s) {
+        const ux = (q.x - p.x) * 1.7, uy = (q.y - p.y) * 1.7, vx = (r2.x - p.x) * 1.7, vy = (r2.y - p.y) * 1.7, lunge = Math.max(0, 1 - (now - beastBit) / 260), t = now / 400;
+        ctx.strokeStyle = 'rgba(255, 96, 72, 0.5)'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 5]); ctx.beginPath();
+        for (let a = 0; a <= 24; a++) { const w2 = toScreen(x + Math.cos(a * 0.2618) * (B.range + 0.5), y + Math.sin(a * 0.2618) * (B.range + 0.5), 0); if (a) ctx.lineTo(w2.x, w2.y); else ctx.moveTo(w2.x, w2.y); }
+        ctx.stroke(); ctx.setLineDash([]);
+        const at = (a, b2) => [p.x + ux * a + vx * b2, p.y + uy * a + vy * b2];
+        ctx.strokeStyle = '#120b08'; ctx.lineWidth = Math.max(1.5, Math.hypot(ux, uy) * 0.12); ctx.lineCap = 'round';
+        for (let k = 0; k < 6; k++) { const side = k < 3 ? -1 : 1, j = k % 3, sway = Math.sin(t + k * 1.7) * 0.12, a0 = at((j - 1) * 0.55, side * 0.5), a1 = at((j - 1) * 0.8 + sway, side * 1.25), a2 = at((j - 1) * 1.0 + sway, side * 1.7); ctx.beginPath(); ctx.moveTo(a0[0], a0[1]); ctx.lineTo(a1[0], a1[1]); ctx.lineTo(a2[0], a2[1]); ctx.stroke(); }
+        const body = (cx2, rx, ry, col) => { const c0 = at(cx2, 0); ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(c0[0], c0[1], Math.hypot(ux, uy) * rx, Math.hypot(vx, vy) * ry, Math.atan2(uy, ux), 0, 7); ctx.fill(); };
+        body(-0.25, 1.15, 0.85, '#1c1210'); body(-0.3, 0.95, 0.66, '#3a1f18'); body(0.95 + lunge * 0.35, 0.5, 0.5, '#241512');
+        ctx.strokeStyle = '#5a2c1e'; ctx.lineWidth = 1; const s0 = at(-1.3, 0), s1 = at(0.6, 0); ctx.beginPath(); ctx.moveTo(s0[0], s0[1]); ctx.lineTo(s1[0], s1[1]); ctx.stroke();
+        ctx.strokeStyle = '#0d0806'; ctx.lineWidth = Math.max(2, Math.hypot(ux, uy) * 0.16);
+        for (const side of [-1, 1]) { const j0 = at(1.3 + lunge * 0.35, side * 0.22), j1 = at(1.9 + lunge * 0.5, side * (0.5 - lunge * 0.3)), j2 = at(2.3 + lunge * 0.5, side * (0.15 - lunge * 0.1)); ctx.beginPath(); ctx.moveTo(j0[0], j0[1]); ctx.quadraticCurveTo(j1[0], j1[1], j2[0], j2[1]); ctx.stroke(); }
+        const hp = sim.beast[0] / B.hp, top = toScreen(x, y, 5.5);
+        ctx.fillStyle = 'rgba(20, 14, 10, 0.85)'; ctx.strokeStyle = '#ff6048'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.roundRect(top.x - 30, top.y - 8, 60, 12, 6); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#ff6048'; ctx.beginPath(); ctx.roundRect(top.x - 28, top.y - 6, 56 * hp, 8, 4); ctx.fill();
+      }
     }
     // Standing stones: the ground they claim, and a stone in the colour of the colony that holds it.
     for (let k = 0; k < sim.sites.length; k++) {
@@ -839,7 +864,7 @@ function frame(now) {
   let stepped = 0;
   if (screen === 'play') stepped = host.advance(lastT ? Math.min(100, now - lastT) : 0, speed);
   if (stepped) { news(); uploadAnts(); }
-  if (sim.result && running) finish(sim.result - 1 === ME, g(ME, CG.QUEEN_HP) <= 0 || g(FOE, CG.QUEEN_HP) <= 0 ? REASON.QUEEN : sim.mission.goals.points && Math.max(g(ME, CG.POINTS), g(FOE, CG.POINTS)) >= sim.mission.goals.points ? REASON.POINTS : sim.mission.goals.haul && Math.max(g(ME, CG.HAUL), g(FOE, CG.HAUL)) >= sim.mission.goals.haul ? REASON.HAUL : REASON.DUSK); // the result event was lost in a full buffer
+  if (sim.result && running) finish(sim.result - 1 === ME, g(ME, CG.QUEEN_HP) <= 0 || g(FOE, CG.QUEEN_HP) <= 0 ? REASON.QUEEN : sim.mission.goals.beast && sim.beast[0] <= 0 ? REASON.BEAST : sim.mission.goals.points && Math.max(g(ME, CG.POINTS), g(FOE, CG.POINTS)) >= sim.mission.goals.points ? REASON.POINTS : sim.mission.goals.haul && Math.max(g(ME, CG.HAUL), g(FOE, CG.HAUL)) >= sim.mission.goals.haul ? REASON.HAUL : REASON.DUSK); // the result event was lost in a full buffer
   light = lightNow(now);
   const want = screen === 'menu' ? VIEW.low : VIEW[set.get('view')], e = Math.min(1, dt * 3.5); lens.pitch += (want.pitch - lens.pitch) * e; lens.fk += (want.fk - lens.fk) * e;
   if (screen === 'menu') { const en = doorXY(ME); cam.x = en.x + 6 + 5 * Math.sin(now / 7000); cam.y = en.y + 3; cam.z = startZoom(); }

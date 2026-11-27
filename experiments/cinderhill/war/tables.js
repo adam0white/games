@@ -96,6 +96,7 @@ export const CAMPAIGN = [
   { fork: 'caste', options: ['spitter', 'warden'] },
   { mission: 'frost' },
   { fork: 'way', options: ['thrift', 'swift'] },
+  { mission: 'hunt' },
   { mission: 'stones' },
   // This fork's options depend on the caste taken at the first fork.
   { fork: 'craft', by: { spitter: ['farspit', 'acid'], warden: ['iron', 'stride'] } },
@@ -135,6 +136,18 @@ export const MISSIONS = {
     kit: { ants: 30, sugar: 10, protein: 5, eggs: 20, larvae: 20, pupae: 12, duskTick: 10800, frostTick: 4800, frostEat: 300, starveAfter: 300, starveDiv: 10, queenHp: 3200, glut: 3 },
     goals: { queen: true, dusk: 'adults' },
     deeds: [{ id: 'a', text: 'See the thaw with a hundred ants or more.', won: true, min: { ADULTS: 100 }, opens: 'post' }, { id: 'b', text: 'Carry three stolen loads home.', min: { HAUL: 3 }, opens: 'raiders' }],
+    picks: [CASTE.SPITTER, CASTE.WARDEN],
+    rooms: [ROOM.STORE, ROOM.NURSERY, ROOM.REST],
+  },
+  // Open ground with no wall, and a great beetle on a dead vole in the middle of it. It bites whatever comes within
+  // two cells, two ants at a time, and never leaves the body. The colony that does it more harm by the time it falls
+  // wins; at dusk, more harm. Its body is meat for whoever carries it.
+  hunt: {
+    id: 'hunt', name: 'The Hunt', map: 'flat',
+    kit: { ants: 30, sugar: 10, protein: 5, eggs: 20, larvae: 20, pupae: 12, duskTick: 9600, queenHp: 6000 },
+    goals: { queen: true, beast: true, dusk: 'harm' },
+    beast: { at: [80, 38], hp: 2800, bite: 8, hits: 2, every: 20, range: 2, press: 12, girth: 384, meat: 120 },
+    deeds: [{ id: 'a', text: 'Bring the beetle down with the greater harm.', won: true, why: 'BEAST', opens: 'hold' }, { id: 'b', text: 'Win with fewer than seventy dead.', won: true, max: { DIED: 69 }, opens: 'post' }],
     picks: [CASTE.SPITTER, CASTE.WARDEN],
     rooms: [ROOM.STORE, ROOM.NURSERY, ROOM.REST],
   },

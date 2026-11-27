@@ -68,9 +68,11 @@ export const EVENT = {
   PLUG: 19, // team, cell: an open cell was packed shut
   TIER: 20, // team, the tier it has reached (2 or 3), its branch
   GARDEN: 21, // team, seeds its fungus gardens paid
+  BEAST_BIT: 22, // the beast's cell, ants it bit this time, its health left
+  BEAST_DEAD: 23, // the beast's cell, the colony that did it more harm
   BREACH: 18, // the team that dug the last cell, cell: the two nests are joined under ground
 };
-export const REASON = { QUEEN: 1, DUSK: 2, STARVED: 3, POINTS: 4, HAUL: 5 };
+export const REASON = { QUEEN: 1, DUSK: 2, STARVED: 3, POINTS: 4, HAUL: 5, BEAST: 6 };
 export const WHY = { FULL: 1, BLOCKED: 2, LONG: 3, NONE: 4 };
 
 export const TRAILS = 6; // per colony
@@ -93,6 +95,7 @@ export const CG = {
   TIER: 33, GROW: 34, BRANCH: 35, // with cfg.tiers: chamber growths done (0 to 2), ticks left of one under way, the branch taken at the first
   PICK: 27, DIET2: 28, SPECIALS: 29, // the caste this colony chose (0: none yet), its share of the brood in four, how many live
   FOUND: 32, // loads dug out of caches in the clay
+  HARM: 36, // harm this colony's ants have done to the mission's beast
   SIZE: 40,
 };
 export const C = {
@@ -171,6 +174,8 @@ export class Sim {
     this.bq = new Int32Array(n); this.prev = new Int32Array(n);
     // Sites that pay while held (a mission's `sites`): their surface cells, fixed by the map, and who holds each (-1: no one).
     this.sites = []; this.siteHold = new Int8Array(MAX_SITES).fill(-1);
+    // A mission's beast (mission.beast): [health, surface cell, press taken this window]. It never leaves its cell.
+    this.beast = new Int32Array(3); this.beast[1] = -1;
     this.queue = []; this.events = []; this.anyDead = false;
     if (options.restoring) return;
     if (cfg.blank) { this.mat.fill(MAT.OPEN, 0, L.nestBase); this.mat.fill(MAT.CLAY, L.nestBase); }
@@ -654,9 +659,10 @@ export class Sim {
     this.census();
     this.stepColonies();
     this.buildBuckets();
-    if ((this.tick % C.BITE_EVERY) === 0) this.press.fill(0, 0, this.n);
+    if ((this.tick % C.BITE_EVERY) === 0) { this.press.fill(0, 0, this.n); this.beast[2] = 0; }
     for (let i = 0; i < this.n; i++) this.stepAnt(i);
     this.fight();
+    if (this.beast[0] > 0 && this.tick % this.mission.beast.every === 0) this.beastBites();
     if (this.anyDead) this.removeDead();
     if (this.dirty) { this.dirty = false; this.rebuildFields(); } else if (this.dirtyStore) this.rebuildStoreFields();
     if (this.tick % 50 === 49) this.checkTrails();
@@ -1067,6 +1073,16 @@ export class Sim {
         }
       }
       if (target >= 0) { if (!far) this.press[target]++; dmg[target] += this.stat[t].bite[this.caste[i]]; by[target] = t; any = true; this.cool[i] = C.BITE_EVERY - 1 + below(this.rng, STREAM.ants, 3); continue; }
+      // No ant to bite: the beast, if she is beside it. Its body takes more bites in a window than an ant's.
+      if (layer !== NEST && this.beast[0] > 0 && this.beast[2] < this.mission.beast.press) {
+        const bc = this.beast[1], bx = ((bc % L.sw) << 8) + 128, byy = (Math.floor(bc / L.sw) << 8) + 128;
+        if (est(this.x[i] - bx, this.y[i] - byy) <= reach + this.mission.beast.girth) {
+          const d = Math.min(this.beast[0], this.stat[t].bite[this.caste[i]]);
+          this.beast[0] -= d; this.beast[2]++; cg[t * CG.SIZE + CG.HARM] += d; this.cool[i] = C.BITE_EVERY - 1 + below(this.rng, STREAM.ants, 3);
+          if (this.beast[0] === 0) this.beastFalls();
+          continue;
+        }
+      }
       // No ant to bite: an enemy queen within a cell.
       if (layer === NEST) for (let e = 0; e < TEAMS; e++) {
         if (e === t || cg[e * CG.SIZE + CG.QUEEN_HP] <= 0 || this.queenF[e][this.cellOf(i)] > 1) continue;
@@ -1075,6 +1091,31 @@ export class Sim {
       }
     }
     if (any) for (let i = 0; i < n; i++) if (dmg[i]) { if (this.hp[i] > 0) this.hurt(i, dmg[i], by[i]); dmg[i] = 0; }
+  }
+
+  /** The beast bites the ants nearest it, of either colony: `hits` of them within `range` cells, `bite` each. */
+  beastBites() {
+    const B = this.mission.beast, L = this.L, bc = this.beast[1], cx = bc % L.sw, cy = Math.floor(bc / L.sw), bx = (cx << 8) + 128, by = (cy << 8) + 128, R = B.range;
+    const near = [];
+    for (let oy = -R; oy <= R; oy++) for (let ox = -R; ox <= R; ox++) {
+      const cc = cellAt(L, SURFACE, cx + ox, cy + oy); if (cc < 0) continue;
+      for (let j = this.head[cc]; j >= 0; j = this.nextAnt[j]) if (this.hp[j] > 0) near.push(j);
+    }
+    if (!near.length) return;
+    const d = j => est(this.x[j] - bx, this.y[j] - by);
+    near.sort((a, b) => d(a) - d(b) || this.id[a] - this.id[b]);
+    const n = Math.min(B.hits, near.length);
+    for (let k = 0; k < n; k++) this.hurt(near[k], B.bite, -1);
+    this.event(EVENT.BEAST_BIT, bc, n, this.beast[0]);
+  }
+
+  /** The beast is dead: its body is meat where it fell, and where the mission says so the colony that did it more harm wins. */
+  beastFalls() {
+    const cg = this.cg, B = this.mission.beast;
+    let best = 0; for (let t = 1; t < TEAMS; t++) if (cg[t * CG.SIZE + CG.HARM] > cg[best * CG.SIZE + CG.HARM]) best = t;
+    this.drop(this.beast[1], FOOD.PROTEIN, B.meat);
+    this.event(EVENT.BEAST_DEAD, this.beast[1], best);
+    if (this.mission.goals.beast && !this.result) { this.result = 1 + best; this.why = REASON.BEAST; this.event(EVENT.RESULT, best, REASON.BEAST); }
   }
 
   /** No clay or stone on the straight line from a cell to the cell (ox, oy) away. */
@@ -1145,7 +1186,7 @@ export class Sim {
     if (this.mission.goals.dusk && this.cfg.duskTick > 0 && this.tick + 1 >= this.cfg.duskTick) {
       this.census(); // count this tick's births and deaths before the dusk score
       // Dusk: more points where the mission counts them, else (and on a tie of points) more adults.
-      const d = this.mission.goals.dusk, score = t => (d === 'points' ? cg[t * CG.SIZE + CG.POINTS] : d === 'haul' ? cg[t * CG.SIZE + CG.HAUL] : 0) * 100000 + cg[t * CG.SIZE + CG.ADULTS];
+      const d = this.mission.goals.dusk, score = t => (d === 'points' ? cg[t * CG.SIZE + CG.POINTS] : d === 'haul' ? cg[t * CG.SIZE + CG.HAUL] : d === 'harm' ? cg[t * CG.SIZE + CG.HARM] : 0) * 100000 + cg[t * CG.SIZE + CG.ADULTS];
       let best = 0;
       for (let t = 1; t < TEAMS; t++) if (score(t) > score(best)) best = t;
       if (d === 'holder') best = 1; // a siege: the colony under attack (team 1) wins by lasting until dusk
@@ -1174,7 +1215,7 @@ export class Sim {
   stateArrays() {
     const n = this.n, b = this.bn;
     return [
-      ['mat', this.mat], ['room', this.room], ['binS', this.binS], ['binP', this.binP], ['cache', this.cache], ['mark', this.mark], ['digLeft', this.digLeft], ['cg', this.cg], ['rng', this.rng], ['pileCell', this.pileCell], ['pileAmount', this.pileAmount], ['pileKind', this.pileKind], ['siteHold', this.siteHold],
+      ['mat', this.mat], ['room', this.room], ['binS', this.binS], ['binP', this.binP], ['cache', this.cache], ['mark', this.mark], ['digLeft', this.digLeft], ['cg', this.cg], ['rng', this.rng], ['pileCell', this.pileCell], ['pileAmount', this.pileAmount], ['pileKind', this.pileKind], ['siteHold', this.siteHold], ['beast', this.beast],
       ...['x', 'y', 'layer', 'heading', 'team', 'caste', 'hp', 'task', 'carry', 'tr', 'cool', 'press', 'to', 'tx', 'ty', 'since', 'inv', 'id'].map(k => [k, this[k], n]),
       ...['bTeam', 'bStage', 'bAge', 'bFed', 'bHunger', 'bCell', 'bMajor'].map(k => [k, this[k], b]),
       ['trLive', this.trLive], ['trKind', this.trKind], ['trLevel', this.trLevel], ['trDry', this.trDry], ['trMode', this.trMode], ['trLen', this.trLen], ['trSeq', this.trSeq], ['trPath', this.trPath],

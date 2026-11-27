@@ -622,3 +622,38 @@ test('The rival falls back to a raid over the ground when it is joined under gro
   const s = new Sim({ seed: 3, mission: 'crossing', tiers: false }); s.linked = true;
   const orders = think(s, 1, { mood: 2 }); assert.ok(!orders.some(o => o.under), 'no order the sim would refuse');
 });
+
+test('The Hunt: the beetle bites the two nearest ants, takes harm from both hills, and a save carries on the same', () => {
+  const s = new Host({ seed: 4, mission: 'hunt' }).sim, B = s.mission.beast, bc = s.beast[1];
+  assert.equal(s.beast[0], B.hp); assert.ok(bc >= 0);
+  const a = [s.spawn(0, CASTE.MAJOR, bc + 1), s.spawn(0, CASTE.MAJOR, bc + 1), s.spawn(0, CASTE.MAJOR, bc - 1), s.spawn(0, CASTE.WORKER, bc + 4 * s.L.sw)];
+  const hp0 = a.map(i => s.hp[i]);
+  for (let k = 0; k < B.every + 1; k++) s.step();
+  const hurt = a.filter((i, k) => s.hp[i] < hp0[k]).length;
+  assert.equal(hurt, B.hits, 'two ants bitten, not all of them');
+  assert.equal(s.hp[a[3]], hp0[3], 'an ant four cells off is out of its reach');
+  s.spawn(1, CASTE.MAJOR, bc - 2 * s.L.sw); s.spawn(1, CASTE.MAJOR, bc - 2 * s.L.sw);
+  for (let k = 0; k < 60; k++) s.step();
+  const h0 = s.g(0, CG.HARM), h1 = s.g(1, CG.HARM);
+  assert.ok(h0 > 0 && h1 > 0, 'both hills have hurt it');
+  assert.equal(B.hp - s.beast[0], h0 + h1, 'its lost health is the two hills\' harm');
+  const b = copyOf(s); assert.equal(b.hash(), s.hash());
+  for (let k = 0; k < 200; k++) { s.step(); b.step(); }
+  assert.equal(b.hash(), s.hash()); assert.equal(b.beast[0], s.beast[0]);
+});
+
+test('The Hunt: when the beetle falls the hill that did it more harm has won, and the deed is done', () => {
+  const s = new Host({ seed: 4, mission: 'hunt' }).sim, bc = s.beast[1];
+  s.cg[1 * CG.SIZE + CG.HARM] = 900; s.cg[0 * CG.SIZE + CG.HARM] = 300; s.beast[0] = 5;
+  s.spawn(0, CASTE.MAJOR, bc + 1);
+  for (let k = 0; k < 60 && !s.result; k++) s.step();
+  assert.equal(s.result, 2, 'the last bite does not decide it: the harm does');
+  assert.equal(s.beast[0], 0);
+  assert.equal(s.deeds(1)[0], true); assert.equal(s.deeds(0)[0], false);
+});
+
+test('The Hunt: two rivals play it to an end, and other missions have no beast', () => {
+  const h = new Host({ seed: 2, mission: 'hunt', ai: { 0: 1, 1: 1 } }).run(9700);
+  assert.ok(h.sim.result > 0); assert.ok(h.sim.g(0, CG.HARM) + h.sim.g(1, CG.HARM) > 0);
+  const o = new Host({ seed: 2 }).sim; assert.equal(o.beast[1], -1); assert.equal(o.beast[0], 0);
+});
