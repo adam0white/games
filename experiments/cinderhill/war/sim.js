@@ -585,7 +585,7 @@ export class Sim {
   // ---- Fields ----
 
   /** Steps to the nearest source over open cells (four ways and through doors), FAR where there is no way. */
-  field(out, sources, doors = true) {
+  field(out, sources, doors = true, shut = -1) {
     const L = this.L, n = L.n, mat = this.mat, q = this.bq, link = this.link, nb = L.nb;
     const d = out || new Uint16Array(n);
     d.fill(FAR);
@@ -594,7 +594,7 @@ export class Sim {
     while (qh < qt) {
       const c = q[qh++], v = d[c] + 1;
       for (let k = 0; k < 4; k++) { const m = nb[c * 4 + k]; if (m >= 0 && d[m] === FAR && mat[m] === MAT.OPEN) { d[m] = v; q[qt++] = m; } }
-      const m = doors ? link[c] : -1;
+      const m = doors && c !== shut && link[c] !== shut ? link[c] : -1; // shut: one door this field does not use
       if (m >= 0 && d[m] === FAR && mat[m] === MAT.OPEN) { d[m] = v; q[qt++] = m; }
     }
     return d;
@@ -602,7 +602,10 @@ export class Sim {
 
   buildTrailField(s) {
     const len = this.trLen[s], at = s * PATH_MAX, P = this.trPath;
-    const d = (this.trF[s] = this.field(this.trF[s], P.subarray(at, at + len)));
+    // A raid sent under ground goes under ground: its field does not use the other hill's door, so a soldier standing
+    // outside walks home and down the tunnel with the rest, not over the top alone into the guard at the pass.
+    const t = Math.floor(s / TRAILS), under = len === 1 && P[at] >= this.L.nestBase && this.owner(P[at] - this.L.nestBase) !== t;
+    const d = (this.trF[s] = this.field(this.trF[s], P.subarray(at, at + len), true, under ? this.door[1 - t] : -1));
     for (let c = 0; c < d.length; c++) if (d[c] !== FAR) d[c] = Math.min(FAR - 1, d[c] + OFF);
     for (let j = 0; j < len; j++) { const c = P[at + j], left = len - 1 - j; if (d[c] >= OFF || left < d[c]) d[c] = left; } // on the path: steps left to its end
   }
