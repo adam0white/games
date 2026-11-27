@@ -496,3 +496,70 @@ mission so that the third fork depends on the first.
 
 **Open.** Bold v bold on The Stones averaged 299 points at the end, cause not examined. Steady v steady on First Frost ends on
 a queen 25 times in 30.
+
+## One finger, the fork measured against nothing, and saves
+
+**One finger** (setting `finger`, key `cinderhill:war:finger`, default `hill`). With `hill`, a trail or raid stroke starts within
+64 px of your own door; a drag that starts anywhere else moves the view, and a tap acts as before. With `draw`, one finger
+always draws and the Move tool or two fingers move the view (the behaviour before this setting). Reason: the owner named the
+Move button as a shortcoming of the page. This is my reading of that remark, not a confirmed one. The setting is recorded in
+`rec.start`, so the share of players who change it is readable. Checked in a phone-size browser: a drag away from the door
+moved the camera and drew nothing; a drag from the door drew one trail.
+
+**Each fork option against no trait**, wins of 30 seeds, same mind both sides (identical minds split about 15 give or take 5):
+
+| mission | swift, steady | swift, bold | thrift, steady | thrift, bold |
+| --- | --- | --- | --- | --- |
+| The Crossing | 21 | 13 | 15 | 19 |
+| First Frost | 22 | 9 | 20 | 17 |
+| The Stones | 17 | 20 | 11 | 15 |
+
+Swift 102 of 180, thrift 97 of 180. Both options help a little and neither changes what a colony does. The fork is even
+because it is weak. It ships as is; the next round replaces number changes with options that change orders or layout.
+
+**Saves.** The page never writes a sim save to storage (`save()` and `load()` are used by tests and the host only), so the
+`WAR_VERSION` bump to 4 cannot meet an old save in a browser. The campaign key written by the earlier page has no `forks`
+field; `loadCamp` adds it. Checked by opening the page with that older value in storage: no page error, and with a steady
+rival and thrift picked the sim ran with `[["thrift"],["swift"]]`.
+
+Five screenshots (`war/nest1.png` to `nest5.png`) were committed by mistake in an earlier slice and are removed here.
+
+## A fourth mission, a fork that depends on a fork, and fixes from an outside review
+
+**Outside review.** Three reviewers read the war folder cold and scored it against the owner's six goals (missions, base
+building, strategy, variety, progression, decision branches): between 2 and 6 of 10 each, lowest on variety (one map) and
+progression (a line, no tree). What they agreed on, in the order it is being taken:
+1. bugs: the dusk score used a census taken before the last tick's births and deaths (two reviewers reproduced a wrong
+   winner); on The Stones the page warned "marching on your hill" for a raid on a stone; the rival sent crews of one soldier
+   to a stone that takes three. All three fixed here. The planner's winter sum now reads the colony's own `eatPer`.
+2. a mission won by theft (this slice);
+3. the caste upgrades should be a fork (this slice);
+4. forks should change what a player does, not a number by a few percent (open);
+5. a second map; stores robbed cell by cell, guard posts, a reason to place rooms (open);
+6. hidden map and scouts (open, `lab-5w7.49`).
+Not taken: reviewers also proposed sharing a seed and order log for a friend to take over a losing hill. Recorded as an idea.
+Reported and not yet checked: repainting the starting store as quarters costs nothing; a spitter can stop behind a wall with
+a target it cannot hit; a trail slot reused within a few ticks keeps ants bound to the old trail; trails can skip a painted
+bend; workers on a forage trail count toward holding a stone.
+
+**The Larder** (`MISSIONS.larder`). `lean: 3` leaves a third of the food outside; both stores start with 40 seeds and 20 meat.
+A load taken from the rival's store carries a flag (`CARRY.LOOT`) and counts in `CG.HAUL` only when the thief reaches her own
+store. First to 10 wins (`REASON.HAUL`); at dusk the larger haul wins, adults break a tie. Queens have 6000 hit points and,
+on a haul mission, soldiers inside the rival nest stand at its store and do not go for the queen: the first build let them,
+and every match ended on a queen. The rival keeps half its soldiers on the richest ford, which is the opening a thief
+needs; a first build with the whole guard at home had no theft at all against a timid rival (0 loads in 8 seeds). A rival
+that fights breaks in with every soldier and workers to carry when it has half as many soldiers again (steady) or a quarter
+more (bold). On the page a tap on the rival door in this mission draws that same full raid.
+
+20 seeds a pairing, wins for the left: steady v steady 11; bold v bold 12; steady v timid 9; bold v timid 6; bold v steady 8;
+steady spitters v steady wardens 3; bold spitters v bold wardens 7. Mean haul is between 2 and 6 loads, so most matches go to
+dusk. A timid rival wins ties on adults because it never loses soldiers in a raid; a player must bring one load home to
+beat it. Wardens are much the better caste here (they hold a tunnel). Bots only.
+
+**The third fork ("craft")** offers the two upgrades of the caste taken at the first fork: far spit or strong spit; iron shell
+or long stride. The rival, which has the other caste, takes the upgrade in the other position of its own list. Steady minds
+on The Larder, 20 seeds: far spit v strong spit 5 to 15 with strong spit at bite 6, so it is now 5 (not re-run); iron v stride
+9 to 11; far-spit spitters v stride wardens 9 to 11; strong-spit spitters v iron wardens 14 to 6 (at bite 6).
+
+**Open from this slice.** The menu is five boxes and four missions long on a phone. An idle colony on The Larder starves to
+one ant by tick 4000.

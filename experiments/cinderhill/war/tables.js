@@ -27,7 +27,7 @@ export const TRAITS = {
   thrift: { id: 'thrift', name: 'Thrift', text: 'A seed feeds twenty at a meal, not ten.', set: [['eatPer', 20]] },
   swift: { id: 'swift', name: 'Swift brood', text: 'Pupae hatch a little sooner.', set: [['pupa', 370]] },
   farspit: { id: 'farspit', name: 'Far spit', text: 'Spitters reach three and a half cells.', needs: 'spitter', set: [['reach', CASTE.SPITTER, 896]] },
-  acid: { id: 'acid', name: 'Strong spit', text: 'A spit bites as hard as a soldier.', needs: 'spitter', set: [['bite', CASTE.SPITTER, 6]] },
+  acid: { id: 'acid', name: 'Strong spit', text: 'A spit bites as hard as a soldier.', needs: 'spitter', set: [['bite', CASTE.SPITTER, 5]] },
   iron: { id: 'iron', name: 'Iron shell', text: 'Wardens take half as much again to kill.', needs: 'warden', set: [['hp', CASTE.WARDEN, 144]] },
   stride: { id: 'stride', name: 'Long stride', text: 'Wardens keep pace with the soldiers.', needs: 'warden', set: [['speed', CASTE.WARDEN, 34]] },
 };
@@ -40,6 +40,9 @@ export const CAMPAIGN = [
   { mission: 'frost' },
   { fork: 'way', options: ['thrift', 'swift'] },
   { mission: 'stones' },
+  // This fork's options depend on the caste taken at the first fork.
+  { fork: 'craft', by: { spitter: ['farspit', 'acid'], warden: ['iron', 'stride'] } },
+  { mission: 'larder' },
 ];
 export const LOSS_ANTS = 8;
 
@@ -69,6 +72,15 @@ export const MISSIONS = {
     kit: { ants: 30, sugar: 10, protein: 5, eggs: 20, larvae: 20, pupae: 12, duskTick: 10800, queenHp: 2400 },
     goals: { queen: true, points: 400, dusk: 'points' },
     sites: [[79, 28], [80, 84], [54, 100], [105, 100]],
+    picks: [CASTE.SPITTER, CASTE.WARDEN],
+    rooms: [ROOM.STORE, ROOM.NURSERY, ROOM.REST],
+  },
+  // A lean season: little outside, full stores inside. A load counts when a thief carries it all the way home. The
+  // queens are too tough to be worth the bites, so the stores are the fight.
+  larder: {
+    id: 'larder', name: 'The Larder', map: 'crossing',
+    kit: { ants: 30, sugar: 40, protein: 20, eggs: 20, larvae: 20, pupae: 12, duskTick: 9600, queenHp: 6000, lean: 3 },
+    goals: { queen: true, haul: 10, dusk: 'haul' },
     picks: [CASTE.SPITTER, CASTE.WARDEN],
     rooms: [ROOM.STORE, ROOM.NURSERY, ROOM.REST],
   },

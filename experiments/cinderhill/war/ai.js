@@ -37,7 +37,7 @@ export function think(sim, t, mind = 1) {
   if (cg[o + CG.QUEEN_HP] <= 0 || sim.result) return out;
   // Before a frost it plans for the winter: stores for every mouth first, and no more housing than the stores can feed.
   const cfg = sim.cfg, winter = cfg.frostTick > 0 && (typeof mind === 'number' || mind.winter !== false), frozen = winter && sim.tick >= cfg.frostTick;
-  const meals = winter ? Math.ceil((cfg.duskTick - Math.max(sim.tick, cfg.frostTick)) / cfg.frostEat) : 0, feed = mouths => Math.ceil(mouths / 10) * meals;
+  const meals = winter ? Math.ceil((cfg.duskTick - Math.max(sim.tick, cfg.frostTick)) / cfg.frostEat) : 0, feed = mouths => Math.ceil(mouths / sim.stat[t].eatPer) * meals;
   const door = sim.door[t], dx = door % sw, dy = Math.floor(door / sw);
   const ends = [], live = [];
   for (let k = 0; k < TRAILS; k++) {
@@ -65,7 +65,7 @@ export function think(sim, t, mind = 1) {
   // Diet: workers first, then one in four a major, then two in four.
   const adults = cg[o + CG.ADULTS], majors = cg[o + CG.MAJORS];
   // Bold raises soldiers from the first brood: it means to strike before a growing hill's rooms have paid.
-  const diet = mood === 2 || sim.sites.length ? (adults < 34 ? 1 : 2) : adults < 36 ? 0 : adults < 60 ? 1 : 2;
+  const diet = mood === 2 || sim.sites.length || sim.mission.goals.haul ? (adults < 34 ? 1 : 2) : adults < 36 ? 0 : adults < 60 ? 1 : 2;
   // Its chosen caste (mind.pick), if the mission allows one: picked at the start, then raised beside the soldiers.
   const pick = typeof mind === 'number' ? 0 : mind.pick | 0, special = pick && diet ? Math.min(4 - diet, mind.special ?? 1) : 0;
   if (pick && !cg[o + CG.PICK]) out.push({ team: t, type: CMD.PICK, caste: pick });
@@ -92,13 +92,32 @@ export function think(sim, t, mind = 1) {
   if (foes >= 3 && cg[o + CG.RALLY_HOLD] < 100) out.push({ team: t, type: CMD.RALLY, x: dx, y: dy, hold: 400 });
   // Stones that pay while held: its soldiers stand on the nearest ones (timid one, steady two, bold three), a raid trail each.
   if (sim.sites.length) {
-    const want = sim.sites.map(c => [sim.doorF[t][c], c]).sort((a, b) => a[0] - b[0]).slice(0, 1 + mood).map(e => e[1]);
+    const want = sim.sites.map(c => [sim.doorF[t][c], c]).sort((a, b) => a[0] - b[0]).slice(0, Math.max(1, Math.min(1 + mood, Math.floor(majors / 3)))).map(e => e[1]); // three soldiers a stone, or it cannot hold one
     const by = (e, c) => Math.abs((e % sw) - (c % sw)) <= 2 && Math.abs(Math.floor(e / sw) - Math.floor(c / sw)) <= 2;
     const end = k => { const s2 = t * TRAILS + k; return sim.trPath[s2 * PATH_MAX + sim.trLen[s2] - 1]; };
     const kept = raids.filter(k => majors >= 2 && want.some(c => by(end(k), c)));
     for (const k of raids) if (!kept.includes(k)) out.push({ team: t, type: CMD.ERASE, trail: k });
     let room = TRAILS - live.length;
     if (majors >= 3) for (const c of want) if (room > 0 && !kept.some(k => by(end(k), c))) { out.push({ team: t, type: CMD.TRAIL, kind: KIND.RAID, level: mood ? 1 : 2, points: [c % sw, Math.floor(c / sw)] }); room--; }
+    return out;
+  }
+  // A haul mission: the loads in the other store are the goal. A rival that fights sends everything through the door
+  // (a Surge raid takes workers along to carry), and calls it off when the soldiers are spent.
+  if (sim.mission.goals.haul) {
+    // Half its soldiers stand on the richest ford (so half the guard is away from its store, which is the opening a
+    // thief needs). A rival that fights breaks in with everything when it has the numbers, workers along to carry.
+    let foe = -1, foeMajors = 0; for (let e = 0; e < TEAMS; e++) if (e !== t && cg[e * CG.SIZE + CG.QUEEN_HP] > 0) { foe = e; foeMajors = cg[e * CG.SIZE + CG.MAJORS]; }
+    const atDoor = k => { const s2 = t * TRAILS + k, e = sim.trPath[s2 * PATH_MAX + sim.trLen[s2] - 1]; return foe >= 0 && sim.doorF[foe][e] <= 4; };
+    const strike = mood > 0 && foe >= 0 && majors >= (mood === 2 ? Math.max(6, Math.ceil(foeMajors * 1.25)) : Math.max(8, Math.ceil(foeMajors * 1.5)));
+    if (raids.length && (majors < 3 || (strike && !atDoor(raids[0])) || (atDoor(raids[0]) && majors * 2 < foeMajors))) for (const k of raids) out.push({ team: t, type: CMD.ERASE, trail: k });
+    else if (!raids.length && live.length < TRAILS && foe >= 0) {
+      if (strike) { const ed = sim.door[foe]; out.push({ team: t, type: CMD.TRAIL, kind: KIND.RAID, level: 3, points: [ed % sw, Math.floor(ed / sw)] }); }
+      else if (majors >= 4) {
+        let best = -1, amount = 0; const mid = sw >> 1;
+        for (let p = 0; p < MAX_PILES; p++) { const c = sim.pileCell[p]; if (c >= 0 && sim.pileAmount[p] > amount && Math.abs((c % sw) - mid) <= 6) { amount = sim.pileAmount[p]; best = c; } }
+        if (best >= 0) out.push({ team: t, type: CMD.TRAIL, kind: KIND.RAID, level: 2, points: [best % sw, Math.floor(best / sw)] });
+      }
+    }
     return out;
   }
   // War. It breaks into the enemy nest only with the numbers for it (bold: at parity; steady: a quarter more), since a

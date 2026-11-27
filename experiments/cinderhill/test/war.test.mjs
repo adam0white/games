@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { Sim, CG, CMD, KIND, CASTE, TEAMS, ROOM } from '../war/sim.js';
 import { Host } from '../war/host.js';
 import { think, THINK_EVERY } from '../war/ai.js';
+import { CAMPAIGN, TRAITS, MISSIONS } from '../war/tables.js';
 
 test('an idle colony loses to the rival', () => {
   const h = new Host({ seed: 3 }).run(7200);
@@ -201,4 +202,21 @@ test('The Stones: a mind that holds more stones beats one that holds fewer', () 
     const h = new Host({ seed, mission: 'stones', swap: seed % 2 === 0, ai: { 0: 1, 1: 0 } }).run(12000);
     assert.equal(h.sim.result, 1, `seed ${seed}`);
   }
+});
+
+test('The Larder: a stolen load counts when it reaches home, and ten of them end the mission', () => {
+  const h = new Host({ seed: 3, mission: 'larder', ai: { 0: 1, 1: 1 } }), s = h.sim;
+  while (!s.result && s.tick < 9700 && s.g(0, CG.HAUL) + s.g(1, CG.HAUL) === 0) h.run(200);
+  assert.ok(s.g(0, CG.HAUL) + s.g(1, CG.HAUL) > 0, 'some thief got home');
+  for (const t of [0, 1]) assert.ok(s.g(t, CG.HAUL) <= s.g(t, CG.STOLEN), 'no load is hauled that was not taken');
+  const b = Sim.load(JSON.parse(JSON.stringify(s.save(), (k, v) => (ArrayBuffer.isView(v) ? Array.from(v) : v))));
+  assert.equal(b.hash(), s.hash());
+  const t = s.g(0, CG.HAUL) ? 0 : 1; s.cg[t * CG.SIZE + CG.HAUL] = 10; s.step();
+  assert.equal(s.result, 1 + t);
+});
+
+test('the campaign: the third fork offers the upgrades of the caste taken at the first', () => {
+  const craft = CAMPAIGN.find(c => c.fork === 'craft');
+  for (const [caste, list] of Object.entries(craft.by)) for (const id of list) assert.equal(TRAITS[id].needs, caste);
+  for (const c of CAMPAIGN) if (c.mission) assert.ok(MISSIONS[c.mission], c.mission);
 });

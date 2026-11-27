@@ -33,7 +33,7 @@ function statsFor(traits = []) {
 }
 export const TASK = { REST: 0, OUT: 1, BACK: 2, GUARD: 3, NURSE: 4, DIG: 5 };
 // What a nest cell is used for is in tables.js (ROOM). A room counts once its cell is dug open.
-export const CARRY = { NONE: 0, SUGAR: 1, PROTEIN: 2 };
+export const CARRY = { NONE: 0, SUGAR: 1, PROTEIN: 2, KIND: 3, LOOT: 4 }; // LOOT is a flag on a stolen load: carry & KIND is the food
 export const FOOD = { SUGAR: 0, PROTEIN: 1 };
 export const STAGE = { EGG: 0, LARVA: 1, PUPA: 2 };
 export const KIND = { FORAGE: 0, RAID: 1 };
@@ -56,7 +56,7 @@ export const EVENT = {
   FROST: 14, // the frost came: the food outside is gone
   SITE: 15, // site, the team that holds it now (-1: no one), the team that held it
 };
-export const REASON = { QUEEN: 1, DUSK: 2, STARVED: 3, POINTS: 4 };
+export const REASON = { QUEEN: 1, DUSK: 2, STARVED: 3, POINTS: 4, HAUL: 5 };
 export const WHY = { FULL: 1, BLOCKED: 2, LONG: 3, NONE: 4 };
 
 export const TRAILS = 6; // per colony
@@ -75,6 +75,7 @@ export const CG = {
   DIET: 12, RECALL: 13, RALLY_CELL: 14, RALLY_HOLD: 15, ADULTS: 16, MAJORS: 17, WORKERS: 18, RESTING: 19, LAID: 20, SEQ: 21,
   CAP_FOOD: 22, CAP_BROOD: 23, CAP_ADULTS: 24, MARKS: 25, DIGGERS: 26,
   POINTS: 30, // paid by held sites, one a second each
+  HAUL: 31, // loads taken from a rival's store and carried all the way home
   PICK: 27, DIET2: 28, SPECIALS: 29, // the caste this colony chose (0: none yet), its share of the brood in four, how many live
   SIZE: 32,
 };
@@ -661,8 +662,9 @@ export class Sim {
     }
     if (task === TASK.BACK) {
       if (home[c] <= 1 && this.layer[i] === NEST) {
-        const kind = this.carry[i];
+        const kind = this.carry[i] & CARRY.KIND;
         if (kind) {
+          if (this.carry[i] & CARRY.LOOT) cg[o + CG.HAUL]++; // counted here, at home: a thief who dies on the way hauls nothing
           const food = kind === CARRY.PROTEIN ? FOOD.PROTEIN : FOOD.SUGAR;
           const slot = o + (food === FOOD.PROTEIN ? CG.PROTEIN : CG.SUGAR);
           this.carry[i] = 0;
@@ -751,13 +753,14 @@ export class Sim {
       const F = this.homeF[e];
       if (F[c] <= 1 && this.layer[i] === NEST) {
         const kind = cg[eo + CG.PROTEIN] > cg[eo + CG.SUGAR] ? FOOD.PROTEIN : FOOD.SUGAR, k = eo + (kind === FOOD.PROTEIN ? CG.PROTEIN : CG.SUGAR);
-        if (cg[k] > 0) { cg[k]--; cg[eo + CG.LOST]++; cg[t * CG.SIZE + CG.STOLEN]++; this.carry[i] = kind === FOOD.PROTEIN ? CARRY.PROTEIN : CARRY.SUGAR; this.event(EVENT.STOLEN, e, t, kind); }
+        if (cg[k] > 0) { cg[k]--; cg[eo + CG.LOST]++; cg[t * CG.SIZE + CG.STOLEN]++; this.carry[i] = (kind === FOOD.PROTEIN ? CARRY.PROTEIN : CARRY.SUGAR) | CARRY.LOOT; this.event(EVENT.STOLEN, e, t, kind); }
         this.inv[i] = 0; this.task[i] = TASK.BACK;
         return this.next(this.homeF[t], c);
       }
       const m = this.next(F, c); return m < 0 ? c : m;
     }
-    const Q = this.queenF[e];
+    // Where the stores are the goal, the fighters hold the store for the thieves and leave the queen be.
+    const Q = this.mission.goals.haul ? this.homeF[e] : this.queenF[e];
     if (Q[c] <= 1) return c;
     const m = this.next(Q, c); return m < 0 ? c : m;
   }
@@ -901,9 +904,12 @@ export class Sim {
     if (this.mission.goals.queen && alive <= 1) { this.result = 1 + Math.max(0, last); this.event(EVENT.RESULT, Math.max(0, last), REASON.QUEEN); return; }
     const goal = this.mission.goals.points | 0;
     if (goal) for (let t = 0; t < TEAMS; t++) if (cg[t * CG.SIZE + CG.POINTS] >= goal) { this.result = 1 + t; this.event(EVENT.RESULT, t, REASON.POINTS); return; }
+    const haul = this.mission.goals.haul | 0;
+    if (haul) for (let t = 0; t < TEAMS; t++) if (cg[t * CG.SIZE + CG.HAUL] >= haul) { this.result = 1 + t; this.event(EVENT.RESULT, t, REASON.HAUL); return; }
     if (this.mission.goals.dusk && this.cfg.duskTick > 0 && this.tick + 1 >= this.cfg.duskTick) {
+      this.census(); // count this tick's births and deaths before the dusk score
       // Dusk: more points where the mission counts them, else (and on a tie of points) more adults.
-      const score = t => (this.mission.goals.dusk === 'points' ? cg[t * CG.SIZE + CG.POINTS] * 100000 : 0) + cg[t * CG.SIZE + CG.ADULTS];
+      const d = this.mission.goals.dusk, score = t => (d === 'points' ? cg[t * CG.SIZE + CG.POINTS] : d === 'haul' ? cg[t * CG.SIZE + CG.HAUL] : 0) * 100000 + cg[t * CG.SIZE + CG.ADULTS];
       let best = 0;
       for (let t = 1; t < TEAMS; t++) if (score(t) > score(best)) best = t;
       this.result = 1 + best; this.event(EVENT.RESULT, best, REASON.DUSK);
