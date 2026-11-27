@@ -1,7 +1,7 @@
 // The war sim: bots as acceptance. An idle colony loses, a run replays from its orders, a save carries on the same.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Sim, CG, CMD, KIND, CASTE, TEAMS, ROOM } from '../war/sim.js';
+import { Sim, CG, CMD, KIND, MODE, CASTE, TEAMS, ROOM } from '../war/sim.js';
 import { Host } from '../war/host.js';
 import { think, THINK_EVERY } from '../war/ai.js';
 import { CAMPAIGN, TRAITS, MISSIONS, MAPS } from '../war/tables.js';
@@ -240,7 +240,7 @@ test('The Narrows: the colony under siege wins at dusk, however small', () => {
 
 test('a guard post keeps a share of the idle soldiers inside the nest', () => {
   const run = post => {
-    const s = new Sim({ seed: 4, mission: 'larder' }), L = s.L, dx = s.door[0] % L.sw;
+    const s = new Sim({ seed: 4, mission: 'larder', traits: [['post'], []] }), L = s.L, dx = s.door[0] % L.sw;
     for (let k = 0; k < 16; k++) s.spawn(0, CASTE.MAJOR, s.door[0]);
     if (post) s.order({ team: 0, type: CMD.ROOM, kind: ROOM.POST, cells: [dx - 2, 16, dx - 1, 16, dx, 16, dx + 1, 16] }); // four cells of the queen's chamber
     for (let k = 0; k < 600; k++) s.step();
@@ -254,4 +254,32 @@ test('a guard post keeps a share of the idle soldiers inside the nest', () => {
   assert.ok(without <= 2, `no post: the guard stands by the door (${without} inside)`);
   assert.ok(withPost >= 5 && withPost <= 11, `four cells: about half of sixteen inside (${withPost})`);
   assert.throws(() => { const s = new Sim({ seed: 1, mission: 'crossing' }); let why = 0; s.order({ team: 0, type: CMD.ROOM, kind: ROOM.POST, cells: [s.door[0] % s.L.sw, 16] }); s.step(); for (const e of s.drainEvents()) if (e[0] === 7) why++; if (!why && s.room[16 * s.L.nw + s.door[0] % s.L.sw] !== ROOM.POST) throw new Error('refused'); }, /refused/);
+});
+
+test('a raid sent for the store brings loads home; a raid told to hold stays out of the door', () => {
+  const run = (traits, mode) => {
+    const s = new Sim({ seed: 3, mission: 'crossing', traits: [traits, []] }), sw = s.L.sw, ed = s.door[1];
+    for (let k = 0; k < 14; k++) s.spawn(0, CASTE.MAJOR, s.door[0]);
+    s.order({ team: 0, type: CMD.TRAIL, kind: KIND.RAID, level: 2, mode, points: [ed % sw, Math.floor(ed / sw)] });
+    let inside = 0;
+    for (let k = 0; k < 2400 && !s.result; k++) { s.step(); for (let i = 0; i < s.n; i++) if (s.team[i] === 0 && s.caste[i] === CASTE.MAJOR && s.inv[i]) inside++; }
+    return { mode: s.trMode[0], inside, haul: s.g(0, CG.HAUL), queen: s.g(1, CG.QUEEN_HP) };
+  };
+  const press = run([], 0), noNode = run([], MODE.LOOT), loot = run(['raiders'], MODE.LOOT), hold = run(['hold'], MODE.HOLD);
+  assert.equal(noNode.mode, MODE.PRESS, 'without the node the raid presses');
+  assert.equal(loot.mode, MODE.LOOT); assert.equal(hold.mode, MODE.HOLD);
+  assert.ok(press.inside > 0 && hold.inside === 0, `a holding raid never goes in (${press.inside}, ${hold.inside})`);
+  assert.ok(loot.haul >= 3 && press.haul === 0, `only soldiers sent for the store carry loads home (${loot.haul} v ${press.haul})`);
+  assert.ok(loot.queen > press.queen, 'and leave the queen be');
+});
+
+test('deeds are judged by the sim from its own counts', () => {
+  const s = new Sim({ seed: 1, mission: 'crossing' });
+  assert.deepEqual(s.deeds(0), [false, false]);
+  s.cg[CG.HAUL] = 1; assert.deepEqual(s.deeds(0), [true, false], 'a count reached is a deed done at once');
+  s.cg[CG.SIZE + CG.QUEEN_HP] = 0; s.step();
+  assert.equal(s.result, 1); assert.deepEqual(s.deeds(0), [true, true]); assert.deepEqual(s.deeds(1), [false, false]);
+  const b = Sim.load(JSON.parse(JSON.stringify(s.save(), (k, v) => (ArrayBuffer.isView(v) ? Array.from(v) : v))));
+  assert.deepEqual(b.deeds(0), [true, true], 'a save keeps how the mission ended');
+  for (const m of Object.values(MISSIONS)) { assert.equal(m.deeds.length, 2); for (const d of m.deeds) assert.ok(TRAITS[d.opens], `${m.id}.${d.id} opens a known node`); }
 });

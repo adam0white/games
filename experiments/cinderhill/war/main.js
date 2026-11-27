@@ -1,8 +1,8 @@
 // Cinderhill: The Crossing. The page for the war sim (./sim.js): two colonies on one hill. No game rule lives here:
 // everything on screen is read from the sim or its events, and every order goes through host.order() under seat 0.
 import { Host } from './host.js';
-import { CMD, KIND, CG, EVENT, REASON, TASK, CASTE, STAGE, MAT, ROOM, TRAILS, PATH_MAX, MAX_PILES, C, LEVEL_SHARE, RAID_SHARE } from './sim.js';
-import { CAMPAIGN, LOSS_ANTS, MISSIONS, TRAITS } from './tables.js';
+import { CMD, KIND, MODE, CG, EVENT, REASON, TASK, CASTE, STAGE, MAT, ROOM, TRAILS, PATH_MAX, MAX_PILES, C, LEVEL_SHARE, RAID_SHARE } from './sim.js';
+import { CAMPAIGN, LINEAGE, LOSS_ANTS, MISSIONS, TRAITS } from './tables.js';
 import { makeGestures } from '../gestures.js';
 import { GameRenderer, sky } from '../game/gl.js';
 import { noZoom } from '../../kit/zoom.js';
@@ -53,6 +53,14 @@ const FORK = { spitter: ['Spitters', 'Frail. They spit from two cells away, over
 function loadCamp() { try { const c = JSON.parse(localStorage.getItem(CAMP_KEY)); if (c && c.v === 1 && c.done) { c.forks ??= {}; return c; } } catch { /* a fresh campaign */ } return { v: 1, done: {}, caste: null, forks: {} }; }
 let camp = loadCamp();
 const saveCamp = () => { try { localStorage.setItem(CAMP_KEY, JSON.stringify(camp)); } catch { /* private mode: the campaign lasts the visit */ } };
+// The Lineage: the deeds done, by 'mission.deed'. Its own key. A node is yours once any deed that opens it is done.
+const LINE_KEY = 'cinderhill:war:lineage';
+function loadLine() { try { const c = JSON.parse(localStorage.getItem(LINE_KEY)); if (c && c.v === 1 && c.deeds) return c; } catch { /* none yet */ } return { v: 1, deeds: {} }; }
+let line = loadLine();
+const saveLine = () => { try { localStorage.setItem(LINE_KEY, JSON.stringify(line)); } catch { /* private mode */ } };
+const deedsFor = node => Object.values(MISSIONS).flatMap(m => m.deeds.filter(d => d.opens === node).map(d => ({ ...d, mission: m })));
+const hasNode = node => deedsFor(node).some(d => line.deeds[`${d.mission.id}.${d.id}`]);
+const nodesNow = () => LINEAGE.flatMap(b => b.nodes).filter(n => n.node && hasNode(n.node)).map(n => n.node);
 const STEPS = CAMPAIGN.filter(s => s.mission).map(s => s.mission);
 const before = id => STEPS[STEPS.indexOf(id) - 1];
 /** A mission is open when the one before it was played to its end and every fork before it is taken. */
@@ -65,7 +73,7 @@ const optionsOf = s => s.options ?? s.by?.[camp.caste] ?? [];
 const rivalOf = s => { const mine = taken(s.fork); if (s.options) return s.options.filter(v => v !== mine); const i = optionsOf(s).indexOf(mine), other = s.by[camp.caste === 'spitter' ? 'warden' : 'spitter']; return i < 0 ? [] : [other[1 - i]]; };
 const optionText = v => FORK[v] ?? [TRAITS[v].name, TRAITS[v].text];
 // Traits: yours are the forks you took; the rival takes the other option of each, so the choice is a trade and not a gift.
-const traitsNow = () => { const mine = [], theirs = []; for (const s of CAMPAIGN) if (s.fork && s.fork !== 'caste' && taken(s.fork)) { mine.push(taken(s.fork)); theirs.push(...rivalOf(s)); } return [mine, MOOD[set.get('rival')] ? theirs : []]; };
+const traitsNow = () => { const mine = nodesNow(), theirs = nodesNow(); for (const s of CAMPAIGN) if (s.fork && s.fork !== 'caste' && taken(s.fork)) { mine.push(taken(s.fork)); theirs.push(...rivalOf(s)); } return [mine, MOOD[set.get('rival')] ? theirs : []]; };
 function isOpen(id) { if (id === query.get('mission')) return true; for (const s of CAMPAIGN) { if (s.mission === id) return true; if (s.mission && !camp.done[s.mission]) return false; if (s.fork && !taken(s.fork)) return false; } return false; }
 const firstOpen = () => { let last = STEPS[0]; for (const id of STEPS) { if (!isOpen(id)) break; last = id; if (!camp.done[id]) break; } return last; };
 const qMission = query.get('mission');
@@ -182,7 +190,7 @@ function setScreen(s) {
 }
 function opening() { const e = doorXY(ME); cam.x = e.x; cam.y = e.y; cam.z = 24; clampCam(); camGoal = { x: e.x + 4, y: e.y, z: startZoom(), rate: 0.8 }; }
 function startRun() {
-  rec.start({ ...set.snapshot(), caste: camp.caste ?? 'none', way: camp.forks.way ?? 'none', craft: camp.forks.craft ?? 'none', mode: 'war', mission: missionId, ants: sim.cfg.antsBy[ME], look: `war:${set.get('view')}/${set.get('light')}/${set.get('style')}`, seed, v: 1 });
+  rec.start({ ...set.snapshot(), caste: camp.caste ?? 'none', way: camp.forks.way ?? 'none', craft: camp.forks.craft ?? 'none', nodes: nodesNow().join('+') || 'none', mode: 'war', mission: missionId, ants: sim.cfg.antsBy[ME], look: `war:${set.get('view')}/${set.get('light')}/${set.get('style')}`, seed, v: 1 });
   host.ai[FOE] = rivalMind(); if (camp.caste) host.order({ team: ME, type: CMD.PICK, caste: PICK[camp.caste] });
   running = true; opening();
 }
@@ -218,7 +226,55 @@ function renderPath() {
   $('mGoals').textContent = ''; for (const line of lost ? [...t.goals, `The last mission was lost: you start with ${startAnts()[0]} workers, not ${m.kit.ants}.`] : t.goals) { const p = document.createElement('p'); p.textContent = line; $('mGoals').append(p); }
   $('play').textContent = running && host.sim.mission.id === missionId ? 'Resume' : 'Play'; $('play').disabled = !isOpen(missionId);
   $('fresh').hidden = !Object.keys(camp.done).length; $('fresh').textContent = 'New campaign'; freshArmed = false;
+  renderDeeds($('mDeeds'), missionId, []); renderTree();
 }
+/** A mission's two deeds: done or not, and the node each opens. `fresh`: the ids done just now, for the result card. */
+function renderDeeds(el, id, fresh) {
+  el.textContent = ''; const h = document.createElement('h3'); h.textContent = 'Deeds'; el.append(h);
+  for (const d of MISSIONS[id].deeds) {
+    const p = document.createElement('p'), span = document.createElement('span'), small = document.createElement('small'), done = !!line.deeds[`${id}.${d.id}`], isNew = fresh.includes(d.id);
+    p.className = (done ? 'done' : '') + (isNew ? ' new' : ''); span.textContent = d.text;
+    small.textContent = isNew ? `Done. ${TRAITS[d.opens].name} is yours: ${TRAITS[d.opens].text}` : done ? `Done. It opened ${TRAITS[d.opens].name}.` : hasNode(d.opens) ? `Opens ${TRAITS[d.opens].name}, which you have.` : `Opens ${TRAITS[d.opens].name}.`;
+    span.append(small); p.append(span); el.append(p);
+  }
+}
+/** The Lineage: four boughs. A fork shows both sides (yours lit, the other struck out); a node is lit when a deed has opened it. */
+let treeSel = null;
+function renderTree() {
+  const el = $('tree'); el.textContent = '';
+  let have = 0, all = 0;
+  const about = document.createElement('p'); about.className = 'about';
+  const say = (key, name, text, how) => { treeSel = key; about.textContent = ''; const b = document.createElement('b'); b.textContent = `${name}. `; const sm = document.createElement('small'); sm.textContent = how; about.append(b, text, sm); for (const x of el.querySelectorAll('button')) x.setAttribute('aria-pressed', String(x.dataset.key === key)); };
+  for (const bough of LINEAGE) {
+    const box = document.createElement('div'), head = document.createElement('b'), row = document.createElement('div');
+    box.className = 'bough'; row.className = 'row'; head.textContent = bough.name;
+    bough.nodes.forEach((n, i) => {
+      if (i) { const arrow = document.createElement('span'); arrow.textContent = '›'; row.append(arrow); }
+      if (n.fork) {
+        const step = CAMPAIGN.find(c => c.fork === n.fork), mine = taken(n.fork), opts = step.options ?? step.by[camp.caste] ?? [], at = CAMPAIGN.indexOf(step), after = MISSIONS[CAMPAIGN[at - 1].mission], open = !!camp.done[after.id];
+        all++; if (mine) have++;
+        if (!opts.length) { const b = document.createElement('button'); b.className = 'locked'; b.textContent = FORK_HEAD[n.fork]; b.dataset.key = n.fork; b.addEventListener('click', () => say(n.fork, FORK_HEAD[n.fork], 'One of two crafts for the caste you took.', 'Take a third caste first.')); row.append(b); return; }
+        opts.forEach((v, j) => {
+          if (j) { const or = document.createElement('span'); or.textContent = 'or'; row.append(or); }
+          const b = document.createElement('button'), [name, what] = optionText(v);
+          b.textContent = name; b.dataset.key = v; b.className = mine === v ? 'have' : mine ? 'shut' : open ? '' : 'locked';
+          b.addEventListener('click', () => say(v, name, what, mine === v ? 'Yours for this campaign.' : mine ? 'Closed: you took the other side, and the rival has this one.' : open ? 'Open. Choose it in the list of missions above.' : `A fork. It opens when ${after.name} has been played to its end.`));
+          row.append(b);
+        });
+      } else {
+        const tr = TRAITS[n.node], got = hasNode(n.node), b = document.createElement('button');
+        all++; if (got) have++;
+        b.textContent = tr.name; b.dataset.key = n.node; b.className = got ? 'have' : 'locked';
+        b.addEventListener('click', () => say(n.node, tr.name, tr.text, got ? 'Yours. The rival has it too.' : `Opened by a deed: ${deedsFor(n.node).map(d => `${d.text.replace(/\.$/, '')} (${d.mission.name})`).join('; or ')}.`));
+        row.append(b);
+      }
+    });
+    box.append(head, row); el.append(box);
+  }
+  about.textContent = 'Tap a node to see what it does and how it opens.'; el.append(about);
+  $('treeBtn').textContent = `The Lineage · ${have} of ${all}`;
+}
+$('treeBtn').addEventListener('click', () => { const open = $('tree').hidden; $('tree').hidden = !open; $('treeBtn').setAttribute('aria-expanded', String(open)); rec.event('lineage', { open: open ? 1 : 0 }); if (open) $('tree').scrollIntoView({ block: 'nearest', behavior: 'smooth' }); });
 let freshArmed = false;
 renderPath();
 function toMenu() { dropTouches(); if (running) rec.end('left', summary()); running = false; document.body.classList.remove('frost'); if (nestOpen) setNest(false); $('toast').classList.remove('on'); setScreen('menu'); renderPath(); }
@@ -240,7 +296,7 @@ $('restart').addEventListener('click', () => restart());
 $('again').addEventListener('click', () => restart());
 $('toMenu').addEventListener('click', toMenu);
 $('next').addEventListener('click', () => { missionId = firstOpen(); toMenu(); });
-$('fresh').addEventListener('click', () => { if (!freshArmed) { freshArmed = true; $('fresh').textContent = 'Tap again to erase the campaign'; return; } camp = { v: 1, done: {}, caste: null, forks: {} }; saveCamp(); rec.event('campaign', { fresh: 1 }); missionId = STEPS[0]; renderPath(); });
+$('fresh').addEventListener('click', () => { if (!freshArmed) { freshArmed = true; $('fresh').textContent = 'Tap again to erase the campaign'; return; } camp = { v: 1, done: {}, caste: null, forks: {} }; saveCamp(); line = { v: 1, deeds: {} }; saveLine(); rec.event('campaign', { fresh: 1 }); missionId = STEPS[0]; renderPath(); });
 $('harder').addEventListener('click', () => { const v = set.get('rival'); set.set('rival', won ? (v === 'timid' ? 'steady' : 'bold') : v === 'bold' ? 'steady' : 'timid'); restart(); });
 onLeave(pauseGame);
 addEventListener('keydown', e => { if (isPauseKey(e)) { if (screen === 'play') pauseGame(); else if (screen === 'paused') resume(); e.preventDefault(); } });
@@ -268,6 +324,7 @@ for (const b of document.querySelectorAll('#specials [data-special]')) b.addEven
 for (const b of document.querySelectorAll('#diets [data-diet]')) b.addEventListener('click', () => { order({ type: CMD.DIET, share: Number(b.dataset.diet) }); tone(560 + 60 * Number(b.dataset.diet), 0.08, 0.04, 'triangle'); setTimeout(hud, 80); });
 let sel = -1, routeUntil = 0, firstTrail = false;
 const showRoute = (ms = 6000) => { routeUntil = performance.now() + ms; };
+for (const b of document.querySelectorAll('#modes [data-mode]')) b.addEventListener('click', () => { if (sel < 0) return; order({ type: CMD.CREW, trail: sel, mode: Number(b.dataset.mode) }); rec.event('mode', { mode: Number(b.dataset.mode) }); tone(440 + 110 * Number(b.dataset.mode), 0.08, 0.04, 'triangle'); showRoute(); setTimeout(hud, 80); });
 for (const b of document.querySelectorAll('#levels [data-level]')) b.addEventListener('click', () => { if (sel < 0) return; order({ type: CMD.CREW, trail: sel, level: Number(b.dataset.level) }); tone(500 + 90 * Number(b.dataset.level), 0.08, 0.04, 'triangle'); showRoute(); setTimeout(hud, 80); });
 $('erase').addEventListener('click', () => { if (sel < 0) return; order({ type: CMD.ERASE, trail: sel }); sel = -1; routeUntil = 0; tone(260, 0.12, 0.05, 'triangle', -80); setTimeout(hud, 80); });
 
@@ -354,7 +411,7 @@ function paintAt(e) {
 function setNestTab(t) { $('diet').dataset.tab = t; for (const b of document.querySelectorAll('#diet .tabs [data-tab]')) b.setAttribute('aria-pressed', String(b.dataset.tab === t)); if (t !== 'dig' && nestTool !== 'look') setNestTool('look'); }
 for (const b of document.querySelectorAll('#diet .tabs [data-tab]')) b.addEventListener('click', () => { setNestTab(b.dataset.tab); tone(480, 0.05, 0.03, 'triangle'); });
 const DIG_HELP = { look: 'Pick a room, then drag in the earth beside a tunnel.', store: 'Store: each cell holds 8 more seeds and 8 more meat. Drag in the earth: a seed to dig a cell.', nursery: 'Nursery: each cell holds one more egg or grub. Drag in the earth: a seed to dig a cell.', rest: 'Quarters: each cell houses 4 more ants. Drag in the earth: a seed to dig a cell.', post: 'Guard post: each cell keeps one in eight of your idle soldiers standing here, inside, and not out by the door.', clear: 'Drag over marks or rooms to take them off. Dug earth stays dug.' };
-function roomButtons() { for (const b of document.querySelectorAll('#rooms [data-room]')) b.hidden = !!ROOM_OF[b.dataset.room] && !sim.mission.rooms.includes(ROOM_OF[b.dataset.room]); if (ROOM_OF[nestTool] && !sim.mission.rooms.includes(ROOM_OF[nestTool])) setNestTool('look'); }
+function roomButtons() { for (const b of document.querySelectorAll('#rooms [data-room]')) b.hidden = !!ROOM_OF[b.dataset.room] && !sim.mayRoom(ME, ROOM_OF[b.dataset.room]); if (ROOM_OF[nestTool] && !sim.mayRoom(ME, ROOM_OF[nestTool])) setNestTool('look'); }
 roomButtons();
 function setNestTool(t) { nestTool = t; $('digHelp').textContent = DIG_HELP[t]; if (t !== 'look' && $('diet').dataset.tab !== 'dig') setNestTab('dig'); for (const b of document.querySelectorAll('#rooms [data-room]')) b.setAttribute('aria-pressed', String(b.dataset.room === t)); }
 for (const b of document.querySelectorAll('#rooms [data-room]')) b.addEventListener('click', () => { setNestTool(b.dataset.room); tone(500, 0.06, 0.03, 'triangle'); });
@@ -439,6 +496,11 @@ function finish(w, reason) {
   rec.end(w ? 'won' : 'lost', { ...s, reason });
   const text = TEXT[missionId], was = camp.done[missionId];
   camp.done[missionId] = { won: w || !!was?.won, best: Math.max(was?.best ?? 0, w ? s.adults : 0) }; saveCamp();
+  // Deeds: the sim judges them; the page only keeps which were done, and which are new this time.
+  const did = sim.deeds(ME), fresh = [];
+  sim.mission.deeds.forEach((d, i) => { const key = `${missionId}.${d.id}`; if (did[i] && !line.deeds[key]) { const had = hasNode(d.opens); line.deeds[key] = 1; fresh.push(d.id); rec.event('deed', { deed: key, opens: had ? 'had' : d.opens }); } });
+  if (fresh.length) saveLine();
+  renderDeeds($('overDeeds'), missionId, fresh);
   const upNext = CAMPAIGN[CAMPAIGN.findIndex(c => c.mission === missionId) + 1];
   $('next').hidden = !upNext; $('next').textContent = upNext?.fork && !taken(upNext.fork) ? (upNext.fork === 'caste' ? 'Choose a third caste' : upNext.fork === 'craft' ? 'Choose a craft' : 'Choose a way of living') : upNext ? `Next: ${MISSIONS[upNext.mission ?? STEPS[STEPS.indexOf(missionId) + 1]]?.name ?? 'the missions'}` : '';
   $('overKicker').textContent = reason === REASON.POINTS ? 'The stones have chosen' : reason === REASON.HAUL ? 'The larder is bare' : reason === REASON.QUEEN ? (w ? 'The rival queen is dead' : 'Your queen is dead') : text.end === 'dusk' ? 'Dusk' : 'The thaw';
@@ -471,6 +533,8 @@ function hud() {
     $('routeDot').style.background = raid ? '#ff5a3c' : TRAIL_CSS[sel]; $('routeName').textContent = raid ? 'Raid' : 'Forage';
     $('routeInfo').textContent = sim.trDry[s] ? 'nothing left at its end' : `${sim.crew[s]} of ${sim.want[s]} ${raid ? 'soldiers' : 'workers'}`;
     const sh = raid ? RAID_SHARE : LEVEL_SHARE, words = raid ? ['1 in 4', 'half', 'all, and workers'] : ['1 in 10', '1 in 4', 'half'];
+    const st = sim.stat[ME], canMode = raid && (st.loot || st.hold); $('modes').hidden = !canMode;
+    if (canMode) for (const b of document.querySelectorAll('#modes [data-mode]')) { const m = Number(b.dataset.mode); b.hidden = (m === MODE.LOOT && !st.loot) || (m === MODE.HOLD && !st.hold); b.setAttribute('aria-pressed', String(m === sim.trMode[s])); }
     for (const b of document.querySelectorAll('#levels [data-level]')) { const l = Number(b.dataset.level); b.setAttribute('aria-pressed', String(l === lv)); b.querySelector('small').textContent = words[l - 1]; void sh; }
   }
   const diet = g(ME, CG.DIET);
@@ -716,6 +780,8 @@ window.game = {
   door: t => doorXY(t), piles: () => { const o = []; for (let p = 0; p < MAX_PILES; p++) if (sim.pileAmount[p] > 0) o.push({ x: sim.pileCell[p] % L0.sw, y: Math.floor(sim.pileCell[p] / L0.sw), kind: sim.pileKind[p], amount: sim.pileAmount[p] }); return o; },
   run: n => { host.run(n); }, // tests: run the sim ahead
   traits: () => sim.cfg.traits,
+  auto: mood => { host.ai[ME] = mood; }, // tests: the rival's mind plays your seat too
+  modes: () => Array.from(sim.trMode.subarray(ME * TRAILS, ME * TRAILS + TRAILS)), select: k => { sel = k; showRoute(); hud(); },
   trails: () => { let n = 0; for (let k = 0; k < TRAILS; k++) if (sim.trLive[ME * TRAILS + k]) n++; return n; },
   setTool, setNest, setNestTool, nestXY: (x, y) => { const r = nestCanvas.getBoundingClientRect(); return [r.left + (x + 0.5 - nestCam.x) * nestCam.z + NW / 2, r.top + (y + 0.5 - nestCam.y) * nestCam.z + 26]; }, setSpeed, order, run: n => { host.run(n); news(); uploadAnts(); }, log: () => JSON.parse(JSON.stringify(host.log)), hash: () => sim.hash(),
 };
