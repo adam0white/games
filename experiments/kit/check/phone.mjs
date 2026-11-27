@@ -1355,12 +1355,12 @@ const GAMES = {
     let posts = 0; await page.route('**/lab-api/board/**', r => { if (r.request().method() === 'POST') posts++; return r.fulfill({ status: 200, contentType: 'application/json', body: '{"rows":[],"place":0}' }); });
     await page.goto(`${base}/lantern/?lang=en&dare=bad.link`);
     assert.ok(await page.isHidden('#dareCard'), 'a broken dare link shows no dare');
-    await page.evaluate(() => { for (const [k, v] of Object.entries({ 'lantern-tutorial': '1', 'lantern-hint': '1', 'lantern-name': 'Ada', 'lantern-share': '1', 'lantern-board-id': '11111111-2222-4333-8444-555555555555' })) localStorage.setItem(k, v); });
+    await page.evaluate(() => { for (const [k, v] of Object.entries({ 'lantern:set:river': 'classic', 'lantern-tutorial': '1', 'lantern-hint': '1', 'lantern-name': 'Ada', 'lantern-share': '1', 'lantern-board-id': '11111111-2222-4333-8444-555555555555' })) localStorage.setItem(k, v); });
     await page.goto(`${base}/lantern/?lang=en&dare=k2j9x.7.1.Sam`);
     await until(page, () => !document.getElementById('dareCard').hidden, 'the dare is on the menu'); assert.match(await page.textContent('#dareText'), /^Sam scored 7 on this river/);
     await page.click('#dareGo'); await until(page, () => window.lanternState().playing, 'the dare starts');
     const run = await page.evaluate(() => { const s = window.lanternSim(); return { seed: s.seed, their: s.dare && s.dare.score, things: [...s.on, ...s.gifts], endless: s.endless, gentle: !!s.gentle }; });
-    assert.deepEqual(run, { seed: parseInt('k2j9x', 36), their: 7, things: ['boost'], endless: true, gentle: false }, 'the same river with the same abilities, classic banks');
+    assert.deepEqual(run, { seed: parseInt('k2j9x', 36), their: 7, things: ['boost'], endless: true, gentle: false }, 'the same river with the same abilities; the banks follow the River setting, Classic here');
     await page.evaluate(() => { const s = window.lanternSim(); s.rocks = []; s.next = Infinity; s.safe = 60; }); await until(page, () => window.lanternState().score > 7, 'a score past the dare', 30000);
     await page.evaluate(() => { const s = window.lanternSim(); s.safe = 0; s.hearts = 1; s.shield = 0; s.field = 0; s.x = 5; }); await until(page, () => window.lanternState().screen === 'card', 'the dare ends', 15000);
     assert.match(await page.textContent('#line'), /You beat Sam: \d+ against 7/); assert.equal(await page.textContent('#dareSend'), 'Send your score back');

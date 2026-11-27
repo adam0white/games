@@ -671,7 +671,8 @@ function begin() {
 // The gentle river (the lab's own change, 2026-11-27; NOTES.md): play records showed new players ending their first runs on the bank
 // within seconds. On story nights a gentle river's banks push the boat back and dim the flame a little; rocks, ice and the dark are as
 // they were. The endless river, today's river, the tower and the modes always have classic banks, so every board stays fair.
-const gentleRun = () => !tutor && !endless && !tower && !daily && !mod && opts.get('river') === 'gentle';
+// A dare (below) follows the setting: it is on no board, and a friend who arrives by a link is often new.
+const gentleRun = () => !tutor && (!endless || !!s.dare) && !tower && !daily && !mod && opts.get('river') === 'gentle'; // a dare is on no board, so a friend who is new meets the gentle river there too
 const mode = () => mod ? mod.id : tutor ? 'tutorial' : tower ? 'tower' : s.dare ? 'dare' : endless ? 'endless' : 'night';
 // A dare by link (kit/dare.js; the lab's own change, 2026-11-27, for play between friends with no account). The card after an endless
 // run, a run on today's river or a dare has "Dare a friend": a link that carries the river's seed, the score, the name and which
