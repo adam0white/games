@@ -206,19 +206,23 @@ export class Sim {
    *  is each mission's choice (painting them again needs no digging). So does a room that needs a growth or a deed. Nothing is kept within four cells of the
    *  line between the hills, so two nests that were joined start apart. A cache where a kept cell lies is gone. */
   inherit(nests) {
-    const L = this.L, mid = ((this.door[0] % L.sw) + (this.door[1] % L.sw)) >> 1;
+    const L = this.L, mid = ((this.door[0] % L.sw) + (this.door[1] % L.sw)) >> 1, fresh = [];
     for (let t = 0; t < TEAMS; t++) {
-      const list = nests[t]; if (!list) continue;
+      const list = nests[t]; if (!Array.isArray(list)) continue;
       const dx = this.door[t] % L.sw, side = dx < mid ? 1 : -1;
       for (let j = 0; j + 2 < list.length; j += 3) {
         const x = dx + side * (list[j] | 0), y = list[j + 1] | 0, r = list[j + 2] | 0;
         if (x < 0 || x >= L.nw || y < 0 || y >= L.nh || Math.abs(x - mid) < 4) continue;
         const k = y * L.nw + x, m = L.nestBase + k;
         if (this.owner(k) !== t || (this.mat[m] !== MAT.CLAY && this.mat[m] !== MAT.OPEN)) continue;
+        if (this.mat[m] === MAT.CLAY) fresh.push(k, t);
         this.mat[m] = MAT.OPEN; this.cache[k] = 0;
         this.room[k] = r === ROOM.STORE || r === ROOM.NURSERY ? r : 0;
       }
     }
+    // A kept cell that the gap between the hills cut off from its queen is clay again: a room no ant can reach is no room.
+    const F = [this.field(null, [this.queen[0]], false), this.field(null, [this.queen[1]], false)];
+    for (let j = 0; j < fresh.length; j += 2) { const k = fresh[j], m = L.nestBase + k; if (F[fresh[j + 1]][m] === FAR) { this.mat[m] = MAT.CLAY; this.room[k] = 0; } }
   }
 
   startColony(t) {

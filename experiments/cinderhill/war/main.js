@@ -57,6 +57,8 @@ const TEXT = {
 const FORK = { spitter: ['Spitters', 'Frail. They spit from two cells away, over the front line.'], warden: ['Wardens', 'Slow and very hard to kill. They hold a tunnel.'] };
 function loadCamp() { try { const c = JSON.parse(localStorage.getItem(CAMP_KEY)); if (c && c.v === 1 && c.done) { c.forks ??= {}; return c; } } catch { /* a fresh campaign */ } return { v: 1, done: {}, caste: null, forks: {} }; }
 let camp = loadCamp();
+// A campaign from before the fork in the road, with one of its two missions finished: that one was the road taken.
+{ const got = ROAD.pair.filter(x => camp.done[x]); if (!camp.forks.road && got.length === 1) camp.forks.road = got[0]; }
 const saveCamp = () => { try { localStorage.setItem(CAMP_KEY, JSON.stringify(camp)); } catch { /* private mode: the campaign lasts the visit */ } };
 // The Lineage: the deeds done, by 'mission.deed'. Its own key. A node is yours once any deed that opens it is done.
 const LINE_KEY = 'cinderhill:war:lineage';
@@ -72,7 +74,7 @@ const HILL_KEY = 'cinderhill:war:hills';
 function loadHills() { try { const c = JSON.parse(localStorage.getItem(HILL_KEY)); if (c && c.v === 1 && c.after) return c; } catch { /* none yet */ } return { v: 1, after: {} }; }
 let hills = loadHills();
 const saveHills = () => { try { localStorage.setItem(HILL_KEY, JSON.stringify(hills)); } catch { /* private mode */ } };
-const hillOf = id => { if (set.get('home') !== 'carried') return null; for (let f = MISSIONS[id].from; f; f = MISSIONS[f].from) if (hills.after[f]) return { from: f, nests: hills.after[f].nests }; return null; };
+const hillOf = id => { if (set.get('home') !== 'carried') return null; for (let f = MISSIONS[id].from; f; f = MISSIONS[f].from) { const n = hills.after[f]?.nests; if (Array.isArray(n) && Array.isArray(n[0]) && Array.isArray(n[1])) return { from: f, nests: n }; } return null; };
 const STEPS = CAMPAIGN.filter(s => s.mission).map(s => s.mission);
 const before = id => STEPS[STEPS.indexOf(id) - 1];
 /** A mission is open when the one before it was played to its end and every fork before it is taken. */
@@ -92,7 +94,8 @@ const qMission = query.get('mission');
 let missionId = MISSIONS[qMission] ? qMission : firstOpen();
 const rivalMind = () => { const mood = MOOD[set.get('rival')]; return mood && camp.caste ? { mood, pick: camp.caste === 'spitter' ? CASTE.WARDEN : CASTE.SPITTER } : mood; };
 // A mission lost costs the next one some of its first workers: the colony carries on smaller.
-const startAnts = () => { const prev = before(missionId), ants = MISSIONS[missionId].kit.ants; return prev && camp.done[prev] && !camp.done[prev].won ? [Math.max(10, ants - LOSS_ANTS), MISSIONS[missionId].kit.foeAnts ?? ants] : [ants, MISSIONS[missionId].kit.foeAnts ?? ants]; };
+const roadBefore = id => { const [a, b] = ROAD.pair, r = camp.forks.road; if (id === a || id === b) return r && r !== id ? r : before(a); const p = before(id); return (p === a || p === b) && r ? (r === a ? b : a) : p; };
+const startAnts = () => { const prev = roadBefore(missionId), ants = MISSIONS[missionId].kit.ants; return prev && camp.done[prev] && !camp.done[prev].won ? [Math.max(10, ants - LOSS_ANTS), MISSIONS[missionId].kit.foeAnts ?? ants] : [ants, MISSIONS[missionId].kit.foeAnts ?? ants]; };
 // The fork in the road: the mission of the pair that was not finished first has changed by the time it is played.
 const late = id => ROAD.pair.includes(id) && !!camp.forks.road && camp.forks.road !== id;
 const lateOpts = id => { if (!late(id)) return {}; const { foePoints, foeHarm, ...o } = ROAD.late[id]; if (foePoints) { o.pointsBy = [0, 0]; o.pointsBy[FOE] = foePoints; } if (foeHarm) { o.harmBy = [0, 0]; o.harmBy[FOE] = foeHarm; } return o; };
@@ -258,12 +261,13 @@ function renderPath() {
       const m = MISSIONS[s.mission], d = camp.done[s.mission], b = document.createElement('button');
       b.className = 'step' + (d ? (d.won ? ' won' : ' lost') : ''); b.disabled = !isOpen(s.mission); b.setAttribute('aria-pressed', String(s.mission === missionId));
       const i = document.createElement('i'), name = document.createElement('span'), em = document.createElement('em');
-      i.textContent = String(++n); name.textContent = m.name; em.textContent = d ? (d.won ? `Won · best ${d.best}` : 'Lost') : b.disabled ? 'Closed' : 'New';
+      i.textContent = String(++n); name.textContent = m.name; em.textContent = d ? (d.won ? `Won · best ${d.best}` : 'Lost') : b.disabled ? 'Closed' : ROAD.pair.includes(s.mission) && !camp.forks.road ? `New · if left: ${ROAD.price[s.mission]}` : late(s.mission) ? `New · ${ROAD.price[s.mission]}` : 'New';
       b.append(i, name, em); b.addEventListener('click', () => { missionId = s.mission; renderPath(); tone(560, 0.06, 0.03, 'triangle'); });
       el.append(b);
     } else if (s.fork) {
-      const open = !!camp.done[STEPS[n - 1]], mine = taken(s.fork), free = set.get('forks') === 'free', box = document.createElement('div'), head = document.createElement('b'), row = document.createElement('div'), note = document.createElement('p');
+      const open = STEPS.slice(0, n).every(x => camp.done[x]), mine = taken(s.fork), free = set.get('forks') === 'free', box = document.createElement('div'), head = document.createElement('b'), row = document.createElement('div'), note = document.createElement('p');
       box.className = 'fork'; head.textContent = FORK_HEAD[s.fork];
+      const undone = STEPS.slice(0, n).filter(x => !camp.done[x]), left = undone.slice(undone.slice(-2).every(x => ROAD.pair.includes(x)) ? -2 : -1).map(x => MISSIONS[x].name), waits = `Opens when ${left.join(' and ')} ${left.length > 1 ? 'have' : 'has'} been played to ${left.length > 1 ? 'their' : 'its'} end.`;
       for (const v of optionsOf(s)) {
         const b = document.createElement('button'), small = document.createElement('small'), [name, what] = optionText(v);
         b.textContent = name; small.textContent = what; b.append(small);
@@ -271,7 +275,7 @@ function renderPath() {
         b.addEventListener('click', () => { if (mine === v) return; if (mine) rec.event('refork', { fork: s.fork, from: mine, to: v }); if (s.fork === 'caste') { camp.caste = v; set.set('caste', v); for (const c of CAMPAIGN) if (c.by) delete camp.forks[c.fork]; /* a craft belongs to its caste */ } else camp.forks[s.fork] = v; saveCamp(); rec.event('fork', { fork: s.fork, pick: v }); missionId = firstOpen(); renderPath(); tone(700, 0.2, 0.05, 'triangle', 120); });
         row.append(b);
       }
-      note.textContent = s.by ? (mine ? (free ? 'Yours for now: tap the other to change. The rival takes a craft for its own caste.' : 'Chosen for this campaign. The rival takes a craft for its own caste.') : open ? 'Choose one. It is kept for the whole campaign. The rival takes a craft for its own caste.' : `Opens when ${MISSIONS[STEPS[n - 1]].name} has been played to its end.`) : mine ? (free ? 'Yours for now: tap the other to change. The rival has the other.' : 'Chosen for this campaign. The rival has the other.') : open ? 'Choose one. It is kept for the whole campaign, and the rival has the other.' : `Opens when ${MISSIONS[STEPS[n - 1]].name} has been played to its end.`;
+      note.textContent = s.by ? (mine ? (free ? 'Yours for now: tap the other to change. The rival takes a craft for its own caste.' : 'Chosen for this campaign. The rival takes a craft for its own caste.') : open ? 'Choose one. It is kept for the whole campaign. The rival takes a craft for its own caste.' : waits) : mine ? (free ? 'Yours for now: tap the other to change. The rival has the other.' : 'Chosen for this campaign. The rival has the other.') : open ? 'Choose one. It is kept for the whole campaign, and the rival has the other.' : waits;
       box.append(head, row, note); el.append(box);
     }
   }
@@ -279,7 +283,7 @@ function renderPath() {
   $('mKicker').textContent = m.name; $('mSub').textContent = t.sub;
   $('mGoals').textContent = ''; const hill = hillOf(missionId), kept = hill ? (() => { const n = [0, 0, 0, 0], l = hill.nests[ME] ?? []; for (let j = 2; j < l.length; j += 3) n[l[j] < 4 ? l[j] : 0]++; return `You start in your hill as you left it at ${MISSIONS[hill.from].name}: ${l.length / 3} cells dug, ${n[ROOM.STORE]} of them stores, ${n[ROOM.NURSERY]} nursery. Your ${n[ROOM.REST]} quarters cells are bare tunnels again: paint them as Quarters when you want the ants, with no digging to do. The rival starts in its own.`; })() : m.from && set.get('home') === 'carried' ? (camp.done[m.from] ? `This is the hill of ${MISSIONS[m.from].name}. Play that mission again to its end and you start here in the nest you dug there.` : `This is the hill of ${MISSIONS[m.from].name}. Finish that mission and you start here in the nest you dug there.`) : Object.values(MISSIONS).some(x => x.from === missionId) && set.get('home') === 'carried' ? 'What you dig here stays: the next mission on this hill starts in this nest.' : null;
   const other = ROAD.pair.find(x => x !== missionId), road = !ROAD.pair.includes(missionId) ? null : late(missionId) ? `You went to ${MISSIONS[other].name} first. ${ROAD.text[missionId]}` : camp.forks.road || ROAD.pair.some(x => camp.done[x]) ? null : `A fork in the road. ${MISSIONS[ROAD.pair[0]].name} and ${MISSIONS[ROAD.pair[1]].name} are both open, and the one you leave for later changes while you are away. Leave ${MISSIONS[ROAD.pair[0]].name}: ${ROAD.text[ROAD.pair[0]]} Leave ${MISSIONS[ROAD.pair[1]].name}: ${ROAD.text[ROAD.pair[1]]}`;
-  for (const line of [...t.goals, ...(lost ? [`The last mission was lost: you start with ${startAnts()[0]} workers, not ${m.kit.ants}.`] : []), ...(kept ? [kept] : []), ...(road ? [road] : [])]) { const p = document.createElement('p'); p.textContent = line; $('mGoals').append(p); }
+  for (const line of [...t.goals, ...(lost ? [`Your last mission was lost: you start with ${startAnts()[0]} workers, not ${m.kit.ants}.`] : []), ...(kept ? [kept] : []), ...(road ? [road] : [])]) { const p = document.createElement('p'); p.textContent = line; $('mGoals').append(p); }
   $('play').textContent = running && host.sim.mission.id === missionId ? 'Resume' : 'Play'; $('play').disabled = !isOpen(missionId);
   $('fresh').hidden = !Object.keys(camp.done).length; $('fresh').textContent = 'New campaign'; freshArmed = false;
   renderDeeds($('mDeeds'), missionId, []); renderTree();
@@ -599,14 +603,15 @@ function finish(w, reason) {
   const text = TEXT[missionId], was = camp.done[missionId];
   camp.done[missionId] = { won: w || !!was?.won, best: Math.max(was?.best ?? 0, w ? s.adults : 0) }; saveCamp();
   if (ROAD.pair.includes(missionId) && !camp.forks.road && !camp.done[ROAD.pair.find(x => x !== missionId)]) { camp.forks.road = missionId; saveCamp(); rec.event('road', { first: missionId }); }
-  if (sim.mission.from || Object.values(MISSIONS).some(x => x.from === missionId)) { hills.after[missionId] = { nests: sim.nests() }; saveHills(); }
+  if (set.get('home') === 'carried' && (sim.mission.from || Object.values(MISSIONS).some(x => x.from === missionId))) { hills.after[missionId] = { nests: sim.nests() }; saveHills(); }
   // Deeds: the sim judges them; the page only keeps which were done, and which are new this time.
   const did = sim.deeds(ME), fresh = [];
   sim.mission.deeds.forEach((d, i) => { const key = `${missionId}.${d.id}`; if (did[i] && !line.deeds[key]) { const had = hasNode(d.opens); line.deeds[key] = 1; fresh.push(d.id); rec.event('deed', { deed: key, opens: had ? 'had' : d.opens }); } });
   if (fresh.length) saveLine();
   renderDeeds($('overDeeds'), missionId, fresh);
-  const upNext = CAMPAIGN[CAMPAIGN.findIndex(c => c.mission === missionId) + 1];
-  $('next').hidden = !upNext; $('next').textContent = upNext?.fork && !taken(upNext.fork) ? (upNext.fork === 'caste' ? 'Choose a third caste' : upNext.fork === 'craft' ? 'Choose a craft' : 'Choose a way of living') : upNext ? `Next: ${MISSIONS[upNext.mission ?? STEPS[STEPS.indexOf(missionId) + 1]]?.name ?? 'the missions'}` : '';
+  // Where "next" leads: the first fork that is open and not taken, else the first mission not yet played to its end.
+  const forkNext = (() => { for (const c of CAMPAIGN) { if (c.mission) { if (!camp.done[c.mission]) return null; } else if (c.fork && !taken(c.fork)) return c.fork; } return null; })(), nx = firstOpen();
+  $('next').hidden = false; $('next').textContent = forkNext ? (forkNext === 'caste' ? 'Choose a third caste' : forkNext === 'craft' ? 'Choose a craft' : 'Choose a way of living') : !camp.done[nx] ? `Next: ${MISSIONS[nx].name}` : 'The missions';
   $('overKicker').textContent = reason === REASON.BEAST ? 'The beetle is carried off' : reason === REASON.POINTS ? 'The stones have chosen' : reason === REASON.HAUL ? 'The larder is bare' : reason === REASON.QUEEN ? (w ? 'The rival queen is dead' : 'Your queen is dead') : text.end === 'dusk' ? 'Dusk' : 'The thaw';
   $('overTitle').textContent = w ? text.won : sim.mission.goals.beast && g(ME, CG.QUEEN_HP) > 0 ? 'The rival took the beetle' : 'The hill is lost'; $('overTitle').classList.toggle('lost', !w);
   $('overWhy').textContent = reason === REASON.QUEEN ? (w ? (sim.mission.map === 'wall' ? 'Her colony scatters. The wall did not save her.' : sim.mission.map === 'pass' ? 'Her colony scatters. The ridge is yours.' : 'Her colony scatters. Both fords are yours now.') : 'Without her the colony has no tomorrow.') : sim.mission.goals.carry && sim.fallen ? `${sim.carried(ME)} loads of the beetle home to the rival's ${sim.carried(FOE)}.` : sim.mission.goals.beast ? `Your ants did it ${T(ME, CG.HARM)} harm. The rival's did it ${T(FOE, CG.HARM)}.` : sim.mission.goals.points ? `${T(ME, CG.POINTS)} points to the rival's ${T(FOE, CG.POINTS)}.` : sim.mission.goals.dusk === 'holder' ? 'Dusk fell and their queen still lives.' : sim.mission.goals.haul ? `You carried home ${T(ME, CG.HAUL)} of their loads. They carried home ${T(FOE, CG.HAUL)} of yours.` : w ? `At ${text.end} you stood ${s.adults} to ${s.foe}.` : `At ${text.end} the rival stood ${s.foe} to your ${s.adults}.`;

@@ -1002,3 +1002,17 @@ Not known: whether a person finds either late mission fair, and whether the choi
 | The Stones, rival 40 ahead | 10 v 0 | 5 v 5 |
 
 Read: each late mission now costs something, in different pairings. The late Hunt bites against the timid rival (the default) and not when a bold hill meets a steady one; the late Stones the other way round. They are not equal costs, and no pairing shows both. Recorded as open in bead lab-5w7.76.
+
+### The home hill and the fork after an outside review
+
+An outside reviewer read the code of both features and four phone screenshots. Fixed here:
+
+- A saved hill that is not two lists is passed over, and the mission before it on the same hill is used. It used to stop the mission list from drawing, the "New campaign" button with it.
+- A kept cell that the gap between the hills cuts off from its queen is clay again (sim `inherit`). A nursery with no way in used to count as beds.
+- A mission played with "A new hill every mission" no longer replaces the hill kept from it.
+- The cost of a mission lost follows the road taken, not the printed order: lose First Frost, go to The Stones, and The Stones is the one that starts short.
+- A campaign from before the fork with one of the pair finished: that mission is the road taken, set when the page loads, so a replay cannot decide it.
+- Each of the pair shows what leaving it costs on its row in the mission list ("if left: rival +40 points").
+- A fork opens when every mission before it is finished. The Stones first used to open the craft fork before The Hunt, a gain no card named. The button after a mission says where it leads.
+
+Left open (bead lab-5w7.76): a second tab can write an erased campaign back; a plugged cell is not kept as a plug; the rival bot reads one corner of a room slot as the whole room; with the Timid rival the rival takes no fork options although the cards say it has the other; the reviewer would drop the late beetle's extra health (in its count the meat phase was reached in 2 of 8 games against 5 of 8) and suggested a rearguard left on the road not taken.
