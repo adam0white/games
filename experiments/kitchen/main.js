@@ -9,6 +9,7 @@ import { music } from '../kit/music.js';
 import { onLeave, isPauseKey } from '../kit/pause.js';
 import { screens } from '../kit/screens.js';
 import { lab } from '../kit/lab.js';
+import { settings } from '../kit/settings.js';
 import * as story from './story.js';
 // Story beats and daily specials (data). A failed load just means a day without story.
 const storyData = Promise.all(['beats', 'specials'].map(n => fetch(`./story/${n}.json`).then(r => r.json()).catch(() => null))).then(([beats, sp]) => ({ beats: beats ?? [], specials: sp?.specials ?? [] }));
@@ -56,7 +57,8 @@ let lookId = LOOK_IDS.includes(query.get('look')) ? query.get('look') : LOOK_IDS
 if (LOOK_IDS.includes(query.get('look'))) write(LOOK_KEY, lookId);
 // Taste choices are player settings with a default; each change is recorded (from, to) so the default can follow players.
 const LOOK_ORDER = ['diner', 'storybook', 'diorama', 'comic', 'toon', 'night', 'clay'].filter(id => LOOK_IDS.includes(id));
-const settingChanged = (name, from, to) => rec.event('setting', { name, from, to, where: screen });
+// Recorded through the kit's settings (kit/settings.js): setting {id, value, from, def}.
+const settingChanged = (id, from, to) => opts.track(id, to, from);
 
 // ---------- sound: made in code (kit/audio.js); music from kit/music.js
 let musicOn = read(MUSIC_KEY) !== '0', song = null;
@@ -104,6 +106,7 @@ const buzz = ms => { if (save.sound && navigator.vibrate) try { navigator.vibrat
 
 // ---------- lab recording
 const rec = lab('kitchen', { lang: W.lang });
+const opts = settings('kitchen', { look: { values: LOOK_ORDER, def: 'diner', key: LOOK_KEY } }, { rec });
 rec.notice($('menu').firstElementChild);
 rec.toggle($('paused').firstElementChild);
 
@@ -1165,8 +1168,8 @@ $('play').addEventListener('click', async () => { snd.unlock(); await ready; if 
 for (const id of ['sound1', 'sound2']) $(id).addEventListener('click', () => { save.sound = !save.sound; store(); settingChanged('sound', !save.sound, save.sound); if (save.sound) { snd.unlock(); if (!paused) snd.release(); SFX.tap(); } labels(); });
 for (const id of ['music1', 'music2']) $(id).addEventListener('click', () => { musicOn = !musicOn; write(MUSIC_KEY, musicOn ? '1' : '0'); settingChanged('music', !musicOn, musicOn); labels(); });
 for (const id of ['look1', 'look2']) $(id).addEventListener('click', () => {
-  const from = lookId; lookId = LOOK_ORDER[(LOOK_ORDER.indexOf(lookId) + 1) % LOOK_ORDER.length]; write(LOOK_KEY, lookId);
-  art?.setLook(lookId); SFX.tap(); settingChanged('look', from, lookId); labels();
+  lookId = opts.set('look', LOOK_ORDER[(LOOK_ORDER.indexOf(lookId) + 1) % LOOK_ORDER.length]);
+  art?.setLook(lookId); SFX.tap(); labels();
 });
 
 $('lang').addEventListener('click', () => { const from = W.lang(); W.setLang(from === 'en' ? 'tr' : 'en'); settingChanged('lang', from, W.lang()); W.apply(); labels(); menu(); SFX.tap(); });
