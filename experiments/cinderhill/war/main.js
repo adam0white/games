@@ -46,6 +46,7 @@ const TEXT = {
   crossing: { sub: 'Two hills. One creek. Not enough food for both.', goals: ['Have the larger colony at dusk, or kill the rival queen.', 'Lose your queen and the hill is lost.', 'The big food lies on the two fords. So does the rival.'], clock: ['Dusk'], won: 'The crossing is yours', end: 'dusk' },
   stones: { sub: 'Four standing stones. Stand by them longer than the rival does.', goals: ['A stone pays a point a second to the colony with more ants beside it. It takes three ants at least.', 'First to 400 points wins. At dusk, more points wins.', 'Draw a raid trail to a stone and your soldiers stand there.', 'Two stones stand on the fords. One stands on each far flank.'], clock: ['Dusk'], won: 'The stones are yours', end: 'dusk' },
   larder: { sub: 'A lean season. Their stores are full. So are yours.', goals: ['Carry ten loads home from the rival\'s store. A load counts when the thief reaches your own store with it.', 'Tap Raid, then tap the rival door. Every soldier goes, and workers go along to carry. The soldiers hold the store while the workers take from it.', 'Half the rival\'s soldiers stand on a ford. Strike while they are away, and mind your own door.', 'At dusk, more loads carried home wins.'], clock: ['Dusk'], won: 'Their larder is yours', end: 'dusk' },
+  narrows: { sub: 'A ridge of stone. One pass. Their queen is frail, and dusk is on her side.', goals: ['Kill the rival queen before dusk. If she lives to see it, you have lost.', 'There is one way through the ridge, and the rich food lies in it.', 'The rival will not march on your hill. It will hold the pass and its own door.', 'Grow, raise soldiers, then draw a raid to the rival door.'], clock: ['Dusk'], won: 'The ridge is yours', end: 'dusk' },
   frost: { sub: 'The seeds are falling. The frost is coming.', goals: ['Half way through, the frost takes all the food outside.', 'In the cold the hill eats four times as fast. Dig stores and fill them with seeds.', 'Have the larger colony at the thaw. A small hill with full stores outlives a big hungry one.', 'Raiders can carry off the rival\'s stores.'], clock: ['Frost', 'Thaw'], won: 'The hill sees the thaw', end: 'the thaw' },
 };
 const FORK = { spitter: ['Spitters', 'Frail. They spit from two cells away, over the front line.'], warden: ['Wardens', 'Slow and very hard to kill. They hold a tunnel.'] };
@@ -71,7 +72,7 @@ const qMission = query.get('mission');
 let missionId = MISSIONS[qMission] ? qMission : firstOpen();
 const rivalMind = () => { const mood = MOOD[set.get('rival')]; return mood && camp.caste ? { mood, pick: camp.caste === 'spitter' ? CASTE.WARDEN : CASTE.SPITTER } : mood; };
 // A mission lost costs the next one some of its first workers: the colony carries on smaller.
-const startAnts = () => { const prev = before(missionId), ants = MISSIONS[missionId].kit.ants; return prev && camp.done[prev] && !camp.done[prev].won ? [Math.max(10, ants - LOSS_ANTS), ants] : [ants, ants]; };
+const startAnts = () => { const prev = before(missionId), ants = MISSIONS[missionId].kit.ants; return prev && camp.done[prev] && !camp.done[prev].won ? [Math.max(10, ants - LOSS_ANTS), MISSIONS[missionId].kit.foeAnts ?? ants] : [ants, MISSIONS[missionId].kit.foeAnts ?? ants]; };
 const newHost = () => new Host({ seed, mission: missionId, antsBy: startAnts(), traits: traitsNow(), ai: { [FOE]: MOOD[set.get('rival')] } });
 let host = newHost(), sim = host.sim;
 let screen = 'menu', tool = 'trail', nestOpen = false, running = false, speed = 1, lastT = 0;
@@ -228,7 +229,7 @@ function restart(newSeed = true) {
   dropTouches();
   if (running) rec.end('restart', summary());
   if (newSeed && !(qSeed > 0)) seed = 1 + Math.floor(Math.random() * 9999);
-  host = newHost(); sim = host.sim; document.body.classList.remove('frost'); sel = -1; floats = []; pulses = []; beacon = null; parts.length = 0; trailSig = '?'; told.clear(); told.fullAt = told.popAt = told.qAt = 0; builds.clear(); firstTrail = false; danger = 0; setSpeed(1);
+  host = newHost(); sim = host.sim; document.body.classList.remove('frost'); for (const b of document.querySelectorAll('#rooms [data-room]')) b.hidden = !!ROOM_OF[b.dataset.room] && !sim.mission.rooms.includes(ROOM_OF[b.dataset.room]); sel = -1; floats = []; pulses = []; beacon = null; parts.length = 0; trailSig = '?'; told.clear(); told.fullAt = told.popAt = told.qAt = 0; builds.clear(); firstTrail = false; danger = 0; setSpeed(1);
   if (tool !== 'trail') setTool('trail'); if (nestOpen) setNest(false);
   uploadTerrain(); uploadAnts(); startRun(); resume();
 }
@@ -341,8 +342,8 @@ $('mini').addEventListener('pointerdown', e => { const r = $('mini').getBounding
 // The nest: with Look, a drag moves the view; with a room tool, a drag paints cells and lifting the finger sends the orders.
 let nestDrag = null, nestTool = 'look', paint = null;
 const builds = new Set(); // ids of the build orders sent, to tell a refused one from a refused trail
-const ROOM_OF = { store: ROOM.STORE, nursery: ROOM.NURSERY, rest: ROOM.REST };
-const ROOM_CSS = ['', '255, 196, 90', '240, 232, 214', '140, 214, 150'];
+const ROOM_OF = { store: ROOM.STORE, nursery: ROOM.NURSERY, rest: ROOM.REST, post: ROOM.POST };
+const ROOM_CSS = ['', '255, 196, 90', '240, 232, 214', '140, 214, 150', '255, 120, 96'];
 const nestCell = e => { const r = nestCanvas.getBoundingClientRect(); return [Math.floor((e.clientX - r.left - NW / 2) / nestCam.z + nestCam.x), Math.floor((e.clientY - r.top - 26) / nestCam.z + nestCam.y)]; };
 function paintAt(e) {
   const r = nestCanvas.getBoundingClientRect(); if (e.clientY < r.top + 26 || e.clientY > r.bottom || e.clientX < r.left || e.clientX > r.right) return; // only what is on screen
@@ -352,7 +353,7 @@ function paintAt(e) {
 }
 function setNestTab(t) { $('diet').dataset.tab = t; for (const b of document.querySelectorAll('#diet .tabs [data-tab]')) b.setAttribute('aria-pressed', String(b.dataset.tab === t)); if (t !== 'dig' && nestTool !== 'look') setNestTool('look'); }
 for (const b of document.querySelectorAll('#diet .tabs [data-tab]')) b.addEventListener('click', () => { setNestTab(b.dataset.tab); tone(480, 0.05, 0.03, 'triangle'); });
-const DIG_HELP = { look: 'Pick a room, then drag in the earth beside a tunnel.', store: 'Store: each cell holds 8 more seeds and 8 more meat. Drag in the earth: a seed to dig a cell.', nursery: 'Nursery: each cell holds one more egg or grub. Drag in the earth: a seed to dig a cell.', rest: 'Quarters: each cell houses 4 more ants. Drag in the earth: a seed to dig a cell.', clear: 'Drag over marks or rooms to take them off. Dug earth stays dug.' };
+const DIG_HELP = { look: 'Pick a room, then drag in the earth beside a tunnel.', store: 'Store: each cell holds 8 more seeds and 8 more meat. Drag in the earth: a seed to dig a cell.', nursery: 'Nursery: each cell holds one more egg or grub. Drag in the earth: a seed to dig a cell.', rest: 'Quarters: each cell houses 4 more ants. Drag in the earth: a seed to dig a cell.', post: 'Guard post: each cell keeps one in eight of your idle soldiers standing here, inside, and not out by the door.', clear: 'Drag over marks or rooms to take them off. Dug earth stays dug.' };
 function setNestTool(t) { nestTool = t; $('digHelp').textContent = DIG_HELP[t]; if (t !== 'look' && $('diet').dataset.tab !== 'dig') setNestTab('dig'); for (const b of document.querySelectorAll('#rooms [data-room]')) b.setAttribute('aria-pressed', String(b.dataset.room === t)); }
 for (const b of document.querySelectorAll('#rooms [data-room]')) b.addEventListener('click', () => { setNestTool(b.dataset.room); tone(500, 0.06, 0.03, 'triangle'); });
 nestCanvas.addEventListener('pointerdown', e => {
@@ -440,7 +441,7 @@ function finish(w, reason) {
   $('next').hidden = !upNext; $('next').textContent = upNext?.fork && !taken(upNext.fork) ? (upNext.fork === 'caste' ? 'Choose a third caste' : upNext.fork === 'craft' ? 'Choose a craft' : 'Choose a way of living') : upNext ? `Next: ${MISSIONS[upNext.mission ?? STEPS[STEPS.indexOf(missionId) + 1]]?.name ?? 'the missions'}` : '';
   $('overKicker').textContent = reason === REASON.POINTS ? 'The stones have chosen' : reason === REASON.HAUL ? 'The larder is bare' : reason === REASON.QUEEN ? (w ? 'The rival queen is dead' : 'Your queen is dead') : text.end === 'dusk' ? 'Dusk' : 'The thaw';
   $('overTitle').textContent = w ? text.won : 'The hill is lost'; $('overTitle').classList.toggle('lost', !w);
-  $('overWhy').textContent = reason === REASON.QUEEN ? (w ? 'Her colony scatters. Both fords are yours now.' : 'Without her the colony has no tomorrow.') : sim.mission.goals.points ? `${T(ME, CG.POINTS)} points to the rival's ${T(FOE, CG.POINTS)}.` : sim.mission.goals.haul ? `You carried home ${T(ME, CG.HAUL)} of their loads. They carried home ${T(FOE, CG.HAUL)} of yours.` : w ? `At ${text.end} you stood ${s.adults} to ${s.foe}.` : `At ${text.end} the rival stood ${s.foe} to your ${s.adults}.`;
+  $('overWhy').textContent = reason === REASON.QUEEN ? (w ? 'Her colony scatters. Both fords are yours now.' : 'Without her the colony has no tomorrow.') : sim.mission.goals.points ? `${T(ME, CG.POINTS)} points to the rival's ${T(FOE, CG.POINTS)}.` : sim.mission.goals.dusk === 'holder' ? 'Dusk fell and their queen still lives.' : sim.mission.goals.haul ? `You carried home ${T(ME, CG.HAUL)} of their loads. They carried home ${T(FOE, CG.HAUL)} of yours.` : w ? `At ${text.end} you stood ${s.adults} to ${s.foe}.` : `At ${text.end} the rival stood ${s.foe} to your ${s.adults}.`;
   const rows = [['', 'You', 'Rival'], ['Ants at the end', T(ME, CG.ADULTS), T(FOE, CG.ADULTS)], ['Soldiers', T(ME, CG.MAJORS), T(FOE, CG.MAJORS)], ['Born', T(ME, CG.BORN), T(FOE, CG.BORN)], ['Fallen', T(ME, CG.DIED), T(FOE, CG.DIED)], ['Loads carried home', T(ME, CG.LOADS_S) + T(ME, CG.LOADS_P), T(FOE, CG.LOADS_S) + T(FOE, CG.LOADS_P)], ['Loads stolen', T(ME, CG.STOLEN), T(FOE, CG.STOLEN)]];
   $('tally').textContent = '';
   rows.forEach((r, i) => r.forEach((v, j) => { const el = document.createElement(j ? 'b' : 'span'); el.textContent = v; if (!i) el.className = 'h'; if (j === 2) el.classList.add('foe'); $('tally').append(el); }));
@@ -456,6 +457,7 @@ function hud() {
   bump('chipAnts', g(ME, CG.ADULTS) - g(ME, CG.MAJORS)); bump('chipMajors', g(ME, CG.MAJORS)); bump('chipSugar', g(ME, CG.SUGAR)); bump('chipProtein', g(ME, CG.PROTEIN)); bump('chipBrood', brood);
   const G2 = sim.mission.goals, goal = (G2.points | 0) || (G2.haul | 0), slot = G2.points ? CG.POINTS : G2.haul ? CG.HAUL : CG.ADULTS, us = g(ME, slot), them = g(FOE, slot);
   $('vsUs').textContent = goal ? `You ${us} / ${goal}` : `You ${us}`; $('vsThem').textContent = `${them} Rival`; $('bar2').firstElementChild.style.width = `${(100 * us / Math.max(1, us + them)).toFixed(1)}%`;
+  if (G2.dusk === 'holder') { const pct = Math.max(0, Math.ceil(100 * g(FOE, CG.QUEEN_HP) / sim.cfg.queenHp)); $('vsUs').textContent = `You ${us}`; $('vsThem').textContent = `Rival queen ${pct}%`; $('bar2').firstElementChild.style.width = `${100 - pct}%`; }
   const toFrost = sim.cfg.frostTick > sim.tick, left = Math.max(0, (toFrost ? sim.cfg.frostTick : sim.cfg.duskTick) - sim.tick) / 20; $('dusk').textContent = `${TEXT[sim.mission.id].clock[toFrost ? 0 : TEXT[sim.mission.id].clock.length - 1]} in ${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}`;
   if (g(ME, CG.SUGAR) === 0 && sim.tick > 600) once('hungry', 'No seeds in store. The colony starves without them.', 3600, true);
   trailMesh();
@@ -626,7 +628,7 @@ function drawNest(now) {
       c.fillStyle = `rgba(${ROOM_CSS[r]}, 0.16)`; c.fillRect(px + 0.5, py + 0.5, z - 1, z - 1);
       // A small sign of the room's use in each cell's corner, so an empty room still reads: a seed, an egg, a bed.
       c.fillStyle = `rgba(${ROOM_CSS[r]}, 0.55)`; c.beginPath();
-      if (r === ROOM.STORE) c.arc(px + z * 0.22, py + z * 0.22, z * 0.09, 0, 7); else if (r === ROOM.NURSERY) c.ellipse(px + z * 0.22, py + z * 0.22, z * 0.11, z * 0.07, 0.6, 0, 7); else c.rect(px + z * 0.12, py + z * 0.17, z * 0.22, z * 0.09);
+      if (r === ROOM.STORE) c.arc(px + z * 0.22, py + z * 0.22, z * 0.09, 0, 7); else if (r === ROOM.NURSERY) c.ellipse(px + z * 0.22, py + z * 0.22, z * 0.11, z * 0.07, 0.6, 0, 7); else if (r === ROOM.POST) { c.moveTo(px + z * 0.12, py + z * 0.3); c.lineTo(px + z * 0.23, py + z * 0.1); c.lineTo(px + z * 0.34, py + z * 0.3); } else c.rect(px + z * 0.12, py + z * 0.17, z * 0.22, z * 0.09);
       c.fill();
     }
     if (m) { c.fillStyle = `rgba(${ROOM_CSS[r] || '255, 255, 255'}, ${0.2 + 0.08 * Math.sin(now / 260 + x + y)})`; c.fillRect(px + 1, py + 1, z - 2, z - 2); c.strokeStyle = `rgba(${ROOM_CSS[r] || '255, 255, 255'}, 0.8)`; c.lineWidth = 1; c.beginPath(); c.moveTo(px + 2, py + z - 2); c.lineTo(px + z - 2, py + 2); c.stroke(); const left = sim.digLeft[k] / C.DIG_TICKS; if (left < 1) { c.fillStyle = '#120c09'; c.fillRect(px + 1, py + 1, (z - 2) * (1 - left), z - 2); } }

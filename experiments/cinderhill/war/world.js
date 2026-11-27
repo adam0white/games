@@ -3,6 +3,7 @@
 
 import { cellAt, MAT, SURFACE, NEST } from '../sim/grid.js';
 import { below, STREAM } from '../sim/rng.js';
+import { MAPS } from './tables.js';
 
 export const FOOD_SUGAR = 0, FOOD_PROTEIN = 1;
 export const DOORS = [[36, 56], [124, 56]];
@@ -32,21 +33,20 @@ export function generate(sim, layoutOnly = false) {
   // Sites that pay while held: a mission's list, in cells of the 160 by 112 map.
   sim.sites = (sim.mission.sites ?? []).map(([x, y]) => S(Math.round((x * sw) / 160), Math.round((y * sh) / 112)));
   if (layoutOnly || cfg.blank) return;
-  const mid = sw >> 1, mx = x => sw - 1 - x;
-  const ford = y => FORDS.some(f => Math.abs(y - Math.round((f * sh) / 112)) <= 2);
+  const mid = sw >> 1, mx = x => sw - 1 - x, M = MAPS[sim.mission.map] ?? MAPS.crossing, wall = M.wall === 'stone' ? MAT.STONE : MAT.WATER;
+  const ford = y => M.gaps.some(f => Math.abs(y - Math.round((f * sh) / 112)) <= M.gapHalf);
   // The creek: four cells wide down the middle, a cell wider here and there, open at the fords.
   for (let y = 0; y < sh; y++) {
     if (ford(y)) continue;
     const e = below(sim.rng, STREAM.world, 3) === 0 ? 1 : 0;
-    for (let x = mid - 2 - e; x <= mid + 1 + e; x++) mat[S(x, y)] = MAT.WATER;
+    if (M.wall) for (let x = mid - 2 - e; x <= mid + 1 + e; x++) mat[S(x, y)] = wall;
   }
   // Food, mirrored.
-  const piles = [[27, 49, FOOD_SUGAR, 60], [45, 66, FOOD_PROTEIN, 50], [50, 34, FOOD_SUGAR, 80], [30, 84, FOOD_PROTEIN, 70], [58, 70, FOOD_SUGAR, 70], [20, 22, FOOD_PROTEIN, 60]];
+  const piles = M.piles;
   const spots = [];
   const lean = cfg.lean || 1, glut = cfg.glut || 1; // a mission's seed fall: every seed pile this many times as big
   for (const [x, y, kind, a] of piles) { const amount = Math.max(1, Math.floor((kind === FOOD_SUGAR ? a * glut : a) / lean)); sim.drop(S(x, y), kind, amount); sim.drop(S(mx(x), y), kind, amount); spots.push([x, y], [mx(x), y]); }
-  sim.drop(S(mid - 1, FORDS[0]), FOOD_PROTEIN, Math.floor(160 / lean)); sim.drop(S(mid, FORDS[1]), FOOD_SUGAR, Math.floor(160 * glut / lean));
-  spots.push([mid, FORDS[0]], [mid, FORDS[1]]);
+  for (const [ox, y, kind, a] of M.mid) { sim.drop(S(mid + ox, y), kind, Math.floor((kind === FOOD_SUGAR ? a * glut : a) / lean)); spots.push([mid, y]); }
   // Stones, mirrored: small clumps away from doors, food and the fords.
   const clear = (x, y) => {
     if (x < 2 || y < 2 || y > sh - 3 || x > mid - 6) return false;
@@ -55,7 +55,7 @@ export function generate(sim, layoutOnly = false) {
     return true;
   };
   for (const c of sim.sites) spots.push([c % sw, Math.floor(c / sw)], [mx(c % sw), Math.floor(c / sw)]);
-  for (let k = 0; k < 16; k++) {
+  for (let k = 0; k < M.clumps; k++) {
     let x = 2 + below(sim.rng, STREAM.world, mid - 8), y = 2 + below(sim.rng, STREAM.world, sh - 4);
     const size = 2 + below(sim.rng, STREAM.world, 5);
     for (let j = 0; j < size; j++) {
