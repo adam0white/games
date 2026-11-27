@@ -151,7 +151,7 @@ export const MISSIONS = {
     id: 'wall', name: 'The Wall', map: 'wall', breach: true, rivalMood: 1,
     kit: { ants: 30, sugar: 14, protein: 5, eggs: 20, larvae: 20, pupae: 12, duskTick: 9600 },
     goals: { queen: true, dusk: 'adults' },
-    deeds: [{ id: 'a', text: 'Kill the queen inside six minutes.', won: true, why: 'QUEEN', by: 7200, opens: 'hold' }, { id: 'b', text: 'Win with fewer than forty dead.', won: true, max: { DIED: 39 }, opens: 'post' }],
+    deeds: [{ id: 'a', text: 'Kill the queen inside seven minutes.', won: true, why: 'QUEEN', by: 8400, opens: 'hold' }, { id: 'b', text: 'Win with fewer than 120 dead.', won: true, max: { DIED: 119 }, opens: 'post' }],
     picks: [CASTE.SPITTER, CASTE.WARDEN],
     rooms: [ROOM.STORE, ROOM.NURSERY, ROOM.REST, ROOM.POST],
   },

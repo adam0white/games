@@ -458,6 +458,10 @@ test('The Wall: the rival\'s dig is a way through the clay, and the mouth is on 
   const at = mouth(s, 1, 0, 6); assert.equal(at.length, 12);
   for (let j = 0; j < at.length; j += 2) { assert.equal(at[j + 1], 12); assert.equal(s.owner(12 * L.nw + at[j]), 1); assert.equal(s.room[12 * L.nw + at[j]], 0); }
   assert.deepEqual(breachRun(s, 0, 1), [], 'joined: nothing more to dig');
+  // A tunnel that comes straight into a room: the post goes on the way on from that room, not nowhere.
+  for (let j = 0; j < cells.length; j += 2) { const k = cells[j + 1] * L.nw + cells[j]; if (s.owner(k) === 1) s.room[k] = ROOM.NURSERY; }
+  const on = mouth(s, 1, 0, 6); assert.ok(on.length >= 2, 'a post beyond the room');
+  for (let j = 0; j < on.length; j += 2) { const k = on[j + 1] * L.nw + on[j]; assert.equal(s.owner(k), 1); assert.equal(s.room[k], 0); assert.equal(s.mat[L.nestBase + k], MAT.OPEN); }
 });
 
 test('The Wall: on its own ground a colony takes a rival\'s dig mark over, so a mark cannot block its rooms', () => {
