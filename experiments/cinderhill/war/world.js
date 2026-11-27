@@ -13,7 +13,8 @@ export const FORDS = [28, 84]; // the rows the fords are centred on
 export function generate(sim, layoutOnly = false) {
   const L = sim.L, cfg = sim.cfg, mat = sim.mat, sw = L.sw, sh = L.sh;
   const S = (x, y) => cellAt(L, SURFACE, x, y), N = (x, y) => cellAt(L, NEST, x, y);
-  const doors = [[Math.round((sw * 36) / 160), sh >> 1], [sw - 1 - Math.round((sw * 36) / 160), sh >> 1]];
+  const M = MAPS[sim.mission.map] ?? MAPS.crossing, DX = M.door ?? 36; // how far in from its edge each door stands
+  const doors = [[Math.round((sw * DX) / 160), sh >> 1], [sw - 1 - Math.round((sw * DX) / 160), sh >> 1]];
   if (cfg.swap) doors.reverse(); // seats change sides: for telling a bias of the side from a bias of the seat
   if (!layoutOnly) { mat.fill(MAT.OPEN, 0, L.nestBase); mat.fill(MAT.CLAY, L.nestBase); }
   for (let t = 0; t < doors.length; t++) {
@@ -39,7 +40,7 @@ export function generate(sim, layoutOnly = false) {
     const [ox, y, kind, amount] = CACHES[(Math.abs(cfg.seed | 0) + j) % CACHES.length];
     for (let t = 0; t < doors.length; t++) { const x = doors[t][0] + (doors[t][0] < sw >> 1 ? ox : -ox), c = N(x, y); if (c >= 0 && mat[c] === MAT.CLAY) sim.cache[c - L.nestBase] = amount * 2 + kind; }
   }
-  const mid = sw >> 1, mx = x => sw - 1 - x, M = MAPS[sim.mission.map] ?? MAPS.crossing, wall = M.wall === 'stone' ? MAT.STONE : MAT.WATER;
+  const mid = sw >> 1, mx = x => sw - 1 - x, wall = M.wall === 'stone' ? MAT.STONE : MAT.WATER;
   const ford = y => M.gaps.some(f => Math.abs(y - Math.round((f * sh) / 112)) <= M.gapHalf);
   // The creek: four cells wide down the middle, a cell wider here and there, open at the fords.
   for (let y = 0; y < sh; y++) {

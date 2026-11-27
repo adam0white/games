@@ -27,7 +27,7 @@ export const CASTE_HP = CASTES.map(c => c.hp), CASTE_BITE = CASTES.map(c => c.bi
 const FIGHTS = CASTES.map(c => c.fights);
 /** One colony's numbers: the tables' rows, then its traits (`cfg.traits[team]`, ids of TRAITS) laid over them. */
 function statsFor(traits = []) {
-  const st = { hp: CASTES.map(c => c.hp), bite: CASTES.map(c => c.bite), speed: CASTES.map(c => c.speed), food: CASTES.map(c => c.food), reach: CASTES.map(c => c.reach), per: ROOMS.map(r => (r ? r.per : 0)), eatPer: C.ADULTS_PER_SUGAR, pupa: C.PUPA_TICKS, room: ROOMS.map(() => 0), loot: 0, hold: 0 };
+  const st = { hp: CASTES.map(c => c.hp), bite: CASTES.map(c => c.bite), speed: CASTES.map(c => c.speed), food: CASTES.map(c => c.food), reach: CASTES.map(c => c.reach), per: ROOMS.map(r => (r ? r.per : 0)), eatPer: C.ADULTS_PER_SUGAR, pupa: C.PUPA_TICKS, room: ROOMS.map(() => 0), loot: 0, hold: 0, breach: 0 };
   for (const id of traits) { const tr = TRAITS[id]; if (!tr) throw new Error(`no trait ${id}`); for (const [key, a, b] of tr.set) { if (b === undefined) st[key] = a; else st[key][a] = b; } }
   return st;
 }
@@ -60,6 +60,8 @@ export const EVENT = {
   FROST: 14, // the frost came: the food outside is gone
   SITE: 15, // site, the team that holds it now (-1: no one), the team that held it
   FOUND: 16, // team, cell, loads * 2 + food kind: a cache in the clay was dug open
+  HEARD: 17, // the team whose ground it is, cell, the team digging: a rival opened a cell on this colony's side
+  BREACH: 18, // the team that dug the last cell, cell: the two nests are joined under ground
 };
 export const REASON = { QUEEN: 1, DUSK: 2, STARVED: 3, POINTS: 4, HAUL: 5 };
 export const WHY = { FULL: 1, BLOCKED: 2, LONG: 3, NONE: 4 };
@@ -152,6 +154,7 @@ export class Sim {
     this.queenF = Array.from({ length: TEAMS }, () => new Uint16Array(n)); this.rallyF = Array.from({ length: TEAMS }, () => null);
     this.crew = new Int32Array(T); this.want = new Int32Array(T);
     this.digF = Array.from({ length: TEAMS }, () => null); this.storeCells = [[], []]; this.nurseryCells = [[], []]; this.postCells = [[], []]; this.postF = [null, null]; this.dirty = false;
+    this.underF = [null, null]; this.linked = false; this.lastDug = null; // under ground only: steps to each queen with no door used, and whether the two nests are joined
     this.bins = [[], []]; this.floor = [0, 0]; this.dirtyStore = false; // bins: the nest cells that hold food, nearest the door first
     this.putF = Array.from({ length: TEAMS * 2 }, () => new Uint16Array(n)); this.lootF = Array.from({ length: TEAMS }, () => new Uint16Array(n)); this.putAny = new Uint8Array(TEAMS * 2); this.lootAny = new Uint8Array(TEAMS);
     this.head = new Int32Array(n).fill(-1); this.nextAnt = new Int32Array(A); this.occ = new Uint8Array(n);
@@ -304,7 +307,7 @@ export class Sim {
   /** Queue an order: { team, type, id?, tick?, ... }. It applies at the start of its tick (the next one by default). */
   order(o) {
     const e = { ...o, tick: Math.max(o.tick ?? this.tick, this.tick) };
-    if (o.points) e.points = Array.from(o.points); if (o.cells) e.cells = Array.from(o.cells); // the log keeps its own copy
+    if (o.points) e.points = Array.from(o.points); if (o.cells) e.cells = Array.from(o.cells); if (o.under) e.under = Array.from(o.under); // the log keeps its own copy
     let at = this.queue.length;
     while (at > 0 && this.queue[at - 1].tick > e.tick) at--;
     this.queue.splice(at, 0, e);
@@ -316,6 +319,9 @@ export class Sim {
   /** May this colony dig this kind of room here? The mission's list, and the rooms its own nodes open. */
   mayRoom(t, kind) { return this.mission.rooms.includes(kind) || !!this.stat[t].room[kind]; }
 
+  /** May this colony dig past its own ground, into the rival's? The mission says, or a node of its own. */
+  mayBreach(t) { return !!this.mission.breach || !!this.stat[t].breach; }
+
   apply(o) {
     const t = o.team | 0, cg = this.cg, base = t * CG.SIZE;
     if (t < 0 || t >= TEAMS) return;
@@ -324,7 +330,15 @@ export class Sim {
       let k = -1;
       for (let j = 0; j < TRAILS && k < 0; j++) if (!this.trLive[t * TRAILS + j]) k = j;
       if (k < 0) return no(WHY.FULL);
-      const s = t * TRAILS + k, len = this.buildPath(t, o.points || [], s * PATH_MAX);
+      const s = t * TRAILS + k;
+      let len;
+      if (o.under) {
+        // A raid under ground: its end is one open nest cell, and its soldiers take the shortest way there, a breach if there is one.
+        const L = this.L, x = o.under[0] | 0, y = o.under[1] | 0, m = x >= 0 && x < L.nw && y >= 0 && y < L.nh ? L.nestBase + y * L.nw + x : -1;
+        if (o.kind !== KIND.RAID || !this.mayBreach(t) || m < 0 || this.mat[m] !== MAT.OPEN || this.queenF[t][m] === FAR) return no(WHY.BLOCKED);
+        if (this.owner(m - L.nestBase) !== t && this.underF[1 - t]?.[m] === FAR) return no(WHY.BLOCKED); // its own tunnel in the rival's ground, not yet through: soldiers sent there would wait for a fight that cannot start
+        this.trPath[s * PATH_MAX] = m; len = 1;
+      } else len = this.buildPath(t, o.points || [], s * PATH_MAX);
       if (len < 0) return no(len === -2 ? WHY.LONG : WHY.BLOCKED);
       this.trLive[s] = 1; this.trKind[s] = o.kind === KIND.RAID ? KIND.RAID : KIND.FORAGE; this.trLevel[s] = o.level >= 1 && o.level <= 3 ? o.level : 2;
       this.trLen[s] = len; this.trSeq[s] = ++cg[base + CG.SEQ]; this.trDry[s] = 0; this.trMode[s] = this.modeFor(t, this.trKind[s], o.mode);
@@ -366,12 +380,18 @@ export class Sim {
         const x = pts[j] | 0, y = pts[j + 1] | 0;
         if (x < 1 || x >= L.nw - 1 || y < 2 || y >= L.nh - 1) continue;
         const k = y * L.nw + x, m = this.mat[L.nestBase + k];
-        if (this.owner(k) !== t) continue;
+        if (this.owner(k) !== t) {
+          // The rival's ground: a colony that may breach marks plain clay there and takes its own marks off, and no more.
+          if (!this.mayBreach(t)) continue;
+          if (dig && o.on !== 0 && o.on !== false) { if (m === MAT.CLAY && !this.mark[k] && marks < C.MARKS_MAX) { this.mark[k] = t + 1; this.digLeft[k] = C.DIG_TICKS; marks++; done++; } }
+          else if ((dig || !kind) && this.mark[k] === t + 1) { this.mark[k] = 0; marks--; done++; }
+          continue;
+        }
         if (dig) {
           if (o.on === 0 || o.on === false) { if (this.mark[k] === t + 1) { this.mark[k] = 0; marks--; done++; if (this.room[k]) use(k, ROOM.NONE); } }
-          else if (m === MAT.CLAY && !this.mark[k] && marks < C.MARKS_MAX) { this.mark[k] = t + 1; this.digLeft[k] = C.DIG_TICKS; marks++; done++; }
+          else if (m === MAT.CLAY && this.mark[k] !== t + 1 && marks < C.MARKS_MAX) { this.mark[k] = t + 1; this.digLeft[k] = C.DIG_TICKS; marks++; done++; } // on its own ground a colony takes a rival's mark over
         } else {
-          if (o.dig && kind && m === MAT.CLAY && !this.mark[k] && marks < C.MARKS_MAX) { this.mark[k] = t + 1; this.digLeft[k] = C.DIG_TICKS; marks++; done++; }
+          if (o.dig && kind && m === MAT.CLAY && this.mark[k] !== t + 1 && marks < C.MARKS_MAX) { this.mark[k] = t + 1; this.digLeft[k] = C.DIG_TICKS; marks++; done++; }
           if (!kind && this.mark[k] === t + 1) { this.mark[k] = 0; marks--; done++; }
           if ((m === MAT.OPEN || this.mark[k] === t + 1 || !kind) && this.room[k] !== kind) use(k, kind);
         }
@@ -463,7 +483,7 @@ export class Sim {
   // ---- Fields ----
 
   /** Steps to the nearest source over open cells (four ways and through doors), FAR where there is no way. */
-  field(out, sources) {
+  field(out, sources, doors = true) {
     const L = this.L, n = L.n, mat = this.mat, q = this.bq, link = this.link, nb = L.nb;
     const d = out || new Uint16Array(n);
     d.fill(FAR);
@@ -472,7 +492,7 @@ export class Sim {
     while (qh < qt) {
       const c = q[qh++], v = d[c] + 1;
       for (let k = 0; k < 4; k++) { const m = nb[c * 4 + k]; if (m >= 0 && d[m] === FAR && mat[m] === MAT.OPEN) { d[m] = v; q[qt++] = m; } }
-      const m = link[c];
+      const m = doors ? link[c] : -1;
       if (m >= 0 && d[m] === FAR && mat[m] === MAT.OPEN) { d[m] = v; q[qt++] = m; }
     }
     return d;
@@ -495,6 +515,11 @@ export class Sim {
     }
     this.rebuildStoreFields();
     for (let s = 0; s < TEAMS * TRAILS; s++) if (this.trLive[s]) this.buildTrailField(s); else this.trF[s] = null;
+    if (this.mayBreach(0) || this.mayBreach(1)) {
+      for (let t = 0; t < TEAMS; t++) this.underF[t] = this.field(this.underF[t], [this.queen[t]], false);
+      const was = this.linked; this.linked = this.underF[0][this.queen[1]] !== FAR;
+      if (this.linked && !was && this.lastDug) this.event(EVENT.BREACH, this.lastDug[0], this.lastDug[1]);
+    }
     this.rebuildDig();
   }
 
@@ -505,8 +530,10 @@ export class Sim {
       const src = [];
       if (this.cg[t * CG.SIZE + CG.MARKS] > 0) for (let k = 0; k < NN; k++) {
         if (this.mark[k] !== t + 1) continue;
-        // Only from its own earth: a mark on the border is not a way into the rival's nest.
-        for (let d = 0; d < 4; d++) { const m = L.nb[(L.nestBase + k) * 4 + d]; if (m >= L.nestBase && this.mat[m] === MAT.OPEN && this.owner(m - L.nestBase) === t) src.push(m); }
+        // Only from its own earth: a mark on the border is not a way into the rival's nest. A colony that may breach
+        // digs from any cell its own ants can walk to under ground, on either side.
+        const U = this.mayBreach(t) ? this.underF[t] : null;
+        for (let d = 0; d < 4; d++) { const m = L.nb[(L.nestBase + k) * 4 + d]; if (m >= L.nestBase && this.mat[m] === MAT.OPEN && (U ? U[m] !== FAR : this.owner(m - L.nestBase) === t)) src.push(m); }
       }
       this.digF[t] = src.length ? this.field(this.digF[t], src) : null;
     }
@@ -731,6 +758,8 @@ export class Sim {
         // The opening stroke costs a seed: earth is carried out on food. The last few seeds are kept for the colony to eat: the cell waits.
         if (this.digLeft[k] === 1) { if (cg[o + CG.SUGAR] < C.DIG_SUGAR + C.DIG_KEEP) return c; this.take(t, FOOD.SUGAR, C.DIG_SUGAR); }
         if (--this.digLeft[k] === 0) { this.mat[m] = MAT.OPEN; this.mark[k] = 0; this.recount(); this.dirty = true; this.event(EVENT.DUG, t, m);
+          if (this.owner(k) !== t) this.event(EVENT.HEARD, this.owner(k), m, t);
+          this.lastDug = [t, m]; // if this stroke joins the nests, the rebuild at the end of the tick says whose it was
           // A cache: its loads join the stores (the next rebuild finds them cells; what finds no room spoils).
           if (this.cache[k]) { const v = this.cache[k], slot = o + (v & 1 ? CG.PROTEIN : CG.SUGAR), got = Math.max(0, Math.min(v >> 1, cg[o + CG.CAP_FOOD] - cg[slot])); cg[slot] += got; cg[o + CG.FOUND] += got; this.cache[k] = 0; this.settle(t); this.dirtyStore = true; this.event(EVENT.FOUND, t, m, got * 2 + (v & 1)); } }
         return c;
@@ -826,7 +855,7 @@ export class Sim {
       }
     }
     if (raid) {
-      if (this.trMode[s] !== MODE.HOLD) for (let e = 0; e < TEAMS; e++) if (e !== t && this.cg[e * CG.SIZE + CG.QUEEN_HP] > 0 && this.doorF[e][c] <= 4) { this.inv[i] = 1 + e; return this.invade(i, c, t); }
+      if (this.trMode[s] !== MODE.HOLD) for (let e = 0; e < TEAMS; e++) if (e !== t && this.cg[e * CG.SIZE + CG.QUEEN_HP] > 0 && (this.doorF[e][c] <= 4 || (c >= this.L.nestBase && this.owner(c - this.L.nestBase) === e))) { this.inv[i] = 1 + e; return this.invade(i, c, t); }
       return this.mill(i, c, m => this.trF[s] && this.trF[s][m] <= 2, 16);
     }
     if (this.since[i] > C.WAIT_AT_END) { this.task[i] = TASK.BACK; this.tr[i] = -1; return this.next(this.homeF[t], c); }
