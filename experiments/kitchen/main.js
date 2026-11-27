@@ -51,7 +51,9 @@ const storeTools = () => writeJson(TOOLS_KEY, tools);
 const STAFF_KEY = 'kitchen-staff';
 const staff = (() => { const o = readJson(STAFF_KEY, null); return Array.isArray(o) ? o.filter(x => x && Number.isFinite(x.look) && (x.kind === 'hired' || x.kind === 'owed')).slice(0, sim.STAFF_MAX).map(x => ({ look: x.look | 0, kind: x.kind, name: String(x.name ?? 'Pip').slice(0, 12), fresh: !!x.fresh })) : []; })();
 const storeStaff = () => writeJson(STAFF_KEY, staff.map(({ look, kind, name, fresh }) => ({ look, kind, name, ...(fresh ? { fresh } : {}) })));
+// No look button: art directions are picked by link (?look=storybook), and the pick sticks on this device.
 let lookId = LOOK_IDS.includes(query.get('look')) ? query.get('look') : LOOK_IDS.includes(read(LOOK_KEY)) ? read(LOOK_KEY) : 'diner';
+if (LOOK_IDS.includes(query.get('look'))) write(LOOK_KEY, lookId);
 
 // ---------- sound: made in code (kit/audio.js); music from kit/music.js
 let musicOn = read(MUSIC_KEY) !== '0', song = null;
@@ -140,7 +142,6 @@ const show = screens(['menu', 'paused', 'extra', 'dayEnd', 'shop'], name => {
 function labels() {
   for (const id of ['sound1', 'sound2']) { $(id).textContent = t(save.sound ? 'soundOn' : 'soundOff'); $(id).setAttribute('aria-pressed', String(save.sound)); }
   for (const id of ['music1', 'music2']) { $(id).textContent = t(musicOn ? 'musicOn' : 'musicOff'); $(id).setAttribute('aria-pressed', String(musicOn)); }
-  $('look').textContent = t('look', { name: t('looks_' + lookId) });
   $('chopBtnText').textContent = t('chop'); $('wheelBtnText').textContent = t('wheelBtn');
 }
 const rankName = tier => t('rank_' + TIERS[tier].name);
@@ -1137,10 +1138,7 @@ onLeave(pause);
 $('play').addEventListener('click', async () => { snd.unlock(); await ready; if (screen === 'menu') beginDay(); });
 for (const id of ['sound1', 'sound2']) $(id).addEventListener('click', () => { save.sound = !save.sound; store(); if (save.sound) { snd.unlock(); if (!paused) snd.release(); SFX.tap(); } labels(); });
 for (const id of ['music1', 'music2']) $(id).addEventListener('click', () => { musicOn = !musicOn; write(MUSIC_KEY, musicOn ? '1' : '0'); labels(); });
-$('look').addEventListener('click', () => {
-  lookId = LOOK_IDS[(LOOK_IDS.indexOf(lookId) + 1) % LOOK_IDS.length]; write(LOOK_KEY, lookId);
-  art?.setLook(lookId); SFX.tap(); labels();
-});
+
 $('lang').addEventListener('click', () => { W.setLang(W.lang() === 'en' ? 'tr' : 'en'); W.apply(); labels(); menu(); SFX.tap(); });
 
 // ---------- the frame
