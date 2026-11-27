@@ -1261,3 +1261,33 @@ its door against 50 to 64 soldiers. The morning is fixed and the end is not. Wha
 hard to storm (`lab-5w7.66`), not more bot work. Two timid bots are unchanged (dusk, 426 to 434 against 246 to 297).
 The stolen-loads deed did not fall in these wins before the change (0 on four seeds) and reads 14, 0, 4, 0 after, so
 one aggressive win does not open all three nodes.
+
+## The rival after noon in High Summer: three trials, parked
+
+Measure: seat 0 bold against the default rival (timid), seeds 1 to 4, bots only. Baseline after the ford rule above: the
+rival's queen dies 2019, 1506, 1780 and 2095 ticks after noon.
+
+- **Guard pulled inside at noon (forced recall, not shipped).** 1579, 1627, 1857, 3045 ticks. Attackers lost 108, 82, 94,
+  104 since noon against 60, 29, 119, 70. Fighting in the tunnels costs the attacker more and does not hold the nest.
+- **Meat by source, ticks 6000 to 9600.** The bold hill carried 288 to 370 loads of meat, the rival 104 to 140. The
+  difference is ford meat (152 to 224 against 19 to 48). The rival's mean count of soldiers on the fords was 0.0 on every
+  seed: the default rival concedes every ford fall.
+- **Timid also stands on a ford fall (tried, reverted).** The rival fell to 72, 47 and 47 adults at noon on three seeds
+  and won the fourth outright. Two timid hills, which before stood at 266 v 238, 230 v 224, 308 v 202, 191 v 241 at
+  noon, went to 31 v 220, 81 v 181, 276 v 77, 82 v 181. At tick 6000 the loser's meat carried was unchanged (209, 198,
+  233 against 209, 200, 233) while its adults fell from 95, 104, 134 to 51, 69, 96: the loss is deaths in the open
+  fight, not income.
+
+Reading: in the open the larger force loses little and the smaller loses everything, so any contest for a ford is
+total, and the hill that loses it does not come back. The peaceful case is the stable one. Unresolved: the trial sent
+soldiers at any odds once it had four, so it does not show that an even contest must be total. No person has played
+either path, so the early win of a player who holds the fords is not known to be a fault. Parked on `lab-5w7.66`; no
+further rival tuning in High Summer without a person's game to read.
+
+## Phone labels from the outside read
+
+The reader of the High Summer screens faulted four labels; all four are changed in the page only. An alert that points
+at a place can be tapped (it ends in an arrow): a windfall alert moves the view to the fall, the weevil alert opens the
+Nest. The score line says what it counts ("Ants: you 80", "rival 76") and adds a queen's health once she is hurt. A long
+mission's card states its length, when noon comes and how the day ends. Seen on a phone profile: the card line, both
+taps, the score names. Not seen: the queen's health in the score (no queen was hurt in the walk).
