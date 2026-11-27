@@ -5,6 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#05080f">
 <title>Lantern</title>
+<meta name="description" content="Carry a small flame down a dark river to dawn. One thumb, no install, no account. Dare a friend by link.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Lantern">
+<meta property="og:description" content="Carry a small flame down a dark river to dawn. One thumb, no install, no account.">
+<meta property="og:url" content="https://play.adamwhite.work/lantern/">
+<meta property="og:image" content="https://play.adamwhite.work/lantern/share.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="canonical" href="https://play.adamwhite.work/lantern/">
 <style>
   html, body { margin: 0; height: 100%; background: #05080f; overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
   body { font: 16px/1.5 Georgia, 'Times New Roman', serif; color: #f3e6cf; }
@@ -189,6 +199,11 @@ import { hull, wake, flame, burn, glow as flameGlow, mark, TINT, reeds, shine, h
 import { t, lang, setLang, apply, langs } from './words.js'; // every word the player sees, in English and Turkish
 
 const query = new URLSearchParams(location.search);
+// A portal copy (scripts/portal-zip.mjs sets window.PORTAL before this script): the page runs inside another site's frame, so it
+// asks this site for nothing: no shared board, no lab recording (kit/lab.js), no tester notes, no Race rooms. 'itch' may link out,
+// so a dare link points at HOME; 'strict' is for portals that allow no links out, and has no dare.
+const PORTAL = typeof window.PORTAL === 'string' ? window.PORTAL : '', HOME = 'https://play.adamwhite.work/lantern/';
+if (PORTAL) document.querySelector('.mode[data-mode="race"]')?.closest('.opt')?.remove();
 let gain = Number(query.get('gain')) || 1.3; // boat travel per finger travel; ?gain= to compare; the Settings card's "Steering feel" sets it (opts below)
 const store = { get: k => readNumber(k), set: write, json: readJson }; // keys and formats are listed in NOTES.md and must not change
 // Story: a night is one river. Reaching dawn opens the next night, up to night 50. Any opened night can be replayed.
@@ -665,7 +680,7 @@ const mode = () => mod ? mod.id : tutor ? 'tutorial' : tower ? 'tower' : s.dare 
 const dare = dareRead(); let dareRun = null;
 const dareThings = n => ABILITIES.filter((k, i) => n & (1 << i)), dareExtra = st => ABILITIES.reduce((n, k, i) => n | (st.on.includes(k) || st.gifts.includes(k) ? 1 << i : 0), 0);
 async function dareSend() {
-  const pts = score(s), url = dareLink({ seed: s.seed, score: pts, extra: s.dare ? s.dare.extra : dareExtra(s), name: boardName(playerName()) }); if (!url) return;
+  const pts = score(s), url = dareLink({ seed: s.seed, score: pts, extra: s.dare ? s.dare.extra : dareExtra(s), name: boardName(playerName()) }, PORTAL ? { href: HOME } : location); if (!url) return;
   const how = await shareLink(url, t('dareWords', { n: pts }));
   rec.event('dare_send', { how, score: pts, back: !!s.dare });
   $('dareNote').textContent = t(how === 'copied' ? 'dareCopied' : how === 'shown' ? 'dareShown' : 'dareNote'); $('dareUrl').hidden = how !== 'shown'; $('dareUrl').value = url; if (how === 'shown') $('dareUrl').select();
@@ -714,7 +729,7 @@ function finish() {
     else if (won) { $('line').textContent = t('wonNight', { n: stage, next: stage + 1, ahead: ahead(stage + 1) }); stage++; opened = Math.max(opened, stage); store.set('lantern-night', opened); $('go').textContent = t('playNight', { n: stage }); }
     else { $('line').textContent = t('nightLost', { why, pct, best }); $('go').textContent = t('playAgain'); }
   }
-  { const can = endless && !tower && !mod && score(s) > 0; $('dareRow').hidden = !can; $('dareUrl').hidden = true; if (can) { $('dareSend').textContent = t(s.dare && score(s) > s.dare.score ? 'dareBack' : 'dareFriend'); $('dareNote').textContent = t('dareNote'); } }
+  { const can = endless && !tower && !mod && score(s) > 0 && PORTAL !== 'strict'; $('dareRow').hidden = !can; $('dareUrl').hidden = true; if (can) { $('dareSend').textContent = t(s.dare && score(s) > s.dare.score ? 'dareBack' : 'dareFriend'); $('dareNote').textContent = t('dareNote'); } }
   const tune = song && song.melody, laid = tune ? tune.played + tune.missed : 0; // the share of tonight's melody the embers played
   $('sub').textContent = gained + (musicOn && laid >= 4 ? ' ' + t('melodyPlayed', { pct: Math.round(tune.share * 100) }) : '');
   setTimeout(() => { if (!playing && screen === 'play') show('card'); }, won ? 2600 : crash ? 1300 : 700); // a crash plays out before the card
@@ -742,6 +757,7 @@ const daySeed = d => { let h = 2166136261; for (const c of `lantern ${d}`) h = M
 let daily = false, ranDay = '', sharedDay = null, mineDay = 0;
 let decided = read('lantern-share') !== null, sharing = read('lantern-share', '') === '1', boardId = read('lantern-board-id', ''), shared = null, tab = 'all', mine = 0, asked = 0, ticket = null, sends = [0, 0];
 async function boardCall(body, url = BOARD_URL) {
+  if (PORTAL) return null; // a portal copy has only this phone's board
   const stop = new AbortController(), timer = setTimeout(() => stop.abort(), BOARD_WAIT);
   try {
     const res = await fetch(url, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: stop.signal, keepalive: true } : { signal: stop.signal });
