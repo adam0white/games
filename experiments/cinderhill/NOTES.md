@@ -692,10 +692,37 @@ Shipped numbers (5 seeds, both seats; W: war grower with spitters, D: deep growe
 
 Read: growing is close to even against not growing for a bot, so it is neither a tax nor a must. Which branch is
 better depends on the mission. On The Wall the War hill beats the Deep hill 9 of 10: not fixed. The Wall's guard
-post with growth on: the queen held in 4 of 5 controlled strikes with a guard (seed 5 ended at 320 of 800).
+post with growth on: the queen lived through 5 of 5 controlled strikes with a guard (seed 5 ended at 320 of 800).
 
 Open from the two outside reviews: the second growth opens nothing for a colony with no Lineage nodes; a locked raid
 mode is turned into Press without a word; the rival retries a refused plug each think; the campaign caste is ordered
 by the client on the tier event, so a headless replay lacks it; the Larder haul test moved seed (2 to 1) to pass.
 
 Not known: how any of this plays for a person. Bots take a branch by seed, not by reading the map.
+
+## Rooms by tier: a fungus garden, a hill that mends, and growth as a setting
+
+After PR 406 the second growth opened nothing for a colony with no Lineage nodes, and base building had three rooms.
+
+- **Fungus garden** (`ROOM.GARDEN`, `TIERS.rooms`): a Deep hill may dig it from its first growth, any hill from its
+  second. Each open cell pays a seed at every `GARDEN_EVERY` (a minute) if a store cell has room, and houses one ant
+  fewer (`per: -1` on the ants cap; the cap never falls under `REST_MIN`). Food with no trail to guard, paid for in
+  housing and in clay. A raid can carry the seeds off like any others.
+- **A full-grown hill mends its wounded** (`TIERS.heal`): at tier 3 an ant inside its own nest gets back a sixteenth
+  of its health every `HEAL_EVERY` ticks. So Recall has a use beyond running away, for every hill, with or without
+  Lineage nodes.
+- **Setting "The tree"** (`cinderhill:war:growth`): grow in each mission (default), or deeds alone (`tiers: false`).
+  Recorded with the rest of the settings at the start of a match, so the two shapes can be compared by play.
+- `mayGrow` now counts only seeds that lie in a store cell, so the client and the rival are not told yes and then
+  refused.
+- The rival digs one garden room (16 cells) off the far end of its first nursery. Its left nursery slot moved right.
+  It takes the second growth only with 60 seeds to spare.
+
+Measured (5 seeds, both seats, steady minds): a Deep hill that digs gardens against one that does not: 5–5 on all six
+missions. So gardens are not a must and not a trap for a bot, and their worth to a bot is not shown either: matches
+end near tick 5,700, about three garden harvests after they are dug. On The Crossing at 12 seeds a hill that grows
+twice as soon as it can lost 8–16 to one that never grows; held back to a 60 seed surplus it is 13–11, and one growth
+only is 11–13. The second growth is a late-game buy, not a build order.
+
+Not known: whether a person finds the garden worth its housing; whether mending makes a defended nest too hard to
+take (no bot test separates it). The War hill still beats the Deep hill on The Wall (10–0 at 5 seeds).

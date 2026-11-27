@@ -15,7 +15,8 @@ export const THINK_EVERY = 20;
 const SLOTS = [
   [ROOM.STORE, 3, 4, 6, 6], [ROOM.STORE, -6, 4, -3, 6],
   [ROOM.REST, 1, 7, 5, 8], [ROOM.REST, -5, 7, -1, 8], [ROOM.REST, 3, 14, 7, 15], [ROOM.REST, -7, 14, -3, 15], [ROOM.REST, 6, 7, 10, 8], [ROOM.REST, -10, 7, -6, 8],
-  [ROOM.NURSERY, 6, 10, 9, 13], [ROOM.NURSERY, -10, 10, -7, 13],
+  [ROOM.NURSERY, 6, 10, 9, 13], [ROOM.NURSERY, 10, 10, 13, 13],
+  [ROOM.GARDEN, -10, 10, -7, 13], // off the far end of the first nursery, away from the shaft and the queen
   [ROOM.POST, 0, 2, 0, 3], [ROOM.POST, 0, 7, 0, 9], // the throat above the store, then the shaft below it
 ];
 
@@ -146,7 +147,7 @@ export function think(sim, t, mind = 1) {
   // stores can pay with a meal to spare; the second growth when it can pay again.
   // (A mind that names no branch takes one by the seed and its seat; `grow: 0` never grows.)
   const grow = mind.grow ?? (mind.pick ? 1 : 1 + ((Math.abs(cfg.seed | 0) + t) & 1)); // a mind with a caste to raise goes to war for it; one that plans for a frost keeps its seeds
-  if (grow && !winter && sim.mayGrow(t) === 0 && (cg[o + CG.TIER] === 0 || mind.grow2 !== false) && adults >= (mind.growAt ?? 45) + 40 * cg[o + CG.TIER] && cg[o + CG.SUGAR] >= TIERS.grow[cg[o + CG.TIER]].sugar + 6) out.push({ team: t, type: CMD.GROW, branch: grow });
+  if (grow && !winter && sim.mayGrow(t) === 0 && (cg[o + CG.TIER] === 0 || mind.grow2 !== false) && adults >= (mind.growAt ?? 45) + 40 * cg[o + CG.TIER] && cg[o + CG.SUGAR] >= TIERS.grow[cg[o + CG.TIER]].sugar + (cg[o + CG.TIER] ? mind.spare2 ?? 60 : 6)) out.push({ team: t, type: CMD.GROW, branch: grow });
   if (cg[o + CG.DIET] !== diet || (cg[o + CG.PICK] && cg[o + CG.DIET2] !== special)) out.push({ team: t, type: CMD.DIET, share: diet, special });
   const outnumbered = cg[(1 - t) * CG.SIZE + CG.MAJORS] * 2 > cg[o + CG.MAJORS] * 3 + 4; // the other hill has half as many soldiers again, and more
   // Building, one room at a time: a store when the stores are nearly full, quarters when the hill is, a nursery wing when the brood is.
@@ -169,6 +170,8 @@ export function think(sim, t, mind = 1) {
     if (may(ROOM.STORE) && (winter ? !frozen && cg[o + CG.SUGAR] >= 30 && capF < (feed(adults + brood + 2 * majors) * 5 >> 2) + 16 : Math.max(cg[o + CG.SUGAR], cg[o + CG.PROTEIN]) * 5 >= capF * 4)) wants.push(ROOM.STORE);
     if (may(ROOM.REST) && adults + brood >= cg[o + CG.CAP_ADULTS] - 10 && (!winter || (frozen ? cg[o + CG.SUGAR] : capF) >= feed(cg[o + CG.CAP_ADULTS] + 20))) wants.push(ROOM.REST);
     if (may(ROOM.NURSERY) && brood >= cg[o + CG.CAP_BROOD] - 4) wants.push(ROOM.NURSERY);
+    // Fungus gardens, once it has grown to them: food that needs no trail. Not past a third of what its quarters house.
+    if (mind.garden !== false && may(ROOM.GARDEN) && sim.mayRoom(t, ROOM.GARDEN) && adults >= 40 && sim.gardens[t] < (mind.gardens ?? 16) && cg[o + CG.SUGAR] >= 14) wants.push(ROOM.GARDEN);
     // A guard post in the throat of the shaft, where a break-in must pass, once there is a guard worth posting.
     if (may(ROOM.POST) && sim.mayRoom(t, ROOM.POST) && majors >= 4) wants.push(ROOM.POST);
     let dug = false;
