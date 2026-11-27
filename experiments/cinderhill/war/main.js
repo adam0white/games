@@ -207,19 +207,20 @@ for (const b of document.querySelectorAll('#grows [data-grow]')) b.addEventListe
   const tier = g(ME, CG.TIER), br = Number(b.dataset.grow) || g(ME, CG.BRANCH);
   if (sim.mayGrow(ME) !== 0 || growAsked === sim.tick) return;
   growAsked = sim.tick;
-  order({ type: CMD.GROW, branch: br }); rec.event('grow', { to: tier + 2, branch: br === BRANCH.WAR ? 'war' : 'deep', at: sim.tick, ants: g(ME, CG.ADULTS) }); tone(330, 0.3, 0.05, 'triangle', 160); navigator.vibrate?.(10);
+  const craft = Number(b.dataset.craft) || 0;
+  order({ type: CMD.GROW, branch: br, craft }); rec.event('grow', { to: tier + 2, branch: br === BRANCH.WAR ? 'war' : 'deep', craft: TIERS.craft[craft]?.id ?? '', at: sim.tick, ants: g(ME, CG.ADULTS) }); tone(330, 0.3, 0.05, 'triangle', 160); navigator.vibrate?.(10);
 });
 function growPane() {
   const on = !!sim.cfg.tiers; document.querySelector('#diet .tabs [data-tab="grow"]').hidden = !on; if (!on) return;
   const tier = g(ME, CG.TIER), left = g(ME, CG.GROW), br = g(ME, CG.BRANCH), row = TIERS.grow[tier], may = sim.mayGrow(ME), can = may === 0;
-  const name = br === BRANCH.WAR ? 'War hill' : br === BRANCH.DEEP ? 'Deep hill' : 'A young hill';
+  const craftOf = TIERS.craft[g(ME, CG.CRAFT)], name = (br === BRANCH.WAR ? 'War hill' : br === BRANCH.DEEP ? 'Deep hill' : 'A young hill') + (craftOf && tier >= 2 ? `, ${craftOf.name}` : '');
   $('growHead').textContent = `${name} · tier ${tier + 1} of 3`; $('growInfo').textContent = left ? `growing: ${Math.ceil(left / 20)}s` : !row ? 'full grown' : may > 1 ? `${may - 2} more seeds needed` : `${row.sugar} seeds to grow`;
   for (const b of document.querySelectorAll('#grows [data-grow]')) { const k = Number(b.dataset.grow); b.hidden = tier === 0 ? k === 0 : k !== 0 || !row; b.disabled = !can; }
   const done = left && row ? 1 - left / row.ticks : 0; $('growBar').firstElementChild.style.width = `${(100 * done).toFixed(0)}%`; $('growBar').hidden = !left;
   const other = br === BRANCH.WAR ? BRANCH.DEEP : BRANCH.WAR, last = lastList();
   $('growHelp').innerHTML = left ? 'The chamber is being widened. Until it is done the queen lays nothing.'
     : tier === 0 ? `Widen the queen's chamber: <b>${row.sugar} seeds</b>, and for ${row.ticks / 20} seconds she lays nothing. Choose what the hill becomes; it stays that for the mission. <b>War hill</b>: ${branchList(BRANCH.WAR)}. <b>Deep hill</b>: ${branchList(BRANCH.DEEP)}.${camp.caste ? ` A Deep hill raises ${camp.caste}s only after it grows again.` : ''}`
-    : tier === 1 ? (() => { const more = [...branchOpens(other), ...last]; if (other === BRANCH.DEEP) more.unshift('fungus gardens'); return `Grow again: <b>${row.sugar} seeds</b>, ${row.ticks / 20} seconds. A full-grown hill tends its wounded: ants inside your nest mend.${more.length ? ` It also opens ${more.join(', ')}.` : ''}`; })()
+    : tier === 1 ? (() => { const more = [...branchOpens(other), ...last]; if (other === BRANCH.DEEP) more.unshift('fungus gardens'); return `Grow again: <b>${row.sugar} seeds</b>, ${row.ticks / 20} seconds. Choose a craft; the hill keeps it for the mission. ${TIERS.craft.slice(1).map(c => `<b>${c.name}</b>: ${c.text}`).join('. ')}. Whichever you take, a full-grown hill tends its wounded: ants inside your nest mend.${more.length ? ` It also opens ${more.join(', ')}.` : ''}`; })()
     : 'The chamber is as wide as it will go.';
   document.querySelector('#diet .tabs [data-tab="grow"]').classList.toggle('ready', can);
   const per = r => sim.stat[ME].per[r];
@@ -526,7 +527,7 @@ function news() {
       if (a === ME) { toast('Packed shut'); tone(180, 0.25, 0.06, 'square', -60); rec.event('plug', { at: sim.tick }); } else if (sim.owner(b - L0.nestBase) !== ME && underTrail(ME) >= 0) toast('They have packed the tunnel shut. Mark it with Tunnel to dig it out.', 4200, true);
     } else if (type === EVENT.TIER) {
       const what = c === BRANCH.WAR ? 'War hill' : 'Deep hill';
-      if (a === ME) { pickCaste(); roomButtons(); toast(b === 2 ? `The chamber is wider. You are a ${what} now.` : 'The chamber is full grown.', 3600); tone(392, 0.5, 0.06, 'triangle', 240); shake = 0.15; rec.event('tier', { tier: b, branch: c === BRANCH.WAR ? 'war' : 'deep', at: sim.tick }); }
+      if (a === ME) { pickCaste(); roomButtons(); toast(b === 2 ? `The chamber is wider. You are a ${what} now.` : TIERS.craft[g(ME, CG.CRAFT)] ? `The chamber is full grown. Your hill has the ${TIERS.craft[g(ME, CG.CRAFT)].name} craft.` : 'The chamber is full grown.', 3600); tone(392, 0.5, 0.06, 'triangle', 240); shake = 0.15; rec.event('tier', { tier: b, branch: c === BRANCH.WAR ? 'war' : 'deep', at: sim.tick }); }
       else { toast(b === 2 ? `The rival has grown into a ${what}.` : 'The rival\'s chamber is full grown.', 3600, true); rec.event('rivalTier', { tier: b, branch: c === BRANCH.WAR ? 'war' : 'deep', at: sim.tick }); }
     } else if (type === EVENT.BREACH) {
       rec.event('breach', { by: a === ME ? 'me' : 'rival', at: sim.tick }); shake = 0.3; roomButtons();

@@ -92,7 +92,7 @@ export const CG = {
   CAP_FOOD: 22, CAP_BROOD: 23, CAP_ADULTS: 24, MARKS: 25, DIGGERS: 26,
   POINTS: 30, // paid by held sites, one a second each
   HAUL: 31, // loads taken from a rival's store and carried all the way home
-  TIER: 33, GROW: 34, BRANCH: 35, GROWN: 37, // with cfg.tiers: chamber growths done (0 to 2), ticks left of one under way, the branch taken at the first
+  TIER: 33, GROW: 34, BRANCH: 35, GROWN: 37, CRAFT: 38, // with cfg.tiers: chamber growths done (0 to 2), ticks left of one under way, the branch taken at the first
   PICK: 27, DIET2: 28, SPECIALS: 29, // the caste this colony chose (0: none yet), its share of the brood in four, how many live
   FOUND: 32, // loads dug out of caches in the clay
   HARM: 36, // harm this colony's ants have done to the mission's beast
@@ -265,6 +265,7 @@ export class Sim {
     const o = t * CG.SIZE, tier = this.cfg.tiers ? this.cg[o + CG.TIER] : 0, br = this.cg[o + CG.BRANCH], sets = [];
     // The branch's own numbers stay its own: the second growth brings the other branch's nodes and caste, not these.
     if (tier >= 1 && TIERS.branch[br]) sets.push(...TIERS.branch[br].set);
+    if (tier >= 2 && TIERS.craft[this.cg[o + CG.CRAFT]]) sets.push(...TIERS.craft[this.cg[o + CG.CRAFT]].set);
     this.stat[t] = statsFor(this.cfg.traits?.[t], sets);
   }
 
@@ -459,6 +460,7 @@ export class Sim {
       if (may !== 0) return no(WHY.BLOCKED);
       this.take(t, FOOD.SUGAR, row.sugar); if (row.protein) this.take(t, FOOD.PROTEIN, row.protein);
       if (tier === 0) cg[base + CG.BRANCH] = br;
+      if (tier === 1) cg[base + CG.CRAFT] = TIERS.craft[o.craft | 0] ? o.craft | 0 : 0; // none asked for: none had
       cg[base + CG.GROW] = row.ticks;
     } else if (o.type === CMD.RALLY) {
       const c = this.snap(o.x | 0, o.y | 0);
