@@ -746,3 +746,41 @@ test('a second door: opened from a tunnel, trails start at the nearer door, it s
   plain.cg[CG.SUGAR] = 60; plain.order({ team: 0, type: CMD.DOOR, x: ox }); plain.step(); plain.step();
   assert.equal(plain.side[0], -1, 'no second door without the trait or the option');
 });
+
+test('High Summer: food keeps falling, told beforehand, the same on both sides, and a save carries on the same', () => {
+  const h = new Host({ seed: 5, mission: 'summer' }), s = h.sim, sw = s.L.sw, fl = s.cfg.falls, falls = [];
+  while (s.tick < fl.from + 2 * fl.every + 2) { h.run(1); const ev = h.drain(); for (let k = 0; k < ev.length; k += 4) if (ev[k] === EVENT.FALL) falls.push([s.tick, ev[k + 1], ev[k + 2], ev[k + 3]]); }
+  const told = falls.filter(f => f[3] === 0), landed = falls.filter(f => f[3] > 0);
+  assert.equal(told.length, 5); assert.equal(landed.length, 5); // two pairs and one fall on a ford
+  assert.equal(told[0][0], fl.from - fl.warn); assert.equal(landed[0][0], fl.from);
+  assert.deepEqual(told.map(f => [f[1], f[2]]), landed.map(f => [f[1], f[2]])); // what was told is what falls, where it was told
+  assert.equal(landed[0][1] % sw, sw - 1 - (landed[1][1] % sw)); assert.equal(Math.floor(landed[0][1] / sw), Math.floor(landed[1][1] / sw)); // a pair is mirrored
+  assert.ok(Math.abs((landed[4][1] % sw) - (sw >> 1)) <= 3); assert.equal(landed[4][2], FOOD.PROTEIN); assert.equal(landed[4][3], fl.mid); // the third is on a ford, and is meat
+  let on = 0; for (let p = 0; p < s.pileAmount.length; p++) if (s.pileAmount[p] > 0 && s.pileCell[p] === landed[4][1]) on = s.pileAmount[p];
+  assert.equal(on, fl.mid);
+  // Nothing of the falls is kept in a save: a hill loaded before a fall gets the same fall.
+  const a = new Host({ seed: 5, mission: 'summer', ai: { 0: 1, 1: 1 } }).run(fl.from - 50).sim;
+  const b = Sim.load(JSON.parse(JSON.stringify(a.save(), (k, v) => (ArrayBuffer.isView(v) ? Array.from(v) : v))));
+  for (let k = 0; k < 400; k++) { a.step(); b.step(); }
+  assert.equal(a.hash(), b.hash());
+  // The seven older missions have no falls, no truce and no reserve.
+  for (const m of Object.values(MISSIONS)) if (m.id !== 'summer') { const c = new Sim({ mission: m.id }).cfg; assert.ok(!c.falls && !c.truce && !c.reserve, m.id); }
+});
+
+test('High Summer: until noon no raid goes down the other door and no queen is hurt; a hill with no workers raises some', () => {
+  const s = new Host({ seed: 2, mission: 'summer', ai: { 0: 2, 1: 0 } }).run(9590).sim;
+  assert.equal(s.cfg.truce, 9600); assert.equal(s.result, 0);
+  for (const t of [0, 1]) assert.equal(s.g(t, CG.QUEEN_HP), s.cfg.queenHp, 'no queen is hurt before noon');
+  for (let i = 0; i < s.n; i++) if (s.hp[i] > 0 && s.layer[i] === 1) assert.equal(s.owner(s.cellOf(i) - s.L.nestBase), s.team[i], 'no ant is under the other hill before noon');
+  // The queen's reserve: every worker dead and no meat in the store, and there are workers again a while later.
+  const r = new Sim({ seed: 4, mission: 'summer' });
+  for (let i = 0; i < r.n; i++) if (r.team[i] === 0) r.hp[i] = 0;
+  r.anyDead = true; r.cg[CG.PROTEIN] = 0; for (let k = 0; k < r.binP.length; k++) if (r.owner(k) === 0) r.binP[k] = 0;
+  for (let k = 0; k < 2400; k++) r.step();
+  assert.ok(r.g(0, CG.ADULTS) >= 6, `a hill left with no ants has ${r.g(0, CG.ADULTS)} again`);
+  const plain = new Sim({ seed: 4, mission: 'summer', reserve: false });
+  for (let i = 0; i < plain.n; i++) if (plain.team[i] === 0) plain.hp[i] = 0;
+  plain.anyDead = true; plain.cg[CG.PROTEIN] = 0; for (let k = 0; k < plain.binP.length; k++) if (plain.owner(k) === 0) plain.binP[k] = 0;
+  for (let k = 0; k < 2400; k++) plain.step();
+  assert.ok(plain.g(0, CG.ADULTS) < r.g(0, CG.ADULTS), 'without the reserve it raises fewer');
+});

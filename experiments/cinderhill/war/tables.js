@@ -95,6 +95,13 @@ export const MAPS = {
   wall: { wall: 'stone', gaps: [], gapHalf: 0, clumps: 12, door: 58,
     piles: [[40, 50, 0, 60], [44, 66, 1, 50], [30, 30, 0, 80], [28, 84, 1, 70], [14, 62, 0, 70], [18, 22, 1, 60], [68, 28, 0, 60], [70, 86, 1, 50]],
     mid: [] },
+  // A meadow cut by a creek with three fords. Little lies on the ground at dawn: the food falls through the day
+  // (a mission's `falls`), in pairs on each colony's own ground at `falls` and alone on the fords at `fallsMid`.
+  meadow: { wall: 'water', gaps: [20, 56, 92], gapHalf: 2, clumps: 14,
+    piles: [[26, 44, 0, 40], [28, 70, 1, 50], [46, 56, 0, 50], [20, 24, 1, 50], [22, 90, 0, 40]],
+    mid: [],
+    falls: [[52, 30], [50, 84], [30, 16], [30, 98], [62, 56], [14, 56], [62, 24], [62, 90]],
+    fallsMid: [[0, 20], [-1, 56], [0, 92]] },
 };
 
 /** The campaign, in order. A fork is a choice kept for the whole campaign; it opens when the mission before it has been
@@ -102,6 +109,8 @@ export const MAPS = {
 export const CAMPAIGN = [
   { mission: 'crossing' },
   { fork: 'caste', options: ['spitter', 'warden'] },
+  // A side mission: open as soon as The Crossing has been played, and never in the way of the road below.
+  { mission: 'summer', side: true },
   { mission: 'frost' },
   { fork: 'way', options: ['thrift', 'swift'] },
   { mission: 'hunt' },
@@ -217,5 +226,17 @@ export const MISSIONS = {
     deeds: [{ id: 'a', text: 'Kill the queen inside seven minutes.', won: true, why: 'QUEEN', by: 8400, opens: 'sappers' }, { id: 'b', text: 'Win with fewer than 120 dead.', won: true, max: { DIED: 119 }, opens: 'post' }],
     picks: [CASTE.SPITTER, CASTE.WARDEN],
     rooms: [ROOM.STORE, ROOM.NURSERY, ROOM.REST, ROOM.POST],
+  },
+  // The long game. Twenty minutes, not eight, and the food does not run out: it falls through the day, on each
+  // colony's own ground and on the fords between them. A hill that stops digging at minute three is outgrown by
+  // minute ten, so what is built, and where, is the mission. The queens are tough: a raid thins a hill before it ends one.
+  summer: {
+    id: 'summer', name: 'High Summer', map: 'meadow', visitor: true, long: true,
+    kit: { ants: 30, sugar: 10, protein: 5, eggs: 20, larvae: 20, pupae: 12, duskTick: 24000, queenHp: 6400, truce: 9600, reserve: true, falls: { from: 2000, every: 1200, warn: 300, amount: 70, mid: 160 } },
+    visits: [1500, 4500, 7500, 10500, 13500, 16500, 19500, 22500],
+    goals: { queen: true, dusk: 'adults' },
+    deeds: [{ id: 'a', text: 'Win with two hundred ants or more.', won: true, min: { ADULTS: 200 }, opens: 'door' }, { id: 'b', text: 'Win by killing the rival queen.', won: true, why: 'QUEEN', opens: 'sappers' }, { id: 'c', text: 'Carry twenty stolen loads home.', min: { HAUL: 20 }, opens: 'raiders' }],
+    picks: [CASTE.SPITTER, CASTE.WARDEN],
+    rooms: [ROOM.STORE, ROOM.NURSERY, ROOM.REST, ROOM.POST, ROOM.GARDEN],
   },
 };

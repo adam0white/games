@@ -33,9 +33,11 @@ const set = settings('cinderhill', {
   growth: { values: ['mission', 'deeds'], def: 'mission', key: 'cinderhill:war:growth' },
   home: { values: ['carried', 'bare'], def: 'carried', key: 'cinderhill:war:home' },
   visitor: { values: ['comes', 'hungry', 'never'], def: 'comes', key: 'cinderhill:war:visitor' },
+  day: { values: ['12', '20', '30'], def: '20', key: 'cinderhill:war:day' },
+  falls: { values: ['lean', 'fair', 'rich'], def: 'fair', key: 'cinderhill:war:falls' },
 }, { rec });
-const LABEL = { caste: 'Your third caste', rival: 'Rival', view: 'View', light: 'Light', style: 'Style', size: 'Ants', sound: 'Sound', finger: 'One finger', forks: 'Forks', growth: 'The tree', home: 'The home hill', visitor: 'The weevil' };
-const NAME = { comes: 'Comes for your stores', hungry: 'Comes hungry, and harder to kill', never: 'Never comes', carried: 'Kept from mission to mission', bare: 'A new hill every mission', mission: 'Grow the hill in each mission', deeds: 'Deeds alone open tools (no growth)', spitter: 'Spitters', warden: 'Wardens', timid: 'Timid', steady: 'Steady', bold: 'Bold', tilt: 'Tilted', top: 'Top down', low: 'Low', cycle: 'Day to dusk', day: 'Day', ember: 'Ember', relief: 'Painted', ink: 'Ink', 1: 'True size', 1.5: 'Larger', hill: 'Draws from your hill, moves the view elsewhere', draw: 'Always draws', kept: 'Kept for the campaign', free: 'Can be changed between missions', all: 'Music & effects', fx: 'Effects', off: 'Off' };
+const LABEL = { caste: 'Your third caste', rival: 'Rival', view: 'View', light: 'Light', style: 'Style', size: 'Ants', sound: 'Sound', finger: 'One finger', forks: 'Forks', growth: 'The tree', home: 'The home hill', visitor: 'The weevil', day: 'High Summer: length', falls: 'High Summer: windfalls' };
+const NAME = { 12: 'Twelve minutes', 20: 'Twenty minutes', 30: 'Thirty minutes', lean: 'Lean: a third less falls', fair: 'Fair', rich: 'Rich: half as much again', comes: 'Comes for your stores', hungry: 'Comes hungry, and harder to kill', never: 'Never comes', carried: 'Kept from mission to mission', bare: 'A new hill every mission', mission: 'Grow the hill in each mission', deeds: 'Deeds alone open tools (no growth)', spitter: 'Spitters', warden: 'Wardens', timid: 'Timid', steady: 'Steady', bold: 'Bold', tilt: 'Tilted', top: 'Top down', low: 'Low', cycle: 'Day to dusk', day: 'Day', ember: 'Ember', relief: 'Painted', ink: 'Ink', 1: 'True size', 1.5: 'Larger', hill: 'Draws from your hill, moves the view elsewhere', draw: 'Always draws', kept: 'Kept for the campaign', free: 'Can be changed between missions', all: 'Music & effects', fx: 'Effects', off: 'Off' };
 const MOOD = { timid: 0, steady: 1, bold: 2 };
 const redraw = set.panel($('settings'), { only: set.ids.filter(id => id !== 'caste'), label: id => LABEL[id], name: (id, v) => NAME[v] ?? v, what: (id, v) => (id === 'caste' ? (v === 'spitter' ? 'Frail, but they spit from two cells away, over the front line. Applies from the next start.' : 'Slow and very hard to kill: they hold a tunnel. Applies from the next start.') : id === 'rival' ? (v === 'timid' ? 'It never attacks your hill. Applies from the next start.' : v === 'bold' ? 'It raids early, even at even odds. Applies from the next start.' : 'It holds the fords, and raids when it has the numbers. Applies from the next start.') : id === 'growth' ? (v === 'mission' ? 'Each mission you widen the queen\'s chamber, choose a War hill or a Deep hill, and grow into your tools. Applies from the next start.' : 'No growth: what your deeds have opened is yours from the first minute. Applies from the next start.') : id === 'home' ? (v === 'carried' ? 'First Frost, The Stones and The Larder are fought on the hill of The Crossing. Each starts in the nest as you left it, tunnels, stores and nurseries, and the rival starts in its own. Quarters come back as bare tunnels to paint again. Applies from the next start.' : 'Every mission starts in the same small nest. Applies from the next start.') : id === 'visitor' ? (v === 'never' ? 'No weevil in any mission. Applies from the next start.' : `In First Frost a weevil comes in at each door ${VISITOR[v].at.length} times and eats up to ${VISITOR[v].fill} seeds a visit from stores within ${VISITOR[v].reach} steps of the door. Applies from the next start.`) : null), onChange: (id, v) => { if (id === 'forks' || id === 'home' || id === 'visitor') renderPath(); if (id === 'sound') { if (v === 'off') snd.hold(); else { snd.release(); startSong(); } } tone(660, 0.06, 0.03, 'triangle', 80); } });
 
@@ -47,6 +49,7 @@ const PICK = { spitter: CASTE.SPITTER, warden: CASTE.WARDEN };
 // The campaign: what has been played to its end, and the forks taken. Its own key; nothing else reads it.
 const CAMP_KEY = 'cinderhill:war:campaign';
 const TEXT = {
+  summer: { sub: 'A long day. The food keeps falling. Build a hill worth the name.', goals: ['Have the larger colony at dusk, or kill the rival queen after noon.', 'Until noon no raid can go down a door and no queen can be hurt. Use the morning to dig: stores, nurseries, quarters, gardens.', 'Food falls all day, on your ground and on the three fords. You are told a little before, and so is the rival.'], clock: ['Noon', 'Dusk'], won: 'The meadow is yours', end: 'dusk' },
   crossing: { sub: 'Two hills. One creek. Not enough food for both.', goals: ['Have the larger colony at dusk, or kill the rival queen.', 'Lose your queen and the hill is lost.', 'The big food lies on the two fords. So does the rival.'], clock: ['Dusk'], won: 'The crossing is yours', end: 'dusk' },
   hunt: { sub: 'Open ground. A great beetle on a dead vole. Two hungry hills.', goals: ['First kill it. Then carry forty loads of its meat home before the rival does. The hill that hurt it more starts six loads ahead.', 'It bites whatever comes inside the red ring, two ants at a time, and it never leaves the body. A few soldiers die there for little: raise a dozen in the Nest first, then tap Raid and tap the beetle.', 'When it falls, draw a Forage trail to the body and send most of your workers. Keep soldiers on it: the rival wants the same meat.', 'At dusk, more meat home wins. If the beetle still lives, more harm wins.'], clock: ['Dusk'], won: 'The beetle is yours', end: 'dusk' },
   stones: { sub: 'Four standing stones. Stand by them longer than the rival does.', goals: ['A stone pays a point a second to the colony with more ants beside it. It takes three ants at least.', 'First to 400 points wins. At dusk, more points wins.', 'Draw a raid trail to a stone and your soldiers stand there.', 'Two stones stand on the fords. One stands on each far flank.'], clock: ['Dusk'], won: 'The stones are yours', end: 'dusk' },
@@ -81,7 +84,7 @@ const saveDoors = () => { try { localStorage.setItem(DOOR_KEY, JSON.stringify(do
 const sidesOf = id => { const h = hillOf(id), s = h && doors.after[h.from]; return Array.isArray(s) && s.length === 2 ? s.map(x => (Number.isInteger(x) ? x : -1)) : null; };
 const saveHills = () => { try { localStorage.setItem(HILL_KEY, JSON.stringify(hills)); } catch { /* private mode */ } };
 const hillOf = id => { if (set.get('home') !== 'carried') return null; for (let f = MISSIONS[id].from; f; f = MISSIONS[f].from) { const n = hills.after[f]?.nests; if (Array.isArray(n) && Array.isArray(n[0]) && Array.isArray(n[1])) return { from: f, nests: n }; } return null; };
-const STEPS = CAMPAIGN.filter(s => s.mission).map(s => s.mission);
+const STEPS = CAMPAIGN.filter(s => s.mission && !s.side).map(s => s.mission), SIDE = CAMPAIGN.filter(s => s.side).map(s => s.mission);
 const before = id => STEPS[STEPS.indexOf(id) - 1];
 /** A mission is open when the one before it was played to its end and every fork before it is taken. */
 // A fork's choice: the caste fork keeps its own field; the rest sit in camp.forks. A fork's options name a caste or a trait.
@@ -94,7 +97,7 @@ const rivalOf = s => { const mine = taken(s.fork); if (s.options) return s.optio
 const optionText = v => FORK[v] ?? [TRAITS[v].name, TRAITS[v].text];
 // Traits: yours are the forks you took; the rival takes the other option of each, so the choice is a trade and not a gift.
 const traitsNow = () => { const mine = nodesNow(), theirs = nodesNow(); for (const s of CAMPAIGN) if (s.fork && s.fork !== 'caste' && taken(s.fork)) { mine.push(taken(s.fork)); theirs.push(...rivalOf(s)); } return [mine, MOOD[set.get('rival')] ? theirs : []]; };
-function isOpen(id) { if (id === query.get('mission')) return true; for (const s of CAMPAIGN) { if (s.mission === id) return true; if (s.mission && !camp.done[s.mission] && !(ROAD.pair.includes(s.mission) && ROAD.pair.includes(id))) return false; if (s.fork && !taken(s.fork)) return false; } return false; }
+function isOpen(id) { if (id === query.get('mission')) return true; if (SIDE.includes(id)) return !!camp.done[STEPS[0]]; for (const s of CAMPAIGN) { if (s.mission === id) return true; if (s.mission && !s.side && !camp.done[s.mission] && !(ROAD.pair.includes(s.mission) && ROAD.pair.includes(id))) return false; if (s.fork && !taken(s.fork)) return false; } return false; }
 const firstOpen = () => { let last = STEPS[0]; for (const id of STEPS) { if (!isOpen(id)) break; last = id; if (!camp.done[id]) break; } return last; };
 const qMission = query.get('mission');
 let missionId = MISSIONS[qMission] ? qMission : firstOpen();
@@ -106,8 +109,11 @@ const startAnts = () => { const prev = roadBefore(missionId), ants = MISSIONS[mi
 const late = id => ROAD.pair.includes(id) && !!camp.forks.road && camp.forks.road !== id;
 const lateOpts = id => { if (!late(id)) return {}; const { foePoints, foeHarm, ...o } = ROAD.late[id]; if (foePoints) { o.pointsBy = [0, 0]; o.pointsBy[FOE] = foePoints; } if (foeHarm) { o.harmBy = [0, 0]; o.harmBy[FOE] = foeHarm; } return o; };
 // A mission's visitor: the weevil of the strength set, or none.
-const visitorOf = id => (MISSIONS[id].visitor && set.get('visitor') !== 'never' ? VISITOR[set.get('visitor')] : null);
-const newHost = () => new Host({ seed, mission: missionId, ...lateOpts(missionId), ...(visitorOf(missionId) ? { pest: visitorOf(missionId) } : {}), ...(hillOf(missionId) ? { nests: hillOf(missionId).nests } : {}), ...(sidesOf(missionId) ? { sides: sidesOf(missionId) } : {}), antsBy: startAnts(), traits: traitsNow(), tiers: set.get('growth') !== 'deeds', ai: { [FOE]: MOOD[set.get('rival')] } });
+const visitorOf = id => (MISSIONS[id].visitor && set.get('visitor') !== 'never' ? { ...VISITOR[set.get('visitor')], ...(MISSIONS[id].visits ? { at: MISSIONS[id].visits } : {}) } : null);
+// A long mission (High Summer): its length and how much falls are settings. Noon, when the truce ends, stays at two fifths of the day.
+const FALLS = { lean: 2, fair: 3, rich: 4.5 };
+const longOpts = id => { const m = MISSIONS[id]; if (!m.long) return {}; const duskTick = +set.get('day') * 1200, f = FALLS[set.get('falls')] / 3, fl = m.kit.falls; return { duskTick, truce: Math.round(duskTick * 0.4), falls: { ...fl, amount: Math.round(fl.amount * f), mid: Math.round(fl.mid * f) } }; };
+const newHost = () => new Host({ seed, mission: missionId, ...lateOpts(missionId), ...longOpts(missionId), ...(visitorOf(missionId) ? { pest: visitorOf(missionId) } : {}), ...(hillOf(missionId) ? { nests: hillOf(missionId).nests } : {}), ...(sidesOf(missionId) ? { sides: sidesOf(missionId) } : {}), antsBy: startAnts(), traits: traitsNow(), tiers: set.get('growth') !== 'deeds', ai: { [FOE]: MOOD[set.get('rival')] } });
 let host = newHost(), sim = host.sim;
 let screen = 'menu', tool = 'trail', nestOpen = false, running = false, speed = 1, lastT = 0;
 const Gs = makeGestures();
@@ -270,7 +276,7 @@ function renderPath() {
       const m = MISSIONS[s.mission], d = camp.done[s.mission], b = document.createElement('button');
       b.className = 'step' + (d ? (d.won ? ' won' : ' lost') : ''); b.disabled = !isOpen(s.mission); b.setAttribute('aria-pressed', String(s.mission === missionId));
       const i = document.createElement('i'), name = document.createElement('span'), em = document.createElement('em');
-      i.textContent = String(++n); name.textContent = m.name; em.textContent = d ? (d.won ? `Won · best ${d.best}` : 'Lost') : b.disabled ? 'Closed' : ROAD.pair.includes(s.mission) && !camp.forks.road ? `New · if left: ${ROAD.price[s.mission]}` : late(s.mission) ? `New · ${ROAD.price[s.mission]}` : 'New';
+      i.textContent = s.side ? '+' : String(++n); name.textContent = m.name; em.textContent = d ? (d.won ? `Won · best ${d.best}` : 'Lost') : b.disabled ? (s.side ? 'Opens after The Crossing' : 'Closed') : s.side ? 'New · the long game' : ROAD.pair.includes(s.mission) && !camp.forks.road ? `New · if left: ${ROAD.price[s.mission]}` : late(s.mission) ? `New · ${ROAD.price[s.mission]}` : 'New';
       b.append(i, name, em); b.addEventListener('click', () => { missionId = s.mission; renderPath(); tone(560, 0.06, 0.03, 'triangle'); });
       el.append(b);
     } else if (s.fork) {
@@ -320,7 +326,7 @@ function renderTree() {
     bough.nodes.forEach((n, i) => {
       if (i) { const arrow = document.createElement('span'); arrow.textContent = '›'; row.append(arrow); }
       if (n.fork) {
-        const step = CAMPAIGN.find(c => c.fork === n.fork), mine = taken(n.fork), opts = step.options ?? step.by[camp.caste] ?? [], at = CAMPAIGN.indexOf(step), prior = CAMPAIGN.slice(0, at).filter(c => c.mission).map(c => c.mission), after = MISSIONS[prior.find(x => !camp.done[x]) ?? CAMPAIGN[at - 1].mission], open = prior.every(x => camp.done[x]);
+        const step = CAMPAIGN.find(c => c.fork === n.fork), mine = taken(n.fork), opts = step.options ?? step.by[camp.caste] ?? [], at = CAMPAIGN.indexOf(step), prior = CAMPAIGN.slice(0, at).filter(c => c.mission && !c.side).map(c => c.mission), after = MISSIONS[prior.find(x => !camp.done[x]) ?? CAMPAIGN[at - 1].mission], open = prior.every(x => camp.done[x]);
         all++; if (mine) have++;
         if (!opts.length) { const b = document.createElement('button'); b.className = 'locked'; b.textContent = FORK_HEAD[n.fork]; b.dataset.key = n.fork; b.addEventListener('click', () => say(n.fork, FORK_HEAD[n.fork], 'One of two crafts for the caste you took.', 'Take a third caste first.')); row.append(b); return; }
         opts.forEach((v, j) => {
@@ -572,6 +578,16 @@ function news() {
       toast(a === ME ? 'You are through! Pick Strike in the Nest and tap where your soldiers should go.' : 'The rival has broken into your nest. A Guard post where it comes in holds them.', 6000, a !== ME);
       tone(a === ME ? 520 : 110, 0.6, 0.07, 'sawtooth', a === ME ? 200 : -40);
     }
+    else if (type === EVENT.FALL) {
+      /* a windfall: a is its cell, b the food, c the loads landed (0: told beforehand) */
+      const fx = a % L0.sw, fy = Math.floor(a / L0.sw), mid = Math.abs(fx - (L0.sw >> 1)) <= 3, mine = !mid && (fx < L0.sw >> 1) === (doorXY(ME).x < L0.sw >> 1);
+      if (mid || mine) {
+        const where = mid ? `on the ${fy < L0.sh / 3 ? 'north' : fy > (2 * L0.sh) / 3 ? 'south' : 'middle'} ford` : 'on your ground', what = b ? 'Meat' : 'Seeds';
+        beacon = { x: fx + 0.5, y: fy + 0.5, at: now };
+        if (c) { toast(`${what} ${b ? 'has' : 'have'} fallen ${where}. Draw a trail to ${b ? 'it' : 'them'}.`, 3600); tone(660, 0.18, 0.05, 'triangle', 120); burst(fx + 0.5, fy + 0.5, KIND_COL[b], 18, { vh: 6, life: 1.2 }); }
+        else { beacon.life = 15000; toast(`${what} will fall ${where} soon.${mid ? ' The rival knows too.' : ''}`, 3600); tone(520, 0.12, 0.04, 'sine', 80); }
+      }
+    }
     else if (type === EVENT.DOOR) {
       roomButtons();
       if (a === ME) { toast('Your second door is open. New trails start at the nearer door. Mark a Store beside it.', 5200); tone(392, 0.25, 0.06, 'triangle', 200); beacon = { x: b % L0.sw + 0.5, y: Math.floor(b / L0.sw) + 0.5, at: now }; rec.event('door', { x: c, at: sim.tick }); }
@@ -633,11 +649,11 @@ function finish(w, reason) {
   if (fresh.length) saveLine();
   renderDeeds($('overDeeds'), missionId, fresh);
   // Where "next" leads: the first fork that is open and not taken, else the first mission not yet played to its end.
-  const forkNext = (() => { for (const c of CAMPAIGN) { if (c.mission) { if (!camp.done[c.mission]) return null; } else if (c.fork && !taken(c.fork)) return c.fork; } return null; })(), nx = firstOpen();
+  const forkNext = (() => { for (const c of CAMPAIGN) { if (c.side) continue; if (c.mission) { if (!camp.done[c.mission]) return null; } else if (c.fork && !taken(c.fork)) return c.fork; } return null; })(), nx = firstOpen();
   $('next').hidden = false; $('next').textContent = forkNext ? (forkNext === 'caste' ? 'Choose a third caste' : forkNext === 'craft' ? 'Choose a craft' : 'Choose a way of living') : !camp.done[nx] ? `Next: ${MISSIONS[nx].name}` : 'The missions';
   $('overKicker').textContent = reason === REASON.BEAST ? 'The beetle is carried off' : reason === REASON.POINTS ? 'The stones have chosen' : reason === REASON.HAUL ? 'The larder is bare' : reason === REASON.QUEEN ? (w ? 'The rival queen is dead' : 'Your queen is dead') : text.end === 'dusk' ? 'Dusk' : 'The thaw';
   $('overTitle').textContent = w ? text.won : sim.mission.goals.beast && g(ME, CG.QUEEN_HP) > 0 ? 'The rival took the beetle' : 'The hill is lost'; $('overTitle').classList.toggle('lost', !w);
-  $('overWhy').textContent = reason === REASON.QUEEN ? (w ? (sim.mission.map === 'wall' ? 'Her colony scatters. The wall did not save her.' : sim.mission.map === 'pass' ? 'Her colony scatters. The ridge is yours.' : 'Her colony scatters. Both fords are yours now.') : 'Without her the colony has no tomorrow.') : sim.mission.goals.carry && sim.fallen ? `${sim.carried(ME)} loads of the beetle home to the rival's ${sim.carried(FOE)}.` : sim.mission.goals.beast ? `Your ants did it ${T(ME, CG.HARM)} harm. The rival's did it ${T(FOE, CG.HARM)}.` : sim.mission.goals.points ? `${T(ME, CG.POINTS)} points to the rival's ${T(FOE, CG.POINTS)}.` : sim.mission.goals.dusk === 'holder' ? 'Dusk fell and their queen still lives.' : sim.mission.goals.haul ? `You carried home ${T(ME, CG.HAUL)} of their loads. They carried home ${T(FOE, CG.HAUL)} of yours.` : w ? `At ${text.end} you stood ${s.adults} to ${s.foe}.` : `At ${text.end} the rival stood ${s.foe} to your ${s.adults}.`;
+  $('overWhy').textContent = reason === REASON.QUEEN ? (w ? (sim.mission.map === 'wall' ? 'Her colony scatters. The wall did not save her.' : sim.mission.map === 'pass' ? 'Her colony scatters. The ridge is yours.' : sim.mission.map === 'meadow' ? 'Her colony scatters. The meadow is yours to the far bank.' : 'Her colony scatters. Both fords are yours now.') : 'Without her the colony has no tomorrow.') : sim.mission.goals.carry && sim.fallen ? `${sim.carried(ME)} loads of the beetle home to the rival's ${sim.carried(FOE)}.` : sim.mission.goals.beast ? `Your ants did it ${T(ME, CG.HARM)} harm. The rival's did it ${T(FOE, CG.HARM)}.` : sim.mission.goals.points ? `${T(ME, CG.POINTS)} points to the rival's ${T(FOE, CG.POINTS)}.` : sim.mission.goals.dusk === 'holder' ? 'Dusk fell and their queen still lives.' : sim.mission.goals.haul ? `You carried home ${T(ME, CG.HAUL)} of their loads. They carried home ${T(FOE, CG.HAUL)} of yours.` : w ? `At ${text.end} you stood ${s.adults} to ${s.foe}.` : `At ${text.end} the rival stood ${s.foe} to your ${s.adults}.`;
   const rows = [['', 'You', 'Rival'], ['Ants at the end', T(ME, CG.ADULTS), T(FOE, CG.ADULTS)], ['Soldiers', T(ME, CG.MAJORS), T(FOE, CG.MAJORS)], ['Born', T(ME, CG.BORN), T(FOE, CG.BORN)], ['Fallen', T(ME, CG.DIED), T(FOE, CG.DIED)], ['Loads carried home', T(ME, CG.LOADS_S) + T(ME, CG.LOADS_P), T(FOE, CG.LOADS_S) + T(FOE, CG.LOADS_P)], ['Loads stolen', T(ME, CG.STOLEN), T(FOE, CG.STOLEN)]]; if (sim.mission.beast) rows.splice(1, 0, ['Harm to the beetle', T(ME, CG.HARM), T(FOE, CG.HARM)], ['Its meat carried home', sim.carried(ME), sim.carried(FOE)]);
   $('tally').textContent = '';
   rows.forEach((r, i) => r.forEach((v, j) => { const el = document.createElement(j ? 'b' : 'span'); el.textContent = v; if (!i) el.className = 'h'; if (j === 2) el.classList.add('foe'); $('tally').append(el); }));
@@ -654,7 +670,8 @@ function hud() {
   const G2 = sim.mission.goals, goal = (G2.points | 0) || (G2.haul | 0), slot = G2.points ? CG.POINTS : G2.haul ? CG.HAUL : G2.beast ? CG.HARM : CG.ADULTS, meat = !!G2.carry && sim.fallen, us = meat ? sim.carried(ME) : g(ME, slot), them = meat ? sim.carried(FOE) : g(FOE, slot);
   $('vsUs').textContent = meat ? `Meat home: you ${us} / ${G2.carry}` : goal ? `You ${us} / ${goal}` : G2.beast ? `Harm: you ${us}` : `You ${us}`; $('vsThem').textContent = G2.beast ? `rival ${them}` : `${them} Rival`; $('bar2').firstElementChild.style.width = `${(100 * us / Math.max(1, us + them)).toFixed(1)}%`;
   if (G2.dusk === 'holder') { const pct = Math.max(0, Math.ceil(100 * g(FOE, CG.QUEEN_HP) / sim.cfg.queenHp)); $('vsUs').textContent = `You ${us}`; $('vsThem').textContent = `Rival queen ${pct}%`; $('bar2').firstElementChild.style.width = `${100 - pct}%`; }
-  const toFrost = sim.cfg.frostTick > sim.tick, left = Math.max(0, (toFrost ? sim.cfg.frostTick : sim.cfg.duskTick) - sim.tick) / 20; $('dusk').textContent = `${TEXT[sim.mission.id].clock[toFrost ? 0 : TEXT[sim.mission.id].clock.length - 1]} in ${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}`;
+  if (sim.cfg.truce && sim.tick >= sim.cfg.truce && !told.has('noon')) { told.add('noon'); toast('Noon. The truce is over: a raid can go down a door now, and the queens can be hurt.', 6000, true); tone(294, 0.5, 0.06, 'sawtooth', -20); }
+  const toFrost = sim.cfg.frostTick > sim.tick || sim.cfg.truce > sim.tick, left = Math.max(0, (sim.cfg.frostTick > sim.tick ? sim.cfg.frostTick : sim.cfg.truce > sim.tick ? sim.cfg.truce : sim.cfg.duskTick) - sim.tick) / 20; $('dusk').textContent = `${TEXT[sim.mission.id].clock[toFrost ? 0 : TEXT[sim.mission.id].clock.length - 1]} in ${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}`;
   if (g(ME, CG.SUGAR) === 0 && sim.tick > 600) once('hungry', 'No seeds in store. The colony starves without them.', 3600, true);
   trailMesh();
   const s = sel >= 0 && sim.trLive[ME * TRAILS + sel] ? ME * TRAILS + sel : -1;
@@ -956,7 +973,7 @@ function frame(now) {
   const piles = [];
   for (let p = 0; p < MAX_PILES; p++) if (sim.pileAmount[p] > 0) { const c = sim.pileCell[p], x = c % L0.sw, y = Math.floor(c / L0.sw); piles.push({ x, y, amount: sim.pileAmount[p], kind: sim.pileKind[p] ? 1 : 0, d: (x - cam.x) ** 2 + (y - cam.y) ** 2 }); }
   piles.sort((a, b) => a.d - b.d);
-  const b = beacon && now - beacon.at < 7000 ? { x: beacon.x, y: beacon.y, age: (now - beacon.at) / 1000 } : null;
+  const b = beacon && now - beacon.at < (beacon.life ?? 7000) ? { x: beacon.x, y: beacon.y, age: (now - beacon.at) / 1000 } : null;
   const rally = rallyAt && g(ME, CG.RALLY_HOLD) > 0 ? rallyAt : null;
   if (renderer && renderer.draw({ view, light, ink: set.get('style') === 'ink', alpha: screen === 'play' ? host.alpha : 1, running: screen === 'play', time: now / 1000, piles, entrances: [{ ...doorXY(ME), w: 3 }, { ...doorXY(FOE), w: 3 }], alarm: rally, beacon: b, big: Number(set.get('size')) })) frames++;
   drawOverlay(now);
