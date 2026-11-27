@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cinderhill</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#14100e">
+<meta name="robots" content="noindex">
+<style>
+  :root { --ember: #ff9a3c; --hot: #ffcf7a; --ink: #14100e; --glass: rgba(22, 17, 15, 0.72); --line: rgba(255, 190, 120, 0.22); --text: #f3e6d6; --dim: #b9a895; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--ink); color: var(--text); font: 15px/1.35 ui-rounded, "SF Pro Rounded", system-ui, sans-serif; touch-action: none; user-select: none; -webkit-user-select: none; }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  #c { touch-action: none; }
+  button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+  .glass { background: var(--glass); border: 1px solid var(--line); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35); }
+
+  /* top: what the colony has */
+  #top { position: fixed; top: calc(8px + env(safe-area-inset-top)); left: 8px; right: 8px; display: none; gap: 6px; align-items: center; pointer-events: none; }
+  body.playing #top { display: flex; }
+  .chip { display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 10px; border-radius: 17px; font-weight: 700; font-variant-numeric: tabular-nums; pointer-events: auto; }
+  .chip i { width: 14px; height: 14px; display: block; flex: none; }
+  .chip.bump { animation: bump 0.35s ease-out; }
+  @keyframes bump { 30% { transform: scale(1.18); border-color: var(--hot); } }
+  .i-ant { background: radial-gradient(circle at 22% 50%, #e9d8c4 0 3px, transparent 3.5px), radial-gradient(circle at 52% 50%, #e9d8c4 0 2.2px, transparent 2.7px), radial-gradient(circle at 80% 50%, #e9d8c4 0 2.8px, transparent 3.3px); }
+  .i-sugar { border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff3c4, #f0c64a 60%, #a67a18); }
+  .i-protein { border-radius: 45% 55% 50% 50%; background: radial-gradient(circle at 35% 30%, #e88a6a, #a8381f 60%, #5a1608); }
+  .i-brood { border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, #e9e0cc 60%, #a59a80); transform: scaleY(0.75); }
+  #pause { margin-left: auto; width: 40px; height: 40px; border-radius: 20px; pointer-events: auto; display: grid; place-items: center; }
+  #pause::before { content: ""; width: 12px; height: 14px; border-left: 4px solid var(--text); border-right: 4px solid var(--text); }
+  #fps { position: fixed; top: 54px; left: 8px; font: 11px/1.3 ui-monospace, monospace; white-space: pre; color: #fff; background: rgba(0, 0, 0, 0.5); padding: 4px 6px; border-radius: 6px; display: none; pointer-events: none; }
+  #fps.on { display: block; }
+
+  /* bottom: the tools */
+  #bar { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(10px + env(safe-area-inset-bottom)); display: none; gap: 4px; padding: 5px; border-radius: 30px; z-index: 5; }
+  body.playing #bar { display: flex; }
+  #bar button { width: 54px; height: 50px; border-radius: 25px; display: grid; place-items: center; gap: 0; font-size: 10px; font-weight: 700; letter-spacing: 0.02em; color: var(--dim); transition: background 0.15s, color 0.15s; }
+  #bar button svg { width: 24px; height: 24px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  #bar button[aria-pressed="true"] { background: linear-gradient(#ffb057, #e06a1c); color: #1b0f08; box-shadow: 0 0 18px rgba(255, 140, 50, 0.55); }
+  #bar .sep { width: 1px; background: var(--line); margin: 8px 2px; }
+
+  /* the route card */
+  #route { position: fixed; left: 50%; transform: translate(-50%, 20px); bottom: calc(78px + env(safe-area-inset-bottom)); width: min(340px, calc(100vw - 20px)); padding: 9px 10px; border-radius: 18px; opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s; z-index: 5; }
+  #route.on { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+  body.nest #route { bottom: calc(78px + 44vh + env(safe-area-inset-bottom)); }
+  #routeHead { display: flex; align-items: baseline; gap: 8px; margin: 0 2px 7px; }
+  #routeHead b { font-size: 15px; } #routeHead span { color: var(--dim); font-size: 12.5px; margin-left: auto; text-align: right; }
+  #levels { display: grid; grid-template-columns: 34px 1fr 1fr 1fr 34px; gap: 5px; }
+  #levels button { height: 38px; border-radius: 12px; background: rgba(255, 255, 255, 0.07); font-weight: 700; font-size: 13px; }
+  #levels button[aria-pressed="true"] { background: linear-gradient(#ffb057, #e06a1c); color: #1b0f08; }
+  #levels button small { display: block; font-weight: 600; font-size: 10px; opacity: 0.75; }
+
+  /* the nest, cut away */
+  #nestWrap { position: fixed; left: 0; right: 0; bottom: 0; height: calc(44vh + 70px + env(safe-area-inset-bottom)); transform: translateY(102%); transition: transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1); border-top: 2px solid rgba(255, 180, 100, 0.5); box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.55); z-index: 3; background: #1b130f; }
+  body.nest #nestWrap { transform: none; }
+  #nest { position: absolute; inset: 0; touch-action: none; }
+
+  #toast { position: fixed; left: 50%; top: calc(56px + env(safe-area-inset-top)); transform: translate(-50%, -8px); padding: 8px 14px; border-radius: 16px; font-weight: 700; opacity: 0; transition: opacity 0.25s, transform 0.25s; pointer-events: none; z-index: 6; text-align: center; max-width: 86vw; }
+  #toast.on { opacity: 1; transform: translate(-50%, 0); }
+
+  /* cards: the title, pause and settings */
+  .scrim { position: fixed; inset: 0; display: none; place-items: center; z-index: 10; padding: 16px; }
+  .scrim.on { display: grid; }
+  #menu { background: radial-gradient(ellipse at 50% 38%, rgba(20, 12, 8, 0.15), rgba(10, 6, 4, 0.82)); }
+  #paused { background: rgba(8, 5, 4, 0.6); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+  .card { width: min(360px, 100%); max-height: 100%; overflow: auto; text-align: center; }
+  h1 { font: 800 46px/1 ui-serif, "New York", Georgia, serif; letter-spacing: 0.01em; margin: 0 0 6px; color: #ffe2b8; text-shadow: 0 0 22px rgba(255, 130, 40, 0.75), 0 2px 0 #3a1806; }
+  .sub { color: #e9d2b6; margin: 0 0 22px; text-shadow: 0 1px 8px #000; }
+  .big { display: block; width: 100%; height: 58px; border-radius: 29px; font-weight: 800; font-size: 19px; background: linear-gradient(#ffbe6b, #e2691a); color: #1b0f08; box-shadow: 0 0 34px rgba(255, 130, 40, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.5); }
+  .plain { display: block; width: 100%; height: 46px; border-radius: 23px; margin-top: 8px; font-weight: 700; background: rgba(255, 255, 255, 0.09); border: 1px solid var(--line); }
+  .panel { padding: 14px; border-radius: 22px; margin-top: 14px; text-align: left; }
+  .row { display: flex; align-items: center; gap: 8px; margin: 7px 0; }
+  .row > span { width: 62px; color: var(--dim); font-size: 13px; font-weight: 700; flex: none; }
+  .seg { display: flex; flex: 1; gap: 4px; }
+  .seg button { flex: 1; height: 38px; border-radius: 12px; background: rgba(255, 255, 255, 0.07); font-size: 13px; font-weight: 700; }
+  .seg button[aria-pressed="true"] { background: linear-gradient(#ffb057, #e06a1c); color: #1b0f08; }
+  .lab { font-size: 12px; color: var(--dim); margin-top: 10px; text-align: left; }
+  .lab a { color: var(--hot); }
+  #nogl { display: none; position: fixed; inset: 0; place-items: center; padding: 24px; text-align: center; z-index: 20; background: var(--ink); }
+  #nogl.on { display: grid; }
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<canvas id="c"></canvas>
+
+<div id="top">
+  <div class="chip glass" id="chipAnts" title="Ants"><i class="i-ant"></i><span id="nAnts">0</span></div>
+  <div class="chip glass" id="chipSugar" title="Sugar"><i class="i-sugar"></i><span id="nSugar">0</span></div>
+  <div class="chip glass" id="chipProtein" title="Protein"><i class="i-protein"></i><span id="nProtein">0</span></div>
+  <div class="chip glass" id="chipBrood" title="Brood"><i class="i-brood"></i><span id="nBrood">0</span></div>
+  <button class="glass" id="pause" aria-label="Pause"></button>
+</div>
+<div id="fps"></div>
+<div id="toast" class="glass"></div>
+
+<div id="nestWrap"><canvas id="nest"></canvas></div>
+
+<div id="route" class="glass">
+  <div id="routeHead"><b id="routeName">Trail</b><span id="routeInfo"></span></div>
+  <div id="levels">
+    <button id="crewMinus" aria-label="One ant fewer">−</button>
+    <button data-level="1">Light<small>1 in 10</small></button>
+    <button data-level="2">Steady<small>1 in 4</small></button>
+    <button data-level="3">Surge<small>half</small></button>
+    <button id="crewPlus" aria-label="One ant more">+</button>
+  </div>
+</div>
+
+<div id="bar" class="glass">
+  <button data-tool="trail" aria-pressed="true"><svg viewBox="0 0 24 24"><path d="M4 18c3-8 6 2 9-5s4-6 7-7"/><circle cx="4" cy="18" r="1.6"/><circle cx="20" cy="6" r="1.6"/></svg>Trail</button>
+  <button data-tool="dig"><svg viewBox="0 0 24 24"><path d="M5 19l8-8M11 5c4 0 8 4 8 8l-4-1-3-3z"/></svg>Dig</button>
+  <button data-tool="alarm"><svg viewBox="0 0 24 24"><path d="M12 4v9M12 17.5v.5"/><circle cx="12" cy="12" r="9"/></svg>Alarm</button>
+  <div class="sep"></div>
+  <button id="recall" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M4 12l8-7 8 7M7 10v9h10v-9"/></svg><span id="recallText">Home</span></button>
+  <button id="nestBtn" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M3 8h18M12 8v5c0 2-4 2-4 5M12 13c0 2 4 2 4 5"/></svg>Nest</button>
+  <button id="speed" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M5 6l7 6-7 6zM13 6l7 6-7 6z"/></svg><span id="speedText">1×</span></button>
+</div>
+
+<div id="menu" class="scrim on">
+  <div class="card" id="menuCard">
+    <h1>Cinderhill</h1>
+    <p class="sub">The hill burned. The colony did not.<br>Draw a trail and bring them back.</p>
+    <button class="big" id="play">Play</button>
+    <div class="lab" id="menuLab"></div>
+  </div>
+</div>
+
+<div id="paused" class="scrim">
+  <div class="card">
+    <button class="big" id="resume">Resume</button>
+    <div class="panel glass" id="pauseCard">
+      <div class="row"><span>View</span><div class="seg" data-set="view"><button data-v="tilt">Tilted</button><button data-v="top">Top down</button></div></div>
+      <div class="row"><span>Light</span><div class="seg" data-set="light"><button data-v="cycle">Day &amp; night</button><button data-v="day">Day</button><button data-v="ember">Ember</button></div></div>
+      <div class="row"><span>Style</span><div class="seg" data-set="style"><button data-v="relief">Painted</button><button data-v="ink">Ink</button></div></div>
+      <div class="row"><span>Ants</span><div class="seg" data-set="size"><button data-v="1">True size</button><button data-v="1.5">Larger</button></div></div>
+      <div class="row"><span>Sound</span><div class="seg" data-set="sound"><button data-v="all">Music &amp; effects</button><button data-v="fx">Effects</button><button data-v="off">Off</button></div></div>
+    </div>
+    <button class="plain" id="restart">Start again</button>
+  </div>
+</div>
+<div id="nogl">This game needs WebGL2, which this browser does not have.</div>
+<script type="module" src="./main.js"></script>
+</body>
+</html>
