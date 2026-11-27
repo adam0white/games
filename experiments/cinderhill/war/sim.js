@@ -35,7 +35,7 @@ function statsFor(traits = [], grown = []) {
 }
 export const TASK = { REST: 0, OUT: 1, BACK: 2, GUARD: 3, NURSE: 4, DIG: 5 };
 // What a nest cell is used for is in tables.js (ROOM). A room counts once its cell is dug open.
-export const CARRY = { NONE: 0, SUGAR: 1, PROTEIN: 2, KIND: 3, LOOT: 4 }; // LOOT is a flag on a stolen load: carry & KIND is the food
+export const CARRY = { NONE: 0, SUGAR: 1, PROTEIN: 2, KIND: 3, LOOT: 4, PRIZE: 8 }; // LOOT is a flag on a stolen load: carry & KIND is the food
 export const FOOD = { SUGAR: 0, PROTEIN: 1 };
 export const STAGE = { EGG: 0, LARVA: 1, PUPA: 2 };
 export const KIND = { FORAGE: 0, RAID: 1 };
@@ -92,7 +92,7 @@ export const CG = {
   CAP_FOOD: 22, CAP_BROOD: 23, CAP_ADULTS: 24, MARKS: 25, DIGGERS: 26,
   POINTS: 30, // paid by held sites, one a second each
   HAUL: 31, // loads taken from a rival's store and carried all the way home
-  TIER: 33, GROW: 34, BRANCH: 35, GROWN: 37, CRAFT: 38, // with cfg.tiers: chamber growths done (0 to 2), ticks left of one under way, the branch taken at the first
+  TIER: 33, GROW: 34, BRANCH: 35, GROWN: 37, CRAFT: 38, MEAT0: 39, // with cfg.tiers: chamber growths done (0 to 2), ticks left of one under way, the branch taken at the first
   PICK: 27, DIET2: 28, SPECIALS: 29, // the caste this colony chose (0: none yet), its share of the brood in four, how many live
   FOUND: 32, // loads dug out of caches in the clay
   HARM: 36, // harm this colony's ants have done to the mission's beast
@@ -897,6 +897,7 @@ export class Sim {
       if (home[c] <= 1 && this.layer[i] === NEST) {
         const kind = this.carry[i] & CARRY.KIND;
         if (kind) {
+          if (this.carry[i] & CARRY.PRIZE) cg[o + CG.MEAT0]++; // a load of the beast, home
           if (this.carry[i] & CARRY.LOOT) cg[o + CG.HAUL]++; // counted here, at home: a thief who dies on the way hauls nothing
           const food = kind === CARRY.PROTEIN ? FOOD.PROTEIN : FOOD.SUGAR;
           this.carry[i] = 0;
@@ -967,6 +968,7 @@ export class Sim {
       const p = this.pileNear(c);
       if (p >= 0) {
         this.carry[i] = this.pileKind[p] === FOOD.PROTEIN ? CARRY.PROTEIN : CARRY.SUGAR;
+        if (this.pileKind[p] === FOOD.PROTEIN && this.fallen && this.mission.goals.carry) { const sw = this.L.sw, pc = this.pileCell[p], bc = this.beast[1]; if (Math.abs(pc % sw - bc % sw) <= 1 && Math.abs(Math.floor(pc / sw) - Math.floor(bc / sw)) <= 1) this.carry[i] |= CARRY.PRIZE; }
         if (--this.pileAmount[p] === 0) { this.event(EVENT.PILE_EMPTY, p); this.pileCell[p] = -1; }
         this.task[i] = TASK.BACK; this.since[i] = 0;
         return c;
@@ -1120,6 +1122,8 @@ export class Sim {
     let best = 0; for (let t = 1; t < TEAMS; t++) if (score(t) > score(best)) best = t;
     this.drop(this.beast[1], FOOD.PROTEIN, B.meat);
     this.event(EVENT.BEAST_DEAD, this.beast[1], best);
+    // Where the mission says `carry`, the fall ends nothing: the body is the prize, and the hill that hurt it more starts `lead` loads ahead.
+    if (this.mission.goals.carry) { for (let t = 0; t < TEAMS; t++) cg[t * CG.SIZE + CG.MEAT0] = t === best ? this.mission.goals.lead | 0 : 0; return; }
     if (this.mission.goals.beast && !this.result && cg[best * CG.SIZE + CG.QUEEN_HP] > 0) { this.result = 1 + best; this.why = REASON.BEAST; this.event(EVENT.RESULT, best, REASON.BEAST); }
   }
 
@@ -1178,6 +1182,11 @@ export class Sim {
   }
 
   /** The mission: a colony whose queen dies loses at once; at dusk the colony with more adults wins (a tie goes to team 0). */
+  /** The beast is dead on this map. */
+  get fallen() { return this.beast[1] >= 0 && this.beast[0] === 0; }
+  /** Loads of meat colony t has carried home since the beast fell, with its head start. */
+  carried(t) { return this.fallen ? this.cg[t * CG.SIZE + CG.MEAT0] : 0; }
+
   judge() {
     if (this.result) return;
     const cg = this.cg;
@@ -1186,12 +1195,14 @@ export class Sim {
     if (this.mission.goals.queen && alive <= 1) { this.result = 1 + Math.max(0, last); this.why = REASON.QUEEN; this.event(EVENT.RESULT, Math.max(0, last), REASON.QUEEN); return; }
     const goal = this.mission.goals.points | 0;
     if (goal) for (let t = 0; t < TEAMS; t++) if (cg[t * CG.SIZE + CG.POINTS] >= goal) { this.result = 1 + t; this.why = REASON.POINTS; this.event(EVENT.RESULT, t, REASON.POINTS); return; }
+    const carry = this.mission.goals.carry | 0;
+    if (carry && this.fallen) for (let t = 0; t < TEAMS; t++) if (this.carried(t) >= carry && this.carried(t) > this.carried(1 - t)) { this.result = 1 + t; this.why = REASON.BEAST; this.event(EVENT.RESULT, t, REASON.BEAST); return; }
     const haul = this.mission.goals.haul | 0;
     if (haul) for (let t = 0; t < TEAMS; t++) if (cg[t * CG.SIZE + CG.HAUL] >= haul) { this.result = 1 + t; this.why = REASON.HAUL; this.event(EVENT.RESULT, t, REASON.HAUL); return; }
     if (this.mission.goals.dusk && this.cfg.duskTick > 0 && this.tick + 1 >= this.cfg.duskTick) {
       this.census(); // count this tick's births and deaths before the dusk score
       // Dusk: more points where the mission counts them, else (and on a tie of points) more adults.
-      const d = this.mission.goals.dusk, score = t => (d === 'points' ? cg[t * CG.SIZE + CG.POINTS] : d === 'haul' ? cg[t * CG.SIZE + CG.HAUL] : d === 'harm' ? cg[t * CG.SIZE + CG.HARM] : 0) * 100000 + cg[t * CG.SIZE + CG.ADULTS];
+      const d = this.mission.goals.dusk, score = t => (d === 'points' ? cg[t * CG.SIZE + CG.POINTS] : d === 'haul' ? cg[t * CG.SIZE + CG.HAUL] : d === 'harm' ? (this.fallen && this.mission.goals.carry ? 4096 * (64 + this.carried(t)) : cg[t * CG.SIZE + CG.HARM]) : 0) * 100000 + cg[t * CG.SIZE + CG.ADULTS];
       let best = 0;
       for (let t = 1; t < TEAMS; t++) if (score(t) > score(best)) best = t;
       if (d === 'holder') best = 1; // a siege: the colony under attack (team 1) wins by lasting until dusk

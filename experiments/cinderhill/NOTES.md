@@ -774,3 +774,21 @@ craft at the second growth takes none. The rival takes Legion when bold, Swift w
 Numbers, steady v steady on The Crossing, 6 seeds both seats: Legion v none 8 to 4, Swift v none 7 to 5, Thrift v
 none 6 to 6, Legion v Swift 8 to 4, Legion v Thrift 8 to 4, Swift v Thrift 7 to 5. Twelve games a row is a small
 sample. Not run: First Frost, where Thrift should matter most, and the other missions.
+
+## The Hunt in two phases: kill, then carry (war build)
+
+The fall of the beetle no longer ends the mission. Its body is 110 loads of meat where it fell. The first hill to
+carry forty of those loads home wins; the hill that did it more harm starts six ahead (`goals.carry`, `goals.lead`).
+At dusk more meat home wins, or more harm if the beetle still lives. This came from the outside review: the kill had
+no use, and a hill ahead on harm had nothing left to decide.
+
+- Only the body counts. A worker that lifts meat from the pile at the beetle's cell after the fall carries a flag
+  (`CARRY.PRIZE`); the load is counted in `CG.MEAT0` when she is home. Counting all meat home was tried first: a hill
+  with other meat trails scored twelve in the first five seconds.
+- The rival keeps its raid trail on the body after the fall and sends at two soldiers; its foragers find the pile as
+  they find any other.
+- Numbers at 6 seeds, both seats: steady v steady 6 to 6, bold v steady 12 to 0, steady v timid 10 to 2, bold v timid
+  12 to 0. Against a steadier rival the bold one kills the beetle near tick 2900 and has its forty loads between
+  ticks 4900 and 5900, so the carry phase runs two to three minutes. In those games the loser carried nothing: the
+  killer's soldiers hold the body. Whether a person can break that hold is not known. About a third of steady v
+  steady games reach dusk with the beetle alive.

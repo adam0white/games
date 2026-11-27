@@ -248,10 +248,10 @@ export function think(sim, t, mind = 1) {
   const siege = sim.mission.goals.dusk === 'holder', late = siege && t !== 1 && sim.tick * 2 >= cfg.duskTick && majors >= 6;
   const strike = !(siege && t === 1) && foe >= 0 && (late || (mood > 0 && majors >= need && sim.tick >= from && (mood === 2 ? majors >= foeMajors : majors * 4 >= foeMajors * 5)));
   // A hunt: its soldiers go for the beast and not for the other hill. Bold goes with four, steady with six, timid with ten.
-  if (sim.mission.goals.beast && sim.beast[0] > 0 && (typeof mind === 'number' || mind.hunt !== false)) {
+  if (sim.mission.goals.beast && (sim.beast[0] > 0 || (sim.mission.goals.carry && sim.beast[1] >= 0)) && (typeof mind === 'number' || mind.hunt !== false)) {
     const bc = sim.beast[1], atBeast = k => { const s2 = t * TRAILS + k; return sim.trPath[s2 * PATH_MAX + sim.trLen[s2] - 1] === bc; };
     if (raids.length && (majors < 2 || !atBeast(raids[0]))) for (const k of raids) out.push({ team: t, type: CMD.ERASE, trail: k });
-    else if (!raids.length && live.length < TRAILS && majors >= (mind.huntAt ?? (mood === 2 ? 12 : mood === 1 ? 10 : 4))) out.push({ team: t, type: CMD.TRAIL, kind: KIND.RAID, level: majors >= 12 ? 3 : 2, points: [bc % sw, Math.floor(bc / sw)] });
+    else if (!raids.length && live.length < TRAILS && majors >= (sim.beast[0] === 0 ? 2 : mind.huntAt ?? (mood === 2 ? 12 : mood === 1 ? 10 : 4))) out.push({ team: t, type: CMD.TRAIL, kind: KIND.RAID, level: majors >= 12 ? 3 : 2, points: [bc % sw, Math.floor(bc / sw)] });
     return out;
   }
   // The other hill's soldiers out on its raid trails: a thief's opening is a guard that is away.
