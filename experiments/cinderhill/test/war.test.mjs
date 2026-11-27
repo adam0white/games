@@ -1,9 +1,9 @@
 // The war sim: bots as acceptance. An idle colony loses, a run replays from its orders, a save carries on the same.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Sim, CG, CMD, KIND, MODE, CASTE, TEAMS, ROOM } from '../war/sim.js';
+import { Sim, CG, CMD, KIND, MODE, CASTE, TEAMS, ROOM, EVENT, MAT } from '../war/sim.js';
 import { Host } from '../war/host.js';
-import { think, THINK_EVERY } from '../war/ai.js';
+import { think, THINK_EVERY, cacheRun } from '../war/ai.js';
 import { CAMPAIGN, TRAITS, MISSIONS, MAPS } from '../war/tables.js';
 
 test('an idle colony loses to the rival', () => {
@@ -161,11 +161,11 @@ test('First Frost: the frost takes the food outside, the cold eats faster, and a
   const a = drive(new Sim({ seed: 4, mission: 'frost' }), 4700);
   assert.ok(a.pileAmount.some(v => v > 0), 'food lies outside before the frost');
   const b = Sim.load(JSON.parse(JSON.stringify(a.save(), (k, v) => (ArrayBuffer.isView(v) ? Array.from(v) : v))));
-  drive(a, 4800); a.drainEvents(); const before = a.g(0, CG.SUGAR);
+  drive(a, 4800); a.drainEvents(); const before = a.g(0, CG.SUGAR) - a.g(0, CG.LOADS_S); // less the loads still on the way home
   assert.ok(a.pileAmount.every(v => v === 0), 'nothing is left outside');
   drive(a, 5400); drive(b, 5400);
   assert.equal(b.hash(), a.hash());
-  assert.ok(before - a.g(0, CG.SUGAR) >= Math.ceil(a.g(0, CG.ADULTS) / 10), 'two meals in thirty seconds of cold');
+  assert.ok(before - (a.g(0, CG.SUGAR) - a.g(0, CG.LOADS_S)) >= Math.ceil(a.g(0, CG.ADULTS) / 10), 'two meals in thirty seconds of cold');
 });
 
 test('First Frost: a mind that stores for the winter ends larger than one that does not dig stores', () => {
@@ -205,7 +205,7 @@ test('The Stones: a mind that holds more stones beats one that holds fewer', () 
 });
 
 test('The Larder: a stolen load counts when it reaches home, and ten of them end the mission', () => {
-  const h = new Host({ seed: 3, mission: 'larder', ai: { 0: 1, 1: 1 } }), s = h.sim;
+  const h = new Host({ seed: 2, mission: 'larder', ai: { 0: 1, 1: 1 } }), s = h.sim;
   while (!s.result && s.tick < 9700 && s.g(0, CG.HAUL) + s.g(1, CG.HAUL) === 0) h.run(200);
   assert.ok(s.g(0, CG.HAUL) + s.g(1, CG.HAUL) > 0, 'some thief got home');
   for (const t of [0, 1]) assert.ok(s.g(t, CG.HAUL) <= s.g(t, CG.STOLEN), 'no load is hauled that was not taken');
@@ -282,4 +282,68 @@ test('deeds are judged by the sim from its own counts', () => {
   const b = Sim.load(JSON.parse(JSON.stringify(s.save(), (k, v) => (ArrayBuffer.isView(v) ? Array.from(v) : v))));
   assert.deepEqual(b.deeds(0), [true, true], 'a save keeps how the mission ended');
   for (const m of Object.values(MISSIONS)) { assert.equal(m.deeds.length, 2); for (const d of m.deeds) assert.ok(TRAITS[d.opens], `${m.id}.${d.id} opens a known node`); }
+});
+
+// Every load lies in a cell. The totals the rest of the sim reads are the sums of the cells.
+const held = (s, t) => { let a = 0, b = 0; for (const k of s.bins[t]) { a += s.binS[k]; b += s.binP[k]; } return [a, b]; };
+const agrees = s => { for (let t = 0; t < TEAMS; t++) assert.deepEqual(held(s, t), [s.g(t, CG.SUGAR), s.g(t, CG.PROTEIN)], `tick ${s.tick} team ${t}`); };
+
+test('stores: the loads in the cells add up to the totals all through a match and across a save', () => {
+  for (const mission of ['crossing', 'larder']) {
+    const h = new Host({ seed: 2, mission, ai: { 0: 1, 1: 2 } }), s = h.sim;
+    agrees(s);
+    while (!s.result && s.tick < 6000) { h.run(20); agrees(s); for (let t = 0; t < TEAMS; t++) for (const k of s.bins[t]) assert.ok(s.binS[k] <= s.binCap(t, k) && s.binP[k] <= s.binCap(t, k), 'no cell over its measure'); }
+    const b = Sim.load(JSON.parse(JSON.stringify(s.save(), (k, v) => (ArrayBuffer.isView(v) ? Array.from(v) : v))));
+    assert.equal(b.hash(), s.hash()); agrees(b);
+  }
+});
+
+test('stores: a thief takes from the cell she reaches, and the nearest cell with food is the one she walks to', () => {
+  const s = new Sim({ seed: 3, mission: 'crossing', traits: [['raiders'], []] }), L = s.L, sw = L.sw, ed = s.door[1], dx = ed % sw;
+  // The rival keeps its food in two places: a little on the porch, the rest in a store dug beside the queen.
+  for (let x = dx + 3; x <= dx + 6; x++) for (let y = 16; y <= 18; y++) { s.mat[L.nestBase + y * L.nw + x] = MAT.OPEN; s.room[y * L.nw + x] = ROOM.STORE; }
+  s.recount(); s.rebuildFields();
+  const deep = s.bins[1].filter(k => Math.floor(k / L.nw) >= 16), porch = s.bins[1].filter(k => Math.floor(k / L.nw) < 16);
+  for (const k of s.bins[1]) s.binS[k] = s.binP[k] = 0;
+  for (const k of deep) s.binS[k] = 8; porch.slice(0, 2).forEach(k => { s.binS[k] = 3; });
+  s.cg[CG.SIZE + CG.SUGAR] = deep.length * 8 + 6; s.cg[CG.SIZE + CG.PROTEIN] = 0; s.rebuildStoreFields(); agrees(s);
+  for (let i = 0; i < s.n; i++) if (s.team[i] === 1) s.hp[i] = 0; // no one home: this is about where the thieves walk
+  for (let k = 0; k < 12; k++) s.spawn(0, CASTE.MAJOR, s.door[0]);
+  s.order({ team: 0, type: CMD.TRAIL, kind: KIND.RAID, level: 2, mode: MODE.LOOT, points: [dx, Math.floor(ed / sw)] });
+  const cells = [];
+  for (let k = 0; k < 3000 && s.g(0, CG.STOLEN) < 10; k++) { s.step(); const ev = s.drainEvents(); for (let j = 0; j < ev.length; j += 4) if (ev[j] === EVENT.STOLEN) cells.push((ev[j + 3] >> 1) - L.nestBase); agrees(s); }
+  assert.ok(cells.length >= 8, `thieves took loads (${cells.length})`);
+  const first = cells.findIndex(k => deep.includes(k));
+  assert.ok(first >= 2 && cells.slice(0, first).every(k => porch.includes(k)), 'the porch is robbed first');
+  assert.ok(cells.slice(first).every(k => deep.includes(k)) && cells.length - first >= 3, 'and once it is bare they walk down to the deep store');
+});
+
+test('stores: a store cell unpainted gives its loads to cells with room, and what finds none spoils', () => {
+  const s = new Sim({ seed: 1, mission: 'crossing' }), L = s.L, dx = s.door[0] % L.sw;
+  for (const k of s.bins[0]) s.binS[k] = 8; s.cg[CG.SUGAR] = s.bins[0].length * 8; agrees(s);
+  const row = y => { const c = []; for (let x = dx - 2; x <= dx + 2; x++) c.push(x, y); return c; };
+  s.order({ team: 0, type: CMD.ROOM, cells: row(4), kind: ROOM.NONE }); s.step(); agrees(s);
+  assert.equal(s.g(0, CG.SUGAR), 80, 'five cells fewer: forty loads had nowhere to lie');
+  for (const k of s.bins[0]) s.binS[k] = 4; s.cg[CG.SUGAR] = 40;
+  s.order({ team: 0, type: CMD.ROOM, cells: row(6), kind: ROOM.NONE }); s.step(); agrees(s);
+  assert.equal(s.g(0, CG.SUGAR), 40, 'with room in the row left, nothing is lost');
+  // No store cell at all: the hill keeps a small heap where it was founded.
+  s.order({ team: 0, type: CMD.ROOM, cells: row(5), kind: ROOM.NONE }); s.step(); agrees(s);
+  assert.equal(s.g(0, CG.CAP_FOOD), 24); assert.equal(s.g(0, CG.SUGAR), 24); assert.equal(s.binS[s.store[0] - L.nestBase], 24);
+});
+
+test('caches: each hill has the same ones in its clay, and digging one open carries it to the stores', () => {
+  const s = new Sim({ seed: 5, mission: 'crossing' }), L = s.L, at = [[], []];
+  for (let k = 0; k < s.cache.length; k++) if (s.cache[k]) at[s.owner(k)].push([Math.abs((k % L.nw) - (s.door[s.owner(k)] % L.sw)), Math.floor(k / L.nw), s.cache[k]].join());
+  assert.equal(at[0].length, 4); assert.deepEqual(at[0].sort(), at[1].sort());
+  const run = cacheRun(s, 0), k = run[run.length - 1] * L.nw + run[run.length - 2], v = s.cache[k], slot = v & 1 ? CG.PROTEIN : CG.SUGAR;
+  assert.ok(run.length >= 2 && v > 0, 'the rival\'s mind finds a way to one');
+  for (const b of s.bins[0]) s.binS[b] = 6; s.cg[CG.SUGAR] = s.bins[0].length * 6; agrees(s);
+  s.order({ team: 0, type: CMD.DIG, cells: run });
+  const before = s.g(0, slot); let found = 0;
+  for (let j = 0; j < 4000 && !found; j++) { s.step(); const ev = s.drainEvents(); for (let e = 0; e < ev.length; e += 4) if (ev[e] === EVENT.FOUND && ev[e + 1] === 0) found = ev[e + 3]; }
+  assert.equal(found, v); assert.equal(s.cache[k], 0); assert.equal(s.g(0, CG.FOUND), v >> 1);
+  s.step(); agrees(s);
+  assert.ok(s.g(0, slot) > before - 10 + (v >> 1) - 12, 'the loads are in the stores');
+  assert.equal(new Sim({ seed: 5, mission: 'crossing', caches: 0 }).cache.some(x => x), false, 'a match can be set with none');
 });

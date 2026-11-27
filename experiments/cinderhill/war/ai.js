@@ -3,7 +3,7 @@
 //
 // It knows where every pile is (there is no fog yet; when sight arrives it gets the same sight as a player).
 
-import { CMD, KIND, CG, TRAILS, PATH_MAX, MAX_PILES, FOOD, TEAMS, ROOM } from './sim.js';
+import { CMD, KIND, CG, TRAILS, PATH_MAX, MAX_PILES, FOOD, TEAMS, ROOM, MODE, MAT, C } from './sim.js';
 
 export const THINK_EVERY = 20;
 
@@ -16,10 +16,13 @@ const SLOTS = [
   [ROOM.POST, 0, 1, 0, 3], [ROOM.POST, 0, 7, 0, 9], // the throat above the store, then the shaft below it
 ];
 
+// A mind that keeps its food deep digs its stores beside the queen's chamber, a long walk from the door.
+const DEEP = [[ROOM.STORE, 3, 16, 6, 18], [ROOM.STORE, -6, 16, -3, 18], [ROOM.STORE, 7, 16, 10, 18], [ROOM.STORE, -10, 16, -7, 18]];
+
 /** The dig and room orders for the next room of a kind, or none when every slot of it is taken. */
-export function buildNext(sim, t, kind) {
+export function buildNext(sim, t, kind, deep = false) {
   const L = sim.L, dx = sim.door[t] % L.sw;
-  for (const [k, x0, y0, x1, y1] of SLOTS) {
+  for (const [k, x0, y0, x1, y1] of deep && kind === ROOM.STORE ? DEEP : SLOTS) {
     if (k !== kind || sim.room[y0 * L.nw + dx + x0] === kind) continue;
     const cells = [];
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) cells.push(dx + x, y);
@@ -28,9 +31,27 @@ export function buildNext(sim, t, kind) {
   return [];
 }
 
+/** The cells to dig to reach this colony's nearest cache through its own clay, as [x, y, ...] (the cache last), or none. */
+export function cacheRun(sim, t) {
+  const L = sim.L, nw = L.nw, nh = L.nh, NN = nw * nh, prev = new Int32Array(NN).fill(-2), q = [];
+  // From every open cell of its own, outward through its own clay.
+  for (let k = 0; k < NN; k++) if (sim.mat[L.nestBase + k] === MAT.OPEN && sim.owner(k) === t) { prev[k] = -1; q.push(k); }
+  for (let h = 0; h < q.length; h++) {
+    const k = q[h], x = k % nw, y = Math.floor(k / nw);
+    if (sim.cache[k]) { const cells = []; for (let c = k; prev[c] !== -1; c = prev[c]) cells.unshift(c % nw, Math.floor(c / nw)); return cells; }
+    for (const [ax, ay] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) {
+      if (ax < 1 || ax >= nw - 1 || ay < 2 || ay >= nh - 1) continue;
+      const a = ay * nw + ax;
+      if (prev[a] === -2 && sim.mat[L.nestBase + a] === MAT.CLAY && sim.owner(a) === t) { prev[a] = k; q.push(a); }
+    }
+  }
+  return [];
+}
+
 /** The orders this seat gives now. `mood`: 0 timid (never raids), 1 steady, 2 bold (raids early); or { mood, build: false }
  *  for a mind that never digs, or { mood, rooms: [kinds] } for one that digs only those;
- *  { mood, pick, special } chooses a caste and its share of the brood in four. */
+ *  { mood, pick, special } chooses a caste and its share of the brood in four; { deep: true } keeps its stores by the queen;
+ *  { loot: true } sends its soldiers for the other hill's stores when it is not strong enough to go for the queen. */
 export function think(sim, t, mind = 1) {
   const mood = typeof mind === 'number' ? mind : mind.mood ?? 1, build = typeof mind === 'number' ? true : mind.build !== false;
   const may = k => typeof mind === 'number' || !mind.rooms || mind.rooms.includes(k); // rooms: the only kinds this mind digs
@@ -81,13 +102,28 @@ export function think(sim, t, mind = 1) {
     let brood = 0; for (let b = 0; b < sim.bn; b++) if (sim.bTeam[b] === t) brood++;
     const capF = cg[o + CG.CAP_FOOD];
     // Every kind it wants now, most pressing first; it digs the first that still has a slot.
-    const wants = [];
+    const wants = [], deep = typeof mind !== 'number' && !!mind.deep;
+    // Keeping food deep: its first deep store comes before anything else, and then the porch is a store no longer.
+    if (deep && may(ROOM.STORE)) {
+      const porch = 5 * L.nw + dx, first = 17 * L.nw + dx + 3;
+      if (sim.room[first] !== ROOM.STORE) wants.push(ROOM.STORE);
+      else if (sim.room[porch] === ROOM.STORE && sim.mat[L.nestBase + first] === 0) { const cells = []; for (let y = 4; y <= 6; y++) for (let x = -2; x <= 2; x++) cells.push(dx + x, y); out.push({ team: t, type: CMD.ROOM, cells, kind: ROOM.NONE }); }
+    }
     if (may(ROOM.STORE) && (winter ? !frozen && cg[o + CG.SUGAR] >= 30 && capF < (feed(adults + brood + 2 * majors) * 5 >> 2) + 16 : Math.max(cg[o + CG.SUGAR], cg[o + CG.PROTEIN]) * 5 >= capF * 4)) wants.push(ROOM.STORE);
     if (may(ROOM.REST) && adults + brood >= cg[o + CG.CAP_ADULTS] - 10 && (!winter || (frozen ? cg[o + CG.SUGAR] : capF) >= feed(cg[o + CG.CAP_ADULTS] + 20))) wants.push(ROOM.REST);
     if (may(ROOM.NURSERY) && brood >= cg[o + CG.CAP_BROOD] - 4) wants.push(ROOM.NURSERY);
     // A guard post in the throat of the shaft, where a break-in must pass, once there is a guard worth posting.
     if (may(ROOM.POST) && sim.mayRoom(t, ROOM.POST) && majors >= 4) wants.push(ROOM.POST);
-    for (const kind of wants) { const b = buildNext(sim, t, kind); if (b.length) { out.push(...b); break; } }
+    let dug = false;
+    for (const kind of wants) { const b = buildNext(sim, t, kind, deep); if (b.length) { out.push(...b); dug = true; break; } }
+    // With nothing pressing to build and hands to spare, it digs for the nearest cache: a seed a cell, paid back at the end.
+    if (!dug && adults >= 40 && (typeof mind === 'number' || mind.caches !== false)) {
+      const run = cacheRun(sim, t), cells = run.length >> 1;
+      if (cells && cells <= 24 && cg[o + CG.SUGAR] >= cells * C.DIG_SUGAR + C.DIG_KEEP + 6 && !frozen) {
+        const v = sim.cache[run[run.length - 1] * L.nw + run[run.length - 2]];
+        if (cg[o + (v & 1 ? CG.PROTEIN : CG.SUGAR)] + (v >> 1) <= capF) out.push({ team: t, type: CMD.DIG, cells: run });
+      }
+    }
   }
   // Defence: enemies by the door call the guard and the resting to it.
   let foes = 0;
@@ -132,10 +168,13 @@ export function think(sim, t, mind = 1) {
   // with what it has if it has not found the numbers before.
   const siege = sim.mission.goals.dusk === 'holder', late = siege && t !== 1 && sim.tick * 2 >= cfg.duskTick && majors >= 6;
   const strike = !(siege && t === 1) && foe >= 0 && (late || (mood > 0 && majors >= need && sim.tick >= from && (mood === 2 ? majors >= foeMajors : majors * 4 >= foeMajors * 5)));
+  // The other hill's soldiers out on its raid trails: a thief's opening is a guard that is away.
+  const away = () => { let n = 0; for (let k = 0; k < TRAILS; k++) { const s2 = foe * TRAILS + k; if (sim.trLive[s2] && sim.trKind[s2] === KIND.RAID) n += sim.crew[s2]; } return n; };
   const atDoor = k => { const s2 = t * TRAILS + k, e = sim.trPath[s2 * PATH_MAX + sim.trLen[s2] - 1]; return foe >= 0 && sim.doorF[foe][e] <= 4; };
-  if (raids.length && (majors < 3 || (strike && !atDoor(raids[0])) || (!strike && atDoor(raids[0]) && majors * 2 < foeMajors))) for (const k of raids) out.push({ team: t, type: CMD.ERASE, trail: k });
+  if (raids.length && (majors < 3 || (strike && (!atDoor(raids[0]) || sim.trMode[t * TRAILS + raids[0]] === MODE.LOOT)) || (!strike && atDoor(raids[0]) && majors * 2 < foeMajors))) for (const k of raids) out.push({ team: t, type: CMD.ERASE, trail: k });
   else if (!raids.length && live.length < TRAILS && foe >= 0) {
     if (strike) { const ed = sim.door[foe]; out.push({ team: t, type: CMD.TRAIL, kind: KIND.RAID, level: majors >= need * 2 ? 3 : 2, points: [ed % sw, Math.floor(ed / sw)] }); }
+    else if (typeof mind !== 'number' && mind.loot && majors >= 4 && sim.stat[t].loot && away() * 2 >= foeMajors) { const ed = sim.door[foe]; out.push({ team: t, type: CMD.TRAIL, kind: KIND.RAID, level: 2, mode: MODE.LOOT, points: [ed % sw, Math.floor(ed / sw)] }); }
     else if (mood > 0 && majors >= 4 && sim.tick >= 1500) {
       let best = -1, amount = 20; const mid = sw >> 1;
       for (let p = 0; p < MAX_PILES; p++) { const c = sim.pileCell[p]; if (c >= 0 && sim.pileAmount[p] > amount && Math.abs((c % sw) - mid) <= 6) { amount = sim.pileAmount[p]; best = c; } }

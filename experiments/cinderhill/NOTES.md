@@ -606,3 +606,15 @@ The three forks were all changes to a number. An outside design review (two revi
 
 Not built, in the order the reviews put them: stores robbed cell by cell with deep stores; a second door; trail stances beyond hold; sight and scouts. One reviewer's wildcard is worth a node of its own: both nests share one underground grid, so a colony could tunnel sideways into the other's nest.
 - Deeds count against any rival, the timid one included, where the bot does both Stones deeds in one win. Early nodes are meant to come easily; if records show every player holding every node after one pass, tie the later deeds to a steady rival.
+
+## Food lies in cells, and caches lie in the clay
+
+- **Every load lies in a nest cell** (`binS`, `binP`). The totals the rest of the sim reads are the sums; a test checks that every tick of two matches and across a save. A store cell holds the room's measure of each food. A hill with few store cells keeps the old floor of 24 as a heap on its founding cell.
+- **A carrier walks to a cell with room for her load** (`putF`), the nearest to the door first. **The colony eats from the cells nearest the door first** (`cfg.eatDeep` reverses it), so deep cells fill last and empty last: they are the reserve.
+- **A thief walks to the nearest cell with anything in it** (`lootF`) and takes from that cell. The `STOLEN` event carries the cell.
+- **A store cell unpainted** gives its loads to cells with room; what finds none spoils. This replaces the old rule that clipped the totals.
+- **Bot runs: depth is a cost and not yet a gain.** A mind that keeps its stores beside the queen (`{ deep: true }`) carries home about 30 in 100 fewer loads and lost every match of 10 on The Crossing and of 20 on The Larder. Thieves take two to five loads a match of about 200 carried, so there is nothing for depth to save. A mind that sends soldiers for the store whenever it has four (`{ loot: true }`) lost 10 of 10; sent only when the other guard is away it never finds the moment. **Deep stores is not built as a node** until theft bites harder. A guard post is still worth nothing measurable (12 wins of 20 against 14 without).
+- **Caches** (`CACHES` in `tables.js`): four a hill, the same either side, chosen by the seed. They show in the clay. Digging one open adds its loads to the stores (what finds no room spoils) and counts in `CG.FOUND`. The rival digs to its nearest when nothing else presses (`cacheRun`). A mind that digs for them against one that does not: 16 wins of 20 on The Larder (14 when both dig), 11 of 20 on The Crossing (11 when both dig). So a cache is a small gain, not a strategy.
+- **Tunnel tool**: a plain dig order from the nest sheet, so a way to a cache does not have to be a room.
+- **Found while measuring, not fixed:** on The Larder with no change of sides, seat 0 won 6 of 8 before this change and 8 of 8 after it (steady against steady). The sweeps above change sides every other seed and seat 0 still wins 14 of 20 there, so the lean is in the seat, not the side of the map.
+- Version 6: older saves are refused, as before.

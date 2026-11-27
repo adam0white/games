@@ -43,6 +43,10 @@ export const TRAITS = {
  *  none), open at the rows in `gaps` (each `gapHalf` rows either side). piles: [x, y, food kind (0 seeds, 1 meat),
  *  amount] on the left half, twinned on the right. mid: piles on the middle line, [x offset, y, kind, amount].
  *  clumps: how many small clumps of stones are scattered on each half. */
+// Caches buried in the clay, as [x from the shaft, row, food (0 seed, 1 meat), loads]. Each hill has the same ones, mirrored.
+// A mission takes `caches` of them (default 4), starting from a row the seed picks. Digging one open carries it to the stores.
+export const CACHES = [[12, 5, 0, 16], [-13, 9, 1, 12], [9, 22, 0, 20], [-8, 24, 1, 14], [14, 17, 1, 12], [-14, 20, 0, 18], [3, 28, 0, 24], [-3, 31, 1, 18]];
+
 export const MAPS = {
   // Two hills either side of a creek with two fords. The big food lies on the fords.
   crossing: { wall: 'water', gaps: [28, 84], gapHalf: 2, clumps: 16,

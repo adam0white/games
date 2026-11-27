@@ -410,7 +410,7 @@ function paintAt(e) {
 }
 function setNestTab(t) { $('diet').dataset.tab = t; for (const b of document.querySelectorAll('#diet .tabs [data-tab]')) b.setAttribute('aria-pressed', String(b.dataset.tab === t)); if (t !== 'dig' && nestTool !== 'look') setNestTool('look'); }
 for (const b of document.querySelectorAll('#diet .tabs [data-tab]')) b.addEventListener('click', () => { setNestTab(b.dataset.tab); tone(480, 0.05, 0.03, 'triangle'); });
-const DIG_HELP = { look: 'Pick a room, then drag in the earth beside a tunnel.', store: 'Store: each cell holds 8 more seeds and 8 more meat. Drag in the earth: a seed to dig a cell.', nursery: 'Nursery: each cell holds one more egg or grub. Drag in the earth: a seed to dig a cell.', rest: 'Quarters: each cell houses 4 more ants. Drag in the earth: a seed to dig a cell.', post: 'Guard post: each cell keeps one in eight of your idle soldiers standing here, inside, and not out by the door.', clear: 'Drag over marks or rooms to take them off. Dug earth stays dug.' };
+const DIG_HELP = { look: 'Pick a room, then drag in the earth beside a tunnel.', tunnel: 'Tunnel: drag through the earth, a seed to dig a cell. Seeds showing in the clay are an old cache: dig to it and it is carried to your stores.', store: 'Store: each cell holds 8 more seeds and 8 more meat. Drag in the earth: a seed to dig a cell.', nursery: 'Nursery: each cell holds one more egg or grub. Drag in the earth: a seed to dig a cell.', rest: 'Quarters: each cell houses 4 more ants. Drag in the earth: a seed to dig a cell.', post: 'Guard post: each cell keeps one in eight of your idle soldiers standing here, inside, and not out by the door.', clear: 'Drag over marks or rooms to take them off. Dug earth stays dug.' };
 function roomButtons() { for (const b of document.querySelectorAll('#rooms [data-room]')) b.hidden = !!ROOM_OF[b.dataset.room] && !sim.mayRoom(ME, ROOM_OF[b.dataset.room]); if (ROOM_OF[nestTool] && !sim.mayRoom(ME, ROOM_OF[nestTool])) setNestTool('look'); }
 roomButtons();
 function setNestTool(t) { nestTool = t; $('digHelp').textContent = DIG_HELP[t]; if (t !== 'look' && $('diet').dataset.tab !== 'dig') setNestTab('dig'); for (const b of document.querySelectorAll('#rooms [data-room]')) b.setAttribute('aria-pressed', String(b.dataset.room === t)); }
@@ -431,7 +431,7 @@ nestCanvas.addEventListener('pointerup', e => {
   if (!nestDrag || e.pointerId !== nestDrag.id) return;
   if (paint && paint.cells.length) {
     const cells = paint.cells, nestTool = paint.tool; // the tool the stroke began with
-    builds.add(order({ type: CMD.ROOM, cells, kind: nestTool === 'clear' ? ROOM.NONE : ROOM_OF[nestTool], dig: 1 }));
+    builds.add(order(nestTool === 'tunnel' ? { type: CMD.DIG, cells } : { type: CMD.ROOM, cells, kind: nestTool === 'clear' ? ROOM.NONE : ROOM_OF[nestTool], dig: 1 }));
     rec.event('build', { tool: nestTool, cells: cells.length / 2, at: sim.tick }); tone(380, 0.1, 0.04, 'triangle', 90); navigator.vibrate?.(8);
   }
   paint = null; nestDrag = null;
@@ -462,6 +462,7 @@ function news() {
       if (a === ME) deaths++;
     } else if (type === EVENT.PILE_EMPTY) { /* its trail goes dry: see DRY */ }
     else if (type === EVENT.DRY && a === ME) { toast('That food is gone. The trail waits for more.'); tone(300, 0.2, 0.04, 'triangle', -90); }
+    else if (type === EVENT.FOUND) { if (a === ME) { toast(`A cache: ${c >> 1} loads of ${c & 1 ? 'meat' : 'seed'} carried to your stores`, 3200); rec.event('cache', { at: sim.tick, loads: c >> 1, kind: c & 1 }); } }
     else if (type === EVENT.DUG && a === ME) { if (nestOpen) tone(210 + Math.random() * 60, 0.05, 0.03, 'square', -60); }
     else if (type === EVENT.FULL && a === ME) { if (now - (told.fullAt ?? 0) > 20000) { told.fullAt = now; toast(`No room for more ${b ? 'meat' : 'seeds'}. Dig a store in the Nest.`, 3600, true); } }
     else if (type === EVENT.REJECTED && a === ME) {
@@ -688,7 +689,7 @@ function drawNest(now) {
   // Rooms by tint, cells waiting to be dug as hatched squares, the stroke under the finger brighter.
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
     const k = y * w + x, r = sim.room[k], m = sim.mark[k];
-    if (!r && !m) continue;
+    if (!r && !m && !(sim.binS[k] | sim.binP[k]) && !sim.cache[k]) continue;
     const px = sx(x), py = sy(y);
     if (r && open(x, y)) {
       c.fillStyle = `rgba(${ROOM_CSS[r]}, 0.16)`; c.fillRect(px + 0.5, py + 0.5, z - 1, z - 1);
@@ -697,9 +698,14 @@ function drawNest(now) {
       if (r === ROOM.STORE) c.arc(px + z * 0.22, py + z * 0.22, z * 0.09, 0, 7); else if (r === ROOM.NURSERY) c.ellipse(px + z * 0.22, py + z * 0.22, z * 0.11, z * 0.07, 0.6, 0, 7); else if (r === ROOM.POST) { c.moveTo(px + z * 0.12, py + z * 0.3); c.lineTo(px + z * 0.23, py + z * 0.1); c.lineTo(px + z * 0.34, py + z * 0.3); } else c.rect(px + z * 0.12, py + z * 0.17, z * 0.22, z * 0.09);
       c.fill();
     }
+    // A cache in the clay: a few seeds or a scrap of meat showing in the earth.
+    if (sim.cache[k]) { const v = sim.cache[k], big = v >> 1 >= 18; c.fillStyle = `rgba(${v & 1 ? '224, 96, 60' : '243, 215, 122'}, ${0.13 + 0.05 * Math.sin(now / 420 + x)})`; c.beginPath(); c.arc(sx(x + 0.5), sy(y + 0.5), z * 0.7, 0, 7); c.fill(); c.fillStyle = v & 1 ? 'rgba(224, 96, 60, 0.85)' : 'rgba(243, 215, 122, 0.85)'; c.beginPath(); for (const [ax, ay] of big ? [[0.3, 0.38], [0.6, 0.34], [0.45, 0.6], [0.72, 0.62], [0.26, 0.7]] : [[0.35, 0.4], [0.62, 0.45], [0.48, 0.66]]) { c.moveTo(sx(x) + z * (ax + 0.09), sy(y) + z * ay); c.arc(sx(x) + z * ax, sy(y) + z * ay, z * 0.09, 0, 7); } c.fill(); }
+    // What lies in a store cell: one seed drawn for a load, sugar pale along the floor, meat red above it.
+    const bs = sim.binS[k], bp = sim.binP[k];
+    if (bs | bp) for (const [n, col, row] of [[bs, '#f3d77a', 0], [bp, '#e0603c', 2]]) { c.fillStyle = col; c.beginPath(); for (let j = 0; j < Math.min(n, 8); j++) { const gx = px + z * (0.2 + 0.2 * (j % 4)), gy = py + z * (0.86 - 0.17 * (row + (j >> 2))); c.moveTo(gx + z * 0.075, gy); c.arc(gx, gy, z * 0.075, 0, 7); } c.fill(); }
     if (m) { c.fillStyle = `rgba(${ROOM_CSS[r] || '255, 255, 255'}, ${0.2 + 0.08 * Math.sin(now / 260 + x + y)})`; c.fillRect(px + 1, py + 1, z - 2, z - 2); c.strokeStyle = `rgba(${ROOM_CSS[r] || '255, 255, 255'}, 0.8)`; c.lineWidth = 1; c.beginPath(); c.moveTo(px + 2, py + z - 2); c.lineTo(px + z - 2, py + 2); c.stroke(); const left = sim.digLeft[k] / C.DIG_TICKS; if (left < 1) { c.fillStyle = '#120c09'; c.fillRect(px + 1, py + 1, (z - 2) * (1 - left), z - 2); } }
   }
-  if (paint) { c.fillStyle = paint.tool === 'clear' ? 'rgba(255, 90, 60, 0.4)' : `rgba(${ROOM_CSS[ROOM_OF[paint.tool]]}, 0.45)`; for (let j = 0; j < paint.cells.length; j += 2) c.fillRect(sx(paint.cells[j]) + 1, sy(paint.cells[j + 1]) + 1, z - 2, z - 2); }
+  if (paint) { c.fillStyle = paint.tool === 'clear' ? 'rgba(255, 90, 60, 0.4)' : `rgba(${ROOM_CSS[ROOM_OF[paint.tool]] || '255, 255, 255'}, 0.45)`; for (let j = 0; j < paint.cells.length; j += 2) c.fillRect(sx(paint.cells[j]) + 1, sy(paint.cells[j + 1]) + 1, z - 2, z - 2); }
   for (const t of [ME, FOE]) {
     const st = sim.store[t] - base, stx = st % w, sty = Math.floor(st / w), q = sim.queen[t] - base, qx = sx(q % w + 0.5), qy = sy(Math.floor(q / w) + 0.5), tint = t ? '120, 150, 255' : '255, 170, 80';
     const gl = c.createRadialGradient(qx, qy, 0, qx, qy, z * 7); gl.addColorStop(0, `rgba(${tint}, ${0.28 + 0.05 * Math.sin(now / 700)})`); gl.addColorStop(1, `rgba(${tint}, 0)`); c.fillStyle = gl; c.fillRect(qx - z * 7, qy - z * 7, z * 14, z * 14);
@@ -777,7 +783,7 @@ requestAnimationFrame(frame);
 window.game = {
   state: () => ({ screen, tool, nest: nestOpen, t: sim.tick, ants: sim.n, drawn: drawnAnts, gl: !!renderer && !renderer.lost, glFailed, frames, result: sim.result, sel, set: set.snapshot(), ...summary() }),
   toScreen: (x, y, h) => toScreen(x, y, h), camera: () => ({ ...cam }), setCamera: c => { camGoal = null; Object.assign(cam, c); clampCam(); },
-  door: t => doorXY(t), piles: () => { const o = []; for (let p = 0; p < MAX_PILES; p++) if (sim.pileAmount[p] > 0) o.push({ x: sim.pileCell[p] % L0.sw, y: Math.floor(sim.pileCell[p] / L0.sw), kind: sim.pileKind[p], amount: sim.pileAmount[p] }); return o; },
+  door: t => doorXY(t), caches: t => { const o = []; for (let k = 0; k < sim.cache.length; k++) if (sim.cache[k] && sim.owner(k) === t) o.push({ x: k % L0.nw, y: Math.floor(k / L0.nw), loads: sim.cache[k] >> 1, kind: sim.cache[k] & 1 }); return o; }, bins: t => sim.bins[t].map(k => ({ x: k % L0.nw, y: Math.floor(k / L0.nw), s: sim.binS[k], p: sim.binP[k] })), piles: () => { const o = []; for (let p = 0; p < MAX_PILES; p++) if (sim.pileAmount[p] > 0) o.push({ x: sim.pileCell[p] % L0.sw, y: Math.floor(sim.pileCell[p] / L0.sw), kind: sim.pileKind[p], amount: sim.pileAmount[p] }); return o; },
   run: n => { host.run(n); }, // tests: run the sim ahead
   traits: () => sim.cfg.traits,
   auto: mood => { host.ai[ME] = mood; }, // tests: the rival's mind plays your seat too
