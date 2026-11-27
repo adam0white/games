@@ -563,3 +563,30 @@ on The Larder, 20 seeds: far spit v strong spit 5 to 15 with strong spit at bite
 
 **Open from this slice.** The menu is five boxes and four missions long on a phone. An idle colony on The Larder starves to
 one ant by tick 4000.
+
+## Maps as table rows, and a siege
+
+**Maps** are rows in `MAPS` (`war/tables.js`): what runs down the middle (water, stone or nothing), the rows where it is open,
+the food piles and how many stone clumps. `world.js` reads the row named by the mission's `map`. The Crossing's row
+reproduces the old hard-coded map exactly: state hashes of eight runs (four missions, two seeds, 1800 ticks) are the same
+before and after. Two new rows: `pass` (a stone ridge with one gap, the rich food in the gap) and `flat` (no wall, many
+small piles; no mission uses it yet).
+
+**The Narrows** (`MISSIONS.narrows`, map `pass`). A siege: the rival (team 1) starts with 40 workers to your 36 and wins by
+lasting until dusk (`goals.dusk: 'holder'`); its queen has 1200 hit points. A rival under siege never marches on the other
+hill. A machine attacker goes at the half-way mark with what it has. Attacker's wins of 12 seeds by start sizes:
+
+| start (you, rival) | timid v timid | steady v timid | steady v steady | bold v steady | bold v bold |
+| --- | --- | --- | --- | --- | --- |
+| 36, 36 | 12 | 12 | 9 (queen 2400) | 11 | 12 |
+| 36, 40 (shipped) | 10 | 12 | 5 | 0 | 0 |
+| 32, 40 | 3 | 7 | 3 | 1 | 0 |
+| 36, 44 | 4 | 12 | 2 | 2 | 3 |
+
+The result turns on who wins the first fight in the pass and then snowballs, so four workers move it a long way. At the
+shipped sizes a timid rival is easy, a steady one about even for the steady bot, and a bold-against-bold attack never got
+through. Bots only. The versus bar shows the rival queen's health in this mission.
+
+## A guard post
+
+A fourth room kind, `post`, has no cap and stores nothing. Each post cell holds one idle fighter in eight inside the nest, so four cells keep about half the guard underground beside whatever the player painted them next to. Without a post the guard stands at the door as before, and the eight reference hashes did not move. A mission lists the rooms it allows, and the dig menu hides the others: posts open with The Larder and stay for The Narrows. This is the first unlock that comes from reaching a mission and not from a fork. The rival does not paint posts yet, and no sweep has measured what a post is worth.

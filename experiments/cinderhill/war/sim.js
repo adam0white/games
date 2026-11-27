@@ -141,7 +141,7 @@ export class Sim {
     this.homeF = Array.from({ length: TEAMS }, () => new Uint16Array(n)); this.doorF = Array.from({ length: TEAMS }, () => new Uint16Array(n));
     this.queenF = Array.from({ length: TEAMS }, () => new Uint16Array(n)); this.rallyF = Array.from({ length: TEAMS }, () => null);
     this.crew = new Int32Array(T); this.want = new Int32Array(T);
-    this.digF = Array.from({ length: TEAMS }, () => null); this.storeCells = [[], []]; this.nurseryCells = [[], []]; this.dirty = false;
+    this.digF = Array.from({ length: TEAMS }, () => null); this.storeCells = [[], []]; this.nurseryCells = [[], []]; this.postCells = [[], []]; this.postF = [null, null]; this.dirty = false;
     this.head = new Int32Array(n).fill(-1); this.nextAnt = new Int32Array(A); this.occ = new Uint8Array(n);
     this.bq = new Int32Array(n); this.prev = new Int32Array(n);
     // Sites that pay while held (a mission's `sites`): their surface cells, fixed by the map, and who holds each (-1: no one).
@@ -160,7 +160,7 @@ export class Sim {
   startColony(t) {
     const cfg = this.cfg, o = t * CG.SIZE, cg = this.cg;
     cg[o + CG.SUGAR] = cfg.sugar; cg[o + CG.PROTEIN] = cfg.protein; cg[o + CG.QUEEN_HP] = cfg.queenHp; cg[o + CG.DIET] = 0; cg[o + CG.RALLY_CELL] = -1;
-    const ants = cfg.antsBy ? cfg.antsBy[t] : cfg.ants; // antsBy: a start that differs by colony
+    const ants = cfg.antsBy ? cfg.antsBy[t] : t === 1 && cfg.foeAnts ? cfg.foeAnts : cfg.ants; // antsBy: a start that differs by colony
     for (let k = 0; k < ants; k++) {
       const i = this.spawn(t, CASTE.WORKER, k % 10 === 9 ? this.nurseryCell(t) : this.store[t]);
       if (i >= 0 && k % 10 === 9) this.task[i] = TASK.NURSE;
@@ -175,19 +175,19 @@ export class Sim {
 
   /** Count each colony's open rooms into its caps and its lists of store and nursery cells. */
   recount() {
-    const L = this.L, cg = this.cg, NN = this.room.length, n = [0, 0, 0, 0, 0, 0, 0, 0], marks = [0, 0];
-    for (let t = 0; t < TEAMS; t++) { this.storeCells[t].length = 0; this.nurseryCells[t].length = 0; }
+    const L = this.L, cg = this.cg, NN = this.room.length, n = new Array(TEAMS * 8).fill(0), marks = [0, 0];
+    for (let t = 0; t < TEAMS; t++) { this.storeCells[t].length = 0; this.nurseryCells[t].length = 0; this.postCells[t].length = 0; }
     for (let k = 0; k < NN; k++) {
       if (this.mark[k]) marks[this.mark[k] - 1]++;
       const r = this.room[k];
       if (!r || this.mat[L.nestBase + k] !== MAT.OPEN) continue;
-      const t = this.owner(k); n[t * 4 + r]++;
-      if (r === ROOM.STORE) this.storeCells[t].push(L.nestBase + k); else if (r === ROOM.NURSERY) this.nurseryCells[t].push(L.nestBase + k);
+      const t = this.owner(k); n[t * 8 + r]++;
+      if (r === ROOM.STORE) this.storeCells[t].push(L.nestBase + k); else if (r === ROOM.NURSERY) this.nurseryCells[t].push(L.nestBase + k); else if (r === ROOM.POST) this.postCells[t].push(L.nestBase + k);
     }
     for (let t = 0; t < TEAMS; t++) {
       const o = t * CG.SIZE;
       const cap = { food: 0, brood: 0, ants: 0 };
-      for (let r = 1; r < ROOMS.length; r++) cap[ROOMS[r].cap] += this.stat[t].per[r] * n[t * 4 + r];
+      for (let r = 1; r < ROOMS.length; r++) if (ROOMS[r].cap) cap[ROOMS[r].cap] += this.stat[t].per[r] * n[t * 8 + r];
       cg[o + CG.CAP_FOOD] = Math.max(C.STORE_MIN, cap.food); cg[o + CG.CAP_BROOD] = Math.max(C.BROOD_MIN, cap.brood); cg[o + CG.CAP_ADULTS] = C.REST_BASE + cap.ants;
       cg[o + CG.MARKS] = marks[t];
     }
@@ -281,7 +281,7 @@ export class Sim {
       const L = this.L, pts = o.cells || [], dig = o.type === CMD.DIG, kind = o.kind | 0;
       if (!dig && kind !== ROOM.NONE && !this.mission.rooms.includes(kind)) return no(WHY.NONE);
       let done = 0, marks = cg[base + CG.MARKS], stores = false;
-      const use = (k, to) => { if (this.room[k] === ROOM.STORE || to === ROOM.STORE) stores = true; this.room[k] = to; done++; };
+      const use = (k, to) => { if (this.room[k] === ROOM.STORE || to === ROOM.STORE || this.room[k] === ROOM.POST || to === ROOM.POST) stores = true; this.room[k] = to; done++; };
       for (let j = 0; j + 1 < pts.length && j < 512; j += 2) {
         const x = pts[j] | 0, y = pts[j + 1] | 0;
         if (x < 1 || x >= L.nw - 1 || y < 2 || y >= L.nh - 1) continue;
@@ -408,6 +408,7 @@ export class Sim {
   rebuildFields() {
     for (let t = 0; t < TEAMS; t++) {
       this.field(this.homeF[t], this.storeCells[t].length ? this.storeCells[t] : [this.store[t]]); this.field(this.doorF[t], [this.door[t]]); this.field(this.queenF[t], [this.queen[t]]);
+      this.postF[t] = this.postCells[t].length ? this.field(this.postF[t], this.postCells[t]) : null;
       const r = this.cg[t * CG.SIZE + CG.RALLY_CELL];
       this.rallyF[t] = r >= 0 ? this.field(this.rallyF[t], [r]) : null;
     }
@@ -686,6 +687,9 @@ export class Sim {
       if (this.task[i] !== TASK.GUARD) return r;
       const R = this.rallyF[t];
       if (R) return R[c] > 2 ? this.next(R, c) : this.mill(i, c, m => R[m] <= 3, 12);
+      // A guard post keeps a share of the guard inside: one in eight for each of its cells.
+      const P = this.postF[t];
+      if (P && (this.id[i] & 7) < this.postCells[t].length) return P[c] > 0 ? this.next(P, c) : c;
       const D = this.doorF[t];
       return D[c] > C.GUARD_R || this.layer[i] === NEST ? this.next(D, c) : this.mill(i, c, m => D[m] <= C.GUARD_R && m < this.L.nestBase, 30);
     }
@@ -912,6 +916,7 @@ export class Sim {
       const d = this.mission.goals.dusk, score = t => (d === 'points' ? cg[t * CG.SIZE + CG.POINTS] : d === 'haul' ? cg[t * CG.SIZE + CG.HAUL] : 0) * 100000 + cg[t * CG.SIZE + CG.ADULTS];
       let best = 0;
       for (let t = 1; t < TEAMS; t++) if (score(t) > score(best)) best = t;
+      if (d === 'holder') best = 1; // a siege: the colony under attack (team 1) wins by lasting until dusk
       this.result = 1 + best; this.event(EVENT.RESULT, best, REASON.DUSK);
     }
   }

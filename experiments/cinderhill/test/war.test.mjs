@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { Sim, CG, CMD, KIND, CASTE, TEAMS, ROOM } from '../war/sim.js';
 import { Host } from '../war/host.js';
 import { think, THINK_EVERY } from '../war/ai.js';
-import { CAMPAIGN, TRAITS, MISSIONS } from '../war/tables.js';
+import { CAMPAIGN, TRAITS, MISSIONS, MAPS } from '../war/tables.js';
 
 test('an idle colony loses to the rival', () => {
   const h = new Host({ seed: 3 }).run(7200);
@@ -219,4 +219,39 @@ test('the campaign: the third fork offers the upgrades of the caste taken at the
   const craft = CAMPAIGN.find(c => c.fork === 'craft');
   for (const [caste, list] of Object.entries(craft.by)) for (const id of list) assert.equal(TRAITS[id].needs, caste);
   for (const c of CAMPAIGN) if (c.mission) assert.ok(MISSIONS[c.mission], c.mission);
+});
+
+test('maps are table rows: the pass has a stone ridge with one gap, the flat has no wall', () => {
+  const wallAt = (mission, y) => { const s = new Sim({ seed: 1, mission }), sw = s.L.sw; return s.mat[y * sw + (sw >> 1)]; };
+  const pass = new Sim({ seed: 1, mission: 'narrows' }), sh = pass.L.sh, gap = Math.round((56 * sh) / 112);
+  assert.notEqual(wallAt('narrows', 5), wallAt('narrows', gap), 'the ridge is closed away from the pass and open in it');
+  assert.equal(wallAt('narrows', gap), wallAt('crossing', Math.round((28 * sh) / 112)), 'a gap is open ground, like a ford');
+  assert.notEqual(wallAt('narrows', 5), wallAt('crossing', 5), 'stone, not water');
+  assert.ok(MAPS.flat.wall === null && MAPS.flat.gaps.length === 0);
+  for (const m of Object.values(MISSIONS)) assert.ok(MAPS[m.map], m.map);
+});
+
+test('The Narrows: the colony under siege wins at dusk, however small', () => {
+  const s = new Sim({ seed: 1, mission: 'narrows', duskTick: 40 });
+  for (let i = 0; i < s.n; i++) if (s.team[i] === 1 && i % 2) s.hp[i] = 0;
+  while (!s.result && s.tick < 60) s.step();
+  assert.equal(s.result, 2);
+});
+
+test('a guard post keeps a share of the idle soldiers inside the nest', () => {
+  const run = post => {
+    const s = new Sim({ seed: 4, mission: 'larder' }), L = s.L, dx = s.door[0] % L.sw;
+    for (let k = 0; k < 16; k++) s.spawn(0, CASTE.MAJOR, s.door[0]);
+    if (post) s.order({ team: 0, type: CMD.ROOM, kind: ROOM.POST, cells: [dx - 2, 16, dx - 1, 16, dx, 16, dx + 1, 16] }); // four cells of the queen's chamber
+    for (let k = 0; k < 600; k++) s.step();
+    let inside = 0; for (let i = 0; i < s.n; i++) if (s.team[i] === 0 && s.caste[i] === CASTE.MAJOR && s.layer[i] === 1) inside++;
+    const b = Sim.load(JSON.parse(JSON.stringify(s.save(), (k, v) => (ArrayBuffer.isView(v) ? Array.from(v) : v))));
+    for (let k = 0; k < 100; k++) { s.step(); b.step(); }
+    assert.equal(b.hash(), s.hash(), 'a save carries on the same');
+    return inside;
+  };
+  const without = run(false), withPost = run(true);
+  assert.ok(without <= 2, `no post: the guard stands by the door (${without} inside)`);
+  assert.ok(withPost >= 5 && withPost <= 11, `four cells: about half of sixteen inside (${withPost})`);
+  assert.throws(() => { const s = new Sim({ seed: 1, mission: 'crossing' }); let why = 0; s.order({ team: 0, type: CMD.ROOM, kind: ROOM.POST, cells: [s.door[0] % s.L.sw, 16] }); s.step(); for (const e of s.drainEvents()) if (e[0] === 7) why++; if (!why && s.room[16 * s.L.nw + s.door[0] % s.L.sw] !== ROOM.POST) throw new Error('refused'); }, /refused/);
 });

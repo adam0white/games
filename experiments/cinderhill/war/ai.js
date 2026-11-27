@@ -125,7 +125,10 @@ export function think(sim, t, mind = 1) {
   let foeMajors = 0, foe = -1;
   for (let e = 0; e < TEAMS; e++) if (e !== t && cg[e * CG.SIZE + CG.QUEEN_HP] > 0) { foe = e; foeMajors = Math.max(foeMajors, cg[e * CG.SIZE + CG.MAJORS]); }
   const need = mood === 2 ? 8 : 10, from = mood === 2 ? 1600 : 4200;
-  const strike = mood > 0 && foe >= 0 && majors >= need && sim.tick >= from && (mood === 2 ? majors >= foeMajors : majors * 4 >= foeMajors * 5);
+  // A siege: the colony under attack never marches on the other hill; the attacker must, and goes at the half-way mark
+  // with what it has if it has not found the numbers before.
+  const siege = sim.mission.goals.dusk === 'holder', late = siege && t !== 1 && sim.tick * 2 >= cfg.duskTick && majors >= 6;
+  const strike = !(siege && t === 1) && foe >= 0 && (late || (mood > 0 && majors >= need && sim.tick >= from && (mood === 2 ? majors >= foeMajors : majors * 4 >= foeMajors * 5)));
   const atDoor = k => { const s2 = t * TRAILS + k, e = sim.trPath[s2 * PATH_MAX + sim.trLen[s2] - 1]; return foe >= 0 && sim.doorF[foe][e] <= 4; };
   if (raids.length && (majors < 3 || (strike && !atDoor(raids[0])) || (!strike && atDoor(raids[0]) && majors * 2 < foeMajors))) for (const k of raids) out.push({ team: t, type: CMD.ERASE, trail: k });
   else if (!raids.length && live.length < TRAILS && foe >= 0) {

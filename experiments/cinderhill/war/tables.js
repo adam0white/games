@@ -17,8 +17,11 @@ export const ROOMS = [
   { id: 'store', name: 'Store', cap: 'food', per: 8 },
   { id: 'nursery', name: 'Nursery', cap: 'brood', per: 1 },
   { id: 'rest', name: 'Quarters', cap: 'ants', per: 4 },
+  // A guard post adds to no cap. Each open cell keeps one in eight of the colony's idle fighters standing on it, inside
+  // the nest, and not out by the door: eight cells bring the whole guard in.
+  { id: 'post', name: 'Guard post', cap: null, per: 0 },
 ];
-export const ROOM = { NONE: 0, STORE: 1, NURSERY: 2, REST: 3 };
+export const ROOM = { NONE: 0, STORE: 1, NURSERY: 2, REST: 3, POST: 4 };
 
 /** Traits: a colony's standing changes to the rows above. set: [key, value] for a colony number (eatPer: adults a seed
  *  feeds at a meal; pupa: ticks a pupa takes), or [key, index, value] for one caste's or one room's number. needs: the
@@ -32,6 +35,25 @@ export const TRAITS = {
   stride: { id: 'stride', name: 'Long stride', text: 'Wardens keep pace with the soldiers.', needs: 'warden', set: [['speed', CASTE.WARDEN, 34]] },
 };
 
+/** Maps, in cells of a 160 by 112 field, mirrored left to right. wall: what runs down the middle ('water', 'stone' or
+ *  none), open at the rows in `gaps` (each `gapHalf` rows either side). piles: [x, y, food kind (0 seeds, 1 meat),
+ *  amount] on the left half, twinned on the right. mid: piles on the middle line, [x offset, y, kind, amount].
+ *  clumps: how many small clumps of stones are scattered on each half. */
+export const MAPS = {
+  // Two hills either side of a creek with two fords. The big food lies on the fords.
+  crossing: { wall: 'water', gaps: [28, 84], gapHalf: 2, clumps: 16,
+    piles: [[27, 49, 0, 60], [45, 66, 1, 50], [50, 34, 0, 80], [30, 84, 1, 70], [58, 70, 0, 70], [20, 22, 1, 60]],
+    mid: [[-1, 28, 1, 160], [0, 84, 0, 160]] },
+  // A ridge of stone with one narrow pass. All the rich food lies in the pass and just beyond it.
+  pass: { wall: 'stone', gaps: [56], gapHalf: 2, clumps: 10,
+    piles: [[24, 30, 0, 50], [26, 84, 1, 40], [48, 20, 0, 40], [52, 92, 0, 40], [66, 50, 1, 60], [68, 62, 0, 90]],
+    mid: [[0, 56, 0, 200], [-1, 54, 1, 120]] },
+  // Open ground, no wall at all: nothing to hold, every flank is open. Food is spread wide, in many small piles.
+  flat: { wall: null, gaps: [], gapHalf: 0, clumps: 24,
+    piles: [[22, 20, 0, 40], [20, 92, 0, 40], [44, 40, 1, 40], [46, 74, 0, 40], [60, 14, 1, 40], [62, 98, 0, 50], [70, 56, 1, 40], [56, 56, 0, 40]],
+    mid: [[0, 20, 0, 80], [-1, 56, 1, 80], [0, 92, 0, 80]] },
+};
+
 /** The campaign, in order. A fork is a choice kept for the whole campaign; it opens when the mission before it has been
  *  played to its end, won or lost. A lost mission costs the next one `LOSS_ANTS` of its starting workers. */
 export const CAMPAIGN = [
@@ -43,6 +65,7 @@ export const CAMPAIGN = [
   // This fork's options depend on the caste taken at the first fork.
   { fork: 'craft', by: { spitter: ['farspit', 'acid'], warden: ['iron', 'stride'] } },
   { mission: 'larder' },
+  { mission: 'narrows' },
 ];
 export const LOSS_ANTS = 8;
 
@@ -82,6 +105,15 @@ export const MISSIONS = {
     kit: { ants: 30, sugar: 40, protein: 20, eggs: 20, larvae: 20, pupae: 12, duskTick: 9600, queenHp: 6000, lean: 3 },
     goals: { queen: true, haul: 10, dusk: 'haul' },
     picks: [CASTE.SPITTER, CASTE.WARDEN],
-    rooms: [ROOM.STORE, ROOM.NURSERY, ROOM.REST],
+    rooms: [ROOM.STORE, ROOM.NURSERY, ROOM.REST, ROOM.POST],
+  },
+  // A siege. The rival (team 1) starts larger, behind a ridge with one pass, and wins by lasting until dusk. Its queen
+  // is frail: reach her and it is over.
+  narrows: {
+    id: 'narrows', name: 'The Narrows', map: 'pass',
+    kit: { ants: 36, foeAnts: 40, sugar: 10, protein: 5, eggs: 20, larvae: 20, pupae: 12, duskTick: 9600, queenHp: 1200 },
+    goals: { queen: true, dusk: 'holder' },
+    picks: [CASTE.SPITTER, CASTE.WARDEN],
+    rooms: [ROOM.STORE, ROOM.NURSERY, ROOM.REST, ROOM.POST],
   },
 };
