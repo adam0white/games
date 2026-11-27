@@ -408,3 +408,12 @@ Owner direction: the game should be of the colony-strategy genre in full (missio
 - Meat is held back for a larva waiting on the soldier diet. Before this, worker larvae ate each load as it came and no soldier was ever raised from a trickle.
 - Balance as first shipped: queen 800 hit points, dusk at 9,600 ticks, the steady rival raids from tick 4,200 with ten soldiers. Bot matches end by a queen's death near tick 5,500 to 5,900. Not yet tuned with players.
 - A tap is a short order: Raid sends soldiers to the tapped spot, Forage sends workers to a pile under the finger. The sim routes from the door.
+
+### Bot sweeps (2026-11-27)
+
+`node experiments/cinderhill/war/sweep.mjs 30` plays each pairing over 30 seeds. Findings and the changes they led to:
+
+- First sweep: the timid rival (never raids) beat the steady one 100 to 0, because a raid into an equal guard at the door is thrown away. Turtling was the best play.
+- Change: the rival breaks into a nest only with the numbers for it (bold at parity, steady with a quarter more soldiers). Short of that its soldiers hold the richest food on the fords. Bites of one tick now land together.
+- After: bold beats steady 77 to 23, steady beats timid 100 to 0, bold beats timid 93 to 7. Steady against steady is 43 to 57 and bold against bold 63 to 37 (30 seeds; a small side bias is not ruled out, lab-5w7.55).
+- A novice script (three trails and a soldier diet at the start, nothing after) loses to all three moods. Against timid it loses at dusk on count; against the others its queen dies near 3:30 to 4:30. So the default rival is timid, and the result card offers the next mood up after a win.

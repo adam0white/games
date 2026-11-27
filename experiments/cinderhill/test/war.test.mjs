@@ -60,3 +60,21 @@ test('a tick stays cheap with two thousand ants', () => {
   assert.ok(s.n >= 2000, `ants ${s.n}`);
   assert.ok(ms < 4, `a tick took ${ms.toFixed(2)} ms`);
 });
+
+test('one trail keeps carrying until its pile is empty', () => {
+  const s = new Sim({ seed: 1 });
+  s.order({ team: 0, type: CMD.TRAIL, kind: KIND.FORAGE, level: 3, points: [27, 49] });
+  for (let k = 0; k < 4000; k++) s.step();
+  assert.ok(s.g(0, CG.LOADS_S) >= 60, `sixty loads lay there, ${s.g(0, CG.LOADS_S)} came home`);
+});
+
+test('a fight ends the same whichever colony was spawned first', () => {
+  const left = order => {
+    const s = new Sim({ seed: 1, blank: true, ants: 0, eggs: 0, larvae: 0, pupae: 0, duskTick: 0 });
+    for (const t of order) for (let k = 0; k < 10; k++) s.spawn(t, CASTE.MAJOR, s.L.sw * (20 + (k >> 1)) + (t ? 77 + (k & 1) : 73 + (k & 1)));
+    for (let k = 0; k < 600; k++) s.step();
+    return s.g(0, CG.MAJORS) - s.g(1, CG.MAJORS);
+  };
+  const a = left([0, 1]), b = left([1, 0]);
+  assert.ok(Math.sign(a) === Math.sign(b) && Math.abs(a - b) <= 3, `the same fight, spawned in the other order, ended ${a} and ${b}`);
+});

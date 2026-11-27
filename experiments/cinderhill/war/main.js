@@ -20,7 +20,7 @@ const ME = 0, FOE = 1;
 const rec = lab('cinderhill', { lang: () => 'en' });
 rec.notice($('menuLab')); rec.toggle($('menuLab')); rec.toggle($('pauseLab'));
 const set = settings('cinderhill', {
-  rival: { values: ['timid', 'steady', 'bold'], def: 'steady', key: 'cinderhill:war:rival' },
+  rival: { values: ['timid', 'steady', 'bold'], def: 'timid', key: 'cinderhill:war:rival' },
   view: { values: ['tilt', 'top', 'low'], def: 'tilt', key: 'cinderhill:war:view' },
   light: { values: ['cycle', 'day', 'ember'], def: 'cycle', key: 'cinderhill:war:light' },
   style: { values: ['relief', 'ink'], def: 'relief', key: 'cinderhill:war:style' },
@@ -30,7 +30,7 @@ const set = settings('cinderhill', {
 const LABEL = { rival: 'Rival', view: 'View', light: 'Light', style: 'Style', size: 'Ants', sound: 'Sound' };
 const NAME = { timid: 'Timid', steady: 'Steady', bold: 'Bold', tilt: 'Tilted', top: 'Top down', low: 'Low', cycle: 'Day to dusk', day: 'Day', ember: 'Ember', relief: 'Painted', ink: 'Ink', 1: 'True size', 1.5: 'Larger', all: 'Music & effects', fx: 'Effects', off: 'Off' };
 const MOOD = { timid: 0, steady: 1, bold: 2 };
-const redraw = set.panel($('settings'), { label: id => LABEL[id], name: (id, v) => NAME[v] ?? v, what: (id, v) => (id === 'rival' ? (v === 'timid' ? 'It never attacks your hill. Applies from the next start.' : v === 'bold' ? 'It raids early and often. Applies from the next start.' : 'It raids once it has soldiers. Applies from the next start.') : null), onChange: (id, v) => { if (id === 'sound') { if (v === 'off') snd.hold(); else { snd.release(); startSong(); } } tone(660, 0.06, 0.03, 'triangle', 80); } });
+const redraw = set.panel($('settings'), { label: id => LABEL[id], name: (id, v) => NAME[v] ?? v, what: (id, v) => (id === 'rival' ? (v === 'timid' ? 'It never attacks your hill. Applies from the next start.' : v === 'bold' ? 'It raids early, even at even odds. Applies from the next start.' : 'It holds the fords, and raids when it has the numbers. Applies from the next start.') : null), onChange: (id, v) => { if (id === 'sound') { if (v === 'off') snd.hold(); else { snd.release(); startSong(); } } tone(660, 0.06, 0.03, 'triangle', 80); } });
 
 // ---- the game ----
 const qSeed = Math.floor(Number(query.get('seed')));
@@ -221,7 +221,7 @@ function act(a) {
   switch (a.type) {
     case 'preview': preview = a; strokeTake(a.points); break;
     case 'clear': preview = null; break;
-    case 'pan': { const w = toWorld(W / 2 + a.dx, H / 2 + a.dy); cam.x -= w.x - cam.x; cam.y -= w.y - cam.y; camGoal = null; clampCam(); break; }
+    case 'pan': { const o = toWorld(W / 2, H / 2), w = toWorld(W / 2 + a.dx, H / 2 + a.dy); cam.x -= w.x - o.x; cam.y -= w.y - o.y; camGoal = null; clampCam(); break; }
     case 'zoom': { const b = toWorld(a.x, a.y); cam.z *= a.f; clampCam(); const c = toWorld(a.x, a.y); cam.x += b.x - c.x; cam.y += b.y - c.y; camGoal = null; clampCam(); break; }
     case 'order': {
       strokeTake(a.points);
