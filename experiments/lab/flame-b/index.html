@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#101B32">
+<title>Pass the Flame</title>
+<style>
+:root{color-scheme:dark;--bg:#101B32;--ink:#F3E6C8;--muted:#b9ad93;--accent:#FFC34D;--card:#0b1426e8;--edge:#F3E6C833;--btn:#FFC34D;--btnInk:#101B32}
+body[data-look=thermal]{--bg:#050C16;--ink:#e9f6f8;--muted:#8fb3c4;--accent:#FF682B;--card:#050c16e8;--edge:#62E4EC40;--btn:#FF682B;--btnInk:#050C16}
+body[data-look=storm]{--bg:#123E40;--ink:#efe6d3;--muted:#a9b5b8;--accent:#E8AB50;--card:#141c1de8;--edge:#E8AB5040;--btn:#E8AB50;--btnInk:#1b1f1f}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);font:16px/1.35 system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-user-select:none;user-select:none}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+button{font:inherit;color:inherit;-webkit-tap-highlight-color:transparent;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.serif{font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif}
+#arrive{position:fixed;left:0;right:0;top:0;padding:max(56px,calc(env(safe-area-inset-top) + 44px)) 24px 0;text-align:center;pointer-events:none;transition:opacity .8s}
+#arrive.gone{opacity:0}
+#line1{font-size:clamp(22px,6vw,34px);line-height:1.15;margin:0 auto;max-width:17em;text-wrap:balance;text-shadow:0 2px 18px #000c;opacity:0;transform:translateY(6px);transition:opacity 1.1s,transform 1.1s}
+#line2{font-size:15px;color:var(--muted);margin:10px 0 0;opacity:0;transition:opacity 1s .5s}
+#arrive.in #line1{opacity:1;transform:none}#arrive.in #line2{opacity:1}
+#touch{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 112px);text-align:center;font-size:15px;letter-spacing:.06em;color:var(--accent);opacity:0;transition:opacity .6s;pointer-events:none;text-shadow:0 1px 10px #000}
+#touch.on{opacity:1;animation:breathe 2.4s ease-in-out infinite}
+@keyframes breathe{50%{opacity:.45}}
+#notice{position:fixed;left:16px;right:16px;bottom:calc(env(safe-area-inset-bottom) + 12px);color:var(--muted);font-size:11px;text-align:center;pointer-events:auto;transition:opacity .8s}
+#notice a{color:inherit}
+#notice.gone{opacity:0;pointer-events:none}
+#gear{position:fixed;top:max(10px,env(safe-area-inset-top));right:max(8px,env(safe-area-inset-right));width:44px;height:44px;border:0;background:transparent;opacity:.55;display:grid;place-items:center;z-index:3}
+#gear svg{width:20px;height:20px}
+.sheet{position:fixed;left:0;right:0;bottom:0;display:none;justify-content:center;padding:0 12px max(14px,env(safe-area-inset-bottom));z-index:2}
+.sheet.on{display:flex;animation:rise .7s cubic-bezier(.2,.8,.2,1)}
+@keyframes rise{from{opacity:0;transform:translateY(30px)}}
+.card{width:min(100%,420px);background:var(--card);border:1px solid var(--edge);border-radius:18px;padding:18px 18px 14px;box-shadow:0 -10px 60px #0009;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);max-height:calc(100dvh - 90px);overflow:auto}
+.card h2{font-size:clamp(24px,6.6vw,30px);font-weight:500;margin:0 0 6px;line-height:1.1}
+.card p{margin:6px 0}
+.sub{color:var(--muted);font-size:14px}
+.big{width:100%;min-height:54px;border:0;border-radius:14px;background:var(--btn);color:var(--btnInk);font-weight:700;font-size:18px;margin:12px 0 4px;letter-spacing:.01em}
+.quiet{width:100%;min-height:46px;border:1px solid var(--edge);border-radius:14px;background:transparent;margin:6px 0 2px}
+#names{list-style:none;padding:0;margin:12px 0 8px;display:flex;flex-wrap:wrap;gap:6px}
+#names li{font-size:13px;padding:4px 9px 4px 7px;border-radius:99px;border:1px solid var(--edge);color:var(--muted);white-space:nowrap;display:flex;align-items:center;gap:5px}
+#names li::before{content:'';width:7px;height:9px;border-radius:50% 50% 45% 45%/60% 60% 40% 40%;background:var(--accent);opacity:.55}
+#names li.me{color:var(--ink);border-color:var(--accent)}#names li.me::before{opacity:1;box-shadow:0 0 8px var(--accent)}
+#names li.dark{opacity:.35}#names li.dark::before{background:#777;box-shadow:none}
+.meter{display:flex;align-items:center;gap:12px;margin:10px 0 2px}
+.meter .fl{width:26px;height:36px;position:relative;flex:none}
+.meter .fl i{position:absolute;left:50%;bottom:0;width:22px;transform:translateX(-50%);border-radius:50% 50% 45% 45%/62% 62% 38% 38%;background:radial-gradient(circle at 50% 75%,#fff6d6 0 18%,var(--accent) 45%,#e0582a00 72%)}
+label.nm{display:block;font-size:13px;color:var(--muted);margin-top:12px}
+#name{width:100%;min-height:46px;margin-top:4px;padding:0 12px;border-radius:12px;border:1px solid var(--edge);background:#0005;color:var(--ink);font:inherit;font-size:16px;-webkit-user-select:text;user-select:text}
+#status{font-size:14px;min-height:1.2em;color:var(--accent)}
+#linkOut{width:100%;font:12px ui-monospace,monospace;padding:8px;border-radius:10px;border:1px solid var(--edge);background:#0006;color:var(--ink);display:none;-webkit-user-select:text;user-select:text}
+#paused{position:fixed;inset:0;display:none;place-items:center;text-align:center;pointer-events:none;background:#0006;z-index:1}
+#paused.on{display:grid}
+#paused b{display:block;font-size:28px;font-weight:500}
+#settings .card{padding-bottom:10px}
+.setting{margin:10px 0}.setting b{font-size:13px;color:var(--muted);font-weight:600}
+.setting button{min-height:40px;margin:4px 6px 0 0;padding:0 14px;border-radius:99px;border:1px solid var(--edge);background:transparent}
+.setting button.on{background:var(--btn);color:var(--btnInk);border-color:transparent;font-weight:650}
+.setting small{color:var(--muted)}
+.row{display:flex;gap:8px}.row>*{flex:1}
+#rec label{font-size:13px;color:var(--muted)}
+</style>
+</head>
+<body data-look="paper">
+<canvas id="c" data-i18n-aria="board" role="img"></canvas>
+<div id="arrive"><p id="line1" class="serif"></p><p id="line2"></p></div>
+<p id="touch"></p>
+<div id="notice"></div>
+<button id="gear" type="button" data-i18n-aria="gear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg></button>
+<div id="paused"><div><b data-i18n="paused">Paused</b><span class="sub" data-i18n="resume">Touch to go on</span></div></div>
+
+<div id="hand" class="sheet"><section class="card">
+  <h2 id="handTitle" class="serif"></h2>
+  <div class="meter"><span class="fl"><i id="handFlame"></i></span><p id="handOn"></p></div>
+  <ul id="names"></ul>
+  <p id="handTotal" class="sub"></p>
+  <label class="nm" for="name" data-i18n="nameLabel">Your name on the flame</label>
+  <input id="name" maxlength="16" autocomplete="nickname" enterkeyhint="done" spellcheck="false">
+  <button id="pass" class="big" type="button" data-i18n="pass">Pass the flame</button>
+  <p id="status" role="status"></p>
+  <input id="linkOut" readonly>
+</section></div>
+
+<div id="drop" class="sheet"><section class="card">
+  <h2 id="dropTitle" class="serif"></h2>
+  <p id="dropLine" class="sub"></p>
+  <p id="dropRule" class="sub"></p>
+  <button id="again" class="big" type="button" data-i18n="again">Try again</button>
+  <button id="fresh" class="quiet" type="button" data-i18n="light">Light a new flame</button>
+</section></div>
+
+<div id="settings" class="sheet"><section class="card">
+  <h2 class="serif" data-i18n="settings">Settings</h2>
+  <div id="opts"></div>
+  <div id="rec"></div>
+  <div class="row"><button id="lang" class="quiet" type="button"></button><button id="close" class="quiet" type="button" data-i18n="close">Close</button></div>
+</section></div>
+<script type="module" src="./main.js"></script>
+</body>
+</html>
