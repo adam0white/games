@@ -1,7 +1,7 @@
 // The war sim: bots as acceptance. An idle colony loses, a run replays from its orders, a save carries on the same.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Sim, CG, CMD, KIND, CASTE, TEAMS } from '../war/sim.js';
+import { Sim, CG, CMD, KIND, CASTE, TEAMS, ROOM } from '../war/sim.js';
 import { Host } from '../war/host.js';
 import { think, THINK_EVERY } from '../war/ai.js';
 
@@ -77,4 +77,39 @@ test('a fight ends the same whichever colony was spawned first', () => {
   };
   const a = left([0, 1]), b = left([1, 0]);
   assert.ok(Math.sign(a) === Math.sign(b) && Math.abs(a - b) <= 3, `the same fight, spawned in the other order, ended ${a} and ${b}`);
+});
+
+test('workers dig what is marked and the rooms raise the caps; a save mid-dig carries on', () => {
+  const s = new Sim({ seed: 4 }), dx = s.door[0] % s.L.sw, cells = [];
+  for (let y = 7; y <= 8; y++) for (let x = 1; x <= 5; x++) cells.push(dx + x, y);
+  const cap0 = s.g(0, CG.CAP_ADULTS), food0 = s.g(0, CG.CAP_FOOD), brood0 = s.g(0, CG.CAP_BROOD);
+  assert.deepEqual([food0, brood0], [120, 48]);
+  s.order({ team: 0, type: CMD.DIG, cells }); s.order({ team: 0, type: CMD.ROOM, cells, kind: ROOM.REST });
+  s.order({ team: 0, type: CMD.DIG, id: 9, cells: [s.door[1] % s.L.sw + 3, 7] }); // the rival's earth: refused
+  for (let k = 0; k < 150; k++) s.step();
+  const ev = s.drainEvents(); let refused = 0;
+  for (let k = 0; k < ev.length; k += 4) if (ev[k] === 6 && ev[k + 2] === 9) refused++;
+  assert.equal(refused, 1);
+  assert.equal(s.g(0, CG.MARKS) + (s.g(0, CG.CAP_ADULTS) - cap0) / 4, 10, 'every cell is still marked or already quarters');
+  const b = Sim.load(JSON.parse(JSON.stringify(s.save(), (k, v) => (ArrayBuffer.isView(v) ? Array.from(v) : v))));
+  for (let k = 0; k < 900; k++) { s.step(); b.step(); }
+  assert.equal(s.g(0, CG.MARKS), 0);
+  assert.equal(s.g(0, CG.CAP_ADULTS), cap0 + 40);
+  assert.equal(b.hash(), s.hash());
+});
+
+test('a load that comes home to full stores is lost', () => {
+  const s = new Sim({ seed: 4, sugar: 119 });
+  s.order({ team: 0, type: CMD.TRAIL, kind: KIND.FORAGE, level: 3, points: [27, 49] });
+  for (let k = 0; k < 1500; k++) s.step();
+  assert.ok(s.g(0, CG.SUGAR) <= 120, `sugar ${s.g(0, CG.SUGAR)}`);
+  const ev = s.drainEvents(); let full = 0;
+  for (let k = 0; k < ev.length; k += 4) if (ev[k] === 13 && ev[k + 1] === 0) full++;
+  assert.ok(full > 0, 'no load was turned away');
+});
+
+test('a mind that builds beats the same mind that does not', () => {
+  let wins = 0;
+  for (const seed of [2, 5, 8]) { const h = new Host({ seed, ai: { 0: 1, 1: { mood: 1, build: false } } }).run(9600); if (h.sim.result === 1) wins++; }
+  assert.equal(wins, 3);
 });

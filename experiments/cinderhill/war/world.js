@@ -22,6 +22,10 @@ export function generate(sim, layoutOnly = false) {
     open(dx, 14, dx, 16); open(dx - 2, 16, dx + 2, 18); // the queen's chamber
     sim.door[t] = S(dx, dy); sim.store[t] = N(dx, 5); sim.queen[t] = N(dx, 17);
     sim.nursery[t] = { x: dx - 6, y: 10, w: 12, h: 4 };
+    if (!layoutOnly) {
+      const paint = (x0, y0, x1, y1, kind) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (x >= 0 && x < L.nw && y >= 0 && y < L.nh) sim.room[y * L.nw + x] = kind; };
+      paint(dx - 2, 4, dx + 2, 6, 1); paint(dx - 6, 10, dx + 5, 13, 2); // the porch is a store, the wide room a nursery
+    }
     sim.link[S(dx, dy)] = N(dx, 0); sim.link[N(dx, 0)] = S(dx, dy);
   }
   if (layoutOnly || cfg.blank) return;

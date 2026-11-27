@@ -404,7 +404,7 @@ Owner direction: the game should be of the colony-strategy genre in full (missio
 - It imports only the modules of `sim/` that hold no colony state: grid, rng, math, hash.
 - Slice 1 leaves out digging, rooms, fog, heat and air, water as a weapon, and follow-one-ant. The rival knows every pile and the player sees the rival's nest and trails until sight is built.
 - The page `war/` reuses `game/gl.js` (now two doors, sixteen piles, a rival body colour on ant kind +16) and `gestures.js`. Settings go through the kit under slug `cinderhill` with keys `cinderhill:war:*`; plays record under `cinderhill` with `mode: 'war'`.
-- Rival mood (timid, steady, bold) is a player setting, default steady.
+- Rival mood (timid, steady, bold) is a player setting. It shipped with steady as the default; the sweeps below moved the default to timid.
 - Meat is held back for a larva waiting on the soldier diet. Before this, worker larvae ate each load as it came and no soldier was ever raised from a trickle.
 - Balance as first shipped: queen 800 hit points, dusk at 9,600 ticks, the steady rival raids from tick 4,200 with ten soldiers. Bot matches end by a queen's death near tick 5,500 to 5,900. Not yet tuned with players.
 - A tap is a short order: Raid sends soldiers to the tapped spot, Forage sends workers to a pile under the finger. The sim routes from the door.
@@ -417,3 +417,19 @@ Owner direction: the game should be of the colony-strategy genre in full (missio
 - Change: the rival breaks into a nest only with the numbers for it (bold at parity, steady with a quarter more soldiers). Short of that its soldiers hold the richest food on the fords. Bites of one tick now land together.
 - After: bold beats steady 77 to 23, steady beats timid 100 to 0, bold beats timid 93 to 7. Steady against steady is 43 to 57 and bold against bold 63 to 37 (30 seeds; a small side bias is not ruled out, lab-5w7.55).
 - A novice script (three trails and a soldier diet at the start, nothing after) loses to all three moods. Against timid it loses at dusk on count; against the others its queen dies near 3:30 to 4:30. So the default rival is timid, and the result card offers the next mood up after a win.
+
+## Digging and rooms in the war sim (2026-11-27)
+
+- A nest cell has a use (`room`: store, nursery, quarters), a mark to dig (`mark`: 1 + the colony) and work left (`digLeft`). All three are saved; `WAR_VERSION` is 2. A cell belongs to the colony whose door is nearer in x.
+- Orders: `CMD.DIG { cells, on }` marks own clay (at most 96 marks a colony); `CMD.ROOM { cells, kind }` paints a use on open or marked own cells. The page sends both from one drag, so a stroke digs and names a room.
+- Up to 8 resting workers dig. Each stroke takes a tick off a cell's 120; the opening stroke rebuilds the walking fields once that tick. A mark with no open cell beside it waits.
+- Caps: stores hold 8 loads of each food a store cell (the porch gives 120; a load over the cap is lost, event `FULL`); the brood cap is one a nursery cell (48 at the start); the hill holds 90 ants and brood plus 4 a quarters cell, and the queen stops laying at that cap. Laying is a little faster (every 14 ticks) so the nursery cap is what binds.
+- Carriers walk to the nearest store cell, nurses mill on nursery cells, brood lies on nursery cells.
+- The rival builds through the same orders, one room at a time, from fixed slots around its shaft (`ai.js` `SLOTS`): a store at 80% of the food cap, quarters within 10 of the hill's cap, a nursery wing within 4 of the brood cap.
+- A bite's wait now varies by a tick either way. Before, an even fight was settled by where each side stood, and with larger hills that decided most matches for one seat.
+- Sweep, 30 seeds a pairing (`war/sweep.mjs`): a steady mind that builds beats the same mind that never digs 100 to 0; so do bold and timid. A mind that digs only stores, only a nursery, only quarters, or stores and quarters loses 0 to 100 to the full builder. A mind that digs nursery and quarters and no store does as well as the full builder (30 to 70, the same as steady against steady).
+- What that says: nursery and quarters are worth building and are needed together. Stores do not matter yet, because food is eaten as fast as it comes. Digging costs only the diggers' time. Both are open (bead lab-5w7.47): a build is worthwhile but not yet a choice between builds.
+- Seat bias: steady against steady is 30 to 70 and bold against bold 57 to 43. Not explained (lab-5w7.55). The first big fight at a ford decides most matches.
+- The moods' order moved with the larger hills: bold now loses to steady (27 to 73), steady beats timid 93 to 7. The novice (three trails, no rooms) loses every match to every mood.
+- Page: the Nest sheet has Look, Store, Nursery, Quarters and Clear; a drag in the cutaway paints cells; marks are hatched and fill as they are dug; the sheet shows stores, young and ants against their caps. No setting was added.
+- Not verified: no person has dug a room on a phone. The scripted browser check drew quarters with the mouse and the cap rose from 90 to 130.

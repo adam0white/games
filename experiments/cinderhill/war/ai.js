@@ -3,12 +3,35 @@
 //
 // It knows where every pile is (there is no fog yet; when sight arrives it gets the same sight as a player).
 
-import { CMD, KIND, CG, TRAILS, PATH_MAX, MAX_PILES, FOOD, TEAMS } from './sim.js';
+import { CMD, KIND, CG, TRAILS, PATH_MAX, MAX_PILES, FOOD, TEAMS, ROOM } from './sim.js';
 
 export const THINK_EVERY = 20;
 
-/** The orders this seat gives now. `mood`: 0 timid (never raids), 1 steady, 2 bold (raids early). */
-export function think(sim, t, mood = 1) {
+// Where it digs, as [kind, x0, y0, x1, y1] offsets from its shaft: stores beside the porch, quarters beside the tunnels,
+// nursery wings. It takes the first of a kind it has not painted yet.
+const SLOTS = [
+  [ROOM.STORE, 3, 4, 6, 6], [ROOM.STORE, -6, 4, -3, 6],
+  [ROOM.REST, 1, 7, 5, 8], [ROOM.REST, -5, 7, -1, 8], [ROOM.REST, 3, 14, 7, 15], [ROOM.REST, -7, 14, -3, 15], [ROOM.REST, 6, 7, 10, 8], [ROOM.REST, -10, 7, -6, 8],
+  [ROOM.NURSERY, 6, 10, 9, 13], [ROOM.NURSERY, -10, 10, -7, 13],
+];
+
+/** The dig and room orders for the next room of a kind, or none when every slot of it is taken. */
+export function buildNext(sim, t, kind) {
+  const L = sim.L, dx = sim.door[t] % L.sw;
+  for (const [k, x0, y0, x1, y1] of SLOTS) {
+    if (k !== kind || sim.room[y0 * L.nw + dx + x0] === kind) continue;
+    const cells = [];
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) cells.push(dx + x, y);
+    return [{ team: t, type: CMD.DIG, cells }, { team: t, type: CMD.ROOM, cells, kind }];
+  }
+  return [];
+}
+
+/** The orders this seat gives now. `mood`: 0 timid (never raids), 1 steady, 2 bold (raids early); or { mood, build: false }
+ *  for a mind that never digs, or { mood, rooms: [kinds] } for one that digs only those. */
+export function think(sim, t, mind = 1) {
+  const mood = typeof mind === 'number' ? mind : mind.mood ?? 1, build = typeof mind === 'number' ? true : mind.build !== false;
+  const may = k => typeof mind === 'number' || !mind.rooms || mind.rooms.includes(k); // rooms: the only kinds this mind digs
   const out = [], L = sim.L, sw = L.sw, o = t * CG.SIZE, cg = sim.cg;
   if (cg[o + CG.QUEEN_HP] <= 0 || sim.result) return out;
   const door = sim.door[t], dx = door % sw, dy = Math.floor(door / sw);
@@ -38,6 +61,13 @@ export function think(sim, t, mood = 1) {
   const adults = cg[o + CG.ADULTS], majors = cg[o + CG.MAJORS];
   const diet = adults < 36 ? 0 : adults < 60 ? 1 : 2;
   if (cg[o + CG.DIET] !== diet) out.push({ team: t, type: CMD.DIET, share: diet });
+  // Building, one room at a time: a store when the stores are nearly full, quarters when the hill is, a nursery wing when the brood is.
+  if (build && cg[o + CG.MARKS] === 0) {
+    let brood = 0; for (let b = 0; b < sim.bn; b++) if (sim.bTeam[b] === t) brood++;
+    const capF = cg[o + CG.CAP_FOOD];
+    const kind = may(ROOM.STORE) && Math.max(cg[o + CG.SUGAR], cg[o + CG.PROTEIN]) * 5 >= capF * 4 ? ROOM.STORE : may(ROOM.REST) && adults + brood >= cg[o + CG.CAP_ADULTS] - 10 ? ROOM.REST : may(ROOM.NURSERY) && brood >= cg[o + CG.CAP_BROOD] - 4 ? ROOM.NURSERY : 0;
+    if (kind) for (const b of buildNext(sim, t, kind)) out.push(b);
+  }
   // Defence: enemies by the door call the guard and the resting to it.
   let foes = 0;
   for (let i = 0; i < sim.n; i++) if (sim.team[i] !== t && sim.hp[i] > 0 && sim.layer[i] === 0 && Math.abs((sim.x[i] >> 8) - dx) <= 10 && Math.abs((sim.y[i] >> 8) - dy) <= 10) foes++;
