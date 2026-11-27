@@ -1021,3 +1021,20 @@ The lab page moved to `archive/lab/lantern-ripples/`. Its old address goes to `/
 
 The lab asked whether tilting the phone should also steer in 2D and 3D. The answer: no, only first person. That is how the game already works (2D and 3D steer by sliding a finger; tilt, slide and press are offered in first person only), so nothing changed. The question is closed.
 
+## 2026-11-27: the gentle river and a Settings card (the lab's own change, for outside players)
+
+**Why.** Lab play records from 2026-11-22 to 27 (owner rows, twelve player ids). Ten ids looked new. Their first runs: eight ended on the bank, at 1 s, 1 s, 2 s, 2 s, 7 s, 13 s, 18 s and 22 s; none of them reached dawn in the first session; six played one or two runs and did not come back. A browser run with nobody steering ends on the bank of night 1 in about 9 s, because the river bends and the boat goes straight. Those records are from before the tutorial of 2026-11-26, so the tutorial's effect is not measured yet.
+
+**What changed.**
+- `sim.js`: a state with `s.gentle` set treats the bank like the moment after a blow: it holds the boat in. The first touch of each brush dims the flame by 0.06 (never below 0.12) and sends a `brush` event; the page says "The reeds push you back. Steer for open water." A state without `s.gentle` plays exactly as before (`bots.mjs` does not set it).
+- The page sets `s.gentle` and at least two hearts on story nights when the River setting is Gentle. The endless river, today's river, the tower, the tutorial and the modes are always Classic, so every board stays fair.
+- Settings card (menu, `#toSettings`), built on the new `kit/settings.js`: River (Gentle or Classic), Steering feel (Calm 1, Normal 1.3, Quick 1.7; the old `?gain=` still wins), Perspective and Music (their old keys `lantern-view` and `lantern-music`).
+- Default for River: Gentle for a player with no save, Classic for a player who has one. It is decided once and kept under `lantern:set:river~def`; the choice is under `lantern:set:river`, the steering feel under `lantern:set:gain`.
+- Records: every run's start carries `set` (the four values) and `gentle`; a change sends a `setting` event with `id`, `value`, `from`, `def`. This follows the owner's rule of 2026-11-27 (options as settings with a default, then count who changes them).
+
+**The gate for "strangers finish without help"** (not met or measured yet): of player ids first seen after this change, the share that reach a dawn in their first session. Before: 0 of 10. Read it with `node scripts/lab-mine.mjs <day> --game=lantern`.
+
+**Checked.** A scratch browser script in WebKit iPhone 13 and Chromium Pixel 7 profiles: a new player gets Gentle and two hearts; an unsteered run with rocks removed brushes the bank and ends in the dark at 17.7 s, not on the bank; after picking Classic the same run ends on the bank; picks survive a reload; an old save gets Classic; the endless river is never gentle; no page errors. `phone.mjs lantern` reads the defaults.
+
+**Not verified.** A person playing it; whether Gentle is too easy for a second week of play (a player can switch); the Turkish of the new lines (AI-written).
+

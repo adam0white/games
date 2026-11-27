@@ -284,8 +284,12 @@ export function step(s, target) {
   if (Math.abs(s.x - c) > edge) {
     // Just after a blow the bank only holds the boat in; otherwise it is a blow, and the boat is set back inside.
     if (s.safe || s.field) s.x = c + Math.sign(s.x - c) * edge; // the force field holds the boat off the bank too
+    else if (s.gentle) { // a gentle river (the page sets s.gentle on story nights): the reeds push the boat back; each touch dims the flame a little
+      s.x = c + Math.sign(s.x - c) * edge;
+      if (!s.brushed) { s.brushed = true; s.light = Math.max(0.12, s.light - 0.06); s.events.push('brush'); }
+    }
     else { if (blow(s, 'bank')) return s; s.x = c + Math.sign(s.x - c) * (edge - 0.03); }
-  }
+  } else if (s.brushed && Math.abs(s.x - c) < edge - 0.02) s.brushed = false;
   if (s.light <= 0) { s.light = 0; s.over = 'dark'; s.events.push('out'); return s; }
   if (!s.endless && s.y + s.bonus >= GOAL) { s.over = 'dawn'; s.events.push('dawn'); }
   if (s.rocks.length && s.rocks[0].y0 < s.y - 1.5) s.rocks = s.rocks.filter(k => k.y0 >= s.y - 1.5);
