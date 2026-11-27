@@ -15,7 +15,7 @@ const el = id => document.getElementById(id);
 const canvas = el('river');
 const draw = river(canvas);
 const randomSeed = () => crypto.getRandomValues(new Uint32Array(1))[0];
-const rec = lab('flame', { lang });
+const rec = lab('flame-a', { lang });
 const prefs = settings('flame', {
   look: { values: ['paper', 'thermal', 'storm'], def: 'paper' },
   drop: { values: ['dims', 'ends'], def: 'dims' },

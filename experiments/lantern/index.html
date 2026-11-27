@@ -33,7 +33,8 @@
   .screen { position: fixed; inset: 0; display: none; place-items: center; text-align: center; pointer-events: none; }
   .screen.on { display: grid; }
   .screen > div { max-width: 21em; width: calc(100% - 2em); padding: 1em; pointer-events: auto; }
-  #card > div { pointer-events: none; } #card button { pointer-events: auto; }
+  #card > div { pointer-events: none; } #card button, #card input { pointer-events: auto; }
+  #card { background: #05080fd9; -webkit-backdrop-filter: blur(6px) brightness(.45); backdrop-filter: blur(6px) brightness(.45); } #card .hint { opacity: .85; } /* every card dims and blurs the river behind it, so its words pass contrast over a bright dawn (measured on the dawn card, 2026-11-27: NOTES.md) */
   .veil { background: #05080fd9; } #menu.veil { background: #05080f99; }
   #menu.compact { align-items: start; background: linear-gradient(#05080fc9, #05080f2a 54%, transparent 72%); }
   #menu.compact > div { margin-top: max(12px, min(12dvh, 96px)); }
@@ -44,7 +45,7 @@
   #menu .lab-notice a { display: inline-block; padding: .15em .35em; }
   #ordinaryPlay { color: #ffe6bd; display: inline-flex; align-items: center; min-height: 44px; padding: 0 .5em; touch-action: manipulation; }
   #skipCrash { position: fixed; bottom: calc(16px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); }
-  #card.on { background: radial-gradient(ellipse at center, #05080fe0 0%, #05080f70 64%, transparent 100%); }
+  #card.on { background: radial-gradient(ellipse at center, #05080fee 0%, #05080fd9 64%, #05080fc8 100%); } /* WebKit draws no backdrop filter over the 3D canvas, so the colour alone must dim it */
   #card > div { max-height: 100dvh; box-sizing: border-box; overflow-y: auto; touch-action: pan-y; }
   #card h1 { font-size: clamp(1.65em, 8vw, 2.6em); letter-spacing: .05em; }
   #card #pauseLanguage { top: 0; right: 0; }
@@ -103,10 +104,14 @@
   #fuel.low { outline: 1px dashed #ffe9b2; outline-offset: 2px; }
   #embers { font-size: 26px; line-height: 1.3; color: #ffd9a0; }
   #count { display: inline-block; }
+  #rival { position: fixed; top: calc(6px + clamp(22px, 7vw, 36px) * 1.15 + env(safe-area-inset-top)); left: 0; right: 0; text-align: center; font-size: 15px; color: #ffd9a0; pointer-events: none; text-shadow: 0 1px 6px #000; font-variant-numeric: tabular-nums; } #rival.passed { color: #b8f0c0; } #rival.passed::before { content: '✓ '; }
+  #tutSkip { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translateX(-50%); }
+  #toView b, #toView small { display: block; } /* in Settings, as it was in the menu's row: the name over what is chosen */
+  #dareAsk input { box-sizing: border-box; width: 100%; max-width: 14em; padding: .5em; color: inherit; background: #070b14; border: 1px solid #ffd9a088; border-radius: 8px; }
   #big { position: fixed; top: calc(6px + env(safe-area-inset-top)); left: 0; right: 0; display: none; text-align: center; font-size: clamp(22px, 7vw, 36px); line-height: 1.1; color: #fff3dc; pointer-events: none; text-shadow: 0 1px 8px #000; font-variant-numeric: tabular-nums; }
   #warn, #say { position: fixed; left: 0; right: 0; text-align: center; pointer-events: none; opacity: 0; transition: opacity .3s; text-shadow: 0 1px 8px #000; padding: 0 1em; }
   #warn { top: 24%; font-size: 18px; line-height: 1.2; color: #ffe9b2; }
-  body.ember-intro .kit-hint[data-kind="fingertip"] .label { display: none; }
+  .kit-hint[data-kind="fingertip"].still .label { top: 24px !important; } /* with reduced motion the words go under the fingertip, clear of the ghost boat drawn above it */
   #warn.on { opacity: 1; animation: pulse .9s infinite alternate; }
   @keyframes pulse { to { opacity: .7; } }
   #tip { position: fixed; top: 17%; left: 1em; right: 1em; display: none; text-align: center; font-size: 22px; line-height: 1.3; color: #ffe6bd; text-shadow: 0 1px 8px #000, 0 0 16px #000; pointer-events: none; }
@@ -123,7 +128,7 @@
 <canvas id="c3" hidden></canvas>
 <canvas id="c"></canvas>
 <div id="hud"><div id="hearts"></div><div id="fuel" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" data-i18n-aria="fuel"></div><div id="embers"><span class="dot"></span><span id="count">0</span></div></div>
-<div id="big"></div>
+<div id="big"></div><div id="rival" hidden></div><button id="tutSkip" hidden data-i18n="tutSkip">Skip</button>
 <div id="warn" data-i18n="fade">The lantern is beginning to fade</div>
 <div id="say"></div>
 <div id="tip" aria-live="polite"></div>
@@ -137,12 +142,12 @@
   <p class="menuOption" data-i18n="tagline">Carry the light down the river to dawn.</p>
   <p class="bank menuOption"><span class="dot"></span><span id="bank">0</span> <span data-i18n="embers">embers</span><span id="stars"></span></p>
   <p id="storyStart"><button id="less" class="small menuOption" aria-label="Earlier night" data-i18n-aria="earlier">&lsaquo;</button><button id="play" class="main">Play</button><button id="more" class="small menuOption" aria-label="Later night" data-i18n-aria="later">&rsaquo;</button></p>
-  <p id="dareCard" hidden><span id="dareText" hidden></span><button id="dareGo" class="main"></button><br><a id="ordinaryPlay" href="./" data-i18n="ordinaryPlay">Play Lantern</a></p>
+  <p id="dareCard" hidden><span id="dareText" hidden></span><button id="dareGo" class="main"></button><br><button id="dareAgain" hidden data-i18n="dareAgain">Play the dare again</button><br><a id="ordinaryPlay" href="./" data-i18n="ordinaryPlay">Play Lantern</a></p>
   <p><button id="moreOptions" aria-controls="menuOptions" aria-expanded="false" data-i18n="moreOptions">More</button></p>
   <div id="menuOptions" class="menuOption">
     <p id="about"></p>
     <p id="ready"></p>
-    <p class="groups"><button id="toModes"><b data-i18n="modes">Game mode</b><small id="modesNow"></small></button><button id="toShop"><b data-i18n="shop">Shop</b><small id="shopNow"></small></button><button id="toView"><b data-i18n="perspective">Perspective</b><small id="viewNow"></small></button></p>
+    <p class="groups"><button id="toModes"><b data-i18n="modes">Game mode</b><small id="modesNow"></small></button><button id="toShop"><b data-i18n="shop">Shop</b><small id="shopNow"></small></button></p>
     <p class="foot"><button id="toBoard" data-i18n="board">Leaderboard</button><button id="toTutor" data-i18n="howTo">How to play</button><button id="toSettings" data-i18n="settings">Settings</button><button class="music"></button><button id="toCredits" data-i18n="credits">Credits</button></p>
     <p class="hint viewNote" id="viewNote" hidden></p>
   </div>
@@ -185,6 +190,7 @@
 <div id="settings" class="screen veil"><div>
   <h2 data-i18n="settings">Settings</h2>
   <div id="setRows"></div>
+  <p><button id="toView"><b data-i18n="steerHead">Steering</b><small id="viewNow"></small></button></p>
   <p><button class="back" data-i18n="back">Back</button></p>
 </div></div>
 <div id="tutor" class="screen veil"><div>
@@ -213,7 +219,7 @@
 <div id="card" class="screen"><div><button id="pauseLanguage" class="language" hidden></button><h1 id="title"></h1><p id="line"></p><p id="sub"></p>
   <p id="primaryRetry"><button id="go" class="main">Play again</button><button id="sameRiver" hidden data-i18n="sameRiver">Same river</button></p>
   <p id="riverRetries" hidden><button id="wonNewRiver" data-i18n="newRiver">New river</button><button id="wonSameRiver" data-i18n="sameRiver">Same river</button></p>
-  <p id="dareRow" hidden><button id="dareSend">Dare a friend</button><br><span class="hint" id="dareNote" aria-live="polite"></span><input id="dareUrl" readonly hidden aria-label="Dare link" data-i18n-aria="dareLinkLabel"></p>
+  <p id="dareRow" hidden><span id="dareAsk" hidden><label for="dareName" data-i18n="dareYou">Your name (optional)</label><br><input id="dareName" maxlength="16" autocomplete="nickname" enterkeyhint="send"><br></span><button id="dareSend">Dare a friend</button><br><span class="hint" id="dareSame" data-i18n="dareSame">Same river, same hearts.</span><br><span class="hint" id="dareNote" aria-live="polite"></span><input id="dareUrl" readonly hidden aria-label="Dare link" data-i18n-aria="dareLinkLabel"></p>
   <div id="ask" hidden><p data-i18n="ask">Show your endless scores to everyone on the leaderboard? After a yes, every run from the next one goes up by itself.</p><p><input id="askName" maxlength="16" autocomplete="nickname" enterkeyhint="done" placeholder="Type a name"></p><p class="hint" id="askNote">Your name and your score are sent, and a signal when a run starts. Nothing else.</p><p><button id="askYes" data-i18n="askYes">Yes, show them</button><button id="askNo" data-i18n="askNo">No</button></p></div>
   <p><button id="toMenu">Menu</button><button class="music"></button></p><p><button id="viewNext" hidden></button></p><p class="steerRow" hidden><button class="steer"></button></p><div id="recordCard"></div></div></div>
 <script type="module">
@@ -228,17 +234,24 @@ import { sides } from '../kit/sides.js';
 import { tiltSteer } from '../kit/tilt.js';
 import { hint } from '../kit/hint.js?v=2';
 import { feedback } from '../kit/fx.js';
-import { dareLink, dareRead, shareLink } from '../kit/dare.js'; // a dare by link: the same river for a friend, no account (dare below)
-import { readRiver, riverBits } from './dare-river.js?v=1';
+import { dareLink, dareRead, shareLink } from '../kit/dare.js?v=2'; // a dare by link: the same river for a friend, no account (dare below)
+import { readRiver, riverBits, ENDLESS_TOP } from './dare-river.js?v=2';
 import { drawHazards, poolLead } from './hazards.js?v=1';
 import { lab } from '../kit/lab.js'; // lab recording: the rec lines below
 import { settings } from '../kit/settings.js'; // options with a default, and a record of each change: opts below
 import { noZoom } from '../kit/zoom.js'; noZoom(); // no double-tap or pinch zoom (note #74)
 import { hull, wake, flame, burn, glow as flameGlow, mark, TINT, reeds, shine, halo, flood } from './looks.js?v=4';
-import { t, lang, setLang, apply, langs } from './words.js?v=1'; // every word the player sees, in English and Turkish
+import { t, lang, setLang, apply, langs } from './words.js?v=2'; // every word the player sees, in English and Turkish
 
 const query = new URLSearchParams(location.search);
 const dare = readRiver(dareRead());
+// The dare's own helpers (share loop, 2026-11-27). A night or a tower level is scored in percent of the way to dawn, the endless river in points.
+const pctDare = d => Boolean(d.night || d.tower);
+const dareKey = d => `${d.seed}.${d.score}.${d.extra}.${d.name}`;
+// lantern-dare-done: { k, n, seed, extra } once this phone has played the dare in the link k (dareKey) to an end, n its best score there.
+// The menu then shows that result and Send it back, not the dare it already took.
+const dareDone = () => { const d = plain(readJson('lantern-dare-done', {})); return dare && d.k === dareKey(dare) && Number.isInteger(d.n) && Number.isInteger(d.seed) && Number.isInteger(d.extra) ? d : null; };
+const dareGap = (n, d) => { const name = d.name || t('dareAnon'), pc = pctDare(d); return n > d.score ? t(pc ? 'dareByPct' : 'dareBy', { name, d: n - d.score }) : n === d.score ? t('dareTied', { name }) : t(pc ? 'dareShortPct' : 'dareShort', { name, d: d.score - n + 1 }); };
 let landingMore = false;
 // A portal copy (scripts/portal-zip.mjs sets window.PORTAL before this script): the page runs inside another site's frame, so it
 // asks this site for nothing: no shared board, no lab recording (kit/lab.js), no tester notes, no Race rooms. 'itch' may link out,
@@ -374,7 +387,7 @@ window.lanternSim = () => s; // the browser checks use this to reach late stretc
 const cards = screens(['menu', 'shop', 'credits', 'card', 'board', 'modes', 'perspective', 'tutor', 'mode', 'settings']);
 // More modes (NOTES.md, "How a mode plugs in"): a mode is a module in modes/ that index.html loads when it is chosen. mod is the mode
 // chosen, or null; with null, every line below runs as before modes. A mode is drawn flat: the view the player chose comes back after.
-const MODES = { spark: () => import('./modes/spark.js?v=1'), tide: () => import('./modes/tide.js?v=1'), duet: () => import('./modes/duet.js?v=1'), race: () => import('./modes/race.js?v=1') }, made = {};
+const MODES = { spark: () => import('./modes/spark.js?v=2'), tide: () => import('./modes/tide.js?v=2'), duet: () => import('./modes/duet.js?v=2'), race: () => import('./modes/race.js?v=2') }, made = {};
 let mod = null;
 const pct = () => mod ? mod.reach() : progress(s);
 async function chooseMode(id) {
@@ -425,11 +438,14 @@ function menu() {
   if (dare) {
     const name = dare.name || t('dareAnon');
     const dawn = dare.night && dare.score === 100;
-    $('dareGo').textContent = t(dawn ? 'dareMatch' : dare.night ? 'dareBeatNight' : 'dareBeat', { name, n: dare.score });
+    const done = dareDone();
+    $('dareGo').textContent = done ? t('dareSendBack') : t(dawn ? 'dareMatch' : pctDare(dare) ? 'dareBeatNight' : 'dareBeat', { name, n: dare.score });
     // The recording trace uses the accessible label. Keep the sender's name on the page.
-    $('dareGo').setAttribute('aria-label', t(dawn ? 'dareAriaMatch' : dare.night ? 'dareAriaNight' : 'dareAria', { n: dare.score }));
-    $('dareText').textContent = t(dare.night ? 'dareRivalNight' : 'dareRival', { name, n: dare.score });
+    $('dareGo').setAttribute('aria-label', done ? t('dareSendBack') : t(dawn ? 'dareAriaMatch' : pctDare(dare) ? 'dareAriaNight' : 'dareAria', { n: dare.score }));
+    $('dareText').textContent = done ? dareGap(done.n, dare) : t(pctDare(dare) ? 'dareRivalNight' : 'dareRival', { name, n: dare.score });
+    $('dareText').hidden = $('dareAgain').hidden = !done;
   }
+  $('rival').hidden = $('tutSkip').hidden = true;
   $('stars').textContent = reborn ? ` · ${'★'.repeat(Math.min(5, reborn))}${reborn > 5 ? reborn : ''}` : '';
   $('modesNow').textContent = t('modesNow'); $('shopNow').textContent = t('shopNow'); $('bank').textContent = bank; $('play').textContent = t('playNight', { n: stage });
   $('less').disabled = stage <= 1; $('more').disabled = stage >= opened;
@@ -683,6 +699,10 @@ const TUTOR = [
   { say: () => 'tutRock', lay() { if (tutor.age > 1 && tutor.laid < 3 && !s.rocks.some(k => k.y > s.y)) { tutor.laid++; const c = centre(s, s.y); stone(Math.max(-0.8, Math.min(0.8, (s.x - c) / half(s, s.y))), 1.5); } }, done: () => tutor.laid >= 3 && !s.rocks.some(k => k.y > s.y - 0.1) },
   { say: () => 'tutField', lay() { if (!s.field && !waiting1('shield')) lay('shield', side1()); if (s.field && tutor.laid < 4 && !s.rocks.some(k => k.y > s.y + 0.7)) { tutor.laid++; stone(0, 1.3); stone(0.7, 1.45); stone(-0.7, 1.45); } }, done: () => s.events.includes('fieldEnd') },
 ];
+// How to play waits on the player at each step. After 6 s with no steering on the first step a fingertip shows how to slide
+// (kit/hint.js, made only then, under its own key lantern-tutor-hint, set back to '0' first so each page's first stalled tutorial shows it; no other run has a second hint); after 20 s on any step, Skip.
+let tutorHelp = null;
+function tutorFinger() { write('lantern-tutor-hint', '0'); tutorHelp = hint(canvas, { kind: 'fingertip', label: t('hint'), key: 'lantern-tutor-hint', delay: 100, reach: 35, bottom: demoBottom, played: false, when: () => playing && !paused && tutor?.at === 0 && dragging() }); }
 function tutorial() {
   store.set('lantern-tutorial', '1'); endless = tower = daily = false;
   tutor = { at: 0, age: 0, moved: 0, from: 0, laid: 0 };
@@ -692,14 +712,16 @@ function tutorTick(was) {
   tutor.age += DT; tutor.moved += Math.abs(s.x - was); s.bonus = -s.y; // the river has no end while a step is unfinished
   if (s.events.includes('hurt')) say(t('tutHurt'), 2200);
   const step1 = TUTOR[tutor.at]; step1.lay();
+  if (tutor.at === 0 && tutor.age > 6 && !tutorHelp && dragging() && !steerHint.shown) tutorFinger();
+  if (tutor.age > 20) $('tutSkip').hidden = false;
   if (step1.done()) {
     tutor.at++; tutor.age = 0; tutor.laid = 0; tutor.from = s.taken; s.rocks = []; s.embers = s.embers.filter(e => e.got); tone(660, 0.25, 0.09, 'triangle'); setTimeout(() => tone(990, 0.4, 0.09, 'triangle'), 110);
     if (tutor.at >= TUTOR.length) { tutorEnd(); return; }
   }
   const words = t(TUTOR[tutor.at].say()); if ($('tip').textContent !== words) $('tip').textContent = words;
 }
-function tutorEnd() {
-  playing = false; ended = performance.now(); tutor = null; steer.drop(); pads.drop(); $('tip').textContent = ''; rec.end('done', { mode: 'tutorial', night: 0 });
+function tutorEnd(why = 'done') {
+  playing = false; ended = performance.now(); tutor = null; steer.drop(); pads.drop(); $('tip').textContent = ''; $('tutSkip').hidden = true; rec.end(why, { mode: 'tutorial', night: 0 });
   $('toMenu').textContent = t('menu'); $('ask').hidden = $('viewNext').hidden = true; $('title').textContent = t('tutDone');
   $('line').textContent = t(dare ? 'tutDoneDare' : 'tutDoneLine'); $('sub').textContent = '';
   $('go').textContent = dare ? t('dareGo') : t('playNight', { n: stage });
@@ -724,6 +746,9 @@ function begin({ replay, challenge = null } = {}) {
   const abilities = tutor ? [] : challenge?.abilities ?? (replay ? [...replay.on, ...replay.gifts] : powersOwned());
   s = mod ? mod.start(abilities) : create(runSeed, runNight, tower ? 'tower' : endless, abilities, runStats, climb, tutor ? 0 : challenge?.reborn ?? reborn);
   if (challenge) s.dare = challenge;
+  s.fromFloor = tower ? fromFloor : 0; rivalPassed = false; $('tutSkip').hidden = true;
+  $('rival').hidden = !challenge; $('rival').classList.remove('passed');
+  if (challenge) $('rival').textContent = t(pctDare(challenge) ? 'dareHudPct' : 'dareHud', { name: challenge.name || t('dareAnon'), n: challenge.score });
   practiceFinished = false;
   $('sameRiver').hidden = $('riverRetries').hidden = $('dareRow').hidden = true;
   if (!tower) fromFloor = 0; else if (fromFloor) startAt(s, fromFloor); // part-way up the level (note #142)
@@ -738,7 +763,7 @@ function begin({ replay, challenge = null } = {}) {
   $('tip').textContent = ''; shown = ''; show('play'); introTick(); hud();
   if (tutor) { floor = 0; rec.start({ ...opts.snapshot(), view, mode: 'tutorial', night: 0 }); return; }
   if ($('tip').textContent) $('say').style.opacity = 0;
-  else say(mod ? mod.hello() : (tower ? t(climb > LEVELS ? (fromFloor ? 'saySectorFloor' : 'saySector') : (fromFloor ? 'sayTowerFloor' : 'sayTower'), { n: climb > LEVELS ? climb - LEVELS : climb, of: LEVELS, f: fromFloor }) : endless ? t('endless') : t('sayNight', { n: runNight })) + (boosted && !challenge ? '. ' + t('statsOn') : waiting ? '. ' + t('statsWait') : ''), waiting ? 2800 : 1800);
+  else say(mod ? mod.hello() : (tower ? t(climb > LEVELS ? (fromFloor ? 'saySectorFloor' : 'saySector') : (fromFloor ? 'sayTowerFloor' : 'sayTower'), { n: climb > LEVELS ? climb - LEVELS : climb, of: LEVELS, f: fromFloor }) : endless ? t(daily && !challenge ? 'daily' : 'endless') : t('sayNight', { n: runNight })) + (boosted && !challenge ? '. ' + t('statsOn') : waiting ? '. ' + t('statsWait') : ''), waiting ? 2800 : 1800);
   floor = fromFloor;
   const river = challenge || replay ? (s.gentle ? 'gentle' : 'classic') : opts.get('river');
   rec.start({ ...opts.snapshot(), view, river, mode: mode(), night: runNightNumber(), ...(tower ? { level: climb, floor: fromFloor } : {}), gentle: !!s.gentle, ...(challenge ? { their: challenge.score } : {}) });
@@ -747,42 +772,58 @@ function begin({ replay, challenge = null } = {}) {
 // within seconds. On story nights a gentle river's banks push the boat back and dim the flame a little; rocks, ice and the dark are as
 // they were. The endless river, today's river, the tower and the modes always have classic banks, so every board stays fair.
 const gentleRun = () => !tutor && !endless && !tower && !daily && !mod && opts.get('river') === 'gentle';
-const mode = () => mod ? mod.id : tutor ? 'tutorial' : tower ? 'tower' : s.dare ? 'dare' : endless ? 'endless' : 'night';
+const mode = () => mod ? mod.id : tutor ? 'tutorial' : s.dare ? 'dare' : tower ? 'tower' : endless ? 'endless' : 'night';
 const runNightNumber = () => mod ? mod.night() : tower || endless || tutor ? 0 : s.stage;
 const dareResult = state => state.endless ? score(state) : Math.floor(progress(state) * 100);
 function playDare(challenge = dare) {
-  endless = !challenge.night;
-  tower = daily = false;
+  endless = !challenge.night && !challenge.tower;
+  tower = Boolean(challenge.tower); daily = false;
+  if (tower) { climb = challenge.climb; fromFloor = challenge.floor; } // the tower menu reads the saved climb again (towerAt), so the player's own climb is untouched
   begin({ challenge });
 }
+let rivalPassed = false;
+// The first dare asks for a name (share loop, 2026-11-27), the sender's and the receiver's alike: a field on the card, optional.
+// A name goes under lantern-name, the board's own key, and shares nothing by itself; lantern-dare-asked is '1' once asked, so an empty field is not asked again.
+const askDareName = () => !playerName() && read('lantern-dare-asked') === null;
+const dareUrlFor = (seed, pts, extra) => dareLink({ seed, score: pts, extra, name: boardName(playerName()) }, PORTAL ? { href: HOME } : location);
+async function dareShare(url, words) {
+  const how = await shareLink(url, words);
+  return [how, t(how === 'copied' ? 'dareCopied' : how === 'shown' ? 'dareShown' : 'dareShared') + ' ' + t(playerName() ? 'dareHasName' : 'dareHasNoName')];
+}
+const dareWords = (ran, pts) => t(ran.endless ? 'dareWords' : ran.tower ? 'dareWordsTower' : pts === 100 ? 'dareWordsDawn' : 'dareWordsNight', { n: pts, night: ran.stage, level: ran.climb });
 async function dareSend() {
   const ran = s, pts = dareResult(ran);
-  const url = dareLink({ seed: ran.seed, score: pts, extra: riverBits(ran), name: boardName(playerName()) }, PORTAL ? { href: HOME } : location);
+  if ($('dareAsk').hidden && askDareName()) { $('ask').hidden = true; $('dareAsk').hidden = false; $('dareName').value = ''; $('dareSend').textContent = t('dareSendNow'); $('dareName').focus(); return; }
+  if (!$('dareAsk').hidden) { const n = boardName($('dareName').value); if (n) store.set('lantern-name', n); store.set('lantern-dare-asked', '1'); $('dareAsk').hidden = true; $('dareSend').textContent = t(ran.dare && pts > ran.dare.score ? 'dareBack' : 'dareFriend'); }
+  const url = dareUrlFor(ran.seed, pts, riverBits(ran, ran.fromFloor));
   if (!url) return;
-  const how = await shareLink(url, t(ran.endless ? 'dareWords' : pts === 100 ? 'dareWordsDawn' : 'dareWordsNight', { n: pts, night: ran.stage }));
+  const [how, note] = await dareShare(url, dareWords(ran, pts));
   if (s !== ran || screen !== 'card') return;
-  rec.event('dare_send', { how, score: pts, back: !!ran.dare });
-  $('dareNote').textContent = t(how === 'copied' ? 'dareCopied' : how === 'shown' ? 'dareShown' : 'dareShared');
+  rec.event('dare_send', { how, score: pts, back: !!ran.dare, named: !!playerName() });
+  $('dareNote').textContent = note;
   $('dareUrl').hidden = how !== 'shown';
   $('dareUrl').value = url;
   if (how === 'shown') { $('dareUrl').focus(); $('dareUrl').select(); }
 }
-function bankRun() { s.banked = Math.round(s.taken * boon() * (mod?.share ?? 1)); bank += s.banked; store.set('lantern-bank', bank); } // a rebirth's bonus is added as the run banks; a mode can bank a share (Duet's rope takes about twice a night's embers)
+// Every run that ends pays at least LEAST embers (share loop, 2026-11-27), so a run lost on the first rock still moves the shop on.
+// A run left from the pause card pays what it took. One fixed floor, not a setting: no player would want a run to pay less.
+const LEAST = 3;
+function bankRun(least = 0) { const got = Math.round(s.taken * boon() * (mod?.share ?? 1)); s.banked = Math.max(least, got); s.least = s.banked > got; bank += s.banked; store.set('lantern-bank', bank); } // a rebirth's bonus is added as the run banks; a mode can bank a share (Duet's rope takes about twice a night's embers)
 function finish() {
   const paid = s.over === 'dawn' && !tower && !endless && !mod && !s.dare && reborn ? 10 * Math.min(5, reborn) : 0; s.taken += paid; // a reborn night pays more at dawn
-  playing = false; ended = performance.now(); steer.drop(); pads.drop(); bankRun();
+  playing = false; ended = performance.now(); steer.drop(); pads.drop(); bankRun(LEAST); $('rival').hidden = true;
   rec.end(s.over, { mode: mode(), night: runNightNumber(), reached: Math.floor(pct() * 100), score: endless ? score(s) : null, embers: s.taken, hearts: s.hearts, bank });
   pauseButton.style.display = 'none';
   if (!crash) $('hud').style.display = $('big').style.display = 'none';
   $('warn').classList.remove('on');
   const won = s.over === 'dawn', why = !won && t(['dark', 'bank', 'ice', 'log', 'pool', 'geyser', 'isle'].includes(s.over) ? `why_${s.over}` : 'why_rock');
-  const gained = t(s.banked > s.taken ? 'gainedBonus' : s.banked === 1 ? 'gained1' : 'gained', { n: s.banked, taken: s.taken, bank });
+  const gained = t(s.least ? 'gainedLeast' : s.banked > s.taken ? 'gainedBonus' : s.banked === 1 ? 'gained1' : 'gained', { n: s.banked, taken: s.taken, bank, least: LEAST });
   const reached = Math.floor(pct() * 100);
   const story = !mod && !tower && !endless && !s.dare;
   const nextNight = story && won && s.stage < NIGHTS ? s.stage + 1 : 0;
   $('toMenu').textContent = t('menu'); $('ask').hidden = $('viewNext').hidden = true;
   if (mod) { const c = mod.end(); $('title').textContent = c.title; $('line').textContent = c.line; $('go').textContent = c.go; } // a mode keeps its own save: no board, no night, no best
-  else if (tower) { // after each level: climb on to a harder one, or stop. The next climb goes on where this one left off (tester t1, note #73)
+  else if (tower && !s.dare) { // after each level: climb on to a harder one, or stop. The next climb goes on where this one left off (tester t1, note #73)
     const at = Math.min(FLOORS, Math.floor(progress(s) * FLOORS)); store.set('lantern-best-tower', Math.max(at, store.get('lantern-best-tower'))); // the old best floor, still kept
     const cleared = won ? climb : climb - 1, best = Math.max(cleared, store.get('lantern-best-level')); store.set('lantern-best-level', best);
     climbNext = won && climb < TOP ? climb + 1 : won ? 1 : climb; store.set('lantern-tower-at', climbNext); // a lost level is tried again
@@ -795,11 +836,11 @@ function finish() {
       $('go').textContent = t('climbOn', { tag: tag(climb + 1) }); $('toMenu').textContent = t('stop');
     } else { $('title').textContent = t('floorResult', { n: at, of: FLOORS }); $('line').textContent = t(back ? 'towerLostFloor' : 'towerLost', { why, best: best > LEVELS ? tag(best) : t('nOf', { n: best, of: LEVELS }), tag: tag(climb), back, at }); $('go').textContent = back ? t('tryFloor', { n: back }) : t('tryLevel', { tag: tag(climb) }); }
   } else if (s.dare) {
-    const n = dareResult(s), their = s.dare.score, name = s.dare.name || t('dareAnon');
-    const rival = t(endless ? 'dareRival' : 'dareRivalNight', { name, n: their });
+    const n = dareResult(s);
     $('title').textContent = endless ? String(n) : t(won ? 'dawn' : 'dawnResult', { n });
-    $('line').textContent = [why, t(n > their ? 'dareWon' : n === their ? 'dareTie' : 'dareLost', { rival })].filter(Boolean).join(' ');
+    $('line').textContent = [why, dareGap(n, s.dare)].filter(Boolean).join(' ');
     $('go').textContent = t('sameRiver');
+    if (dare && dareKey(s.dare) === dareKey(dare)) store.set('lantern-dare-done', JSON.stringify({ k: dareKey(dare), n: Math.max(n, dareDone()?.n ?? 0), seed: s.seed, extra: riverBits(s, s.fromFloor) }));
   } else if (endless && daily) {
     // A run that ends after midnight UTC was on yesterday's river: it counts for neither day and is not sent.
     const late = ranDay !== today(), pts = score(s), was = plain(store.json('lantern-daily', {})), prior = was.d === today() ? Math.floor(was.s) || 0 : 0, best = Math.max(late ? 0 : pts, prior); if (!late) store.set('lantern-daily', JSON.stringify({ d: today(), s: best }));
@@ -813,7 +854,7 @@ function finish() {
     boardSend(pts, ticket); ticket = null;
     if (!decided && pts > 0) { $('ask').hidden = false; $('askName').value = playerName(); $('askNote').textContent = t('askNote'); }
     $('title').textContent = pts > prior ? t('scorePersonalBest', { n: pts }) : String(pts);
-    $('line').textContent = t(place ? 'endlessPlace' : 'endlessLine', { why, best, place }); $('go').textContent = t('playAgain');
+    $('line').textContent = t(place === 1 && board.length === 1 ? 'endlessFirst' : place ? 'endlessPlace' : 'endlessLine', { why, best, place }); $('go').textContent = t('playAgain');
   } else {
     const night = s.stage, key = `lantern-best-${night}`;
     store.set(key, Math.max(reached, store.get(key)));
@@ -826,7 +867,8 @@ function finish() {
   }
   $('sameRiver').hidden = !story || Boolean(nextNight);
   $('riverRetries').hidden = !story || !nextNight;
-  $('dareRow').hidden = Boolean(mod || tower || PORTAL === 'strict' || (endless && dareResult(s) === 0));
+  // A dare on every card a link can carry (story nights, today's river, the tower, the endless river), and none for a result its reader would refuse (dare-river.js).
+  $('dareRow').hidden = Boolean(mod || PORTAL === 'strict' || !(dareResult(s) > 0) || (endless && dareResult(s) > ENDLESS_TOP)); $('dareAsk').hidden = true;
   $('dareSend').textContent = t(s.dare && dareResult(s) > s.dare.score ? 'dareBack' : 'dareFriend');
   $('dareUrl').hidden = true; $('dareNote').textContent = '';
   const tune = song && song.melody, laid = tune ? tune.played + tune.missed : 0; // the share of tonight's melody the embers played
@@ -1004,6 +1046,7 @@ function hud() {
   fuel.style.setProperty('--level', `${flame}%`);
   fuel.classList.toggle('low', flame < 16);
   maxHearts = Math.max(maxHearts, s.hearts);
+  if (s.dare && playing && !rivalPassed && dareResult(s) > s.dare.score) { rivalPassed = true; $('rival').classList.add('passed'); say(t('darePassed', { name: s.dare.name || t('dareAnon') }), 1600); tone(880, 0.3, 0.08, 'triangle'); }
   const big = tutor ? '' : t(endless ? 'hudScore' : 'hudDawn', { n: endless ? score(s) : Math.floor(pct() * 100) });
   const low = playing && !paused && !tutor && flame < 16, now = `${s.hearts}|${maxHearts}|${s.taken}|${big}|${low}`;
   if (now === shown) return; shown = now; // touch the page only when a number changes
@@ -1078,7 +1121,16 @@ function drawSteerDemo() {
 // Buttons.
 function playStory() { endless = tower = daily = false; begin(); }
 $('play').addEventListener('click', playStory);
-$('dareGo').addEventListener('click', () => playDare());
+$('dareGo').addEventListener('click', async () => {
+  const done = dareDone(); if (!done) { playDare(); return; }
+  const url = dareUrlFor(done.seed, done.n, done.extra); if (!url) return;
+  const [how, note] = await dareShare(url, dareWords({ endless: !pctDare(dare), tower: dare.tower, stage: dare.night, climb: dare.climb }, done.n));
+  rec.event('dare_send', { how, score: done.n, back: true, named: !!playerName(), from: 'menu' });
+  $('dareText').textContent = how === 'shown' ? `${note} ${url}` : note;
+});
+$('dareAgain').addEventListener('click', () => playDare());
+$('tutSkip').addEventListener('click', () => { if (tutor) tutorEnd('skip'); });
+$('dareName').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') dareSend(); });
 $('dareSend').addEventListener('click', dareSend);
 $('ordinaryPlay').addEventListener('click', e => {
   if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;

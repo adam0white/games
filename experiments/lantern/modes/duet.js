@@ -8,7 +8,7 @@ import { hull, wake, reeds } from '../looks.js?v=4';
 import { drag } from '../../kit/drag.js';
 import { hint } from '../../kit/hint.js';
 import { read, readJson, writeJson } from '../../kit/save.js';
-import { t } from '../words.js?v=1';
+import { t } from '../words.js?v=2';
 
 // Save. lantern-mode-duet:save is { v: 1, best: { night, pct }, unlocked: nights open, played: runs }.
 // The lab page's save (lantern-duet:v1, { best, unlocked, sound }) is read once for its best and its nights, and never written.
@@ -109,7 +109,7 @@ export function mode(page) {
     const go = document.createElement('button'); go.className = 'main'; go.id = 'modePlay'; go.textContent = t('playNight', { n: night }); go.addEventListener('click', () => page.play());
     const p = document.createElement('p'); p.append(go);
     const best = document.createElement('p'); best.className = 'hint'; best.textContent = bestText();
-    const keyLine = document.createElement('p'); keyLine.className = 'hint'; keyLine.textContent = t('duetKeys') + ' ' + t('duetShare');
+    const keyLine = document.createElement('p'); keyLine.className = 'hint'; keyLine.textContent = (matchMedia('(any-pointer: fine)').matches ? t('duetKeys') + ' ' : '') + t('duetShare'); // the keys only where there is a keyboard and mouse, not on a phone
     box.append(h, what, rule, row, p, best, keyLine);
     if (read('lantern-view', '2d') !== '2d') { const flat = document.createElement('p'); flat.className = 'hint'; flat.textContent = t('duetFlat'); box.append(flat); }
   }

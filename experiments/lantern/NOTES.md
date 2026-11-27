@@ -1067,3 +1067,22 @@ The compact landing shows the recording switch before play and puts practice und
 | Ember-seeking policy with 250 ms delay and lateral noise reaches dawn | 13/300 | 300/300 |
 
 The policy test also checked 20 seeds on each of the 50 Gentle nights at maximum rebirth pace, contact coordinates, positive-clearance grazes, penalty floors, pickup restoration and dare link round trips. A local DOM smoke test exercised the landing, recording opt-out, direct start, touch and key input, HUD, retries and practice-to-dare routing with mocked browser APIs. The shared phone harness could not bind loopback in this session. It also still contains expectations for the superseded tutorial prompt, notice and dare copy. Real-phone input, audio, vibration, visual readability in WebGL and how quickly new players learn or reach dawn remain unverified.
+
+## 2026-11-27: phone check and the share loop (dist/review/brief-share-loop.md)
+
+**Phone check.** Two of the six failures were regressions, fixed in the game: the first-minute commit had shortened the kit's recording notice (it lost "records play" and how to stop it) and renamed the switch; `words.js` now takes both from `kit/lab.js`. A CSS line hid the first-time hint's words under reduced motion; the words now show, below the fingertip. The other failures were stale: they expected the tutorial question, the old lost-run cards and the full menu after an erase. They now assert the new behaviour: the first tap on Play is night 1 (`startedAtOnce`), result-first titles, the compact screen and More. New checks: `lantern first screen` (compact screen for no save, notice and switch inside the viewport, unticking before a run, full menu for a returning player, outline and haptics, the flame gauge, Same river and New river) and more lines in `lantern dare`.
+
+**Share loop.**
+- The first dare tap asks for a name, optional, 16 characters, saved under `lantern-name` (sharing to the board is still only `lantern-share`). New key `lantern-dare-asked`, `'1'` once asked, so an empty field is not asked again.
+- `kit/dare.js`: a link with no name ends at the number (`?dare=k2j9x.412.1`); old links with the trailing dot still read. A long name is cut at a space when it has one.
+- `dare-river.js` refuses a score of 0, over 100 on a night or a tower level, and over 100000 on the endless river. Bit 27 marks a tower level: level, starting floor and stats ride in the link; the dare leaves the player's own climb alone.
+- In a dare run, "Sam 412" sits under the score and turns green with a tick, with "Past Sam!", when passed. The card says "+12 to beat Sam" or "You beat Sam by 54".
+- New key `lantern-dare-done`, JSON `{ k, n, seed, extra }`: the dare in this page's link was played to an end. The menu then shows the result, Send it back and Play the dare again.
+- "Dare a friend" is on every card a reader would accept: story nights, today's river, the tower, the endless river. "Same river, same hearts." The note after sending says whether the link carries a name.
+- Every run that ends pays at least 3 embers. Not a setting: nobody would choose less. A run left from the pause card pays what it took.
+- Copy: Tower "Two sectors of 50 levels"; today's river says "Today's river"; Duet shows key hints only with a fine pointer and its hint names both thumbs; a first endless score says "First score on this phone"; Perspective left the menu (Settings has it, with the same `#toView` button for steering); the steering note says Tilt and Press are first person only.
+- Cards dim and blur the river behind them. WebKit drew no backdrop filter over the 3D canvas, so the card's own colour does the dimming. Measured on the dawn card with the card's words hidden, brightest pixel in the middle 70% of the screen: text 10.9:1 or better, hint lines 8.4:1 or better, 2D and 3D, Chromium Pixel 7 and WebKit iPhone 13 (it was 2.1:1 in WebKit 3D before).
+- How to play: after 6 s with no steering a fingertip shows (its own hint, key `lantern-tutor-hint`, made only then); after 20 s on one step, Skip. A skipped tutorial records `skip`.
+- Spark's button sits further in and its ring grows less, so the ring stays on a Pixel 7 screen.
+
+**Not verified.** A real share sheet; the Turkish lines (AI-written); contrast on cards other than dawn (assumed no worse). Partly done: Send it back from the menu does not ask for a name; Duet's moving hint still draws one slider (its words now name both thumbs).

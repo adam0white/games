@@ -5,7 +5,7 @@
 // ../NOTES.md ("How a mode plugs in"); why Tide is built this way is under "Tide is a mode inside Lantern".
 import { start, tick, jet, strength, rating, reach, centre, half, NIGHTS } from './tide-sim.js?v=1';
 import { read, readJson, writeJson } from '../../kit/save.js';
-import { t } from '../words.js?v=1';
+import { t } from '../words.js?v=2';
 
 // Save. lantern-mode-tide:save is { v: 1, best: highest stage open, stars: { stage: 0..3 }, far: { stage: best % reached }, played: runs }.
 // The lab page's save (lantern-tide:night, '2' once its first night was won) is read once to open stage 2, and never written.

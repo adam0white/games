@@ -330,6 +330,12 @@ async function hinted(page, g) {
   assert.equal(await pose(), p0, 'hint: still with reduced motion'); assert.equal(await label.evaluate(el => getComputedStyle(el).display), 'block', 'hint: words with reduced motion');
   await page.emulateMedia({ reducedMotion: 'no-preference' });
 }
+// Lantern's first minute (2026-11-27): a player with no save is asked nothing; the first tap on Play is night 1 in play, with no
+// tutorial question on the screen (#tutorNo stays hidden) and no tutorial running.
+async function startedAtOnce(page) {
+  const st = await page.evaluate(() => ({ ...window.lanternState(), question: !!document.getElementById('tutorNo')?.getClientRects().length }));
+  assert.deepEqual([st.playing, st.screen, st.tutor, st.question], [true, 'play', -1, false], 'the first tap on Play starts the night, with no tutorial question');
+}
 // A game that follows the house layout: #play on the menu, #pause in play, a state hook with `screen`, and a save blob.
 async function started(page, slug, hook, toMenu) {
   const wait = async (fn, what) => { try { await page.waitForFunction(fn, hook, { timeout: 8000 }); } catch { throw new Error(`timed out waiting for: ${what}`); } };
@@ -686,8 +692,8 @@ const GAMES = {
     await page.goto(`${base}/lantern/?view=3d&x=1`); await until(page, () => window.lanternState().view === '3d' && window.lanternState().viewReady, '?view=3d opens 3D', 20000);
     assert.equal((await saved())['lantern-view'], undefined, '?view=3d does not change the saved view');
     await page.goto(`${base}/lantern/`); assert.equal((await state()).view, '2d', 'without ?view the saved view (2D) comes back');
-    await page.route('**/view3d.js*', r => r.abort()); page.context().viewBad = true; await page.click('#toView'); await page.click('[data-view="3d"]'); await until(page, () => !document.querySelector('#perspective .viewNote').hidden, 'a failed 3D load says so'); assert.equal((await state()).view, '2d', 'no 3D: the river stays 2D'); await page.unroute('**/view3d.js*');
-    await page.reload(); await page.click('#toView'); await page.click('[data-view="3d"]'); await until(page, () => window.lanternState().view === '3d' && window.lanternState().viewReady, '3D starts', 20000); assert.equal((await saved())['lantern-view'], '3d'); assert.equal(await page.isDisabled('[data-steer="tilt"]'), true, 'tilt is for first person'); await page.click('#perspective .back');
+    await page.route('**/view3d.js*', r => r.abort()); page.context().viewBad = true; await page.click('#toSettings'); await page.click('#toView'); await page.click('[data-view="3d"]'); await until(page, () => !document.querySelector('#perspective .viewNote').hidden, 'a failed 3D load says so'); assert.equal((await state()).view, '2d', 'no 3D: the river stays 2D'); await page.unroute('**/view3d.js*');
+    await page.reload(); await page.click('#toSettings'); await page.click('#toView'); await page.click('[data-view="3d"]'); await until(page, () => window.lanternState().view === '3d' && window.lanternState().viewReady, '3D starts', 20000); assert.equal((await saved())['lantern-view'], '3d'); assert.equal(await page.isDisabled('[data-steer="tilt"]'), true, 'tilt is for first person'); await page.click('#perspective .back');
     await page.click('#play'); await page.evaluate(() => { const s = window.lanternSim(); s.safe = 60; s.light = 1; }); const v0 = (await state()).target;
     await finger(page, '#c', [['pointerdown', 200, 400], ['pointermove', 215, 400]]); assert.ok((await state()).target > v0, '3D steers by a drag'); await finger(page, '#c', [['pointerup', 215, 400]]);
     await finger(page, '#pause', [['pointerdown', 0, 0]]); assert.equal(await page.isVisible('#viewNext'), true, 'the pause card changes the view'); await page.click('#viewNext'); assert.equal((await state()).view, 'first'); assert.equal((await saved())['lantern-view'], 'first');
@@ -713,7 +719,7 @@ const GAMES = {
     for (const sign of [-1, 1]) { await calm(); await lean(sign * 25); await until(page, g => { for (let i = 0; i < 2; i++) dispatchEvent(Object.assign(new Event('deviceorientation'), { beta: 45, gamma: g * 25 })); return Math.sign(window.lanternState().slide) === g; }, `leaning steers (${sign})`, 8000, sign); }
     await until(page, () => { dispatchEvent(Object.assign(new Event('deviceorientation'), { beta: 45, gamma: 0 })); return window.lanternState().slide === 0; }, 'level stops the boat');
     await sleep(1700); assert.equal((await state()).tilting, false, 'no readings: pressing steers again');
-    await page.reload(); await until(page, () => window.lanternState().view === 'first', 'the view is kept'); await page.click('#toView'); await page.click('[data-view="2d"]'); assert.equal((await state()).view, '2d'); await page.click('#perspective .back');
+    await page.reload(); await until(page, () => window.lanternState().view === 'first', 'the view is kept'); await page.click('#toSettings'); await page.click('#toView'); await page.click('[data-view="2d"]'); assert.equal((await state()).view, '2d'); await page.click('#perspective .back');
     // A look on the whole screen (notes #73 and #112): tapping an owned boat shows it and hides every button; a tap brings the shop back,
     // and the button under the pack wears it.
     await page.click('#toShop'); await page.click('[data-item="red"]'); st = await state();
@@ -824,7 +830,7 @@ const GAMES = {
       await page.click('#go'); await until(page, () => window.lanternState().screen === 'play' && window.lanternMode().stage === 3, 'a Tide run on stage 3');
       await page.evaluate(() => { clearInterval(window.__hold); const s = window.lanternSim(); s.safe = 1e9; s.light = 0.002; });
       await until(page, () => window.lanternState().screen === 'card', 'the flame goes out', 12000);
-      assert.match(await page.textContent('#line'), /^The flame went out\. \d+% of the way \(best \d+%\)\./, 'the card says why the run ended and the best');
+      assert.match(await page.textContent('#title'), /^\d+% to dawn$/, 'the card leads with the result'); assert.match(await page.textContent('#line'), /^The flame went out\. Best: \d+%\.$/, 'the card says why the run ended and the best');
       const after = await saved(); mine = JSON.parse(after['lantern-mode-tide:save']);
       assert.equal(mine.played, 2); assert.equal(mine.best, 3, 'a loss opens nothing');
       assert.equal(after['lantern-tide:night'], '2', 'the lab save is never written');
@@ -895,7 +901,7 @@ const GAMES = {
       await page.evaluate(() => { const s = window.lanternSim(), m = (s.left + s.right) / 2; s.safe = 0; s.hearts = 1; s.light = 1; s.rocks = [{ x: m, y: s.y + 0.03, rad: 0.012, snagged: false, spent: false, warned: false }]; s.narrows = []; s.left = m - 0.06; s.right = m + 0.06; window.lanternDuetAim(m - 0.06, m + 0.06); });
       await until(page, () => window.lanternState().screen === 'card', 'the snag ends the run', 12000);
       assert.equal(await page.evaluate(() => window.lanternSim().over), 'rope');
-      assert.match(await page.textContent('#line'), /^The snagged rope cost the last heart\. \d+% to dawn\. Embers: 0\. Snags: 1\. Best: night \d, \d+% to dawn\.$/, 'the card says why the run ended and the best');
+      assert.match(await page.textContent('#title'), /^\d+% to dawn$/, 'the card leads with the result'); assert.match(await page.textContent('#line'), /^The snagged rope cost the last heart\. Snags: 1\. Best: night \d, \d+% to dawn\.$/, 'the card says why the run ended and the best');
       const after = await saved(); mine = JSON.parse(after['lantern-mode-duet:save']);
       assert.equal(mine.played, 2); assert.equal(mine.unlocked, 3, 'a loss opens nothing');
       assert.equal(after['lantern-duet:v1'], before['lantern-duet:v1'], 'the lab save is never written');
@@ -970,7 +976,7 @@ const GAMES = {
       await serve({ t: 'roster', ids: [1, 2] }); await serve({ t: 'round', seed: 777, start: await page.evaluate(() => Date.now() + 1000) });
       await until(page, () => window.lanternMode().phase === 'race', 'a second round', 8000);
       await page.keyboard.press('p'); await until(page, () => window.lanternState().screen === 'card', 'P retires a live boat');
-      assert.equal(await page.evaluate(() => window.lanternSim().over), 'left'); assert.equal(await page.textContent('#title'), 'Boat retired'); assert.equal((await state()).paused, false);
+      assert.equal(await page.evaluate(() => window.lanternSim().over), 'left'); assert.match(await page.textContent('#title'), /^\d+% to dawn$/, 'the card leads with the result'); assert.match(await page.textContent('#line'), /^Boat retired · /, 'and says the boat was retired'); assert.equal((await state()).paused, false);
       // No server: three bots, and the race pauses like a night.
       await page.click('#toMenu'); await until(page, () => window.lanternMode().phase === 'menu', 'Menu leaves the room');
       assert.equal(await page.evaluate(() => window.raceSockets[0].readyState), 3, 'and closes the socket');
@@ -1004,6 +1010,7 @@ const GAMES = {
     await until(page, () => document.querySelector('#menu h1').textContent === 'Fener', 'the Turkish menu');
     assert.equal(await page.evaluate(() => document.documentElement.lang), 'tr');
     assert.equal(await page.textContent('#toShop b'), 'Mağaza'); assert.equal(await page.textContent('#toBoard'), 'Sıralama');
+    assert.ok(await page.evaluate(() => document.getElementById('menu').classList.contains('compact')), 'after the erase: the compact first screen'); assert.equal(await page.textContent('#moreOptions'), 'Daha fazla'); await page.click('#moreOptions');
     await page.click('#toModes'); assert.deepEqual(await page.$$eval('#modes a.mode', as => as.map(a => a.getAttribute('href'))), [], 'no mode is a link away now'); assert.deepEqual(await page.$$eval('#modes button.mode', bs => bs.map(b => [b.dataset.mode, b.textContent])), [['race', 'Fener Yarışı'], ['spark', 'Fener Kıvılcım'], ['tide', 'Fener Gelgit'], ['duet', 'Fener Düet']], 'Race, Spark, Tide and Duet are chosen inside Lantern'); await page.click('#modes .back');
     await page.click('#menuLanguage');
     assert.equal(await page.evaluate(() => document.documentElement.lang), 'en');
@@ -1012,8 +1019,8 @@ const GAMES = {
     { const kept = await saved(); await page.click('#toTutor'); assert.equal((await state()).tutor, 0, 'How to play starts the tutorial'); await until(page, () => /steer/.test(document.querySelector('#tip').textContent), 'the first step says how to steer');
       await page.evaluate(() => { const s = window.lanternSim(); s.hearts = 1; s.light = 0.0001; }); await sleep(600); assert.equal((await state()).playing, true, 'nobody loses in the tutorial');
       await finger(page, '#pause', [['pointerdown', 0, 0]]); await page.click('#toMenu'); assert.equal((await state()).tutor, -1); const now = await saved(); for (const k of ['lantern-bank', 'lantern-night', 'lantern-best-1', 'lantern-stats']) assert.equal(now[k], kept[k], k + ' is untouched by the tutorial');
-      await page.evaluate(() => { for (const k of ['lantern-bank', 'lantern-night', 'lantern-tutorial']) localStorage.removeItem(k); }); await page.reload(); await page.click('#play'); assert.equal((await state()).screen, 'tutor', 'a first-time player is asked'); await page.click('#tutorNo'); assert.equal((await state()).playing, true, 'skip plays at once'); assert.equal((await saved())['lantern-tutorial'], '1');
-      await page.reload(); await page.click('#play'); assert.equal((await state()).playing, true, 'asked only once'); await page.evaluate(k => { localStorage.clear(); for (const [a, b] of Object.entries(k)) localStorage.setItem(a, b); }, kept); await page.reload(); }
+      await page.evaluate(() => { for (const k of ['lantern-bank', 'lantern-night', 'lantern-tutorial']) localStorage.removeItem(k); }); await page.reload(); await page.click('#play'); await startedAtOnce(page); assert.equal((await saved())['lantern-tutorial'], undefined, 'night 1 is not the tutorial');
+      await page.reload(); await page.click('#play'); assert.equal((await state()).playing, true, 'and again after a reload'); await page.evaluate(k => { localStorage.clear(); for (const [a, b] of Object.entries(k)) localStorage.setItem(a, b); }, kept); await page.reload(); }
     await page.evaluate(() => localStorage.removeItem('kit:lang'));
   },
   async 'ant-promotion'(page) {
@@ -1323,7 +1330,7 @@ const GAMES = {
     const response = await page.goto(`${base}/proto/lantern/?x=1`);
     assert.equal(page.url(), `${base}/lantern/?x=1`, 'redirected with the query');
     assert.equal((await response.request().redirectedFrom().response()).status(), 301, 'a permanent redirect');
-    await page.click('#play'); await page.click('#tutorNo'); const t = (await page.evaluate(() => window.lanternState())).t;
+    await page.click('#play'); await startedAtOnce(page); const t = (await page.evaluate(() => window.lanternState())).t;
     await page.waitForFunction(t => window.lanternState().playing && window.lanternState().t > t, t);
     await page.goto(`${base}/proto/lab/`); assert.equal(page.url(), `${base}/lab/`, 'lab index');
     await page.goto(`${base}/proto/`); assert.equal(page.url(), `${base}/lab/`, '/proto/ goes to the lab index');
@@ -1332,7 +1339,7 @@ const GAMES = {
   async 'lab down'(page) {
     page.context().labDown = true;
     await page.goto(`${base}/lantern/`); await page.evaluate(LAB_LOCAL); await page.reload();
-    await page.click('#play'); await page.click('#tutorNo'); await page.evaluate(() => { window.lanternSim().light = 0.0001; });
+    await page.click('#play'); await startedAtOnce(page); await page.evaluate(() => { window.lanternSim().light = 0.0001; });
     await until(page, () => window.lanternState().screen === 'card' && !window.lanternState().playing, 'end card');
     await page.click('#go'); assert.ok((await page.evaluate(() => window.lanternState())).playing, 'plays on');
     assert.ok(page.context().labTried > 0, 'a send was tried');
@@ -1340,7 +1347,7 @@ const GAMES = {
   // The page is put away and left while a record is still being compressed: no page error (WebKit raised one).
   async 'leaving mid-run'(page) {
     await page.goto(`${base}/lantern/`); await page.evaluate(LAB_LOCAL); await page.reload();
-    await page.click('#play'); await page.click('#tutorNo');
+    await page.click('#play'); await startedAtOnce(page);
     for (let i = 0; i < 3; i++) {
       await page.evaluate(() => { Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' }); document.dispatchEvent(new Event('visibilitychange')); });
       await page.goto(`${base}/kit/`); await sleep(300);
@@ -1358,17 +1365,95 @@ const GAMES = {
     assert.ok(await page.isHidden('#dareCard'), 'a broken dare link shows no dare');
     await page.evaluate(() => { for (const [k, v] of Object.entries({ 'lantern:set:river': 'classic', 'lantern-tutorial': '1', 'lantern-hint': '1', 'lantern-name': 'Ada', 'lantern-share': '1', 'lantern-board-id': '11111111-2222-4333-8444-555555555555' })) localStorage.setItem(k, v); });
     await page.goto(`${base}/lantern/?lang=en&dare=k2j9x.7.1.Sam`);
-    await until(page, () => !document.getElementById('dareCard').hidden, 'the dare is on the menu'); assert.match(await page.textContent('#dareText'), /^Sam scored 7 on this river/);
+    await until(page, () => !document.getElementById('dareCard').hidden, 'the dare is on the menu');
+    assert.equal(await page.textContent('#dareGo'), 'Beat Sam’s 7', 'the dare names the sender and the score to beat'); assert.equal(await page.getAttribute('#dareGo', 'aria-label'), 'Take the dare and beat 7', 'the traced label carries no name');
+    assert.ok(await page.isVisible('#ordinaryPlay'), 'and the way to play Lantern without the dare');
     await page.click('#dareGo'); await until(page, () => window.lanternState().playing, 'the dare starts');
+    assert.ok(await page.isVisible('#rival'), 'the target shows in the run'); assert.equal(await page.textContent('#rival'), 'Sam 7', 'beside the score: the sender and the score to beat');
+    assert.equal(await page.evaluate(() => document.getElementById('rival').classList.contains('passed')), false, 'not yet passed');
     const run = await page.evaluate(() => { const s = window.lanternSim(); return { seed: s.seed, their: s.dare && s.dare.score, things: [...s.on, ...s.gifts], endless: s.endless, gentle: !!s.gentle }; });
     assert.deepEqual(run, { seed: parseInt('k2j9x', 36), their: 7, things: ['boost'], endless: true, gentle: false }, 'the same river with the same abilities; the banks follow the River setting, Classic here');
     await page.evaluate(() => { const s = window.lanternSim(); s.rocks = []; s.next = Infinity; s.safe = 60; }); await until(page, () => window.lanternState().score > 7, 'a score past the dare', 30000);
+    await until(page, () => document.getElementById('rival').classList.contains('passed'), 'the target is marked once passed');
     await page.evaluate(() => { const s = window.lanternSim(); s.safe = 0; s.hearts = 1; s.shield = 0; s.field = 0; s.x = 5; }); await until(page, () => window.lanternState().screen === 'card', 'the dare ends', 15000);
-    assert.match(await page.textContent('#line'), /You beat Sam: \d+ against 7/); assert.equal(await page.textContent('#dareSend'), 'Send your score back');
+    assert.match(await page.textContent('#line'), /You beat Sam by \d+\.$/); assert.equal(await page.textContent('#dareSend'), 'Send your score back');
+    assert.ok(await page.isHidden('#rival'), 'the target leaves with the run'); assert.equal(await page.textContent('#dareSame'), 'Same river, same hearts.');
     assert.equal(posts, 0, 'a dare takes no board ticket and sends no score'); assert.equal(await page.evaluate(() => localStorage.getItem('lantern-best-endless')), null, 'a dare is not a best endless score');
     await page.evaluate(() => { Object.defineProperty(navigator, 'share', { value: undefined, configurable: true }); Object.defineProperty(navigator, 'clipboard', { value: { writeText: async () => { throw new Error('none'); } }, configurable: true }); });
     await page.click('#dareSend'); await until(page, () => !document.getElementById('dareUrl').hidden, 'with no share sheet and no clipboard the link is shown');
     assert.match(await page.inputValue('#dareUrl'), /\/lantern\/\?dare=k2j9x\.\d+\.1\.Ada$/, 'the link back: the same river, this score, this name');
+    assert.ok(await page.isHidden('#dareAsk'), 'a player with a name is not asked for one');
+    assert.match(await page.textContent('#dareNote'), /your score and your name in it\.$/, 'the note says what the link carries');
+    // Name asked at the first dare tap (share loop, 2026-11-27): optional; an empty field sends a link with no name and no trailing dot.
+    const share0 = await page.evaluate(() => localStorage.getItem('lantern-share'));
+    await page.evaluate(() => localStorage.removeItem('lantern-name'));
+    await page.click('#dareSend'); assert.ok(await page.isVisible('#dareName'), 'with no name, the first dare tap asks for one'); assert.equal(await page.textContent('#dareSend'), 'Send the dare');
+    await page.click('#dareSend'); await until(page, () => /dare=k2j9x\.\d+\.1$/.test(document.getElementById('dareUrl').value), 'an empty name sends a link that ends at the number');
+    assert.match(await page.textContent('#dareNote'), /and no name\.$/, 'the note says the link has no name in it'); assert.equal((await page.evaluate(() => localStorage.getItem('lantern-dare-asked'))), '1');
+    await page.click('#dareSend'); assert.ok(await page.isHidden('#dareAsk'), 'asked once: the next dare is sent without asking');
+    await page.evaluate(() => localStorage.removeItem('lantern-dare-asked'));
+    await page.click('#dareSend'); await page.fill('#dareName', 'Bo'); await page.keyboard.press('p'); assert.equal((await page.evaluate(() => window.lanternState().screen)), 'card', 'typing P in the name does nothing else');
+    await page.fill('#dareName', 'Bo'); await page.click('#dareSend'); await until(page, () => /dare=k2j9x\.\d+\.1\.Bo$/.test(document.getElementById('dareUrl').value), 'a typed name rides in the link');
+    assert.equal(await page.evaluate(() => localStorage.getItem('lantern-name')), 'Bo', 'the name is kept under the board\'s own key'); assert.equal(await page.evaluate(() => localStorage.getItem('lantern-share')), share0, 'and shares nothing by itself');
+    // Back on the menu, a finished dare shows its result and Send it back, not the dare again.
+    await page.click('#toMenu'); assert.match(await page.textContent('#dareText'), /^You beat Sam by \d+\.$/); assert.ok(await page.isVisible('#dareText'));
+    assert.equal(await page.textContent('#dareGo'), 'Send it back'); assert.ok(await page.isVisible('#dareAgain'), 'the dare can still be played again');
+    const done = JSON.parse(await page.evaluate(() => localStorage.getItem('lantern-dare-done'))); assert.equal(done.k, `${parseInt('k2j9x', 36)}.7.1.Sam`);
+    await page.reload(); await until(page, () => window.lanternState, 'reload'); assert.equal(await page.textContent('#dareGo'), 'Send it back', 'and after a reload');
+    await page.evaluate(() => { Object.defineProperty(navigator, 'share', { value: undefined, configurable: true }); Object.defineProperty(navigator, 'clipboard', { value: { writeText: async () => { throw new Error('none'); } }, configurable: true }); });
+    await page.click('#dareGo'); await until(page, () => /^Link shown\.|Copy this link/.test(document.getElementById('dareText').textContent), 'Send it back shares the result');
+    assert.match(await page.textContent('#dareText'), /dare=k2j9x\.\d+\.1\.Bo$/, 'the link back from the menu');
+    // Links: no trailing dot is valid; a score of 0 or past what the mode can make is refused.
+    await page.goto(`${base}/lantern/?lang=en&dare=k2j9x.7.1`); await until(page, () => !document.getElementById('dareCard').hidden, 'a link with no name and no trailing dot works');
+    assert.equal(await page.textContent('#dareGo'), 'Beat a friend’s 7');
+    for (const bad of ['k2j9x.0.1', 'k2j9x.100001.1', 'k2j9x.101.129']) { await page.goto(`${base}/lantern/?lang=en&dare=${bad}`); await until(page, () => window.lanternState, 'load'); assert.ok(await page.isHidden('#dareCard'), `${bad}: a score the mode cannot make shows no dare`); }
+    // A tower dare: the same level from the same floor, scored in percent; the player's own climb is untouched.
+    await page.evaluate(() => { localStorage.setItem('lantern-tower-at', '4'); localStorage.setItem('lantern-tower-floor', '0'); });
+    const tower = await page.evaluate(async () => { const { riverBits } = await import('/lantern/dare-river.js?v=2'); const { create } = await import('/lantern/sim.js?v=16'); return riverBits(create(99, 2, 'tower', [], {}, 12, 0), 2); });
+    await page.goto(`${base}/lantern/?lang=en&dare=2r.40.${tower}.Sam`); await until(page, () => !document.getElementById('dareCard').hidden, 'a tower dare');
+    assert.equal(await page.textContent('#dareGo'), 'Beat Sam’s 40%'); await page.click('#dareGo'); await until(page, () => window.lanternState().playing, 'the tower dare starts');
+    const tw = await page.evaluate(() => { const s = window.lanternSim(); return { tower: s.tower, climb: s.climb, seed: s.seed, from: s.fromFloor }; }); assert.deepEqual(tw, { tower: true, climb: 12, seed: 99, from: 2 }, 'level 12 from floor 2 on the same seed');
+    assert.equal(await page.textContent('#rival'), 'Sam 40%');
+    await page.evaluate(() => { const s = window.lanternSim(); s.safe = 0; s.hearts = 1; s.shield = 0; s.field = 0; s.x = 5; }); await until(page, () => window.lanternState().screen === 'card', 'the tower dare ends', 15000);
+    assert.match(await page.textContent('#line'), /\+\d+% to beat Sam\.$|You beat Sam by \d+%\.$/); assert.ok(await page.isVisible('#dareSend'), 'a tower level can be dared');
+    assert.deepEqual(await page.evaluate(() => [localStorage.getItem('lantern-tower-at'), localStorage.getItem('lantern-tower-floor')]), ['4', '0'], 'a tower dare leaves the climb as it was');
+  },
+  // Lantern's first screen and story card (share loop, 2026-11-27).
+  async 'lantern first screen'(page) {
+    await page.goto(`${base}/lantern/?lang=en`); await page.evaluate(() => localStorage.clear()); await page.reload(); await until(page, () => window.lanternState, 'load');
+    // No save: the compact first screen; the recording notice and its switch inside the viewport before any run.
+    assert.ok(await page.evaluate(() => document.getElementById('menu').classList.contains('compact')), 'a player with no save gets the compact first screen');
+    const box = await page.evaluate(() => ['#play', '#recordMenu input', '#recordMenu a'].map(q => { const r = document.querySelector(q)?.getBoundingClientRect(); return r && r.width > 0 && r.top >= 0 && r.bottom <= innerHeight; }));
+    assert.deepEqual(box, [true, true, true], 'Play, the recording switch and the privacy link are all on the first screen');
+    assert.ok((await page.textContent('#menu')).includes(NOTICE), 'the kit\'s own notice');
+    await page.uncheck('#recordMenu input'); assert.equal(await page.evaluate(() => localStorage.getItem('hf-lab-recording-off')), '1', 'unticking stops recording before any run'); await page.check('#recordMenu input');
+    assert.ok(await page.isHidden('#toTutor'), 'the full menu waits behind More'); await page.click('#moreOptions'); assert.ok(await page.isVisible('#toTutor'), 'More shows the rest');
+    // A returning player: the full menu.
+    await page.evaluate(() => { localStorage.setItem('lantern-night', '2'); localStorage.setItem('lantern-tutorial', '1'); localStorage.setItem('lantern-hint', '1'); }); await page.reload(); await until(page, () => window.lanternState, 'reload');
+    assert.equal(await page.evaluate(() => document.getElementById('menu').classList.contains('compact')), false, 'a returning player gets the full menu');
+    assert.ok(await page.isVisible('#toModes') && await page.isVisible('#toSettings'), 'with modes and settings'); assert.ok(await page.isHidden('#toView'), 'Perspective is in Settings, not on the menu');
+    // Settings: outline and haptics, each with a default, saved under their own keys and in the run snapshot.
+    await page.click('#toSettings'); assert.ok(await page.isVisible('#toView'), 'steering and view from Settings');
+    assert.deepEqual(await page.evaluate(() => { const v = window.lanternSet(); return [v.outline, v.haptics]; }), ['1', '1'], 'outline and haptics are on by default');
+    await page.click('[data-setting="outline"] [data-value="0"]'); await page.click('[data-setting="haptics"] [data-value="0"]');
+    assert.deepEqual(await page.evaluate(() => [localStorage.getItem('lantern:set:outline'), localStorage.getItem('lantern:set:haptics'), window.lanternSet().outline, window.lanternSet().haptics]), ['0', '0', '0', '0'], 'both are kept and read back');
+    await page.click('#settings .back');
+    // The flame gauge falls with the flame and rises with an ember.
+    await page.click('#play'); await until(page, () => window.lanternState().playing, 'night 2');
+    const gauge = () => page.evaluate(() => Number(document.getElementById('fuel').getAttribute('aria-valuenow')));
+    await page.evaluate(() => { const s = window.lanternSim(); s.light = 0.5; s.safe = 60; }); await until(page, () => Number(document.getElementById('fuel').getAttribute('aria-valuenow')) <= 50, 'the gauge shows the flame');
+    const low = await gauge(); await until(page, low => Number(document.getElementById('fuel').getAttribute('aria-valuenow')) < low, 'the gauge falls as the flame burns', 8000, low);
+    const before = await gauge(); await page.evaluate(() => { const s = window.lanternSim(); s.embers.push({ x: s.x, y: s.y + 0.04, got: false, kind: 'ember' }); });
+    await until(page, before => Number(document.getElementById('fuel').getAttribute('aria-valuenow')) > before, 'an ember lifts the gauge', 8000, before);
+    // A story end card: Same river keeps the river; after a dawn, New river and Same river both.
+    const seed = await page.evaluate(() => window.lanternSim().seed);
+    await page.evaluate(() => { const s = window.lanternSim(); s.safe = 0; s.hearts = 1; s.light = 0.0001; }); await until(page, () => window.lanternState().screen === 'card', 'the night ends', 15000);
+    assert.ok(await page.isVisible('#sameRiver'), 'Same river on a lost night'); await page.click('#sameRiver'); await until(page, () => window.lanternState().playing, 'again');
+    assert.equal(await page.evaluate(() => window.lanternSim().seed), seed, 'Same river is the same river');
+    await page.evaluate(() => { const s = window.lanternSim(); s.safe = 99; s.bonus = 1000; }); await until(page, () => window.lanternState().screen === 'card', 'dawn', 15000);
+    assert.ok(await page.isVisible('#wonSameRiver') && await page.isVisible('#wonNewRiver'), 'after a dawn: New river and Same river');
+    await page.click('#wonNewRiver'); await until(page, () => window.lanternState().playing, 'a new river'); const fresh = await page.evaluate(() => ({ seed: window.lanternSim().seed, stage: window.lanternSim().stage }));
+    assert.notEqual(fresh.seed, seed, 'New river is a new river'); assert.equal(fresh.stage, 2, 'on the same night');
   },
   async 'lantern ripples'(page) {
     if (MUTATE) await page.route(/\/lantern\/view3d\.js/, async route => { const r = await route.fetch(), body = (await r.text()).replace('* uRip.w, c) * k;', '* uRip.w, c) * 0.;'); return route.fulfill({ response: r, body }); });
@@ -1476,7 +1561,7 @@ const MUTATE = process.argv.includes('--mutate'); // only 'lantern ripples' read
 const [onlyGame, onlyPhone] = process.argv.slice(2).filter(a => a !== '--mutate');
 // The first argument is 'all' or a comma list of experiments. An experiment's name picks its own check, its
 // first-time help check, and for Lantern the three checks below that play Lantern.
-const WITH = { lantern: ['old links', 'lab down', 'leaving mid-run', 'lantern ripples', 'lantern dare'], duel: ['duel friend'], cinderhill: ['cinderhill check', 'cinderhill orders', 'cinderhill hud', 'cinderhill colony', 'cinderhill days', 'cinderhill looks', 'cinderhill crews', 'cinderhill crew levels', 'cinderhill speed'] };
+const WITH = { lantern: ['old links', 'lab down', 'leaving mid-run', 'lantern ripples', 'lantern dare', 'lantern first screen'], duel: ['duel friend'], cinderhill: ['cinderhill check', 'cinderhill orders', 'cinderhill hud', 'cinderhill colony', 'cinderhill days', 'cinderhill looks', 'cinderhill crews', 'cinderhill crew levels', 'cinderhill speed'] };
 // PHONE_QUICK=1 (pull requests) runs only each named experiment's own check: no help checks and no WITH extras.
 // Those run nightly and by hand, where the first argument is 'all'.
 const QUICK = process.env.PHONE_QUICK === '1' && onlyGame && onlyGame !== 'all';

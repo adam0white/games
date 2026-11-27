@@ -4,7 +4,7 @@
 // pause and the end card. How a mode plugs in is in ../NOTES.md ("How a mode plugs in").
 import { start, tick, view, stars, murmur, rating, reach, centre, half, NIGHTS, TIN_MAX, RING_MAX } from './spark-sim.js?v=1';
 import { read, write, readJson, writeJson } from '../../kit/save.js';
-import { t } from '../words.js?v=1';
+import { t } from '../words.js?v=2';
 import { mark, TINT } from '../looks.js?v=4';
 
 // Save. lantern-mode-spark:save is { v: 1, best: highest night open, stars: { night: 0..3 }, played: runs }.
@@ -25,7 +25,7 @@ function clean(raw) {
 }
 
 const STYLE = `
-#sparkBtn { position: fixed; right: calc(12px + env(safe-area-inset-right)); bottom: calc(18px + env(safe-area-inset-bottom)); width: 72px; height: 72px; min-width: 0; min-height: 0; margin: 0; padding: 0; border-radius: 50%; display: none; touch-action: none; z-index: 5;
+#sparkBtn { position: fixed; right: calc(22px + env(safe-area-inset-right)); bottom: calc(24px + env(safe-area-inset-bottom)); width: 72px; height: 72px; min-width: 0; min-height: 0; margin: 0; padding: 0; border-radius: 50%; display: none; touch-action: none; z-index: 5;
   background: radial-gradient(circle at 50% 42%, #ffe9b8 0, rgb(var(--fire)) 34%, #3a1c08 78%, #1a0e04 100%); border: 2px solid #ffd9a0; box-shadow: 0 0 22px rgba(var(--fire),.55), inset 0 -6px 12px #0006; }
 #sparkBtn svg { width: 34px; height: 34px; display: block; margin: 0 auto; filter: drop-shadow(0 0 4px #fff8); }
 #sparkBtn b { position: absolute; right: -6px; top: -6px; min-width: 28px; height: 28px; border-radius: 14px; background: #0b1020; color: #ffe6bd; border: 1.5px solid #ffd9a0aa; font: bold 15px/25px system-ui, sans-serif; text-align: center; padding: 0 3px; box-sizing: border-box; }
@@ -34,7 +34,7 @@ const STYLE = `
 #sparkBtn.empty { filter: grayscale(.9) brightness(.55); }
 #sparkBtn.pulse::after { content: ''; position: absolute; inset: -4px; border-radius: 50%; border: 3px solid #ffe9b8; animation: sparkRing 1.3s ease-out infinite; pointer-events: none; }
 #sparkBtn.call { box-shadow: 0 0 40px 10px rgba(var(--fire),.9), inset 0 -6px 12px #0006; }
-@keyframes sparkRing { from { transform: scale(1); opacity: .9; } to { transform: scale(1.7); opacity: 0; } }
+@keyframes sparkRing { from { transform: scale(1); opacity: .9; } to { transform: scale(1.4); opacity: 0; } } /* the ring's widest (40px × 1.4) stays inside the screen from the button's centre 58px in from the edge (Pixel 7 check, 2026-11-27) */
 @media (prefers-reduced-motion: reduce) { #sparkBtn.pulse::after { animation: none; opacity: .8; transform: scale(1.25); } }
 #modePanel .nights { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: .6em 0 .3em; }
 #modePanel .nights button { min-width: 48px; width: 48px; height: 56px; padding: 0; margin: 0; border-radius: 14px; display: grid; place-items: center; line-height: 1; font-size: 18px; }

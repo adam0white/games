@@ -10,7 +10,7 @@ import { hull } from '../looks.js?v=4';
 import { DISTANCE, SEND_MS, clamp, cleanName, roomCode, makeCode, dailySeed, countdown, decodeRoomFrame, position, ranking, ghostTrack, interpolate, nightForSeed, botControl, bytes } from './race-sim.js?v=1';
 import { read, readJson, writeJson } from '../../kit/save.js';
 import { shareLink } from '../../kit/room.js';
-import { t } from '../words.js?v=1';
+import { t } from '../words.js?v=2';
 
 // Save. lantern-mode-race:save is { v: 1, best: 0..100000 (the farthest crossing), name: the boat's name, played: races finished }.
 // The lab page's keys (lantern-race-best, lantern-race-name, lantern-race-played) are read once, and never written.

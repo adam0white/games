@@ -18,7 +18,7 @@ import { createView } from './draw.js';
 noZoom();
 const $ = id => document.getElementById(id);
 const { t, lang, setLang, apply } = words(WORDS);
-const rec = lab('flame', { lang });
+const rec = lab('flame-b', { lang });
 const set = settings('flame', {
   look: { values: ['paper', 'thermal', 'storm'], def: 'paper' },
   drop: { values: ['ends', 'dims'], def: 'dims' },
