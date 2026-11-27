@@ -16,7 +16,17 @@ The first day is a tutorial: the coach line plus a pointing finger shows the cat
 
 ## Looks (for Adam to pick)
 
-Menu **Look** button cycles them, or `?look=diner|toon|night|clay`: Sunny diner (default), Cartoon (toon shading and ink outlines), Night market (dusk sky, string lights), Clay (soft, low saturation).
+No button: a look is picked by link, `?look=<id>`, and the pick sticks on that device (key `kitchen-look`).
+Round 1 looks: `diner` (default), `toon`, `night`, `clay`. Adam called the cartoon "not bad but there's better", so round 2 adds three
+art directions, each a full-screen shader pass over the 3D render (`post` in `LOOKS`, the `post` block in art.js):
+
+- `storybook`: watercolour. A Kuwahara filter turns surfaces into flat painted patches, brown ink lines come from depth and
+  colour edges, and paper grain and a warm vignette sit on top.
+- `diorama`: a toy model. Tilt-shift blur at the very top and bottom (the band where food falls stays sharp), bright paint,
+  strong sun.
+- `comic`: three tones, halftone dots in the shadows, thick ink lines from depth.
+
+Cost: one extra full-screen pass. Desktop WebKit holds 72 fps on all of them; CI's software GL drops from about 11 to 5-8 fps.
 
 ## Difficulty (bots.mjs)
 

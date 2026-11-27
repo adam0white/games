@@ -17,6 +17,10 @@ export const LOOKS = {
   diner: { sky: ['#8fd3ff', '#fff1d6'], wall: '#ffcf9e', trim: '#ff8a5c', floor: ['#fff4e0', '#ffd8b0'], amb: 1.25, sun: 2.4, sunColor: '#fff2dc', toon: false, outline: false, fog: '#ffe6cc', exposure: 1.0, lamps: false, sat: 1 },
   toon: { sky: ['#5ec8ff', '#d8f6ff'], wall: '#ffe066', trim: '#ff5d8f', floor: ['#ffffff', '#a8e6ff'], amb: 1.5, sun: 2.2, sunColor: '#ffffff', toon: true, outline: true, fog: '#d8f6ff', exposure: 1.0, lamps: false, sat: 1.15 },
   night: { sky: ['#1b1440', '#7a3d8c'], wall: '#4b3a6b', trim: '#ffb347', floor: ['#3b2f52', '#2a2140'], amb: 0.55, sun: 0.5, sunColor: '#9fb4ff', toon: false, outline: false, fog: '#2a1f45', exposure: 1.15, lamps: true, sat: 1 },
+  // Art directions to pick by playing (?look=...). Each adds a full-screen pass over the 3D render.
+  storybook: { sky: ['#bfe3e8', '#fbf1dc'], wall: '#f2d3b0', trim: '#c9714f', floor: ['#f7ecd8', '#eedcc0'], amb: 1.45, sun: 2.0, sunColor: '#fff0d8', toon: false, outline: false, fog: '#f6ead4', exposure: 0.95, lamps: false, sat: 0.85, post: 1 },
+  diorama: { sky: ['#6ec6ff', '#e9f7ff'], wall: '#ffd27a', trim: '#ff6b5b', floor: ['#fffaf0', '#cfe9ff'], amb: 1.05, sun: 3.2, sunColor: '#fff4e2', toon: false, outline: false, fog: '#e9f7ff', exposure: 1.05, lamps: false, sat: 1.2, post: 2 },
+  comic: { sky: ['#ffd23f', '#fff3c4'], wall: '#7fd1ff', trim: '#ff3d6e', floor: ['#ffffff', '#ffe3ef'], amb: 1.35, sun: 2.4, sunColor: '#ffffff', toon: true, outline: false, fog: '#fff3c4', exposure: 1.0, lamps: false, sat: 1.25, post: 3 },
   clay: { sky: ['#f3e4d7', '#e8d2c0'], wall: '#e9c9b4', trim: '#b98b73', floor: ['#efe2d6', '#e2cfbf'], amb: 1.6, sun: 1.5, sunColor: '#fff6ee', toon: false, outline: false, fog: '#efe2d6', exposure: 0.95, lamps: false, sat: 0.55, clay: true },
 };
 export const LOOK_IDS = Object.keys(LOOKS);
@@ -409,6 +413,98 @@ export async function createView(canvas, lookId) {
 
   // ---------- loop helpers
   const clock = { t: 0 };
+  // ---------- art-direction pass: the scene renders to a texture, then one shader draws it to the screen.
+  // 1 storybook: pencil lines from depth, paper grain, soft washes. 2 diorama: tilt-shift blur and toy colours.
+  // 3 comic: thick ink lines, three tones, halftone dots in the shadows.
+  const post = (() => {
+    let rt = null;
+    const qScene = new THREE.Scene(), qCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    const mat = new THREE.ShaderMaterial({
+      uniforms: { tColor: { value: null }, tDepth: { value: null }, res: { value: new THREE.Vector2(1, 1) }, mode: { value: 0 }, near: { value: 0.1 }, far: { value: 100 }, time: { value: 0 }, dpr: { value: 1 } },
+      vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+      fragmentShader: `
+        uniform sampler2D tColor; uniform sampler2D tDepth; uniform vec2 res; uniform int mode; uniform float near, far, time, dpr;
+        varying vec2 vUv;
+        float lin(vec2 uv) { float d = texture2D(tDepth, uv).x; return (near * far) / (far - d * (far - near)); }
+        float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+        float noise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+          return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y); }
+        float edge(vec2 uv, float w) { vec2 px = w / res; float c = lin(uv);
+          float e = abs(lin(uv + vec2(px.x, 0.0)) - c) + abs(lin(uv - vec2(px.x, 0.0)) - c) + abs(lin(uv + vec2(0.0, px.y)) - c) + abs(lin(uv - vec2(0.0, px.y)) - c);
+          return e / max(c, 0.5); }
+        float lum(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
+        vec3 sat(vec3 c, float s) { return mix(vec3(lum(c)), c, s); }
+        void main() {
+          vec2 uv = vUv; vec3 col;
+          vec2 sp = gl_FragCoord.xy / dpr;
+          if (mode == 1) {
+            // Watercolour: a Kuwahara filter flattens shapes into painted patches, ink lines from depth and colour,
+            // pigment pooling at patch edges, and paper grain.
+            vec2 px = dpr / res; float wob = (noise(sp * 0.04) - 0.5) * 1.5;
+            vec3 m[4]; vec3 v[4];
+            for (int k = 0; k < 4; k++) { m[k] = vec3(0.0); v[k] = vec3(0.0); }
+            for (int j = 0; j <= 3; j++) for (int i = 0; i <= 3; i++) {
+              vec3 a = texture2D(tColor, uv + vec2(-i, -j) * px).rgb; m[0] += a; v[0] += a * a;
+              vec3 b = texture2D(tColor, uv + vec2(i, -j) * px).rgb; m[1] += b; v[1] += b * b;
+              vec3 c = texture2D(tColor, uv + vec2(-i, j) * px).rgb; m[2] += c; v[2] += c * c;
+              vec3 d = texture2D(tColor, uv + vec2(i, j) * px).rgb; m[3] += d; v[3] += d * d;
+            }
+            float best = 1e9;
+            for (int k = 0; k < 4; k++) { vec3 mu = m[k] / 16.0; vec3 s2 = abs(v[k] / 16.0 - mu * mu); float q = s2.r + s2.g + s2.b;
+              if (q < best) { best = q; col = mu; } }
+            col = sat(col, 1.3); col = (col - 0.5) * 1.08 + 0.5;
+            float le = 0.0; vec3 c0 = texture2D(tColor, uv).rgb;
+            le += length(texture2D(tColor, uv + vec2(px.x, 0.0)).rgb - c0) + length(texture2D(tColor, uv + vec2(0.0, px.y)).rgb - c0);
+            float e = max(smoothstep(0.012, 0.045, edge(uv + vec2(wob) * px, 1.5 * dpr)), smoothstep(0.25, 0.6, le) * 0.6);
+            col *= 1.0 - smoothstep(0.0, 0.15, best) * 0.25;
+            col = mix(col, vec3(0.22, 0.13, 0.1), e * 0.85);
+            float paper = noise(sp * 0.7) * 0.6 + noise(sp * 0.13) * 0.4;
+            col *= 0.9 + paper * 0.14;
+            col = mix(col, vec3(1.0, 0.97, 0.9), 0.04);
+            float vg = length((uv - 0.5) * vec2(1.0, 1.2)); col *= 1.0 - smoothstep(0.5, 1.0, vg) * 0.3;
+          } else if (mode == 2) {
+            float k = max(smoothstep(0.9, 1.0, uv.y), smoothstep(0.3, 0.0, uv.y)); // sharp where food falls, toy-blur at the very top and bottom
+            vec3 acc = texture2D(tColor, uv).rgb; float n = 1.0;
+            for (int i = 0; i < 12; i++) { float a = float(i) * 2.39996; float r = sqrt(float(i) + 0.5) / sqrt(12.0);
+              vec2 o = vec2(cos(a), sin(a)) * r * k * 7.0 * dpr / res; acc += texture2D(tColor, uv + o).rgb; n += 1.0; }
+            col = acc / n;
+            col = sat(col, 1.35); col = (col - 0.5) * 1.12 + 0.5;
+            float v = length(uv - 0.5); col *= 1.0 - smoothstep(0.35, 0.85, v) * 0.45;
+          } else {
+            col = texture2D(tColor, uv).rgb;
+            float l = lum(col);
+            float band = l < 0.18 ? 0.55 : l < 0.5 ? 0.85 : 1.08;
+            col = sat(col / max(l, 0.001) * band * 0.55, 1.3);
+            vec2 g = mat2(0.7071, -0.7071, 0.7071, 0.7071) * sp / 5.0;
+            float dots = length(fract(g) - 0.5);
+            if (l < 0.5) col *= mix(1.0, 0.55, step(dots, (0.5 - l) * 0.9));
+            float e = smoothstep(0.05, 0.1, edge(uv, 2.0 * dpr));
+            col = mix(col, vec3(0.06, 0.03, 0.08), e);
+          }
+          gl_FragColor = vec4(col, 1.0);
+          #include <tonemapping_fragment>
+          #include <colorspace_fragment>
+        }`,
+      depthTest: false, depthWrite: false,
+    });
+    qScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat));
+    const size = new THREE.Vector2();
+    return {
+      render(mode) {
+        renderer.getDrawingBufferSize(size);
+        if (!rt || rt.width !== size.x || rt.height !== size.y) {
+          rt?.dispose();
+          rt = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: mode === 3 ? 0 : 4 });
+          rt.depthTexture = new THREE.DepthTexture(size.x, size.y);
+        }
+        renderer.setRenderTarget(rt); renderer.render(scene, camera); renderer.setRenderTarget(null);
+        const u = mat.uniforms; u.tColor.value = rt.texture; u.tDepth.value = rt.depthTexture; u.res.value.copy(size); u.mode.value = mode;
+        u.near.value = camera.near; u.far.value = camera.far; u.time.value = clock.t; u.dpr.value = renderer.getPixelRatio();
+        renderer.render(qScene, qCam);
+      },
+    };
+  })();
+
   function frame(dt) {
     clock.t += dt; skyMat.uniforms.t.value = clock.t;
     const k = 1 - Math.pow(0.0025, dt);
@@ -421,7 +517,7 @@ export async function createView(canvas, lookId) {
     for (let i = pops.length - 1; i >= 0; i--) { const p = pops[i]; p.t += dt; const e = elasticOut(Math.min(1, p.t / 0.7)); p.o.scale.copy(p.s).multiplyScalar(Math.max(0.01, e)); if (p.t >= 0.7) { p.o.scale.copy(p.s); pops.splice(i, 1); } }
     islands.children.forEach((g, i) => { g.position.y = g.userData.y + Math.sin(clock.t * 0.6 + i) * 0.08; g.rotation.y += dt * 0.05; });
     for (const [i, b] of bulbs.children.entries()) b.material.color.offsetHSL(0, 0, Math.sin(clock.t * 3 + i) * 0.002);
-    renderer.render(scene, camera);
+    if (look.post) post.render(look.post); else renderer.render(scene, camera);
   }
 
   // Screen point of a world position (CSS pixels).
