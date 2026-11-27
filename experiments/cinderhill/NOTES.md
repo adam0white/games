@@ -1016,3 +1016,38 @@ An outside reviewer read the code of both features and four phone screenshots. F
 - A fork opens when every mission before it is finished. The Stones first used to open the craft fork before The Hunt, a gain no card named. The button after a mission says where it leads.
 
 Left open (bead lab-5w7.76): a second tab can write an erased campaign back; a plugged cell is not kept as a plug; the rival bot reads one corner of a room slot as the whole room; with the Timid rival the rival takes no fork options although the cards say it has the other; the reviewer would drop the late beetle's extra health (in its count the meat phase was reached in 2 of 8 games against 5 of 8) and suggested a rearguard left on the road not taken.
+
+## The weevil: a visitor in the nest (war build)
+
+A second kind of enemy, and the first that comes into the nest. The sim option `pest` (tables `VISITOR`, a page picks
+one for a mission with `visitor`; First Frost has it). One for each colony, at the same ticks.
+
+The rule, as the card says it: it comes in at your door, walks to the nearest store cell that holds food, eats there
+(a seed every half second, up to its fill), and walks out. It goes no deeper than 16 steps from the door: with no food
+that near it turns round. It bites one ant beside it each second. Ants beside it bite it; killed, it is 20 loads of
+meat in that colony's stores. It digs nothing, so `nests()` keeps nothing of it.
+
+The answer is where the stores are, which is what the home hill keeps: stores past its reach are safe, at the cost of
+a longer walk for every load. The Nest view shows the reach in red and the first safe cells in green while the weevil
+is in or the Store tool is in hand. The other answer is soldiers beside it.
+
+Setting "The weevil": comes (default), hungry, never. Recorded with the other settings at a start; `weevil` events
+(came, left with seeds eaten, died) and `weevilAte`, `weevilsKilled`, `foeWeevilAte` at the end.
+
+Measured with bots on First Frost, six seeds each way, nests kept from a bot's Crossing, steady bots, one keeping its
+stores deep (`mind.deep`) against one that does not:
+
+| weevil | deep bot wins of 12 | seeds eaten from the plain bot a game | weevils the plain bot killed, of 30 |
+| --- | --- | --- | --- |
+| none | 1 | 0 | none |
+| comes (420 health, fill 60) | 4 | about 235 | 13 |
+| hungry (600 health, fill 80) | 9 | about 330 | 1 |
+
+The deep bot lost nothing to it in any game. So keeping stores shallow is right with no weevil, wrong against the
+hungry one, and a closer call at the default. First Frost with no weevil gives the same ten-seed tallies as before it
+(8v2, 3v7, 6v4, 4v6 for neither, both, seat 0, seat 1 kept).
+
+Not known: the bot's deep stores sit far deeper (20 steps and more) than a person need dig (17), so a person pays less
+for safety than the bot does and the default may be an easy call for one who reads the green line. The rival in the
+campaign does not keep its stores deep, so it feeds the weevil. On The Stones a deep bot lost 12 of 12 with or without
+the weevil (points decide there, not seeds), which is why the weevil is not on that mission. No person has played it.
