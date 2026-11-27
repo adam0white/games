@@ -68,7 +68,7 @@ const glCanvas = $('gl'), ui = $('c'), ctx = ui.getContext('2d'), nestCanvas = $
 let dprCap = 2, slow = { sum: 0, n: 0 };   // a phone that cannot hold the frame rate draws fewer pixels, not fewer frames
 let W = innerWidth, H = innerHeight, dpr = Math.min(dprCap, devicePixelRatio || 1), NW = 1, NH = 1;
 let renderer = null, glFailed = '';
-try { renderer = GameRenderer.create(glCanvas, { restored: () => { uploadAll(); trailSig = ''; }, lost: () => { pauseGame(); toast('The picture was lost. It comes back by itself.', 4000); } }); } catch (e) { glFailed = String(e.message || e).slice(0, 300); renderer = null; }
+try { renderer = GameRenderer.create(glCanvas, { restored: () => { uploadAll(); trailSig = '?'; }, lost: () => { pauseGame(); toast('The picture was lost. It comes back by itself.', 4000); } }); } catch (e) { glFailed = String(e.message || e).slice(0, 300); renderer = null; }
 if (!renderer) $('nogl').classList.add('on');
 const L0 = host.sim.L;
 const cam = { x: L0.sw / 2 + 0.5, y: L0.sh / 2 + 0.5, z: 8 };
@@ -83,7 +83,10 @@ let eye = null;   // this frame's pose, shared by the picture and by every pick
 const zMin = () => Math.min(W / L0.sw, H / L0.sh) * 1.2;
 function clampCam() { cam.z = Math.max(zMin(), Math.min(44, cam.z)); cam.x = Math.max(0, Math.min(L0.sw, cam.x)); cam.y = Math.max(0, Math.min(L0.sh, cam.y)); eye = pose(); }
 function toWorld(sx, sy, h = 0) {
-  const v = eye, qx = (sx - W / 2) / v.f, qy = (sy - H / 2) / v.f, dz = Math.min(-qy * v.sin - v.cos, -0.02), t = (h - v.ez) / dz;
+  const v = eye, qx = (sx - W / 2) / v.f;
+  let qy = (sy - H / 2) / v.f;
+  if (v.sin > 0.05) qy = Math.max(qy, (0.05 - v.cos) / v.sin);   // a point in the sky picks the ground just under the horizon, straight below it on screen
+  const dz = -qy * v.sin - v.cos, t = (h - v.ez) / dz;
   return { x: v.ex + qx * t, y: v.ey + (qy * v.cos - v.sin) * t };
 }
 function toScreen(wx, wy, h = 0) {
@@ -198,7 +201,7 @@ function resume() { if (renderer?.lost) return; setScreen('play'); host.last = n
 function restart() {
   dropTouches();
   host = newHost(); stats = host.stats(); crewSeq = -1; seen = null; floats = []; pulses = []; flyers = []; pending = []; beacon = null; alarmAt = null; parts.length = 0; setSpeed(1);
-  pileTop.clear(); routeUntil = 0; trailSig = ''; firstTrail = false; clearTimeout(toastTimer); $('toast').classList.remove('on');
+  pileTop.clear(); routeUntil = 0; trailSig = '?'; firstTrail = false; clearTimeout(toastTimer); $('toast').classList.remove('on');
   if (tool !== 'trail') setTool('trail'); if (nestOpen) setNest(false, true);
   startRecord(); running = true; uploadAll(); opening(); resume();
 }
@@ -214,7 +217,7 @@ function paintSettings() { for (const seg of document.querySelectorAll('.seg')) 
 for (const seg of document.querySelectorAll('.seg')) for (const b of seg.children) b.addEventListener('click', () => {
   const k = seg.dataset.set, v = b.dataset.v; if (set[k] === v) return;
   const from = set[k]; set[k] = v; persist(); paintSettings();
-  labrec.emit('setting', { name: k, to: v, from, id: k, value: v, def: DEFAULTS[k], k, v, at: host.tick });   // name/from/to is what the lab's Settings report counts
+  (labrec.open ? (t, d) => labrec.emit(t, d) : (t, d) => rec.event(t, d))('setting', { name: k, to: v, from, id: k, value: v, def: DEFAULTS[k], k, v, at: host.tick });   // name/from/to is what the lab's Settings report counts
   if (k === 'sound') { if (v === 'off') snd.hold(); else { snd.release(); startSong(); } tuneSong(); }
   tone(660, 0.06, 0.03, 'triangle', 80);
 });
