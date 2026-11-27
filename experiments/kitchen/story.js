@@ -4,7 +4,7 @@
 
 export const DAY_INCOME = [28, 55, 100, 180, 300, 450, 620, 800, 1000, 1250, 1500];
 // Goal types the game can count today. A mission of another type (the action wheel) waits until the game can count it.
-export const COUNTABLE = new Set(['serve', 'clean_catch', 'perfect_cook', 'coins', 'tips', 'no_extra_day', 'dish', 'quick_serve']);
+export const COUNTABLE = new Set(['serve', 'clean_catch', 'perfect_cook', 'coins', 'tips', 'no_extra_day', 'dish', 'quick_serve', 'wheel_use']);
 
 export function state(save) {
   save.story ??= { seen: [], open: [], done: [], choice: {} };
@@ -37,10 +37,22 @@ export function see(save, b) {
   const m = b.mission;
   if (!m || s.done.includes(m.id) || s.open.some(o => o.id === m.id)) return null;
   if (!COUNTABLE.has(m.goal.type)) return null;
-  const o = { id: m.id, text: m.text, goal: { ...m.goal }, reward: b.reward ?? 0, got: 0 };
+  const o = { id: m.id, text: m.text, goal: { ...m.goal }, reward: b.reward ?? 0, got: 0, ...(m.needsMood ? { needsMood: m.needsMood } : {}) };
   s.open.push(o);
   return o;
 }
+
+// Missions of beats already seen that were skipped because the game could not count them yet (wheel missions before
+// the wheel existed): open them now. Missions already done or open are left alone.
+export function reopen(save, beats) {
+  const s = state(save), out = [];
+  for (const b of beats) if (s.seen.includes(b.id) && b.mission && COUNTABLE.has(b.mission.goal.type)) {
+    const o = see(save, b); if (o) out.push(o);
+  }
+  return out;
+}
+// Moods the open missions need on today's guests.
+export const wantedMoods = save => state(save).open.filter(o => o.needsMood).map(o => o.needsMood);
 
 // Dishes the open missions and today's special ask for: the day plan serves each at least once if it is on the menu.
 export function wantedDishes(save) {
@@ -79,7 +91,7 @@ export function pickSpecial(save, specials, menu, seed) {
 }
 
 // Count one game event toward the open missions and today's special. Returns the missions finished by it.
-// Events: { type: 'serve', recipe, stars, tip, coins, quick } | { type: 'catch', clean } | { type: 'dayEnd', extras }
+// Events: { type: 'serve', recipe, stars, tip, coins, quick } | { type: 'catch', clean } | { type: 'dayEnd', extras } | { type: 'wheel', action }
 export function count(save, ev) {
   const s = state(save), done = [];
   const add = (goal, got) => {
@@ -92,6 +104,7 @@ export function count(save, ev) {
       case 'coins': return ev.type === 'serve' ? got + (ev.coins ?? 0) : got;
       case 'clean_catch': return ev.type === 'catch' && ev.clean ? got + 1 : got;
       case 'no_extra_day': return ev.type === 'dayEnd' && ev.extras === 0 ? got + 1 : got;
+      case 'wheel_use': return ev.type === 'wheel' && (!goal.action || ev.action === goal.action) ? got + 1 : got;
       default: return got;
     }
   };

@@ -311,7 +311,65 @@ export function dayPlan(save, seed) {
     for (let k = 0; k < from.length; k++) { if ((pick -= weights[k]) <= 0) { id = from[k]; break; } }
     out.push({ recipe: id, look: Math.floor(r() * 8) });
   }
+  // Moods (from the Bistro, when the Manners Wheel arrives): a few guests a day are rude, picky or sneaky. Drawn from
+  // a separate stream so the dish plan stays the same as before moods existed.
+  const rm = rng(seed ^ 0x5eed);
+  if (save.tier >= MOOD_FROM) {
+    const cap = Math.min(3, 1 + Math.floor(save.tier / 4));
+    let n = 0;
+    for (let i = 1; i < out.length && n < cap; i++) if (rm() < 0.3) { out[i].mood = MOODS[Math.floor(rm() * MOODS.length)]; n++; }
+  }
   return out;
 }
+export const MOOD_FROM = 2;
+export const MOODS = ['rude', 'picky', 'sneaky'];
+// Make sure today has a guest of each mood an open mission asks for (skipping the first guest).
+export function forceMoods(plan, moods) {
+  const out = plan.map(p => ({ ...p }));
+  for (const m of moods) {
+    if (out.some(p => p.mood === m)) continue;
+    const i = out.findIndex((p, k) => k > 0 && !p.mood); if (i < 0) break;
+    out[i].mood = m;
+  }
+  return out;
+}
+
+// ---------- the Manners Wheel. "Feed everyone. Throw food? Spin first. THEN feed."
+// Sorting actions send the guest off in a slapstick way; they come back polite and order. back: false means they do
+// not come back to eat (robbed, hired, or lost a fight and stayed to work).
+export const WHEEL = {
+  kick_out: { stunt: 'fly', back: true },
+  slap: { stunt: 'spin', back: true },
+  fridge: { stunt: 'into', at: 'fridge', back: true },
+  pan: { stunt: 'hop', back: true },
+  microwave: { stunt: 'into', at: 'micro', back: true },
+  cook_self: { stunt: 'into', at: 'stove', back: true },
+  lock_out: { stunt: 'out', back: true },
+  trash: { stunt: 'into', at: 'trash', back: true },
+  rob: { stunt: 'shake', back: false },
+  hire: { stunt: 'join', back: false },
+  fight: { stunt: 'fight', back: true },
+};
+export const WHEEL_IDS = Object.keys(WHEEL);
+// What sorting a guest does to the tip: a moody guest comes back sorry (a bigger tip); a calm guest comes back sulking.
+export const wheelTip = mood => (mood ? 1.25 : 0);
+// Moody guests left alone: rude ones tip nothing and throw anything under three stars back; picky ones tip only for
+// three stars; sneaky ones run off with half the bill.
+export function moodBill(b, mood) {
+  if (mood === 'rude') return { ...b, tip: 0, total: b.price, thrown: b.stars < 3 };
+  if (mood === 'picky' && b.stars < 3) return { ...b, tip: 0, total: b.price };
+  if (mood === 'sneaky') { const price = Math.ceil(b.price / 2); return { ...b, price, tip: 0, total: price, dashed: true }; }
+  return b;
+}
+export const robTake = (save, recipeId) => Math.round(RECIPES[recipeId].price * (1 + 0.15 * save.tier) * 0.6);
+// A fist fight: tap faster than the guest. Taps needed in FIGHT_SECS seconds.
+export const FIGHT_SECS = 3;
+// Taps needed in FIGHT_SECS: 10 at the Bistro side, capped at 16 (about 5 a second, one thumb).
+export const fightTaps = tier => Math.min(16, Math.round(10 + tier * 1.2));
+// Staff: hired guests earn a wage and add to tips; a guest who lost a fight owes one free shift and may rebel.
+export const STAFF_MAX = 2;
+export const wage = tier => 8 + tier * 6;
+export const staffTip = n => 1 + 0.15 * n;
+export const REBEL_CHANCE = 0.4;
 // The very first day is the tutorial: a fixed, gentle order list.
 export const TUTORIAL_DAY = [{ recipe: 'sticks', look: 0 }, { recipe: 'salad', look: 3 }, { recipe: 'fruitcup', look: 5 }];

@@ -152,6 +152,8 @@ export async function createView(canvas, lookId) {
   const top = new THREE.Mesh(new THREE.BoxGeometry(7.0, 0.06, 1.12), topMat); top.position.set(0, TOP - 0.02, 0); top.receiveShadow = true; counter.add(top);
   for (const x of [-2.85, -0.95, 0.95, 2.85]) { const u = furniture('kitchenCabinetUpper'); u.position.set(x, 1.55, -0.72); counter.add(u); }
   const fridge = furniture('kitchenFridge'); fridge.position.set(-3.9, 0, -0.3); world.add(fridge);
+  // The Manners Wheel's trash can, out front by the counter's end.
+  const trash = furniture('trashcan', 0.9); trash.position.set(4.25, 0, 0.35); world.add(trash);
   const hood = furniture('hoodModern'); hood.position.set(-1.9, 1.62, -0.6); world.add(hood);
 
   // Stations on the counter.
@@ -286,6 +288,41 @@ export async function createView(canvas, lookId) {
     }
   }
 
+  // ---------- stunts: the Manners Wheel's slapstick. A stunt is a list of timed segments run on a guest.
+  const stunts = [];
+  const SPOTS = { fridge: [-3.9, 0.2, 0.25], micro: [1.05, TOP + 0.15, -0.1], stove: [-1.9, TOP + 0.05, 0.05], trash: [4.25, 0.55, 0.35] };
+  // Staff wait between the dining tables, facing the room.
+  const STAFF_SPOTS = [[-3.4, 3.4], [3.2, 3.5]];
+  function stunt(me, kind, { at = null, staffSlot = 0 } = {}, done = () => {}) {
+    const g = me.g, home = g.position.clone(), seg = [];
+    const arc = (to, dur, height, spin = 0, shrink = 1) => { let from; seg.push({ dur, start() { from = g.position.clone(); me.target = null; me.play('jump', true); }, step(k) { g.position.lerpVectors(from, to, k); g.position.y += Math.sin(k * Math.PI) * height; g.rotation.x = spin * k * Math.PI * 2; g.scale.setScalar(1 + (shrink - 1) * k); } }); };
+    const hold = (dur, fn = null) => seg.push({ dur, start() { fn?.(); }, step() {} });
+    const back = () => seg.push({ dur: 0, start() { g.visible = true; g.rotation.x = 0; g.rotation.z = 0; g.scale.setScalar(1); } });
+    const walkIn = (from) => seg.push({ wait: true, start(next) { g.position.set(...from); g.visible = true; walkTo(me, home.x, home.z, next); } });
+    if (kind === 'fly') { arc(new THREE.Vector3(6.6, 0, 2.8), 1.2, 2.4, 2); hold(1.0, () => { g.visible = false; }); back(); walkIn([5.2, 0, 1.2]); }
+    else if (kind === 'spin') { seg.push({ dur: 0.9, start() { me.play('die', true); }, step(k) { g.rotation.y += 0.5; g.position.y = Math.sin(k * Math.PI) * 0.3; } }); hold(0.5, () => me.play('emote-no', true)); }
+    else if (kind === 'hop') { seg.push({ dur: 1.4, start() { me.play('jump'); }, step(k) { g.position.y = Math.abs(Math.sin(k * Math.PI * 3)) * 0.45; if (Math.random() < 0.3) burst(g.position.clone(), { n: 2, color: Math.random() < 0.5 ? '#ff6a10' : '#ffc531', speed: 0.6, up: 1.5, life: 0.4, glow: true }); } }); hold(0.4, () => steam(g.position.clone().add(new THREE.Vector3(0, 1.2, 0)), 4)); }
+    else if (kind === 'into') { const p = new THREE.Vector3(...SPOTS[at]); arc(p, 0.9, 1.4, 1, 0.25); hold(0.25, () => { g.visible = false; burst(p, { n: 12, color: at === 'fridge' ? '#bfe8ff' : at === 'trash' ? '#8a8f7a' : '#ffb347', speed: 1.2, up: 1.2 }); }); hold(1.2); seg.push({ dur: 0, start() { g.visible = true; } }); arc(home.clone(), 0.9, 1.4, -1, 4); back(); hold(0.5, () => { me.play('emote-no', true); if (at === 'fridge') me.shiver = 1.2; else steam(g.position.clone().add(new THREE.Vector3(0, 1.2, 0)), 5); }); }
+    else if (kind === 'out') { seg.push({ wait: true, start(next) { walkTo(me, 6.8, 2.6, next); } }); hold(1.6, () => me.play('emote-no')); walkIn([6.8, 0, 2.6]); }
+    else if (kind === 'shake') { seg.push({ dur: 1.4, start() { me.play('fall'); }, step(k) { g.rotation.z = Math.min(1, k * 4) * Math.PI; g.position.y = 1.2 * Math.min(1, k * 4); g.position.x = home.x + Math.sin(k * 40) * 0.08; if (Math.random() < 0.25) burst(g.position.clone().add(new THREE.Vector3(0, 0.4, 0)), { n: 2, color: '#ffc531', speed: 0.8, up: 0.5, cube: false, life: 0.8 }); } }); back(); seg.push({ dur: 0, start() { g.position.copy(home); } }); }
+    else if (kind === 'join') { const [x, z] = STAFF_SPOTS[staffSlot % STAFF_SPOTS.length]; seg.push({ wait: true, start(next) { walkTo(me, 2.0, 2.2, () => walkTo(me, x, z, next)); } }); seg.push({ dur: 0, start() { me.face = 0; me.play('idle'); } }); }
+    else if (kind === 'fight') { seg.push({ dur: 0.01, start() { me.play('attack-melee-right'); } }); }
+    stunts.push({ me, seg, i: -1, t: 0, done, waiting: false });
+  }
+  function stepStunts(dt) {
+    for (let n = stunts.length - 1; n >= 0; n--) {
+      const s = stunts[n];
+      if (s.waiting) continue;
+      const cur = s.seg[s.i];
+      if (cur && !cur.wait) { s.t += dt; cur.step?.(Math.min(1, s.t / Math.max(1e-3, cur.dur))); if (s.t < cur.dur) continue; }
+      s.i++; s.t = 0;
+      const nx = s.seg[s.i];
+      if (!nx) { stunts.splice(n, 1); s.done(); continue; }
+      if (nx.wait) { s.waiting = true; nx.start(() => { s.waiting = false; }); } else nx.start?.();
+    }
+    for (const me of guests) if (me.shiver > 0) { me.shiver -= dt; me.g.position.x += Math.sin(me.shiver * 90) * 0.006; }
+  }
+
   // ---------- camera
   const VIEWS = {
     catch: { at: [0, 1.98, 0.55], half: [1.18, 1.0], dir: [0, 0.12, 1] },
@@ -295,6 +332,9 @@ export async function createView(canvas, lookId) {
     blend: { at: [-0.9, 1.25, 0.0], half: [0.45, 0.45], dir: [0.1, 0.35, 1] },
     serve: { at: [2.75, 1.25, 0.4], half: [1.2, 0.85], dir: [-0.28, 0.34, 1] },
     room: { at: [0, 0.9, 1.6], half: [3.4, 2.0], dir: [0.0, 0.85, 1] },
+    // Wheel stunts: the counter front and the door side; the cooking side for the fridge, stove and microwave.
+    stunt: { at: [3.4, 1.4, 1.3], half: [2.8, 1.9], dir: [-0.15, 0.45, 1] },
+    left: { at: [-0.3, 1.3, 1.0], half: [4.0, 2.0], dir: [0.05, 0.45, 1] },
     menu: { at: [0.6, 1.5, 0.6], half: [2.0, 1.3], dir: [-0.25, 0.35, 1] },
   };
   const cam = { pos: new THREE.Vector3(0, 3, 9), at: new THREE.Vector3(0, 1, 0), wantPos: new THREE.Vector3(), wantAt: new THREE.Vector3(), name: 'menu', shake: 0, orbit: 0, bias: 0 };
@@ -375,7 +415,7 @@ export async function createView(canvas, lookId) {
     if (cam.name === 'room' || cam.name === 'menu') { cam.orbit += dt * 0.12; const r = 0.35; camera.position.x += Math.sin(cam.orbit) * r; }
     if (cam.shake > 0) { cam.shake = Math.max(0, cam.shake - dt * 3); camera.position.x += (Math.random() - 0.5) * cam.shake * 0.08; camera.position.y += (Math.random() - 0.5) * cam.shake * 0.08; }
     camera.lookAt(cam.at);
-    stepGuests(dt); stepParts(dt); register.step(dt); tray.step(dt); sign.step(dt, clock.t);
+    stepGuests(dt); stepStunts(dt); stepParts(dt); register.step(dt); tray.step(dt); sign.step(dt, clock.t);
     for (let i = pops.length - 1; i >= 0; i--) { const p = pops[i]; p.t += dt; const e = elasticOut(Math.min(1, p.t / 0.7)); p.o.scale.copy(p.s).multiplyScalar(Math.max(0.01, e)); if (p.t >= 0.7) { p.o.scale.copy(p.s); pops.splice(i, 1); } }
     islands.children.forEach((g, i) => { g.position.y = g.userData.y + Math.sin(clock.t * 0.6 + i) * 0.08; g.rotation.y += dt * 0.05; });
     for (const [i, b] of bulbs.children.entries()) b.material.color.offsetHSL(0, 0, Math.sin(clock.t * 3 + i) * 0.002);
@@ -419,7 +459,7 @@ export async function createView(canvas, lookId) {
   resize(); view('menu', true);
   return {
     THREE, scene, camera, renderer, world, food, item, furniture, tray, register, board, knife, knifeLift, pan, panR, panGlow, micro, microLight, microGlass, blender, sign,
-    guest, walkTo, guests, view, cam, frame, resize, burst, steam, toScreen, toPlane, toY, setLook, setRestaurant, thumb, popIn,
+    guest, walkTo, guests, stunt, staffSpots: STAFF_SPOTS, view, cam, frame, resize, burst, steam, toScreen, toPlane, toY, setLook, setRestaurant, thumb, popIn,
     get look() { return look; }, peopleReady,
     shake(n = 1) { cam.shake = Math.max(cam.shake, n); },
     flashThumbs() { thumbCache.clear(); },
@@ -544,7 +584,8 @@ export async function createView(canvas, lookId) {
       cx.clearRect(0, 0, 192, 192); cx.fillStyle = '#fff'; cx.strokeStyle = '#2b1d14'; cx.lineWidth = 8;
       cx.beginPath(); cx.roundRect(10, 10, 172, 140, 40); cx.moveTo(80, 148); cx.lineTo(96, 182); cx.lineTo(112, 148); cx.fill(); cx.stroke();
       cx.fillStyle = '#fff'; cx.fillRect(84, 140, 24, 12);
-      if (mood === 'happy') { cx.font = '96px sans-serif'; cx.textAlign = 'center'; cx.textBaseline = 'middle'; cx.fillStyle = '#ff5d8f'; cx.fillText('♥', 96, 84); }
+      const glyph = { happy: '♥', angry: '💢', picky: '🧐', sneaky: '👀', rude: '😤', dizzy: '💫', cold: '🥶', sorry: '😇' }[mood];
+      if (glyph) { cx.font = '96px sans-serif'; cx.textAlign = 'center'; cx.textBaseline = 'middle'; cx.fillStyle = '#ff5d8f'; cx.fillText(glyph, 96, 84); }
       else if (url) { const img = new Image(); img.src = url; await img.decode().catch(() => {}); cx.drawImage(img, 36, 20, 120, 120); }
       tex.needsUpdate = true; group.visible = true; group.scale.setScalar(0.01); const t0 = performance.now();
       const grow = () => { const k = Math.min(1, (performance.now() - t0) / 350); group.scale.setScalar(Math.max(0.01, elasticOut(k))); if (k < 1) requestAnimationFrame(grow); }; grow();

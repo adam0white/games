@@ -120,6 +120,21 @@ console.log('bots: ok');
   // Specials: one a day, deterministic, countable.
   const sp = story.pickSpecial(s0, specials, sim.menuFor(s0), 77);
   assert.ok(sp && story.COUNTABLE.has(sp.goal.type) && sp.pay > 0);
+  // Wheel missions: a save that saw the heckler beat before the wheel existed gets its mission back, once.
+  const s4 = { ...fresh(), tier: 2, dayAtTier: 3 }; const heck = beats.find(b => b.mission?.goal.type === 'wheel_use');
+  s4.story = { seen: [heck.id], open: [], done: [], choice: {} };
+  assert.equal(story.reopen(s4, beats).length, 1, 'a skipped wheel mission reopens'); assert.equal(story.reopen(s4, beats).length, 0, 'and only once');
+  assert.deepEqual(story.wantedMoods(s4), [heck.mission.needsMood]);
+  const forced = sim.forceMoods(sim.dayPlan(s4, 9), story.wantedMoods(s4));
+  assert.ok(forced.some(p => p.mood === heck.mission.needsMood), 'the day brings the guest the mission needs');
+  story.count(s4, { type: 'wheel', action: 'slap' }); assert.equal(s4.story.open.length, heck.mission.goal.action === 'slap' ? 0 : 1, 'another action does not count');
+  story.count(s4, { type: 'wheel', action: heck.mission.goal.action }); assert.equal(s4.story.open.length, 0, 'the asked action finishes it');
+  // Moods start at the Bistro, never on the first guest, and never change the dishes.
+  assert.ok(sim.dayPlan(fresh(), 3).every(p => !p.mood), 'no moods at the cart');
+  for (let d = 0; d < 20; d++) { const p = sim.dayPlan({ ...fresh(), tier: 4 }, d); assert.ok(!p[0].mood); assert.ok(p.filter(x => x.mood).length <= 2); }
+  // Unhandled moods: rude throws back anything under three stars, sneaky pays half.
+  assert.ok(sim.moodBill({ price: 10, tip: 3, stars: 2, total: 13 }, 'rude').thrown);
+  assert.equal(sim.moodBill({ price: 10, tip: 3, stars: 3, total: 13 }, 'sneaky').total, 5);
   console.log('story: ok');
 }
 
