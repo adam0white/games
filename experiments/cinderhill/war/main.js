@@ -496,7 +496,7 @@ for (const b of document.querySelectorAll('#diet .tabs [data-tab]')) b.addEventL
 const DIG_HELP = { door: `Second door: tap the end of a tunnel dug along the top of your ground (the third row down), at least ${C.DOOR_APART} cells from your door. ${C.DOOR_SUGAR} seeds. New trails start at the nearer door, and it is still open in the next mission on this hill.`, plug: `Plug: tap an open tunnel of yours to pack it shut, ${C.PLUG_SUGAR} seeds. It takes five times as long to dig out. Not in a room, not with the rival near, and no more than ${C.PLUGS_MAX} at once.`, look: 'Pick a room, then drag in the earth beside a tunnel.', tunnel: 'Tunnel: drag through the earth, a seed to dig a cell. Seeds showing in the clay are an old cache: dig to it and it is carried to your stores.', store: 'Store: each cell holds 8 more seeds and 8 more meat. Drag in the earth: a seed to dig a cell.', nursery: 'Nursery: each cell holds one more egg or grub. Drag in the earth: a seed to dig a cell.', rest: 'Quarters: each cell houses 4 more ants. Drag in the earth: a seed to dig a cell.', garden: `Fungus garden: each cell pays a seed a minute with no trail to guard, and houses one ant fewer (its gardeners live in it). A raid can still carry the seeds off.`, post: 'Guard post: each cell keeps one in eight of your idle soldiers standing here, inside, and not out by the door.', clear: 'Drag over marks or rooms to take them off. Dug earth stays dug.', strike: 'Strike: tap an open cell in the rival nest. Half your soldiers go there under ground and on to the queen. Tap the mark again to send them all, and again to call them back.' };
 function roomButtons() { for (const b of document.querySelectorAll('#rooms [data-room]')) b.hidden = b.dataset.room === 'door' ? !sim.mayDoor(ME) || sim.side[ME] >= 0 : b.dataset.room === 'strike' ? !sim.mayBreach(ME) : b.dataset.room === 'plug' ? !sim.mayPlug() : !!ROOM_OF[b.dataset.room] && !sim.mayRoom(ME, ROOM_OF[b.dataset.room]); if (nestTool === 'strike' && !sim.mayBreach(ME)) setNestTool('look'); if (nestTool === 'door' && (!sim.mayDoor(ME) || sim.side[ME] >= 0)) setNestTool('look'); if (nestTool === 'plug' && !sim.mayPlug()) setNestTool('look'); if (ROOM_OF[nestTool] && !sim.mayRoom(ME, ROOM_OF[nestTool])) setNestTool('look'); }
 roomButtons();
-function setNestTool(t) { nestTool = t; $('digHelp').textContent = sim.cfg.digSugar ? DIG_HELP[t] : DIG_HELP[t].replace(/a seed to dig a cell/g, 'soft ground here, no seed to dig'); if (t !== 'look' && $('diet').dataset.tab !== 'dig') setNestTab('dig'); for (const b of document.querySelectorAll('#rooms [data-room]')) b.setAttribute('aria-pressed', String(b.dataset.room === t)); }
+function setNestTool(t) { nestTool = t; delete $('digHelp').dataset.text; $('digHelp').textContent = sim.cfg.digSugar ? DIG_HELP[t] : DIG_HELP[t].replace(/a seed to dig a cell/g, 'soft ground here, no seed to dig'); if (t !== 'look' && $('diet').dataset.tab !== 'dig') setNestTab('dig'); for (const b of document.querySelectorAll('#rooms [data-room]')) b.setAttribute('aria-pressed', String(b.dataset.room === t)); }
 for (const b of document.querySelectorAll('#rooms [data-room]')) b.addEventListener('click', () => { setNestTool(b.dataset.room); tone(500, 0.06, 0.03, 'triangle'); });
 nestCanvas.addEventListener('pointerdown', e => {
   if (nestDrag) return; // one finger at a time
@@ -714,17 +714,22 @@ function needLine(pop, capA, brood, capB, capF) {
   if (!seedLog.length || sim.tick - seedLog[seedLog.length - 1][0] >= 100) seedLog.push([sim.tick, home]);
   while (seedLog.length > 1 && sim.tick - seedLog[1][0] >= 1200) seedLog.shift();
   const span = sim.tick - seedLog[0][0], grown = sim.gardens[ME] * sim.stat[ME].garden;
-  const income = span >= 600 ? Math.round((home - seedLog[0][1]) * 1200 / span) + grown : -1;
+  const income = span >= 1100 ? Math.round((home - seedLog[0][1]) * 1200 / span) + grown : -1;
   const meal = Math.ceil((g(ME, CG.ADULTS) + 2 * g(ME, CG.MAJORS)) / sim.stat[ME].eatPer);
   const can = r => { const b = document.querySelector(`#rooms [data-room="${r}"]`); return b && !b.hidden; };
-  let text = '', room = '';
-  if (pop >= capA) { room = 'rest'; text = `<b>The hill is full</b> (${pop} of ${capA}): the queen has stopped laying. Dig quarters.`; }
-  else if (income >= 0 && income < meal && seeds < 3 * meal) { room = can('garden') ? 'garden' : ''; text = `<b>Seeds are running out</b>: the hill eats ${meal} a minute and ${income} came in. ${room ? 'A garden cell grows one a minute.' : 'Put more workers on a seed trail.'}`; }
-  else if (brood >= capB) { room = 'nursery'; text = `<b>The nursery is full</b> (${brood} of ${capB}): new eggs wait. Dig nursery.`; }
-  else if (Math.max(seeds, g(ME, CG.PROTEIN)) >= capF) { room = 'store'; text = `<b>The store is full</b> (${capF}): loads are left outside. Dig store.`; }
-  else if (pop * 10 >= capA * 9) { room = 'rest'; text = `<b>The hill is nearly full</b> (${pop} of ${capA}). Dig quarters soon.`; }
-  else if (income >= 0 && income < meal) { room = can('garden') ? 'garden' : ''; text = `The hill eats ${meal} seeds a minute and ${income} came in. The store covers it for now.`; }
+  let text = '', room = '', dig = '';
+  if (sim.tick < 400) text = ''; /* the opening brood is over the nursery's count for a moment: not a thing to act on */
+  else if (pop >= capA) { room = 'rest'; text = `<b>The hill is full</b> (${pop} of ${capA}): the queen has stopped laying.`; dig = 'Dig quarters.'; }
+  else if (income >= 0 && income < meal && seeds < 3 * meal) { room = 'garden'; text = `<b>Seeds are running out</b>: the hill eats ${meal} a minute and ${income} came in.`; dig = 'A garden cell grows one a minute.'; }
+  else if (brood >= capB) { room = 'nursery'; text = `<b>The nursery is full</b> (${brood} of ${capB}): new eggs wait.`; dig = 'Dig nursery.'; }
+  else if (Math.max(seeds, g(ME, CG.PROTEIN)) >= capF) { room = 'store'; text = `<b>The store is full</b> (${capF}): loads are left outside.`; dig = 'Dig store.'; }
+  else if (pop * 10 >= capA * 9) { room = 'rest'; text = `<b>The hill is nearly full</b> (${pop} of ${capA}).`; dig = 'Dig quarters soon.'; }
+  else if (income >= 0 && income < meal) text = `The hill eats ${meal} seeds a minute and ${income} came in. The store covers it for now.`;
+  if (room && !can(room)) { dig = room === 'garden' ? 'Put more workers on a seed trail.' : ''; room = ''; } /* a room this hill may not dig is not offered */
+  if (dig) text += ' ' + dig;
   const el = $('need'); if (el.dataset.text !== text) { el.dataset.text = text; el.innerHTML = text; } el.dataset.room = room;
+  /* On the Dig tab the line takes the help row's place while no room is picked, so the panel grows no taller there. */
+  if (nestTool === 'look') { const h = $('digHelp'), want = text || DIG_HELP.look; if (h.dataset.text !== want) { h.dataset.text = want; h.innerHTML = want; } }
   for (const b of document.querySelectorAll('#rooms [data-room]')) b.classList.toggle('want', b.dataset.room === room);
 }
 
