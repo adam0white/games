@@ -311,7 +311,7 @@ function renderTree() {
     bough.nodes.forEach((n, i) => {
       if (i) { const arrow = document.createElement('span'); arrow.textContent = '›'; row.append(arrow); }
       if (n.fork) {
-        const step = CAMPAIGN.find(c => c.fork === n.fork), mine = taken(n.fork), opts = step.options ?? step.by[camp.caste] ?? [], at = CAMPAIGN.indexOf(step), after = MISSIONS[CAMPAIGN[at - 1].mission], open = !!camp.done[after.id];
+        const step = CAMPAIGN.find(c => c.fork === n.fork), mine = taken(n.fork), opts = step.options ?? step.by[camp.caste] ?? [], at = CAMPAIGN.indexOf(step), prior = CAMPAIGN.slice(0, at).filter(c => c.mission).map(c => c.mission), after = MISSIONS[prior.find(x => !camp.done[x]) ?? CAMPAIGN[at - 1].mission], open = prior.every(x => camp.done[x]);
         all++; if (mine) have++;
         if (!opts.length) { const b = document.createElement('button'); b.className = 'locked'; b.textContent = FORK_HEAD[n.fork]; b.dataset.key = n.fork; b.addEventListener('click', () => say(n.fork, FORK_HEAD[n.fork], 'One of two crafts for the caste you took.', 'Take a third caste first.')); row.append(b); return; }
         opts.forEach((v, j) => {
