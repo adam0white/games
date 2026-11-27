@@ -86,6 +86,13 @@ let g = null;          // the guest being served: { recipe, model, phase, catch,
 let goldenNext = false, skipCatch = false, peopleIn = false, phase = 'idle', trayX = 0, trayTarget = 0, finger = null, keys = new Set(), touched = false;
 const meshes = new Map();  // falling item n -> mesh
 
+// The Chop button, for touch screens.
+const coarse = matchMedia('(pointer: coarse)').matches;
+let chopShown = false;
+function chopBtn(on) { on = on && (coarse || touchSeen); if (on !== chopShown) { chopShown = on; $('chopBtn').style.display = on ? 'flex' : 'none'; } }
+let touchSeen = false;
+addEventListener('pointerdown', e => { if (e.pointerType === 'touch') touchSeen = true; }, true);
+
 const show = screens(['menu', 'paused', 'extra', 'dayEnd', 'shop'], name => {
   screen = name === 'dayEnd' ? 'dayend' : name;
   const playing = name === 'play' || name === 'extra';
@@ -93,6 +100,9 @@ const show = screens(['menu', 'paused', 'extra', 'dayEnd', 'shop'], name => {
   $('hud').style.display = playing || name === 'paused' ? 'flex' : 'none';
   for (const id of ['ticket', 'gauge', 'coach', 'banner', 'finger', 'mission']) if (!playing && name !== 'paused') $(id).style.display = 'none';
   if (playing && g && ['catch', 'chop', 'fry', 'micro', 'blend', 'ring', 'close', 'serve', 'plate'].includes(phase)) $('ticket').style.display = 'block';
+  // Off play, nothing of a station stays out: no Chop button; and off the pause card the knife, flames and pan go back.
+  if (name !== 'play') chopBtn(false);
+  if (art && !playing && name !== 'paused') { art.knife.rest(); if (flames) flames.visible = false; art.pan.rotation.x = 0; art.panGlow.material.opacity = 0; }
   if (name === 'menu') menu();
   if (name === 'play') missionChip();
   // A story card waits under the pause and extra cards; leaving for the menu drops it.
@@ -318,8 +328,9 @@ function startChop() {
   const pieces = ids.map((id, i) => {
     const m = lie(art.item(itemModel(id), 0.24)); const x = n === 1 ? 0 : -span / 2 + span * i / (n - 1);
     m.position.set(x, TOP + 0.045, 0.12 + (i % 2 ? 0.07 : -0.05)); m.rotation.y = (Math.random() - 0.5) * 0.6; art.world.add(m);
+    const hw = Math.min(0.13, new art.THREE.Box3().setFromObject(m).getSize(new art.THREE.Vector3()).x / 2), s0 = m.scale.x;
     art.popIn(m, false);
-    return { id, m, cuts: 0, x, z0: m.position.z, ph: Math.random() * 6.28 };
+    return { id, m, cuts: 0, x, z0: m.position.z, ph: Math.random() * 6.28, hw, s0 };
   });
   cook = { kind: 'chop', pieces, t0: clock, cuts: sim.chopCuts(save), slide: sim.chopSlide(save), bits: [] };
   banner(t('chop'), t('chopSub'));
@@ -358,12 +369,12 @@ function cutAt(p, x = p.m.position.x) {
   }
   floater(worldPx(p.m.position.x, TOP + 0.25, p.m.position.z), cook.pieces.every(q => q.done) ? t('yum') : '✂');
   if (cook.pieces.every(q => q.done)) {
-    const q = sim.chopQuality(clock - cook.t0, cook.pieces.length, save.built.knife);
+    const q = sim.chopQuality(clock - cook.t0, cook.pieces.length * cook.cuts, save.built.knife);
     finishStep('chop', q);
   }
 }
 let aim = 0, tapStart = null;
-const KNIFE = { y: TOP + 0.035, up: 0.26, tilt: 0.45, hitW: 0.09, down: 0.07, back: 0.14 };
+const KNIFE = { y: TOP + 0.035, up: 0.26, tilt: 0.45, hitW: 0.025, down: 0.07, back: 0.14 };
 function aimAt(cx, cy) { const w = art.toY(cx, cy, TOP + 0.05); if (Number.isFinite(w.x)) aim = Math.max(-0.55, Math.min(0.55, w.x)); }
 function strike() {
   if (phase !== 'chop' || !cook || cook.kind !== 'chop' || cook.over || cook.strike) return;
@@ -384,7 +395,8 @@ function stepKnife(dt) {
 }
 function land(x) {
   if (!cook || cook.kind !== 'chop' || cook.over) return;
-  const hits = cook.pieces.filter(p => !p.done && Math.abs(p.m.position.x - x) < KNIFE.hitW);
+  // The blade cuts what is under it: half the piece's width (it shrinks with each slice), plus a little.
+  const hits = cook.pieces.filter(p => !p.done && Math.abs(p.m.position.x - x) < p.hw * p.m.scale.x / p.s0 + KNIFE.hitW);
   if (!hits.length) { SFX.thunk(); art.shake(0.15); buzz(6); cook.misses = (cook.misses ?? 0) + 1; return; }
   if (hits.length >= 2) combo(hits.length, art.toScreen(hits[0].m.position.clone().add(new art.THREE.Vector3(0, 0.1, 0))));
   for (const p of hits) { cutAt(p, x); if (cook?.over) break; }
@@ -392,7 +404,7 @@ function land(x) {
 function combo(n, s) { floater({ x: s.x, y: s.y - 40 }, t('combo', { n }), 'gold'); SFX.coin(); g.combo = Math.max(g.combo ?? 0, n); }
 const reach = () => Math.max(34, Math.min(innerWidth, innerHeight) * 0.09);
 function stepChop() {
-  for (const p of cook.pieces) if (!p.done) { p.m.position.x = p.x + Math.sin(clock * (1.3 + cook.slide * 5) + p.ph) * cook.slide * 0.7; p.m.position.z = p.z0 + Math.cos(clock * 1.1 + p.ph) * cook.slide * 0.15; }
+  for (const p of cook.pieces) if (!p.done) { p.m.position.x = p.x + Math.sin(clock * (1.1 + cook.slide * 3.5) + p.ph) * cook.slide * 0.7; p.m.position.z = p.z0 + Math.cos(clock * 1.1 + p.ph) * cook.slide * 0.15; }
 }
 
 // Fry: hold to heat, let go in the green. The food sits in the pan's bowl, flips twice, and browns golden, then brown, then black.
@@ -432,13 +444,13 @@ function sticks() {
 function flameRing() {
   if (flames) return flames;
   flames = new art.THREE.Group();
-  const mat = new art.THREE.MeshBasicMaterial({ color: '#ff8a1f', transparent: true, opacity: 0.85, blending: art.THREE.AdditiveBlending, depthWrite: false });
-  const blue = new art.THREE.MeshBasicMaterial({ color: '#4fa3ff', transparent: true, opacity: 0.8, blending: art.THREE.AdditiveBlending, depthWrite: false });
+  const mat = new art.THREE.MeshBasicMaterial({ color: '#ff6a10', transparent: true, opacity: 0.92, depthWrite: false });
+  const blue = new art.THREE.MeshBasicMaterial({ color: '#2f7dff', transparent: true, opacity: 0.9, depthWrite: false });
   for (let i = 0; i < 12; i++) {
     const a = i / 12 * Math.PI * 2, f = new art.THREE.Group();
     const o = new art.THREE.Mesh(new art.THREE.ConeGeometry(0.022, 0.09, 8), mat); o.position.y = 0.045; f.add(o);
     const b = new art.THREE.Mesh(new art.THREE.ConeGeometry(0.014, 0.04, 8), blue); b.position.y = 0.02; f.add(b);
-    f.position.set(PAN.x + Math.cos(a) * art.panR * 1.08, TOP + 0.005, PAN.z + Math.sin(a) * art.panR * 1.08); f.userData.ph = Math.random() * 6; flames.add(f);
+    const rr = art.panR / 0.8 + 0.015; f.position.set(PAN.x + Math.cos(a) * rr, TOP + 0.005, PAN.z + Math.sin(a) * rr); f.userData.ph = Math.random() * 6; flames.add(f);
   }
   art.world.add(flames); return flames;
 }
@@ -809,12 +821,6 @@ addEventListener('keydown', e => {
 });
 addEventListener('keyup', e => { keys.delete(e.key); if ((e.key === ' ' || e.key === 'Enter') && phase === 'fry') letGo(); });
 
-// The Chop button, for touch screens.
-const coarse = matchMedia('(pointer: coarse)').matches;
-let chopShown = false;
-function chopBtn(on) { on = on && (coarse || touchSeen); if (on !== chopShown) { chopShown = on; $('chopBtn').style.display = on ? 'flex' : 'none'; } }
-let touchSeen = false;
-addEventListener('pointerdown', e => { if (e.pointerType === 'touch') touchSeen = true; }, true);
 $('chopBtn').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); strike(); });
 
 // ---------- pause
@@ -879,9 +885,10 @@ function frame(now) {
     if (slide && dish) { slide.t = Math.min(1, slide.t + dt * 2.2); dish.position.lerpVectors(slide.from, slide.to, elasticOut(slide.t) * 0.3 + slide.t * 0.7); dish.position.y = TOP + Math.sin(slide.t * Math.PI) * 0.15; if (slide.t >= 1) slide = null; }
     if (phase !== 'chop') art.knife.rest();
     if (phase !== 'fry' && flames?.visible) flames.visible = false;
-    chopBtn(live && phase === 'chop' && !cook?.over);
+
     stepFinger(dt);
   }
+  if (art) chopBtn(live && phase === 'chop' && !cook?.over);
   song?.set({ on: musicOn && live, progress: day ? Math.min(1, (day.i + 0.5) / day.plan.length) : 0, danger: phase === 'catch' && g?.catch ? Math.min(1, (clock - g.catchT0) / TUNE.patience) * 0.6 : 0, light: 1 });
   art.frame(paused ? 0 : dt);
 }
@@ -902,7 +909,7 @@ window.kitchenState = () => art && peopleIn && ({
   built: { ...save.built }, tutorial: save.tutorial, served: save.served, touched, ready: !!art, recipe: g?.recipe ?? null,
   guest: day?.i ?? -1, guests: day?.plan.length ?? 0, need: g?.catch ? { ...g.catch.need } : null, got: g?.catch ? { ...g.catch.got } : null,
   extra: g?.catch?.extra?.id ?? null, items: g?.catch ? g.catch.items.map(it => ({ id: it.id, x: it.x, y: it.y })) : [], half: g?.catch?.half ?? 0,
-  cook: cook ? { kind: cook.kind, d: cook.d, p: cook.p, band: cook.band, fill: cook.fill, left: cook.pieces?.filter(p => !p.done).length, misses: cook.misses ?? 0, striking: !!cook.strike } : null,
+  cook: cook ? { kind: cook.kind, d: cook.d, p: cook.p, band: cook.band, fill: cook.fill, left: cook.pieces?.filter(p => !p.done).length, misses: cook.misses ?? 0, striking: !!cook.strike, cuts: cook.pieces?.reduce((n, p) => n + p.cuts, 0), xs: cook.pieces?.map(p => p.done ? null : [p.m.position.x, p.m.position.z]), aim } : null, q: g?.q,
   look: lookId, hint: !!document.querySelector('.kit-hint.on'),
 });
 window.kitchenMusic = () => song && { ...song.melody, on: song.state.on, step: song.step, notes: song.log.length, kinds: song.log.map(l => l.kind) };

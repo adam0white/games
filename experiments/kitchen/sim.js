@@ -249,8 +249,9 @@ export function restartCatch(c) {
 // Chop: each piece needs `cuts` swipes; quality falls with time over a par.
 export const chopCuts = save => (save.tier >= 2 ? 3 : save.tier >= 1 ? 2 : 1);
 // From the diner on, pieces slide on the board (lane units a second); faster at higher ranks.
-export const chopSlide = save => (save.tier >= 1 ? 0.12 + 0.05 * save.tier : 0);
-export function chopQuality(seconds, pieces, knife) { const par = pieces * (1.1 - 0.1 * knife) + 0.6; return seconds <= par ? 1 : Math.max(0.4, 1 - (seconds - par) / (par * 1.5)); }
+export const chopSlide = save => (save.tier >= 1 ? Math.min(0.4, 0.12 + 0.05 * save.tier) : 0);
+// Par counts strikes (pieces x cuts): about half a second each to aim and drop the knife, a little less with a better knife.
+export function chopQuality(seconds, strikes, knife) { const par = strikes * (0.6 - 0.04 * knife) + 0.8; return seconds <= par ? 1 : Math.max(0.4, 1 - (seconds - par) / (par * 1.5)); }
 // Fry: hold to heat; doneness grows while held; let go inside the golden band.
 export function fryBand(stove, tier) { const w = 0.14 + 0.04 * stove - 0.015 * tier; return [0.62 - w / 2, 0.62 + w / 2]; }
 export const FRY_RATE = 0.42; // doneness a second while held
