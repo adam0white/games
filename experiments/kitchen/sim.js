@@ -364,7 +364,8 @@ export function moodBill(b, mood) {
 export const robTake = (save, recipeId) => Math.round(RECIPES[recipeId].price * (1 + 0.15 * save.tier) * 0.6);
 // A fist fight: tap faster than the guest. Taps needed in FIGHT_SECS seconds.
 export const FIGHT_SECS = 3;
-export const fightTaps = tier => Math.round(10 + tier * 1.2);
+// Taps needed in FIGHT_SECS: 10 at the Bistro side, capped at 16 (about 5 a second, one thumb).
+export const fightTaps = tier => Math.min(16, Math.round(10 + tier * 1.2));
 // Staff: hired guests earn a wage and add to tips; a guest who lost a fight owes one free shift and may rebel.
 export const STAFF_MAX = 2;
 export const wage = tier => 8 + tier * 6;

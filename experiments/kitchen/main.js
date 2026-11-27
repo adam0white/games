@@ -49,8 +49,8 @@ const tools = (() => { const o = readJson(TOOLS_KEY, null), ids = TOOLS.map(x =>
 const storeTools = () => writeJson(TOOLS_KEY, tools);
 // Staff (own key): guests hired with the wheel, or beaten in a fist fight and owing a free shift.
 const STAFF_KEY = 'kitchen-staff';
-const staff = (() => { const o = readJson(STAFF_KEY, null); return Array.isArray(o) ? o.filter(x => x && Number.isFinite(x.look) && (x.kind === 'hired' || x.kind === 'owed')).slice(0, sim.STAFF_MAX).map(x => ({ look: x.look | 0, kind: x.kind, name: String(x.name ?? 'Pip').slice(0, 12) })) : []; })();
-const storeStaff = () => writeJson(STAFF_KEY, staff.map(({ look, kind, name }) => ({ look, kind, name })));
+const staff = (() => { const o = readJson(STAFF_KEY, null); return Array.isArray(o) ? o.filter(x => x && Number.isFinite(x.look) && (x.kind === 'hired' || x.kind === 'owed')).slice(0, sim.STAFF_MAX).map(x => ({ look: x.look | 0, kind: x.kind, name: String(x.name ?? 'Pip').slice(0, 12), fresh: !!x.fresh })) : []; })();
+const storeStaff = () => writeJson(STAFF_KEY, staff.map(({ look, kind, name, fresh }) => ({ look, kind, name, ...(fresh ? { fresh } : {}) })));
 let lookId = LOOK_IDS.includes(query.get('look')) ? query.get('look') : LOOK_IDS.includes(read(LOOK_KEY)) ? read(LOOK_KEY) : 'diner';
 
 // ---------- sound: made in code (kit/audio.js); music from kit/music.js
@@ -178,6 +178,7 @@ function beginDay() {
   let plan = save.tutorial ? sim.dayPlan(save, seed) : sim.TUTORIAL_DAY.slice();
   if (save.tutorial && query.get('recipe') in RECIPES) plan = plan.map(p => ({ ...p, recipe: query.get('recipe') })); // for checks and the owner's tries
   if (save.tutorial && storyBook) {
+    if (story.reopen(save, storyBook.beats).length) store();
     const menuNow = sim.menuFor(save);
     story.pickSpecial(save, storyBook.specials, menuNow, seed);
     plan = story.forceDishes(plan, story.wantedDishes(save), menuNow);
@@ -681,7 +682,9 @@ function endDay() {
   // Wages for hired staff (as much as there is); owed shifts are done.
   let wages = 0;
   for (const m of staff) if (m.kind === 'hired') { const w = Math.min(save.coins, sim.wage(save.tier)); save.coins -= w; wages += w; }
-  const freed = staff.filter(m => m.kind === 'owed'); for (const m of freed) staff.splice(staff.indexOf(m), 1);
+  // A beaten guest works the rest of today and all of tomorrow, then goes home.
+  const freed = staff.filter(m => m.kind === 'owed' && !m.fresh); for (const m of freed) staff.splice(staff.indexOf(m), 1);
+  for (const m of staff) delete m.fresh;
   storeStaff(); hud();
   store();
   const stars = day.stars.length ? Math.round(day.stars.reduce((a, b) => a + b, 0) / day.stars.length) : 0;
@@ -784,7 +787,7 @@ function openWheel(ctx) {
   for (const b of $('wheelItems').querySelectorAll('button')) b.addEventListener('click', e => { e.stopPropagation(); pickWheel(b.dataset.w); });
 }
 function closeWheel() { $('wheel').style.display = 'none'; }
-$('wheelMid').addEventListener('click', e => { e.stopPropagation(); SFX.tap(); closeWheel(); if (!g) return; if (wheelCtx === 'payback') { phase = 'serve'; payUp(); } else { phase = 'order'; wait(0.4, () => { if (phase === 'order') startCatch(); }); } });
+$('wheelMid').addEventListener('click', e => { e.stopPropagation(); SFX.tap(); closeWheel(); if (!g) return; if (wheelCtx === 'payback') { phase = 'serve'; payUp(); } else { phase = 'order'; wait(0.4, () => { if (phase === 'order') goCatch(); }); } });
 $('wheelBtn').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if (phase === 'order' && wheelOn()) openWheel('order'); });
 function pickWheel(id) {
   const ctx = wheelCtx, me = g, w = sim.WHEEL[id];
@@ -803,7 +806,7 @@ function afterStunt(id, me, ctx) {
   if (me !== g) return;
   coach(t('p_' + id), 4);
   if (id === 'rob') { const n = sim.robTake(save, g.recipe); save.coins += n; day.robbed += n; hud(); store(); floater(worldPx(3.25, 1.9, 0.95), `+${n}`, 'gold'); return leaveNow(); }
-  if (id === 'hire') { addStaff('hired', g.model); $('ticket').style.display = 'none'; return wait(1.0, nextGuest); }
+  if (id === 'hire') { addStaff('hired', g.model, false); $('ticket').style.display = 'none'; return wait(1.0, nextGuest); }
   resumeAfter(ctx);
 }
 function afterFight(won, me, ctx) {
@@ -816,7 +819,7 @@ function afterFight(won, me, ctx) {
   }
   coach(t('fightLostLine'), 3); g.model?.play('emote-yes', true);
   if (ctx === 'payback') { phase = 'serve'; return payUp(); }
-  g.sorted = 0; g.mood = null; phase = 'order'; art.view('serve'); wait(1.2, () => { if (phase === 'order') startCatch(); });
+  g.sorted = 0; g.mood = null; phase = 'order'; art.view('serve'); wait(1.2, () => { if (phase === 'order') goCatch(); });
 }
 function resumeAfter(ctx) {
   art.view('serve');
@@ -824,8 +827,9 @@ function resumeAfter(ctx) {
   g.sorted = sim.wheelTip(g.mood); g.mood = null; phase = 'order';
   if (g.model) { g.model.face = -Math.PI * 0.6; g.model.bubble.show(null, g.sorted ? 'sorry' : 'angry'); }
   later(1000, () => { if (g?.model && phase === 'order') g.model.bubble.show(art.thumb(dishModel(g.recipe))); });
-  wait(1.5, () => { if (phase === 'order') startCatch(); });
+  wait(1.5, () => { if (phase === 'order') goCatch(); });
 }
+const goCatch = () => { if (storyOpen()) pendingCatch = g; else startCatch(); };
 function leaveNow() {
   const m = g.model; $('ticket').style.display = 'none';
   if (m) { m.bubble.hide(); m.speed = 4; art.walkTo(m, 6.5, 1.6, () => { m.gone = true; }); m.play('sprint'); }
@@ -872,11 +876,11 @@ function fightEnd(won) {
 }
 $('fightTap').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); fightTap(); });
 // Staff stand in the dining room: hired ones cost a wage at day end; a beaten guest works one free shift.
-function addStaff(kind, model) {
+function addStaff(kind, model, walk = true) {
   if (staff.length >= sim.STAFF_MAX) { coach(t('staffFull'), 3); return false; }
-  const m = { look: g?.look ?? 0, kind, name: NAMES[Math.floor(Math.random() * NAMES.length)], model };
+  const m = { look: g?.look ?? 0, kind, name: NAMES[Math.floor(Math.random() * NAMES.length)], model, ...(kind === 'owed' ? { fresh: true } : {}) };
   staff.push(m); storeStaff();
-  if (model) { model.bubble.hide(); art.stunt(model, 'join', { staffSlot: staff.length - 1 }); }
+  if (model) { model.bubble.hide(); if (walk) art.stunt(model, 'join', { staffSlot: staff.length - 1 }); }
   floater({ x: innerWidth / 2, y: innerHeight * 0.36 }, t(kind === 'hired' ? 'hiredLine' : 'owedLine', { name: m.name }), 'gold');
   rec.event('staff', { kind, n: staff.length });
   return true;
