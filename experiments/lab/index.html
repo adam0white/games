@@ -9,34 +9,75 @@
   html, body { margin: 0; min-height: 100%; background: #0b0d14; color: #efe8da; font: 17px/1.5 Georgia, 'Times New Roman', serif; }
   main { max-width: 34em; margin: 0 auto; padding: 1.4em 1em 3em; }
   h1 { font-weight: normal; letter-spacing: .08em; color: #ffd9a0; margin: 0 0 .2em; }
+  h2 { font-weight: normal; letter-spacing: .06em; color: #ffd9a0; font-size: 1.05em; margin: 2em 0 .2em; opacity: .9; }
   p { opacity: .85; margin: .4em 0; }
   a.card { display: block; margin: 1em 0; padding: .9em 1em; border: 1.5px solid #ffd9a055; border-radius: 14px; color: inherit; text-decoration: none; background: #ffffff0a; }
+  a.card:focus-visible, a.card:hover { border-color: #ffd9a0aa; }
   a.card b { display: block; font-weight: normal; font-size: 1.25em; color: #ffd9a0; }
   a.card small { opacity: .7; }
+  a.card.top { border-color: #ffd9a0aa; }
 </style>
 </head>
 <body>
 <main>
   <h1>Lab experiments</h1>
-  <p>New ideas are tried here first. The ones that worked have moved out: the small games have their own home, and the Lantern and Ant Promotion ideas are in those games.</p>
-  <a class="card" href="/small/"><b>Small games</b><span>Twelve short games, three picked for tonight.</span></a>
+  <p>Every game we are working on, newest ideas included. Games on hold or archived are not listed.</p>
+  <a class="card top" href="/small/"><b>Small games</b><span>Twelve short games, three picked for tonight.</span></a>
   <div id="list"></div>
-  <p><a href="/lantern/" style="color:#ffd9a0">Lantern</a> · <a href="/ant-promotion/" style="color:#ffd9a0">Ant Promotion</a></p>
 </main>
 <script type="module">
-// One entry per experiment: [directory, title, what it tests, which game it comes from]
-// The lab was cleaned up on 2026-11-24 (NOTES.md, "Lab cleanup"). The small games are listed at /small/. Pages the
-// owner accepted into Lantern and Ant Promotion are not listed here while they are being folded in; their addresses
-// keep working until each fold lands and then redirect to the game.
-const LIST = [];
+// The lab's game list: active games only, newest work first within each section. Small games are listed at /small/
+// (experiments/small/catalog.js), not here. Leave out games that are on hold (Exile, since 2026-11-25) or archived
+// (archive/). When a game is put on hold or archived, take its line out; when one goes live, add it.
+// The story games mirror the listed games in human-framework apps/site/src/games.ts; three of them live on that site.
+// One entry per game: [address, title, one line]
+const SECTIONS = [
+  ['Main games', [
+    ['/lantern/', 'Lantern', 'Carry the light down the river to dawn. Spark, Tide, Duet and Race modes.'],
+    ['/ant-promotion/', 'Ant Promotion', 'Start as an ant, eat what is weaker than you, and pick what you become next.'],
+    ['/kitchen/', 'Sky Kitchen', 'Catch falling ingredients, cook them, serve guests and grow a food cart into a restaurant.'],
+    ['/crumbwar/', 'Crumbwar', 'Ant colonies against other players online. Classic, Feast and Rush.'],
+    ['/cinderhill/', 'Cinderhill', 'Early build of an ant colony game: paint trails and watch the workers follow.'],
+  ]],
+  ['More experiments', [
+    ['/alibi/', 'Alibi', 'A wordless whodunit. Scrub the clock and catch the alibi that does not match.'],
+    ['/borrowed/', 'Borrowed Time', 'Live borrowed lives and name who lies before the candle runs out.'],
+    ['/grapevine/', 'Grapevine', 'Route the news through villagers who each change it, so it arrives right.'],
+    ['/fixit/', 'Fix-It Stall', 'Mend toys, doors and zips at a market stall before the customer gives up.'],
+    ['/ducklings/', 'Follow Me', 'Lead a mother duck home. Each duckling swims exactly where she swam.'],
+    ['/nightshift/', 'Tiptoe Museum', 'Freeze runaway exhibits with your torch until they return to their plinths.'],
+    ['/vine/', 'Night Vine', 'Grow a vine in a glasshouse with a lamp and a pruning flick.'],
+    ['/boat/', 'Paper Boat', 'You never steer the boat. You move the water.'],
+    ['/flock/', 'Night Flock', 'Bring the sheep into the fold over twenty evenings in the valley.'],
+    ['/harvest/', 'Harvest Morning', 'Cut the wheat and get it to the cart before the storm reaches the field.'],
+    ['/breath/', 'Hold Your Breath', 'Run a smoky building floor by floor, breathing only where the air is clean.'],
+    ['/matchmaker/', 'Good Match', 'Match each helper on the street to the home that needs them.'],
+    ['/sling/', 'Seed Sling', 'Sling seeds from flower to flower until every patch blooms.'],
+    ['/duel/', 'Thumb Duel', 'Two players, one phone, nine kinds of quick duels. Or play the bot.'],
+  ]],
+  ['Story games', [
+    ['/murmur/', 'The Two Voices', 'A week as one of two voices in Dilan’s head. Each evening, she reflects on her choices.'],
+    ['/stairwell/', 'The Stairwell', 'Caretaker of a seven-flat Istanbul building: bread, bins and what to share about the residents.'],
+    ['/pass/', 'The Pass', 'Run a small kitchen for four weeks. The people working with you can disagree.'],
+    ['/glance/', 'The Glance', 'The night desk at a dam during a stormy week. Your tired keepers read the gauges.'],
+    ['/warren/', 'The Warren', 'A village builds a refuge in soft stone. You mark where to dig; the villagers decide when.'],
+    ['/rope/', 'The Rope', 'Lead five people up a mountain and back. Every one of them can say no.'],
+    ['/word/', 'His Word', 'A tailor left conflicting promises. Agree on work, storage and rent before time runs out.'],
+    ['/lefthand/', 'The Left Hand', 'Carry help through a snowy village over three nights.'],
+    ['https://human.adamwhite.work/watch/', 'The Night Watch', 'Guide the watch in a walled village through many winters.'],
+    ['https://human.adamwhite.work/voice/', 'The Day You Say Nothing', 'A voice in Halil’s head during his first Ramadan as a widower.'],
+    ['https://human.adamwhite.work/colony/', 'Twice at the Well', 'Two versions of one village: one follows your orders, the other decides for itself.'],
+  ]],
+];
 const box = document.getElementById('list');
-if (!LIST.length) box.innerHTML = '<p>Nothing is on trial right now. The next experiments will appear here.</p>';
-for (const [dir, title, what, from] of LIST) {
-  const a = document.createElement('a'); a.className = 'card'; a.href = `./${dir}/`;
-  const b = document.createElement('b'); b.textContent = title;
-  const p = document.createElement('span'); p.textContent = what;
-  const s = document.createElement('small'); s.textContent = ` From ${from}.`;
-  a.append(b, p, s); box.append(a);
+for (const [heading, games] of SECTIONS) {
+  const h = document.createElement('h2'); h.textContent = heading; box.append(h);
+  for (const [href, title, line] of games) {
+    const a = document.createElement('a'); a.className = 'card'; a.href = href;
+    const b = document.createElement('b'); b.textContent = title;
+    const s = document.createElement('span'); s.textContent = line;
+    a.append(b, s); box.append(a);
+  }
 }
 </script>
 </body>
