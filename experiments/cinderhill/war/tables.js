@@ -113,6 +113,14 @@ export const CAMPAIGN = [
 ];
 export const LOSS_ANTS = 8;
 
+/** A fork in the road: the two missions of `pair` open together. The one finished first is the road taken; the other
+ *  has changed by the time the colony comes to it: `late` is laid over its options, and `text` says how. */
+export const ROAD = {
+  pair: ['hunt', 'stones'],
+  late: { hunt: { beastHp: 4200 }, stones: { foePoints: 40 } },
+  text: { hunt: 'The beetle has fed for a season. It takes half as much again to bring down.', stones: 'The rival has held the stones for a season. It starts forty points ahead.' },
+};
+
 /** The Lineage: the colony's tree, bough by bough. A `fork` names a fork of CAMPAIGN (take one side; the rival has the
  *  other). A `node` names a trait that a deed opens (see each mission's `deeds`); the rival is given the same nodes, so
  *  a node is a new thing to do and not a lead. */

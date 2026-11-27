@@ -2,7 +2,7 @@
 // everything on screen is read from the sim or its events, and every order goes through host.order() under seat 0.
 import { Host } from './host.js';
 import { CMD, KIND, MODE, CG, EVENT, REASON, TASK, CASTE, STAGE, MAT, ROOM, TRAILS, PATH_MAX, MAX_PILES, C, LEVEL_SHARE, RAID_SHARE, PLUG } from './sim.js';
-import { CAMPAIGN, LINEAGE, LOSS_ANTS, MISSIONS, TRAITS, TIERS, BRANCH } from './tables.js';
+import { CAMPAIGN, LINEAGE, LOSS_ANTS, MISSIONS, TRAITS, TIERS, BRANCH, ROAD } from './tables.js';
 import { makeGestures } from '../gestures.js';
 import { GameRenderer, sky } from '../game/gl.js';
 import { noZoom } from '../../kit/zoom.js';
@@ -86,14 +86,17 @@ const rivalOf = s => { const mine = taken(s.fork); if (s.options) return s.optio
 const optionText = v => FORK[v] ?? [TRAITS[v].name, TRAITS[v].text];
 // Traits: yours are the forks you took; the rival takes the other option of each, so the choice is a trade and not a gift.
 const traitsNow = () => { const mine = nodesNow(), theirs = nodesNow(); for (const s of CAMPAIGN) if (s.fork && s.fork !== 'caste' && taken(s.fork)) { mine.push(taken(s.fork)); theirs.push(...rivalOf(s)); } return [mine, MOOD[set.get('rival')] ? theirs : []]; };
-function isOpen(id) { if (id === query.get('mission')) return true; for (const s of CAMPAIGN) { if (s.mission === id) return true; if (s.mission && !camp.done[s.mission]) return false; if (s.fork && !taken(s.fork)) return false; } return false; }
+function isOpen(id) { if (id === query.get('mission')) return true; for (const s of CAMPAIGN) { if (s.mission === id) return true; if (s.mission && !camp.done[s.mission] && !(ROAD.pair.includes(s.mission) && ROAD.pair.includes(id))) return false; if (s.fork && !taken(s.fork)) return false; } return false; }
 const firstOpen = () => { let last = STEPS[0]; for (const id of STEPS) { if (!isOpen(id)) break; last = id; if (!camp.done[id]) break; } return last; };
 const qMission = query.get('mission');
 let missionId = MISSIONS[qMission] ? qMission : firstOpen();
 const rivalMind = () => { const mood = MOOD[set.get('rival')]; return mood && camp.caste ? { mood, pick: camp.caste === 'spitter' ? CASTE.WARDEN : CASTE.SPITTER } : mood; };
 // A mission lost costs the next one some of its first workers: the colony carries on smaller.
 const startAnts = () => { const prev = before(missionId), ants = MISSIONS[missionId].kit.ants; return prev && camp.done[prev] && !camp.done[prev].won ? [Math.max(10, ants - LOSS_ANTS), MISSIONS[missionId].kit.foeAnts ?? ants] : [ants, MISSIONS[missionId].kit.foeAnts ?? ants]; };
-const newHost = () => new Host({ seed, mission: missionId, ...(hillOf(missionId) ? { nests: hillOf(missionId).nests } : {}), antsBy: startAnts(), traits: traitsNow(), tiers: set.get('growth') !== 'deeds', ai: { [FOE]: MOOD[set.get('rival')] } });
+// The fork in the road: the mission of the pair that was not finished first has changed by the time it is played.
+const late = id => ROAD.pair.includes(id) && !!camp.forks.road && camp.forks.road !== id;
+const lateOpts = id => { if (!late(id)) return {}; const { foePoints, ...o } = ROAD.late[id]; if (foePoints) { o.pointsBy = [0, 0]; o.pointsBy[FOE] = foePoints; } return o; };
+const newHost = () => new Host({ seed, mission: missionId, ...lateOpts(missionId), ...(hillOf(missionId) ? { nests: hillOf(missionId).nests } : {}), antsBy: startAnts(), traits: traitsNow(), tiers: set.get('growth') !== 'deeds', ai: { [FOE]: MOOD[set.get('rival')] } });
 let host = newHost(), sim = host.sim;
 let screen = 'menu', tool = 'trail', nestOpen = false, running = false, speed = 1, lastT = 0;
 const Gs = makeGestures();
@@ -241,7 +244,7 @@ function growPane() {
   if (can && tier === 0 && sim.tick > 400 && !(nestOpen && $('diet').dataset.tab === 'grow')) once('grow', 'Seeds to spare. Open Nest, then Grow: the queen\'s chamber can be widened.', 4200);
 }
 function startRun() {
-  rec.start({ ...set.snapshot(), caste: camp.caste ?? 'none', way: camp.forks.way ?? 'none', craft: camp.forks.craft ?? 'none', nodes: nodesNow().join('+') || 'none', mode: 'war', mission: missionId, ants: sim.cfg.antsBy[ME], hill: hillOf(missionId)?.from ?? 'new', dug: sim.cfg.nests ? sim.cfg.nests[ME].length / 3 : 0, look: `war:${set.get('view')}/${set.get('light')}/${set.get('style')}`, seed, v: 1 });
+  rec.start({ ...set.snapshot(), caste: camp.caste ?? 'none', way: camp.forks.way ?? 'none', craft: camp.forks.craft ?? 'none', nodes: nodesNow().join('+') || 'none', mode: 'war', mission: missionId, ants: sim.cfg.antsBy[ME], road: late(missionId) ? 'late' : camp.forks.road === missionId ? 'first' : 'none', hill: hillOf(missionId)?.from ?? 'new', dug: sim.cfg.nests ? sim.cfg.nests[ME].length / 3 : 0, look: `war:${set.get('view')}/${set.get('light')}/${set.get('style')}`, seed, v: 1 });
   host.ai[FOE] = rivalMind(); pickCaste();
   running = true; opening();
 }
@@ -275,7 +278,8 @@ function renderPath() {
   const m = MISSIONS[missionId], t = TEXT[missionId], lost = startAnts()[0] < m.kit.ants;
   $('mKicker').textContent = m.name; $('mSub').textContent = t.sub;
   $('mGoals').textContent = ''; const hill = hillOf(missionId), kept = hill ? (() => { const n = [0, 0, 0, 0], l = hill.nests[ME] ?? []; for (let j = 2; j < l.length; j += 3) n[l[j] < 4 ? l[j] : 0]++; return `You start in your hill as you left it at ${MISSIONS[hill.from].name}: ${l.length / 3} cells dug, ${n[ROOM.STORE]} of them stores, ${n[ROOM.NURSERY]} nursery. Your ${n[ROOM.REST]} quarters cells are bare tunnels again: paint them as Quarters when you want the ants, with no digging to do. The rival starts in its own.`; })() : m.from && set.get('home') === 'carried' ? (camp.done[m.from] ? `This is the hill of ${MISSIONS[m.from].name}. Play that mission again to its end and you start here in the nest you dug there.` : `This is the hill of ${MISSIONS[m.from].name}. Finish that mission and you start here in the nest you dug there.`) : Object.values(MISSIONS).some(x => x.from === missionId) && set.get('home') === 'carried' ? 'What you dig here stays: the next mission on this hill starts in this nest.' : null;
-  for (const line of [...t.goals, ...(lost ? [`The last mission was lost: you start with ${startAnts()[0]} workers, not ${m.kit.ants}.`] : []), ...(kept ? [kept] : [])]) { const p = document.createElement('p'); p.textContent = line; $('mGoals').append(p); }
+  const other = ROAD.pair.find(x => x !== missionId), road = !ROAD.pair.includes(missionId) ? null : late(missionId) ? `You went to ${MISSIONS[other].name} first. ${ROAD.text[missionId]}` : camp.forks.road ? null : `A fork in the road. ${MISSIONS[ROAD.pair[0]].name} and ${MISSIONS[ROAD.pair[1]].name} are both open, and the one you leave for later changes while you are away. Leave ${MISSIONS[ROAD.pair[0]].name}: ${ROAD.text[ROAD.pair[0]]} Leave ${MISSIONS[ROAD.pair[1]].name}: ${ROAD.text[ROAD.pair[1]]}`;
+  for (const line of [...t.goals, ...(lost ? [`The last mission was lost: you start with ${startAnts()[0]} workers, not ${m.kit.ants}.`] : []), ...(kept ? [kept] : []), ...(road ? [road] : [])]) { const p = document.createElement('p'); p.textContent = line; $('mGoals').append(p); }
   $('play').textContent = running && host.sim.mission.id === missionId ? 'Resume' : 'Play'; $('play').disabled = !isOpen(missionId);
   $('fresh').hidden = !Object.keys(camp.done).length; $('fresh').textContent = 'New campaign'; freshArmed = false;
   renderDeeds($('mDeeds'), missionId, []); renderTree();
@@ -594,6 +598,7 @@ function finish(w, reason) {
   rec.end(w ? 'won' : 'lost', { ...s, reason });
   const text = TEXT[missionId], was = camp.done[missionId];
   camp.done[missionId] = { won: w || !!was?.won, best: Math.max(was?.best ?? 0, w ? s.adults : 0) }; saveCamp();
+  if (ROAD.pair.includes(missionId) && !camp.forks.road && !camp.done[ROAD.pair.find(x => x !== missionId)]) { camp.forks.road = missionId; saveCamp(); rec.event('road', { first: missionId }); }
   if (sim.mission.from || Object.values(MISSIONS).some(x => x.from === missionId)) { hills.after[missionId] = { nests: sim.nests() }; saveHills(); }
   // Deeds: the sim judges them; the page only keeps which were done, and which are new this time.
   const did = sim.deeds(ME), fresh = [];
