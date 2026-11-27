@@ -67,6 +67,7 @@ export const EVENT = {
   HEARD: 17, // the team whose ground it is, cell, the team digging: a rival opened a cell on this colony's side
   PLUG: 19, // team, cell: an open cell was packed shut
   TIER: 20, // team, the tier it has reached (2 or 3), its branch
+  GARDEN: 21, // team, seeds its fungus gardens paid
   BREACH: 18, // the team that dug the last cell, cell: the two nests are joined under ground
 };
 export const REASON = { QUEEN: 1, DUSK: 2, STARVED: 3, POINTS: 4, HAUL: 5 };
@@ -99,7 +100,7 @@ export const C = {
   SITE_R: 3, SITE_MIN: 3,
   EAT_EVERY: 1200, ADULTS_PER_SUGAR: 10, STARVE_AFTER: 1200, STARVE_EVERY: 200,
   // Rooms: a store cell holds eight loads of each food, a nursery cell one brood, a quarters cell four ants (adults and brood together; the queen stops laying at the cap).
-  STORE_MIN: 24, BROOD_MIN: 8, REST_BASE: 90, DIG_TICKS: 120, DIG_SUGAR: 1, DIG_KEEP: 3, DIG_CREW: 8, MARKS_MAX: 96, PLUGS_MAX: 3, PLUG_SUGAR: 3, PLUG_SLOW: 5, PLUG_BREAK: 4, PLUG_CLEAR: 8,
+  STORE_MIN: 24, BROOD_MIN: 8, REST_BASE: 90, REST_MIN: 40, GARDEN_EVERY: 1200, HEAL_EVERY: 32, DIG_TICKS: 120, DIG_SUGAR: 1, DIG_KEEP: 3, DIG_CREW: 8, MARKS_MAX: 96, PLUGS_MAX: 3, PLUG_SUGAR: 3, PLUG_SLOW: 5, PLUG_BREAK: 4, PLUG_CLEAR: 8,
   QUEEN_HP: 800, BITE_EVERY: 10, BITE_R: 200, SEE: 3, PRESS_OPEN: 5, PRESS_TUNNEL: 2, WAIT_AT_END: 60, GUARD_R: 4,
 };
 
@@ -123,6 +124,7 @@ export class Sim {
     const L = (this.L = makeLayout(cfg)), n = L.n, A = cfg.maxAnts;
     this.stat = Array.from({ length: TEAMS }, (_, t) => statsFor(cfg.traits?.[t]));
     this.tick = 0;
+    this.gardens = new Array(TEAMS).fill(0); // open fungus garden cells, counted in recount()
     this.result = 0; // 0: running; else 1 + the winning team
     this.why = 0; // how it ended (REASON)
     this.rng = seedStreams(cfg.seed);
@@ -214,7 +216,7 @@ export class Sim {
       const cap = { food: 0, brood: 0, ants: 0 };
       for (let r = 1; r < ROOMS.length; r++) if (ROOMS[r].cap) cap[ROOMS[r].cap] += this.stat[t].per[r] * n[t * 8 + r];
       this.floor[t] = Math.max(0, C.STORE_MIN - cap.food); // a hill with few store cells keeps this much in a heap on its founding cell
-      cg[o + CG.CAP_FOOD] = Math.max(C.STORE_MIN, cap.food); cg[o + CG.CAP_BROOD] = Math.max(C.BROOD_MIN, cap.brood); cg[o + CG.CAP_ADULTS] = C.REST_BASE + cap.ants;
+      cg[o + CG.CAP_FOOD] = Math.max(C.STORE_MIN, cap.food); cg[o + CG.CAP_BROOD] = Math.max(C.BROOD_MIN, cap.brood); cg[o + CG.CAP_ADULTS] = Math.max(C.REST_MIN, C.REST_BASE + cap.ants); this.gardens[t] = n[t * 8 + ROOM.GARDEN];
       cg[o + CG.MARKS] = marks[t];
     }
     // The cells that hold food stay in door order, so a meal or a cost paid before the fields are rebuilt comes from the same cells.
@@ -359,13 +361,15 @@ export class Sim {
     const o = t * CG.SIZE, row = this.cfg.tiers ? TIERS.grow[this.cg[o + CG.TIER]] : null;
     if (!row || this.cg[o + CG.QUEEN_HP] <= 0) return -1;
     if (this.cg[o + CG.GROW] > 0) return 1;
-    const short = Math.max(row.sugar + C.DIG_KEEP - this.cg[o + CG.SUGAR], row.protein - this.cg[o + CG.PROTEIN]);
+    // The count can run ahead of the cells for a tick (a store cleared this tick): only seeds that lie in a cell pay.
+    let held = 0; for (const k of this.bins[t]) held += this.binS[k];
+    const short = Math.max(row.sugar + C.DIG_KEEP - Math.min(held, this.cg[o + CG.SUGAR]), row.protein - this.cg[o + CG.PROTEIN]);
     return short > 0 ? 2 + short : 0;
   }
   /** May this colony choose its third caste yet? */
   mayPick(t) { return this.open(t, TIERS.pick); }
   /** May this colony dig this kind of room here? The mission's list, and the rooms its own nodes open. */
-  mayRoom(t, kind) { return this.mission.rooms.includes(kind) || (!!this.stat[t].room[kind] && this.open(t, this.stat[t].at['room' + kind])); }
+  mayRoom(t, kind) { return this.mission.rooms.includes(kind) || (!!this.cfg.tiers && !!TIERS.rooms[kind] && this.open(t, TIERS.rooms[kind])) || (!!this.stat[t].room[kind] && this.open(t, this.stat[t].at['room' + kind])); }
 
   /** May this colony dig past its own ground, into the rival's? The mission says, or a node of its own. */
   mayBreach(t) { return !!this.mission.breach || !!this.has(t, 'breach'); }
@@ -447,9 +451,6 @@ export class Sim {
       if (may < 0) return no(WHY.NONE);
       if (tier === 0 && br !== BRANCH.WAR && br !== BRANCH.DEEP) return no(WHY.NONE);
       if (may !== 0) return no(WHY.BLOCKED);
-      // The count can run ahead of the cells for a tick (a store cleared this tick): the seeds must really be there.
-      let held = 0; for (const k of this.bins[t]) held += this.binS[k];
-      if (held < row.sugar) return no(WHY.BLOCKED);
       this.take(t, FOOD.SUGAR, row.sugar); if (row.protein) this.take(t, FOOD.PROTEIN, row.protein);
       if (tier === 0) cg[base + CG.BRANCH] = br;
       cg[base + CG.GROW] = row.ticks;
@@ -733,6 +734,13 @@ export class Sim {
       if (cg[o + CG.GROW] > 0 && --cg[o + CG.GROW] === 0) this.grown(t);
       if (cg[o + CG.LAY] > 0) cg[o + CG.LAY]--;
       if (cg[o + CG.LAY] === 0 && cg[o + CG.GROW] === 0 && cg[o + CG.SUGAR] > 0 && count[t] < cg[o + CG.CAP_BROOD] && cg[o + CG.ADULTS] + count[t] < cg[o + CG.CAP_ADULTS] && this.n + this.bn < this.cfg.maxAnts) { if (this.addBrood(t, STAGE.EGG) >= 0) cg[o + CG.LAY] = C.LAY_EVERY; }
+      // A fungus garden pays a seed a cell, if there is a store cell with room for it.
+      if (this.gardens[t] && this.tick % C.GARDEN_EVERY === C.GARDEN_EVERY - 2) { let got = 0; for (let j = 0; j < this.gardens[t]; j++) if (this.put(t, FOOD.SUGAR, this.store[t])) got++; if (got) this.event(EVENT.GARDEN, t, got); }
+      // A full-grown hill tends its wounded.
+      if (this.cfg.tiers && cg[o + CG.TIER] + 1 >= TIERS.heal && this.tick % C.HEAL_EVERY === t) {
+        const nw = this.L.nw, max = this.stat[t].hp;
+        for (let i = 0; i < this.n; i++) if (this.team[i] === t && this.hp[i] > 0 && this.layer[i] === NEST && this.hp[i] < max[this.caste[i]] && this.owner((this.y[i] >> 8) * nw + (this.x[i] >> 8)) === t) this.hp[i] = Math.min(max[this.caste[i]], this.hp[i] + Math.max(1, max[this.caste[i]] >> 4));
+      }
       // Meals: a major eats as three.
       const eat = this.cfg.frostTick && this.tick >= this.cfg.frostTick ? this.cfg.frostEat : C.EAT_EVERY;
       if (this.tick % eat === eat - 1) {

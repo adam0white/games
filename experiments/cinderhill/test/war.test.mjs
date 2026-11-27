@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { Sim, CG, CMD, KIND, MODE, CASTE, TEAMS, ROOM, EVENT, MAT } from '../war/sim.js';
 import { Host } from '../war/host.js';
 import { think, THINK_EVERY, cacheRun, breachRun, mouth } from '../war/ai.js';
-import { PLUG, C } from '../war/sim.js';
+import { PLUG, C, FOOD } from '../war/sim.js';
 import { CAMPAIGN, TRAITS, MISSIONS, MAPS, TIERS, BRANCH } from '../war/tables.js';
 
 test('an idle colony loses to the rival', () => {
@@ -585,7 +585,40 @@ test('Growth: with growFreeze the brood waits while the chamber grows, and livin
 test('Growth: seeds that are counted but not in the store cells do not pay for a growth', () => {
   const s = new Sim({ seed: 4, mission: 'crossing', tiers: true, sugar: 100 });
   for (const k of s.bins[0]) s.binS[k] = Math.min(s.binS[k], 1); // the count still says 100
-  assert.equal(s.mayGrow(0), 0);
+  assert.ok(s.mayGrow(0) > 1, 'and the colony is told so');
   s.order({ team: 0, type: CMD.GROW, branch: BRANCH.WAR }); s.step();
   assert.equal(s.g(0, CG.GROW), 0); assert.equal(s.g(0, CG.BRANCH), 0);
+});
+
+test('Growth: a Deep hill may dig fungus gardens, which pay seeds and cost housing; a War hill waits for its second growth', () => {
+  const s = new Sim({ seed: 4, mission: 'crossing', tiers: true, sugar: 100 });
+  assert.equal(s.mayRoom(0, ROOM.GARDEN), false);
+  s.order({ team: 0, type: CMD.GROW, branch: BRANCH.DEEP }); s.order({ team: 1, type: CMD.GROW, branch: BRANCH.WAR });
+  while (s.g(0, CG.GROW) > 0 || s.g(0, CG.TIER) === 0) s.step();
+  assert.equal(s.mayRoom(0, ROOM.GARDEN), true); assert.equal(s.mayRoom(1, ROOM.GARDEN), false);
+  assert.equal(new Sim({ seed: 4, mission: 'crossing', tiers: false }).mayRoom(0, ROOM.GARDEN), false);
+  // paint three open cells of its own nest as garden
+  const L = s.L, mine = []; for (let k = 0; k < s.room.length && mine.length < 3; k++) if (s.mat[L.nestBase + k] === MAT.OPEN && Math.floor(k / L.nw) >= 8 && s.owner(k) === 0 && !s.room[k] && L.nestBase + k !== s.store[0] && L.nestBase + k !== s.queen[0]) mine.push(k);
+  const cap = s.g(0, CG.CAP_ADULTS), cells = mine.flatMap(k => [k % L.nw, Math.floor(k / L.nw)]);
+  s.order({ team: 0, type: CMD.ROOM, cells, kind: ROOM.GARDEN }); s.step();
+  assert.equal(s.gardens[0], 3); assert.equal(s.g(0, CG.CAP_ADULTS), cap - 3);
+  s.take(0, FOOD.SUGAR, s.g(0, CG.SUGAR) - 5); // room in the stores for what it grows
+  let paid = 0; for (let i = 0; i < C.GARDEN_EVERY + 2; i++) { s.step(); const ev = s.drainEvents(); for (let k = 0; k < ev.length; k += 4) if (ev[k] === EVENT.GARDEN && ev[k + 1] === 0) paid += ev[k + 2]; }
+  assert.equal(paid, 3);
+  const again = copyOf(s); assert.equal(again.gardens[0], 3); assert.equal(again.hash(), s.hash());
+});
+
+test('Growth: a full-grown hill mends its wounded inside its own nest', () => {
+  const s = new Sim({ seed: 4, mission: 'crossing', tiers: true, sugar: 200 });
+  const i = s.spawn(0, CASTE.MAJOR, s.queen[0]); s.hp[i] = 5;
+  for (let n = 0; n < 200; n++) s.step(); assert.equal(s.hp[i], 5, 'not before');
+  s.order({ team: 0, type: CMD.GROW, branch: BRANCH.WAR }); while (s.g(0, CG.TIER) < 1) s.step();
+  s.cg[CG.SUGAR] += 0; s.order({ team: 0, type: CMD.GROW }); while (s.g(0, CG.TIER) < 2 && s.tick < 4000) s.step();
+  assert.equal(s.g(0, CG.TIER), 2); const hp = s.hp[i]; for (let n = 0; n < 200; n++) s.step();
+  assert.ok(s.hp[i] > hp || s.layer[i] !== 1 || s.hp[i] <= 0);
+});
+
+test('The rival falls back to a raid over the ground when it is joined under ground but may not strike there', () => {
+  const s = new Sim({ seed: 3, mission: 'crossing', tiers: false }); s.linked = true;
+  const orders = think(s, 1, { mood: 2 }); assert.ok(!orders.some(o => o.under), 'no order the sim would refuse');
 });

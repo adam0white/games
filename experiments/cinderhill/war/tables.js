@@ -20,8 +20,11 @@ export const ROOMS = [
   // A guard post adds to no cap. Each open cell keeps one in eight of the colony's idle fighters standing on it, inside
   // the nest, and not out by the door: eight cells bring the whole guard in.
   { id: 'post', name: 'Guard post', cap: null, per: 0 },
+  // A fungus garden grows food under ground with no trail to guard: each open cell pays a seed at every meal. Its
+  // gardeners live in it, so each cell houses one ant fewer. It opens with the chamber's growth (TIERS.rooms).
+  { id: 'garden', name: 'Fungus garden', cap: 'ants', per: -1 },
 ];
-export const ROOM = { NONE: 0, STORE: 1, NURSERY: 2, REST: 3, POST: 4 };
+export const ROOM = { NONE: 0, STORE: 1, NURSERY: 2, REST: 3, POST: 4, GARDEN: 5 };
 
 /** Traits: a colony's standing changes to the rows above. set: [key, value] for a colony number (eatPer: adults a seed
  *  feeds at a meal; pupa: ticks a pupa takes), or [key, index, value] for one caste's or one room's number. needs: the
@@ -51,8 +54,12 @@ export const TIERS = {
   grow: [{ sugar: 18, protein: 0, ticks: 300 }, { sugar: 36, protein: 0, ticks: 400 }],
   branch: [null,
     { id: 'war', name: 'War hill', text: 'Soldiers a quarter tougher', set: [['hp', 1, 125]] },
-    { id: 'deep', name: 'Deep hill', text: 'Stores and quarters hold half as much again, and pupae hatch sooner', set: [['pupa', 87], ['per', 1, 150], ['per', 3, 150]] }],
+    { id: 'deep', name: 'Deep hill', text: 'Stores and quarters hold half as much again, pupae hatch sooner, and it may dig fungus gardens', set: [['pupa', 87], ['per', 1, 150], ['per', 3, 150]] }],
   pick: [2, 1],
+  // Rooms a growth opens, as [tier, branch]: the fungus garden for a Deep hill at its first growth, for any hill at its second.
+  rooms: { 5: [2, 2] },
+  // A full-grown hill (tier 3) tends its wounded: an ant inside its own nest mends a sixteenth of its health every HEAL_EVERY ticks.
+  heal: 3,
 };
 
 /** Maps, in cells of a 160 by 112 field, mirrored left to right. wall: what runs down the middle ('water', 'stone' or
