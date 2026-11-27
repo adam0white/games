@@ -115,6 +115,15 @@ export const LOSS_ANTS = 8;
 
 /** A fork in the road: the two missions of `pair` open together. The one finished first is the road taken; the other
  *  has changed by the time the colony comes to it: `late` is laid over its options, and `text` says how. */
+// A nest's visitor (the sim's `pest` option), by strength: a weevil that comes in at each colony's door at these ticks,
+// walks to the nearest store cell that holds food and eats there, and goes no deeper than `reach` steps from the door.
+// A page picks one for a mission with `visitor`. Stores dug deeper than its reach are the answer, at the cost of a longer
+// walk for every load; soldiers beside it are the other.
+export const VISITOR = {
+  comes: { at: [1500, 3000, 4500, 6000, 7500], warn: 200, hp: 420, every: 10, fill: 60, reach: 16, step: 8, bite: 8, biteEvery: 20, press: 4, meat: 20 },
+  hungry: { at: [1500, 3000, 4500, 6000, 7500], warn: 200, hp: 600, every: 10, fill: 80, reach: 16, step: 8, bite: 8, biteEvery: 20, press: 4, meat: 20 },
+};
+
 export const ROAD = {
   pair: ['hunt', 'stones'],
   late: { hunt: { beastHp: 4200, foeHarm: 400 }, stones: { foePoints: 40 } },
@@ -148,7 +157,7 @@ export const MISSIONS = {
   // Half way through, the frost takes the food outside. Meals come four times as often and hunger kills fast: the hill
   // lives on what it stored, or on what it steals.
   frost: {
-    from: 'crossing', id: 'frost', name: 'First Frost', map: 'crossing',
+    from: 'crossing', id: 'frost', name: 'First Frost', map: 'crossing', visitor: true,
     kit: { ants: 30, sugar: 10, protein: 5, eggs: 20, larvae: 20, pupae: 12, duskTick: 10800, frostTick: 4800, frostEat: 300, starveAfter: 300, starveDiv: 10, queenHp: 3200, glut: 3 },
     goals: { queen: true, dusk: 'adults' },
     deeds: [{ id: 'a', text: 'See the thaw with a hundred ants or more.', won: true, min: { ADULTS: 100 }, opens: 'post' }, { id: 'b', text: 'Carry three stolen loads home.', min: { HAUL: 3 }, opens: 'raiders' }],

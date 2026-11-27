@@ -701,3 +701,21 @@ test('the fork in the road: the mission left for later starts changed', () => {
   const stones = new Sim({ seed: 2, mission: 'stones', pointsBy: [0, ROAD.late.stones.foePoints] });
   assert.equal(stones.g(1, CG.POINTS), 40); assert.equal(stones.g(0, CG.POINTS), 0);
 });
+
+test('a nest visitor: it eats from stores near the door, stores past its reach are safe, and a save in the middle carries on the same', () => {
+  const pest = { at: [200, 2000], warn: 100, hp: 5000, every: 10, fill: 6, reach: 16, step: 8, bite: 8, biteEvery: 20, press: 4, meat: 20 };
+  const a = new Sim({ seed: 7, mission: 'frost', pest }), plain = new Sim({ seed: 7, mission: 'frost' });
+  for (let k = 0; k < 150; k++) { a.step(); plain.step(); }
+  assert.equal(a.pest[0], 0, 'not yet');
+  let mid = null;
+  for (let k = 0; k < 1300; k++) { a.step(); if (a.tick === 420) mid = a.save(); }
+  assert.equal(a.pest[5], 6, 'it ate its fill from the porch store'); assert.equal(a.pest[8 + 5], 6, 'and so did the rival\'s');
+  assert.equal(a.pest[7], 1); assert.equal(a.pest[0], 0, 'and it has gone'); assert.ok(a.g(0, CG.LOST) >= 6);
+  const b = Sim.load(mid); while (b.tick < a.tick) b.step();
+  assert.equal(b.hash(), a.hash(), 'a save taken while it ate carries on the same');
+  // With no food within its reach it turns round: a bot that keeps its stores deep loses nothing, the plain bot beside it does.
+  const h = new Host({ seed: 7, mission: 'frost', ai: { 0: { mood: 1, deep: true }, 1: { mood: 1 } }, pest: { ...pest, at: [2400], fill: 30 } }).run(3600).sim;
+  assert.equal(h.pest[7], 1); assert.equal(h.pest[8 + 7], 1, 'it came to both');
+  assert.equal(h.pest[5], 0, 'deep stores: nothing eaten'); assert.ok(h.pest[8 + 5] >= 20, 'a porch store: it fed');
+  assert.deepEqual([...plain.pest], [0, -1, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0], 'no visitor unless asked for');
+});

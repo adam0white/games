@@ -70,8 +70,11 @@ export const EVENT = {
   GARDEN: 21, // team, seeds its fungus gardens paid
   BEAST_BIT: 22, // the beast's cell, ants it bit this time, its health left
   BEAST_DEAD: 23, // the beast's cell, the colony that did it more harm
+  PEST: 24, // the team whose nest it is in, what (PEST), a number: seeds eaten so far, or its health left
   BREACH: 18, // the team that dug the last cell, cell: the two nests are joined under ground
 };
+// What a nest's visitor did (EVENT.PEST): came in at the door, ate a seed, went out, or was killed.
+export const PEST = { CAME: 0, ATE: 1, LEFT: 2, DIED: 3, NEAR: 4 };
 export const REASON = { QUEEN: 1, DUSK: 2, STARVED: 3, POINTS: 4, HAUL: 5, BEAST: 6 };
 export const WHY = { FULL: 1, BLOCKED: 2, LONG: 3, NONE: 4 };
 
@@ -177,6 +180,9 @@ export class Sim {
     this.sites = []; this.siteHold = new Int8Array(MAX_SITES).fill(-1);
     // A mission's beast (mission.beast): [health, surface cell, press taken this window]. It never leaves its cell.
     this.beast = new Int32Array(3); this.beast[1] = -1;
+    // A nest's visitor (cfg.pest), one for each colony: [health, cell, seeds eaten this visit, 1 going in or 2 going out, bites taken
+    // this window, seeds eaten in all, visitors killed, visits].
+    this.pest = new Int32Array(TEAMS * 8); for (let t = 0; t < TEAMS; t++) this.pest[t * 8 + 1] = -1;
     this.queue = []; this.events = []; this.anyDead = false;
     if (options.restoring) return;
     if (cfg.blank) { this.mat.fill(MAT.OPEN, 0, L.nestBase); this.mat.fill(MAT.CLAY, L.nestBase); }
@@ -705,10 +711,11 @@ export class Sim {
     this.census();
     this.stepColonies();
     this.buildBuckets();
-    if ((this.tick % C.BITE_EVERY) === 0) { this.press.fill(0, 0, this.n); this.beast[2] = 0; }
+    if ((this.tick % C.BITE_EVERY) === 0) { this.press.fill(0, 0, this.n); this.beast[2] = 0; this.pest[4] = this.pest[12] = 0; }
     for (let i = 0; i < this.n; i++) this.stepAnt(i);
     this.fight();
     if (this.beast[0] > 0 && this.tick % this.mission.beast.every === 0) this.beastBites();
+    if (this.cfg.pest) this.stepPests();
     if (this.anyDead) this.removeDead();
     if (this.dirty) { this.dirty = false; this.rebuildFields(); } else if (this.dirtyStore) this.rebuildStoreFields();
     if (this.tick % 50 === 49) this.checkTrails();
@@ -1123,6 +1130,19 @@ export class Sim {
         }
       }
       if (target >= 0) { if (!far) this.press[target]++; dmg[target] += this.stat[t].bite[this.caste[i]]; by[target] = t; any = true; this.cool[i] = C.BITE_EVERY - 1 + below(this.rng, STREAM.ants, 3); continue; }
+      // No ant to bite: a visitor in the nest, if she is beside it.
+      if (layer === NEST && this.cfg.pest) {
+        let hit = false;
+        for (let u = 0; u < TEAMS && !hit; u++) {
+          const po = u * 8, pc = this.pest[po + 1]; if (this.pest[po] <= 0 || pc < 0 || this.pest[po + 4] >= this.cfg.pest.press) continue;
+          const k = pc - L.nestBase, px = ((k % L.nw) << 8) + 128, py = (Math.floor(k / L.nw) << 8) + 128;
+          if (est(this.x[i] - px, this.y[i] - py) > reach + 128) continue;
+          const d = Math.min(this.pest[po], this.stat[t].bite[this.caste[i]]);
+          this.pest[po] -= d; this.pest[po + 4]++; this.cool[i] = C.BITE_EVERY - 1 + below(this.rng, STREAM.ants, 3); hit = true;
+          if (this.pest[po] === 0) this.pestDies(u, t);
+        }
+        if (hit) continue;
+      }
       // No ant to bite: the beast, if she is beside it. Its body takes more bites in a window than an ant's.
       if (layer !== NEST && this.beast[0] > 0 && this.beast[2] < this.mission.beast.press) {
         const bc = this.beast[1], bx = ((bc % L.sw) << 8) + 128, byy = (Math.floor(bc / L.sw) << 8) + 128;
@@ -1156,6 +1176,58 @@ export class Sim {
     const n = Math.min(B.hits, near.length);
     for (let k = 0; k < n; k++) this.hurt(near[k], B.bite, -1);
     this.event(EVENT.BEAST_BIT, bc, n, this.beast[0]);
+  }
+
+  /** A nest's visitors (cfg.pest). Each comes in at a colony's door at the ticks in `at`, walks to the nearest cell with
+   *  food in it, and eats there: a seed every `every` ticks until it has had `fill`. Then it walks out. It goes no more
+   *  than `reach` steps from the door: with nothing to eat that near, it turns round. It bites one ant beside it
+   *  every `biteEvery` ticks. Killed in the nest, it is `meat` loads of meat in that colony's stores. */
+  stepPests() {
+    const P = this.cfg.pest, L = this.L, cg = this.cg;
+    for (let t = 0; t < TEAMS; t++) {
+      const po = t * 8, D = this.doorF[t], under = this.link[this.door[t]];
+      if (this.pest[po] <= 0) {
+        if (cg[t * CG.SIZE + CG.QUEEN_HP] <= 0 || under < 0) continue;
+        if (P.at.includes(this.tick + P.warn)) this.event(EVENT.PEST, t, PEST.NEAR, P.warn);
+        if (!P.at.includes(this.tick)) continue;
+        this.pest[po] = P.hp; this.pest[po + 1] = under; this.pest[po + 2] = 0; this.pest[po + 3] = 1;
+        this.pest[po + 7]++; this.event(EVENT.PEST, t, PEST.CAME, P.hp);
+        continue;
+      }
+      let c = this.pest[po + 1];
+      if (this.tick % P.biteEvery === 0) {
+        const k = c - L.nestBase, cx = k % L.nw, cy = Math.floor(k / L.nw), px = (cx << 8) + 128, py = (cy << 8) + 128;
+        let best = -1, bd = 400;
+        for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) {
+          const cc = cellAt(L, NEST, cx + ox, cy + oy); if (cc < 0) continue;
+          for (let j = this.head[cc]; j >= 0; j = this.nextAnt[j]) { if (this.hp[j] === 0) continue; const d = est(this.x[j] - px, this.y[j] - py); if (d < bd || (d === bd && best >= 0 && this.id[j] < this.id[best])) { bd = d; best = j; } }
+        }
+        if (best >= 0) this.hurt(best, P.bite, -1);
+      }
+      const F = this.lootF[t], going = this.pest[po + 3] === 1;
+      if (going && this.lootAny[t] && F[c] === 0) { // at the food: it eats
+        if (this.tick % P.every === 0) {
+          const k = c - L.nestBase, kind = this.binP[k] > this.binS[k] ? FOOD.PROTEIN : FOOD.SUGAR, bin = kind === FOOD.PROTEIN ? this.binP : this.binS;
+          if (bin[k] > 0) { bin[k]--; cg[t * CG.SIZE + (kind === FOOD.PROTEIN ? CG.PROTEIN : CG.SUGAR)]--; cg[t * CG.SIZE + CG.LOST]++; this.dirtyStore = true; this.pest[po + 5]++; this.event(EVENT.PEST, t, PEST.ATE, ++this.pest[po + 2]); }
+          if (this.pest[po + 2] >= P.fill) this.pest[po + 3] = 2;
+        }
+        continue;
+      }
+      if (this.tick % P.step) continue;
+      const W = going ? F : D; let m = -1, best = going && !this.lootAny[t] ? -1 : W[c];
+      if (best >= 0) for (let j = 0; j < 4; j++) { const a = L.nb[c * 4 + j]; if (a >= L.nestBase && this.mat[a] === MAT.OPEN && W[a] < best) { best = W[a]; m = a; } }
+      if (going && (m < 0 || D[m] > P.reach)) { this.pest[po + 3] = 2; continue; } // nothing to eat this near the door
+      if (!going && (m < 0 || c === under)) { this.event(EVENT.PEST, t, PEST.LEFT, this.pest[po + 2]); this.pest[po] = 0; this.pest[po + 1] = -1; this.pest[po + 3] = 0; continue; }
+      this.pest[po + 1] = m;
+    }
+  }
+
+  /** Colony t's visitor is dead, killed by colony `by`: meat in the stores of the colony whose nest it lies in. */
+  pestDies(t, by) {
+    const po = t * 8, c = this.pest[po + 1];
+    for (let k = 0; k < this.cfg.pest.meat; k++) if (!this.put(t, FOOD.PROTEIN, c)) break;
+    this.event(EVENT.PEST, t, PEST.DIED, by);
+    this.pest[po + 1] = -1; this.pest[po + 3] = 0; this.pest[po + 6]++;
   }
 
   /** The beast is dead: its body is meat where it fell, and where the mission says so the colony that did it more harm wins. */
@@ -1274,7 +1346,7 @@ export class Sim {
   stateArrays() {
     const n = this.n, b = this.bn;
     return [
-      ['mat', this.mat], ['room', this.room], ['binS', this.binS], ['binP', this.binP], ['cache', this.cache], ['mark', this.mark], ['digLeft', this.digLeft], ['cg', this.cg], ['rng', this.rng], ['pileCell', this.pileCell], ['pileAmount', this.pileAmount], ['pileKind', this.pileKind], ['siteHold', this.siteHold], ['beast', this.beast],
+      ['mat', this.mat], ['room', this.room], ['binS', this.binS], ['binP', this.binP], ['cache', this.cache], ['mark', this.mark], ['digLeft', this.digLeft], ['cg', this.cg], ['rng', this.rng], ['pileCell', this.pileCell], ['pileAmount', this.pileAmount], ['pileKind', this.pileKind], ['siteHold', this.siteHold], ['beast', this.beast], ['pest', this.pest],
       ...['x', 'y', 'layer', 'heading', 'team', 'caste', 'hp', 'task', 'carry', 'tr', 'cool', 'press', 'to', 'tx', 'ty', 'since', 'inv', 'id'].map(k => [k, this[k], n]),
       ...['bTeam', 'bStage', 'bAge', 'bFed', 'bHunger', 'bCell', 'bMajor'].map(k => [k, this[k], b]),
       ['trLive', this.trLive], ['trKind', this.trKind], ['trLevel', this.trLevel], ['trDry', this.trDry], ['trMode', this.trMode], ['trLen', this.trLen], ['trSeq', this.trSeq], ['trPath', this.trPath],
