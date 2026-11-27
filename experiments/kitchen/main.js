@@ -184,7 +184,7 @@ function beginDay() {
     plan = story.forceDishes(plan, story.wantedDishes(save), menuNow);
     if (save.tier >= sim.MOOD_FROM) plan = sim.forceMoods(plan, story.wantedMoods(save));
   }
-  day = { plan, i: -1, served: 0, earned: 0, tips: 0, stars: [], seed, t0: clock, extras: 0, robbed: 0, rebels: [] };
+  day = { plan, i: -1, served: 0, earned: 0, tips: 0, stars: [], seed, t0: clock, extras: 0, robbed: 0, rebels: [], line: sim.lineOn(save) ? [] : null, next: 0, arriveT: 0.3, lost: 0, pickT: 0 };
   // Staff come in for the shift. A guest who owes a shift may rebel at some point today.
   const rr = sim.rng(seed ^ 0xbad);
   staff.forEach(m => { m.model = null; if (m.kind === 'owed' && rr() < sim.REBEL_CHANCE) day.rebels.push({ at: 1 + Math.floor(rr() * Math.max(1, plan.length - 1)), who: m }); });
@@ -199,10 +199,15 @@ function beginDay() {
 async function nextGuest() {
   day.i++;
   clearCatch(); g = null;
-  if (day.i >= day.plan.length) return endDay();
+  if (!day.line && day.i >= day.plan.length) return endDay();
   const reb = day.rebels.find(x => x.at === day.i && staff.includes(x.who));
   if (reb) { day.rebels = day.rebels.filter(x => x !== reb); day.i--; return rebel(reb.who); }
-  const p = day.plan[day.i], r = RECIPES[p.recipe];
+  if (day.line) return pickPhase();
+  startGuest(day.plan[day.i], null);
+}
+// The guest at the counter. With the line, `model` is the guest already waiting in the room.
+async function startGuest(p, model) {
+  const r = RECIPES[p.recipe];
   g = { mood: p.mood ?? null, look: p.look, recipe: p.recipe, q: [], steps: r.steps.slice(), step: -1, wait: 0, extras: 0, restarts: 0, paid: 0, model: null, tut: !save.tutorial ? day.i : -1 };
   // A golden recipe: rare, more ingredients, a harder catch, and triple pay if every step is clean.
   g.golden = goldenNext || (save.tutorial && save.tier >= 1 && day.i > 0 && sim.rng(day.seed * 7 + day.i * 131)() < sim.TUNE.golden);
@@ -211,8 +216,9 @@ async function nextGuest() {
   const me = g;
   phase = 'enter'; art.view('serve');
   $('ticket').style.display = 'none';
-  const m = await art.guest(p.look);
+  const m = model ?? await art.guest(p.look);
   if (me !== g) { if (m) m.gone = true; return; }
+  m?.bubble.hide();
   g.model = m;
   const arrive = () => { if (me !== g) return; m && (m.face = -Math.PI * 0.6); order(); };
   if (m) art.walkTo(m, 3.25, 0.95, arrive); else arrive();
@@ -674,7 +680,7 @@ function flyCoin(from, to, done) {
 
 // ---------- the end of a day
 function endDay() {
-  phase = 'idle'; g = null;
+  phase = 'idle'; g = null; $('line').style.display = 'none';
   const first = !save.tutorial;
   const fin = save.tutorial ? tally({ type: 'dayEnd', extras: day.extras }) ?? [] : [];
   save.tutorial = true; save.day++; save.dayAtTier++;
@@ -691,7 +697,7 @@ function endDay() {
   rec.end('day', { day: save.day - 1, tier: save.tier, served: day.served, coins: day.earned + day.tips, stars });
   $('dayTitle').textContent = t('dayDone', { n: save.day - 1 });
   $('dayStars').textContent = '★'.repeat(stars) + '☆'.repeat(3 - stars);
-  $('ledger').innerHTML = `<tr><td>${t('served')}</td><td>${day.served}</td></tr><tr><td>${t('earned')}</td><td>${day.earned}</td></tr><tr><td>${t('tips')}</td><td>${day.tips}</td></tr>${day.robbed ? `<tr><td>${t('robbed')}</td><td>${day.robbed}</td></tr>` : ''}${wages ? `<tr><td>${t('wages')}</td><td>−${wages}</td></tr>` : ''}<tr class="total"><td><i class="coin"></i></td><td>${save.coins}</td></tr>`;
+  $('ledger').innerHTML = `<tr><td>${t('served')}</td><td>${day.served}</td></tr><tr><td>${t('earned')}</td><td>${day.earned}</td></tr><tr><td>${t('tips')}</td><td>${day.tips}</td></tr>${day.lost ? `<tr><td>${t('walkouts')}</td><td>${day.lost}</td></tr>` : ''}${day.robbed ? `<tr><td>${t('robbed')}</td><td>${day.robbed}</td></tr>` : ''}${wages ? `<tr><td>${t('wages')}</td><td>−${wages}</td></tr>` : ''}<tr class="total"><td><i class="coin"></i></td><td>${save.coins}</td></tr>`;
   $('dayLine').textContent = first ? t('t7') : '';
   $('dayMissions').innerHTML = fin.map(o => `<li class="won">✓ ${esc(o.text)} <b>+${o.reward}</b></li>`).join('') + (save.story?.open ?? []).slice(0, 3).map(o => `<li>${esc(o.text)} <b>${story.progress(o)}</b></li>`).join('');
   coach(null); fingerOff(); gauge(null);
@@ -767,6 +773,72 @@ function starUp() {
   if (tw) floater({ x: innerWidth / 2, y: innerHeight * 0.38 }, `${t('twistNew')}: ${t('tw_' + tw.id)}`, 'gold');
 }
 
+
+
+// ---------- the line: guests wait by the tables; tap who comes to the counter next.
+function lineDue() { return day?.line && day.next >= day.plan.length && !day.line.length; }
+function pickPhase() {
+  if (lineDue()) return endDay();
+  phase = 'pick'; day.pickT = 0; art.view('room'); $('ticket').style.display = 'none';
+  if (!day.pickTold) { day.pickTold = true; coach(t('pickWho'), 3); }
+  renderLine();
+}
+async function arrive() {
+  const idx = day.next++, p = day.plan[idx], me = day;
+  const used = new Set(day.line.map(e => e.spot));
+  const spot = [0, 1, 2, 3].find(i => !used.has(i)) ?? 0;
+  const e = { idx, p, spot, left: sim.patienceFor(save.tier, p.mood), full: sim.patienceFor(save.tier, p.mood), model: null };
+  day.line.push(e); renderLine();
+  rec.event('arrive', { recipe: p.recipe, mood: p.mood ?? null });
+  const m = await art.guest(p.look);
+  if (me !== day || !day.line.includes(e)) { if (m) m.gone = true; return; }
+  e.model = m; if (!m) return; m.speed = 2.6;
+  const [x, z] = art.waitSpots[spot];
+  art.walkTo(m, x, z, () => { if (!day.line.includes(e)) return; m.face = Math.PI; m.play('idle'); m.bubble.show(art.thumb(dishModel(p.recipe)), p.mood ?? 'want'); });
+}
+function callGuest(e) {
+  if (phase !== 'pick' || !day.line.includes(e)) return;
+  day.line.splice(day.line.indexOf(e), 1); e.called = true; renderLine(); SFX.tap(); coach(null);
+  rec.event('call', { recipe: e.p.recipe, left: Math.round(e.left), waiting: day.line.length });
+  art.view('serve');
+  startGuest(e.p, e.model);
+}
+function walkOut(e) {
+  day.line.splice(day.line.indexOf(e), 1); day.lost++;
+  const m = e.model;
+  if (m) { m.bubble.show(null, 'angry'); m.speed = 2.6; art.walkTo(m, 6.5, 1.6, () => { m.gone = true; }); }
+  else e.called = true; // the model may still be loading: drop it when it lands
+  SFX.wrong(); floater({ x: innerWidth / 2, y: innerHeight * 0.22 }, t('walkout', { what: t('r_' + e.p.recipe) }), 'bad');
+  rec.event('walkout', { recipe: e.p.recipe, mood: e.p.mood ?? null });
+  renderLine();
+}
+function stepLine(dt) {
+  if (!day?.line || storyOpen() || $('fight').style.display === 'flex') return;
+  if (day.next < day.plan.length && day.line.length < sim.lineSeats(save)) {
+    if (phase === 'pick' && !day.line.length) day.arriveT = Math.min(day.arriveT, 0.6);
+    if ((day.arriveT -= dt) <= 0) { day.arriveT = day.next < sim.LINE_OPEN - 1 ? 1.2 : sim.arriveEvery(save.tier); arrive(); }
+  }
+  for (const e of sim.stepLine(day.line, dt)) walkOut(e);
+  if (phase === 'pick') {
+    if (lineDue()) return endDay();
+    if (day.line.length && (day.pickT += dt) > sim.AUTO_CALL) callGuest(sim.nextInLine(day.line));
+  }
+  lineBars();
+}
+const MOOD_ICON = { rude: '😤', picky: '🧐', sneaky: '👀' };
+function renderLine() {
+  const el = $('line');
+  if (!day?.line || screen !== 'play') { el.style.display = 'none'; return; }
+  el.style.display = 'flex'; el.classList.toggle('mini', phase !== 'pick');
+  el.innerHTML = day.line.map((e, i) => `<button data-i="${i}" class="${e.p.mood ? 'mood' : ''}"><img alt="" src="${art.thumb(dishModel(e.p.recipe))}"><span class="nm">${esc(t('r_' + e.p.recipe))}</span><span class="pr"><i class="coin"></i>${sim.bill(save, e.p.recipe, 1, 0).price}${e.p.mood ? ' ' + MOOD_ICON[e.p.mood] : ''}</span><span class="pat"><i></i></span></button>`).join('');
+  [...el.children].forEach((b, i) => b.addEventListener('pointerdown', ev => { ev.preventDefault(); ev.stopPropagation(); callGuest(day.line[i]); }));
+  lineBars();
+}
+function lineBars() {
+  const el = $('line'); if (!day?.line) return;
+  el.classList.toggle('mini', phase !== 'pick');
+  day.line.forEach((e, i) => { const bar = el.children[i]?.querySelector('.pat i'); if (!bar) return; const k = Math.max(0, e.left / e.full); bar.style.transform = `scaleX(${k})`; bar.style.background = k < 0.25 ? '#ff5a4a' : k < 0.5 ? '#ffb347' : '#6fd36f'; });
+}
 
 // ---------- the Manners Wheel: "Feed everyone. Throw food? Spin first. THEN feed."
 const WHEEL_ICON = { kick_out: '🥾', slap: '🐟', fridge: '🧊', pan: '🍳', microwave: '⏲️', cook_self: '👨‍🍳', lock_out: '🔒', trash: '🗑️', rob: '💰', hire: '🤝', fight: '🥊' };
@@ -1026,6 +1098,7 @@ addEventListener('keydown', e => {
   if (e.key === ' ' || e.key === 'Enter') {
     e.preventDefault();
     if (fight) { fightTap(); return; }
+    if (phase === 'pick' && day?.line?.length) { callGuest(sim.nextInLine(day.line)); return; }
     if (phase === 'fry' && cook && !cook.over) cook.held = true;
     else if (phase === 'micro') stopMicro();
     else if (phase === 'blend') tapBlend();
@@ -1091,8 +1164,9 @@ function frame(now) {
     else if (phase === 'fry' && cook) stepFry(dt);
     else if (phase === 'micro' && cook) stepMicro(dt);
     else if (phase === 'chop' && cook) { if (cook.slide) stepChop(dt); stepKnife(dt); }
-    if (fight) stepFight(dt);
     else if (phase === 'blend' && cook) stepBlend(dt);
+    if (fight) stepFight(dt);
+    stepLine(dt);
     if (!(g && phase === 'catch')) { const bar = $('patience').firstElementChild; bar.style.transform = ''; bar.style.background = ''; }
     if (g && phase === 'catch') { const w = (clock - g.catchT0) / TUNE.patience; $('patience').firstElementChild.style.transform = `scaleX(${Math.max(0, 1 - w)})`; $('patience').firstElementChild.style.background = w > 0.75 ? '#ff6b6b' : w > 0.5 ? '#ffb347' : ''; }
     for (const b of cook?.bits ?? []) { if (b.t > 0.6) continue; b.t += dt; b.v.y -= 6 * dt; b.m.position.addScaledVector(b.v, dt); if (b.m.position.y < b.y0) { b.m.position.y = b.y0; b.v.set(0, 0, 0); b.t = 1; } b.m.rotation.z += dt * 6 * Math.sign(b.v.x); }
@@ -1106,6 +1180,7 @@ function frame(now) {
   }
   if (art) chopBtn(live && phase === 'chop' && !cook?.over);
   if ((phase !== 'order' || !live) && $('wheelBtn').style.display === 'flex') wheelBtn(false);
+  if (screen !== 'play' && $('line').style.display === 'flex') $('line').style.display = 'none';
   song?.set({ on: musicOn && live, progress: day ? Math.min(1, (day.i + 0.5) / day.plan.length) : 0, danger: phase === 'catch' && g?.catch ? Math.min(1, (clock - g.catchT0) / TUNE.patience) * 0.6 : 0, light: 1 });
   art.frame(paused ? 0 : dt);
 }
@@ -1128,6 +1203,7 @@ window.kitchenState = () => art && peopleIn && ({
   extra: g?.catch?.extra?.id ?? null, items: g?.catch ? g.catch.items.map(it => ({ id: it.id, x: it.x, y: it.y })) : [], half: g?.catch?.half ?? 0,
   cook: cook ? { kind: cook.kind, d: cook.d, p: cook.p, band: cook.band, fill: cook.fill, left: cook.pieces?.filter(p => !p.done).length, misses: cook.misses ?? 0, striking: !!cook.strike, cuts: cook.pieces?.reduce((n, p) => n + p.cuts, 0), xs: cook.pieces?.map(p => p.done ? null : [p.m.position.x, p.m.position.z]), aim } : null, q: g?.q,
   look: lookId, hint: !!document.querySelector('.kit-hint.on'),
+  line: day?.line ? day.line.map(e => ({ recipe: e.p.recipe, left: +e.left.toFixed(1) })) : null, lost: day?.lost ?? 0,
   mood: g?.mood ?? null, staff: staff.map(m => m.kind), wheel: $('wheel').style.display === 'block', fight: fight ? { taps: fight.taps, need: fight.need } : null,
 });
 window.kitchenMusic = () => song && { ...song.melody, on: song.state.on, step: song.step, notes: song.log.length, kinds: song.log.map(l => l.kind) };
@@ -1138,6 +1214,7 @@ window.kitchenAim = () => { const p = cook?.kind === 'chop' && cook.pieces.find(
 // Test hooks: open the wheel and pick an action; settle a fight.
 window.kitchenWheel = id => { if (phase === 'order' || phase === 'thrown') openWheel(phase === 'order' ? 'order' : 'payback'); if (phase === 'wheel') pickWheel(id); return phase; };
 window.kitchenFight = win => { if (!fight) return false; if (win) { fight.taps = fight.need - 1; fightTap(); } else fight.t = sim.FIGHT_SECS; return true; };
+window.kitchenCall = i => { const e = day?.line?.[i]; if (e) callGuest(e); return !!e; };
 window.kitchenThrow = () => { throwNext = true; };
 window.kitchenMood = m => { if (g) g.mood = m; return !!g; };
 window.kitchenSkipCatch = () => { skipCatch = true; };

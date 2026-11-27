@@ -67,6 +67,20 @@ assert.ok(get('top table', 'good').clean >= 0.1, 'the top table stays possible f
 assert.ok(get('top table', 'good').clean <= get('five stars', 'good').clean + 0.05, 'the ranks above five stars are not easier than five stars');
 assert.ok(get('five stars', 'new').clean < get('cart day 1', 'new').clean - 0.3, 'five stars is clearly harder than day 1');
 assert.ok(get('cart day 1', 'good').seconds < 30, 'a first catch takes under half a minute');
+
+// The line: a quick cook keeps everyone; a slow one loses some; a very slow one loses many. --mutate stops the drain.
+{
+  const L = (tier, seats, n, service) => sim.simulateLine({ tier, seats, n, service, drain: !mutate });
+  const rows = [['diner, good', L(1, 2, sim.TIERS[1].guests, 28)], ['bistro, new', L(2, 3, sim.TIERS[2].guests, 42)], ['five, good', L(5, 4, sim.TIERS[5].guests, 30)], ['top, good', L(10, 4, sim.TIERS[10].guests, 30)], ['top, slow', L(10, 4, sim.TIERS[10].guests, 60)]];
+  console.table(rows.map(([name, r]) => ({ name, ...r })));
+  const get = k => rows.find(r => r[0] === k)[1];
+  assert.equal(get('diner, good').walkouts, 0, 'line: a good cook at the Diner keeps every guest');
+  assert.ok(get('bistro, new').walkouts <= 1, 'line: a new cook at the Bistro loses at most one guest');
+  assert.ok(get('top, good').walkouts <= 2, 'line: a good cook at the top loses at most two');
+  assert.ok(get('top, slow').walkouts >= 2, 'line: a slow cook at the top loses guests');
+  assert.ok(sim.patienceFor(3, 'rude') < sim.patienceFor(3), 'line: rude guests have less patience');
+  console.log('line: ok');
+}
 if (mutate) assert.ok(rows.every(r => r.extras === 0), 'mutation: extras no longer stop a catch');
 // Variety (Adam 2026-11-26: "everybody wanted carrots, then everybody wants hot dogs"): every rank offers at least
 // five dishes, a day never serves the same dish twice in a row, and no dish takes more than half of a day.

@@ -293,6 +293,8 @@ export async function createView(canvas, lookId) {
   const SPOTS = { fridge: [-3.9, 0.2, 0.25], micro: [1.05, TOP + 0.15, -0.1], stove: [-1.9, TOP + 0.05, 0.05], trash: [4.25, 0.55, 0.35] };
   // Staff wait between the dining tables, facing the room.
   const STAFF_SPOTS = [[-3.4, 3.4], [3.2, 3.5]];
+  // The line: guests wait in front of the dining tables, facing the counter, clear of the door path and the staff.
+  const WAIT_SPOTS = [[-2.4, 1.55], [0.9, 1.75], [-0.3, 2.55], [-1.5, 3.4]];
   function stunt(me, kind, { at = null, staffSlot = 0 } = {}, done = () => {}) {
     const g = me.g, home = g.position.clone(), seg = [];
     const arc = (to, dur, height, spin = 0, shrink = 1) => { let from; seg.push({ dur, start() { from = g.position.clone(); me.target = null; me.play('jump', true); }, step(k) { g.position.lerpVectors(from, to, k); g.position.y += Math.sin(k * Math.PI) * height; g.rotation.x = spin * k * Math.PI * 2; g.scale.setScalar(1 + (shrink - 1) * k); } }); };
@@ -459,7 +461,7 @@ export async function createView(canvas, lookId) {
   resize(); view('menu', true);
   return {
     THREE, scene, camera, renderer, world, food, item, furniture, tray, register, board, knife, knifeLift, pan, panR, panGlow, micro, microLight, microGlass, blender, sign,
-    guest, walkTo, guests, stunt, staffSpots: STAFF_SPOTS, view, cam, frame, resize, burst, steam, toScreen, toPlane, toY, setLook, setRestaurant, thumb, popIn,
+    guest, walkTo, guests, stunt, staffSpots: STAFF_SPOTS, waitSpots: WAIT_SPOTS, view, cam, frame, resize, burst, steam, toScreen, toPlane, toY, setLook, setRestaurant, thumb, popIn,
     get look() { return look; }, peopleReady,
     shake(n = 1) { cam.shake = Math.max(cam.shake, n); },
     flashThumbs() { thumbCache.clear(); },
