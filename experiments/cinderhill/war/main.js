@@ -386,7 +386,12 @@ function pickTrailAt(sx, sy) {
     if (tool === 'raid' && nearDoor) { const p2 = [Math.floor(fd.x), Math.floor(fd.y)]; pending.push({ id: order({ type: CMD.TRAIL, kind: KIND.RAID, level: sim.mission.goals.haul ? 3 : 2, points: p2 }), points: p2, kind: KIND.RAID }); }
     else if (tool === 'raid' && sim.beast[0] > 0 && (() => { const bc = sim.beast[1], b = toScreen(bc % L0.sw + 0.5, Math.floor(bc / L0.sw) + 0.5, 1); return Math.abs(w.x - bc % L0.sw) <= 4 && Math.abs(w.y - Math.floor(bc / L0.sw)) <= 4 || Math.hypot(b.x - sx, b.y - sy) < 44; })()) { const bc = sim.beast[1], p2 = [bc % L0.sw, Math.floor(bc / L0.sw)]; pending.push({ id: order({ type: CMD.TRAIL, kind: KIND.RAID, level: 2, points: p2 }), points: p2, kind: KIND.RAID }); toast(g(ME, CG.MAJORS) ? 'Half your soldiers go for the beetle. Tap the trail to send more.' : 'A raid trail to the beetle. You have no soldiers yet: raise some in the Nest.', 3200); }
     else if (tool === 'raid') pending.push({ id: order({ type: CMD.TRAIL, kind: KIND.RAID, level: 2, points: [x, y] }), points: [x, y], kind: KIND.RAID });
-    else if (tool === 'trail') for (let p = 0; p < MAX_PILES; p++) { if (sim.pileAmount[p] <= 0) continue; const c = sim.pileCell[p], px = c % L0.sw, py = Math.floor(c / L0.sw); if (Math.abs(px - x) <= 2 && Math.abs(py - y) <= 2) { pending.push({ id: order({ type: CMD.TRAIL, kind: KIND.FORAGE, level: 2, points: [px, py] }), points: [px, py], kind: KIND.FORAGE }); break; } }
+    else if (tool === 'trail') {
+      // The nearest pile to the tap, not the first in the list: beside the fallen beetle lies other meat, and only the beetle's own counts.
+      let best = -1, bd = 99; const bc = sim.fallen ? sim.beast[1] : -1;
+      for (let p = 0; p < MAX_PILES; p++) { if (sim.pileAmount[p] <= 0) continue; const c = sim.pileCell[p], px = c % L0.sw, py = Math.floor(c / L0.sw); if (Math.abs(px - x) > 2 || Math.abs(py - y) > 2) continue; const d = c === bc ? -1 : Math.abs(px - x) + Math.abs(py - y); if (d < bd) { bd = d; best = p; } }
+      if (best >= 0) { const c = sim.pileCell[best], px = c % L0.sw, py = Math.floor(c / L0.sw); pending.push({ id: order({ type: CMD.TRAIL, kind: KIND.FORAGE, level: 2, points: [px, py] }), points: [px, py], kind: KIND.FORAGE }); }
+    }
     return;
   }
   sel = best; showRoute(); hud(); tone(600, 0.05, 0.03, 'triangle');

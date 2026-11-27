@@ -874,3 +874,24 @@ Legion: The Crossing 13 to 7 for Deep, The Hunt 14 to 6 for Deep, The Wall 17 to
 for War, First Frost 13 to 7 for War. With Swift on both sides it is closer and mixed. So the fork now reads: Deep
 for open ground and long games over food, War for sieges and tunnels. Workers at a third tougher was not enough
 (Deep 9 to 7 on The Crossing but 2 to 18 and 0 to 20 in the sieges, and behind on The Hunt).
+
+## The Hunt's carry phase, measured, and a tap that carried the wrong meat
+
+Ten seeds, both seats, games where the beetle fell:
+
+| pairing | beetle fell | hill behind on harm carried any | hill behind on harm won |
+| --- | --- | --- | --- |
+| steady v steady | 14 of 20 | 14 | 14 |
+| bold v steady | 20 | 0 | 0 |
+| bold v bold | 20 | 4 | 4 |
+| steady v timid | 20 | 11 | 7 |
+
+So it is a race in some pairings, and between two steady hills the kill is a losing move every time: the killer ends
+on 6 to 20 loads and the other hill carries forty. The six-load head start may be too small, or the killer's
+soldiers too spent to hold the body. Not tuned.
+
+A real Forage tap on the body in a phone-sized browser found a fault. Other meat lies two cells from the beetle, and
+the tap took the first pile in the list within two cells, so a trail could go to meat that does not count: 900
+ticks, nothing carried. The tap now takes the beetle's own pile when it has fallen, else the nearest. After: the
+same tap carried three loads in 900 ticks at the default crew. That is slow next to bots on five full trails (29 in
+1200); no person has tried it.
