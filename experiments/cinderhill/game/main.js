@@ -51,11 +51,12 @@ function tuneSong() { try { song?.set?.({ on: set.sound === 'all' && screen === 
 // ---- recording (the kit's lab, under the painter's slug; `look` says which client and which settings) ----
 const rec = lab('cinderhill', { lang: () => 'en' });
 rec.notice($('menuLab')); rec.toggle($('menuLab')); rec.toggle($('pauseCard'));
+{ const start = rec.start.bind(rec); rec.start = d => start({ ...set, ...d }); }   // each run's start carries the settings in use, one key each
 const labrec = new LabRecord(rec);
 const lookName = () => `game:${set.view}/${set.light}/${set.style}`;
 let running = false;
 function startRecord() {
-  labrec.start(host, { ...set, mode: free ? 'sandbox' : 'colony', look: lookName(), viewport: [innerWidth, innerHeight, Math.round(devicePixelRatio * 100) / 100] });
+  labrec.start(host, { mode: free ? 'sandbox' : 'colony', look: lookName(), viewport: [innerWidth, innerHeight, Math.round(devicePixelRatio * 100) / 100] });
   labrec.emit('client', { c: 'game', v: 1, set: { ...set }, changed: Object.keys(DEFAULTS).filter(k => set[k] !== DEFAULTS[k]) });
 }
 addEventListener('error', e => labrec.error(e.message ?? 'error'));
