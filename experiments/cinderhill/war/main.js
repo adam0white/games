@@ -350,7 +350,7 @@ function setTool(next) {
   if (next === tool) return;
   run(Gs.reset('tool')); tool = next;
   for (const b of document.querySelectorAll('[data-tool]')) b.setAttribute('aria-pressed', String(b.dataset.tool === tool));
-  if (tool === 'raid') toast(g(ME, CG.MAJORS) ? 'Tap where the soldiers should go. Tap the rival door to break in.' : 'You have no soldiers yet. Open Nest and raise some.', 2600);
+  if (tool === 'raid') toast(g(ME, CG.MAJORS) ? 'Tap where the soldiers should go. Tap the rival door to break in.' : 'You have no soldiers yet. Open Nest, then Young, and raise some.', 2600);
   else if (tool === 'rally') toast('Hold a finger down: guards and resting ants gather there', 3000);
   else if (tool === 'camera') toast('Drag to move the view. Pinch to zoom.');
   tone(520, 0.05, 0.03, 'triangle');
@@ -359,6 +359,7 @@ function setNest(on) { nestOpen = on; document.body.classList.toggle('nest', on)
 for (const b of document.querySelectorAll('[data-tool]')) b.addEventListener('click', () => setTool(b.dataset.tool));
 $('nestBtn').addEventListener('click', () => setNest(!nestOpen));
 function order(o) { const id = host.order({ ...o, team: ME }); if (running) rec.event('order', { at: sim.tick, t: o.type, k: o.kind ?? null, l: o.level ?? o.share ?? o.on ?? null, n: o.points ? o.points.length / 2 : null }); return id; }
+$('raise').addEventListener('click', () => { setNest(true); document.querySelector('#diet .tabs [data-tab="young"]').click(); if (!g(ME, CG.DIET)) toast('Pick how many of the young become soldiers. Each costs meat.', 3600); });
 $('recall').addEventListener('click', () => { const on = !g(ME, CG.RECALL); order({ type: CMD.RECALL, on: on ? 1 : 0 }); toast(on ? 'Everyone comes home' : 'Out again'); tone(on ? 330 : 520, 0.2, 0.05, 'triangle', on ? -120 : 160); });
 const SPEEDS = [1, 2, 4];
 function setSpeed(x) { speed = x; $('speedText').textContent = `${x}×`; $('speed').setAttribute('aria-pressed', String(x > 1)); }
@@ -499,7 +500,7 @@ function strikeAt(x, y) {
   if (sim.mat[m] !== MAT.OPEN) { toast('Tap an open cell: a tunnel or a room.', 2200); return; }
   if (sim.owner(m - L0.nestBase) !== ME && !sim.linked) { toast('Your tunnel is not through yet. Dig until it meets theirs.', 2600); return; }
   if (k >= 0) order({ type: CMD.ERASE, trail: k });
-  if (!g(ME, CG.MAJORS)) toast('You have no soldiers yet. Raise some in Brood.', 2600);
+  if (!g(ME, CG.MAJORS)) toast('You have no soldiers yet. Raise some under Young.', 2600);
   order({ type: CMD.TRAIL, kind: KIND.RAID, level: 2, under: [x, y] }); navigator.vibrate?.(20);
 }
 for (const n of ['pointercancel', 'lostpointercapture']) nestCanvas.addEventListener(n, e => { if (nestDrag && e.pointerId !== nestDrag.id) return; nestDrag = null; paint = null; });
@@ -619,8 +620,9 @@ function hud() {
   if (s >= 0) {
     const raid = sim.trKind[s] === KIND.RAID, lv = sim.trLevel[s];
     $('routeDot').style.background = raid ? '#ff5a3c' : TRAIL_CSS[sel]; $('routeName').textContent = raid ? 'Raid' : 'Forage';
-    $('routeInfo').textContent = sim.trDry[s] ? 'nothing left at its end' : `${sim.crew[s]} of ${sim.want[s]} ${raid ? 'soldiers' : 'workers'}`;
-    const sh = raid ? RAID_SHARE : LEVEL_SHARE, words = raid ? ['1 in 4', 'half', 'all, and workers'] : ['1 in 10', '1 in 4', 'half'];
+    $('routeInfo').textContent = sim.trDry[s] ? 'nothing left at its end' : `${sim.crew[s]} on it, ${sim.want[s]} wanted`;
+    const sh = raid ? RAID_SHARE : LEVEL_SHARE, words = raid ? ['1 soldier in 4', 'half the soldiers', 'all, and workers'] : ['1 worker in 10', '1 worker in 4', 'half the workers'];
+    $('noSoldiers').hidden = !(raid && !g(ME, CG.MAJORS));
     const st = { loot: sim.has(ME, 'loot'), hold: sim.has(ME, 'hold') }, canMode = raid && (st.loot || st.hold); $('modes').hidden = !canMode;
     if (canMode) for (const b of document.querySelectorAll('#modes [data-mode]')) { const m = Number(b.dataset.mode); b.hidden = (m === MODE.LOOT && !st.loot) || (m === MODE.HOLD && !st.hold); b.setAttribute('aria-pressed', String(m === sim.trMode[s])); }
     for (const b of document.querySelectorAll('#levels [data-level]')) { const l = Number(b.dataset.level); b.setAttribute('aria-pressed', String(l === lv)); b.querySelector('small').textContent = words[l - 1]; void sh; }

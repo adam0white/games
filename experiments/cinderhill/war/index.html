@@ -74,6 +74,7 @@
   #nest { position: absolute; inset: 0; touch-action: none; }
 
   #toast { position: fixed; left: 50%; top: calc(140px + env(safe-area-inset-top)); transform: translate(-50%, -8px); padding: 8px 14px; border-radius: 16px; font-weight: 700; opacity: 0; transition: opacity 0.25s, transform 0.25s; pointer-events: none; z-index: 6; text-align: center; max-width: 86vw; }
+  body.nest #toast { top: auto; bottom: calc(84px + env(safe-area-inset-bottom)); }
   #toast.on { opacity: 1; transform: translate(-50%, 0); }
   #toast.bad { border-color: #ff6a4a; color: #ffd0c4; }
 
@@ -170,6 +171,7 @@
     <button data-mode="1">Loot<small>for the store</small></button>
     <button data-mode="2">Hold<small>stay outside</small></button>
   </div>
+  <div class="opts" id="noSoldiers" hidden><button id="raise">Raise soldiers<small>no soldier yet: this trail waits. Opens the Nest.</small></button></div>
 </div>
 <div id="diet" class="sheet glass" data-tab="young">
   <div class="tabs"><button data-tab="young" aria-pressed="true">Young</button><button data-tab="dig">Dig rooms</button><button data-tab="grow" hidden>Grow</button></div>

@@ -909,3 +909,26 @@ only; the numbers come from the sim's state and tables.
 After both changes the rival order on The Hunt still holds (six seeds, both seats): bold beats steady 12 to 0,
 steady beats timid 10 to 2, steady against steady 6 to 6. The beetle's first-bite message now counts the bites from
 the worker's own health (a Deep hill's worker takes three, not two).
+
+## War v Deep at thirty seeds, and three fixes from the screenshot review
+
+Thirty seeds, both seats, after Deep workers went to 150 health (PR 415). Only games where both hills took their craft are counted first; all sixty games follow in brackets. The Hunt rows were measured before the rival learned to carry the fallen beetle (PR 418).
+
+| Ground | Crafts | War | Deep | Both took | All games |
+| --- | --- | --- | --- | --- | --- |
+| Crossing | Legion v Granary | 23 | 25 | 48 | 27 v 33 |
+| Crossing | Swift v Swift | 19 | 28 | 47 | 24 v 36 |
+| Hunt | Legion v Granary | 23 | 31 | 54 | 28 v 32 |
+| Hunt | Swift v Swift | 34 | 20 | 54 | 38 v 22 |
+
+Read with the ten-seed siege rows above: about even on open ground, and War wins sieges. Bots only; no person has played the fork.
+
+The bite toast of PR 418 was seen in a phone browser for a young hill ("Two bites kill a worker"); that PR's body says it was not.
+
+From the third outside review (bead lab-5w7.75), items 1 to 3:
+
+- A Raid trail with no soldier shows a "Raise soldiers" button in its panel. It opens the Nest on Young. The two toasts that named the place disagreed ("Nest" and "Brood"); both now say Young.
+- While the Nest is open, messages sit above the tool bar, over the lower nest view, and no longer over the Nest panel and its tabs.
+- The trail panel says "13 on it, 15 wanted", and the three sizes say what they are a share of ("1 worker in 4", "half the soldiers").
+
+Seen in a phone browser on The Crossing: button shown at 0 soldiers, hidden on The Hunt with 2; the tap opened the Nest on Young; no page errors. Not tested by a person.
