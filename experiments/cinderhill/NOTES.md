@@ -895,3 +895,11 @@ the tap took the first pile in the list within two cells, so a trail could go to
 ticks, nothing carried. The tap now takes the beetle's own pile when it has fallen, else the nearest. After: the
 same tap carried three loads in 900 ticks at the default crew. That is slow next to bots on five full trails (29 in
 1200); no person has tried it.
+
+## Crafts say what they would do for this hill
+
+From the third outside review (screenshots only): a craft's text gave its rule and nothing about the hill in front
+of the player. At the second growth each craft button now reads the hill as it stands: Legion "7 fighters now bite
+harder", Swift "all 194 ants faster", Thrift "a meal: 20 seeds, then 13", Granary "16 garden cells: 16 seeds a
+minute, then 32". A meal comes once a minute, so Thrift and Granary can be weighed against each other. Display
+only; the numbers come from the sim's state and tables.

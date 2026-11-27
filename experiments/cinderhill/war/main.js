@@ -216,6 +216,11 @@ function growPane() {
   const craftOf = TIERS.craft[g(ME, CG.CRAFT)], name = (br === BRANCH.WAR ? 'War hill' : br === BRANCH.DEEP ? 'Deep hill' : 'A young hill') + (craftOf && tier >= 2 ? `, ${craftOf.name}` : '');
   $('growHead').textContent = `${name} · tier ${tier + 1} of 3`; $('growInfo').textContent = left ? `growing: ${Math.ceil(left / 20)}s` : !row ? 'full grown' : may > 1 ? `${may - 2} more seeds needed` : `${row.sugar} seeds to grow`;
   for (const b of document.querySelectorAll('#grows [data-grow]')) { const k = Number(b.dataset.grow); const cr = TIERS.craft[Number(b.dataset.craft) || 0]; b.hidden = tier === 0 ? k === 0 : k !== 0 || !row || (!!cr?.branch && cr.branch !== br); b.disabled = !can; }
+  if (tier === 1) { // what each craft would do for this hill as it stands: the numbers are the hill's own, read now
+    const ad = g(ME, CG.ADULTS), fi = g(ME, CG.MAJORS), ep = sim.stat[ME].eatPer, gd = sim.gardens[ME], meal = n => Math.ceil(ad / n);
+    const now = { 1: fi ? `${fi} fighter${fi === 1 ? '' : 's'} now bite harder` : 'no fighters yet', 2: `all ${ad} ants faster`, 3: `a meal: ${meal(ep)} seeds, then ${meal(Math.floor(ep * 3 / 2))}`, 4: gd ? `${gd} garden cell${gd === 1 ? '' : 's'}: ${gd} seeds a minute, then ${2 * gd}` : 'no gardens dug yet' };
+    for (const b of document.querySelectorAll('#grows [data-craft]')) b.querySelector('small').textContent = now[b.dataset.craft];
+  }
   const done = left && row ? 1 - left / row.ticks : 0; $('growBar').firstElementChild.style.width = `${(100 * done).toFixed(0)}%`; $('growBar').hidden = !left;
   const other = br === BRANCH.WAR ? BRANCH.DEEP : BRANCH.WAR, last = lastList();
   $('growHelp').innerHTML = left ? 'The chamber is being widened. Until it is done the queen lays nothing.'
