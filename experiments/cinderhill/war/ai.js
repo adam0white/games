@@ -124,12 +124,20 @@ export function think(sim, t, mind = 1) {
   const near = (c, r) => ends.some(e => Math.abs((e % sw) - (c % sw)) <= r && Math.abs(Math.floor(e / sw) - Math.floor(c / sw)) <= r);
   // Forage: up to three trails, to the nearest pile of the food it is shorter of.
   const fends = forage.map(k => { const s2 = t * TRAILS + k; return sim.trPath[s2 * PATH_MAX + sim.trLen[s2] - 1]; }), fnear = (c, r) => fends.some(e => Math.abs((e % sw) - (c % sw)) <= r && Math.abs(Math.floor(e / sw) - Math.floor(c / sw)) <= r);
+  // Where food keeps falling (a long mission), it does not feed its workers to a ford the other hill's soldiers hold:
+  // a pile with more of their fighters round it than its own is passed over, and a trail that ends at one is taken up.
+  let lost = null;
+  if (sim.cfg.falls && mind.wary !== false) {
+    lost = c => { const cx = c % sw, cy = Math.floor(c / sw); let foe = 0, own = 0; for (let i = 0; i < sim.n; i++) if (sim.hp[i] > 0 && sim.layer[i] === 0 && sim.caste[i] !== 0 && Math.abs((sim.x[i] >> 8) - cx) <= 6 && Math.abs((sim.y[i] >> 8) - cy) <= 6) sim.team[i] === t ? own++ : foe++; return foe >= 3 && foe > own; };
+    for (let j = forage.length - 1; j >= 0; j--) if (lost(fends[j])) { out.push({ team: t, type: CMD.ERASE, trail: forage[j] }); forage.splice(j, 1); fends.splice(j, 1); }
+  }
   if (forage.length < 3) {
     const want = (winter ? cg[o + CG.PROTEIN] >= 6 : cg[o + CG.SUGAR] <= cg[o + CG.PROTEIN] * 2) ? FOOD.SUGAR : FOOD.PROTEIN;
     let best = -1, bd = 1e9;
     for (let p = 0; p < MAX_PILES; p++) {
       if (sim.pileAmount[p] < 6) continue;
       const c = sim.pileCell[p];
+      if (lost && lost(c)) continue;
       if (sim.cfg.falls ? fnear(c, 2) : near(c, 2)) continue; // where food keeps falling it carries from a pile its soldiers hold
       if (sealed && (c % sw < sw >> 1) !== (dx < sw >> 1)) continue; // the far side of a wall with no gap
       if (winter && sim.pileKind[p] === FOOD.PROTEIN && cg[o + CG.PROTEIN] >= 12) continue; // meat does not keep a hill through the frost

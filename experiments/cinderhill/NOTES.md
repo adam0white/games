@@ -1230,8 +1230,34 @@ the nursery's count) and reads seed income only once it has a minute of it. A ro
 On the Dig tab the line takes the help row's place while no room is picked, so the panel is no taller there and the
 counts and the pause button stay clear. Seen on a phone profile on The Crossing, First Frost and High Summer.
 
-**Open fault: a garden is a must-build once it opens.** A cell costs a seed and one ant's housing and pays a seed a minute
-with no upper bound, and late in High Summer carrying is limited by what falls, not by workers. So gardens add income at
-almost no cost, and enough of them would replace seed trails. The bot stops at sixteen cells, so the runs above do not
-show it. The only fork left is when the garden opens (a Deep hill at its first growth, any hill at its second). A bound
-on yield is owed before the garden is called a choice. Not built.
+**Correction: a garden is not a must-build.** An earlier version of this note said so from reading the code. Measured
+since, by ordering 48 more garden cells for seat 0 once its first sixteen stood (two timid bots, seeds 1 and 2): the
+store fills to its limit (406 and 283 seeds), the gardens then pay only what the store has room for (81 to 186 seeds in
+4000 ticks, where 64 cells could pay 213), housing falls by 48, and the hill ends smaller: 383 adults against 434 with
+sixteen cells on seed 1, 250 against 297 on seed 2. Together with the no-garden runs above, the count of garden cells is a
+trade between seeds and housing with a best point in between. The bot did not dig quarters to win the housing back; a
+person could, at a seed a cell. Bots only.
+
+### The rival in High Summer stops feeding workers to a held ford (war build)
+
+Against a bold or steady hill the default timid rival was beaten by minute five. Traced on four seeds (seat 0 bold): its
+soldiers do not die before noon at all; its workers die at the fords (55 to 65 of them between ticks 4000 and 6000), sent
+for the meat that falls there while the other hill's soldiers stand on it. With 6 to 24 workers left it brings no meat
+home, so it raises nothing, and its soldiers sit at 49 to 61.
+
+One change, in long missions only (`cfg.falls`): the bot passes over a pile with three or more of the other hill's
+fighters within six cells and more of them than its own, and takes up a forage trail that ends at one (`wary: false`
+in a mind turns it off). Re-measured once, same seeds:
+
+| at noon (tick 9600) | before | after |
+| --- | --- | --- |
+| rival adults | 72 to 149 | 160 to 191 |
+| rival workers | 9 to 72 | 93 to 104 |
+| rival soldiers | 49 to 61 | 49 to 64 |
+| queen dies, ticks after noon | 1437 to 2386 | 1506 to 2095 |
+
+So the rival reaches noon with a working hill, and still falls about a hundred seconds after it: 250 to 300 ants go down
+its door against 50 to 64 soldiers. The morning is fixed and the end is not. What is owed is a rule that makes a nest
+hard to storm (`lab-5w7.66`), not more bot work. Two timid bots are unchanged (dusk, 426 to 434 against 246 to 297).
+The stolen-loads deed did not fall in these wins before the change (0 on four seeds) and reads 14, 0, 4, 0 after, so
+one aggressive win does not open all three nodes.
