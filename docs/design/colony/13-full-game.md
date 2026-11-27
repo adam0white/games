@@ -204,7 +204,7 @@ Building goes ahead on the first option of each. Each can be changed later at th
 | Question | Options |
 | --- | --- |
 | Between missions | **A. A home nest you build and defend** (section 3). B. A map and the Lineage only; all building happens inside missions. A makes building matter more and costs one more system |
-| How hard forks lock | **A. Closed for the campaign; the wedding flight carries one pick into the next.** B. Closed until you pay amber to switch. C. Everything can be had in the end and only the order differs (the freeciv way). A makes each pick matter most |
+| How hard forks lock | **A. Closed for the campaign; the wedding flight carries one pick into the next.** B. Closed until you pay stores to switch. C. Everything can be had in the end and only the order differs (the freeciv way). A makes each pick matter most |
 | The region not taken | **A. Stays open but a rival settles it first** (first fork); **falls to the pale colony** (second fork). B. Always stays open unchanged |
 | Labels | **A. Short labels on goals, rooms and picks; no story text.** B. Fully wordless with icons only |
 
