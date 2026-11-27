@@ -38,8 +38,8 @@ uniform float uDist;             // eye to the point looked at, cells
 uniform float uTime;
 uniform vec3 uSun;               // direction to the sun (x, y on the ground, z up), unit
 uniform vec3 uSunCol; uniform vec3 uAmb; uniform float uNight; uniform float uInk;
-uniform vec4 uPile[8];           // x, y, amount, kind + 1 (0: none)
-uniform vec4 uEntrance;          // x, y (cells), width, 1 when shown
+uniform vec4 uPile[16];          // x, y, amount, kind + 1 (0: none)
+uniform vec4 uEntrance[2];       // x, y (cells), width, 1 when shown: a door for each colony on the hill
 uniform vec4 uAlarm;             // x, y, 0, 1 when live
 uniform vec4 uBeacon;            // x, y, age (s), 1 when live: a ring where something new has appeared
 ${COMMON}
@@ -127,8 +127,9 @@ void main() {
   }
   vec3 emis = vec3(0.0); float cover = 0.0;   // where the door or food lies, scent does not paint over it
   // The entrance: a mound of spoil with a dark mouth.
-  if (uEntrance.w > 0.0) {
-    vec2 d = w - uEntrance.xy; d.x /= 1.0 + uEntrance.z * 0.25;
+  for (int e = 0; e < 2; e++) {
+    vec4 ent = uEntrance[e]; if (ent.w <= 0.0) continue;
+    vec2 d = w - ent.xy; d.x /= 1.0 + ent.z * 0.25;
     float r = length(d), mh = ss(4.2, 1.6, r);
     if (r < 4.4) {
       vec3 mn = normalize(vec3(d * mh * (1.0 - mh) * 1.4, 1.0));
@@ -142,7 +143,7 @@ void main() {
   }
   // Food: a seed head (pale, clustered) or a beetle (a dark, shiny shell), each a little dome.
   float glow = 0.0;
-  for (int k = 0; k < 8; k++) {
+  for (int k = 0; k < 16; k++) {
     vec4 p = uPile[k]; if (p.w < 0.5 || p.z <= 0.0) continue;
     float r = 0.7 + 1.5 * sqrt(p.z / 120.0);
     vec2 d = AT(r * 0.3) - p.xy - 0.5;
@@ -215,7 +216,7 @@ const ANT_VS = `#version 300 es
 precision highp float;
 in vec2 aCorner;
 in vec4 aPos;    // previous x, y, new x, y (cells)
-in vec4 aInfo;   // heading (radians), kind (0 forager, 1 digger, 2 guard, 3 nurse; +8: a major), carry (0, 1 sugar, 2 protein), phase
+in vec4 aInfo;   // heading (radians), kind (0 forager, 1 digger, 2 guard, 3 nurse; +8: a major; +16: the rival colony), carry (0, 1 sugar, 2 protein), phase
 uniform float uAlpha; uniform float uRun;
 uniform float uShadow; uniform vec3 uSun; uniform float uBig;
 ${CAM}
@@ -223,7 +224,7 @@ out vec2 vLocal; flat out vec4 vInfo; out float vPx; flat out float vMove;
 void main() {
   vec2 p = mix(aPos.xy, aPos.zw, uAlpha);
   float scale = uF / max(toCam(vec3(p, 0.0)).z, 0.05);              // device px a cell covers at this ant
-  float major = aInfo.y > 7.5 ? 1.5 : 1.0;
+  float major = mod(aInfo.y, 16.0) > 7.5 ? 1.5 : 1.0;
   float half_ = max(0.85 * major * uBig, 4.0 / scale);              // half size in cells; never under about 4 device px
   float c = cos(aInfo.x), s = sin(aInfo.x);
   vec2 o = aCorner * half_;
@@ -256,6 +257,7 @@ void main() {
     outColor = vec4(0.0, 0.0, 0.0, a); return;
   }
   vec3 body = kind < 0.5 ? vec3(0.20, 0.10, 0.06) : kind < 1.5 ? vec3(0.42, 0.22, 0.10) : kind < 2.5 ? vec3(0.36, 0.06, 0.05) : vec3(0.30, 0.18, 0.12);
+  if (vInfo.y > 15.5) body = mix(vec3(0.13, 0.17, 0.30), vec3(0.24, 0.30, 0.52), kind * 0.34);   // the rival: blue-black
   vec3 light = uAmb * 1.2 + uSunCol * 0.75;
   vec3 seedCol = vInfo.z > 1.5 ? vec3(0.62, 0.20, 0.12) : vec3(0.97, 0.86, 0.48);
   if (vPx < 6.0) {                                              // far away: one oval, and the load as a dot
@@ -483,7 +485,7 @@ export class GameRenderer {
     this.dpr = dpr;
   }
   /** view: { ex, ey, ez, sin, cos, f (CSS px), dist } from main.js `pose()`; light: sky(phase). */
-  draw({ view, light, ink = false, alpha, time, piles, entrance, alarm, beacon, running = true, big = 1 }) {
+  draw({ view, light, ink = false, alpha, time, piles, entrance, entrances = null, alarm, beacon, running = true, big = 1 }) {
     const gl = this.gl; if (this.lost || !this.size) return false;
     const W = this.canvas.width, H = this.canvas.height, dpr = this.dpr ?? 1, L = this.size;
     gl.viewport(0, 0, W, H);
@@ -502,9 +504,10 @@ export class GameRenderer {
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.covTex); gl.uniform1i(g.u.uCov, 0);
     gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.scentTex); gl.uniform1i(g.u.uScent, 1);
     gl.uniform2f(g.u.uSize, L.w, L.h); gl.uniform1f(g.u.uDist, view.dist);
-    const pv = new Float32Array(32); (piles || []).slice(0, 8).forEach((p, k) => { pv[4 * k] = p.x; pv[4 * k + 1] = p.y; pv[4 * k + 2] = p.amount; pv[4 * k + 3] = p.kind + 1; });
+    const pv = new Float32Array(64); (piles || []).slice(0, 16).forEach((p, k) => { pv[4 * k] = p.x; pv[4 * k + 1] = p.y; pv[4 * k + 2] = p.amount; pv[4 * k + 3] = p.kind + 1; });
     gl.uniform4fv(g.u.uPile, pv);
-    gl.uniform4f(g.u.uEntrance, entrance ? entrance.x : 0, entrance ? entrance.y : 0, entrance ? entrance.w : 0, entrance ? 1 : 0);
+    const ev = new Float32Array(8); (entrances || (entrance ? [entrance] : [])).slice(0, 2).forEach((e, k) => { ev[4 * k] = e.x; ev[4 * k + 1] = e.y; ev[4 * k + 2] = e.w; ev[4 * k + 3] = 1; });
+    gl.uniform4fv(g.u.uEntrance, ev);
     gl.uniform4f(g.u.uAlarm, alarm ? alarm.x : 0, alarm ? alarm.y : 0, 0, alarm ? 1 : 0);
     gl.uniform4f(g.u.uBeacon, beacon ? beacon.x : 0, beacon ? beacon.y : 0, beacon ? beacon.age : 0, beacon ? 1 : 0);
     gl.bindVertexArray(this.gvao); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
