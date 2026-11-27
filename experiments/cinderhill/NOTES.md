@@ -1295,3 +1295,30 @@ taps, the score names.
 Correction: the queen's health beside the counts wrapped the score onto two lines on a phone (forced worst case: row
 height 16 to 32). It now has its own small line under the clock, "Queens: yours 100% · rival 89%", shown once either
 queen is hurt; seen on a phone profile in High Summer, 218 of 218 wide at the longest text.
+
+## The mess: a room for a hill of soldiers (war build)
+
+Both nodes the earlier readers kept were ruled out by reading the code: an adult already hatches at its brood cell, so
+"soldiers hatch at the nursery that raised them" changes nothing; and the default rival never loots, so store depth
+would cost a player on default settings nothing.
+
+The mess is a sixth room (`ROOM.MESS`, a row of `ROOMS`). A soldier eats as three ants; each open mess cell feeds four
+soldiers (`C.MESS_FEEDS`) as one ant each. It houses nobody and pays nothing without the soldiers to fill it, so the
+same twelve cells are a choice between seeds and housing. It may be dug in High Summer only for now; a node of the
+tree that opens it elsewhere is owed (`lab-5w7.62`).
+
+Measured in High Summer, seat 0 bold against the default rival, seeds 1 to 4, twelve cells ordered at tick 3000, bots
+only. Seeds eaten a minute at noon (tick 9600):
+
+| Twelve cells as | Meal at noon | Seeds in store at noon | Housing at noon |
+| --- | --- | --- | --- |
+| nothing | 51, 44, 45, 37 | 108, 53, 103, 54 | 386, 314, 374, 314 |
+| mess | 35, 33, 33, 24 | 169, 72, 171, 51 | 374, 314, 374, 282 |
+| quarters | 47, 44, 42, 31 | 112, 64, 118, 61 | 386, 362, 386, 282 |
+
+Seeds did not bind for this hill in any row (it never starved), so the gain shows as store, not as ants. The rival digs
+one mess of twelve cells once it has 24 soldiers (`mind.mess`). Two default rivals with and without it: the same hill
+is larger at dusk on all four seeds, and the smaller hill's store no longer reaches nothing on seed 1 (0 to 122 seeds;
+246 to 294 ants). The limit line offers a mess when seeds run short, no garden may be dug and four or more soldiers eat
+unfed. Seen on a phone profile: the button shows in High Summer and not on The Crossing, the help text, the cells
+tinted blue. Not seen: a person painting one, or the limit line offering it.
