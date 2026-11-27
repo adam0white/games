@@ -3,7 +3,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Host } from '../host.js';
-import { EVENT, FOOD, G, JOB, NEST, SLOT, SURFACE } from '../sim/sim.js';
+import { EVENT, FOOD, G, JOB, MAT, NEST, SLOT, SURFACE, Sim } from '../sim/sim.js';
+import { cellAt } from '../sim/grid.js';
 import { C, DAY_TICKS, START } from '../sim/colony.js';
 import { LATE_FIND_AT, WINDFALL_AT } from '../sim/world.js';
 
@@ -25,7 +26,24 @@ test('the start: 20 foragers by the entrance, 10 nurses, the porch store, and fo
     for (const [p, kind, amount] of [[0, FOOD.SUGAR, 30], [1, FOOD.PROTEIN, 20]]) {
       const c = s.pileCell[p], d = Math.hypot(c % L.sw - ex, Math.floor(c / L.sw) - ey);
       assert.equal(s.pileKind[p], kind); assert.equal(s.pileAmount[p], amount);
-      assert.ok(d >= 8 && d <= 13.5, `seed ${seed} pile ${p} ${d.toFixed(1)} cells out`);
+      assert.ok(d >= 8 && d <= 12, `seed ${seed} pile ${p} ${d.toFixed(1)} cells out`);
+    }
+  }
+});
+
+test('on 60 seeds the opening food is 8 to 12 cells out; on a small map the late-find stone leaves the opening piles open', () => {
+  for (let seed = 1; seed <= 60; seed++) {
+    const s = new Sim({ seed, colony: 1, nh: 64, ants: 0 }), L = s.L, ex = L.sw >> 1, ey = L.sh >> 1;
+    for (const p of [0, 1]) {
+      const c = s.pileCell[p], d = Math.hypot(c % L.sw - ex, Math.floor(c / L.sw) - ey);
+      assert.ok(d >= 8 && d <= 12, `seed ${seed} pile ${p} ${d.toFixed(2)} cells out`);
+    }
+    const m = new Sim({ seed, sw: 28, sh: 28, nw: 32, nh: 24, colony: 1, ants: 0 });
+    for (const p of [0, 1]) {
+      const c = m.pileCell[p], x = c % m.L.sw, y = Math.floor(c / m.L.sw);
+      let open = 0;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (m.mat[cellAt(m.L, SURFACE, x + dx, y + dy)] === MAT.OPEN) open++;
+      assert.equal(open, 9, `small map, seed ${seed}: pile ${p} and its pickup cells are open`);
     }
   }
 });

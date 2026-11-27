@@ -88,19 +88,22 @@ export function generate(sim) {
 // until LATE_FIND_AT (lateFind). Further slots stay empty.
 const DIRS = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]];
 function firstFood(sim) {
-  const { L, rng } = sim, ex = L.sw >> 1, ey = L.sh >> 1, q0 = below(rng, W, 8);
+  const { L, rng } = sim, ex = L.sw >> 1, ey = L.sh >> 1, q0 = below(rng, W, 8), opening = [];
   for (let p = 0; p < 2; p++) {
     // A diagonal steps round(d / sqrt 2) on each axis; a straight step is jittered a cell sideways. Either way the
-    // pile is d to d + 1 cells out, clamped inside a small map.
+    // pile is 8 to 12 cells out (no jitter at 12), clamped inside a small map.
     const d = 8 + below(rng, W, 5), [dx, dy] = DIRS[(q0 + p * (3 + below(rng, W, 3))) & 7], j = below(rng, W, 3) - 1;
-    const ax = dx && dy ? Math.round((dx * d * 707) / 1000) : dx * d + (dx ? 0 : j), ay = dx && dy ? Math.round((dy * d * 707) / 1000) : dy * d + (dy ? 0 : j);
+    const ax = dx && dy ? Math.round((dx * d * 707) / 1000) : dx * d + (dx || d === 12 ? 0 : j), ay = dx && dy ? Math.round((dy * d * 707) / 1000) : dy * d + (dy || d === 12 ? 0 : j);
     const px = Math.max(3, Math.min(L.sw - 4, ex + ax)), py = Math.max(3, Math.min(L.sh - 4, ey + ay));
-    disc(sim, SURFACE, px, py, 2, MAT.OPEN, () => false);
+    disc(sim, SURFACE, px, py, 2, MAT.OPEN, () => false); opening.push([px, py]);
     sim.pileCell[p] = cellAt(L, SURFACE, px, py); sim.pileAmount[p] = p === 0 ? 30 : 20; sim.pileKind[p] = p; // 0 sugar, 1 protein
   }
   const d = 25 + below(rng, W, 11), [dx, dy] = DIRS[below(rng, W, 8)], k = dx && dy ? 7 : 10;
   const px = Math.max(4, Math.min(L.sw - 5, ex + Math.trunc((dx * d * k) / 10))), py = Math.max(4, Math.min(L.sh - 5, ey + Math.trunc((dy * d * k) / 10)));
-  disc(sim, SURFACE, px - Math.trunc((dx * 6 * k) / 10), py - Math.trunc((dy * 6 * k) / 10), 2, MAT.STONE, (x, y) => Math.abs(x - ex) < 3 && Math.abs(y - ey) < 3);
+  // The stone keeps off the entrance and the opening piles' pickup cells (on a small map they can be near).
+  const near = (x, y) => opening.some(([ox, oy]) => Math.abs(x - ox) < 4 && Math.abs(y - oy) < 4);
+  disc(sim, SURFACE, px - Math.trunc((dx * 6 * k) / 10), py - Math.trunc((dy * 6 * k) / 10), 2, MAT.STONE,
+    (x, y) => (Math.abs(x - ex) < 3 && Math.abs(y - ey) < 3) || near(x, y));
   disc(sim, SURFACE, px, py, 2, MAT.OPEN, () => false);
   for (let p = 2; p < sim.pileCell.length; p++) { sim.pileCell[p] = -1; sim.pileAmount[p] = 0; sim.pileKind[p] = 0; }
   if (sim.pileCell.length >= 4) for (let j = 0; j < 2; j++) {

@@ -241,7 +241,7 @@ function walk(sim, io, mark = () => {}) {
 }
 
 function headerValues(sim) {
-  const c = sim.cfg, h = sim.home, r = sim.nursery ?? h;
+  const c = sim.cfg, h = sim.home, r = sim.nursery ?? { x: 0, y: 0, w: 0, h: 0 }; // w 0: no nursery (the sandbox)
   return [c.seed >>> 0, c.sw, c.sh, c.nw, c.nh, c.maxAnts, sim.n, h.x, h.y, h.w, h.h, ...c.spread, ...c.halfLife, c.colony ? 1 : 0, c.dayTicks, r.x, r.y, r.w, r.h];
 }
 
@@ -285,7 +285,7 @@ export function restore(bytes) {
   sim.n = n;
   sim.home = { x: hx | 0, y: hy | 0, w: hw, h: hh }; // a chamber can start left of the nest's edge: signed
   const [rx, ry, rw, rh] = header.slice(13 + 2 * FIELDS);
-  sim.nursery = { x: rx | 0, y: ry | 0, w: rw, h: rh };
+  sim.nursery = rw ? { x: rx | 0, y: ry | 0, w: rw, h: rh } : null;
   const dec = new Decoder(bytes.subarray(12 + 4 * count));
   walk(sim, dec);
   dec.finish();

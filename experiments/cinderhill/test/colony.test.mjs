@@ -80,6 +80,16 @@ test('a larva with no protein dies after LARVA_STARVE ticks; one with plenty bec
   assert.equal(b.g[G.PROTEIN], 100 - C.MAJOR_FEEDS);
 });
 
+test('a larva first fed with exactly MAJOR_PROTEIN in store becomes a major, even when another larva eats next', () => {
+  const s = colony({ larvae: 0 });
+  s.g[G.PROTEIN] = C.MAJOR_PROTEIN;
+  addBrood(s, STAGE.LARVA); addBrood(s, STAGE.LARVA);
+  for (let t = 0; t < C.LARVA_TICKS + C.PUPA_TICKS + 10 && s.n < 2; t++) s.step();
+  assert.equal(s.n, 2);
+  assert.deepEqual([s.caste[0], s.caste[1]].sort(), [CASTE.WORKER, CASTE.MAJOR].sort());
+  assert.equal(s.g[G.PROTEIN], C.MAJOR_PROTEIN - C.MAJOR_FEEDS - 1);
+});
+
 test('a load from a protein pile fills the protein store; from a sugar pile, the sugar store', () => {
   const s = colony();
   s.pileCell[0] = cellAt(s.L, SURFACE, 30, 24); s.pileAmount[0] = 50; s.pileKind[0] = FOOD.PROTEIN;
@@ -237,4 +247,12 @@ test('the sandbox carries one kind: a load from a protein pile counts as one loa
   assert.ok(s.g[G.STORES] > 0, 'loads came home');
   assert.equal(carried2, false);
   assert.equal(s.g[G.PROTEIN], 0);
+});
+
+test('restore keeps a sandbox without a nursery and a colony with its nursery', () => {
+  const a = new Sim({ seed: 3, sw: 32, sh: 32, nw: 32, nh: 12 });
+  assert.equal(a.nursery, null);
+  assert.equal(restore(snapshot(a)).nursery, null);
+  const c = new Sim({ seed: 3, colony: 1, nh: 64 });
+  assert.deepEqual(restore(snapshot(c)).nursery, c.nursery);
 });

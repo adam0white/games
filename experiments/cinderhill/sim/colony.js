@@ -118,12 +118,14 @@ export function stepColony(sim) {
       if (age >= C.EGG_TICKS) { stage = STAGE.LARVA; B.age[k] = 0; }
     } else if (stage === STAGE.LARVA) {
       // One meal a tick for the whole brood, in brood order: protein goes to the larvae that came first.
-      // A larva fed with MAJOR_PROTEIN in store at her first meal is fed on to MAJOR_FEEDS: each meal since took one.
-      const wants = B.fed[k] === 0 || (B.fed[k] < C.MAJOR_FEEDS && g[G.PROTEIN] >= C.MAJOR_PROTEIN - B.fed[k]);
-      if (wants && !fedThisTick && g[G.PROTEIN] > 0) { g[G.PROTEIN]--; B.fed[k]++; B.hunger[k] = 0; fedThisTick = true; }
-      else if (B.fed[k] === 0 && B.hunger[k] < 0xFFFF) B.hunger[k]++;
+      // A larva fed with MAJOR_PROTEIN in store at her first meal becomes a major: that meal takes MAJOR_FEEDS loads at
+      // once, so another larva's meal cannot drop the store under the line between her meals.
+      if (B.fed[k] === 0 && !fedThisTick && g[G.PROTEIN] > 0) {
+        const meal = g[G.PROTEIN] >= C.MAJOR_PROTEIN ? C.MAJOR_FEEDS : 1;
+        g[G.PROTEIN] -= meal; B.fed[k] = meal; B.hunger[k] = 0; fedThisTick = true;
+      } else if (B.fed[k] === 0 && B.hunger[k] < 0xFFFF) B.hunger[k]++;
       if (B.hunger[k] >= C.LARVA_STARVE) { keep = false; g[G.BROOD_LOST]++; }
-      else if (B.fed[k] > 0 && age >= C.LARVA_TICKS && !(wants && g[G.PROTEIN] > 0)) { stage = STAGE.PUPA; B.age[k] = 0; }
+      else if (B.fed[k] > 0 && age >= C.LARVA_TICKS) { stage = STAGE.PUPA; B.age[k] = 0; }
     } else if (age >= C.PUPA_TICKS) {
       // An adult, if there is room: at the cap the pupa waits.
       const job = JOB_ROUND[g[G.BORN] % 10], caste = B.fed[k] >= C.MAJOR_FEEDS ? CASTE.MAJOR : CASTE.WORKER;

@@ -442,4 +442,6 @@ Every S4 snapshot restores to the same hash. The workerd means rose with the req
 
 **Independent review** (Codex, read-only): nine findings, all fixed and listed in `../NOTES.md`, Starting values.
 
+A second review of the fixes found five more (`../NOTES.md`, Starting values). Its fixes leave every total above unchanged: after them the pace gate (20 seeds, 12 minutes) gives the same table, S2 colony agrees again at 3700489822, and S4 gives the same sizes, each restoring to the same hash.
+
 **Mutations shown to fail**: eggs costing sugar (3 colony tests fail); foragers starting in the nest (the pace gate fails first delivery, 19.55 s); brood placed without the cell check (the start test fails).
