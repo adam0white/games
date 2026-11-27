@@ -29,6 +29,8 @@ export function generate(sim, layoutOnly = false) {
     }
     sim.link[S(dx, dy)] = N(dx, 0); sim.link[N(dx, 0)] = S(dx, dy);
   }
+  // Sites that pay while held: a mission's list, in cells of the 160 by 112 map.
+  sim.sites = (sim.mission.sites ?? []).map(([x, y]) => S(Math.round((x * sw) / 160), Math.round((y * sh) / 112)));
   if (layoutOnly || cfg.blank) return;
   const mid = sw >> 1, mx = x => sw - 1 - x;
   const ford = y => FORDS.some(f => Math.abs(y - Math.round((f * sh) / 112)) <= 2);
@@ -52,6 +54,7 @@ export function generate(sim, layoutOnly = false) {
     for (const [px, py] of spots) if (Math.abs(x - px) < 5 && Math.abs(y - py) < 5) return false;
     return true;
   };
+  for (const c of sim.sites) spots.push([c % sw, Math.floor(c / sw)], [mx(c % sw), Math.floor(c / sw)]);
   for (let k = 0; k < 16; k++) {
     let x = 2 + below(sim.rng, STREAM.world, mid - 8), y = 2 + below(sim.rng, STREAM.world, sh - 4);
     const size = 2 + below(sim.rng, STREAM.world, 5);

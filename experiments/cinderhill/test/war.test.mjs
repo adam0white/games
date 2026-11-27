@@ -179,3 +179,26 @@ test('a colony can start smaller than its rival', () => {
   s.census();
   assert.deepEqual([s.g(0, CG.ADULTS), s.g(1, CG.ADULTS)], [22, 30]);
 });
+
+test('The Stones: a stone pays the colony with more ants beside it, and points end the mission', () => {
+  const s = new Sim({ seed: 2, mission: 'stones' });
+  assert.equal(s.sites.length, 4);
+  const sw = s.L.sw, c = s.sites[2], put = (t, n) => { for (let k = 0; k < n; k++) { const i = s.spawn(t, CASTE.MAJOR, c); s.task[i] = 0; } };
+  put(0, 2); for (let k = 0; k < 20; k++) s.step();
+  assert.equal(s.siteHold[2], -1, 'two ants are not enough');
+  put(0, 4); for (let k = 0; k < 20; k++) s.step();
+  assert.equal(s.siteHold[2], 0);
+  assert.ok(s.g(0, CG.POINTS) >= 1 && s.g(1, CG.POINTS) === 0);
+  const b = Sim.load(JSON.parse(JSON.stringify(s.save(), (k, v) => (ArrayBuffer.isView(v) ? Array.from(v) : v))));
+  assert.equal(b.hash(), s.hash()); assert.equal(b.siteHold[2], 0); assert.equal(b.sites[2], c);
+  s.cg[CG.POINTS] = 399; put(0, 4); for (let k = 0; k < 20 && !s.result; k++) s.step();
+  assert.equal(s.result, 1);
+  void sw;
+});
+
+test('The Stones: a mind that holds more stones beats one that holds fewer', () => {
+  for (const seed of [1, 2]) {
+    const h = new Host({ seed, mission: 'stones', swap: seed % 2 === 0, ai: { 0: 1, 1: 0 } }).run(12000);
+    assert.equal(h.sim.result, 1, `seed ${seed}`);
+  }
+});

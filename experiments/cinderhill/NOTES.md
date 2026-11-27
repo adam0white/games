@@ -456,3 +456,43 @@ Owner direction: the game should be of the colony-strategy genre in full (missio
 - The caste setting left the settings panel: the fork sets it, so the record still carries it (`caste` in `rec.start`, `none` before the fork; a `fork` event when chosen).
 - From a blind read of the campaign plan by an outside model: every finished mission grants its fork, win or lose (done); the second fork as first drawn (deeper stores or faster brood, after the frost) is a trap because stores stop mattering once the frost has passed (not built; to be redrawn); an unlock that needs both an earlier fork and a mission outcome is what makes it a tree (not built); trails that hold an objective (needed for the next mission, hold sites that pay).
 - Not verified: no person has played First Frost or used the menu. A scripted phone-size browser pass covered: frost closed at first, the Crossing lost, the fork chosen, First Frost started with 22 workers, the frost tint and "Thaw in", the result card; no page errors.
+
+## A third mission, sites, and a second fork
+
+**The Stones** (`MISSIONS.stones`). Four stones stand on the surface (`sites`, cell coordinates). A colony holds a stone when it
+has at least `SITE_MIN` (3) ants within `SITE_R` (3) cells of it on the surface and strictly more than the other colony; a
+holder keeps the stone while it has an ant there and is not outnumbered. Each held stone pays one point a second. First to 400
+points wins (`REASON.POINTS`); at dusk the higher points win, adults break a tie. A dead queen still ends it. The hold is
+state (`siteHold`, saved and hashed), so every hash changed with this slice and `WAR_VERSION` is 4.
+
+**Per-colony stats.** Caste hit points, bite, speed, food cost and reach, room sizes, adults fed per seed and pupa time are read
+from `sim.stat[team]`, built once from the tables plus the colony's traits (`cfg.traits`). A trait is a row in `TRAITS` with a
+list of `set` entries. No rule lives in the client.
+
+**The second fork ("way").** Thrift: a seed feeds twenty at a meal, not ten. Swift brood: pupae hatch in 370 ticks, not 400.
+First values (fifteen, and 300 ticks) failed: swift won 18, 20, 17 and 20 of 20 in four of six pairings, because a brood
+lead compounds. Final values, thrift's wins of 20 seeds against swift, same mind both sides:
+
+| mission | steady | bold |
+| --- | --- | --- |
+| The Crossing | 5 | 13 |
+| First Frost | 8 | 16 |
+| The Stones | 11 | 6 |
+
+59 of 120 overall. No single cell is even, which is the point of a fork: which one is better depends on the mission and on
+how the colony is played. Bots only; no person has played either option.
+
+**Rival traits.** A rival that is not timid takes the option the player did not, so a fork changes both sides.
+
+**The Stones, 30 seeds a pairing** (before the fork values changed; no traits in these runs): timid v timid 16 to 14; steady v
+timid 30 to 0; bold v timid 30 to 0; steady v steady 18 to 12; bold v steady 29 to 1; bold v bold 16 to 14; steady spitters v
+steady wardens 25 to 5; bold spitters v bold wardens 7 to 23. Missions end between 247 and 440 seconds.
+
+**The rival on a site mission.** It wants the nearest `1 + mood` stones, draws a raid trail to each, and does not march on the
+queen. A player can still win by the queen.
+
+**Table rows with no fork yet.** `farspit`, `acid` (need spitters), `iron`, `stride` (need wardens). They wait for a fourth
+mission so that the third fork depends on the first.
+
+**Open.** Bold v bold on The Stones averaged 299 points at the end, cause not examined. Steady v steady on First Frost ends on
+a queen 25 times in 30.
