@@ -54,6 +54,9 @@ const storeStaff = () => writeJson(STAFF_KEY, staff.map(({ look, kind, name, fre
 // No look button: art directions are picked by link (?look=storybook), and the pick sticks on this device.
 let lookId = LOOK_IDS.includes(query.get('look')) ? query.get('look') : LOOK_IDS.includes(read(LOOK_KEY)) ? read(LOOK_KEY) : 'diner';
 if (LOOK_IDS.includes(query.get('look'))) write(LOOK_KEY, lookId);
+// Taste choices are player settings with a default; each change is recorded (from, to) so the default can follow players.
+const LOOK_ORDER = ['diner', 'storybook', 'diorama', 'comic', 'toon', 'night', 'clay'].filter(id => LOOK_IDS.includes(id));
+const settingChanged = (name, from, to) => rec.event('setting', { name, from, to, where: screen });
 
 // ---------- sound: made in code (kit/audio.js); music from kit/music.js
 let musicOn = read(MUSIC_KEY) !== '0', song = null;
@@ -142,6 +145,7 @@ const show = screens(['menu', 'paused', 'extra', 'dayEnd', 'shop'], name => {
 function labels() {
   for (const id of ['sound1', 'sound2']) { $(id).textContent = t(save.sound ? 'soundOn' : 'soundOff'); $(id).setAttribute('aria-pressed', String(save.sound)); }
   for (const id of ['music1', 'music2']) { $(id).textContent = t(musicOn ? 'musicOn' : 'musicOff'); $(id).setAttribute('aria-pressed', String(musicOn)); }
+  for (const id of ['look1', 'look2']) $(id).textContent = t('look', { name: t('looks_' + lookId) });
   $('chopBtnText').textContent = t('chop'); $('wheelBtnText').textContent = t('wheelBtn');
 }
 const rankName = tier => t('rank_' + TIERS[tier].name);
@@ -191,7 +195,7 @@ function beginDay() {
   staff.forEach(m => { m.model = null; if (m.kind === 'owed' && rr() < sim.REBEL_CHANCE) day.rebels.push({ at: 1 + Math.floor(rr() * Math.max(1, plan.length - 1)), who: m }); });
   staffIn();
   song?.start(seed);
-  rec.start({ day: save.day, tier: save.tier, tutorial: !save.tutorial });
+  rec.start({ day: save.day, tier: save.tier, tutorial: !save.tutorial, look: lookId, tool: tools.use, sound: save.sound, music: musicOn });
   paused = false; snd.release(); show('play'); hud();
   if (storyBook) { const d = story.due(save, storyBook.beats); storyQueue = d.cards.slice(); storyToasts = d.toasts.slice(); for (const b of d.toasts) story.see(save, b); store(); }
   nextStory(); missionChip();
@@ -750,6 +754,7 @@ function toolIt(id) {
   const x = TOOLS.find(k => k.id === id); if (!x) return;
   if (!tools.own.includes(id)) { if (save.tier < x.tier || save.coins < x.cost) return; save.coins -= x.cost; tools.own.push(id); store(); SFX.build(); rec.event('tool', { id, cost: x.cost }); }
   else SFX.tap();
+  if (tools.use !== id) settingChanged('tool', tools.use, id);
   tools.use = id; storeTools(); art.knife.setSkin(id); hud();
   const sc = $('builds').scrollTop; shop(); $('builds').scrollTop = sc;
 }
@@ -1157,10 +1162,14 @@ $('quit').addEventListener('click', () => {
 });
 onLeave(pause);
 $('play').addEventListener('click', async () => { snd.unlock(); await ready; if (screen === 'menu') beginDay(); });
-for (const id of ['sound1', 'sound2']) $(id).addEventListener('click', () => { save.sound = !save.sound; store(); if (save.sound) { snd.unlock(); if (!paused) snd.release(); SFX.tap(); } labels(); });
-for (const id of ['music1', 'music2']) $(id).addEventListener('click', () => { musicOn = !musicOn; write(MUSIC_KEY, musicOn ? '1' : '0'); labels(); });
+for (const id of ['sound1', 'sound2']) $(id).addEventListener('click', () => { save.sound = !save.sound; store(); settingChanged('sound', !save.sound, save.sound); if (save.sound) { snd.unlock(); if (!paused) snd.release(); SFX.tap(); } labels(); });
+for (const id of ['music1', 'music2']) $(id).addEventListener('click', () => { musicOn = !musicOn; write(MUSIC_KEY, musicOn ? '1' : '0'); settingChanged('music', !musicOn, musicOn); labels(); });
+for (const id of ['look1', 'look2']) $(id).addEventListener('click', () => {
+  const from = lookId; lookId = LOOK_ORDER[(LOOK_ORDER.indexOf(lookId) + 1) % LOOK_ORDER.length]; write(LOOK_KEY, lookId);
+  art?.setLook(lookId); SFX.tap(); settingChanged('look', from, lookId); labels();
+});
 
-$('lang').addEventListener('click', () => { W.setLang(W.lang() === 'en' ? 'tr' : 'en'); W.apply(); labels(); menu(); SFX.tap(); });
+$('lang').addEventListener('click', () => { const from = W.lang(); W.setLang(from === 'en' ? 'tr' : 'en'); settingChanged('lang', from, W.lang()); W.apply(); labels(); menu(); SFX.tap(); });
 
 // ---------- the frame
 function frame(now) {
