@@ -5,7 +5,7 @@ import { Sim, CG, CMD, KIND, MODE, CASTE, TEAMS, ROOM, EVENT, MAT } from '../war
 import { Host } from '../war/host.js';
 import { think, THINK_EVERY, cacheRun, breachRun, mouth } from '../war/ai.js';
 import { PLUG, C } from '../war/sim.js';
-import { CAMPAIGN, TRAITS, MISSIONS, MAPS } from '../war/tables.js';
+import { CAMPAIGN, TRAITS, MISSIONS, MAPS, TIERS, BRANCH } from '../war/tables.js';
 
 test('an idle colony loses to the rival', () => {
   const h = new Host({ seed: 3 }).run(7200);
@@ -129,7 +129,7 @@ test('clearing takes the mark and the room off; repainting the stores spoils wha
 });
 
 test('a colony picks one caste, once, from the mission list, and raises it', () => {
-  const s = new Sim({ seed: 4, protein: 60 });
+  const s = new Sim({ seed: 4, protein: 60, tiers: false });
   s.order({ team: 0, type: CMD.PICK, id: 1, caste: CASTE.MAJOR }); // not on the list
   s.order({ team: 0, type: CMD.PICK, id: 2, caste: CASTE.SPITTER });
   s.order({ team: 0, type: CMD.PICK, id: 3, caste: CASTE.WARDEN }); // already chosen
@@ -206,7 +206,7 @@ test('The Stones: a mind that holds more stones beats one that holds fewer', () 
 });
 
 test('The Larder: a stolen load counts when it reaches home, and ten of them end the mission', () => {
-  const h = new Host({ seed: 2, mission: 'larder', ai: { 0: 1, 1: 1 } }), s = h.sim;
+  const h = new Host({ seed: 1, mission: 'larder', ai: { 0: 1, 1: 1 } }), s = h.sim;
   while (!s.result && s.tick < 9700 && s.g(0, CG.HAUL) + s.g(1, CG.HAUL) === 0) h.run(200);
   assert.ok(s.g(0, CG.HAUL) + s.g(1, CG.HAUL) > 0, 'some thief got home');
   for (const t of [0, 1]) assert.ok(s.g(t, CG.HAUL) <= s.g(t, CG.STOLEN), 'no load is hauled that was not taken');
@@ -241,7 +241,7 @@ test('The Narrows: the colony under siege wins at dusk, however small', () => {
 
 test('a guard post keeps a share of the idle soldiers inside the nest', () => {
   const run = post => {
-    const s = new Sim({ seed: 4, mission: 'larder', traits: [['post'], []] }), L = s.L, dx = s.door[0] % L.sw;
+    const s = new Sim({ seed: 4, mission: 'larder', tiers: false, traits: [['post'], []] }), L = s.L, dx = s.door[0] % L.sw;
     for (let k = 0; k < 16; k++) s.spawn(0, CASTE.MAJOR, s.door[0]);
     if (post) s.order({ team: 0, type: CMD.ROOM, kind: ROOM.POST, cells: [dx - 2, 16, dx - 1, 16, dx, 16, dx + 1, 16] }); // four cells of the queen's chamber
     for (let k = 0; k < 600; k++) s.step();
@@ -259,7 +259,7 @@ test('a guard post keeps a share of the idle soldiers inside the nest', () => {
 
 test('a raid sent for the store brings loads home; a raid told to hold stays out of the door', () => {
   const run = (traits, mode) => {
-    const s = new Sim({ seed: 3, mission: 'crossing', traits: [traits, []] }), sw = s.L.sw, ed = s.door[1];
+    const s = new Sim({ seed: 3, mission: 'crossing', tiers: false, traits: [traits, []] }), sw = s.L.sw, ed = s.door[1];
     for (let k = 0; k < 14; k++) s.spawn(0, CASTE.MAJOR, s.door[0]);
     s.order({ team: 0, type: CMD.TRAIL, kind: KIND.RAID, level: 2, mode, points: [ed % sw, Math.floor(ed / sw)] });
     let inside = 0;
@@ -300,7 +300,7 @@ test('stores: the loads in the cells add up to the totals all through a match an
 });
 
 test('stores: a thief takes from the cell she reaches, and the nearest cell with food is the one she walks to', () => {
-  const s = new Sim({ seed: 3, mission: 'crossing', traits: [['raiders'], []] }), L = s.L, sw = L.sw, ed = s.door[1], dx = ed % sw;
+  const s = new Sim({ seed: 3, mission: 'crossing', tiers: false, traits: [['raiders'], []] }), L = s.L, sw = L.sw, ed = s.door[1], dx = ed % sw;
   // The rival keeps its food in two places: a little on the porch, the rest in a store dug beside the queen.
   for (let x = dx + 3; x <= dx + 6; x++) for (let y = 16; y <= 18; y++) { s.mat[L.nestBase + y * L.nw + x] = MAT.OPEN; s.room[y * L.nw + x] = ROOM.STORE; }
   s.recount(); s.rebuildFields();
@@ -504,9 +504,65 @@ test('The Wall: a plug packs a tunnel shut; it is slow and dear to dig out, and 
 });
 
 test('Sappers: a colony with the node may dig for the other nest on any ground; one without may not', () => {
-  const s = new Sim({ seed: 3, mission: 'crossing', traits: [['sappers'], []] }), L = s.L;
+  const s = new Sim({ seed: 3, mission: 'crossing', tiers: false, traits: [['sappers'], []] }), L = s.L;
   assert.equal(s.mayBreach(0), true); assert.equal(s.mayBreach(1), false); assert.equal(s.mayPlug(), true);
   const x = L.nw - 20; s.order({ team: 0, type: CMD.DIG, cells: [x, 20] }); s.order({ team: 1, type: CMD.DIG, cells: [20, 20] }); s.step();
   assert.equal(s.mark[20 * L.nw + x], 1); assert.equal(s.mark[20 * L.nw + 20], 0);
   assert.equal(new Sim({ seed: 3, mission: 'crossing' }).mayPlug(), false);
+});
+
+test('Growth: the chamber grows for seeds and a pause in laying; the first growth takes a branch', () => {
+  const s = new Sim({ seed: 4, mission: 'crossing', tiers: true, sugar: 100 }), L = s.L, row = TIERS.grow[0];
+  const off = new Sim({ seed: 4, mission: 'crossing', sugar: 100, tiers: false }); off.order({ team: 0, type: CMD.GROW, branch: BRANCH.WAR }); off.step(); assert.equal(off.g(0, CG.GROW), 0, 'not without tiers');
+  s.order({ team: 0, type: CMD.GROW }); s.step(); assert.equal(s.g(0, CG.GROW), 0, 'the first growth needs a branch');
+  const sugar = s.g(0, CG.SUGAR), open = () => { let n = 0; for (let k = 0; k < L.nw * L.nh; k++) if (s.owner(k) === 0 && s.mat[L.nestBase + k] === MAT.OPEN) n++; return n; }, was = open();
+  s.order({ team: 0, type: CMD.GROW, branch: BRANCH.DEEP }); s.step();
+  assert.equal(s.g(0, CG.SUGAR), sugar - row.sugar); assert.equal(s.g(0, CG.BRANCH), BRANCH.DEEP); assert.ok(s.g(0, CG.GROW) > 0);
+  s.order({ team: 0, type: CMD.GROW }); s.step(); assert.equal(s.g(0, CG.TIER), 0, 'one growth at a time');
+  // she lays nothing while it is done
+  const mid = copyOf(s); assert.equal(mid.hash(), s.hash());
+  let told = null; while (s.g(0, CG.GROW) > 0) { s.step(); mid.step(); const ev = s.drainEvents(); assert.equal(ev.length % 4, 0); for (let k = 0; k < ev.length; k += 4) if (ev[k] === EVENT.TIER) told = ev.slice(k, k + 4); }
+  assert.deepEqual(told, [EVENT.TIER, 0, 2, BRANCH.DEEP]);
+  assert.equal(mid.hash(), s.hash(), 'a save in the middle of a growth carries on the same');
+  assert.equal(s.g(0, CG.TIER), 1); assert.ok(open() > was, 'the chamber is wider'); assert.ok(s.stat[0].pupa < s.stat[1].pupa);
+  assert.equal(s.g(1, CG.TIER), 0);
+  const again = copyOf(s); assert.equal(again.stat[0].pupa, s.stat[0].pupa, 'a save keeps what the colony grew into'); assert.equal(again.hash(), s.hash());
+  // the second growth takes no branch, and there is no third
+  s.order({ team: 0, type: CMD.GROW }); for (let j = 0; j < TIERS.grow[1].ticks + 2; j++) s.step();
+  assert.equal(s.g(0, CG.TIER), 2); assert.equal(s.g(0, CG.BRANCH), BRANCH.DEEP);
+  const left = s.g(0, CG.SUGAR); s.order({ team: 0, type: CMD.GROW }); s.step(); assert.equal(s.g(0, CG.SUGAR), left); assert.equal(s.g(0, CG.GROW), 0);
+  // a poor hill cannot
+  const poor = new Sim({ seed: 4, mission: 'crossing', tiers: true, sugar: row.sugar }); poor.order({ team: 0, type: CMD.GROW, branch: BRANCH.WAR }); poor.step(); assert.equal(poor.g(0, CG.GROW), 0);
+});
+
+test('Growth: laying stops while the chamber grows', () => {
+  const run = grow => { const s = new Sim({ seed: 4, mission: 'crossing', tiers: true, sugar: 100, eggs: 0, larvae: 0, pupae: 0 }); if (grow) s.order({ team: 0, type: CMD.GROW, branch: BRANCH.WAR }); for (let j = 0; j < 200; j++) s.step(); let n = 0; for (let b = 0; b < s.bn; b++) if (s.bTeam[b] === 0) n++; return n; };
+  assert.equal(run(true), 0); assert.ok(run(false) > 5);
+});
+
+test('Growth: a branch opens its own things at the first growth, and the other branch\'s at the second', () => {
+  const mk = () => new Sim({ seed: 4, mission: 'crossing', tiers: true, sugar: 200, traits: [['post', 'raiders', 'sappers'], ['post', 'raiders', 'sappers']] });
+  const grow = (s, t, br) => { s.order({ team: t, type: CMD.GROW, branch: br }); const at = s.g(t, CG.TIER); for (let j = 0; j < 2000 && s.g(t, CG.TIER) === at; j++) s.step(); };
+  const s = mk(), has = t => [s.mayPick(t), s.mayRoom(t, ROOM.POST), !!s.has(t, 'loot'), s.mayBreach(t)];
+  assert.deepEqual(has(0), [false, false, false, false]); assert.equal(s.mayRoom(0, ROOM.STORE), true);
+  s.order({ team: 0, type: CMD.PICK, caste: CASTE.SPITTER }); s.step(); assert.equal(s.g(0, CG.PICK), 0, 'no third caste at tier 1');
+  grow(s, 0, BRANCH.WAR); grow(s, 1, BRANCH.DEEP);
+  assert.deepEqual(has(0), [true, false, true, false]); assert.deepEqual(has(1), [false, true, false, false]);
+  s.order({ team: 0, type: CMD.PICK, caste: CASTE.SPITTER }); s.order({ team: 1, type: CMD.PICK, caste: CASTE.WARDEN }); s.step(); assert.equal(s.g(0, CG.PICK), CASTE.SPITTER); assert.equal(s.g(1, CG.PICK), 0);
+  assert.ok(s.stat[0].hp[CASTE.MAJOR] > s.stat[1].hp[CASTE.MAJOR], 'war: tougher soldiers'); assert.ok(s.stat[1].pupa < s.stat[0].pupa, 'deep: brood hatches sooner');
+  grow(s, 0); grow(s, 1);
+  assert.deepEqual(has(0), [true, true, true, true]); assert.deepEqual(has(1), [true, true, true, true]);
+  assert.equal(s.stat[0].hp[CASTE.MAJOR], s.stat[1].hp[CASTE.MAJOR]);
+  // without tiers the nodes are open from the start, as before
+  const old = new Sim({ seed: 4, mission: 'crossing', tiers: false, traits: [['post', 'raiders', 'sappers'], []] });
+  assert.equal(old.mayRoom(0, ROOM.POST), true); assert.equal(!!old.has(0, 'loot'), true); assert.equal(old.mayBreach(0), true); assert.equal(old.mayPick(0), true);
+});
+
+test('Growth: a deep hill\'s stores and quarters hold more in the same cells', () => {
+  const s = new Sim({ seed: 4, mission: 'crossing', tiers: true, sugar: 100 }), L = s.L, dx = s.door[0] % L.sw;
+  const cells = []; for (let x = 1; x <= 4; x++) cells.push(dx + x, 8); s.order({ team: 0, type: CMD.ROOM, cells, kind: ROOM.REST, dig: true });
+  for (let j = 0; j < 3000; j++) s.step();
+  const before = s.g(0, CG.CAP_ADULTS) - s.stat[0].house; assert.ok(before > 0, 'quarters dug');
+  s.order({ team: 0, type: CMD.GROW, branch: BRANCH.DEEP }); for (let j = 0; j < TIERS.grow[0].ticks + 2; j++) s.step();
+  assert.equal(s.g(0, CG.CAP_ADULTS) - s.stat[0].house, (before / 4) * TIERS.widePer[ROOM.REST]);
 });

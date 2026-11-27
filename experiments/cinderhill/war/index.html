@@ -61,8 +61,11 @@
   .opts button[aria-pressed="true"] { background: linear-gradient(#ffb057, #e06a1c); color: #1b0f08; }
   .opts button.danger { color: #ff9a8a; }
   #caps span { margin-left: 6px; white-space: nowrap; } #caps b { font-weight: 800; font-size: inherit; } #caps .tight { color: #ff9a8a; }
-  .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 8px; } .tabs button { height: 30px; border-radius: 10px; background: rgba(255, 255, 255, 0.07); font-weight: 800; font-size: 13px; } .tabs button[aria-pressed="true"] { background: rgba(255, 176, 87, 0.3); color: #ffd9a8; }
-  #diet[data-tab="young"] [data-pane="dig"], #diet[data-tab="dig"] [data-pane="young"] { display: none; }
+  .tabs { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 5px; margin-bottom: 8px; } .tabs button { height: 30px; border-radius: 10px; background: rgba(255, 255, 255, 0.07); font-weight: 800; font-size: 13px; } .tabs button[aria-pressed="true"] { background: rgba(255, 176, 87, 0.3); color: #ffd9a8; }
+  #diet:not([data-tab="young"]) [data-pane="young"], #diet:not([data-tab="dig"]) [data-pane="dig"], #diet:not([data-tab="grow"]) [data-pane="grow"] { display: none; }
+  #growBar { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.1); margin: 8px 2px 0; overflow: hidden; } #growBar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #b98cff, #ffd9a8); }
+  #growHelp { margin: 7px 2px 0; font-size: 12px; color: var(--dim); min-height: 15px; } #growHelp b { color: #ffd9a8; font-weight: 700; }
+  #grows button:disabled { opacity: 0.45; } .tabs button.ready { box-shadow: inset 0 0 0 1.5px #b98cff; }
   #digHelp { margin: 7px 2px 0; font-size: 12px; color: var(--dim); min-height: 15px; }
   #rooms { grid-auto-flow: row; grid-template-columns: repeat(4, 1fr); } #rooms button { font-size: 12px; min-width: 0; } #rooms button small { font-size: 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
@@ -169,7 +172,7 @@
   </div>
 </div>
 <div id="diet" class="sheet glass" data-tab="young">
-  <div class="tabs"><button data-tab="young" aria-pressed="true">Young</button><button data-tab="dig">Dig rooms</button></div>
+  <div class="tabs"><button data-tab="young" aria-pressed="true">Young</button><button data-tab="dig">Dig rooms</button><button data-tab="grow" hidden>Grow</button></div>
   <div data-pane="young">
   <div class="head"><i style="background:#e9e0cc"></i><b>Raise the young as</b><span id="dietInfo"></span></div>
   <div class="opts" id="diets">
@@ -199,6 +202,16 @@
     <button data-room="clear" class="danger">Unmark<small>marks, rooms</small></button>
   </div>
   <div id="digHelp">Pick a room, then drag in the earth beside a tunnel.</div>
+</div>
+  <div data-pane="grow">
+  <div class="head"><i style="background:#b98cff"></i><b id="growHead">The queen's chamber</b><span id="growInfo"></span></div>
+  <div class="opts" id="grows">
+    <button data-grow="1">War hill<small>tougher soldiers</small></button>
+    <button data-grow="2">Deep hill<small>wider rooms</small></button>
+    <button data-grow="0" hidden>Grow again<small>the other hill's ways too</small></button>
+  </div>
+  <div id="growBar"><i></i></div>
+  <div id="growHelp"></div>
 </div>
 </div>
 

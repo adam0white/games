@@ -2,7 +2,7 @@
 // everything on screen is read from the sim or its events, and every order goes through host.order() under seat 0.
 import { Host } from './host.js';
 import { CMD, KIND, MODE, CG, EVENT, REASON, TASK, CASTE, STAGE, MAT, ROOM, TRAILS, PATH_MAX, MAX_PILES, C, LEVEL_SHARE, RAID_SHARE, PLUG } from './sim.js';
-import { CAMPAIGN, LINEAGE, LOSS_ANTS, MISSIONS, TRAITS } from './tables.js';
+import { CAMPAIGN, LINEAGE, LOSS_ANTS, MISSIONS, TRAITS, TIERS, BRANCH } from './tables.js';
 import { makeGestures } from '../gestures.js';
 import { GameRenderer, sky } from '../game/gl.js';
 import { noZoom } from '../../kit/zoom.js';
@@ -191,9 +191,40 @@ function setScreen(s) {
   tuneSong();
 }
 function opening() { const e = doorXY(ME); cam.x = e.x; cam.y = e.y; cam.z = 24; clampCam(); camGoal = { x: e.x + 4, y: e.y, z: startZoom(), rate: 0.8 }; }
+// The caste taken at the fork is raised once the chamber has grown to where a third caste opens (at once, without tiers).
+function pickCaste() { if (camp.caste && !g(ME, CG.PICK) && sim.mayPick(ME)) host.order({ team: ME, type: CMD.PICK, caste: PICK[camp.caste] }); }
+// Growing the queen's chamber: what each branch gives this colony, by name, from the tables and its own nodes.
+const BRANCH_GIVES = { [BRANCH.WAR]: 'soldiers a quarter tougher', [BRANCH.DEEP]: 'stores and quarters hold half as much again, and young hatch sooner' };
+function branchList(br) {
+  const out = [BRANCH_GIVES[br]]; if (br === BRANCH.WAR && camp.caste) out.push(`your ${camp.caste}s`);
+  for (const id of sim.cfg.traits?.[ME] ?? []) { const at = TRAITS[id].at; if (at && at[0] === 2 && at[1] === br) out.push(TRAITS[id].name); }
+  return out.join(', ');
+}
+function lastList() { const out = []; for (const id of sim.cfg.traits?.[ME] ?? []) { const at = TRAITS[id].at; if (at && at[0] === 3) out.push(TRAITS[id].name); } return out; }
+for (const b of document.querySelectorAll('#grows [data-grow]')) b.addEventListener('click', () => {
+  const tier = g(ME, CG.TIER), br = Number(b.dataset.grow) || g(ME, CG.BRANCH);
+  order({ type: CMD.GROW, branch: br }); rec.event('grow', { to: tier + 2, branch: br === BRANCH.WAR ? 'war' : 'deep', at: sim.tick, ants: g(ME, CG.ADULTS) }); tone(330, 0.3, 0.05, 'triangle', 160); navigator.vibrate?.(10);
+});
+function growPane() {
+  const on = !!sim.cfg.tiers; document.querySelector('#diet .tabs [data-tab="grow"]').hidden = !on; if (!on) return;
+  const tier = g(ME, CG.TIER), left = g(ME, CG.GROW), br = g(ME, CG.BRANCH), row = TIERS.grow[tier], seeds = g(ME, CG.SUGAR), can = !!row && !left && seeds >= row.sugar + C.DIG_KEEP;
+  const name = br === BRANCH.WAR ? 'War hill' : br === BRANCH.DEEP ? 'Deep hill' : 'A young hill';
+  $('growHead').textContent = `${name} · tier ${tier + 1} of 3`; $('growInfo').textContent = left ? `growing: ${Math.ceil(left / 20)}s` : row ? `${row.sugar} seeds to grow` : 'full grown';
+  for (const b of document.querySelectorAll('#grows [data-grow]')) { const k = Number(b.dataset.grow); b.hidden = tier === 0 ? k === 0 : k !== 0 || !row; b.disabled = !can; }
+  const done = left && row ? 1 - left / row.ticks : 0; $('growBar').firstElementChild.style.width = `${(100 * done).toFixed(0)}%`; $('growBar').hidden = !left;
+  const other = br === BRANCH.WAR ? BRANCH.DEEP : BRANCH.WAR, last = lastList();
+  $('growHelp').innerHTML = left ? 'The chamber is being widened. The queen lays nothing until it is done.'
+    : tier === 0 ? `Widen the queen's chamber: <b>${row.sugar} seeds</b>, and she lays nothing for ${row.ticks / 20} seconds. Choose what the hill grows into. <b>War hill</b>: ${branchList(BRANCH.WAR)}. <b>Deep hill</b>: ${branchList(BRANCH.DEEP)}.`
+    : tier === 1 ? `Grow again: <b>${row.sugar} seeds</b>, ${row.ticks / 20} seconds without laying. It brings the other hill's ways too: ${branchList(other)}${last.length ? `; and ${last.join(', ')}` : ''}.`
+    : 'The chamber is as wide as it will go. Both hills\' ways are yours.';
+  document.querySelector('#diet .tabs [data-tab="grow"]').classList.toggle('ready', can);
+  const wide = tier > 0 && sim.open(ME, TIERS.wide), per = r => (wide && TIERS.widePer[r]) || sim.stat[ME].per[r];
+  document.querySelector('#rooms [data-room="store"] small').textContent = `${per(ROOM.STORE)} food each`; document.querySelector('#rooms [data-room="rest"] small').textContent = `${per(ROOM.REST)} ants each`;
+  if (can && tier === 0 && sim.tick > 400 && !(nestOpen && $('diet').dataset.tab === 'grow')) once('grow', 'Seeds to spare. Open Nest, then Grow: the queen\'s chamber can be widened.', 4200);
+}
 function startRun() {
   rec.start({ ...set.snapshot(), caste: camp.caste ?? 'none', way: camp.forks.way ?? 'none', craft: camp.forks.craft ?? 'none', nodes: nodesNow().join('+') || 'none', mode: 'war', mission: missionId, ants: sim.cfg.antsBy[ME], look: `war:${set.get('view')}/${set.get('light')}/${set.get('style')}`, seed, v: 1 });
-  host.ai[FOE] = rivalMind(); if (camp.caste) host.order({ team: ME, type: CMD.PICK, caste: PICK[camp.caste] });
+  host.ai[FOE] = rivalMind(); pickCaste();
   running = true; opening();
 }
 function play() { snd.unlock(); startSong(); if (!isOpen(missionId)) return; if (!running) restart(false); else { setScreen('play'); lastT = 0; snd.release(); } }
@@ -267,7 +298,7 @@ function renderTree() {
         const tr = TRAITS[n.node], got = hasNode(n.node), b = document.createElement('button');
         all++; if (got) have++;
         b.textContent = tr.name; b.dataset.key = n.node; b.className = got ? 'have' : 'locked';
-        b.addEventListener('click', () => say(n.node, tr.name, tr.text, got ? 'Yours. The rival has it too.' : `Opened by a deed: ${deedsFor(n.node).map(d => `${d.text.replace(/\.$/, '')} (${d.mission.name})`).join('; or ')}.`));
+        b.addEventListener('click', () => say(n.node, tr.name, tr.text, got ? `Yours. The rival has it too.${tr.at ? ` In a mission it opens when the chamber grows${tr.at[1] === BRANCH.WAR ? ' into a War hill' : tr.at[1] === BRANCH.DEEP ? ' into a Deep hill' : ' the second time'}.` : ''}` : `Opened by a deed: ${deedsFor(n.node).map(d => `${d.text.replace(/\.$/, '')} (${d.mission.name})`).join('; or ')}.`));
         row.append(b);
       }
     });
@@ -488,6 +519,10 @@ function news() {
       if (a === ME && now - (told.heardAt ?? 0) > 15000) { told.heardAt = now; if (!told.has('heard')) { told.add('heard'); rec.event('heard', { at: sim.tick }); } toast('Digging under your hill. Open Nest and look toward the rival.', 4200, true); tone(140, 0.5, 0.06, 'square', -20); navigator.vibrate?.([10, 40, 10]); }
     } else if (type === EVENT.PLUG) {
       if (a === ME) { toast('Packed shut'); tone(180, 0.25, 0.06, 'square', -60); rec.event('plug', { at: sim.tick }); } else if (sim.owner(b - L0.nestBase) !== ME && underTrail(ME) >= 0) toast('They have packed the tunnel shut. Mark it with Tunnel to dig it out.', 4200, true);
+    } else if (type === EVENT.TIER) {
+      const what = c === BRANCH.WAR ? 'War hill' : 'Deep hill';
+      if (a === ME) { pickCaste(); roomButtons(); toast(b === 2 ? `The chamber is wider. You are a ${what} now.` : 'The chamber is full grown. Both hills\' ways are yours.', 3600); tone(392, 0.5, 0.06, 'triangle', 240); shake = 0.15; rec.event('tier', { tier: b, branch: c === BRANCH.WAR ? 'war' : 'deep', at: sim.tick }); }
+      else { toast(b === 2 ? `The rival has grown into a ${what}.` : 'The rival\'s chamber is full grown.', 3600, true); rec.event('rivalTier', { tier: b, branch: c === BRANCH.WAR ? 'war' : 'deep', at: sim.tick }); }
     } else if (type === EVENT.BREACH) {
       rec.event('breach', { by: a === ME ? 'me' : 'rival', at: sim.tick }); shake = 0.3; roomButtons();
       toast(a === ME ? 'You are through! Pick Strike in the Nest and tap where your soldiers should go.' : 'The rival has broken into your nest. A Guard post where it comes in holds them.', 6000, a !== ME);
@@ -568,15 +603,17 @@ function hud() {
     $('routeDot').style.background = raid ? '#ff5a3c' : TRAIL_CSS[sel]; $('routeName').textContent = raid ? 'Raid' : 'Forage';
     $('routeInfo').textContent = sim.trDry[s] ? 'nothing left at its end' : `${sim.crew[s]} of ${sim.want[s]} ${raid ? 'soldiers' : 'workers'}`;
     const sh = raid ? RAID_SHARE : LEVEL_SHARE, words = raid ? ['1 in 4', 'half', 'all, and workers'] : ['1 in 10', '1 in 4', 'half'];
-    const st = sim.stat[ME], canMode = raid && (st.loot || st.hold); $('modes').hidden = !canMode;
+    const st = { loot: sim.has(ME, 'loot'), hold: sim.has(ME, 'hold') }, canMode = raid && (st.loot || st.hold); $('modes').hidden = !canMode;
     if (canMode) for (const b of document.querySelectorAll('#modes [data-mode]')) { const m = Number(b.dataset.mode); b.hidden = (m === MODE.LOOT && !st.loot) || (m === MODE.HOLD && !st.hold); b.setAttribute('aria-pressed', String(m === sim.trMode[s])); }
     for (const b of document.querySelectorAll('#levels [data-level]')) { const l = Number(b.dataset.level); b.setAttribute('aria-pressed', String(l === lv)); b.querySelector('small').textContent = words[l - 1]; void sh; }
   }
+  growPane();
   const diet = g(ME, CG.DIET);
   for (const b of document.querySelectorAll('#diets [data-diet]')) b.setAttribute('aria-pressed', String(Number(b.dataset.diet) === diet));
   const d2 = g(ME, CG.DIET2), pk = g(ME, CG.PICK);
   for (const b of document.querySelectorAll('#specials [data-special]')) { b.setAttribute('aria-pressed', String(Number(b.dataset.special) === d2)); const sm = b.querySelector('small'); if (sm && Number(b.dataset.special)) sm.textContent = pk === CASTE.WARDEN ? 'wardens' : 'spitters'; }
   $('specialName').textContent = pk === CASTE.WARDEN ? 'Wardens · 4 meat each' : 'Spitters · 2 meat each';
+  $('specialName').parentElement.hidden = $('specials').hidden = !pk; // no third caste yet: nothing to set
   $('dietInfo').textContent = g(ME, CG.PROTEIN) === 0 ? 'no meat: bring red food' : `${g(ME, CG.PROTEIN)} meat in store · a soldier eats 3`;
   const capA = g(ME, CG.CAP_ADULTS), capB = g(ME, CG.CAP_BROOD), capF = g(ME, CG.CAP_FOOD), pop = g(ME, CG.ADULTS) + brood;
   const cap = (id, n, of) => { const el = $(id); el.textContent = `${n}/${of}`; el.parentElement.classList.toggle('tight', n >= of); };

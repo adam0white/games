@@ -4,7 +4,7 @@
 // It knows where every pile is (there is no fog yet; when sight arrives it gets the same sight as a player).
 
 import { CMD, KIND, CG, TRAILS, PATH_MAX, MAX_PILES, FOOD, TEAMS, ROOM, MODE, MAT, C, PLUG } from './sim.js';
-import { MAPS } from './tables.js';
+import { MAPS, TIERS } from './tables.js';
 
 const FAR = 0xFFFF;
 
@@ -141,7 +141,15 @@ export function think(sim, t, mind = 1) {
   const diet = mood === 2 || sim.sites.length || sim.mission.goals.haul ? (adults < 34 ? 1 : 2) : adults < 36 ? 0 : adults < 60 ? 1 : 2;
   // Its chosen caste (mind.pick), if the mission allows one: picked at the start, then raised beside the soldiers.
   const pick = typeof mind === 'number' ? 0 : mind.pick | 0, special = pick && diet ? Math.min(4 - diet, mind.special ?? 1) : 0;
-  if (pick && !cg[o + CG.PICK]) out.push({ team: t, type: CMD.PICK, caste: pick });
+  if (pick && !cg[o + CG.PICK] && sim.mayPick(t)) out.push({ team: t, type: CMD.PICK, caste: pick });
+  // Growing the chamber (missions with tiers): the branch its mind names, once the hill is `growAt` strong and the
+  // stores can pay with a meal to spare; the second growth when it can pay again.
+  // (A mind that names no branch takes one by the seed and its seat; `grow: 0` never grows.)
+  const grow = mind.grow ?? 1 + ((Math.abs(cfg.seed | 0) + t) & 1);
+  if (cfg.tiers && grow && !cg[o + CG.GROW]) {
+    const row = TIERS.grow[cg[o + CG.TIER]];
+    if (row && (cg[o + CG.TIER] === 0 || mind.grow2 !== false) && adults >= (mind.growAt ?? 45) + 40 * cg[o + CG.TIER] && cg[o + CG.SUGAR] >= row.sugar + 6 && cg[o + CG.PROTEIN] >= row.protein) out.push({ team: t, type: CMD.GROW, branch: grow });
+  }
   if (cg[o + CG.DIET] !== diet || (cg[o + CG.PICK] && cg[o + CG.DIET2] !== special)) out.push({ team: t, type: CMD.DIET, share: diet, special });
   const outnumbered = cg[(1 - t) * CG.SIZE + CG.MAJORS] * 2 > cg[o + CG.MAJORS] * 3 + 4; // the other hill has half as many soldiers again, and more
   // Building, one room at a time: a store when the stores are nearly full, quarters when the hill is, a nursery wing when the brood is.
@@ -184,9 +192,11 @@ export function think(sim, t, mind = 1) {
     }
   }
   // Badly outnumbered in soldiers and joined: it packs the tunnel shut where it comes in (a few seeds), and digs no way back while that lasts.
-  if (sim.linked && outnumbered && build && sim.mayPlug() && mind.plug !== false && cg[o + CG.SUGAR] >= C.PLUG_SUGAR + C.DIG_KEEP + 4) {
+  if (sim.linked && (outnumbered || mind.plug === 'always') && build && sim.mayPlug() && mind.plug !== false && cg[o + CG.SUGAR] >= C.PLUG_SUGAR + C.DIG_KEEP + 4) {
     const cells = mouth(sim, t, 1 - t, 99);
-    for (let j = 0; j + 1 < cells.length; j += 2) if (!sim.room[cells[j + 1] * L.nw + cells[j]]) { out.push({ team: t, type: CMD.FILL, cells: [cells[j], cells[j + 1]] }); break; }
+    // (Not with the rival's ants near: the sim would refuse it, every think.)
+    const near = (x, y) => { for (let i = 0; i < sim.n; i++) if (sim.team[i] !== t && sim.hp[i] > 0 && sim.layer[i] === 1 && Math.abs((sim.x[i] >> 8) - x) <= C.PLUG_CLEAR && Math.abs((sim.y[i] >> 8) - y) <= C.PLUG_CLEAR) return true; return false; };
+    for (let j = 0; j + 1 < cells.length; j += 2) if (!sim.room[cells[j + 1] * L.nw + cells[j]]) { if (!near(cells[j], cells[j + 1])) out.push({ team: t, type: CMD.FILL, cells: [cells[j], cells[j + 1]] }); break; }
   }
   // A breach is answered with a guard post where it comes in, as soon as the nests are joined and there are soldiers to stand on it.
   if (sim.linked && build && may(ROOM.POST) && sim.mayRoom(t, ROOM.POST) && cg[o + CG.MAJORS] >= 2 && (typeof mind === 'number' || mind.guard !== false)) {
@@ -252,7 +262,7 @@ export function think(sim, t, mind = 1) {
   if (raids.length && (majors < 3 || (strike && (!atDoor(raids[0]) || sim.trMode[t * TRAILS + raids[0]] === MODE.LOOT)) || (!strike && atDoor(raids[0]) && majors * 2 < foeMajors))) for (const k of raids) out.push({ team: t, type: CMD.ERASE, trail: k });
   else if (!raids.length && live.length < TRAILS && foe >= 0) {
     if (strike) { const ed = sim.door[foe]; out.push({ team: t, type: CMD.TRAIL, kind: KIND.RAID, level: majors >= need * 2 ? 3 : 2, points: [ed % sw, Math.floor(ed / sw)] }); }
-    else if (typeof mind !== 'number' && mind.loot && majors >= 4 && sim.stat[t].loot && away() * 2 >= foeMajors) { const ed = sim.door[foe]; out.push({ team: t, type: CMD.TRAIL, kind: KIND.RAID, level: 2, mode: MODE.LOOT, points: [ed % sw, Math.floor(ed / sw)] }); }
+    else if (typeof mind !== 'number' && mind.loot && majors >= 4 && sim.has(t, 'loot') && away() * 2 >= foeMajors) { const ed = sim.door[foe]; out.push({ team: t, type: CMD.TRAIL, kind: KIND.RAID, level: 2, mode: MODE.LOOT, points: [ed % sw, Math.floor(ed / sw)] }); }
     else if (mood > 0 && majors >= 4 && sim.tick >= 1500) {
       let best = -1, amount = 20; const mid = sw >> 1;
       for (let p = 0; p < MAX_PILES; p++) { const c = sim.pileCell[p]; if (c >= 0 && sim.pileAmount[p] > amount && Math.abs((c % sw) - mid) <= 6) { amount = sim.pileAmount[p]; best = c; } }
