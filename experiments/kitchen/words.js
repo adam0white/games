@@ -4,6 +4,7 @@ import { words } from '../kit/i18n.js';
 export const W = words({
   en: {
     mood_rude: 'A rude one. They might throw it back at you.', mood_picky: 'A picky one. No tip unless it is perfect.', mood_sneaky: 'A sneaky one. They might run off without paying.',
+    pickWho: 'Guests are waiting. Tap who comes to the counter.', walkout: 'Walked out: {what}', walkouts: 'Walked out',
     wheelBtn: 'Wheel', letGo: 'Let it go', thrown: 'SPLAT!', thrownSub: 'Spin the Wheel, then feed them.', dashed: 'They ran off with half the bill!',
     w_kick_out: 'Kick out', w_slap: 'Slap', w_fridge: 'Fridge', w_pan: 'Pan', w_microwave: 'Microwave', w_cook_self: 'Cook it!', w_lock_out: 'Lock out', w_trash: 'Trash can', w_rob: 'Rob', w_hire: 'Hire', w_fight: 'Fight',
     p_kick_out: 'Booted into the hedge. Back in a minute, leaves in hair, asking for the menu.', p_slap: 'A slap with a wet fish. They blink, say sorry, and order.',
@@ -61,6 +62,7 @@ export const W = words({
   },
   tr: {
     mood_rude: 'Kaba biri. Yemeği suratına atabilir.', mood_picky: 'Titiz biri. Mükemmel olmazsa bahşiş yok.', mood_sneaky: 'Sinsi biri. Ödemeden kaçabilir.',
+    pickWho: 'Misafirler bekliyor. Tezgâha kim gelsin, dokun.', walkout: 'Çekip gitti: {what}', walkouts: 'Çekip giden',
     wheelBtn: 'Çark', letGo: 'Boş ver', thrown: 'ŞAP!', thrownSub: 'Önce Çarkı çevir, sonra doyur.', dashed: 'Hesabın yarısıyla kaçtı!',
     w_kick_out: 'Kov', w_slap: 'Tokat', w_fridge: 'Buzdolabı', w_pan: 'Tava', w_microwave: 'Fırın', w_cook_self: 'Pişirsin', w_lock_out: 'Kilitle', w_trash: 'Çöpe', w_rob: 'Soy', w_hire: 'İşe al', w_fight: 'Kavga',
     p_kick_out: 'Çalılığa tekme. Bir dakika sonra saçında yapraklarla menü istiyor.', p_slap: 'Islak balıkla bir tokat. Göz kırpıyor, özür diliyor, sipariş veriyor.',

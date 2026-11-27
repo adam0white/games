@@ -373,3 +373,32 @@ export const staffTip = n => 1 + 0.15 * n;
 export const REBEL_CHANCE = 0.4;
 // The very first day is the tutorial: a fixed, gentle order list.
 export const TUTORIAL_DAY = [{ recipe: 'sticks', look: 0 }, { recipe: 'salad', look: 3 }, { recipe: 'fruitcup', look: 5 }];
+
+// ---------- the line (from the Diner): guests wait by the tables and you call who comes to the counter.
+// Waiting guests lose patience the whole time, also while you cook for someone else. Out of patience, they walk out.
+export const LINE_FROM = 1;
+export const lineOn = save => !!save.tutorial && save.tier >= LINE_FROM;
+export const lineSeats = save => Math.max(2, Math.min(4, save.built.tables));
+export const patienceFor = (tier, mood = null) => Math.round(Math.max(62, 95 - tier * 3) * (mood === 'rude' ? 0.7 : mood === 'picky' ? 0.85 : 1));
+export const arriveEvery = tier => Math.max(15, 26 - tier * 1.1);
+export const LINE_OPEN = 2; // guests already waiting when the doors open
+export const AUTO_CALL = 2.5; // seconds before the guest who has waited longest comes up on their own
+// Drain patience; return the entries that ran out (the caller removes them).
+export function stepLine(line, dt) { const out = []; for (const e of line) { e.left -= dt; if (e.left <= 0) out.push(e); } return out; }
+// Who comes up by default: the one closest to walking out.
+export const nextInLine = line => line.reduce((a, e) => (!a || e.left < a.left ? e : a), null);
+// A whole day of the line with a fixed service time a guest: how many walk out? For bots.mjs.
+export function simulateLine({ tier, seats, n, service, drain = true }) {
+  const line = []; let next = 0, t = 0, arrive = 0, busy = 0, picking = 0, walkouts = 0, served = 0;
+  const dt = 0.25;
+  while ((next < n || line.length || busy > 0) && t < 3600) {
+    t += dt;
+    if (next < n && line.length < seats && (arrive -= dt) <= 0) { line.push({ left: patienceFor(tier) }); next++; arrive = next < LINE_OPEN ? 1.2 : arriveEvery(tier); }
+    if (drain) for (const e of stepLine(line, dt)) { line.splice(line.indexOf(e), 1); walkouts++; }
+    if (busy > 0) { busy -= dt; continue; }
+    if (!line.length) continue;
+    if ((picking += dt) < 1.5) continue;
+    picking = 0; const e = nextInLine(line); line.splice(line.indexOf(e), 1); busy = service; served++;
+  }
+  return { walkouts, served, t };
+}
