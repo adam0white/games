@@ -2,10 +2,10 @@
 // unchanged) under the spark layer (./spark-sim.js); this file draws the dark river, plays the spark sounds, reads the spark input
 // and keeps Spark's own save. index.html owns the run: steering, hearts, embers and the bank, the boat's looks, crashes, victories,
 // pause and the end card. How a mode plugs in is in ../NOTES.md ("How a mode plugs in").
-import { start, tick, view, stars, murmur, rating, reach, centre, half, NIGHTS, TIN_MAX, RING_MAX } from './spark-sim.js';
+import { start, tick, view, stars, murmur, rating, reach, centre, half, NIGHTS, TIN_MAX, RING_MAX } from './spark-sim.js?v=2';
 import { read, write, readJson, writeJson } from '../../kit/save.js';
-import { t } from '../words.js';
-import { mark, TINT } from '../looks.js?v=4';
+import { t } from '../words.js?v=3';
+import { mark, TINT, stone } from '../looks.js?v=5';
 
 // Save. lantern-mode-spark:save is { v: 1, best: highest night open, stars: { night: 0..3 }, played: runs }.
 // lantern-mode-spark:spark is '1' once the player has struck a spark (the button stops pulsing).
@@ -25,7 +25,7 @@ function clean(raw) {
 }
 
 const STYLE = `
-#sparkBtn { position: fixed; right: calc(12px + env(safe-area-inset-right)); bottom: calc(18px + env(safe-area-inset-bottom)); width: 72px; height: 72px; min-width: 0; min-height: 0; margin: 0; padding: 0; border-radius: 50%; display: none; touch-action: none; z-index: 5;
+#sparkBtn { position: fixed; right: calc(22px + env(safe-area-inset-right)); bottom: calc(24px + env(safe-area-inset-bottom)); width: 72px; height: 72px; min-width: 0; min-height: 0; margin: 0; padding: 0; border-radius: 50%; display: none; touch-action: none; z-index: 5;
   background: radial-gradient(circle at 50% 42%, #ffe9b8 0, rgb(var(--fire)) 34%, #3a1c08 78%, #1a0e04 100%); border: 2px solid #ffd9a0; box-shadow: 0 0 22px rgba(var(--fire),.55), inset 0 -6px 12px #0006; }
 #sparkBtn svg { width: 34px; height: 34px; display: block; margin: 0 auto; filter: drop-shadow(0 0 4px #fff8); }
 #sparkBtn b { position: absolute; right: -6px; top: -6px; min-width: 28px; height: 28px; border-radius: 14px; background: #0b1020; color: #ffe6bd; border: 1.5px solid #ffd9a0aa; font: bold 15px/25px system-ui, sans-serif; text-align: center; padding: 0 3px; box-sizing: border-box; }
@@ -34,7 +34,7 @@ const STYLE = `
 #sparkBtn.empty { filter: grayscale(.9) brightness(.55); }
 #sparkBtn.pulse::after { content: ''; position: absolute; inset: -4px; border-radius: 50%; border: 3px solid #ffe9b8; animation: sparkRing 1.3s ease-out infinite; pointer-events: none; }
 #sparkBtn.call { box-shadow: 0 0 40px 10px rgba(var(--fire),.9), inset 0 -6px 12px #0006; }
-@keyframes sparkRing { from { transform: scale(1); opacity: .9; } to { transform: scale(1.7); opacity: 0; } }
+@keyframes sparkRing { from { transform: scale(1); opacity: .9; } to { transform: scale(1.4); opacity: 0; } } /* the ring's widest (40px × 1.4) stays inside the screen from the button's centre 58px in from the edge (Pixel 7 check, 2026-11-27) */
 @media (prefers-reduced-motion: reduce) { #sparkBtn.pulse::after { animation: none; opacity: .8; transform: scale(1.25); } }
 #modePanel .nights { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: .6em 0 .3em; }
 #modePanel .nights button { min-width: 48px; width: 48px; height: 56px; padding: 0; margin: 0; border-radius: 14px; display: grid; place-items: center; line-height: 1; font-size: 18px; }
@@ -47,7 +47,7 @@ const STAR_SVG = '<svg viewBox="0 0 32 32" aria-hidden="true"><path fill="#fff6d
 // page: what index.html lends a mode. See ../NOTES.md for each name.
 export function mode(page) {
   const save = load();
-  let night = save.best, e = null, want = false, squash = 0, shake = 0, red = 0, bits = [], passed = new Set(), trails = new WeakMap(), shapes = new WeakMap(), shapeN = 0;
+  let night = save.best, e = null, want = false, squash = 0, shake = 0, red = 0, bits = [], passed = new Set(), trails = new WeakMap();
   let told = false, lastSlap = 0, murmurGain = null, pan = null, W = 1, H = 1, unit = 1, left = 0, dpr = 1;
   const sparked = () => read(SPARKED) === '1' || read(OLD_SPARKED) === '1';
   const tipped = k => (read(TIPS, '') || '').includes(k), tip = k => write(TIPS, (read(TIPS, '') || '') + k);
@@ -138,10 +138,10 @@ export function mode(page) {
     save.played++;
     if (won) { save.stars[n] = Math.max(save.stars[n] | 0, st); if (n < NIGHTS) save.best = Math.max(save.best, n + 1); }
     writeJson(KEY, save);
-    const mark3 = ' ' + '★'.repeat(st) + '☆'.repeat(3 - st), why = t(['bank', 'ice', 'log', 'pool', 'geyser', 'isle'].includes(e.s.over) ? `why_${e.s.over}` : 'why_rock');
+    const mark3 = ' ' + '★'.repeat(st) + '☆'.repeat(3 - st), why = t(['dark', 'bank', 'ice', 'log', 'pool', 'geyser', 'isle'].includes(e.s.over) ? `why_${e.s.over}` : 'why_rock');
     if (won && n >= NIGHTS) return { title: t('dawn') + mark3, line: t('sparkAll', { n: NIGHTS }), go: t('playNight', { n }) };
     if (won) { night = n + 1; return { title: t('dawn') + mark3, line: t('sparkWon', { used: e.used, next: n + 1 }), go: t('playNight', { n: night }) }; }
-    return { title: t('nightTitle', { n }), line: t('sparkLost', { why, pct: Math.floor(reach(e) * 100) }), go: t('playAgain') };
+    return { title: t('dawnResult', { n: Math.floor(reach(e) * 100) }), line: why, go: t('playAgain') };
   }
 
   // ------------------------------------------------------------ sound and time between frames
@@ -168,7 +168,6 @@ export function mode(page) {
   // ------------------------------------------------------------ drawing (2D only: index.html shows Spark flat)
   function burst(x, y, n, rgb, speed = 0.6, life = 0.8) { for (let i = 0; i < n; i++) { const a = Math.random() * 6.283, v = speed * (0.3 + Math.random() * 0.7); bits.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life, max: life, rgb }); } }
   const hash = (a, b) => { let h = Math.imul(a | 0, 0x27d4eb2d) ^ Math.imul(b | 0, 0x165667b1); h = Math.imul(h ^ (h >>> 15), 0x85ebca6b); h ^= h >>> 13; return (h >>> 0) / 4294967296; };
-  function shapeOf(k) { let sh = shapes.get(k); if (!sh) { const id = ++shapeN; sh = Array.from({ length: 9 }, (_, i) => 0.82 + 0.3 * hash(id, i)); shapes.set(k, sh); } return sh; }
   function water(g, top, bot) {
     const s = e.s; g.beginPath();
     for (let y = bot; y <= top; y += 0.05) g.lineTo(sx(centre(s, y) - half(s, y)), sy(y));
@@ -242,14 +241,15 @@ export function mode(page) {
       g.fillStyle = hal; g.beginPath(); g.arc(X, Y, R * 2.6 + r.len * unit, 0, 6.283); g.fill();
       g.globalAlpha = Math.min(1, 0.25 + a);
       if (r.len) { g.fillStyle = '#2a1c12'; g.beginPath(); g.roundRect ? g.roundRect(X - (r.len + r.rad) * unit, Y - R, 2 * (r.len + r.rad) * unit, 2 * R, R) : g.rect(X - (r.len + r.rad) * unit, Y - R, 2 * (r.len + r.rad) * unit, 2 * R); g.fill(); g.strokeStyle = `rgba(${fr},${a})`; g.lineWidth = 2 * dpr; g.stroke(); }
+      else if (!ice) stone(g, X, Y, R, dpr, page.outline(), Math.sin(r.y * 17) > 0 ? 1 : -1);
       else {
-        const sh = shapeOf(kk); g.beginPath();
+        const sh = [1, .88, 1.06, .91, 1.0, 1.09, .93, 1.02, .9]; g.beginPath();
         for (let i = 0; i < sh.length; i++) { const ang = i / sh.length * 6.283; g.lineTo(X + Math.cos(ang) * R * sh[i], Y + Math.sin(ang) * R * sh[i] * 0.9); }
         g.closePath();
         const body = g.createRadialGradient(X - R * 0.3, Y - R * 0.4, R * 0.1, X, Y, R * 1.2);
-        body.addColorStop(0, ice ? '#3d5868' : '#3a2a20'); body.addColorStop(1, ice ? '#0e1820' : '#0d0907');
+        body.addColorStop(0, '#3d5868'); body.addColorStop(1, '#0e1820');
         g.fillStyle = body; g.fill();
-        g.strokeStyle = ice ? `rgba(190,235,255,${a})` : `rgba(${fr},${a})`; g.lineWidth = 2.2 * dpr; g.stroke();
+        g.strokeStyle = `rgba(190,235,255,${a})`; g.lineWidth = 2.2 * dpr; g.stroke();
         g.fillStyle = `rgba(255,236,200,${0.5 * a})`; g.beginPath(); g.arc(X - R * 0.35, Y - R * 0.35, R * 0.18, 0, 6.283); g.fill();
       }
       g.globalAlpha = 1;

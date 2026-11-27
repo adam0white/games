@@ -12,7 +12,7 @@ const ROPE_SHARE = 0.45; // the rope reaches this share of the river's usual wid
 const MIN_GAP = BOAT * 2.2; // the boats never come closer than this
 const BOAT_SPEED = 0.95; // river units per second each boat can move sideways
 const START_GAP = 0.07;
-const START_LIGHT = 0.8;
+const START_LIGHT = 1;
 const HEARTS = 3;
 const SAFE_TIME = 1.6; // seconds without damage after a hit
 const WARM_TIME = 0.55; // seconds the flame does not fade after an ember
@@ -234,6 +234,7 @@ function warn(s) {
 // One fixed step. targets = [left boat x, right boat x] that the player asks for.
 export function step(s, targets) {
   s.events = [];
+  delete s.emberPickup;
   if (s.over) return s;
   s.t += DT;
   s.y += speed(s) * DT;
@@ -268,7 +269,9 @@ export function step(s, targets) {
     if (e.x < s.left - EMBER_REACH_X || e.x > s.right + EMBER_REACH_X) continue;
     e.got = true;
     s.taken++;
+    const before = s.emberPickup?.before ?? Math.max(0, s.light);
     s.light = Math.min(1, s.light + EMBER_LIGHT);
+    s.emberPickup = { x: e.x, y: e.y, before, after: s.light };
     s.warm = WARM_TIME;
     s.events.push('ember');
   }

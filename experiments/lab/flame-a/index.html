@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101B32">
+  <link rel="icon" href="data:,">
+  <title data-i18n="gameTitle">Pass the Flame</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <main>
+    <canvas id="river" tabindex="0" data-i18n-aria="steerLabel" aria-label="River. Touch and slide to steer."></canvas>
+    <progress id="progress" value="0" max="1" hidden data-i18n-aria="progressLabel"></progress>
+    <button id="gear" type="button" aria-haspopup="dialog" data-i18n-aria="settings" data-i18n-title="settings"><span aria-hidden="true">⚙︎</span></button>
+    <section id="arrival" aria-labelledby="arrivalTitle">
+      <header class="arrival-copy">
+        <h1 id="arrivalTitle">Pass the Flame</h1>
+        <p id="arrivalStory">A flame nobody has carried yet. You are carrier 1.</p>
+      </header>
+      <footer class="arrival-foot">
+        <div class="slide-hint">
+          <span class="slide-mark" aria-hidden="true"><i></i></span>
+          <span data-i18n="steer">Touch and slide to steer</span>
+        </div>
+        <div id="notice"></div>
+      </footer>
+    </section>
+
+    <section id="result" class="sheet result-sheet" aria-labelledby="resultTitle" hidden>
+      <h2 id="resultTitle" tabindex="-1"></h2>
+      <p id="relayTotal"></p>
+      <p id="resultStats"></p>
+      <ol id="carriers" data-i18n-aria="carrierList"></ol>
+      <label id="nameField" for="nickname">
+        <span data-i18n="name">First name or nickname (optional)</span>
+        <input id="nickname" type="text" autocomplete="off" spellcheck="false">
+      </label>
+      <div class="actions">
+        <button id="pass" type="button" class="primary" data-i18n="pass">Pass the flame</button>
+        <button id="newFlame" type="button" class="secondary" data-i18n="newFlame" hidden>Light a new flame</button>
+        <button id="retry" type="button" class="secondary" data-i18n="retry" hidden>Relight from the coals · 25%</button>
+      </div>
+      <p id="shareStatus" role="status"></p>
+      <textarea id="shareUrl" rows="3" readonly hidden data-i18n-aria="manual"></textarea>
+    </section>
+
+    <section id="paused" class="sheet pause-sheet" hidden aria-labelledby="pauseTitle">
+      <h2 id="pauseTitle" data-i18n="paused">Paused</h2>
+      <button id="resume" class="primary" type="button" data-i18n="resume">Resume</button>
+    </section>
+    <dialog id="settings" class="sheet" aria-labelledby="settingsTitle">
+      <header class="settings-head">
+        <h2 id="settingsTitle" data-i18n="settings">Settings</h2>
+        <button id="closeSettings" type="button" data-i18n-aria="close"><span aria-hidden="true">×</span></button>
+      </header>
+      <div id="options"></div>
+      <label class="language" for="language"><span data-i18n="language">Language</span>
+        <select id="language">
+          <option value="en" lang="en">English</option>
+          <option value="tr" lang="tr">Türkçe</option>
+        </select>
+      </label>
+      <div id="recording"></div>
+    </dialog>
+  </main>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>

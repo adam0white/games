@@ -1,0 +1,38 @@
+import { words } from '../../kit/i18n.js';
+
+export const { t, lang, setLang, apply } = words({
+  en: {
+    gameTitle: 'Pass the Flame', virginTitle: 'Pass the Flame', virginStory: 'A flame nobody has carried yet. You are carrier 1.',
+    brokenStory: 'That link could not be read, so here is a flame nobody has carried yet. You are carrier 1.',
+    linkedTitle: 'Flame {count}.', linkedStory: '{name} carried it {distance} m. You are carrier {next}.',
+    steer: 'Touch and slide to steer', steerLabel: 'River. Touch and slide to steer.', progressLabel: 'Distance to the buoy',
+    handoffTitle: 'Your flame is ready.', dropTitle: 'The flame went out.', dimTitle: 'One ember remains.',
+    stats: '{distance} m carried · {flame}% light', total: '{distance} m through {count} {hands}', hand: 'hand', hands: 'hands', person: 'person', people: 'people', meters: '{distance} m', carrierList: 'The carriers, in order', you: 'You', anonymous: 'Anonymous',
+    older: 'Earlier carriers ({n})', pass: 'Pass the flame', newFlame: 'Light a new flame', retry: 'Relight from the coals · 25%',
+    name: 'First name or nickname (optional)', shared: 'Flame shared.', copied: 'Message and link copied.',
+    manual: 'Copy the message and link to pass the flame.',
+    shareText: "This flame has been through {count} {people}. I just carried it {distance} m. Don't be the one who drops it.",
+    settings: 'Settings', close: 'Close settings', language: 'Language', paused: 'Paused', resume: 'Resume',
+    look: 'River', paper: 'Cut paper', thermal: 'Thermal', storm: 'Storm',
+    drop: 'When the flame goes out', ends: 'End the chain', dims: 'Pass an ember',
+    retryRule: 'After a drop', allow: 'One relight at 25%', once: 'One attempt',
+    sound: 'Sound', haptics: 'Vibration', on: 'On', off: 'Off',
+  },
+  tr: {
+    gameTitle: 'Alevi devret', virginTitle: 'Alevi devret', virginStory: 'Bu alevi henüz kimse taşımadı. İlk taşıyıcı sensin.',
+    brokenStory: 'Bağlantı okunamadı. İşte henüz kimsenin taşımadığı bir alev. İlk taşıyıcı sensin.',
+    linkedTitle: '{count}. alev', linkedStory: '{name} alevi {distance} m taşıdı. {next}. taşıyıcı sensin.',
+    steer: 'Yön vermek için dokun ve kaydır', steerLabel: 'Nehir. Yön vermek için dokun ve kaydır.', progressLabel: 'Şamandıraya kalan mesafe',
+    handoffTitle: 'Alevin hazır.', dropTitle: 'Alev söndü.', dimTitle: 'Geriye bir kor kaldı.',
+    stats: '{distance} m taşıdın · Işık %{flame}', total: '{count} elden geçerek {distance} m yol aldı', hand: 'el', hands: 'el', person: 'kişi', people: 'kişi', meters: '{distance} m', carrierList: 'Sırasıyla alevi taşıyanlar', you: 'Sen', anonymous: 'İsimsiz',
+    older: 'Önceki taşıyıcılar ({n})', pass: 'Alevi devret', newFlame: 'Yeni bir alev yak', retry: 'Közden yeniden yak · %25',
+    name: 'Adın veya takma adın (isteğe bağlı)', shared: 'Alev paylaşıldı.', copied: 'Mesaj ve bağlantı kopyalandı.',
+    manual: 'Alevi devretmek için mesajı ve bağlantıyı kopyala.',
+    shareText: 'Bu alev {count} kişinin elinden geçti. Ben de onu {distance} m taşıdım. Sakın elinden düşürme.',
+    settings: 'Ayarlar', close: 'Ayarları kapat', language: 'Dil', paused: 'Duraklatıldı', resume: 'Devam et',
+    look: 'Nehir', paper: 'Kesme kâğıt', thermal: 'Termal', storm: 'Fırtına',
+    drop: 'Alev sönünce', ends: 'Zincir bitsin', dims: 'Koru devret',
+    retryRule: 'Alev düşerse', allow: '%25 ışıkla bir kez yak', once: 'Tek deneme',
+    sound: 'Ses', haptics: 'Titreşim', on: 'Açık', off: 'Kapalı',
+  },
+});

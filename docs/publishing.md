@@ -72,6 +72,27 @@ A post to a forum (for example Show HN) needs only the own-site link, which must
 - The tester notes button appears only in a browser that opened a tester's private link.
 - Not checked: the other listed games.
 
+## Review rounds (owner direction, 2026-11-27)
+
+The owner asked for early, frequent, independent reviews from several models, some blinded, and for bold versions built
+beside the current game. Each round: screenshots and the diff go to reviewers that did not build it, findings go to
+builders as a numbered brief, and the lead checks the result with the phone check on Chromium and WebKit, the bots and
+its own screenshots.
+
+- **Round 1 (five reviewers).** Lantern's first open was an options menu, the opening killed a passive player
+  (median 12.7 s on the gentle river), rocks were unreadable, there was no flame gauge, and the dare lost its sender.
+  Result: the first minute was rebuilt and the share loop repaired.
+- **Round 2 (four reviewers).** Eleven bugs (arrow keys, tutorial skip while paused, a dare reply the parser refused,
+  and others) and eleven readability changes (rock silhouette, lit route ahead, first embers, labelled flame gauge,
+  the goal on the first screen, result-first end cards, a unit on every dare). All built and checked.
+- **Pass the Flame** (`experiments/lab/flame-a/`, `flame-b/`): a wildcard direction from round 1. The link is the
+  flame; each player carries it one leg and passes it on. Two builds of one brief so the owner can compare. A blinded
+  art review and a playtest both preferred version A with the paper look; version B had the better rules, which A then
+  took (idling drops the flame, one relight from the coals, carrier number, distances). Open: the owner's pick of build
+  and look, and whether this becomes its own game or a Lantern mode.
+- **Not verified by any round:** a person on a real phone, sound, the share sheet, vibration, frame rate, and the
+  Turkish wording.
+
 ## Open, for the owner
 
 1. Whether public posts and portal uploads may go ahead (todo item lab-f83), and the recording point above.

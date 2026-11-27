@@ -6,6 +6,7 @@ export const DT = 1 / 60;
 export const GOAL = 78; // river length; about ninety seconds
 export const BOAT = 0.022;
 export const NIGHTS = 50;
+const FIRST_ROW = 2.2;
 // Powers are rare pickups: boost (fast and unbreakable for a moment), slow (the river slows, the way to dawn does not), size (a smaller boat four times in five, a bigger one otherwise).
 // magnet (embers swim to the boat) and flare (the flame is filled and does not fade) are the lab's own two.
 export const POWERS = ['boost', 'slow', 'size', 'magnet', 'flare'];
@@ -86,7 +87,7 @@ export function create(seed, stage = 1, mode = false, powers = ABILITIES, stats 
   const endless = mode === true, tower = mode === 'tower';
   const st = Object.fromEntries(Object.entries(STATS).map(([k, top]) => [k, Math.max(0, Math.min(top, Math.floor(stats[k] || 0)))]));
   const r = rng(seed), q = rng(seed ^ 0x9e3779b9); // powers draw from their own stream, so the rocks and embers of a seed never change
-  const s = { seed, stage, endless, tower, climb: Math.max(1, Math.min(LEVELS * SECTORS, Math.floor(climb) || 1)), q, st, calm: 1 - 0.04 * st.calm, take: 0.05 + 0.012 * st.pull, on: powers.filter(k => POWERS.includes(k)), gifts: powers.filter(k => GIFTS.includes(k)), powers: [], nextPower: 10 + q() * 10, boost: 0, slow: 0, size: 0, magnet: 0, flare: 0, big: false, bonus: 0, extra: 0, hearts: 1 + st.hearts, ice: -9, iceSide: 1, isle: -9, warm: 0, shield: 0, field: 0, hard: mode ? 1 : 1 + REBORN_PACE * Math.max(0, Math.min(5, Math.floor(reborn) || 0)), safe: 0, nextGift: 9 + r() * 5, r, p1: r() * 6.28, p2: r() * 6.28, t: 0, y: 0, x: 0.5, light: 0.8, rocks: [], embers: [], next: 2.2, events: [], over: null, taken: 0, grazes: 0 };
+  const s = { seed, stage, endless, tower, climb: Math.max(1, Math.min(LEVELS * SECTORS, Math.floor(climb) || 1)), q, st, calm: 1 - 0.04 * st.calm, take: 0.05 + 0.012 * st.pull, on: powers.filter(k => POWERS.includes(k)), gifts: powers.filter(k => GIFTS.includes(k)), powers: [], nextPower: 10 + q() * 10, boost: 0, slow: 0, size: 0, magnet: 0, flare: 0, big: false, bonus: 0, extra: 0, hearts: 1 + st.hearts, ice: -9, iceSide: 1, isle: -9, warm: 0, shield: 0, field: 0, hard: mode ? 1 : 1 + REBORN_PACE * Math.max(0, Math.min(5, Math.floor(reborn) || 0)), safe: 0, nextGift: 9 + r() * 5, r, p1: r() * 6.28, p2: r() * 6.28, t: 0, y: 0, x: 0.5, light: 1, rocks: [], embers: [], next: FIRST_ROW, events: [], over: null, taken: 0, grazes: 0 };
   s.x = centre(s, 0);
   return s;
 }
@@ -124,6 +125,12 @@ function power(s, y) {
     if (clear(s, px, py) && s.embers.every(e => Math.hypot(e.x - px, e.y - py) > 0.11)) { s.powers.push({ x: px, y: py, got: false, kind: s.on[Math.floor(s.q() * s.on.length)], big: s.q() < 0.2 }); s.nextPower = y + 26 + s.q() * 14; return; }
   }
 }
+function gift(s, y) {
+  if (y <= s.nextGift) return;
+  // Rare, in open water. A field pushes rocks aside. A heart is a spare life.
+  const gy = y + 0.5, gc = centre(s, gy), gx = gc + (s.r() * 2 - 1) * (half(s, gy) - 0.07), kind = s.r() < 0.4 ? 'heart' : 'shield';
+  if (clear(s, gx, gy)) { if (s.gifts.includes(kind)) s.embers.push({ x: gx, y: gy, got: false, kind }); s.nextGift = y + 16 + s.r() * 8; }
+}
 function special(s, y, c, h, k, lv) {
   if (y - s.ice < 1.5) return false; // the row after ice keeps its own rule
   const row = [];
@@ -160,10 +167,56 @@ function special(s, y, c, h, k, lv) {
   return true;
 }
 
+// Distance at unboosted full speed before the first waterfall. Use full speed
+// even with Calm equipped so a seed keeps the same opening.
+const openingDistance = (s, seconds) => GOAL * Math.expm1(0.62 * pace(s) * seconds / GOAL);
+const gentleFirst = s => s.gentle && s.stage === 1 && !s.endless && !s.tower;
+
+function gentleOpening(s) {
+  const y = openingDistance(s, 2.3), c = centre(s, y), h = half(s, y);
+  const start = centre(s, 0), toward = Math.sign(c - start) || 1;
+  const x = gentleFirst(s) ? Math.max(c - h + 0.08, Math.min(c + h - 0.08, start + toward * 0.095)) : c;
+  s.embers.push({ x, y, got: false, kind: 'ember', opening: gentleFirst(s) });
+  // The extra clearance accounts for rocks that swing along the river.
+  s.next = openingDistance(s, 8) + 0.36;
+  if (!gentleFirst(s)) return;
+
+  // A bend of embers before the first hazard. This pattern consumes no random numbers.
+  for (const [seconds, offset] of [[3.4, 0.075], [4.65, 0.015], [5.9, -0.075]]) {
+    const ey = openingDistance(s, seconds);
+    s.embers.push({ x: centre(s, ey) + toward * offset, y: ey, got: false, kind: 'ember' });
+  }
+  const ry = openingDistance(s, 8.12) + 0.07, rc = centre(s, ry);
+  const side = rc >= start ? 1 : -1;
+  s.rocks.push({ ...rock(rc + side * 0.12, ry, 0.045), opening: true });
+  const ey = ry + 0.63;
+  s.embers.push({ x: centre(s, ey) - side * 0.085, y: ey, got: false, kind: 'ember' });
+  s.next = ry + 1.75;
+}
+
+function gentleRow(s, y, c, h) {
+  // Early rocks keep to the far side of the channel so an idle boat can
+  // pass. Later rocks trade sides and close in toward the centre.
+  const start = centre(s, 0);
+  const easy = y < openingDistance(s, 20) + 0.12;
+  const side = easy ? (c >= start ? 1 : -1) : (s.r() < 0.5 ? -1 : 1);
+  const rad = 0.033 + s.r() * 0.017;
+  const offset = easy ? 0.12 + s.r() * 0.05 : 0.085 + s.r() * (h - 0.15);
+  const k = rock(c + side * offset, y, rad);
+  s.rocks.push(k);
+  const ey = y + 0.56, ec = centre(s, ey);
+  s.embers.push({ x: ec - side * (0.035 + s.r() * 0.065), y: ey, got: false, kind: 'ember' });
+  gift(s, y);
+  power(s, y);
+  s.next += 1.32 + s.r() * 0.57;
+}
+
 function spawn(s) {
+  if (s.gentle && !s.endless && !s.tower && s.next === FIRST_ROW) gentleOpening(s);
   // One row at a time, well ahead of the light, so the same seed always gives the same river.
   while (s.next < s.y + 2.4) {
     const y = s.next, c = centre(s, y), h = half(s, y), k = Math.min(1, y / GOAL), lv = level(s);
+    if (gentleFirst(s)) { gentleRow(s, y, c, h); continue; }
     s.next += (0.95 - 0.3 * k + s.r() * 0.35) / (1 + 0.012 * Math.min(24, lv - 1)) / (1 + 0.15 * steep(s));
     if (fall(s, y) > 0 || fall(s, y + 0.8) > 0) continue; // the waterfall itself is the hazard
     if (lv >= 6 && special(s, y, c, h, k, lv)) continue;
@@ -198,11 +251,7 @@ function spawn(s) {
         if (clear(s, ex, ey)) { s.embers.push({ x: ex, y: ey, got: false, kind: 'ember' }); break; }
       }
     }
-    if (y > s.nextGift) {
-      // Gifts are rare and sit in open water. Blue is a force field that pushes rocks aside for a few seconds; red is a heart, a spare life.
-      const gy = y + 0.5, gc = centre(s, gy), gx = gc + (s.r() * 2 - 1) * (half(s, gy) - 0.07), kind = s.r() < 0.4 ? 'heart' : 'shield';
-      if (clear(s, gx, gy)) { if (s.gifts.includes(kind)) s.embers.push({ x: gx, y: gy, got: false, kind }); s.nextGift = y + 16 + s.r() * 8; }
-    }
+    gift(s, y);
     if (lv >= 10) open(s, y, 'wisp', 0.1); // night 10: false embers that steal light
     power(s, y);
   }
@@ -221,14 +270,20 @@ export function startAt(s, f) {
 }
 
 // A blow: a shield left from an old save takes it, else a spare heart does, else the run ends. Returns true when the run ended.
-function blow(s, cause) {
+function blow(s, cause, x, y) {
+  s.impact = { x, y, cause };
   if (s.shield) { s.shield--; s.safe = 1.2; s.events.push('break'); return false; }
   if (s.hearts > 1) { s.hearts--; s.safe = 1.6; s.events.push('hurt'); return false; }
   s.hearts = 0; s.over = cause; s.events.push('hit'); return true;
 }
 
+// A dim flame below the floor must stay dim.
+const dim = (light, loss, floor) => Math.min(light, Math.max(floor, light - loss));
+
 export function step(s, target) {
   s.events.length = 0;
+  if (s.impact) delete s.impact;
+  if (s.emberPickup) delete s.emberPickup;
   if (s.over) return s;
   spawn(s);
   s.t += DT;
@@ -249,13 +304,21 @@ export function step(s, target) {
     if (e.kind === 'size') { s.big = e.big; if (e.big) s.safe = Math.max(s.safe, 0.8); }
     s.events.push(e.kind === 'size' ? (e.big ? 'big' : 'small') : e.kind);
   }
-  if (!s.warm) s.light -= (0.04 + 0.025 * Math.min(1, s.y / GOAL)) * pace(s) * (rain(s, s.y) ? 1.6 : 1) * sl * s.calm * (1 - 0.08 * s.st.wick) * DT; // the same light per stretch of river on every night; rain costs more
+  const wick = gentleFirst(s) ? 0.7 + 0.3 * Math.max(0, Math.min(1, (progress(s) - 0.15) / 0.3)) : 1;
+  if (!s.warm) s.light -= (0.04 + 0.025 * Math.min(1, s.y / GOAL)) * pace(s) * (rain(s, s.y) ? 1.6 : 1) * sl * s.calm * (1 - 0.08 * s.st.wick) * wick * DT;
   for (const e of s.embers) if (!e.got && Math.hypot(e.x - s.x, e.y - s.y) < (e.kind === 'wisp' ? 0.05 : s.take)) {
     e.got = true;
-    if (e.kind === 'wisp') { s.light = Math.max(0.05, s.light - 0.2); s.events.push('wisp'); }
+    if (e.kind === 'wisp') { s.light = dim(s.light, 0.2, 0.05); s.events.push('wisp'); }
     else if (e.kind === 'shield') { s.field = FIELD + 1.5 * s.st.barrier; s.events.push('shield'); }
     else if (e.kind === 'heart') { s.hearts = Math.min(3, s.hearts + 1); s.events.push('heart'); }
-    else { s.taken++; s.light = Math.min(1, s.light + 0.3); s.warm = 2.5; s.events.push('ember'); }
+    else {
+      const before = Math.max(0, s.light);
+      s.taken++;
+      s.light = Math.min(1, s.light + 0.3);
+      s.warm = 2.5;
+      s.emberPickup = { x: e.x, y: e.y, before, after: s.light };
+      s.events.push('ember');
+    }
   }
   for (const k of s.rocks) {
     if (k.vy) k.y0 += k.vy * DT * flow; // ice drifts by the stretch of river passed, so the river laid down ahead never depends on powers taken
@@ -277,7 +340,17 @@ export function step(s, target) {
       if (!k.pushed) { k.pushed = true; s.events.push('push'); }
       continue;
     }
-    if (d < 0 && !s.safe) { if (blow(s, k.ice ? 'ice' : k.kind || 'rock')) return s; continue; }
+    if (d <= 0) {
+      k.grazed = true; // A rock the hull touches cannot award a near miss.
+      if (d < 0 && !s.safe) {
+        const x = Math.max(k.x - k.len, Math.min(k.x + k.len, s.x));
+        const r = Math.hypot(s.x - x, s.y - k.y);
+        const atX = r ? x + (s.x - x) * k.rad / r : x;
+        const atY = r ? k.y + (s.y - k.y) * k.rad / r : k.y - k.rad;
+        if (blow(s, k.ice ? 'ice' : k.kind || 'rock', atX, atY)) return s;
+      }
+      continue;
+    }
     if (!k.grazed && d < 0.022 && k.y < s.y) { k.grazed = true; s.grazes++; s.light = Math.min(1, s.light + 0.05); s.events.push('graze'); }
   }
   const c = centre(s, s.y), edge = half(s, s.y) - boat(s);
@@ -286,9 +359,9 @@ export function step(s, target) {
     if (s.safe || s.field) s.x = c + Math.sign(s.x - c) * edge; // the force field holds the boat off the bank too
     else if (s.gentle) { // a gentle river (the page sets s.gentle on story nights): the reeds push the boat back; each touch dims the flame a little
       s.x = c + Math.sign(s.x - c) * edge;
-      if (!s.brushed) { s.brushed = true; s.light = Math.max(0.12, s.light - 0.06); s.events.push('brush'); }
+      if (!s.brushed) { s.brushed = true; s.light = dim(s.light, 0.06, 0.12); s.events.push('brush'); }
     }
-    else { if (blow(s, 'bank')) return s; s.x = c + Math.sign(s.x - c) * (edge - 0.03); }
+    else { if (blow(s, 'bank', c + Math.sign(s.x - c) * half(s, s.y), s.y)) return s; s.x = c + Math.sign(s.x - c) * (edge - 0.03); }
   } else if (s.brushed && Math.abs(s.x - c) < edge - 0.02) s.brushed = false;
   if (s.light <= 0) { s.light = 0; s.over = 'dark'; s.events.push('out'); return s; }
   if (!s.endless && s.y + s.bonus >= GOAL) { s.over = 'dawn'; s.events.push('dawn'); }

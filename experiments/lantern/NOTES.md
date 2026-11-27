@@ -1050,3 +1050,49 @@ The lab asked whether tilting the phone should also steer in 2D and 3D. The answ
 
 **Not verified.** A real share sheet on a phone; how the link looks in a chat app before the page has link-preview tags; the Turkish lines (AI-written).
 
+
+## Lantern's first minute
+
+Gentle Night 1 starts with a reachable ember, introduces one outlined rock, then puts the second ember across from it. Every Gentle story night delays rock contact past eight seconds. Early Night 1 rows keep a route open for an idle boat. Later rows alternate the hazards and leave an ember on the safe side. The flame drains more slowly during the first stretch of Night 1. Gentle moves the light pool ahead and draws breaks in the water at threatening rocks and reeds in both renderers. Settings can turn off the outlines and hit vibration. Both default on, with outlines active on Gentle.
+
+The compact landing shows the recording switch before play and puts practice under More → How to play. Night 1 teaches steering in the run. The HUD shows fuel, restored fuel and the current result. A hit marks contact, removes a heart and shows how long protection lasts. Crash results can be opened after the first beat. Story retry can reuse the seed and the entire run's rules, including its one-use upgrades. New River uses a fresh seed and any upgrades waiting in the save. Story dare links carry the night, seed, abilities, upgrades, rebirth pace and river setting. Older endless links still open with Classic rules. Matching dawn ties a completed story dare. Dare runs still skip story unlocks and scoreboards.
+
+**Measured on seeds 1–300**, cycling the seven starter abilities, using `node experiments/lantern/first-minute.mjs --baseline=95095e1a` on the pre-change commit and the same command without the baseline flag after the change.
+
+| Gentle Night 1 | Before | After |
+| --- | ---: | ---: |
+| First rock reaches the boat's row, median | 3.40 s | 8.13 s |
+| Passive survival, minimum / median | 5.00 s / 13.27 s | 22.28 s / 30.43 s |
+| Exact-centre policy reaches dawn | 0/300 | 139/300 |
+| Ember-seeking policy with 250 ms delay and lateral noise reaches dawn | 13/300 | 300/300 |
+
+The policy test also checked 20 seeds on each of the 50 Gentle nights at maximum rebirth pace, contact coordinates, positive-clearance grazes, penalty floors, pickup restoration and dare link round trips. A local DOM smoke test exercised the landing, recording opt-out, direct start, touch and key input, HUD, retries and practice-to-dare routing with mocked browser APIs. The shared phone harness could not bind loopback in this session. It also still contains expectations for the superseded tutorial prompt, notice and dare copy. Real-phone input, audio, vibration, visual readability in WebGL and how quickly new players learn or reach dawn remain unverified.
+
+## 2026-11-27: phone check and the share loop (dist/review/brief-share-loop.md)
+
+**Phone check.** Two of the six failures were regressions, fixed in the game: the first-minute commit had shortened the kit's recording notice (it lost "records play" and how to stop it) and renamed the switch; `words.js` now takes both from `kit/lab.js`. A CSS line hid the first-time hint's words under reduced motion; the words now show, below the fingertip. The other failures were stale: they expected the tutorial question, the old lost-run cards and the full menu after an erase. They now assert the new behaviour: the first tap on Play is night 1 (`startedAtOnce`), result-first titles, the compact screen and More. New checks: `lantern first screen` (compact screen for no save, notice and switch inside the viewport, unticking before a run, full menu for a returning player, outline and haptics, the flame gauge, Same river and New river) and more lines in `lantern dare`.
+
+**Share loop.**
+- The first dare tap asks for a name, optional, 16 characters, saved under `lantern-name` (sharing to the board is still only `lantern-share`). New key `lantern-dare-asked`, `'1'` once asked, so an empty field is not asked again.
+- `kit/dare.js`: a link with no name ends at the number (`?dare=k2j9x.412.1`); old links with the trailing dot still read. A long name is cut at a space when it has one.
+- `dare-river.js` refuses a score of 0, over 100 on a night or a tower level, and over 100000 on the endless river. Bit 27 marks a tower level: level, starting floor and stats ride in the link; the dare leaves the player's own climb alone.
+- In a dare run, "Sam 412" sits under the score and turns green with a tick, with "Past Sam!", when passed. The card says "+12 to beat Sam" or "You beat Sam by 54".
+- New key `lantern-dare-done`, JSON `{ k, n, seed, extra }`: the dare in this page's link was played to an end. The menu then shows the result, Send it back and Play the dare again.
+- "Dare a friend" is on every card a reader would accept: story nights, today's river, the tower, the endless river. "Same river, same hearts." The note after sending says whether the link carries a name.
+- Every run that ends pays at least 3 embers. Not a setting: nobody would choose less. A run left from the pause card pays what it took.
+- Copy: Tower "Two sectors of 50 levels"; today's river says "Today's river"; Duet shows key hints only with a fine pointer and its hint names both thumbs; a first endless score says "First score on this phone"; Perspective left the menu (Settings has it, with the same `#toView` button for steering); the steering note says Tilt and Press are first person only.
+- Cards dim and blur the river behind them. WebKit drew no backdrop filter over the 3D canvas, so the card's own colour does the dimming. Measured on the dawn card with the card's words hidden, brightest pixel in the middle 70% of the screen: text 10.9:1 or better, hint lines 8.4:1 or better, 2D and 3D, Chromium Pixel 7 and WebKit iPhone 13 (it was 2.1:1 in WebKit 3D before).
+- How to play: after 6 s with no steering a fingertip shows (its own hint, key `lantern-tutor-hint`, made only then); after 20 s on one step, Skip. A skipped tutorial records `skip`.
+- Spark's button sits further in and its ring grows less, so the ring stays on a Pixel 7 screen.
+
+**Not verified.** A real share sheet; the Turkish lines (AI-written); contrast on cards other than dawn (assumed no worse). Partly done: Send it back from the menu does not ask for a name; Duet's moving hint still draws one slider (its words now name both thumbs).
+
+## 2026-11-27: Lantern round 2
+
+Practice Skip clears pause and releases its hint. The arrow keys work in solo play, and first-person Press and Tilt dismiss the steering prompt. Race retires a countdown boat without paying embers or counting it as a played race. Dare replies use one optional name prompt and selectable link field on either card. The reader rejects zero scores and Tower scores below the starting floor. A dawn target is won by reaching dawn. The invitation, HUD and result name the scoring unit, and the HUD follows a language change during pause.
+
+Exposed rocks have slate facets and broken upstream edges. The existing Outline setting controls the edges, and the existing Haptics setting controls hit vibration. A blue wash follows the channel ahead in the main 2D and 3D views. Gentle Night 1 adds three embers before the first rock. The first prompt follows the visible amber ember and clears on collection or deliberate steering. The first-person projection shows that prompt earlier in screen space than the 2D view. The hand cue plays once. Runs start with a full fuel gauge and warn once below 25%. The main river and Duet show a spark, wick flare and restored fuel at pickup. Spark keeps its own refill effect for the spark tin.
+
+The compact menu shows the premise and keeps the recording controls together below the boat. The returning menu places Game mode and Shop under Play, with practice, Settings, Music and Credits under More. Story losses lead with progress, cause and action, and the banked amount. Their primary action retries the same seed. Melody progress is in Details.
+
+The 300-seed first-minute check measured a median first rock of 8.13 s and median passive survival of 32.68 s. Its delayed steering policy reached dawn 300/300 times. The eight-second gate passed across all 50 Gentle nights at maximum rebirth pace. A mocked DOM covered pause-to-Skip, arrow keys, Press and Tilt input, zero countdown payout, dawn dares, language switching and the menu link fallback. The canvas command check found the pickup spark, flare and gain at 150 ms. Chromium and WebKit phone checks stopped at the sandbox's loopback restriction. The 150 ms screenshot and rendered visual checks remain open.

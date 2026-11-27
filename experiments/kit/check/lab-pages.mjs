@@ -176,6 +176,34 @@ async function drawBattleTrail(page, { until }) {
 
 const splitlightLegacy = { 'night-splitlight:plate': '2', 'night-splitlight:sound': 'on' };
 
+// Pass the Flame (lab/flame-a and lab/flame-b): the saves both pages read, in the formats they already use.
+const flameSeeds = { 'flame:name': 'Sam', 'flame:set:look': 'thermal', 'flame:set:drop': 'ends', 'flame:set:retryRule': 'once', 'flame:set:sound': 'on', 'flame:set:haptics': 'off' };
+const flameVerify = () => ({
+  // Only flame-a fills its nickname field at load (flame-b reads flame:name at the handoff); the harness checks the key is kept either way.
+  name: document.querySelector('#nickname')?.value ?? null,
+  look: (document.documentElement.dataset.look || document.body.dataset.look),
+  pressed: Object.fromEntries([...document.querySelectorAll('[data-setting]')].map(row => [row.dataset.setting, row.querySelector('[aria-pressed=true]')?.dataset.value])),
+});
+const flameExpect = {
+  name: null, look: 'thermal',
+  pressed: { look: 'thermal', drop: 'ends', sound: 'on', haptics: 'off' },
+};
+const tapRiver = sel => async page => {
+  const { x, y, width, height } = await page.locator(sel).boundingBox();
+  await page.touchscreen.tap(x + width / 2, y + height * .6);
+};
+function steerFlame(sel) {
+  return async (page, { finger, until }) => {
+    const before = await page.evaluate(() => window.flameState().target);
+    const { x, y, width, height } = await page.locator(sel).boundingBox();
+    const from = [x + width * .35, y + height * .75], to = [x + width * .6, y + height * .75];
+    await finger(page, sel, [['pointerdown', ...from], ['pointermove', ...to]]);
+    await until(page, t => window.flameState().target !== t && window.flameState().playing, 'a sliding finger steers the boat', 4000, before);
+    await until(page, () => (window.flameSim().elapsed ?? window.flameSim().t) > 0.5, 'the leg is under way', 4000);
+    await finger(page, sel, [['pointerup', ...to]]);
+  };
+}
+
 export const labPages = {
   'small/wild2-face-shift': pageEntry('wild2-face-shift:save', saves.face, 'wild2-face-shift:hint', {
     // Opens on the first sitter (2026-11-26); the run starts with the first touch on the face.
@@ -313,4 +341,33 @@ export const labPages = {
     },
     hint: { timing: { start: '#play' }, input: drawBattleTrail },
   }),
+  // Pass the Flame, two builds of one brief (lab pages, unlisted). Both read the shared settings slug `flame` (flame:set:*) and
+  // the nickname flame:name; each records under its own lab slug. The page opens on the arrival; a touch on the river takes the flame.
+  'lab/flame-a': {
+    sound: '[data-setting=sound] [data-value=off]', soundKey: 'flame:set:sound', soundOff: 'off',
+    seeds: flameSeeds,
+    state: () => { const s = window.flameState?.(); return s && { screen: s.screen === 'leg' ? 'play' : s.screen === 'arrival' ? 'menu' : s.screen, paused: s.paused, t: window.flameSim().elapsed }; },
+    verify: flameVerify,
+    expect: { name: 'Sam', look: 'thermal', pressed: { ...flameExpect.pressed, retryRule: 'once' } },
+    start: tapRiver('#river'),
+    pause: '#gear', resumeWith: async page => { await page.click('#closeSettings'); },
+    touch: steerFlame('#river'),
+  },
+  'lab/flame-b': {
+    sound: '[data-setting=sound] [data-value=off]', soundKey: 'flame:set:sound', soundOff: 'off',
+    seeds: { ...flameSeeds, 'flame:hint': '1', 'flame:played': '1' },
+    state: () => { const s = window.flameState?.(); return s && { screen: s.screen === 'leg' ? (s.taking ? 'take' : 'play') : s.screen === 'arrive' ? 'menu' : s.screen, paused: s.paused, t: window.flameSim().t }; },
+    verify: flameVerify,
+    expect: flameExpect,
+    start: tapRiver('#c'),
+    pause: '#gear',
+    // Closing settings leaves the game paused; a touch on the river goes on (the touch that ends a pause also resumes).
+    resumeWith: async page => { await page.click('#close'); await tapRiver('#c')(page); },
+    touch: steerFlame('#c'),
+    hint: { key: 'flame:hint', delay: 3000, play: '#c', canvas: '#c', legacy: { 'flame:played': '1' }, waitHintState: true,
+      start: tapRiver('#c'),
+      // Sound off, so nothing in the check depends on audio; the kit hint keeps its own pause card out of it.
+      resumeWith: async page => { await page.keyboard.press('p'); },
+      before: () => window.flameState().target, moved: t => window.flameState().target !== t },
+  },
 };
