@@ -28,7 +28,7 @@ import { MAT, SUB } from './grid.js';
 import { SIM_VERSION, Sim } from './sim.js';
 import { Decoder, Encoder, intModel, probs, sint, tree, uint } from './rangecoder.js';
 
-export const SNAPSHOT_VERSION = 7; // 3: lastCell codes the diagonal neighbours; 4: the colony (pile kinds, caste, hit points, team, brood; colony flag in the header); 5: days (the day length in the header, more globals); 6: the spider's globals; 7: crew sizes (globals)
+export const SNAPSHOT_VERSION = 8; // 8: the nursery rectangle in the header; 3: lastCell codes the diagonal neighbours; 4: the colony (pile kinds, caste, hit points, team, brood; colony flag in the header); 5: days (the day length in the header, more globals); 6: the spider's globals; 7: crew sizes (globals)
 const SCTX = 24; // scent contexts per field
 const LIST_MAX = 1 << 20; // a longer command queue, command or event list is a corrupt payload, not an allocation
 const RANK_BITS = 12; // measured: 6, 8, 10, 12, 14 bits; 12 is near the best (ants share cells, so a fine model pays)
@@ -241,8 +241,8 @@ function walk(sim, io, mark = () => {}) {
 }
 
 function headerValues(sim) {
-  const c = sim.cfg, h = sim.home;
-  return [c.seed >>> 0, c.sw, c.sh, c.nw, c.nh, c.maxAnts, sim.n, h.x, h.y, h.w, h.h, ...c.spread, ...c.halfLife, c.colony ? 1 : 0, c.dayTicks];
+  const c = sim.cfg, h = sim.home, r = sim.nursery ?? { x: 0, y: 0, w: 0, h: 0 }; // w 0: no nursery (the sandbox)
+  return [c.seed >>> 0, c.sw, c.sh, c.nw, c.nh, c.maxAnts, sim.n, h.x, h.y, h.w, h.h, ...c.spread, ...c.halfLife, c.colony ? 1 : 0, c.dayTicks, r.x, r.y, r.w, r.h];
 }
 
 /** Coded bytes per part, in walk order (the spike reports them): [[name, bytes], ...]. */
@@ -275,7 +275,7 @@ export function restore(bytes) {
   // Version 1 (raw shuffled arrays) and any other version are refused by number, never guessed at.
   if (version !== SNAPSHOT_VERSION || simVersion !== SIM_VERSION) throw new Error(`snapshot ${version}/${simVersion}, this sim reads ${SNAPSHOT_VERSION}/${SIM_VERSION}`);
   const count = dv.getUint32(8, true);
-  if (count !== 13 + 2 * FIELDS || bytes.length < 12 + 4 * count) throw new Error('snapshot header is corrupt');
+  if (count !== 17 + 2 * FIELDS || bytes.length < 12 + 4 * count) throw new Error('snapshot header is corrupt');
   const header = [];
   for (let k = 0; k < count; k++) header.push(dv.getUint32(12 + 4 * k, true));
   const [seed, sw, sh, nw, nh, maxAnts, n, hx, hy, hw, hh] = header;
@@ -284,6 +284,8 @@ export function restore(bytes) {
   const sim = new Sim({ seed, sw, sh, nw, nh, maxAnts, ants: 0, spread, halfLife, colony, dayTicks, restoring: true });
   sim.n = n;
   sim.home = { x: hx | 0, y: hy | 0, w: hw, h: hh }; // a chamber can start left of the nest's edge: signed
+  const [rx, ry, rw, rh] = header.slice(13 + 2 * FIELDS);
+  sim.nursery = rw ? { x: rx | 0, y: ry | 0, w: rw, h: rh } : null;
   const dec = new Decoder(bytes.subarray(12 + 4 * count));
   walk(sim, dec);
   dec.finish();

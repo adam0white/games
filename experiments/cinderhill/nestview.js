@@ -34,7 +34,8 @@ export function findRooms(sim) {
     for (let dy = -1; dy <= 1 && !inner[y * w + x]; dy++) for (let dx = -1; dx <= 1; dx++) { const nx = x + dx, ny = y + dy; if (nx >= 0 && ny >= 0 && nx < w && ny < h && core[ny * w + nx]) { inner[y * w + x] = 1; break; } }
   }
   const seen = new Int32Array(w * h).fill(-1), rooms = [], q = [];
-  const hx = sim.home.x + (sim.home.w >> 1), hy = sim.home.y + (sim.home.h >> 1);
+  const qn = sim.nursery ?? sim.home, hx = qn.x + (qn.w >> 1), hy = qn.y + (qn.h >> 1); // the queen lives in the nursery (sim 8)
+  const px = sim.home.x + (sim.home.w >> 1), py = sim.home.y + (sim.home.h >> 1);
   for (let c0 = 0; c0 < w * h; c0++) {
     if (!inner[c0] || seen[c0] >= 0) continue;
     const id = rooms.length, cells = []; q.length = 0; q.push(c0); seen[c0] = id;
@@ -48,10 +49,10 @@ export function findRooms(sim) {
     }
     let sx = 0, sy = 0, x0 = w, y0 = h, x1 = 0, y1 = 0;
     for (const c of cells) { const x = c % w, y = (c / w) | 0; sx += x; sy += y; if (x < x0) x0 = x; if (y < y0) y0 = y; if (x > x1) x1 = x; if (y > y1) y1 = y; }
-    rooms.push({ id, cells, size: cells.length, cx: sx / cells.length + 0.5, cy: sy / cells.length + 0.5, x0, y0, x1, y1, queen: false });
+    rooms.push({ id, cells, size: cells.length, cx: sx / cells.length + 0.5, cy: sy / cells.length + 0.5, x0, y0, x1, y1, queen: false, store: false });
   }
   const out = rooms.filter(r => r.size >= 6);
-  for (const r of out) if (r.cells.includes(hy * w + hx)) r.queen = true;
+  for (const r of out) { if (r.cells.includes(hy * w + hx)) r.queen = true; if (r.cells.includes(py * w + px)) r.store = true; }
   out.sort((a, b) => (b.queen - a.queen) || (a.y0 - b.y0) || (a.x0 - b.x0));
   return out;
 }
@@ -60,7 +61,7 @@ export function findRooms(sim) {
 export function growth(B, k) {
   const age = B.age[k];
   if (B.stage[k] === STAGE.EGG) return Math.min(1, age / C.EGG_TICKS);
-  if (B.stage[k] === STAGE.LARVA) return Math.min(1, (B.fed[k] + (age % C.FEED_EVERY) / C.FEED_EVERY) / C.MAJOR_FEEDS);
+  if (B.stage[k] === STAGE.LARVA) return Math.min(1, Math.max(age / C.LARVA_TICKS, B.fed[k] / C.MAJOR_FEEDS));
   return Math.min(1, age / C.PUPA_TICKS);
 }
 
@@ -83,11 +84,13 @@ export function drawNest(v) {
     ctx.lineWidth = 3; ctx.strokeStyle = L.halo; ctx.strokeText(label, p.x, p.y - 2);
     ctx.fillStyle = L.label; ctx.fillText(label, p.x, p.y - 2);
   });
-  // Stores in the queen's chamber: sugar as pale grains along the left wall, protein as red-brown bits along the right.
-  const qr = rooms.find(r => r.queen);
+  // Stores in the store room (the porch in a colony game, sim 8; the queen's chamber when the porch is too small to be
+  // a room, or in the sandbox): sugar as pale grains along the left wall, protein as red-brown bits along the right.
+  const ph = sim.home, porch = sim.nursery ? { x0: ph.x, y0: ph.y, x1: ph.x + ph.w - 1, y1: ph.y + ph.h - 1, cx: ph.x + ph.w / 2 } : null;
+  const qr = porch ?? rooms.find(r => r.store) ?? rooms.find(r => r.queen); // the porch even when digging joins it to a room
   if (qr) {
     for (const [amount, x, col, rr] of [[sim.g[g.SUGAR], qr.x0 + 0.2, L.sugar, 0.16], [sim.g[g.PROTEIN], qr.x1 + 0.8, L.protein, 0.2]]) {
-      const n = Math.min(60, Math.ceil(amount / 4));
+      const n = Math.min(60, amount); // a grain a load (sim 8: a load is a unit)
       ctx.fillStyle = col; ctx.strokeStyle = L.grainRim; ctx.lineWidth = 0.8;
       for (let i = 0; i < n; i++) {
         const row = Math.floor(Math.sqrt(i)), off = i - row * row; // a heap: more grains low down
@@ -127,7 +130,7 @@ export function drawNest(v) {
 /** The queen: head, thorax, a long abdomen that swells as she lays, six legs, antennae. */
 function drawQueen({ ctx, sim, toScreen, z, now, g, look }) {
   const L = look ?? INK;
-  const h = sim.home, q = toScreen(h.x + h.w / 2, h.y + h.h / 2), u = Math.max(5, z * 1.1);
+  const h = sim.nursery ?? sim.home, q = toScreen(h.x + h.w / 2, h.y + h.h / 2), u = Math.max(5, z * 1.1);
   const laying = sim.g[g.LAY] > 0 ? 1 - sim.g[g.LAY] / C.LAY_EVERY : 1, pulse = 1 + 0.06 * Math.sin(now / 300) + 0.08 * laying;
   ctx.strokeStyle = L.queenLegs; ctx.lineWidth = Math.max(1, u * 0.1); ctx.lineCap = 'round';
   for (let l = 0; l < 3; l++) for (const s of [-1, 1]) { // legs from the thorax

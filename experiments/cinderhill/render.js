@@ -183,7 +183,7 @@ uniform vec2 uView; uniform vec3 uCam; uniform float uAlpha; uniform float uTime
 out vec2 vLocal; flat out vec4 vInfo; out float vPx; flat out float vMove;
 void main() {
   vec2 p = mix(aPos.xy, aPos.zw, uAlpha);
-  float big = aInfo.y > 1.5 ? 1.25 : 1.0;
+  float big = aInfo.y > 1.5 && aInfo.y < 2.5 ? 1.25 : 1.0; // guards are big; nurses (3) are not
 #if LOOK == 2
   big *= 1.3;                                               // the field-guide plate draws ants larger
 #endif

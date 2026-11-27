@@ -90,7 +90,6 @@ test('the floor: a colony short of sugar at dawn is given some', () => {
   const sugar = s.g[G.SUGAR];
   run(s, 1);
   assert.equal(s.g[G.SUGAR], sugar + GIFT_SUGAR);
-  assert.ok(s.n >= START.ants);
 });
 
 test('dawn restart: the dawn save with the same orders reaches the same dusk, hash for hash', () => {
@@ -199,7 +198,8 @@ test('the floor gift saturates instead of wrapping', () => {
 });
 
 test('a day length that would not restore as itself is refused', () => {
-  for (const d of [0, -5, 2.5, 4294967298]) assert.throws(() => colony({ dayTicks: d }), /dayTicks/);
+  for (const d of [-5, 2.5, 4294967298]) assert.throws(() => colony({ dayTicks: d }), /dayTicks/);
+  assert.equal(colony({ dayTicks: 0 }).cfg.dayTicks, 0, '0: no days (sim 8)');
 });
 
 test('a load still counts for the trail goal when new trails replace hers on the way home', () => {

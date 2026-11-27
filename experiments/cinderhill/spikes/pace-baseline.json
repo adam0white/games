@@ -1,27 +1,27 @@
 {
  "first-delivery": {
-  "status": "fail",
-  "value": 16.2
+  "status": "pass",
+  "value": 6.55
  },
  "first-delivery-passive": {
-  "status": "fail",
-  "value": 13.25
+  "status": "pass",
+  "value": 6
  },
  "minute-1-deliveries": {
   "status": "pass",
-  "value": 39
+  "value": 50
  },
  "first-birth": {
   "status": "pass",
-  "value": 15
+  "value": 8
  },
  "first-funded-birth": {
-  "status": "fail",
-  "value": 135
+  "status": "pass",
+  "value": 34
  },
  "quiet-2-min": {
   "status": "fail",
-  "value": 21
+  "value": 67
  },
  "first-choice": {
   "status": "not built",
@@ -36,24 +36,24 @@
   "value": null
  },
  "threat-telegraphed": {
-  "status": "pass",
-  "value": 52.55
+  "status": "not built",
+  "value": null
  },
  "threat-resolved": {
-  "status": "pass",
-  "value": 94.55
+  "status": "not built",
+  "value": null
  },
  "gap-0-10": {
   "status": "fail",
-  "value": 157.5
+  "value": 412.4
  },
  "gap-after-10": {
   "status": "fail",
-  "value": 82.55
+  "value": 120
  },
  "idle-share": {
-  "status": "fail",
-  "value": 0.261
+  "status": "pass",
+  "value": 0.15
  },
  "queued-at-doors": {
   "status": "not built",
