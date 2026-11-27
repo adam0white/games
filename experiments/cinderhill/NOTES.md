@@ -1290,4 +1290,8 @@ The reader of the High Summer screens faulted four labels; all four are changed 
 at a place can be tapped (it ends in an arrow): a windfall alert moves the view to the fall, the weevil alert opens the
 Nest. The score line says what it counts ("Ants: you 80", "rival 76") and adds a queen's health once she is hurt. A long
 mission's card states its length, when noon comes and how the day ends. Seen on a phone profile: the card line, both
-taps, the score names. Not seen: the queen's health in the score (no queen was hurt in the walk).
+taps, the score names.
+
+Correction: the queen's health beside the counts wrapped the score onto two lines on a phone (forced worst case: row
+height 16 to 32). It now has its own small line under the clock, "Queens: yours 100% · rival 89%", shown once either
+queen is hurt; seen on a phone profile in High Summer, 218 of 218 wide at the longest text.
