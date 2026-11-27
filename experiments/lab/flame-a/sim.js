@@ -1,6 +1,8 @@
 // A completed leg carries only its receipt forward. The URL fragment stays in the browser.
 const UINT32_MAX = 0xffffffff;
-const MAX_LEG = 100000;
+// Even a 1% flame must reach the bank before its first possible drop.
+const MIN_LEG = 16;
+const MAX_LEG = 2040; // 60 seconds at up to 34 metres per second.
 const LEG_SECONDS = 60;
 
 export function validName(name) {
@@ -22,31 +24,57 @@ function validChain({ count, flame, total, seed, carriers }) {
       !Array.isArray(carriers) || carriers.length !== Math.min(8, count)) return false;
   let visible = 0;
   for (const carrier of carriers) {
-    if (!carrier || !validName(carrier.name) || !integer(carrier.distance, 0, MAX_LEG)) return false;
+    if (!carrier || !validName(carrier.name) || !integer(carrier.distance, MIN_LEG, MAX_LEG)) return false;
     visible += carrier.distance;
   }
-  return visible <= total && total - visible <= (count - carriers.length) * MAX_LEG;
+  const hidden = count - carriers.length;
+  return integer(total - visible, hidden * MIN_LEG, hidden * MAX_LEG);
+}
+
+function checksum(payload) {
+  let hash = 0x811c9dc5;
+  for (const character of 'river.coals.v2/' + payload) {
+    hash = Math.imul(hash ^ character.charCodeAt(0), 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
 }
 
 export function encodeLink(chain) {
   if (!validChain(chain)) throw new RangeError('Invalid flame receipt');
   const { count, flame, total, seed, carriers } = chain;
   const rows = carriers.map(({ name, distance }) => distance + ':' + encodeURIComponent(name));
-  return '#f=' + [1, count, flame, total, seed, ...rows].join('~');
+  const payload = [count, flame, total, seed, ...rows].join('~');
+  return '#f=2~' + checksum(payload) + '~' + payload;
 }
 
 export function decodeLink(hash) {
-  if (typeof hash !== 'string' || hash.length > 2048 || !hash.startsWith('#f=1~')) return null;
-  const [version, count, flame, total, seed, ...rows] = hash.slice(3).split('~');
-  if (version !== '1' || rows.length < 1 || rows.length > 8) return null;
+  if (typeof hash !== 'string' || hash.length > 2048 || !hash.startsWith('#f=')) return null;
+  const fields = hash.slice(3).split('~');
+  const version = fields.shift();
+  if (version !== '1' && version !== '2') return null;
+  const signature = version === '2' ? fields.shift() : null;
+  if (fields.length < 5 || fields.length > 12) return null;
+  // Chat clients sometimes trim the final colon from an anonymous carrier.
+  if (/^[0-9]+$/.test(fields.at(-1))) fields[fields.length - 1] += ':';
+  if (version === '2' && checksum(fields.join('~')) !== signature) return null;
+  const [count, flame, total, seed, ...rows] = fields;
+  if ([count, flame, total, seed].some(value => String(Number(value)) !== value || !/^[0-9]+$/.test(value))) return null;
+  if (!integer(Number(count), rows.length, UINT32_MAX)) return null;
   try {
     const carriers = rows.map(row => {
-      const [distance, name] = row.split(':');
-      return { name: decodeURIComponent(name), distance: Number(distance) };
+      const split = row.indexOf(':');
+      const name = decodeURIComponent(row.slice(split + 1));
+      const distance = Number(row.slice(0, split));
+      if (row !== distance + ':' + encodeURIComponent(name)) throw new Error('Noncanonical carrier');
+      return { name, distance };
     });
     const chain = { count: Number(count), flame: Number(flame), total: Number(total), seed: Number(seed), carriers };
-    // Require the one canonical spelling, including separators, escapes and integer notation.
-    return validChain(chain) && encodeLink(chain) === hash ? chain : null;
+    if (version === '1') {
+      const hiddenMeters = chain.total - carriers.reduce((sum, c) => sum + c.distance, 0);
+      const possibleHidden = rows.length === 8 ? Math.floor(hiddenMeters / MIN_LEG) : 0;
+      chain.count = Math.min(chain.count, rows.length + possibleHidden);
+    }
+    return validChain(chain) ? chain : null;
   } catch {
     return null;
   }
@@ -81,7 +109,8 @@ export function createRun(chain) {
   const random = randomFrom(chain.seed);
   const items = [{ at: 2.2, x: 0, kind: 'ember', used: false }];
   for (let at = 6; at < 58; at += 4.8 + random() * 1.5) {
-    items.push({ at, x: (random() - 0.5) * 1.52, kind: 'ember', used: false });
+    const side = random() - 0.5;
+    items.push({ at, x: (side < 0 ? -1 : 1) * (0.23 + Math.abs(side) * 1.06), kind: 'ember', used: false });
   }
   for (let at = 12 + random() * 2; at < 58; at += 3.2 + random() * 2.5) {
     let x = (random() - 0.5) * 1.62;
@@ -107,7 +136,7 @@ export function step(run, dt, targetX) {
   run.elapsed += delta;
   run.progress = run.elapsed / LEG_SECONDS;
   run.distance = run.elapsed * run.speed;
-  if (run.elapsed > 3) run.flame -= delta * (run.elapsed < 21 ? 0.85 : 1.8);
+  if (run.elapsed > 3) run.flame -= delta * (run.elapsed < 21 ? 1.1 : 4.65);
 
   function hit(kind) {
     if (run.elapsed - run.lastHit < 1.3) return;
@@ -122,7 +151,9 @@ export function step(run, dt, targetX) {
     item.used = true;
     if (item.kind === 'rock') hit('rock');
     else {
-      run.flame = Math.min(100, run.flame + 22);
+      // The first ember lights the lantern. The sheltered reach holds small coals.
+      const warmth = item.at > 3 && item.at < 21 ? 10 : 22;
+      run.flame = Math.min(100, run.flame + warmth);
       run.lastEmber = run.elapsed;
       events.push({ type: 'ember', kind: 'ember' });
     }

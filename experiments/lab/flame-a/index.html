@@ -16,7 +16,7 @@
     <section id="arrival" aria-labelledby="arrivalTitle">
       <header class="arrival-copy">
         <h1 id="arrivalTitle">Pass the Flame</h1>
-        <p id="arrivalStory">A flame nobody has carried yet.</p>
+        <p id="arrivalStory">A flame nobody has carried yet. You are carrier 1.</p>
       </header>
       <footer class="arrival-foot">
         <div class="slide-hint">
@@ -28,20 +28,21 @@
     </section>
 
     <section id="result" class="sheet result-sheet" aria-labelledby="resultTitle" hidden>
-      <h2 id="resultTitle"></h2>
+      <h2 id="resultTitle" tabindex="-1"></h2>
+      <p id="relayTotal"></p>
       <p id="resultStats"></p>
       <ol id="carriers" data-i18n-aria="carrierList"></ol>
       <label id="nameField" for="nickname">
         <span data-i18n="name">First name or nickname (optional)</span>
-        <input id="nickname" type="text" maxlength="16" autocomplete="off" spellcheck="false">
+        <input id="nickname" type="text" autocomplete="off" spellcheck="false">
       </label>
       <div class="actions">
         <button id="pass" type="button" class="primary" data-i18n="pass">Pass the flame</button>
         <button id="newFlame" type="button" class="secondary" data-i18n="newFlame" hidden>Light a new flame</button>
-        <button id="retry" type="button" class="secondary" data-i18n="retry" hidden>Try again</button>
+        <button id="retry" type="button" class="secondary" data-i18n="retry" hidden>Relight from the coals · 25%</button>
       </div>
       <p id="shareStatus" role="status"></p>
-      <input id="shareUrl" type="url" readonly hidden data-i18n-aria="manual">
+      <textarea id="shareUrl" rows="3" readonly hidden data-i18n-aria="manual"></textarea>
     </section>
 
     <section id="paused" class="sheet pause-sheet" hidden aria-labelledby="pauseTitle">

@@ -29,6 +29,8 @@ rec.toggle(el('recording'));
 
 let chain = decodeLink(location.hash);
 let byLink = Boolean(chain);
+let refusedLink = Boolean(location.hash) && !chain;
+let relit = false, transferCaught = false;
 chain ??= newChain(randomSeed());
 let run = createRun(chain);
 let screen = 'arrival', age = 0, time = 0, target = 0;
@@ -68,36 +70,48 @@ function chime() {
 }
 const nickname = el('nickname');
 const storedName = read('flame:name', '');
+const cleanName = raw => Array.from(raw.normalize('NFC').replace(/[^\p{L}0-9 _.\-]/gu, '')).slice(0, 16).join('');
 nickname.value = validName(storedName) ? storedName : '';
-const displayName = () => nickname.value.trim().normalize('NFC');
+const displayName = () => cleanName(nickname.value).trim();
 const number = n => Math.round(n).toLocaleString(lang());
 const resultScreen = () => screen === 'drop' || screen === 'handoff';
-const mayPass = () => screen === 'handoff' || (screen === 'drop' && dropRule === 'dims');
+const mayPass = () => screen === 'handoff' || (screen === 'drop' && dropRule === 'dims' && !relit);
 const passLevel = () => screen === 'drop' ? 18 : Math.max(1, Math.round(run.flame));
 let historyLabels = [];
 function updateNames() {
   historyLabels = chain.carriers.map(c => ({ ...c, name: c.name || t('anonymous') }));
   if (!resultScreen()) return;
-  const current = validName(displayName()) && displayName() || t('you');
+  const current = mayPass() && displayName() || t('you');
   historyLabels.push({ name: current, distance: Math.round(run.distance) });
   const list = el('carriers');
   list.replaceChildren();
-  const add = text => {
+  const add = (text, meters) => {
     const li = document.createElement('li');
-    li.textContent = text;
+    const label = document.createElement('span');
+    label.textContent = text;
+    const distance = document.createElement('span');
+    distance.textContent = t('meters', { distance: number(meters) });
+    li.append(label, distance);
     list.append(li);
   };
-  if (chain.count > chain.carriers.length) add(t('older', { n: number(chain.count - chain.carriers.length) }));
-  for (const c of historyLabels) add(c.name);
+  if (chain.count > chain.carriers.length) {
+    const earlierDistance = chain.total - chain.carriers.reduce((sum, c) => sum + c.distance, 0);
+    add(t('older', { n: number(chain.count - chain.carriers.length) }), earlierDistance);
+  }
+  for (const c of historyLabels) add(c.name, c.distance);
 }
 function updateText() {
   apply();
   el('language').value = lang();
   const prev = chain.carriers.at(-1);
   el('arrivalTitle').textContent = prev ? t('linkedTitle', { count: number(chain.count) }) : t('virginTitle');
-  el('arrivalStory').textContent = prev ? t('linkedStory', { name: prev.name || t('anonymous'), distance: number(prev.distance) }) : t('virginStory');
+  el('arrivalStory').textContent = prev ? t('linkedStory', { name: prev.name || t('anonymous'), distance: number(prev.distance), next: number(chain.count + 1) }) : t(refusedLink ? 'brokenStory' : 'virginStory');
   if (resultScreen()) {
     el('resultTitle').textContent = t(screen === 'handoff' ? 'handoffTitle' : mayPass() ? 'dimTitle' : 'dropTitle');
+    const count = chain.count + 1;
+    el('relayTotal').textContent = t('total', {
+      count: number(count), hands: t.plural(count, 'hand', 'hands'), distance: number(chain.total + Math.round(run.distance))
+    });
     el('resultStats').textContent = t('stats', { distance: number(run.distance), flame: mayPass() ? passLevel() : 0 });
   }
   updateNames();
@@ -109,19 +123,20 @@ function panels() {
   el('pass').hidden = !mayPass();
   el('nameField').hidden = !mayPass();
   el('newFlame').hidden = screen !== 'drop';
-  el('retry').hidden = screen !== 'drop' || options.retryRule !== 'allow';
+  el('retry').hidden = screen !== 'drop' || relit || options.retryRule !== 'allow';
   el('paused').hidden = !paused || el('settings').open;
 }
-function reset(next, linked) {
+function reset(next, linked, relighting = false) {
   chain = next;
   byLink = linked;
-  run = createRun(chain);
+  refusedLink = false;
+  relit = relighting;
+  run = createRun(relit ? { ...chain, flame: 25 } : chain);
   screen = 'arrival';
   age = target = heldKey = 0;
   revealed = paused = false;
   el('shareUrl').hidden = true;
   el('shareStatus').textContent = '';
-  nickname.setCustomValidity('');
   steer.reset();
   updateText();
   panels();
@@ -131,11 +146,13 @@ function start() {
   if (screen !== 'arrival' || el('settings').open) return;
   screen = 'leg';
   age = 0;
+  transferCaught = false;
   snd.release();
   snd.unlock();
   song?.start(chain.seed);
-  rec.start({ ...options, chain: chain.count, byLink });
-  chime();
+  rec.start({ ...options, chain: chain.count, byLink, relit });
+  if (relit) snd.noise(0.16, 0.055, 1400);
+  else snd.tone(246.94, 0.48, 0.075, 'sine', 246.94);
   panels();
 }
 function end() {
@@ -165,6 +182,7 @@ function resume() {
   paused = false;
   snd.release();
   panels();
+  canvas.focus({ preventScroll: true });
 }
 canvas.addEventListener('pointerdown', e => {
   if (!e.isPrimary || e.button !== 0) return;
@@ -202,7 +220,6 @@ const redrawOptions = prefs.panel(el('options'), {
 el('language').onchange = () => {
   setLang(el('language').value);
   el('shareStatus').textContent = '';
-  nickname.setCustomValidity('');
   updateText();
   redrawOptions();
 };
@@ -217,39 +234,55 @@ addEventListener('keydown', e => {
   }
 });
 addEventListener('keyup', e => { if (e.key.startsWith('Arrow')) heldKey = 0; });
-el('retry').onclick = () => reset(chain, byLink);
+el('retry').onclick = () => {
+  if (screen !== 'drop' || relit || options.retryRule !== 'allow') return;
+  reset(chain, byLink, true);
+  start();
+};
 el('newFlame').onclick = () => {
   const clean = new URL(location.href);
   clean.hash = '';
   history.replaceState(null, '', clean);
   reset(newChain(randomSeed()), false);
 };
-nickname.addEventListener('input', () => {
-  nickname.setCustomValidity('');
+function updateNickname() {
+  const value = cleanName(nickname.value);
+  if (nickname.value !== value) {
+    const caret = cleanName(nickname.value.slice(0, nickname.selectionStart)).length;
+    nickname.value = value;
+    nickname.setSelectionRange(caret, caret);
+  }
   el('shareUrl').hidden = true;
   el('shareStatus').textContent = '';
   updateNames();
-});
+}
+nickname.addEventListener('input', event => { if (!event.isComposing) updateNickname(); });
+nickname.addEventListener('compositionend', updateNickname);
 el('pass').onclick = async () => {
   if (!mayPass() || sending) return;
   const name = displayName();
-  if (!validName(name)) {
-    nickname.setCustomValidity(t('invalidName'));
-    nickname.reportValidity();
-    return;
-  }
   write('flame:name', name);
   const next = addCarrier(chain, name, run.distance, passLevel(), nextSeed);
   const url = new URL(location.pathname, location.href);
   url.hash = encodeLink(next);
   sending = true;
   try {
-    const how = await shareLink(url.href, t('shareText', { count: number(next.count), distance: number(run.distance) }));
+    const pitch = t('shareText', {
+      count: number(next.count), people: t.plural(next.count, 'person', 'people'), distance: number(run.distance)
+    });
+    const message = pitch + '\n' + url.href;
+    let how = 'shown';
+    if (navigator.share) how = await shareLink(url.href, pitch);
+    // The shared kit copies only the URL when native sharing fails.
+    if (!navigator.share || how === 'copied') {
+      try { await navigator.clipboard.writeText(message); how = 'copied'; }
+      catch { how = 'shown'; }
+    }
     rec.event('pass_send', { how });
     el('shareStatus').textContent = t(how === 'shown' ? 'manual' : how);
     el('shareUrl').hidden = how !== 'shown';
     if (how === 'shown') {
-      el('shareUrl').value = url.href;
+      el('shareUrl').value = message;
       el('shareUrl').focus();
       el('shareUrl').select();
     }
@@ -263,7 +296,12 @@ function frame(now) {
   if (!paused && !el('settings').open && !document.hidden) {
     age += dt;
     time += dt;
-    if (screen === 'leg' && age > 0.85) {
+    if (screen === 'leg' && !relit && !transferCaught && age >= 0.77) {
+      transferCaught = true;
+      snd.tone(739.99, 0.64, 0.07, 'triangle');
+      snd.tone(1108.73, 0.85, 0.032, 'sine');
+    }
+    if (screen === 'leg' && (relit || age > 0.85)) {
       if (heldKey) target = Math.max(-1, Math.min(1, target + heldKey * dt * 1.6));
       for (const event of step(run, dt, target)) {
         rec.event(event.type, { kind: event.kind, flame: Math.round(run.flame) });
@@ -284,7 +322,11 @@ function frame(now) {
         snd.tone(440 * 2 ** (-2 * notesPlayed / lights), 0.52, 0.065, 'sine', -35);
         notesPlayed++;
       }
-      if (age > (screen === 'drop' ? 0.8 + lights * interval : 0.95)) { revealed = true; panels(); }
+      if (age > (screen === 'drop' ? 0.8 + lights * interval : 0.95)) {
+        revealed = true;
+        panels();
+        el('resultTitle').focus({ preventScroll: true });
+      }
     }
   }
   el('progress').value = run.progress;
@@ -294,7 +336,7 @@ function frame(now) {
     .map(item => ({ kind: item.kind, x: item.x, ahead: item.at - run.elapsed }));
   draw({ screen, look: options.look, time, age, x: run.x, flame: run.flame / 100, objects,
     history: historyLabels, chain: chain.count + Number(resultScreen()), progress: run.progress, emberAge: run.elapsed - run.lastEmber,
-    hitAge: run.elapsed - run.lastHit, transferAge: screen === 'leg' ? age : Infinity });
+    hitAge: run.elapsed - run.lastHit, transferAge: screen === 'leg' && !relit ? age : Infinity });
   requestAnimationFrame(frame);
 }
 window.flameState = () => ({ screen, playing: screen === 'leg' && !paused, flame: run.flame, progress: run.progress, chain: chain.count, paused, target });

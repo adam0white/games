@@ -80,12 +80,14 @@ export function river(canvas) {
     span,
     world,
     shore,
+    lanternLevel,
     skylayer,
     skyKey = '';
   let trail = [],
     lastTrail = -1,
     lastScreen = '',
-    donorAhead = 1;
+    donorAhead = 1,
+    heading = 0, previousX = 0, previousTime = 0;
   function shape(points, color) {
     ctx.beginPath();
     ctx.moveTo(points[0], points[1]);
@@ -135,7 +137,7 @@ export function river(canvas) {
       grad.addColorStop(1, p.dusk);
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, w, height);
-      for (let i = 0; i < 74; i++) {
+      for (let i = 0; style !== 'storm' && i < 74; i++) {
         const x = w * noise(i + 17),
           y = horizon * noise(i + 76);
         ctx.globalAlpha = 0.17 + noise(i + 74) * 0.55;
@@ -146,16 +148,20 @@ export function river(canvas) {
       const r = unit * 0.073,
         mx = w * 0.61,
         my = horizon * 0.83 - r * 0.4;
-      ellipse(mx, my, r, r, p.sun);
-      ctx.save();
-      ctx.clip();
-      for (let i = 0; i < 9; i++)
-        line(
-          [mx - r, my + r * (0.07 + i * 0.117), mx + r, my + r * (0.07 + i * 0.117)],
-          p.dusk,
-          unit * 0.002 + i * 0.1,
-        );
-      ctx.restore();
+      if (style === 'paper') {
+        ellipse(mx, my, r, r, p.sun);
+        ctx.save();
+        ctx.clip();
+        for (let i = 0; i < 9; i++)
+          line(
+            [mx - r, my + r * (0.07 + i * 0.117), mx + r, my + r * (0.07 + i * 0.117)],
+            p.dusk,
+            unit * 0.002 + i * 0.1,
+          );
+        ctx.restore();
+      } else if (style === 'thermal') {
+        ellipse(mx, my, r * 0.72, r * 0.72, p.mountain);
+      }
       for (let row = 0; row < 3; row++) {
         const contour = [];
         for (let i = 0; i <= 84; i++) {
@@ -184,7 +190,21 @@ export function river(canvas) {
         .getContext('2d')
         .drawImage(canvas, 0, 0, skylayer.width, skylayer.height, 0, 0, skylayer.width, skylayer.height);
       skyKey = key;
-    } else ctx.drawImage(skylayer, 0, 0, w, (skylayer.height * h) / canvas.height);
+    } else {
+      const fullHeight = skylayer.height * h / canvas.height;
+      ctx.drawImage(skylayer, 0, horizon + 2 - fullHeight, w, fullHeight);
+    }
+    if (style === 'storm') {
+      for (let band = 0; band < 3; band++) {
+        const hem = [];
+        for (let i = 60; i >= 0; i--) {
+          const u = i / 60;
+          const swell = wave(u * 7 + band * 2 - t * (0.08 + band * 0.02));
+          hem.push(w * u, horizon * (0.61 - band * 0.15 + swell * 0.19));
+        }
+        shape([0, 0, w, 0, ...hem], ['#465457', '#303d40', '#202c31'][band]);
+      }
+    }
   }
   function bank(side) {
     const lip = [],
@@ -287,7 +307,7 @@ export function river(canvas) {
       const length = spread * (0.6 + 0.32 * jitter);
       const thick = (0.6 + s * 0.87) * (style === 'storm' ? 0.72 : 1);
       ctx.globalAlpha = (0.32 + 0.18 * jitter) * (1 - s * 0.44);
-      const tint = style === 'thermal' ? p.edge : i % 4 === 0 ? p.white : p.sun;
+      const tint = style === 'paper' ? (i % 4 === 0 ? p.white : p.sun) : p.edge;
       if (style === 'storm') {
         ellipse(x, y, length, Math.max(0.8, thick * 2), tint, 0.12, 2.97, true, thick);
       } else {
@@ -332,22 +352,18 @@ export function river(canvas) {
         ctx.lineWidth = q.s;
         ctx.stroke();
       } else if (style === 'storm') {
-        const phase = (t * 0.64 + noise(i + 80)) % 1;
-        ctx.globalAlpha = (1 - phase) * 0.55;
-        const near = objects.some(
-          (o) => o.kind === 'rock' && Math.abs(o.ahead - a) < 0.55 && Math.abs(o.x - x) < 0.19,
+        const phase = (t * 1.18 + noise(i + 80)) % 1;
+        const near = objects.find(
+          o => o.kind === 'rock' && Math.abs(o.ahead - a) < 0.85 && Math.abs(o.x - x) < 0.23,
         );
-        ellipse(
-          q.x,
-          q.y,
-          len * phase + 1,
-          len * phase * 0.32 + 1,
-          Math.abs(q.x - boatX) < span * 0.38 ? p.sun : p.edge,
-          near ? 0.8 : 0.1,
-          near ? 3.1 : 5.95,
-          true,
-          0.8 * q.s,
-        );
+        const lit = Math.hypot(q.x - boatX, (q.y - boatY) * 0.78) < span * (0.10 + 0.85 * lanternLevel);
+        const tint = lit ? p.sun : p.edge;
+        ctx.globalAlpha = (1 - phase) * (lit ? 0.93 : 0.65);
+        const rx = 1 + len * phase, ry = 0.8 + rx * 0.28;
+        if (near) {
+          ellipse(q.x - rx * 0.13, q.y, rx, ry, tint, 1.8, 4.5, true, 0.8 + q.s * 0.5);
+          ellipse(q.x + rx * 0.13, q.y, rx, ry, tint, -1.1, 1.2, true, 0.8 + q.s * 0.5);
+        } else ellipse(q.x, q.y, rx, ry, tint, 0.1, 5.95, true, 0.7 + q.s * 0.4);
       } else {
         shape(
           [q.x - len, q.y, q.x + len * 0.33, q.y - q.s, q.x + len, q.y, q.x - len * 0.45, q.y + q.s],
@@ -411,77 +427,67 @@ export function river(canvas) {
     }
     ctx.globalAlpha = 1;
   }
-  function boat(x, y, k, level, dir = 1) {
+  // Stern nearest the viewer. The keel, benches and foredeck share an oblique axis.
+  function boat(x, y, k, level, yaw = 0) {
     ctx.save();
     ctx.translate(x, y);
-    ctx.scale(k * dir, k);
-    ellipse(0, 2, 38, 5, p.ink);
-    shape([-43, -11, -31, -5, 18, -7, 34, -16, 40, -25, 39, -11, 23, 1, -13, 4, -33, 0], p.ink);
-    shape([-42, -12, -25, -7, 16, -9, 30, -16, 40, -25, 35, -13, 21, -5, -10, -2, -34, -5], p.hull);
-    line([-40, -12, -24, -8, 16, -10, 30, -17, 39, -25], p.white, 1.3);
-    line([-17, -5, -9, 0, 16, -4], p.hull, 1);
-    // Bent mast suspends a square lantern above the gunwale.
-    line([-9, -8, -9, -36, -5, -40, 5, -40, 5, -35], p.ink, 2.8);
-    line([-8, -35, -5, -39, 4, -39], p.edge, 0.8);
+    ctx.scale(k, k);
+    ctx.rotate(yaw);
+    ellipse(1, 0, 22, 7, p.ink);
+    shape([-22,-3, -19,-21, -4,-42, 15,-67, 16,-49, 23,-27, 19,-7, 8,3, -12,5], p.ink);
+    shape([-21,-7, -16,-22, -4,-41, 15,-66, 10,-44, -1,-26, -8,-12, -11,0], p.hull);
+    shape([-16,-12, -8,-29, 12,-54, 17,-32, 17,-17, 10,-10, -8,-7], p.bank);
+    shape([10,-44, 15,-62, 19,-35, 13,-29, 3,-32], p.hull);
+    shape([-14,-18, -11,-23, 16,-27, 17,-23], p.moss);
+    shape([-22,-8, -11,-3, 10,-5, 20,-13, 18,-5, 7,2, -11,4, -21,0], p.hull);
+    line([-21,-8, -14,-25, 0,-45, 15,-66], p.white, 1.45);
+    line([-21,-8, -11,-3, 10,-5, 20,-13, 20,-31, 15,-58], p.edge, 1.15);
+    line([-10,-2, -8,2, 6,0], p.ink, 1);
+    // Lantern hangs off the port quarter, clear of the deck and stern.
+    line([-11,-12, -12,-40, -16,-44, -24,-43, -24,-36], p.ink, 3.1);
+    line([-12,-39, -16,-43, -23,-42], p.edge, 1.2);
     ctx.fillStyle = p.ink;
-    ctx.fillRect(-2, -35, 14, 16);
+    ctx.fillRect(-31,-37,14,16);
     ctx.fillStyle = level > 0 ? p.sun : p.moss;
-    ctx.fillRect(0, -33, 10, 11);
-    if (level > 0) fire(5, -24, 4 + 3 * level);
-    line([-3, -35, 13, -35], p.white, 1.2);
-    line([1, -21, 10, -21], p.hull, 1);
+    ctx.fillRect(-29,-35,10,11);
+    if (level > 0) fire(-24,-26,3.8 + 2.6 * level);
+    line([-32,-37,-16,-37], p.white, 1.4);
+    line([-29,-22,-20,-22], p.hull, 1);
     ctx.restore();
+  }
+  function lantern(x, y, k, yaw) {
+    return [x + k * (-24 * Math.cos(yaw) + 30 * Math.sin(yaw)),
+            y + k * (-24 * Math.sin(yaw) - 30 * Math.cos(yaw))];
   }
   function object(o) {
     const { x, y, s } = position(o.x, o.ahead);
     const k = (s * unit) / 420;
     if (o.kind === 'rock') {
-      ellipse(x, y + 1, 25 * k, 6 * k, p.edge, 0.08, 3.21, true, 1.8 * k);
-      ellipse(x, y + 2 * k, 31 * k, 8 * k, p.moss, 0.45, 2.64, true, 1.2 * k);
-      shape(
-        [
-          x - 21 * k,
-          y,
-          x - 13 * k,
-          y - 11 * k,
-          x - 4 * k,
-          y - 17 * k,
-          x + 9 * k,
-          y - 15 * k,
-          x + 20 * k,
-          y - 2 * k,
-          x + 9 * k,
-          y + 2 * k,
-        ],
-        p.ink,
-      );
-      shape(
-        [
-          x - 21 * k,
-          y,
-          x - 13 * k,
-          y - 11 * k,
-          x - 4 * k,
-          y - 17 * k,
-          x + 9 * k,
-          y - 15 * k,
-          x - 2 * k,
-          y - 10 * k,
-        ],
-        p.edge,
-      );
-      shape(
-        [x - 2 * k, y - 10 * k, x + 9 * k, y - 15 * k, x + 20 * k, y - 2 * k, x + 8 * k, y - 4 * k],
-        p.ridge,
-      );
+      const size = Math.max(0.34, k);
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(size, size);
+      // The two streaks begin at the waterline and separate downstream.
+      line([-15,-2, -21,3, -25,12, -31,18], p.edge, 1.8);
+      line([18,-2, 22,3, 24,9, 28,13], p.moss, 2);
+      shape([-21,0, -16,-13, -6,-27, 6,-25, 18,-9, 21,-1, 8,3, -9,2], p.ink);
+      shape([-16,-13, -6,-27, 6,-25, 2,-18, -7,-17, -18,-5], p.edge);
+      shape([2,-18, 6,-25, 18,-9, 21,-1, 9,-4], p.ridge);
+      line([-16,-13, -6,-27, 6,-25], p.white, 1.6);
+      ctx.restore();
     } else if (o.kind === 'ember') {
-      const bob = Math.sin(t * 3 + o.x) * k * 2;
-      reflection(x, y + 2 * k, k * 0.36, 0.65);
-      ellipse(x, y - 8 * k + bob, k * 13, k * 13, p.sun, 0, TAU, true, k * 0.9);
-      fire(x, y - 3 * k + bob, 8 * k);
-      const phase = (t * 0.6 + o.x + 1) % 1;
+      const size = Math.max(4.5, 9.5 * k);
+      const fy = y - 3 * k + Math.sin(t * 3 + o.x) * k * 2;
+      reflection(x, y + 2 * k, k * 0.5, 0.86);
+      for (let ring = 3; ring >= 1; ring--) {
+        ctx.globalAlpha = 0.06 + (3 - ring) * 0.055;
+        ellipse(x, fy - size * 0.72, size * ring, size * ring * 1.04, p.sun);
+      }
+      ctx.globalAlpha = 1;
+      fire(x, fy, size);
+      const phase = (t * 0.8 + o.x + 1) % 1;
       ctx.globalAlpha = 1 - phase;
-      ellipse(x + Math.sin(t + o.x) * 2 * k, y - (19 + 9 * phase) * k, 1.6 * k, 1.6 * k, p.white);
+      ellipse(x + Math.sin(t + o.x) * size * 0.3, fy - (1.65 + phase) * size, size * 0.16, size * 0.23, p.white);
       ctx.globalAlpha = 1;
     } else if (o.kind === 'buoy') {
       reflection(x, y, k * 0.6, 1);
@@ -532,7 +538,9 @@ export function river(canvas) {
     p = palettes[look] || palettes.paper;
     t = state.time || 0;
     unit = Math.min(w, h, 620);
-    horizon = h * 0.34;
+    const tilt = screen === 'leg' ? ease((age - 0.80) / 1.15) : 0;
+    horizon = h * (0.34 - 0.19 * tilt);
+    lanternLevel = flame;
     boatY = h * 0.77;
     span = Math.min(w * 0.49, unit * 0.79);
     world = screen === 'leg' ? (state.progress || 0) * 60 : screen === 'arrival' ? ease(age / 4) * 4 : 60;
@@ -543,7 +551,16 @@ export function river(canvas) {
       trail = [];
       lastTrail = -1;
       lastScreen = screen;
+      heading = 0;
+      previousX = x;
     }
+    const dt = t - previousTime;
+    if (dt > 0 && dt < 0.25) {
+      const yaw = Math.max(-0.47, Math.min(0.47, (x - previousX) / dt * 0.38));
+      heading += (yaw - heading) * (1 - Math.exp(-dt * 8));
+    }
+    previousX = x;
+    previousTime = t;
     sky();
     water(objects);
     if (screen === 'drop') {
@@ -592,14 +609,29 @@ export function river(canvas) {
       local = 0;
     }
     if (screen === 'leg' && state.transferAge < 0.85) {
-      const f = ease(state.transferAge / 0.85),
-        q = position(-0.42, donorAhead + f * 1.2);
-      boat(q.x, q.y, q.s * k, 0);
-      const arc = (u) => [
-        q.x + (boatX - q.x) * u,
-        q.y + (boatY - q.y) * u - 30 * k - Math.sin(u * Math.PI) * unit * 0.22,
+      const f = ease((state.transferAge - 0.07) / 0.70);
+      const q = position(-0.42, donorAhead + f * 1.2);
+      ctx.globalAlpha = 1 - ease((state.transferAge - 0.50) / 0.35);
+      boat(q.x, q.y, q.s * k, f === 0 ? flame : 0);
+      ctx.globalAlpha = 1;
+      const from = lantern(q.x, q.y, q.s * k, 0);
+      const to = lantern(boatX, boatY + bob, k, heading);
+      const arc = u => [
+        from[0] + (to[0] - from[0]) * u,
+        from[1] + (to[1] - from[1]) * u - Math.sin(u * Math.PI) * unit * 0.23,
       ];
       const [xx, yy] = arc(f);
+      const ribbon = [], lower = [];
+      for (let j = 0; j <= 16; j++) {
+        const u = j / 16;
+        const [px, py] = arc(Math.max(0, f - (1 - u) * 0.28));
+        const width = Math.sin(Math.PI * u) * k * 3;
+        ribbon.push(px, py - width);
+        lower.unshift(px, py + width);
+      }
+      ctx.globalAlpha = 0.80 * Math.sin(Math.PI * f);
+      shape([...ribbon, ...lower], p.sun);
+      ctx.globalAlpha = 1;
       for (let i = 1; i <= 9; i++) {
         const [sx, sy] = arc(Math.max(0, f - i * 0.013));
         ctx.globalAlpha = (1 - i / 10) * Math.sin(Math.PI * f);
@@ -612,19 +644,47 @@ export function river(canvas) {
       }
       ctx.globalAlpha = 1;
       fire(xx, yy, 9 * k);
-      local = flame * f;
+      local = f < 0.96 ? 0 : flame * ease((f - 0.96) / 0.04);
     }
-    const ordered = objects.filter((o) => o.ahead >= -1.6 && o.ahead <= 18);
+    const ordered = state.transferAge < 0.85 ? [] : objects.filter(o => o.ahead >= -1.6 && o.ahead <= 18);
     const remaining = (1 - (state.progress || 0)) * 60;
     if (screen === 'handoff' || (screen === 'leg' && remaining < 8)) {
       ordered.push({ kind: 'buoy', ahead: screen === 'handoff' ? 0 : remaining, x: 0.78 });
     }
     ordered.sort((a, b) => b.ahead - a.ahead);
+    if (screen === 'leg' && state.transferAge >= 0.85) {
+      // Dark adaptation still leaves the banks and crests visible outside the beam.
+      const reach = (0.17 + 1.24 * Math.sqrt(clamp(flame))) * (boatY - horizon);
+      ctx.save();
+      ctx.translate(boatX, boatY - unit * 0.08);
+      ctx.scale(0.78, 1);
+      const shade = ctx.createRadialGradient(0, 0, 0, 0, 0, reach);
+      shade.addColorStop(0, 'rgba(255,198,95,0.09)');
+      shade.addColorStop(0.44, 'rgba(3,9,18,0.045)');
+      shade.addColorStop(0.79, 'rgba(3,9,18,0.32)');
+      shade.addColorStop(1, 'rgba(3,9,18,0.65)');
+      ctx.fillStyle = shade;
+      ctx.fillRect(-w * 2, horizon - boatY + unit * 0.08, w * 4, h - horizon);
+      ctx.restore();
+    }
     for (const o of ordered) if (o.ahead >= 0) object(o);
     pool(boatX, boatY, local, 1);
     reflection(boatX, boatY + 3 * k, k, local);
-    boat(boatX, boatY + bob, k, local);
+    boat(boatX, boatY + bob, k, local, heading);
     for (const o of ordered) if (o.ahead < 0) object(o);
+    if (screen === 'leg' && state.transferAge >= 0.71 && state.transferAge < 1.27) {
+      const bloom = clamp((state.transferAge - 0.71) / 0.56);
+      const [lx, ly] = lantern(boatX, boatY + bob, k, heading);
+      ctx.globalAlpha = Math.sin(bloom * Math.PI) * (1 - bloom);
+      ellipse(lx, ly, k * (7 + 25 * bloom), k * (7 + 25 * bloom), p.sun, 0, TAU, true, k * 1.7);
+      for (let i = 0; i < 7; i++) {
+        const angle = i / 7 * TAU;
+        const radius = k * (10 + 30 * bloom);
+        const sx = lx + radius * Math.cos(angle), sy = ly + radius * Math.sin(angle);
+        line([sx, sy, sx + 3 * k * Math.cos(angle), sy + 3 * k * Math.sin(angle)], p.white, 1.5 * k);
+      }
+      ctx.globalAlpha = 1;
+    }
     if (screen === 'leg' && state.emberAge < 0.7) {
       const v = state.emberAge / 0.7;
       ctx.globalAlpha = 1 - v;
@@ -632,8 +692,8 @@ export function river(canvas) {
         const dx = i * unit * 0.027 * Math.sin((v * Math.PI) / 2);
         shape(
           [
-            boatX + 22 * k,
-            boatY - 12 * k,
+            boatX + (15 + heading * 53) * k,
+            boatY - 58 * k,
             boatX + dx * (1 + v),
             boatY - (0.1 + 0.13 * v) * unit,
             boatX + dx + 6 * k,
@@ -649,6 +709,24 @@ export function river(canvas) {
       ctx.globalAlpha = 0.16 * (1 - state.hitAge / 0.22);
       ctx.fillRect(0, 0, w, h);
       ctx.globalAlpha = 1;
+    }
+    if (style === 'storm') {
+      ctx.save();
+      for (let layer = 0; layer < 2; layer++) {
+        ctx.strokeStyle = layer ? 'rgba(191,213,207,.32)' : 'rgba(163,193,192,.18)';
+        ctx.lineWidth = layer ? 1.15 : 0.7;
+        ctx.beginPath();
+        for (let i = layer; i < 104; i += 2) {
+          const speed = layer ? 1.18 : 0.68;
+          const rx = ((noise(i + 401) - t * speed * 0.31) % 1 + 1) % 1 * (w + 28);
+          const ry = (noise(i + 553) + t * speed * 0.87) % 1 * (h + 44) - 44;
+          const length = (layer ? 0.065 : 0.03) * unit;
+          ctx.moveTo(rx, ry);
+          ctx.lineTo(rx - length * 0.5, ry + length);
+        }
+        ctx.stroke();
+      }
+      ctx.restore();
     }
     if (style === 'paper') {
       ctx.fillStyle = paper;

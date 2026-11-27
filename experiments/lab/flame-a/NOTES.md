@@ -2,19 +2,25 @@
 
 Serve the repository’s `experiments/` directory as the static root and open `/lab/flame-a/`. Touch the river to take the flame, then slide to steer. On a keyboard, use Space to take it, the arrow keys to steer, and P to pause. A fresh flame starts at 76%. A linked flame starts at the level in its fragment. A leg lasts 60 simulation seconds, plus the initial transfer. Actual distance depends on the seed.
 
-At the buoy the carrier can sign with a nickname or leave it blank. Passing tries the native share sheet, then the clipboard. The kit returns “shown” when the sheet is dismissed or automatic copying is unavailable. In that case the game selects the link for manual copying. Sharing again uses the same next seed.
+At the buoy the carrier can sign with a nickname or leave it blank. The result lists each retained name and distance, the current leg, and the total through all hands. Earlier carriers share a row with their combined distance. The native share sheet receives the pitch and URL. Clipboard and manual-copy fallbacks include both on separate lines. Opening the link starts the recipient at the sender’s outgoing light. Sharing the same result again keeps the next seed.
 
 ## Link
 
-The fragment has the form `#f=1~count~flame~total~seed~distance:name[~distance:name…]`. Example for the first player to receive Sam’s flame:
+New fragments use `#f=2~checksum~count~flame~total~seed~distance:name[~distance:name…]`. For example, Sam’s first handoff could be:
 
-    #f=1~1~47~1840~23~1840:Sam
+    #f=2~d66770cc~1~47~1840~23~1840:Sam
 
-The count is the number of previous legs. Total and individual distances are whole metres. The flame ranges from 1 to 100. The seed and count are unsigned 32-bit integers. Up to eight carrier entries appear, oldest first. Earlier distances remain in the total. Names use canonical URI percent encoding and contain at most 16 Unicode letters, ASCII digits, spaces, underscores, dots or hyphens. A blank name is valid. The decoder checks lengths, characters, canonical spelling, integer bounds and distance consistency. Invalid fragments start a fresh flame.
+The eight lowercase hex digits are FNV-1a over the public prefix `river.coals.v2/` and the canonical payload starting with the count. This only deters casual editing. Anyone with the code can calculate a checksum or construct a plausible legacy link. There is no server signature.
+
+The count describes previous legs. Count and seed fit unsigned 32-bit integers. Light is a whole percentage from 1 to 100. Each leg contributes 16–2,040 whole metres. The fragment holds the last eight carriers, oldest first, or everyone in a shorter chain. Names have at most 16 Unicode letters, ASCII digits, spaces, underscores, dots or hyphens, with canonical URI encoding. An anonymous row ends in a colon. Either link version recovers that final colon if a chat app strips it.
+
+Old `#f=1~count~flame~total~seed~…` fragments have no checksum. Both formats check field lengths, canonical spelling, ranges, names and distance arithmetic. For a legacy link, fewer than eight entries support only that many carriers. With eight entries, the distance left after subtracting their legs bounds the number of earlier carriers. The decoder reduces an inflated legacy count to the supported count and refuses an inconsistent total. A refused fragment displays an explanation and opens a fresh flame.
 
 ## Rules and settings
 
-Paper, Thermal and Storm share one seeded simulation. Paper is the default. The default drop rule lets the carrier pass an 18% ember. The alternative ends that branch. Retry is independently configurable and replays the same seed and incoming flame. Lighting a new flame discards that branch and makes the player the first carrier of the new one. Leaving the page pauses a leg.
+Paper, Thermal and Storm share a seeded river. Paper is the default. An idle boat takes the first central ember and misses the later embers. The drain rises after the sheltered first 21 seconds. Steering toward off-centre embers lets a weak flame survive the faster drain.
+
+On a first drop, `dims` (default) allows a carrier to pass an 18% ember. With `ends`, that option is absent. The existing `retryRule=allow` gives one relight on the same river at 25% light. A second drop ends that branch even under `dims`. The existing `retryRule=once` gives one attempt. Starting a new flame makes the player carrier 1. Leaving the page pauses a leg.
 
 ## Storage and recording
 
@@ -35,8 +41,8 @@ The river, boats, wakes, light, rain and sounds are generated. The approaching b
 
 ## Verification
 
-Run `node experiments/lab/flame-a/check.mjs` from the repository root. The check covers canonical and hostile links, retention of the last eight carriers, numeric limits, finish-to-next-start light, first-ember placement, rock timing, idle survival and a deliberate bank drop. Across seeds 0–199, the ember-following policy finished 200 legs. The shortest idle run lasted 46.9 seconds with a fresh flame and 21.3 seconds with a 1% incoming flame.
+Run `node experiments/lab/flame-a/check.mjs`. Across seeds 0–199, steering toward embers finished 200/200 fresh legs and 121/200 legs received at 18%. Idle runs at 1%, 18%, 76% and 100% all dropped between 21.3 and 38.2 simulation seconds. The check also covers a deliberate bank drop, incoming light after a handoff, legacy count inflation, invalid fields, checksum edits, and recovery of a stripped final separator.
 
-A separate integration exercise drove the actual handlers and renderer with DOM and canvas test doubles. It completed a handoff, reopened the generated manual-copy link, hit the bank, passed a weak flame, retried the incoming chain and started a fresh one. It also exercised pause and resume. Each look was drawn and inspected with a native Canvas 2D implementation.
+Round 2 exercised the actual page handlers with Happy DOM, pointer events, a controlled frame clock and a clipboard double. A fresh run reached handoff, filtered a pasted nickname and produced a pitch plus link. Reopening that link restored the name, carrier number and light. A refused link showed its explanation. An idle run dropped, relit at 25% on the identical course, dropped again, then started a fresh flame. A separate 23-carrier arrival reached a 24-hand result and produced English and Turkish share text. The painter ran against native Canvas 2D at 320 px across all three looks, the transfer, and full and low light.
 
-On 2026-11-27 `kit/check/phone.mjs lab/flame-a` passed on Chromium Pixel 7 and WebKit iPhone 13 (seeded save survives, a finger steers, pause stops time, one audio context after the first tap, sound switch). A script also ran a leg to the handoff in both engines and opened the made link in a second page. Not checked: real touch on a phone, native share, clipboard permissions, audio, vibration, load time on a phone connection and 60 fps on a midrange phone still need device verification. The live recording endpoint and its game registration also remain unverified.
+The round 2 phone runner was blocked from binding its localhost server. Browser launches were also denied by the sandbox. The earlier round passed the Pixel 7 Chromium and iPhone 13 WebKit profiles. Current browser layout, native sharing and clipboard permissions, audible playback, haptics, physical-phone frame rate and load time, and live recording remain unverified. The 320 px title clearance comes from the CSS dimensions. Outside-player response to this revision remains unmeasured.
