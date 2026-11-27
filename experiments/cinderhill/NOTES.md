@@ -1114,11 +1114,39 @@ six seeds, outpost bot against plain bot (`node war/measure.mjs door 6 stones sa
 | First Frost, seat 0 | 459 | 433 |
 | First Frost, seat 1 | 454 | 433 |
 
-On First Frost the bot's door is in the wrong place for its food (loads by tick 2000: 188 against 244). The bot digs
-24 columns toward the middle without looking; a person chooses where. The cost in the mission where it is dug: 16 to
+On First Frost the kept door lowers the bot's loads (by tick 2000: 188 against 244). A trace of loads by trail (seed
+1, the plain mind on both hills, same nest) gives the cause, and it is the bot's choice of piles, not the door's rule.
+The bot holds three forage trails and ranks piles by steps from its nearer door, with 40 steps added for the food it
+is not short of. With the door open a pile 71 steps from the first door is 29 from the second, so it takes a trail
+from the start. When the nearest pile runs dry (about tick 1100) the shut hill opens a trail to a pile 16 steps out,
+which brings 143 loads by tick 2000; the open hill's third trail is already on the far pile and its free one goes to
+a pile 50 steps out (73 loads). The second-door trail itself carries what the same crew carried on a 35-step trail
+from the first door (17, 24, 34 loads at ticks 1250, 1500, 1750 on both hills). The forward store is not full (30 of
+120). One rule was tried and reverted: a free ant under ground takes a trail from her nearer door (loads unchanged,
+107 and 181). So a second door pays where it brings a pile much nearer than any other, as on The Stones, and a bot
+that takes the far pile first loses by it. The bot is left as it is. The cost in the mission where it is dug: 16 to
 69 fewer adults at tick 5000 in four traced games (154 v 170, 111 v 180, 155 v 174, 130 v 132).
 
 **Not checked, or open.** No person has played it. A raid sent under ground shuts only the rival's first door out of
 its field, so a soldier may come up the second. The weevil comes in by the first door; its reach is counted from the nearer door, and it may leave by the second. The surface
 shows a banner but no hole in the ground. Wins on six seeds are not read: plain against plain already gives 6 to 0 on
 The Stones.
+
+### Food is the clock (pace trace)
+
+Steady bot against the Timid rival, growth on, two seeds each. The Crossing ends at tick 7680 (queen) and 9600
+(dusk); The Stones at 5720 both (points); The Hunt at 6062 and 5974 (the beast). Food left on the ground falls from
+about 880 to about 190 by tick 4000. Loads home per 1000 ticks peak at 144 to 162 between ticks 2000 and 4000, then
+fall to 63, 42, 58, 18 (The Crossing, seed 1) and 52, 14, 0, 0, 0, 0 (seed 2) while 150 to 300 food is still on the
+map (whether out of reach or on the rival's side was not checked).
+
+Reading: the ground is mostly bare by about minute three and a half, and a mission ends between minute five and
+eight. A thing dug in a mission pays only if it is dug by about minute two, or pays after the ground is bare (food
+made at home, food taken from the rival, points, the beast), or is kept to the next mission. The second door dug at
+tick 3100 to 4600 fails all three inside its own mission, which is why it was flat there. This replaces the earlier
+sentence "a match ends in about five minutes and a real dig takes two".
+
+Rule for the next tree nodes: prefer what pays after the ground is bare or is dug by minute two (all seven missions)
+over what is carried (three missions). A carried thing must be a place or an order in the next mission, not more
+ants or seeds. A node both hills can have is accepted when its measure moves at a fixed tick, its cost is
+measurable, and the person's path is seen in a phone browser.
