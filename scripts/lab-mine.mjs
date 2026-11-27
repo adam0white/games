@@ -106,6 +106,20 @@ const lastEvent = run => (run.data.events ?? []).at(-1);
 const lastTap = run => (run.data.trace ?? []).filter(x => x[1] === 'b' && x[0] >= 0).at(-1);
 const where = run => { const e = lastEvent(run), b = lastTap(run); return [e ? `${e.type}${e.data !== undefined ? ' ' + short(e.data, 40) : ''} at ${secs(e.t)}` : 'no game event', b ? `tap "${b[2]}" at ${secs(b[0])}` : ''].filter(Boolean).join('; '); };
 
+// Player settings (Adam 2026-11-27: give players options as settings with a default, then count who changes them and to
+// what). Games send `setting {name, from, to}` events and may put the active values in a run's start. Per setting: how
+// many players changed it, how many changes, each changer's last pick, and runs played under each value.
+export function settings(runs, between) {
+  const evs = [...runs, ...between].flatMap(r => (r.data.events ?? []).filter(e => e.type === 'setting' && e.data?.name).map(e => ({ player: r.player, at: (r.data.started ?? r.at) + (e.t ?? 0), ...e.data })));
+  const names = [...new Set(evs.map(e => e.name))].sort();
+  return names.map(name => {
+    const mine = evs.filter(e => e.name === name).sort((a, b) => a.at - b.at), last = new Map();
+    for (const e of mine) last.set(e.player, e.to);
+    return { name, changers: last.size, changes: mine.length, finalPick: count([...last.values()], v => String(v)),
+      runsWith: count(runs.filter(r => r.data.start && name in r.data.start), r => String(r.data.start[name])) };
+  });
+}
+
 export function analyse(records) {
   const games = new Map();
   const of = g => { if (!games.has(g)) games.set(g, { records: [], runs: [], between: [], other: [] }); return games.get(g); };
@@ -163,6 +177,7 @@ export function analyse(records) {
       fps: fps.length ? { windows: fps.length, p50fps: Math.round(1000 / q(fps.map(f => f.p50), 0.5)), p95fps: Math.round(1000 / q(fps.map(f => f.p95), 0.5)),
         worstFrame: q(fps.map(f => f.worst), 1), slowWindows: fps.filter(f => f.p95 > 33.4).length } : null,
       errors: count(trace.filter(({ x }) => x[1] === 'err'), ({ x }) => `${x[2]}: ${x[3]}`),
+      settings: settings(runs, g.between),
       other: count(g.other, r => `${r.kind} ${r.data?.format ?? ''}`.trim()),
     };
   }
@@ -189,6 +204,11 @@ function gameReport(game, r) {
   if (r.idle.top.length) L.push('', table(['run', 'from', 'idle', 'last game event before'], r.idle.top.map(x => [x.runId.slice(0, 8), secs(x.from), secs(x.ms), x.before])));
   L.push('', '## Game events', '', table(['event', 'times'], r.events.slice(0, 30)));
   if (r.between.length) L.push('', '**Outside a run:**', '', table(['event', 'times'], r.between));
+  if (r.settings?.length) {
+    L.push('', '## Settings', '', `Of ${r.players} player id(s): who changed each setting, and to what.`, '');
+    L.push(table(['setting', 'players who changed it', 'changes', 'their last pick', 'runs played with'], r.settings.map(x => [x.name, x.changers, x.changes,
+      x.finalPick.map(([k, n]) => `${k} ×${n}`).join(', ') || '-', x.runsWith.map(([k, n]) => `${k} ×${n}`).join(', ') || '-'])));
+  }
   L.push('', '## Input', '', `Device: ${r.devices.map(([k, n]) => `${k} ×${n}`).join(', ') || '-'}; viewports: ${r.viewports.slice(0, 6).map(([k, n]) => `${k} ×${n}`).join(', ') || '-'}.`);
   L.push('', `**Where presses land** (${r.heat.taps} presses; ${r.heat.on.map(([k, n]) => `${k} ${n}`).join(', ') || '-'}; ${r.heat.pointer.map(([k, n]) => `${k} ${n}`).join(', ') || '-'}):`, '', r.heat.taps ? heatText(r.heat.grid) : '_none_');
   L.push('', '**Buttons:**', '', table(['button', 'taps'], r.buttons.slice(0, 30)));
