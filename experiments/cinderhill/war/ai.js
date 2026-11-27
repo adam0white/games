@@ -253,6 +253,8 @@ export function think(sim, t, mind = 1) {
     const bc = sim.beast[1], atBeast = k => { const s2 = t * TRAILS + k; return sim.trPath[s2 * PATH_MAX + sim.trLen[s2] - 1] === bc; };
     if (raids.length && (majors < 2 || !atBeast(raids[0]))) for (const k of raids) out.push({ team: t, type: CMD.ERASE, trail: k });
     else if (!raids.length && live.length < TRAILS && majors >= (sim.beast[0] === 0 ? 2 : mind.huntAt ?? (mood === 2 ? 12 : mood === 1 ? 10 : 4))) out.push({ team: t, type: CMD.TRAIL, kind: KIND.RAID, level: majors >= 12 ? 3 : 2, points: [bc % sw, Math.floor(bc / sw)] });
+    // After the fall the meat has to be carried: one full Forage trail to the body, kept for as long as there is meat on it.
+    if (sim.beast[0] === 0 && sim.mission.goals.carry && !forage.some(k => atBeast(k)) && live.length + out.filter(o => o.type === CMD.TRAIL).length < TRAILS) out.push({ team: t, type: CMD.TRAIL, kind: KIND.FORAGE, level: 3, points: [bc % sw, Math.floor(bc / sw)] });
     return out;
   }
   // The other hill's soldiers out on its raid trails: a thief's opening is a guard that is away.
