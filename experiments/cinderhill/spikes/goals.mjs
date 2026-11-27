@@ -20,30 +20,35 @@ function run(quota) {
   for (const c of script(cfg, TICKS)) sim.queueCommand(encodeCommand(c));
   if (quota !== REBUILDS) sim.rebuildFields = function () { rebuildDirty(this, quota, s => { for (let i = 0; i < this.n; i++) if (this.goal[i] === s) this.best[i] = 0x7FFFFFFF; }); };
   const steady = [], after = [];
-  let live = 0, burstAt = -1, waitMax = 0;
-  while (sim.tick < TICKS) {
-    if (sim.tick === WARM) {
-      // Fill the pool: open cells on a fixed lattice, surface and nest in turn.
-      const L = sim.L;
-      // The pool, and any free fixed slot but a trail's (a trail needs a drawn path; the script keeps them live).
-      const free = () => { for (let s = 0; s < MAX_GOALS; s++) if (!sim.flow.live[s] && !(s >= SLOT.TRAIL0 && s < SLOT.TRAIL0 + SLOT.TRAILS)) return s; return -1; };
-      for (let k = 0; k < 4000 && free() >= 0; k++) {
-        const surf = k % 2 === 0, w = surf ? L.sw : L.nw, h = surf ? L.sh : L.nh, x = (17 + 37 * k) % w, y = (11 + 53 * k) % h;
-        const c = cellAt(L, surf ? SURFACE : NEST, x, y);
-        if (sim.mat[c] === MAT.OPEN) setGoal(sim, free(), GOAL.FOOD, c);
-      }
+  let burstAt = -1, marked = 0, waitTicks = -1, burst = null;
+  // Fill the pool: open cells on a fixed lattice, surface and nest in turn, into any free slot but a trail's (a trail
+  // needs a drawn path; the script keeps them live). Done at WARM, and again just before the burst, since piles and
+  // the alarm come and go (the review found 61 live at the burst without the refill).
+  const fill = () => {
+    const L = sim.L, free = () => { for (let s = 0; s < MAX_GOALS; s++) if (!sim.flow.live[s] && !(s >= SLOT.TRAIL0 && s < SLOT.TRAIL0 + SLOT.TRAILS)) return s; return -1; };
+    for (let k = 0; k < 4000 && free() >= 0; k++) {
+      const surf = k % 2 === 0, w = surf ? L.sw : L.nw, h = surf ? L.sh : L.nh, x = (17 + 37 * k) % w, y = (11 + 53 * k) % h;
+      const c = cellAt(L, surf ? SURFACE : NEST, x, y);
+      if (sim.mat[c] === MAT.OPEN) setGoal(sim, free(), GOAL.FOOD, c);
     }
-    if (sim.tick === Math.floor((WARM + TICKS) / 2)) { for (let s = 0; s < MAX_GOALS; s++) if (sim.flow.live[s]) markDirty(sim, s); burstAt = sim.tick; }
+  };
+  while (sim.tick < TICKS) {
+    if (sim.tick === WARM) fill();
+    if (sim.tick === Math.floor((WARM + TICKS) / 2)) {
+      fill(); sim.rebuildAll(); // the refill's fields built first, so the burst is the marks alone
+      burst = []; for (let s = 0; s < MAX_GOALS; s++) if (sim.flow.live[s]) { markDirty(sim, s); burst.push(s); }
+      marked = burst.length; burstAt = sim.tick;
+    }
     const t = performance.now();
     sim.step();
     const ms = performance.now() - t;
-    let l = 0, d = 0; for (let s = 0; s < MAX_GOALS; s++) { l += sim.flow.live[s]; if (sim.flow.dirty[s]) d++; }
-    if (sim.tick > WARM + 20) { live = Math.max(live, l); (burstAt >= 0 && sim.tick - burstAt <= 20 ? after : steady).push(ms); }
-    if (burstAt >= 0 && d) waitMax = sim.tick - burstAt;
+    if (sim.tick > WARM + 20) (burstAt >= 0 && sim.tick - burstAt <= 20 ? after : steady).push(ms);
+    // Ticks until every field the burst marked is exact again (later marks are not counted).
+    if (burst && waitTicks < 0 && burst.every(s => !sim.flow.live[s] || !sim.flow.dirty[s])) waitTicks = sim.tick - burstAt;
   }
-  return { quota: quota === Infinity ? 'none' : quota, live, steady: stats(steady), burst: stats(after), waitTicks: waitMax + 1, deferred: sim.flow.deferred, hash: sim.hashes().total };
+  return { quota: quota === Infinity ? 'none' : quota, live: marked, steady: stats(steady), burst: stats(after), waitTicks, deferred: sim.flow.deferred, hash: sim.hashes().total };
 }
 
 const q = opt('quota', REBUILDS);
 console.log(`Node ${process.version}, ${ants} ants, ${TICKS} ticks; the pool filled at tick ${WARM}; every field marked at once at tick ${Math.floor((WARM + TICKS) / 2)}`);
-for (const r of [...new Set([q, ...(args.includes('--all') ? [1, 2, 3, 4] : [])])].map(run).concat([run(Infinity)])) console.log(`quota ${r.quota}: ${r.live} live goals; steady ticks mean ${f(r.steady.mean)} / p95 ${f(r.steady.p95)} / max ${f(r.steady.max)} ms; the 20 ticks after the burst mean ${f(r.burst.mean)} / max ${f(r.burst.max)} ms; fields waiting for ${r.waitTicks} tick(s); ${r.deferred} blankings`);
+for (const r of [...new Set([q, ...(args.includes('--all') ? [1, 2, 3, 4] : [])])].map(run).concat([run(Infinity)])) console.log(`quota ${r.quota}: ${r.live} fields marked in the burst; steady ticks mean ${f(r.steady.mean)} / p95 ${f(r.steady.p95)} / max ${f(r.steady.max)} ms; the 20 ticks after the burst mean ${f(r.burst.mean)} / max ${f(r.burst.max)} ms; every one exact after ${r.waitTicks} tick(s); ${r.deferred} blankings`);

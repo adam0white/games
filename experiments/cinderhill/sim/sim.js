@@ -13,7 +13,7 @@
 import { ANGLES, COS, SIN, angleOf, turnTo } from './math.js';
 import { HARDNESS, MAT, NEST, SUB, SURFACE, baseOf, cellAt, cellXY, heightOf, makeLayout, widthOf } from './grid.js';
 import { STREAM, STREAMS, below, seedStreams } from './rng.js';
-import { DIAG, G, GOAL, INF, MAX_GOALS, PATH_MAX, REBUILDS, SLOT, STEP, TRAIL_OFF, backCell, backDist, distAt, dropGoal, isTrailSlot, makeFlow, markDirty, nextCell, rebuild, rebuildDirty, setGoal, terrainChanged } from './flow.js';
+import { DIAG, G, GOAL, INF, MAX_GOALS, PATH_MAX, REBUILDS, SLOT, STEP, TRAIL_OFF, backCell, backDist, distAt, dropGoal, isTrailSlot, makeFlow, markDirty, markKind, nextCell, rebuild, rebuildDirty, setGoal, terrainChanged } from './flow.js';
 import { FIELD, FIELDS, deposit, makeScent, smell, stepScent } from './scent.js';
 import { SUBSYSTEMS, finish, hashArray, hashInt } from './hash.js';
 import { LATE_FIND_AT, WINDFALL_AT, generate, lateFind, windfall } from './world.js';
@@ -214,7 +214,8 @@ export class Sim {
         this.dig[c] = 1; this.g[G.DIG_COUNT]++; marked++;
       }
       if (!marked) return this.event(EVENT.REJECTED, e[1], e[2]);
-      if (!this.flow.live[SLOT.DIG]) setGoal(this, SLOT.DIG, GOAL.DIG); else markDirty(this, SLOT.DIG);
+      if (!this.flow.live[SLOT.DIG]) setGoal(this, SLOT.DIG, GOAL.DIG);
+      markKind(this, GOAL.DIG); // every DIG field, pool ones too, reads these marks
     } else if (type === CMD.ALARM) {
       // [layer, x, y, hold ticks]
       const c = cellAt(L, e[4] === NEST ? NEST : SURFACE, e[5], e[6]);
@@ -392,8 +393,10 @@ export class Sim {
     if (this.anyDead) { this.removeDead(); this.census(); } // the counts are read between ticks too (route cards, the observer)
     if (this.cfg.colony) this.judgeJam(); // after the deaths: a queued ant killed this tick no longer waits
     stepScent(this);
-    this.rebuildFields();
     if (this.cfg.colony && this.cfg.dayTicks > 0) stepDay(this, EVENT.DUSK);
+    // The last rebuild point comes after dusk (sim 11), so no field is marked and still exact at the tick boundary:
+    // a snapshot rebuilds only clean fields, and a marked one is blank on both sides.
+    this.rebuildFields();
     g[G.TICK]++;
   }
 
@@ -511,8 +514,9 @@ export class Sim {
           const v = this.via[i] >= FREE_VIA ? this.via[i] - FREE_VIA : this.via[i];
           if (this.via[i] >= FREE_VIA) slow = true; // a free forager walks at off-trail speed, on the trail too
           if (this.carry[i] && layer === SURFACE && v >= 0 && this.goal[i] !== SLOT.HOME) {
-            const bd = backDist(this, v, c);
-            if (bd !== INF && bd > 0) { follow = v; back = true; }
+            // A trail waiting for its rebuild is not a reason to give it up for the trip: she keeps her heading.
+            if (this.flow.blank[v]) { follow = v; back = true; }
+            else { const bd = backDist(this, v, c); if (bd !== INF && bd > 0) { follow = v; back = true; } }
           }
           if (this.carry[i] && layer === SURFACE) deposit(this, FIELD.TRAIL, c, TRAIL_LAY);
         }
@@ -528,7 +532,7 @@ export class Sim {
           this.heading[i] = (this.heading[i] + 128) & 255; this.g[G.PICKED]++;
           if (--this.pileAmount[p] === 0) { dropGoal(this, SLOT.FOOD0 + p); this.event(EVENT.PILE_EMPTY, p, 0); }
           still = true;
-        } else if (this.since[i] > SEEK_GIVE_UP || distAt(this, SLOT.HOME, c) > FAR) {
+        } else if (this.since[i] > SEEK_GIVE_UP || (!this.flow.blank[SLOT.HOME] && distAt(this, SLOT.HOME, c) > FAR)) { // a blank home field is not "far"
           if (isTrailSlot(this.via[i])) this.crew[this.via[i] - SLOT.TRAIL0]--; // she leaves her crew now, not next tick
           this.setMode(i, MODE.RETURN); follow = SLOT.HOME; this.via[i] = -1; // nothing found: home, then out again
         } else {
@@ -599,7 +603,8 @@ export class Sim {
 
     // A goal this ant cannot reach (walled off, or on a layer with no way through) is dropped for this
     // tick, the same way on every machine: the ant wanders instead of standing still.
-    if (follow >= 0 && this.flow.blank[follow]) { follow = -1; want = -1; wander = false; } // blank until its rebuild (sim 11): she keeps her heading
+    let hold = false; // on a blank field: no turn, and the stall count waits too (no kick from a field's wait)
+    if (follow >= 0 && this.flow.blank[follow]) { follow = -1; want = -1; wander = false; hold = true; } // blank until its rebuild (sim 11): she keeps her heading
     else if (follow >= 0 && distAt(this, follow, c) === INF) { follow = -1; wander = true; still = false; }
     if (follow >= 0) {
       if (this.goal[i] !== follow) { this.goal[i] = follow; this.best[i] = INF; }
@@ -635,7 +640,7 @@ export class Sim {
     // again; repeat every KICK_EVERY ticks while still stuck. Steering again between kicks lets an ant that a
     // crowd pushed back find its way once the crowd thins (a kick every tick was a random walk for good).
     let h = this.heading[i];
-    const st = this.stall[i] < 65535 ? ++this.stall[i] : (this.stall[i] = STALL_KICK + 1), phase = st > STALL_KICK ? (st - STALL_KICK - 1) % KICK_EVERY : -1;
+    const st = hold ? 0 : this.stall[i] < 65535 ? ++this.stall[i] : (this.stall[i] = STALL_KICK + 1), phase = st > STALL_KICK ? (st - STALL_KICK - 1) % KICK_EVERY : -1;
     if (phase === 0) h = (h + 64 + below(r, A, 128)) & 255;
     else if (phase > 0 && phase < KICK_FOR) h = (h + below(r, A, 17) - 8) & 255;
     else if (want >= 0) {
@@ -781,7 +786,7 @@ export class Sim {
       if (--this.pileAmount[p] === 0) { dropGoal(this, SLOT.FOOD0 + p); this.event(EVENT.PILE_EMPTY, p, 0); }
       o.still = true; return o;
     }
-    if (this.since[i] > SEEK_GIVE_UP || distAt(this, SLOT.HOME, c) > FAR) {
+    if (this.since[i] > SEEK_GIVE_UP || (!this.flow.blank[SLOT.HOME] && distAt(this, SLOT.HOME, c) > FAR)) { // a blank home field is not "far"
       if (!free) { this.crew[slot - SLOT.TRAIL0]--; this.freeAll++; this.freeOut++; } // she leaves her crew now, not next tick (and rejoins at home)
       this.setMode(i, MODE.RETURN); this.via[i] = -1; o.follow = SLOT.HOME; return o; // nothing found: home
     }
@@ -830,7 +835,7 @@ export class Sim {
       this.g[G.DIG_COUNT]--; this.g[G.DUG]++;
       this.event(EVENT.DUG, m, 0);
       terrainChanged(this, m);
-      markDirty(this, SLOT.DIG);
+      markKind(this, GOAL.DIG);
       if (this.g[G.DIG_COUNT] === 0) dropGoal(this, SLOT.DIG);
       return;
     }
@@ -840,7 +845,12 @@ export class Sim {
   setCell(c, m) {
     const was = this.mat[c] === MAT.OPEN;
     this.mat[c] = m;
-    if (was !== (m === MAT.OPEN)) terrainChanged(this, c);
+    if (was !== (m === MAT.OPEN)) { terrainChanged(this, c); this.rebuildAll(); } // between ticks: no field left marked at the boundary
+  }
+
+  /** Rebuild every marked field now (between ticks: tools and tests), forgetting followers' closest distances. */
+  rebuildAll() {
+    rebuildDirty(this, Infinity, s => { for (let i = 0; i < this.n; i++) if (this.goal[i] === s) this.best[i] = INF; });
   }
 
   // ---- hashing ----

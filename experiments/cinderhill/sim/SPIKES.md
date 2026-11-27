@@ -504,16 +504,18 @@ R1 step 4 (`../NOTES.md`, Goal manager): 64 goal slots with a pool from slot 16,
 | S1 workerd, 2,000 / 5,000 ants, mean | 1.54 / 1.90 ms | 1.56 / 1.91 ms |
 | S4, 5,000 ants, 3,000 / 8,000 / 24,000 ticks | 39.9 / 39.4 / 37.7 KB | 39.9 / 39.5 / 37.7 KB |
 
-**64 goals** (`spikes/goals.mjs`, 2,000 ants, S1's world and orders, every free slot but the trails' filled with food goals at tick 600, all 64 fields marked at once at tick 1,800):
+**64 goals** (`spikes/goals.mjs` after the review, 2,000 ants, S1's world and orders; at tick 600 and again just before the burst every free slot but a trail's is filled with a food goal; at tick 1,800 every live field is marked at once: 62, since the script leaves two trail slots empty and a trail needs a drawn path):
 
-| Quota a rebuild point | Steady ticks, mean / p95 / max | 20 ticks after the burst, mean / max | Ticks until every field is exact |
+| Quota a rebuild point | Steady ticks, mean / p95 / max | 20 ticks after the burst, mean / max | Ticks until the burst's fields are exact |
 | --- | --- | --- | --- |
-| 1 | 1.59 / 1.66 / 4.13 ms | 4.46 / 5.98 ms | 31 |
-| **2 (kept)** | 1.60 / 1.69 / 3.69 ms | 5.74 / 9.14 ms | 16 |
-| 3 | 1.58 / 1.66 / 3.16 ms | 5.43 / 9.83 ms | 11 |
-| 4 | 1.57 / 1.65 / 3.67 ms | 5.53 / 14.19 ms | 8 |
-| none | 1.60 / 1.68 / 3.25 ms | 5.41 / 77.20 ms | 1 |
+| 1 | 1.59 / 1.67 / 4.15 ms | 7.06 / 15.63 ms | 31 |
+| **2 (kept)** | 1.58 / 1.66 / 3.67 ms | 5.80 / 8.94 ms | 16 |
+| 3 | 1.58 / 1.67 / 3.24 ms | 5.47 / 10.05 ms | 11 |
+| 4 | 1.58 / 1.66 / 3.16 ms | 5.54 / 12.18 ms | 8 |
+| none | 1.60 / 1.72 / 3.36 ms | 5.54 / 79.92 ms | 1 |
 
-64 live goals cost nothing in steady play (no field is rebuilt without a change). The quota is what keeps a burst under the 10 ms line. Every S4 snapshot restores to the same hash.
+The quota 1 maximum (15.6 ms) is out of line with the first run's 6.0 ms and with quota 2 doing twice the work a point; it is one tick on a loaded machine and is read as noise, not measured again. 64 live goals cost nothing in steady play (no field is rebuilt without a change). The quota is what keeps a burst under the 10 ms line. Every S4 snapshot restores to the same hash.
 
-**Mutations shown to fail** (`test/goals.test.mjs`): no quota; newest marked first; a re-marked field moved to the back; wandering on a blank field; a 16-bit ceiling in the search; the flow hash covering marked fields; a dropped goal keeping its memory; no blanking. Equivalent, so not caught: restore rebuilding marked fields as well (the field is exact but flagged blank, and nothing reads it before its turn). `test/flow.test.mjs`'s repair test now rebuilds every marked field directly, since the quota is not what it checks.
+**After the review** (read-only; `../NOTES.md`, Goal manager, Review). The fixes do not change play: the quick, colony and long runs still match sim 10 at every 50th tick, and the totals above stand. A pooled DIG field is now marked by a dig order and a dug cell; the tick's last rebuild point is after dusk and `setCell` rebuilds what it marks, so no field is marked and still exact at a tick boundary; a blank trail does not send a carrier home for the trip; a blank HOME is not "far"; a stalled ant on a blank field does not kick; the oldest mark wins across the order counter's wrap. The spike now refills the pool just before the burst and times until the burst's own fields are exact (it marked 61 fields before, not 64); its numbers are in the table above.
+
+**Mutations shown to fail** (`test/goals.test.mjs`, 11 tests): no quota; newest marked first; raw order numbers (no wrap); lowest slot first; a waiting field flagged blank but not cleared; a 16-bit `best`; a dig marking only the fixed DIG slot; `setCell` leaving marks; a carrier giving up a blank trail; a blank HOME counted far (sandbox, colony); the stall counted on a blank field; a re-marked field moved to the back; wandering on a blank field; a 16-bit ceiling in the search; a dropped goal keeping its memory; no blanking. Equivalent, so not caught: restore rebuilding marked fields too, and the flow hash covering marked fields (at a boundary a marked field is blank on both sides); the last rebuild point before dusk (dusk marks no field yet; the order guards later dusk scripts). `test/flow.test.mjs`'s repair test rebuilds every marked field directly, since the quota is not what it checks.

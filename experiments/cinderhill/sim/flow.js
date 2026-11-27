@@ -63,6 +63,19 @@ export function markDirty(sim, slot) {
   if (!F.dirty[slot]) { const g = sim.g; g[G.DIRTY_SEQ] = ((g[G.DIRTY_SEQ] + 1) & 0x7FFFFFFF) || 1; F.dirty[slot] = g[G.DIRTY_SEQ]; }
 }
 
+/** Mark every live field of `kind` (sim 11: the pool can hold more than one DIG field, and all read the same marks). */
+export function markKind(sim, kind) {
+  const F = sim.flow;
+  for (let s = 0; s < MAX_GOALS; s++) if (F.live[s] && F.kind[s] === kind) markDirty(sim, s);
+}
+
+/** Blank every live field still marked (the tick's end, and a terrain change between ticks): at a tick boundary a
+ *  marked field is always blank, so a snapshot, which rebuilds only clean fields, restores the same game. */
+export function blankMarked(sim) {
+  const F = sim.flow;
+  for (let s = 0; s < MAX_GOALS; s++) if (F.live[s] && F.dirty[s] && !F.blank[s]) { F.dist[s].fill(INF); F.blank[s] = 1; F.deferred++; }
+}
+
 export function setGoal(sim, slot, kind, cell = -1) {
   const F = sim.flow;
   F.kind[slot] = kind; F.live[slot] = 1; F.cell[slot] = cell;
@@ -254,14 +267,16 @@ function rebuildTrail(sim, slot) {
  *  `done(slot)` after each; blank the ones left (ants keep their heading on a blank field). */
 export function rebuildDirty(sim, quota = REBUILDS, done = null) {
   const F = sim.flow;
+  // Age from the last order number, modulo 2^31, so the order holds across the counter's wrap (0 is skipped).
+  const seq = sim.g[G.DIRTY_SEQ], age = s => (seq - F.dirty[s]) & 0x7FFFFFFF;
   for (let k = 0; k < quota; k++) {
     let pick = -1;
-    for (let s = 0; s < MAX_GOALS; s++) if (F.live[s] && F.dirty[s] && (pick < 0 || F.dirty[s] < F.dirty[pick])) pick = s;
+    for (let s = 0; s < MAX_GOALS; s++) if (F.live[s] && F.dirty[s] && (pick < 0 || age(s) > age(pick))) pick = s;
     if (pick < 0) return;
     rebuild(sim, pick);
     if (done) done(pick);
   }
-  for (let s = 0; s < MAX_GOALS; s++) if (F.live[s] && F.dirty[s] && !F.blank[s]) { F.dist[s].fill(INF); F.blank[s] = 1; F.deferred++; }
+  blankMarked(sim);
 }
 
 /** The field can be followed: live, and not blank waiting for its rebuild. */
