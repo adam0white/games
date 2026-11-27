@@ -844,12 +844,12 @@ What the tunnel is worth now, ten seeds each, seat 0 attacking:
 | --- | --- |
 | steady bot, left alone (storms the pass) | 5 |
 | bold bot, left alone | 5 |
-| bold bot, also told to dig | 5, all of them over the top: it keeps a surface raid and never strikes under |
+| bold bot, also told to dig | 5; the one win traced (seed 2) went over the top: it keeps a surface raid and never strikes under |
 | steady bot, also told to dig | 1: once joined it waits and stops storming |
-| steady economy, no surface raids, strikes under at 10 or 16 soldiers | 2, both through the tunnel (ticks 6833 and 6871) |
+| steady economy told to strike under at 10 soldiers, or at 16 | 2 each; in each one win went through the tunnel (ticks 6871 and 6833) and the other was seed 5, where no strike was sent and its soldiers went over the top |
 
-So the tunnel can win and no longer loses the game for the digger, but with bots it is the weaker way: 2 of 10
-against 5 of 10. The card says "the harder way". Not tried: a feint at the pass with the strike under it, which is
+So the tunnel can win and no longer loses the game for the digger, but with bots it is the weaker way: 1 win of 10
+through the tunnel against 5 of 10 through the pass. This fork is still one-sided; that is open. The card says "the harder way". Not tried: a feint at the pass with the strike under it, which is
 what a person would do. No person has played either way.
 
 Tried and dropped: free digging at 120 ticks a cell (1 and 3 of 10 before the other fixes).
@@ -872,23 +872,26 @@ half cheaper (4, 0, 3), gardens paying double from the first growth (4, 0, 4), e
 Taken: Deep workers half again as tough (`['hp', 0, 150]`). At ten seeds, Deep with Granary against War with
 Legion: The Crossing 13 to 7 for Deep, The Hunt 14 to 6 for Deep, The Wall 17 to 3 for War, The Narrows 17 to 3
 for War, First Frost 13 to 7 for War. With Swift on both sides it is closer and mixed. So the fork now reads: Deep
-for open ground and long games over food, War for sieges and tunnels. Workers at a third tougher was not enough
-(Deep 9 to 7 on The Crossing but 2 to 18 and 0 to 20 in the sieges, and behind on The Hunt).
+for open ground and long games over food, War for sieges and tunnels. Workers at a third tougher (135) did less: War 9 to 7 on The Crossing, Deep 12 to 8 on The Hunt, War 18 to 2 and
+20 to 0 in the sieges.
 
 ## The Hunt's carry phase, measured, and a tap that carried the wrong meat
 
-Ten seeds, both seats, games where the beetle fell:
+The first measurement said that between two steady hills the hill that killed the beetle lost the carry 14 times in
+14, whatever the head start (6, 12 or 18 loads). That was the bot, not the mission: after the fall it kept a raid on
+the body and never drew a Forage trail to it, so the killer carried nothing. The bot now draws one full Forage trail
+to the body once the beetle has fallen. Ten seeds, both seats, games where the beetle fell, after that fix:
 
 | pairing | beetle fell | hill behind on harm carried any | hill behind on harm won |
 | --- | --- | --- | --- |
-| steady v steady | 14 of 20 | 14 | 14 |
-| bold v steady | 20 | 0 | 0 |
+| steady v steady | 14 of 20 | 14 | 0 |
+| bold v steady | 20 | 4 | 0 |
 | bold v bold | 20 | 4 | 4 |
-| steady v timid | 20 | 11 | 7 |
+| steady v timid | 20 | 18 | 3 |
 
-So it is a race in some pairings, and between two steady hills the kill is a losing move every time: the killer ends
-on 6 to 20 loads and the other hill carries forty. The six-load head start may be too small, or the killer's
-soldiers too spent to hold the body. Not tuned.
+Between steady hills the loser now ends on 4 to 41 loads against forty (one game 42 to 41), so the carry is a race
+and the kill is worth making. Every bot table for The Hunt above this section was measured before this fix and
+before the Deep hill's workers were made tougher.
 
 A real Forage tap on the body in a phone-sized browser found a fault. Other meat lies two cells from the beetle, and
 the tap took the first pile in the list within two cells, so a trail could go to meat that does not count: 900
@@ -903,3 +906,6 @@ of the player. At the second growth each craft button now reads the hill as it s
 harder", Swift "all 194 ants faster", Thrift "a meal: 20 seeds, then 13", Granary "16 garden cells: 16 seeds a
 minute, then 32". A meal comes once a minute, so Thrift and Granary can be weighed against each other. Display
 only; the numbers come from the sim's state and tables.
+After both changes the rival order on The Hunt still holds (six seeds, both seats): bold beats steady 12 to 0,
+steady beats timid 10 to 2, steady against steady 6 to 6. The beetle's first-bite message now counts the bites from
+the worker's own health (a Deep hill's worker takes three, not two).
