@@ -937,18 +937,26 @@ Seen in a phone browser on The Crossing: button shown at 0 soldiers, hidden on T
 
 Measured against `docs/design/colony/13-full-game.md` section 1, the weakest of the six rows was the last: nothing a player did in one mission changed the next, beyond eight workers lost with a lost mission. Four missions are fought on the same map (The Crossing, First Frost, The Stones, The Larder), so they are now one hill.
 
-- **Rule.** A mission with `from` in `MISSIONS` starts in both nests as they stood at the end of that mission: the player in theirs, the rival in the one it dug in the player's own game. Tunnels, stores, nurseries and quarters are kept. Gardens and guard posts come back as bare tunnels, since they must be earned in each mission. Nothing is kept within four cells of the line between the hills, so joined nests start apart. Ants, food and brood are the mission's own. Chain: Frost from Crossing, Stones from Frost, Larder from Stones; where a link was never finished on this device, the one before it is used. The Hunt, The Narrows and The Wall are other ground and start bare.
+- **Rule.** A mission with `from` in `MISSIONS` starts in both nests as they stood at the end of that mission: the player in theirs, the rival in the one it dug in the player's own game. Tunnels, stores and nurseries are kept. Quarters come back as bare tunnels (see below), and so do gardens and guard posts, which must be earned in each mission. Nothing is kept within four cells of the line between the hills, so joined nests start apart. Ants, food and brood are the mission's own. Chain: Frost from Crossing, Stones from Frost, Larder from Stones; where a link was never finished on this device, the one before it is used. The Hunt, The Narrows and The Wall are other ground and start bare.
 - **Sim.** `sim.nests()` gives each colony's open cells as offsets from its door (mirrored for the right hill, so seats that change sides keep their own). The option `nests` applies them after the map is laid (`inherit`). No save format change: it only sets `mat`, `room` and `cache` before the first tick.
-- **Page.** A new storage key, `cinderhill:war:hills`, written at a mission's end. The mission card says what is kept ("219 cells dug, 27 of them stores, 80 nursery, 40 quarters"). New campaign clears it. Setting "The home hill": kept (default) or a new hill every mission. The record's start carries `hill` (the mission it came from, or `new`) and `dug`.
+- **Page.** A new storage key, `cinderhill:war:hills`, written at a mission's end. The mission card says what is kept ("219 cells dug, 27 of them stores, 80 nursery", and that the quarters cells are bare again). New campaign clears it. Setting "The home hill": kept (default) or a new hill every mission. The record's start carries `hill` (the mission it came from, or `new`) and `dug`.
 
-Bots, steady v steady, ten seeds. The nests come from a bot game on The Crossing with the same seed; wins are seat 0 v seat 1.
+**Quarters are not kept.** The first build kept them. Housing is the only brake a colony has on its own numbers (the queen lays while there is room), and the bot's winter rule works through it. With 210 to 250 housing from the first tick, steady bots on First Frost outgrew themselves and every one of six games ended by a queen's death within a minute and a half of the frost, the loser at 2 to 19 ants. So how many to house stays each mission's choice. The cells stay dug, and painting Quarters on an open cell needs no digging.
 
-| Mission | Neither kept | Both kept | Only seat 0 | Only seat 1 |
-| --- | --- | --- | --- | --- |
-| First Frost | 8 v 2 | 7 v 3 | 10 v 0 | 0 v 10 |
-| The Stones | 9 v 1 | 8 v 2 | 10 v 0 | 3 v 7 |
-| The Larder | 5 v 5 | 5 v 5 | 1 v 9 | 5 v 5 |
+Bots, ten seeds, quarters not kept. The nests come from a bot game on The Crossing with the same seed; wins are seat 0 v seat 1.
 
-Read: on Frost and The Stones a kept nest decides the game when only one hill has it, and overturns the seat lean (bead lab-5w7.74). With both kept the split is as before. On The Larder a kept nest did not help, and seat 0 with it lost 9 of 10: unexplained. A guess, not checked: a bot with room to grow keeps growing and raids for loads later. In play both hills always keep their nests, so what differs is how much each dug.
+| Mission | Bots | Neither kept | Both kept | Only seat 0 | Only seat 1 |
+| --- | --- | --- | --- | --- | --- |
+| First Frost | timid v timid | 7 v 3 | 8 v 2 | 10 v 0 | 0 v 10 |
+| First Frost | steady v steady | 8 v 2 | 3 v 7 | 6 v 4 | 4 v 6 |
+| The Stones | steady v steady | 9 v 1 | 8 v 2 | 10 v 0 | 3 v 7 |
+| The Larder | steady v steady | 5 v 5 | 5 v 5 | 1 v 9 | 5 v 5 |
 
-Not known: how far a person's nest differs from the bot's at the end of a mission, so how large the lead is in play. A phone browser run played The Crossing by bot to its end, then opened First Frost: the card named the kept nest and the Nest view showed it (stores 216, housing 250, against 120 and 90 bare). No person has played it.
+Read:
+
+- Where nobody attacks (timid bots on Frost) and on The Stones, a kept nest decides the game when only one hill has it.
+- Between steady bots on Frost it does not: a battle near the frost decides. In six games followed tick by tick, kept hills were about half a minute ahead (soldiers by 3600, not 4200), and all six ended by a queen's death between ticks 5823 and 7157; bare, three of six did, between 7073 and 8584, and three ran to the thaw. In the one game traced, the loser died in battle with 290 seeds in store, so this is war sooner, not hunger. Frost between two attackers is now a shorter mission. Against the timid rival (the default) six of six still ran to the thaw, with 72 to 91 ants a hill against 54 to 70 bare.
+- On The Larder a kept nest did not help, and seat 0 with it lost 9 of 10. Unexplained. A guess, not checked: more store cells give thieves more to reach.
+- The seat lean on Frost and The Stones (bead lab-5w7.74) is still there and moves about; ten seeds do not separate it from the effect measured here.
+
+Not known: how far a person's nest differs from the bot's at the end of a mission, so how large the lead is in play. A phone browser run played The Crossing by bot to its end, then opened First Frost: the card named the kept nest and the Nest view showed it. No person has played it.

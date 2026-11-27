@@ -679,8 +679,9 @@ test('a mission starts in the nests an earlier one left: rooms kept, nothing nea
   assert.ok(nests[0].length / 3 > 80 && nests[1].length / 3 > 80, 'both bots dug');
   const fresh = new Sim({ seed: 4, mission: 'frost' }), b = new Sim({ seed: 4, mission: 'frost', nests });
   for (let t = 0; t < TEAMS; t++) {
-    assert.ok(b.g(t, CG.CAP_ADULTS) + b.g(t, CG.CAP_FOOD) > fresh.g(t, CG.CAP_ADULTS) + fresh.g(t, CG.CAP_FOOD), 'the kept rooms count');
-    assert.deepEqual(b.nests()[t], nests[t].map((v, j) => (j % 3 === 2 && v > ROOM.REST ? 0 : v)), 'the same nest, but for rooms that must be earned');
+    assert.ok(b.g(t, CG.CAP_BROOD) + b.g(t, CG.CAP_FOOD) > fresh.g(t, CG.CAP_BROOD) + fresh.g(t, CG.CAP_FOOD), 'the kept rooms count');
+    assert.equal(b.g(t, CG.CAP_ADULTS), fresh.g(t, CG.CAP_ADULTS), 'quarters are not kept: housing is each mission\'s choice');
+    assert.deepEqual(b.nests()[t], nests[t].map((v, j) => (j % 3 === 2 && v > ROOM.NURSERY ? 0 : v)), 'the same nest, but for rooms that must be earned');
   }
   assert.equal(b.g(0, CG.ADULTS), fresh.g(0, CG.ADULTS)); assert.equal(b.g(0, CG.SUGAR), fresh.g(0, CG.SUGAR)); // ants and food are the mission's own
   // Seats that change sides keep their own nests; a cell near the line between the hills is not kept.

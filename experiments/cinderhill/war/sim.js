@@ -201,8 +201,9 @@ export class Sim {
     return out;
   }
 
-  /** Start in nests dug earlier (the lists `nests()` gives, one per colony). Only tunnels, stores, nurseries and quarters
-   *  are kept: a room that needs a growth or a deed comes back as a bare tunnel. Nothing is kept within four cells of the
+  /** Start in nests dug earlier (the lists `nests()` gives, one per colony). Only tunnels, stores and nurseries are kept.
+   *  Quarters come back as bare tunnels: housing is the one brake a colony has on its own numbers, so how many to house
+   *  is each mission's choice (painting them again needs no digging). So does a room that needs a growth or a deed. Nothing is kept within four cells of the
    *  line between the hills, so two nests that were joined start apart. A cache where a kept cell lies is gone. */
   inherit(nests) {
     const L = this.L, mid = ((this.door[0] % L.sw) + (this.door[1] % L.sw)) >> 1;
@@ -215,7 +216,7 @@ export class Sim {
         const k = y * L.nw + x, m = L.nestBase + k;
         if (this.owner(k) !== t || (this.mat[m] !== MAT.CLAY && this.mat[m] !== MAT.OPEN)) continue;
         this.mat[m] = MAT.OPEN; this.cache[k] = 0;
-        this.room[k] = r === ROOM.STORE || r === ROOM.NURSERY || r === ROOM.REST ? r : 0;
+        this.room[k] = r === ROOM.STORE || r === ROOM.NURSERY ? r : 0;
       }
     }
   }
