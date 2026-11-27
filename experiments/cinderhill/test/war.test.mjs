@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { Sim, CG, CMD, KIND, MODE, CASTE, TEAMS, ROOM, EVENT, MAT } from '../war/sim.js';
 import { Host } from '../war/host.js';
 import { think, THINK_EVERY, cacheRun, breachRun, mouth } from '../war/ai.js';
-import { PLUG, C, FOOD } from '../war/sim.js';
+import { PLUG, C, FOOD, TRAILS, PATH_MAX } from '../war/sim.js';
 import { CAMPAIGN, TRAITS, MISSIONS, MAPS, TIERS, BRANCH, ROAD } from '../war/tables.js';
 
 test('an idle colony loses to the rival', () => {
@@ -276,13 +276,13 @@ test('a raid sent for the store brings loads home; a raid told to hold stays out
 
 test('deeds are judged by the sim from its own counts', () => {
   const s = new Sim({ seed: 1, mission: 'crossing' });
-  assert.deepEqual(s.deeds(0), [false, false]);
-  s.cg[CG.HAUL] = 1; assert.deepEqual(s.deeds(0), [true, false], 'a count reached is a deed done at once');
+  assert.deepEqual(s.deeds(0), [false, false, false]);
+  s.cg[CG.HAUL] = 1; assert.deepEqual(s.deeds(0), [true, false, false], 'a count reached is a deed done at once');
   s.cg[CG.SIZE + CG.QUEEN_HP] = 0; s.step();
-  assert.equal(s.result, 1); assert.deepEqual(s.deeds(0), [true, true]); assert.deepEqual(s.deeds(1), [false, false]);
+  assert.equal(s.result, 1); assert.deepEqual(s.deeds(0), [true, true, false], 'the third wants ninety ants'); assert.deepEqual(s.deeds(1), [false, false, false]);
   const b = Sim.load(JSON.parse(JSON.stringify(s.save(), (k, v) => (ArrayBuffer.isView(v) ? Array.from(v) : v))));
-  assert.deepEqual(b.deeds(0), [true, true], 'a save keeps how the mission ended');
-  for (const m of Object.values(MISSIONS)) { assert.equal(m.deeds.length, 2); for (const d of m.deeds) assert.ok(TRAITS[d.opens], `${m.id}.${d.id} opens a known node`); }
+  assert.deepEqual(b.deeds(0), [true, true, false], 'a save keeps how the mission ended');
+  for (const m of Object.values(MISSIONS)) { assert.ok(m.deeds.length >= 2); for (const d of m.deeds) assert.ok(TRAITS[d.opens], `${m.id}.${d.id} opens a known node`); }
 });
 
 // Every load lies in a cell. The totals the rest of the sim reads are the sums of the cells.
@@ -718,4 +718,31 @@ test('a nest visitor: it eats from stores near the door, stores past its reach a
   assert.equal(h.pest[7], 1); assert.equal(h.pest[8 + 7], 1, 'it came to both');
   assert.equal(h.pest[5], 0, 'deep stores: nothing eaten'); assert.ok(h.pest[8 + 5] >= 20, 'a porch store: it fed');
   assert.deepEqual([...plain.pest], [0, -1, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0], 'no visitor unless asked for');
+});
+
+test('a second door: opened from a tunnel, trails start at the nearer door, it saves, and a kept one opens again', () => {
+  const sim = new Sim({ seed: 3, mission: 'crossing', sideDoor: 1 }), L = sim.L, dx = sim.door[0] % L.sw, dy = Math.floor(sim.door[0] / L.sw), ox = dx + 12;
+  const run = n => { for (let i = 0; i < n; i++) sim.step(); };
+  sim.order({ team: 0, type: CMD.DOOR, x: ox }); run(2);
+  assert.equal(sim.side[0], -1, 'no door over solid clay');
+  for (let x = dx + 1; x <= ox; x++) sim.mat[L.nestBase + 2 * L.nw + x] = 0; // a tunnel along the third row
+  sim.cg[CG.SUGAR] = 60; sim.dirty = true;
+  sim.order({ team: 0, type: CMD.DOOR, x: dx + 3 }); run(2);
+  assert.equal(sim.side[0], -1, 'not this near the first door');
+  sim.order({ team: 0, type: CMD.DOOR, x: ox }); run(2);
+  assert.equal(sim.side[0], dy * L.sw + ox); assert.equal(sim.link[sim.side[0]], L.nestBase + ox);
+  sim.order({ team: 0, type: CMD.DOOR, x: ox + 4 }); run(2);
+  assert.equal(sim.side[0], dy * L.sw + ox, 'one second door');
+  sim.order({ team: 0, type: CMD.TRAIL, kind: 1, level: 2, points: [ox + 10, dy] }); sim.order({ team: 0, type: CMD.TRAIL, kind: 1, level: 2, points: [dx - 10, dy] }); run(2);
+  const starts = []; for (let k = 0; k < TRAILS; k++) if (sim.trLive[k]) starts.push(sim.trPath[k * PATH_MAX]);
+  assert.deepEqual(starts.sort((a, b) => a - b), [sim.door[0], sim.side[0]].sort((a, b) => a - b));
+  run(300); const mid = sim.save(), again = Sim.load(mid);
+  assert.equal(again.link[again.side[0]], L.nestBase + ox);
+  run(400); for (let i = 0; i < 400; i++) again.step();
+  assert.equal(again.hash(), sim.hash());
+  const next = new Sim({ seed: 4, mission: 'frost', nests: sim.nests(), sides: [ox, -1] });
+  assert.equal(next.side[0], dy * L.sw + ox); assert.equal(next.side[1], -1);
+  const plain = new Sim({ seed: 3, mission: 'crossing' }); for (let x = dx + 1; x <= ox; x++) plain.mat[L.nestBase + 2 * L.nw + x] = 0;
+  plain.cg[CG.SUGAR] = 60; plain.order({ team: 0, type: CMD.DOOR, x: ox }); plain.step(); plain.step();
+  assert.equal(plain.side[0], -1, 'no second door without the trait or the option');
 });

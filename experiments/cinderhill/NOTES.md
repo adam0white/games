@@ -1067,3 +1067,57 @@ the weevil (points decide there, not seeds), which is why the weevil is not on t
   weevil can eat, the walk the deep stores cost, and the three ways to answer, without saying which. The weevil is
   labelled in the Nest view.
 - `node war/measure.mjs visitor [seeds] [mission] [comes|hungry]` gives these tables.
+
+## A second door, and a visitor that was dropped (war build)
+
+### The brood eater: built, measured, dropped
+
+A second nest visitor was tried: it came up among the brood, ate one of the young every 25 to 40 ticks, could be hurt
+only by soldiers, and the guard of a post within six steps went for it. A warding bot kept a two-cell post at the
+nursery's side. Six seeds each on The Stones and The Larder, every pairing and seat:
+
+| | young eaten a game (plain / warding) | visitors killed of 24 (plain / warding) |
+| --- | --- | --- |
+| fill 8, every 40, health 200 | 24 / 18 to 21 | 6 to 8 / 11 to 14 |
+| fill 30, every 25, health 150 | 70 to 83 / 53 to 59 | 5 to 11 / 12 to 15 |
+
+Warding saved about a fifth of the young and changed no result. With the visitor off the post cost nothing that showed.
+On The Larder the eater left both hills larger at the end (fewer mouths in the frost). One rule, one re-measure, then
+dropped. The diff is not in the repo.
+
+### The second door
+
+A colony with the node `door` (Lineage, bough Build; the third deed of The Crossing opens it; in a mission it opens at
+the first growth) may open one second door: `CMD.DOOR { x }`, from an open tunnel of its own in row 2 of the nest, at
+least `C.DOOR_APART` (8) columns from its first door, for `C.DOOR_SUGAR` (12) seeds. The sim opens rows 0 and 1 of that
+column and links the top cell to the surface cell in the door's row. State: `sim.side` (surface cell per colony, -1
+none), hashed and saved; a save without it loads. `doorF` runs from both doors, so guards and the bins' order follow
+the nearer one. A trail starts at whichever door is nearer its first point (`buildPath`). The sim option `sideDoor`
+allows it without the trait; `sides: [x, x]` opens kept doors at the start where the tunnel below is still open.
+
+The client keeps doors beside the kept hills under a new key, `cinderhill:war:doors` (`{ v: 1, after: { mission:
+[x, x] } }`), written when a hill is saved and read with it (setting "home" still decides). A new campaign erases it.
+Nest tool "Second door" (tap a column), a banner on the surface and a ring on the small map. The rival is given an
+outpost mind (`mind.outpost: 24`) when the node is open and it is not Timid.
+
+**Why it is a node though the first runs were flat.** Dug and used inside one mission, the door did nothing a bot
+could show: a 24-cell tunnel is dug one cell at a time and opened between ticks 3100 and 4600 of a match that ends
+near 6000. That is a finding about pace, not about the door: nothing that takes two minutes to dig can pay inside a
+five-minute match. Kept into the next mission on the same hill it does pay. Same kept nests, door open against shut,
+six seeds, outpost bot against plain bot (`node war/measure.mjs door 6 stones` gives the table with each bot's own nest):
+
+| loads home by tick 3000 | door shut | door open |
+| --- | --- | --- |
+| The Stones, seat 0 | 306 | 346 |
+| The Stones, seat 1 | 283 | 338 |
+| First Frost, seat 0 | 459 | 433 |
+| First Frost, seat 1 | 454 | 433 |
+
+On First Frost the bot's door is in the wrong place for its food (loads by tick 2000: 188 against 244). The bot digs
+24 columns toward the middle without looking; a person chooses where. The cost in the mission where it is dug: 16 to
+69 fewer adults at tick 5000 in four traced games (154 v 170, 111 v 180, 155 v 174, 130 v 132).
+
+**Not checked, or open.** No person has played it. A raid sent under ground shuts only the rival's first door out of
+its field, so a soldier may come up the second. The weevil still comes and goes by the first door only. The surface
+shows a banner but no hole in the ground. Wins on six seeds are not read: plain against plain already gives 6 to 0 on
+The Stones.

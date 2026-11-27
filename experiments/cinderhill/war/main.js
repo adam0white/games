@@ -74,6 +74,11 @@ const nodesNow = () => LINEAGE.flatMap(b => b.nodes).filter(n => n.node && hasNo
 const HILL_KEY = 'cinderhill:war:hills';
 function loadHills() { try { const c = JSON.parse(localStorage.getItem(HILL_KEY)); if (c && c.v === 1 && c.after) return c; } catch { /* none yet */ } return { v: 1, after: {} }; }
 let hills = loadHills();
+// Second doors kept with a hill, by the mission they were left after: the column of each colony's (or -1). Its own key.
+const DOOR_KEY = 'cinderhill:war:doors';
+let doors = (() => { try { const c = JSON.parse(localStorage.getItem(DOOR_KEY)); if (c && c.v === 1 && c.after) return c; } catch { /* none yet */ } return { v: 1, after: {} }; })();
+const saveDoors = () => { try { localStorage.setItem(DOOR_KEY, JSON.stringify(doors)); } catch { /* private mode */ } };
+const sidesOf = id => { const h = hillOf(id), s = h && doors.after[h.from]; return Array.isArray(s) && s.length === 2 ? s.map(x => (Number.isInteger(x) ? x : -1)) : null; };
 const saveHills = () => { try { localStorage.setItem(HILL_KEY, JSON.stringify(hills)); } catch { /* private mode */ } };
 const hillOf = id => { if (set.get('home') !== 'carried') return null; for (let f = MISSIONS[id].from; f; f = MISSIONS[f].from) { const n = hills.after[f]?.nests; if (Array.isArray(n) && Array.isArray(n[0]) && Array.isArray(n[1])) return { from: f, nests: n }; } return null; };
 const STEPS = CAMPAIGN.filter(s => s.mission).map(s => s.mission);
@@ -93,7 +98,7 @@ function isOpen(id) { if (id === query.get('mission')) return true; for (const s
 const firstOpen = () => { let last = STEPS[0]; for (const id of STEPS) { if (!isOpen(id)) break; last = id; if (!camp.done[id]) break; } return last; };
 const qMission = query.get('mission');
 let missionId = MISSIONS[qMission] ? qMission : firstOpen();
-const rivalMind = () => { const mood = MOOD[set.get('rival')]; return mood && camp.caste ? { mood, pick: camp.caste === 'spitter' ? CASTE.WARDEN : CASTE.SPITTER } : mood; };
+const rivalMind = () => { const mood = MOOD[set.get('rival')]; if (!mood) return mood; const m = { mood }; if (camp.caste) m.pick = camp.caste === 'spitter' ? CASTE.WARDEN : CASTE.SPITTER; if (hasNode('door')) m.outpost = 24; return m.pick || m.outpost ? m : mood; };
 // A mission lost costs the next one some of its first workers: the colony carries on smaller.
 const roadBefore = id => { const [a, b] = ROAD.pair, r = camp.forks.road; if (id === a || id === b) return r && r !== id ? r : before(a); const p = before(id); return (p === a || p === b) && r ? (r === a ? b : a) : p; };
 const startAnts = () => { const prev = roadBefore(missionId), ants = MISSIONS[missionId].kit.ants; return prev && camp.done[prev] && !camp.done[prev].won ? [Math.max(10, ants - LOSS_ANTS), MISSIONS[missionId].kit.foeAnts ?? ants] : [ants, MISSIONS[missionId].kit.foeAnts ?? ants]; };
@@ -102,7 +107,7 @@ const late = id => ROAD.pair.includes(id) && !!camp.forks.road && camp.forks.roa
 const lateOpts = id => { if (!late(id)) return {}; const { foePoints, foeHarm, ...o } = ROAD.late[id]; if (foePoints) { o.pointsBy = [0, 0]; o.pointsBy[FOE] = foePoints; } if (foeHarm) { o.harmBy = [0, 0]; o.harmBy[FOE] = foeHarm; } return o; };
 // A mission's visitor: the weevil of the strength set, or none.
 const visitorOf = id => (MISSIONS[id].visitor && set.get('visitor') !== 'never' ? VISITOR[set.get('visitor')] : null);
-const newHost = () => new Host({ seed, mission: missionId, ...lateOpts(missionId), ...(visitorOf(missionId) ? { pest: visitorOf(missionId) } : {}), ...(hillOf(missionId) ? { nests: hillOf(missionId).nests } : {}), antsBy: startAnts(), traits: traitsNow(), tiers: set.get('growth') !== 'deeds', ai: { [FOE]: MOOD[set.get('rival')] } });
+const newHost = () => new Host({ seed, mission: missionId, ...lateOpts(missionId), ...(visitorOf(missionId) ? { pest: visitorOf(missionId) } : {}), ...(hillOf(missionId) ? { nests: hillOf(missionId).nests } : {}), ...(sidesOf(missionId) ? { sides: sidesOf(missionId) } : {}), antsBy: startAnts(), traits: traitsNow(), tiers: set.get('growth') !== 'deeds', ai: { [FOE]: MOOD[set.get('rival')] } });
 let host = newHost(), sim = host.sim;
 let screen = 'menu', tool = 'trail', nestOpen = false, running = false, speed = 1, lastT = 0;
 const Gs = makeGestures();
@@ -285,7 +290,7 @@ function renderPath() {
   }
   const m = MISSIONS[missionId], t = TEXT[missionId], lost = startAnts()[0] < m.kit.ants;
   $('mKicker').textContent = m.name; $('mSub').textContent = t.sub;
-  $('mGoals').textContent = ''; const hill = hillOf(missionId), kept = hill ? (() => { const n = [0, 0, 0, 0], l = hill.nests[ME] ?? []; for (let j = 2; j < l.length; j += 3) n[l[j] < 4 ? l[j] : 0]++; return `You start in your hill as you left it at ${MISSIONS[hill.from].name}: ${l.length / 3} cells dug, ${n[ROOM.STORE]} of them stores, ${n[ROOM.NURSERY]} nursery. Your ${n[ROOM.REST]} quarters cells are bare tunnels again: paint them as Quarters when you want the ants, with no digging to do. The rival starts in its own.`; })() : m.from && set.get('home') === 'carried' ? (camp.done[m.from] ? `This is the hill of ${MISSIONS[m.from].name}. Play that mission again to its end and you start here in the nest you dug there.` : `This is the hill of ${MISSIONS[m.from].name}. Finish that mission and you start here in the nest you dug there.`) : Object.values(MISSIONS).some(x => x.from === missionId) && set.get('home') === 'carried' ? 'What you dig here stays: the next mission on this hill starts in this nest.' : null;
+  $('mGoals').textContent = ''; const hill = hillOf(missionId), kept = hill ? (() => { const n = [0, 0, 0, 0], l = hill.nests[ME] ?? []; for (let j = 2; j < l.length; j += 3) n[l[j] < 4 ? l[j] : 0]++; return `You start in your hill as you left it at ${MISSIONS[hill.from].name}: ${l.length / 3} cells dug, ${n[ROOM.STORE]} of them stores, ${n[ROOM.NURSERY]} nursery. Your ${n[ROOM.REST]} quarters cells are bare tunnels again: paint them as Quarters when you want the ants, with no digging to do.${(sidesOf(missionId)?.[ME] ?? -1) >= 0 ? ' Your second door is still open.' : ''} The rival starts in its own.`; })() : m.from && set.get('home') === 'carried' ? (camp.done[m.from] ? `This is the hill of ${MISSIONS[m.from].name}. Play that mission again to its end and you start here in the nest you dug there.` : `This is the hill of ${MISSIONS[m.from].name}. Finish that mission and you start here in the nest you dug there.`) : Object.values(MISSIONS).some(x => x.from === missionId) && set.get('home') === 'carried' ? 'What you dig here stays: the next mission on this hill starts in this nest.' : null;
   const other = ROAD.pair.find(x => x !== missionId), road = !ROAD.pair.includes(missionId) ? null : late(missionId) ? `You went to ${MISSIONS[other].name} first. ${ROAD.text[missionId]}` : camp.forks.road || ROAD.pair.some(x => camp.done[x]) ? null : `A fork in the road. ${MISSIONS[ROAD.pair[0]].name} and ${MISSIONS[ROAD.pair[1]].name} are both open, and the one you leave for later changes while you are away. Leave ${MISSIONS[ROAD.pair[0]].name}: ${ROAD.text[ROAD.pair[0]]} Leave ${MISSIONS[ROAD.pair[1]].name}: ${ROAD.text[ROAD.pair[1]]}`;
   for (const line of [...t.goals, ...(lost ? [`Your last mission was lost: you start with ${startAnts()[0]} workers, not ${m.kit.ants}.`] : []), ...(kept ? [kept] : []), ...(road ? [road] : []), ...(visitorOf(missionId) ? [(V => `A weevil comes ${V.at.length} times for your food. It comes in at your door, eats at the nearest store cell that holds food, up to ${V.fill} seeds a visit, and goes no deeper than ${V.reach} steps from the door. At most it eats ${V.at.length * V.fill} seeds in all. You can pay that, or keep your food past its reach: dig stores deeper and unmark the store by your door (loads go to the store nearest the door first). Then every load of the mission walks about a dozen steps further each way. Or kill it: soldiers beside it bite it, and it is ${V.meat} loads of meat.`)(visitorOf(missionId))] : [])]) { const p = document.createElement('p'); p.textContent = line; $('mGoals').append(p); }
   $('play').textContent = running && host.sim.mission.id === missionId ? 'Resume' : 'Play'; $('play').disabled = !isOpen(missionId);
@@ -360,7 +365,7 @@ $('restart').addEventListener('click', () => restart());
 $('again').addEventListener('click', () => restart());
 $('toMenu').addEventListener('click', toMenu);
 $('next').addEventListener('click', () => { missionId = firstOpen(); toMenu(); });
-$('fresh').addEventListener('click', () => { if (!freshArmed) { freshArmed = true; $('fresh').textContent = 'Tap again to erase the campaign'; return; } camp = { v: 1, done: {}, caste: null, forks: {} }; saveCamp(); line = { v: 1, deeds: {} }; saveLine(); hills = { v: 1, after: {} }; saveHills(); rec.event('campaign', { fresh: 1 }); missionId = STEPS[0]; renderPath(); });
+$('fresh').addEventListener('click', () => { if (!freshArmed) { freshArmed = true; $('fresh').textContent = 'Tap again to erase the campaign'; return; } camp = { v: 1, done: {}, caste: null, forks: {} }; saveCamp(); line = { v: 1, deeds: {} }; saveLine(); hills = { v: 1, after: {} }; saveHills(); doors = { v: 1, after: {} }; saveDoors(); rec.event('campaign', { fresh: 1 }); missionId = STEPS[0]; renderPath(); });
 $('harder').addEventListener('click', () => { const v = set.get('rival'); set.set('rival', won ? (v === 'timid' ? 'steady' : 'bold') : v === 'bold' ? 'steady' : 'timid'); restart(); });
 onLeave(pauseGame);
 addEventListener('keydown', e => { if (isPauseKey(e)) { if (screen === 'play') pauseGame(); else if (screen === 'paused') resume(); e.preventDefault(); } });
@@ -481,8 +486,8 @@ function paintAt(e) {
 }
 function setNestTab(t) { $('diet').dataset.tab = t; for (const b of document.querySelectorAll('#diet .tabs [data-tab]')) b.setAttribute('aria-pressed', String(b.dataset.tab === t)); if (t !== 'dig' && nestTool !== 'look') setNestTool('look'); }
 for (const b of document.querySelectorAll('#diet .tabs [data-tab]')) b.addEventListener('click', () => { setNestTab(b.dataset.tab); tone(480, 0.05, 0.03, 'triangle'); });
-const DIG_HELP = { plug: `Plug: tap an open tunnel of yours to pack it shut, ${C.PLUG_SUGAR} seeds. It takes five times as long to dig out. Not in a room, not with the rival near, and no more than ${C.PLUGS_MAX} at once.`, look: 'Pick a room, then drag in the earth beside a tunnel.', tunnel: 'Tunnel: drag through the earth, a seed to dig a cell. Seeds showing in the clay are an old cache: dig to it and it is carried to your stores.', store: 'Store: each cell holds 8 more seeds and 8 more meat. Drag in the earth: a seed to dig a cell.', nursery: 'Nursery: each cell holds one more egg or grub. Drag in the earth: a seed to dig a cell.', rest: 'Quarters: each cell houses 4 more ants. Drag in the earth: a seed to dig a cell.', garden: `Fungus garden: each cell pays a seed a minute with no trail to guard, and houses one ant fewer (its gardeners live in it). A raid can still carry the seeds off.`, post: 'Guard post: each cell keeps one in eight of your idle soldiers standing here, inside, and not out by the door.', clear: 'Drag over marks or rooms to take them off. Dug earth stays dug.', strike: 'Strike: tap an open cell in the rival nest. Half your soldiers go there under ground and on to the queen. Tap the mark again to send them all, and again to call them back.' };
-function roomButtons() { for (const b of document.querySelectorAll('#rooms [data-room]')) b.hidden = b.dataset.room === 'strike' ? !sim.mayBreach(ME) : b.dataset.room === 'plug' ? !sim.mayPlug() : !!ROOM_OF[b.dataset.room] && !sim.mayRoom(ME, ROOM_OF[b.dataset.room]); if (nestTool === 'strike' && !sim.mayBreach(ME)) setNestTool('look'); if (nestTool === 'plug' && !sim.mayPlug()) setNestTool('look'); if (ROOM_OF[nestTool] && !sim.mayRoom(ME, ROOM_OF[nestTool])) setNestTool('look'); }
+const DIG_HELP = { door: `Second door: tap the end of a tunnel dug along the top of your ground (the third row down), at least ${C.DOOR_APART} cells from your door. ${C.DOOR_SUGAR} seeds. New trails start at the nearer door, and it is still open in the next mission on this hill. A raid can come in by it too.`, plug: `Plug: tap an open tunnel of yours to pack it shut, ${C.PLUG_SUGAR} seeds. It takes five times as long to dig out. Not in a room, not with the rival near, and no more than ${C.PLUGS_MAX} at once.`, look: 'Pick a room, then drag in the earth beside a tunnel.', tunnel: 'Tunnel: drag through the earth, a seed to dig a cell. Seeds showing in the clay are an old cache: dig to it and it is carried to your stores.', store: 'Store: each cell holds 8 more seeds and 8 more meat. Drag in the earth: a seed to dig a cell.', nursery: 'Nursery: each cell holds one more egg or grub. Drag in the earth: a seed to dig a cell.', rest: 'Quarters: each cell houses 4 more ants. Drag in the earth: a seed to dig a cell.', garden: `Fungus garden: each cell pays a seed a minute with no trail to guard, and houses one ant fewer (its gardeners live in it). A raid can still carry the seeds off.`, post: 'Guard post: each cell keeps one in eight of your idle soldiers standing here, inside, and not out by the door.', clear: 'Drag over marks or rooms to take them off. Dug earth stays dug.', strike: 'Strike: tap an open cell in the rival nest. Half your soldiers go there under ground and on to the queen. Tap the mark again to send them all, and again to call them back.' };
+function roomButtons() { for (const b of document.querySelectorAll('#rooms [data-room]')) b.hidden = b.dataset.room === 'door' ? !sim.mayDoor(ME) || sim.side[ME] >= 0 : b.dataset.room === 'strike' ? !sim.mayBreach(ME) : b.dataset.room === 'plug' ? !sim.mayPlug() : !!ROOM_OF[b.dataset.room] && !sim.mayRoom(ME, ROOM_OF[b.dataset.room]); if (nestTool === 'strike' && !sim.mayBreach(ME)) setNestTool('look'); if (nestTool === 'door' && (!sim.mayDoor(ME) || sim.side[ME] >= 0)) setNestTool('look'); if (nestTool === 'plug' && !sim.mayPlug()) setNestTool('look'); if (ROOM_OF[nestTool] && !sim.mayRoom(ME, ROOM_OF[nestTool])) setNestTool('look'); }
 roomButtons();
 function setNestTool(t) { nestTool = t; $('digHelp').textContent = sim.cfg.digSugar ? DIG_HELP[t] : DIG_HELP[t].replace(/a seed to dig a cell/g, 'soft ground here, no seed to dig'); if (t !== 'look' && $('diet').dataset.tab !== 'dig') setNestTab('dig'); for (const b of document.querySelectorAll('#rooms [data-room]')) b.setAttribute('aria-pressed', String(b.dataset.room === t)); }
 for (const b of document.querySelectorAll('#rooms [data-room]')) b.addEventListener('click', () => { setNestTool(b.dataset.room); tone(500, 0.06, 0.03, 'triangle'); });
@@ -506,6 +511,7 @@ nestCanvas.addEventListener('pointerup', e => {
     rec.event('build', { tool: nestTool, cells: cells.length / 2, at: sim.tick }); tone(380, 0.1, 0.04, 'triangle', 90); navigator.vibrate?.(8);
   }
   if (nestTool === 'strike' && running && (nestDrag.far | 0) < 10) strikeAt(...nestCell(e));
+  if (nestTool === 'door' && running && (nestDrag.far | 0) < 10) { const [x] = nestCell(e); builds.add(order({ type: CMD.DOOR, x })); }
   paint = null; nestDrag = null;
 });
 // A raid under ground. One at a time: a tap on its mark sends every soldier, the next tap calls it off; a tap elsewhere moves it.
@@ -531,7 +537,7 @@ const told = new Set();
 let heard = []; // cells a colony opened in the other's ground, lately: drawn as rings in the nest view
 const once = (key, text, ms, bad) => { if (told.has(key)) return; told.add(key); toast(text, ms, bad); };
 let won = false, beastBit = -1e9, beastTold = false;
-const summary = () => ({ tick: sim.tick, ...(sim.cfg.pest ? { weevilAte: sim.pest[ME * 8 + 5], weevilsKilled: sim.pest[ME * 8 + 6], foeWeevilAte: sim.pest[FOE * 8 + 5] } : {}), harm: g(ME, CG.HARM), foeHarm: g(FOE, CG.HARM), meat: sim.carried(ME), foeMeat: sim.carried(FOE), haul: g(ME, CG.HAUL), foeHaul: g(FOE, CG.HAUL), points: g(ME, CG.POINTS), foePoints: g(FOE, CG.POINTS), adults: g(ME, CG.ADULTS), majors: g(ME, CG.MAJORS), foe: g(FOE, CG.ADULTS), born: g(ME, CG.BORN), died: g(ME, CG.DIED), kills: g(ME, CG.KILLS), loads: g(ME, CG.LOADS_S) + g(ME, CG.LOADS_P), stolen: g(ME, CG.STOLEN), lost: g(ME, CG.LOST), queen: g(ME, CG.QUEEN_HP), foeQueen: g(FOE, CG.QUEEN_HP), orders: host.log.filter(o => o.team === ME).length });
+const summary = () => ({ tick: sim.tick, door: sim.side[ME] >= 0 ? 1 : 0, foeDoor: sim.side[FOE] >= 0 ? 1 : 0, ...(sim.cfg.pest ? { weevilAte: sim.pest[ME * 8 + 5], weevilsKilled: sim.pest[ME * 8 + 6], foeWeevilAte: sim.pest[FOE * 8 + 5] } : {}), harm: g(ME, CG.HARM), foeHarm: g(FOE, CG.HARM), meat: sim.carried(ME), foeMeat: sim.carried(FOE), haul: g(ME, CG.HAUL), foeHaul: g(FOE, CG.HAUL), points: g(ME, CG.POINTS), foePoints: g(FOE, CG.POINTS), adults: g(ME, CG.ADULTS), majors: g(ME, CG.MAJORS), foe: g(FOE, CG.ADULTS), born: g(ME, CG.BORN), died: g(ME, CG.DIED), kills: g(ME, CG.KILLS), loads: g(ME, CG.LOADS_S) + g(ME, CG.LOADS_P), stolen: g(ME, CG.STOLEN), lost: g(ME, CG.LOST), queen: g(ME, CG.QUEEN_HP), foeQueen: g(FOE, CG.QUEEN_HP), orders: host.log.filter(o => o.team === ME).length });
 function news() {
   const ev = host.drain(), now = performance.now(), sw = L0.sw;
   let deaths = 0;
@@ -566,10 +572,15 @@ function news() {
       toast(a === ME ? 'You are through! Pick Strike in the Nest and tap where your soldiers should go.' : 'The rival has broken into your nest. A Guard post where it comes in holds them.', 6000, a !== ME);
       tone(a === ME ? 520 : 110, 0.6, 0.07, 'sawtooth', a === ME ? 200 : -40);
     }
+    else if (type === EVENT.DOOR) {
+      roomButtons();
+      if (a === ME) { toast('Your second door is open. New trails start at the nearer door. Mark a Store beside it.', 5200); tone(392, 0.25, 0.06, 'triangle', 200); beacon = { x: b % L0.sw + 0.5, y: Math.floor(b / L0.sw) + 0.5, at: now }; rec.event('door', { x: c, at: sim.tick }); }
+      else toast('The rival has opened a second door.', 3200);
+    }
     else if (type === EVENT.DUG && a === ME) { if (nestOpen) tone(210 + Math.random() * 60, 0.05, 0.03, 'square', -60); }
     else if (type === EVENT.FULL && a === ME) { if (now - (told.fullAt ?? 0) > 20000) { told.fullAt = now; toast(`No room for more ${b ? 'meat' : 'seeds'}. Dig a store in the Nest.`, 3600, true); } }
     else if (type === EVENT.REJECTED && a === ME) {
-      if (builds.has(b)) { builds.delete(b); tone(150, 0.12, 0.05, 'sawtooth', -40); toast(nestTool === 'clear' ? 'Nothing to clear there.' : nestTool === 'plug' ? 'No plug there: it needs an open tunnel of yours, no rival near, seeds to spare, and a way left to your door.' : 'Nothing to dig or change there.', nestTool === 'plug' ? 3600 : 2200); continue; }
+      if (builds.has(b)) { builds.delete(b); tone(150, 0.12, 0.05, 'sawtooth', -40); toast(nestTool === 'door' ? `No door there. It needs your own open tunnel in the third row down, ${C.DOOR_APART} cells or more from your door, open ground above, and ${C.DOOR_SUGAR} seeds to spare.` : nestTool === 'clear' ? 'Nothing to clear there.' : nestTool === 'plug' ? 'No plug there: it needs an open tunnel of yours, no rival near, seeds to spare, and a way left to your door.' : 'Nothing to dig or change there.', nestTool === 'plug' ? 3600 : 2200); continue; }
       const q = pending.find(q => q.id === b); if (q) { pulses.push({ pts: q.points, at: now, bad: true }); q.done = true; }
       tone(150, 0.22, 0.07, 'sawtooth', -40); toast(c === 1 ? 'Six trails is the most. Erase one first.' : 'No ant can walk that.', 2600, true);
     } else if (type === EVENT.TRAIL) {
@@ -615,7 +626,7 @@ function finish(w, reason) {
   const text = TEXT[missionId], was = camp.done[missionId];
   camp.done[missionId] = { won: w || !!was?.won, best: Math.max(was?.best ?? 0, w ? s.adults : 0) }; saveCamp();
   if (ROAD.pair.includes(missionId) && !camp.forks.road && !camp.done[ROAD.pair.find(x => x !== missionId)]) { camp.forks.road = missionId; saveCamp(); rec.event('road', { first: missionId }); }
-  if (set.get('home') === 'carried' && (sim.mission.from || Object.values(MISSIONS).some(x => x.from === missionId))) { hills.after[missionId] = { nests: sim.nests() }; saveHills(); }
+  if (set.get('home') === 'carried' && (sim.mission.from || Object.values(MISSIONS).some(x => x.from === missionId))) { hills.after[missionId] = { nests: sim.nests() }; saveHills(); doors.after[missionId] = [0, 1].map(t => (sim.side[t] >= 0 ? sim.side[t] % L0.sw : -1)); saveDoors(); }
   // Deeds: the sim judges them; the page only keeps which were done, and which are new this time.
   const did = sim.deeds(ME), fresh = [];
   sim.mission.deeds.forEach((d, i) => { const key = `${missionId}.${d.id}`; if (did[i] && !line.deeds[key]) { const had = hasNode(d.opens); line.deeds[key] = 1; fresh.push(d.id); rec.event('deed', { deed: key, opens: had ? 'had' : d.opens }); } });
@@ -719,7 +730,7 @@ function drawMini() {
   for (let i = 0; i < sim.n; i++) if (sim.layer[i] === 0) { mctx.fillStyle = sim.team[i] ? '#8fb0ff' : '#ffb057'; mctx.fillRect(sim.x[i] >> 8, sim.y[i] >> 8, 1.4, 1.4); }
   if (sim.beast[1] >= 0 && sim.beast[0] > 0) { mctx.fillStyle = '#ff6048'; mctx.beginPath(); mctx.arc(sim.beast[1] % w, Math.floor(sim.beast[1] / w), 3, 0, 7); mctx.fill(); }
   for (let k = 0; k < sim.sites.length; k++) { const c = sim.sites[k], hold = sim.siteHold[k]; mctx.fillStyle = hold === ME ? '#ffb057' : hold === FOE ? '#8fb0ff' : '#e8e0d6'; mctx.fillRect(c % w - 2, Math.floor(c / w) - 4, 4, 8); }
-  for (const t of [ME, FOE]) { const d = doorXY(t); mctx.strokeStyle = t ? '#8fb0ff' : '#ffb057'; mctx.lineWidth = 1.5; mctx.beginPath(); mctx.arc(d.x, d.y, 3.5, 0, 7); mctx.stroke(); }
+  for (const t of [ME, FOE]) { const d = doorXY(t); mctx.strokeStyle = t ? '#8fb0ff' : '#ffb057'; mctx.lineWidth = 1.5; mctx.beginPath(); mctx.arc(d.x, d.y, 3.5, 0, 7); mctx.stroke(); if (sim.side[t] >= 0) { mctx.beginPath(); mctx.arc(sim.side[t] % L0.sw + 0.5, Math.floor(sim.side[t] / L0.sw) + 0.5, 2, 0, 7); mctx.stroke(); } }
   if (eye) { const a = toWorld(0, 0), b = toWorld(W, H), c = toWorld(W, 0), d = toWorld(0, H); mctx.strokeStyle = 'rgba(255,255,255,0.8)'; mctx.lineWidth = 1; mctx.beginPath(); mctx.moveTo(a.x, a.y); mctx.lineTo(c.x, c.y); mctx.lineTo(b.x, b.y); mctx.lineTo(d.x, d.y); mctx.closePath(); mctx.stroke(); }
 }
 
@@ -779,6 +790,14 @@ function drawOverlay(now) {
       const wd = Math.max(11, Math.abs(foot.y - top.y) * 0.42);
       ctx.fillStyle = '#4a4440'; ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.beginPath(); ctx.roundRect(foot.x - wd / 2, top.y, wd, foot.y - top.y, wd * 0.4); ctx.fill(); ctx.stroke();
       if (hold >= 0) { ctx.fillStyle = col; ctx.font = '800 11px ui-rounded, system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText('+1', foot.x, top.y - 3); }
+    }
+    // Second doors: a small banner each.
+    for (const t of [ME, FOE]) {
+      const c = sim.side[t]; if (c < 0) continue;
+      const p = toScreen(c % L0.sw + 0.5, Math.floor(c / L0.sw) + 0.5, 2.4); if (!p.s) continue;
+      const col = t ? '#8fb0ff' : '#ffb057';
+      ctx.fillStyle = 'rgba(20, 14, 10, 0.85)'; ctx.strokeStyle = col; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.roundRect(p.x - 20, p.y - 8, 40, 16, 8); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = col; ctx.font = '800 9.5px ui-rounded, system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('DOOR', p.x, p.y);
     }
     // The two doors: a banner over each, and the queen's strength when she has been hurt.
     for (const t of [ME, FOE]) {

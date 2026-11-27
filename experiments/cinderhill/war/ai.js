@@ -175,6 +175,19 @@ export function think(sim, t, mind = 1) {
     if (mind.garden !== false && may(ROOM.GARDEN) && sim.mayRoom(t, ROOM.GARDEN) && adults >= 40 && sim.gardens[t] < (mind.gardens ?? 16) && cg[o + CG.SUGAR] >= 14) wants.push(ROOM.GARDEN);
     // A guard post in the throat of the shaft, where a break-in must pass, once there is a guard worth posting.
     if (may(ROOM.POST) && sim.mayRoom(t, ROOM.POST) && majors >= 4) wants.push(ROOM.POST);
+    // An outpost: a tunnel along the top of its ground toward the middle of the map, a second door at its end, and a
+    // store beside that door, so that what is carried in from that side has a shorter road.
+    if (mind.outpost && sim.mayDoor(t) && adults >= (mind.outpostAt ?? 30)) {
+      const dir = dx < sw >> 1 ? 1 : -1, ox = dx + dir * mind.outpost;
+      if (sim.side[t] < 0) {
+        const cells = []; for (let x = dx + dir; x !== ox + dir; x += dir) if (sim.mat[L.nestBase + 2 * L.nw + x] !== 0) cells.push(x, 2);
+        if (cells.length) { if (cg[o + CG.SUGAR] >= 8) out.push({ team: t, type: CMD.DIG, cells: cells.slice(0, 16) }); }
+        else out.push({ team: t, type: CMD.DOOR, x: ox });
+      } else if (sim.room[4 * L.nw + ox] !== ROOM.STORE) {
+        const cells = []; for (let y = 3; y <= 5; y++) for (let x = ox - 2; x <= ox + 2; x++) cells.push(x, y);
+        out.push({ team: t, type: CMD.ROOM, cells, kind: ROOM.STORE, dig: 1 });
+      }
+    }
     let dug = false;
     for (const kind of wants) { const b = buildNext(sim, t, kind, deep); if (b.length) { out.push(...b); dug = true; break; } }
     // With nothing pressing to build and hands to spare, it digs for the nearest cache: a seed a cell, paid back at the end.
