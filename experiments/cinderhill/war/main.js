@@ -229,7 +229,7 @@ function restart(newSeed = true) {
   dropTouches();
   if (running) rec.end('restart', summary());
   if (newSeed && !(qSeed > 0)) seed = 1 + Math.floor(Math.random() * 9999);
-  host = newHost(); sim = host.sim; document.body.classList.remove('frost'); for (const b of document.querySelectorAll('#rooms [data-room]')) b.hidden = !!ROOM_OF[b.dataset.room] && !sim.mission.rooms.includes(ROOM_OF[b.dataset.room]); sel = -1; floats = []; pulses = []; beacon = null; parts.length = 0; trailSig = '?'; told.clear(); told.fullAt = told.popAt = told.qAt = 0; builds.clear(); firstTrail = false; danger = 0; setSpeed(1);
+  host = newHost(); sim = host.sim; document.body.classList.remove('frost'); roomButtons(); sel = -1; floats = []; pulses = []; beacon = null; parts.length = 0; trailSig = '?'; told.clear(); told.fullAt = told.popAt = told.qAt = 0; builds.clear(); firstTrail = false; danger = 0; setSpeed(1);
   if (tool !== 'trail') setTool('trail'); if (nestOpen) setNest(false);
   uploadTerrain(); uploadAnts(); startRun(); resume();
 }
@@ -354,6 +354,8 @@ function paintAt(e) {
 function setNestTab(t) { $('diet').dataset.tab = t; for (const b of document.querySelectorAll('#diet .tabs [data-tab]')) b.setAttribute('aria-pressed', String(b.dataset.tab === t)); if (t !== 'dig' && nestTool !== 'look') setNestTool('look'); }
 for (const b of document.querySelectorAll('#diet .tabs [data-tab]')) b.addEventListener('click', () => { setNestTab(b.dataset.tab); tone(480, 0.05, 0.03, 'triangle'); });
 const DIG_HELP = { look: 'Pick a room, then drag in the earth beside a tunnel.', store: 'Store: each cell holds 8 more seeds and 8 more meat. Drag in the earth: a seed to dig a cell.', nursery: 'Nursery: each cell holds one more egg or grub. Drag in the earth: a seed to dig a cell.', rest: 'Quarters: each cell houses 4 more ants. Drag in the earth: a seed to dig a cell.', post: 'Guard post: each cell keeps one in eight of your idle soldiers standing here, inside, and not out by the door.', clear: 'Drag over marks or rooms to take them off. Dug earth stays dug.' };
+function roomButtons() { for (const b of document.querySelectorAll('#rooms [data-room]')) b.hidden = !!ROOM_OF[b.dataset.room] && !sim.mission.rooms.includes(ROOM_OF[b.dataset.room]); }
+roomButtons();
 function setNestTool(t) { nestTool = t; $('digHelp').textContent = DIG_HELP[t]; if (t !== 'look' && $('diet').dataset.tab !== 'dig') setNestTab('dig'); for (const b of document.querySelectorAll('#rooms [data-room]')) b.setAttribute('aria-pressed', String(b.dataset.room === t)); }
 for (const b of document.querySelectorAll('#rooms [data-room]')) b.addEventListener('click', () => { setNestTool(b.dataset.room); tone(500, 0.06, 0.03, 'triangle'); });
 nestCanvas.addEventListener('pointerdown', e => {
