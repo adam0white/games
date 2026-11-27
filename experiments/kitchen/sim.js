@@ -99,16 +99,32 @@ export const TIERS = [
   { name: 'restaurant', guests: 5, cost: 320, needs: { knife: 3, blender: 1, decor: 2 } },
   { name: 'fine', guests: 5, cost: 600, needs: { tray: 5, stove: 3, micro: 3, tables: 4 } },
   { name: 'five', guests: 6, cost: 1000, needs: { decor: 5, blender: 3, knife: 5 } },
+  // Past five stars the town rises above the Lid. Each new rank adds a twist to the catch (TWISTS) and one building level.
+  { name: 'garden', guests: 6, cost: 1500, needs: { tray: 7, stove: 6 } },
+  { name: 'galley', guests: 7, cost: 2000, needs: { knife: 6, micro: 6, decor: 6 } },
+  { name: 'cloud', guests: 7, cost: 2600, needs: { blender: 5, tables: 6, tray: 8 } },
+  { name: 'starlight', guests: 8, cost: 3300, needs: { knife: 7, decor: 7, stove: 7 } },
+  { name: 'top', guests: 8, cost: 4200, needs: { micro: 7, blender: 6, tray: 9 } },
 ];
+// What each rank above five stars adds to the catch. wind: steady sideways sway on every item; gust: the whole sky
+// leans left and right together; jitter: some items fall much faster than others; pairs: two or three at once.
+export const TWISTS = [null, null, null, null, null, null,
+  { id: 'wind', wind: 0.18, fall: 0.04 },
+  { id: 'gust', wind: 0.18, gust: 0.22, fall: 0.07 },
+  { id: 'jitter', wind: 0.18, gust: 0.22, jitter: 0.45, fall: 0.09 },
+  { id: 'triples', wind: 0.2, gust: 0.25, jitter: 0.45, triples: true, fall: 0.11 },
+  { id: 'all', wind: 0.22, gust: 0.3, jitter: 0.55, triples: true, fall: 0.14 },
+];
+export const twistFor = tier => TWISTS[Math.min(tier, TWISTS.length - 1)] ?? null;
 // Buildings: level 0 means not built. max: highest level at each star tier. cost(level) is the price of reaching it.
 export const BUILDINGS = {
-  tray: { max: [2, 3, 4, 5, 5, 6], cost: l => [0, 0, 20, 45, 90, 160, 260][l] },
-  knife: { max: [1, 2, 3, 4, 5, 5], cost: l => [0, 0, 25, 50, 90, 150][l] },
-  stove: { max: [1, 2, 3, 3, 4, 5], cost: l => [0, 40, 60, 100, 150, 220][l] },
-  micro: { max: [0, 1, 2, 3, 4, 5], cost: l => [0, 70, 90, 130, 180, 240][l] },
-  blender: { max: [0, 0, 1, 2, 3, 4], cost: l => [0, 110, 140, 180, 230][l] },
-  tables: { max: [1, 2, 3, 4, 5, 6], cost: l => [0, 0, 35, 70, 120, 180, 260][l] },
-  decor: { max: [1, 2, 3, 4, 5, 6], cost: l => [0, 0, 30, 60, 110, 170, 250][l] },
+  tray: { max: [2, 3, 4, 5, 5, 7, 7, 8, 8, 9, 9], cost: l => [0, 0, 20, 45, 90, 160, 260, 380, 520, 700][l] },
+  knife: { max: [1, 2, 3, 4, 5, 5, 6, 6, 7, 7, 8], cost: l => [0, 0, 25, 50, 90, 150, 320, 480, 650][l] },
+  stove: { max: [1, 2, 3, 3, 4, 6, 6, 6, 7, 7, 7], cost: l => [0, 40, 60, 100, 150, 220, 340, 500][l] },
+  micro: { max: [0, 1, 2, 3, 4, 5, 6, 6, 6, 7, 7], cost: l => [0, 70, 90, 130, 180, 240, 360, 520][l] },
+  blender: { max: [0, 0, 1, 2, 3, 4, 4, 5, 5, 6, 6], cost: l => [0, 110, 140, 180, 230, 400, 560][l] },
+  tables: { max: [1, 2, 3, 4, 5, 6, 6, 6, 6, 6, 6], cost: l => [0, 0, 35, 70, 120, 180, 260][l] },
+  decor: { max: [1, 2, 3, 4, 5, 6, 6, 6, 7, 7, 7], cost: l => [0, 0, 30, 60, 110, 170, 250, 420][l] },
 };
 export const BUILDING_IDS = Object.keys(BUILDINGS);
 export const STATION = { chop: 'knife', fry: 'stove', micro: 'micro', blend: 'blender' };
@@ -150,7 +166,7 @@ export const TUNE = {
   lane: 1,              // the catch lane is x in [-1, 1]; the tray sits at y = 0, items start at y = 1.15
   start: 1.15,
   size: 0.15,           // an item's half width, in lane units
-  trayHalf: [0, 0.27, 0.31, 0.35, 0.39, 0.43, 0.47],   // by tray level
+  trayHalf: [0, 0.27, 0.31, 0.35, 0.39, 0.43, 0.47, 0.5, 0.53, 0.56],   // by tray level
   traySpeed: 3.2,       // lane units a second a bot may move the tray (a finger is faster)
   fall: { base: 0.42, perHard: 0.035, max: 0.75 },       // lane heights a second
   every: { base: 1.0, perHard: -0.05, min: 0.55 },      // seconds between items
@@ -170,16 +186,16 @@ export function rng(seed) { let a = seed >>> 0 || 1; return () => { a = a + 0x6D
 
 // ---------- the catch
 // need: { id: count }. Options: hard, trayLevel, seed, tutorial (only needed items, slower).
-export function newCatch({ need, hard = 0, trayLevel = 1, seed = 1, tutorial = false, pool = null }) {
-  const fall = Math.min(TUNE.fall.max, TUNE.fall.base + TUNE.fall.perHard * hard) * (tutorial ? 0.8 : 1);
+export function newCatch({ need, hard = 0, trayLevel = 1, seed = 1, tutorial = false, pool = null, twist = null }) {
+  const fall = Math.min(TUNE.fall.max + (twist?.fall ?? 0), TUNE.fall.base + TUNE.fall.perHard * hard) * (tutorial ? 0.8 : 1);
   const every = Math.max(TUNE.every.min, TUNE.every.base + TUNE.every.perHard * hard) * (tutorial ? 1.1 : 1);
   const extraShare = tutorial === 'first' ? 0 : Math.min(TUNE.extra.max, TUNE.extra.base + TUNE.extra.perHard * hard);
   const others = (pool ?? Object.keys(ING)).filter(id => !(id in need));
   if (hard >= TUNE.junkFrom) others.push(...Object.keys(JUNK));
   return {
     need: { ...need }, got: {}, tray: [], items: [], t: 0, next: 0.6, seq: 0, r: rng(seed),
-    fall, every, extraShare, others, hard, half: TUNE.trayHalf[Math.min(6, trayLevel)],
-    x: 0, extra: null, done: false, spawned: 0, caught: 0, missedNeeded: 0, tutorial,
+    fall, every, extraShare, others, hard, half: TUNE.trayHalf[Math.min(TUNE.trayHalf.length - 1, trayLevel)],
+    x: 0, extra: null, done: false, spawned: 0, caught: 0, missedNeeded: 0, tutorial, twist,
   };
 }
 export const left = c => Object.entries(c.need).reduce((n, [k, v]) => n + Math.max(0, v - (c.got[k] ?? 0)), 0);
@@ -195,8 +211,10 @@ function spawnOne(c, xAt = null) {
     id ??= stillNeeded[0][0];
   }
   const x = xAt ?? (c.r() * 2 - 1) * (TUNE.lane - TUNE.size);
-  const drift = c.hard >= TUNE.drift.from ? TUNE.drift.amp * (c.r() * 2 - 1) : 0;
-  c.items.push({ n: c.seq++, id, x, x0: x, y: TUNE.start, vy: c.fall * (0.9 + c.r() * 0.2), drift, phase: c.r() * 6.28, spin: c.r() * 6.28, state: 'fall' });
+  const tw = c.twist, amp = Math.max(c.hard >= TUNE.drift.from ? TUNE.drift.amp : 0, tw?.wind ?? 0);
+  const drift = amp ? amp * (c.r() * 2 - 1) : 0;
+  const speed = tw?.jitter ? Math.max(0.65, 1 + (c.r() * 2 - 1) * tw.jitter) : 0.9 + c.r() * 0.2;
+  c.items.push({ n: c.seq++, id, x, x0: x, y: TUNE.start, vy: c.fall * speed, drift, phase: c.r() * 6.28, spin: c.r() * 6.28, state: 'fall' });
   c.spawned++;
 }
 
@@ -211,13 +229,15 @@ export function stepCatch(c, trayX, dt = DT) {
     c.next = c.every * (0.85 + c.r() * 0.3);
     if (c.hard >= TUNE.pairsFrom && c.r() < 0.35) {
       const a = (c.r() * 2 - 1) * 0.8; spawnOne(c, a); spawnOne(c, a > 0 ? a - 0.9 : a + 0.9);
+      if (c.twist?.triples && c.r() < 0.4) spawnOne(c, a > 0 ? a - 0.45 : a + 0.45);
     } else spawnOne(c);
   }
   for (const it of c.items) {
     if (it.state !== 'fall') continue;
     const prevY = it.y;
     it.y -= it.vy * dt;
-    if (it.drift) it.x = Math.max(-TUNE.lane + TUNE.size, Math.min(TUNE.lane - TUNE.size, it.x0 + it.drift * Math.sin(c.t * 2.2 + it.phase)));
+    const gust = c.twist?.gust ? c.twist.gust * Math.sin(c.t * 0.9) : 0;
+    if (it.drift || gust) it.x = Math.max(-TUNE.lane + TUNE.size, Math.min(TUNE.lane - TUNE.size, it.x0 + it.drift * Math.sin(c.t * 2.2 + it.phase) + gust));
     if (prevY > TUNE.catchY && it.y <= TUNE.catchY) {
       if (Math.abs(it.x - c.x) <= c.half + TUNE.size * 0.5) {
         const wanted = !isJunk(it.id) && (c.got[it.id] ?? 0) < (c.need[it.id] ?? 0);
@@ -250,8 +270,11 @@ export function restartCatch(c) {
 export const chopCuts = save => (save.tier >= 2 ? 3 : save.tier >= 1 ? 2 : 1);
 // From the diner on, pieces slide on the board (lane units a second); faster at higher ranks.
 export const chopSlide = save => (save.tier >= 1 ? Math.min(0.4, 0.12 + 0.05 * save.tier) : 0);
-// Par counts strikes (pieces x cuts): about half a second each to aim and drop the knife, a little less with a better knife.
-export function chopQuality(seconds, strikes, knife) { const par = strikes * (0.6 - 0.04 * knife) + 0.8; return seconds <= par ? 1 : Math.max(0.4, 1 - (seconds - par) / (par * 1.5)); }
+// Par counts strikes (pieces x cuts): about half a second each to aim and drop the knife. A better knife does not
+// change par; it has a wider edge (knifeReach) and steadies the pieces (knifeCalm), so the same par is easier to make.
+export const knifeReach = knife => 0.02 + 0.005 * knife;
+export const knifeCalm = knife => Math.max(0.6, 1 - 0.05 * (knife - 1));
+export function chopQuality(seconds, strikes, knife) { const par = strikes * 0.52 + 0.8; return seconds <= par ? 1 : Math.max(0.4, 1 - (seconds - par) / (par * 1.5)); }
 // Fry: hold to heat; doneness grows while held; let go inside the golden band.
 export function fryBand(stove, tier) { const w = 0.14 + 0.04 * stove - 0.015 * tier; return [0.62 - w / 2, 0.62 + w / 2]; }
 export const FRY_RATE = 0.42; // doneness a second while held

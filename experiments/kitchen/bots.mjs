@@ -8,8 +8,8 @@ import * as sim from './sim.js';
 const runs = Number(process.argv[2]) || 60;
 const mutate = process.argv.includes('--mutate');
 
-function play({ need, hard, trayLevel, seed, react, skill }) {
-  const c = sim.newCatch({ need, hard, trayLevel, seed });
+function play({ need, hard, trayLevel, seed, react, skill, twist = null }) {
+  const c = sim.newCatch({ need, hard, trayLevel, seed, twist });
   const seen = []; let x = 0, extras = 0;
   for (let step = 0; step < 60 * 180 && !c.done; step++) {
     seen.push(c.items.map(it => ({ ...it })));
@@ -39,6 +39,11 @@ for (const [label, save] of [
   ['restaurant', { tier: 3, dayAtTier: 1, built: { tray: 4 } }],
   ['fine', { tier: 4, dayAtTier: 2, built: { tray: 5 } }],
   ['five stars', { tier: 5, dayAtTier: 4, built: { tray: 6 } }],
+  ['garden', { tier: 6, dayAtTier: 2, built: { tray: 7 } }],
+  ['galley', { tier: 7, dayAtTier: 2, built: { tray: 7 } }],
+  ['cloud', { tier: 8, dayAtTier: 2, built: { tray: 8 } }],
+  ['starlight', { tier: 9, dayAtTier: 2, built: { tray: 8 } }],
+  ['top table', { tier: 10, dayAtTier: 4, built: { tray: 9 } }],
 ]) {
   const hard = sim.hardness(save);
   const menu = sim.RECIPE_IDS.filter(id => sim.RECIPES[id].tier <= save.tier);
@@ -46,7 +51,7 @@ for (const [label, save] of [
     let clean = 0, time = 0, extras = 0;
     for (let i = 0; i < runs; i++) {
       const need = sim.RECIPES[menu[i % menu.length]].need;
-      const r = play({ need, hard, trayLevel: save.built.tray, seed: 1000 + i, react, skill });
+      const r = play({ need, hard, trayLevel: save.built.tray, seed: 1000 + i, react, skill, twist: sim.twistFor(save.tier) });
       if (r.done && r.extras === 0) clean++; time += r.t; extras += r.extras;
     }
     rows.push({ label, who, hard: +hard.toFixed(1), clean: clean / runs, seconds: +(time / runs).toFixed(1), extras: +(extras / runs).toFixed(2) });
@@ -58,6 +63,8 @@ console.table(rows);
 const get = (label, who) => rows.find(r => r.label === label && r.who === who);
 assert.ok(get('cart day 1', 'new').clean >= 0.7, 'a new player finishes most first catches without an extra');
 assert.ok(get('five stars', 'good').clean >= 0.2, 'five stars stays possible for a good player');
+assert.ok(get('top table', 'good').clean >= 0.1, 'the top table stays possible for a good player');
+assert.ok(get('top table', 'good').clean <= get('five stars', 'good').clean + 0.05, 'the ranks above five stars are not easier than five stars');
 assert.ok(get('five stars', 'new').clean < get('cart day 1', 'new').clean - 0.3, 'five stars is clearly harder than day 1');
 assert.ok(get('cart day 1', 'good').seconds < 30, 'a first catch takes under half a minute');
 if (mutate) assert.ok(rows.every(r => r.extras === 0), 'mutation: extras no longer stop a catch');
@@ -115,3 +122,11 @@ console.log('bots: ok');
   assert.ok(sp && story.COUNTABLE.has(sp.goal.type) && sp.pay > 0);
   console.log('story: ok');
 }
+
+// Every rank must be reachable: what rank t needs must be buildable at rank t-1, at a real price.
+for (let t = 1; t < sim.TIERS.length; t++) for (const [k, v] of Object.entries(sim.TIERS[t].needs ?? {})) {
+  assert.ok(v <= sim.BUILDINGS[k].max[t - 1], `rank ${sim.TIERS[t].name} needs ${k} ${v}, but rank ${sim.TIERS[t - 1].name} caps it at ${sim.BUILDINGS[k].max[t - 1]}`);
+  for (let l = 1; l <= v; l++) assert.ok(Number.isFinite(sim.BUILDINGS[k].cost(l)), `${k} level ${l} has no price`);
+}
+for (const k of sim.BUILDING_IDS) for (let l = 1; l <= sim.BUILDINGS[k].max.at(-1); l++) assert.ok(Number.isFinite(sim.BUILDINGS[k].cost(l)), `${k} level ${l} has no price`);
+console.log('ranks reachable: ok');

@@ -4,6 +4,7 @@
 import * as THREE from './vendor/three.module.js';
 import { GLTFLoader } from './vendor/GLTFLoader.js';
 import { clone as cloneSkinned } from './vendor/SkeletonUtils.js';
+import { TUNE } from './sim.js';
 
 export { THREE };
 const FS = 2.2;            // furniture kit to world
@@ -166,6 +167,30 @@ export async function createView(canvas, lookId) {
     const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.05, 0.05, 16), gm); cuff.rotation.x = Math.PI / 2; cuff.position.set(0.0, 0.01, 0.065); glove.add(cuff);
     glove.position.set(0, 0.035, 0.02); glove.traverse(o => { if (o.isMesh) o.castShadow = true; }); knifeLift.add(glove); }
   knife.userData.glove = glove;
+  // Tool skins: the same stroke with a different thing in the glove. Built in knifeLift's frame: handle at the grip
+  // (z near 0), working end toward -z, bottom edge at y = 0.
+  const skins = {};
+  const alongZ = (o, len, z0 = -0.24) => { const g = new THREE.Group(); g.add(o); o.updateMatrixWorld(true); let b = new THREE.Box3().setFromObject(o), sz = b.getSize(new THREE.Vector3()); if (sz.x > sz.z) { o.rotation.y += Math.PI / 2; o.updateMatrixWorld(true); b = new THREE.Box3().setFromObject(o); sz = b.getSize(new THREE.Vector3()); } const k = len / Math.max(1e-3, sz.z); g.scale.setScalar(k); g.updateMatrixWorld(true); b = new THREE.Box3().setFromObject(g); const c = b.getCenter(new THREE.Vector3()); g.position.set(-c.x, -b.min.y, z0 - c.z); return g; };
+  const steel = mat('#c9d2db', 0.25, 0.85), wood = mat('#8a5a33', 0.7), black = mat('#2b2622', 0.5);
+  const box = (w, h, d, m, x, y, z) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); o.castShadow = true; return o; };
+  const handleCyl = (m, len = 0.16) => { const o = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.019, len, 12), m); o.rotation.x = Math.PI / 2; o.position.set(0, 0.035, 0.02); o.castShadow = true; return o; };
+  function buildSkin(id) {
+    const g = new THREE.Group();
+    if (id === 'cleaver') { g.add(handleCyl(wood)); g.add(box(0.012, 0.13, 0.22, steel, 0, 0.065, -0.17)); const hole = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.014, 14), black); hole.rotation.z = Math.PI / 2; hole.position.set(0, 0.1, -0.24); g.add(hole); }
+    else if (id === 'machete') { g.add(handleCyl(black, 0.15)); g.add(box(0.008, 0.055, 0.42, steel, 0, 0.03, -0.27)); const tip = box(0.008, 0.05, 0.1, steel, 0, 0.045, -0.5); tip.rotation.x = -0.35; g.add(tip); }
+    else if (id === 'chopsticks') { for (const x of [-0.012, 0.012]) { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.008, 0.46, 8), mat('#c9894b', 0.6)); c.rotation.x = Math.PI / 2 - 0.12; c.position.set(x, 0.03, -0.16); c.castShadow = true; g.add(c); } }
+    else if (id === 'fish') g.add(alongZ(item('fish', 1), 0.42, -0.2));
+    else if (id === 'spatula') g.add(alongZ(item('cooking-spatula', 1), 0.48, -0.2));
+    else if (id === 'golden') { const k = bladeG.clone(true); k.visible = true; const gm2 = mat('#ffc531', 0.35, 0.35); gm2.emissive = new THREE.Color('#7a5200'); gm2.emissiveIntensity = 0.35; k.traverse(o => { if (o.isMesh) o.material = gm2; }); g.add(k); }
+    return g;
+  }
+  knife.setSkin = id => {
+    bladeG.visible = id === 'chef' || !id;
+    for (const k in skins) skins[k].visible = false;
+    if (bladeG.visible) return;
+    skins[id] ??= (() => { const g = buildSkin(id); knifeLift.add(g); return g; })();
+    skins[id].visible = true;
+  };
   // Rest: lying flat beside the board, no glove.
   knife.rest = () => { knife.position.set(0.55, TOP + 0.03, 0.42); knife.rotation.set(0, 0.5, 0); knifeLift.rotation.set(0, 0, -Math.PI / 2); knifeLift.position.set(0, 0.0, 0); glove.visible = false; };
   knife.rest(); world.add(knife);
@@ -414,7 +439,7 @@ export async function createView(canvas, lookId) {
     let width = 0.6, squash = 0, tilt = 0, lastX = 0;
     return {
       group, load,
-      setLevel(l) { const half = [0, 0.27, 0.31, 0.35, 0.39, 0.43, 0.47][Math.min(6, l)]; width = half * 2 * LANE.s + 0.1; body.scale.set(width, 1, 1); rims.forEach((r, i) => { if (i >= 2) r.position.x = (i === 2 ? -1 : 1) * 0.52 * width; r.scale.x = i < 2 ? 1 : 1 / width; }); },
+      setLevel(l) { const half = TUNE.trayHalf[Math.min(TUNE.trayHalf.length - 1, l)]; width = half * 2 * LANE.s + 0.1; body.scale.set(width, 1, 1); rims.forEach((r, i) => { if (i >= 2) r.position.x = (i === 2 ? -1 : 1) * 0.52 * width; r.scale.x = i < 2 ? 1 : 1 / width; }); },
       setX(x) { group.position.x = x; },
       bump() { squash = 1; },
       step(dt) { squash = Math.max(0, squash - dt * 5); const vx = (group.position.x - lastX) / Math.max(dt, 1e-3); lastX = group.position.x; tilt += (Math.max(-0.25, Math.min(0.25, -vx * 0.04)) - tilt) * Math.min(1, dt * 12); group.rotation.z = tilt; group.scale.set(1 + squash * 0.12, 1 - squash * 0.25, 1); },
@@ -438,8 +463,31 @@ export async function createView(canvas, lookId) {
     const dbox = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.1, 0.46), cream); dbox.position.y = 0.04; drawer.add(dbox);
     const front = new THREE.Mesh(roundedBox(0.6, 0.12, 0.04, 0.02), dark); front.position.set(0, 0.04, 0.24); drawer.add(front);
     const handle = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.02, 0.03), gold); handle.position.set(0, 0.05, 0.27); drawer.add(handle);
-    const cash = [];
-    for (let i = 0; i < 4; i++) { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.025, 16), gold); c.position.set(-0.18 + i * 0.12, 0.1, 0.05); drawer.add(c); cash.push(c); }
+    // Inside the drawer: four bill slots (20, 10, 5, 1) and a coin cup. The stacks grow with the day's takings.
+    const DENOMS = [20, 10, 5, 1], BILL_COL = { 20: '#5fae6b', 10: '#7cc4d8', 5: '#e7b85a', 1: '#d98ab8' };
+    const billTex = {};
+    for (const d of DENOMS) {
+      const cv = document.createElement('canvas'); cv.width = 128; cv.height = 64; const c = cv.getContext('2d');
+      c.fillStyle = BILL_COL[d]; c.fillRect(0, 0, 128, 64); c.strokeStyle = '#ffffffcc'; c.lineWidth = 5; c.strokeRect(6, 6, 116, 52);
+      c.fillStyle = '#ffffffdd'; c.beginPath(); c.arc(64, 32, 17, 0, 7); c.fill();
+      c.fillStyle = '#2b1d14'; c.font = '900 26px ui-rounded, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(String(d), 64, 33);
+      c.font = '900 15px sans-serif'; c.fillText(String(d), 20, 18); c.fillText(String(d), 108, 48);
+      billTex[d] = new THREE.CanvasTexture(cv); billTex[d].colorSpace = THREE.SRGBColorSpace;
+    }
+    const billGeo = new THREE.BoxGeometry(0.11, 0.006, 0.19);
+    const billMat = d => new THREE.MeshStandardMaterial({ map: billTex[d], roughness: 0.8 });
+    const slots = DENOMS.map((d, i) => { const g = new THREE.Group(); g.position.set(-0.2 + i * 0.133, 0.095, -0.02); drawer.add(g); return { d, g, n: 0, m: billMat(d) }; });
+    for (const sl of slots) for (let k = 0; k < 2; k++) { const b = new THREE.Mesh(billGeo, sl.m); b.position.y = k * 0.007; b.rotation.y = (k - 0.5) * 0.08; sl.g.add(b); sl.n++; }
+    const cup = new THREE.Group(); cup.position.set(0, 0.095, 0.17); drawer.add(cup);
+    const coinGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.012, 14);
+    const coinMat = gold, silver = mat('#d9dde3', 0.3, 0.7);
+    let coinsIn = 0;
+    const addCoin = () => { if (coinsIn >= 30) return; const c = new THREE.Mesh(coinGeo, coinsIn % 3 ? coinMat : silver); const k = coinsIn++; c.position.set(-0.2 + (k % 8) * 0.057, Math.floor(k / 8) * 0.013, ((k * 7) % 3 - 1) * 0.02); cup.add(c); };
+    for (let i = 0; i < 5; i++) addCoin();
+    const addBill = d => { const sl = slots.find(x => x.d === d); if (!sl || sl.n >= 14) return; const b = new THREE.Mesh(billGeo, sl.m); b.position.y = sl.n * 0.007; b.rotation.y = Math.sin(sl.n * 2.3) * 0.08; sl.g.add(b); sl.n++; };
+    // Money in the air: bills flutter, coins spin, each lands in its slot.
+    const flying = [];
+    const split = total => { const out = []; let left = Math.max(0, Math.round(total)); for (const d of DENOMS) while (left >= d && out.length < 12) { out.push(d); left -= d; } return out; };
     group.traverse(m => { if (m.isMesh) { m.castShadow = true; m.userData.baseMats = [m.material]; m.userData.styled = true; } });
     let open = 0, want = 0, wob = 0, shown = '';
     const draw = text => { if (text === shown) return; shown = text; sx.fillStyle = '#14302b'; sx.fillRect(0, 0, 256, 96); sx.fillStyle = '#7dffb0'; sx.font = 'bold 64px ui-monospace, monospace'; sx.textAlign = 'right'; sx.textBaseline = 'middle'; sx.fillText(text, 240, 52); screenTex.needsUpdate = true; };
@@ -451,7 +499,30 @@ export async function createView(canvas, lookId) {
       press(i) { const k = keys[i % keys.length]; k.position.y -= 0.015; setTimeout(() => { k.position.y += 0.015; }, 90); },
       get isOpen() { return want === 1; },
       drawerWorld() { return drawer.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.12, 0.25)); },
-      step(dt) { open += (want - open) * Math.min(1, dt * (want ? 14 : 18)); drawer.position.z = 0.02 + open * 0.3; wob = Math.max(0, wob - dt * 2.5); group.scale.set(1 + Math.sin(wob * 20) * wob * 0.04, 1 - Math.sin(wob * 20) * wob * 0.05, 1); bell.rotation.z = Math.sin(wob * 30) * wob * 0.5; },
+      // The guest's money flies from `from` (world) into the open drawer: bills to their slots, the rest as coins.
+      // onLand(kind) fires as each piece lands. Returns the pieces in the order they fly.
+      pay(total, from, onLand) {
+        const pieces = split(total);
+        pieces.forEach((d, i) => {
+          const isCoin = d === 1;
+          const m = isCoin ? new THREE.Mesh(coinGeo, coinMat) : new THREE.Mesh(billGeo, slots.find(x => x.d === d).m);
+          m.castShadow = true; m.position.copy(from); m.scale.setScalar(1.4); world.add(m);
+          flying.push({ m, d, isCoin, t: -i * 0.07, from: from.clone(), spin: (i % 2 ? 1 : -1) * (6 + i), onLand });
+        });
+        return pieces;
+      },
+      reset() { for (const sl of slots) { while (sl.g.children.length > 2) sl.g.remove(sl.g.children.at(-1)); sl.n = 2; } while (cup.children.length > 5) cup.remove(cup.children.at(-1)); coinsIn = Math.min(coinsIn, 5); },
+      step(dt) {
+        open += (want - open) * Math.min(1, dt * (want ? 14 : 18)); drawer.position.z = 0.02 + open * 0.3; wob = Math.max(0, wob - dt * 2.5); group.scale.set(1 + Math.sin(wob * 20) * wob * 0.04, 1 - Math.sin(wob * 20) * wob * 0.05, 1); bell.rotation.z = Math.sin(wob * 30) * wob * 0.5;
+        for (let i = flying.length - 1; i >= 0; i--) {
+          const f = flying[i]; f.t += dt; if (f.t < 0) { f.m.visible = false; continue; } f.m.visible = true;
+          const k = Math.min(1, f.t / 0.45), to = drawer.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.12, f.isCoin ? 0.17 : 0));
+          f.m.position.lerpVectors(f.from, to, k); f.m.position.y += Math.sin(k * Math.PI) * 0.35;
+          if (f.isCoin) { f.m.rotation.x = f.t * f.spin; } else { f.m.rotation.set(Math.sin(f.t * 14) * 0.5 * (1 - k), group.rotation.y + Math.sin(f.t * 9) * 0.6 * (1 - k), Math.cos(f.t * 11) * 0.4 * (1 - k)); }
+          f.m.scale.setScalar(1.4 - 0.4 * k);
+          if (k >= 1) { world.remove(f.m); flying.splice(i, 1); if (f.isCoin) addCoin(); else addBill(f.d); f.onLand?.(f.isCoin ? 'coin' : 'bill'); }
+        }
+      },
     };
   }
   function makeSign() {
@@ -461,7 +532,7 @@ export async function createView(canvas, lookId) {
     const face = new THREE.Mesh(new THREE.PlaneGeometry(2.05, 0.45), new THREE.MeshBasicMaterial({ map: tex, transparent: true })); face.position.z = 0.12; group.add(face); face.userData.noOutline = true;
     board.userData.baseMats = [board.material]; board.userData.styled = true;
     let tier = -1, wob = 0;
-    return { group, set(t) { if (t === tier) return; if (tier >= 0) wob = 1; tier = t; cx.clearRect(0, 0, 512, 112); cx.font = '900 54px ui-rounded, "Arial Rounded MT Bold", sans-serif'; cx.textAlign = 'center'; cx.textBaseline = 'middle'; cx.lineWidth = 8; cx.strokeStyle = '#2b1d14'; cx.fillStyle = '#ff7a45'; cx.strokeText('SKY KITCHEN', 256, 46); cx.fillText('SKY KITCHEN', 256, 46); cx.font = '40px sans-serif'; cx.fillStyle = '#ffc531'; cx.fillText('★'.repeat(t) + '☆'.repeat(5 - t), 256, 92); tex.needsUpdate = true; },
+    return { group, set(t) { if (t === tier) return; if (tier >= 0) wob = 1; tier = t; cx.clearRect(0, 0, 512, 112); cx.font = '900 54px ui-rounded, "Arial Rounded MT Bold", sans-serif'; cx.textAlign = 'center'; cx.textBaseline = 'middle'; cx.lineWidth = 8; cx.strokeStyle = '#2b1d14'; cx.fillStyle = '#ff7a45'; cx.strokeText('SKY KITCHEN', 256, 46); cx.fillText('SKY KITCHEN', 256, 46); cx.font = '40px sans-serif'; cx.fillStyle = '#ffc531'; cx.fillText('★'.repeat(Math.min(5, t)) + '☆'.repeat(Math.max(0, 5 - t)) + '☾'.repeat(Math.max(0, t - 5)), 256, 92); tex.needsUpdate = true; },
       step(dt, time) { wob = Math.max(0, wob - dt); group.rotation.z = Math.sin(time * 1.3) * 0.02 + Math.sin(wob * 25) * wob * 0.12; group.scale.setScalar(1 + wob * 0.25); } };
   }
   function makeBubble() {
