@@ -11,7 +11,7 @@ test('settings: changers, changes, last pick per player, runs per value', () => 
     run('b', 2000, [set(5, 'look', 'diner', 'comic')], { look: 'diner' }),
     run('a', 3000, [], { look: 'storybook' }),
   ];
-  const between = [run('c', 500, [set(0, 'sound', true, false)])];
+  const between = [run('c', 500, [{ t: 0, type: 'setting', data: { id: 'sound', value: 'off', from: 'on', def: 'on' } }])];
   const out = settings(runs, between);
   assert.deepEqual(out.map(x => x.name), ['look', 'sound']);
   const look = out[0];

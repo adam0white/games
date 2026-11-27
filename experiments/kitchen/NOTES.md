@@ -20,7 +20,7 @@ Players pick the look with the **Style** button on the menu and pause cards (Ada
 default, then check how many players changed it and to what"). Default `diner`. The order is diner, storybook, diorama, comic, toon,
 night, clay. A `?look=<id>` link also picks one. The pick sticks on that device (key `kitchen-look`).
 
-Telemetry for every setting: the event `setting {name, from, to, where}` for look, tool, sound, music and lang. Every run's start
+Telemetry for every setting, through `kit/settings.js`: the event `setting {id, value, from, def}` for look, tool, sound, music and lang. Every run's start
 record also carries `look`, `tool`, `sound` and `music`, so share of play per style can be counted as well as changes.
 Round 1 looks: `diner` (default), `toon`, `night`, `clay`. Adam called the cartoon "not bad but there's better", so round 2 adds three
 art directions, each a full-screen shader pass over the 3D render (`post` in `LOOKS`, the `post` block in art.js):

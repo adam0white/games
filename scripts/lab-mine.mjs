@@ -106,11 +106,13 @@ const lastEvent = run => (run.data.events ?? []).at(-1);
 const lastTap = run => (run.data.trace ?? []).filter(x => x[1] === 'b' && x[0] >= 0).at(-1);
 const where = run => { const e = lastEvent(run), b = lastTap(run); return [e ? `${e.type}${e.data !== undefined ? ' ' + short(e.data, 40) : ''} at ${secs(e.t)}` : 'no game event', b ? `tap "${b[2]}" at ${secs(b[0])}` : ''].filter(Boolean).join('; '); };
 
-// Player settings (Adam 2026-11-27: give players options as settings with a default, then count who changes them and to
+// Player settings (owner 2026-11-27: give players options as settings with a default, then count who changes them and to
 // what). Games send `setting {name, from, to}` events and may put the active values in a run's start. Per setting: how
 // many players changed it, how many changes, each changer's last pick, and runs played under each value.
 export function settings(runs, between) {
-  const evs = [...runs, ...between].flatMap(r => (r.data.events ?? []).filter(e => e.type === 'setting' && e.data?.name).map(e => ({ player: r.player, at: (r.data.started ?? r.at) + (e.t ?? 0), ...e.data })));
+  const evs = [...runs, ...between].flatMap(r => (r.data.events ?? []).filter(e => e.type === 'setting' && (e.data?.id ?? e.data?.name)).map(e => ({ player: r.player, at: (r.data.started ?? r.at) + (e.t ?? 0),
+    // kit/settings.js sends {id, value, from, def}; earlier pages sent {name, from, to}.
+    name: e.data.id ?? e.data.name, to: e.data.value ?? e.data.to })));
   const names = [...new Set(evs.map(e => e.name))].sort();
   return names.map(name => {
     const mine = evs.filter(e => e.name === name).sort((a, b) => a.at - b.at), last = new Map();
