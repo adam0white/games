@@ -40,7 +40,7 @@ export const TRAITS = {
   raiders: { id: 'raiders', name: 'Raiders', text: 'A raid may be sent for the store. Its soldiers carry loads home and leave the queen be.', at: [2, 1], set: [['loot', 1]] },
   hold: { id: 'hold', name: 'Hold fast', text: 'A raid may be told to hold. Its soldiers stand at the trail\'s end and never go down a door.', at: [2, 1], set: [['hold', 1]] },
   sappers: { id: 'sappers', name: 'Sappers', text: 'Your workers may tunnel into the other nest on any ground. It is a long dig, and it is heard.', at: [3, 0], set: [['breach', 1]] },
-  door: { id: 'door', name: 'Second door', text: 'Dig a tunnel along the top of your ground and open a second door at its end. New trails start at the nearer door, so a store beside it shortens every road on that side. The door and the tunnel are still there in the next mission on this hill. So is the way in for a raid.', at: [2, 0], set: [['side', 1]] },
+  door: { id: 'door', name: 'Second door', text: 'Dig a tunnel along the top of your ground and open a second door at its end. New trails start at the nearer door, so a store beside it shortens every road on that side. The door and the tunnel are still there in the next mission on this hill.', at: [2, 0], set: [['side', 1]] },
   stride: { id: 'stride', name: 'Long stride', text: 'Wardens keep pace with the soldiers.', needs: 'warden', set: [['speed', CASTE.WARDEN, 34]] },
 };
 

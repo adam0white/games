@@ -1098,13 +1098,14 @@ allows it without the trait; `sides: [x, x]` opens kept doors at the start where
 The client keeps doors beside the kept hills under a new key, `cinderhill:war:doors` (`{ v: 1, after: { mission:
 [x, x] } }`), written when a hill is saved and read with it (setting "home" still decides). A new campaign erases it.
 Nest tool "Second door" (tap a column), a banner on the surface and a ring on the small map. The rival is given an
-outpost mind (`mind.outpost: 24`) when the node is open and it is not Timid.
+outpost mind (`mind.outpost: 24`) when the node is open, it is not Timid, and the mission's hill is one that is kept
+(elsewhere the dig is never paid back). That rival was not measured with growth on: every measure used `sideDoor`.
 
 **Why it is a node though the first runs were flat.** Dug and used inside one mission, the door did nothing a bot
 could show: a 24-cell tunnel is dug one cell at a time and opened between ticks 3100 and 4600 of a match that ends
 near 6000. That is a finding about pace, not about the door: nothing that takes two minutes to dig can pay inside a
 five-minute match. Kept into the next mission on the same hill it does pay. Same kept nests, door open against shut,
-six seeds, outpost bot against plain bot (`node war/measure.mjs door 6 stones` gives the table with each bot's own nest):
+six seeds, outpost bot against plain bot (`node war/measure.mjs door 6 stones same`; without `same` each bot plays in its own kept nest):
 
 | loads home by tick 3000 | door shut | door open |
 | --- | --- | --- |
@@ -1118,6 +1119,6 @@ On First Frost the bot's door is in the wrong place for its food (loads by tick 
 69 fewer adults at tick 5000 in four traced games (154 v 170, 111 v 180, 155 v 174, 130 v 132).
 
 **Not checked, or open.** No person has played it. A raid sent under ground shuts only the rival's first door out of
-its field, so a soldier may come up the second. The weevil still comes and goes by the first door only. The surface
+its field, so a soldier may come up the second. The weevil comes in by the first door; its reach is counted from the nearer door, and it may leave by the second. The surface
 shows a banner but no hole in the ground. Wins on six seeds are not read: plain against plain already gives 6 to 0 on
 The Stones.
