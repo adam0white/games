@@ -32,6 +32,7 @@ const qAnts = Number(query.get('ants'));
 // ?colony=1: a colony game (queen, brood, sugar and protein; M1). Without it, the trail painter sandbox as in M0.
 // The ant count buttons and the saved count do not apply to a colony game.
 const colonyMode = query.get('colony') === '1';
+document.body.classList.toggle('colony', colonyMode); // the route card's crew levels
 let lookName = pickLook(query.get('look')), LOOK = LOOKS[lookName];
 const paintTheme = () => { document.querySelector('meta[name=theme-color]')?.setAttribute('content', LOOK.theme); document.body.style.background = LOOK.theme; };
 paintTheme();
@@ -309,6 +310,14 @@ for (const [id, sign] of [['crewPlus', 1], ['crewMinus', -1]]) {
   b.addEventListener('click', e => { e.preventDefault(); if (long) { long = false; return; } crewStep(sign); });
 }
 addEventListener('blur', () => crewStops.forEach(f => f()));
+// Crew levels (sim 9, colony games): Light, Steady and Surge set the crew to 10, 25 or 50% of the outside workforce.
+for (const b of document.querySelectorAll('#crewLevels button')) b.addEventListener('click', e => {
+  e.preventDefault();
+  const tr = crewTrail(); if (!tr || screen !== 'play') return;
+  order({ type: CMD.CREW, seq: tr.seq, delta: 0, level: Number(b.dataset.level) });
+  snd.tone(600, 0.08, 0.04, 'triangle', 60);
+  setTimeout(hud, 80);
+});
 /** A tap near a trail's number picks that trail for plus and minus. */
 function pickTrailAt(sx, sy) {
   if (layer !== SURFACE) return false;
@@ -520,11 +529,16 @@ function hud() {
   if (stats.alarm) lines.push(t('alarmCrew', stats.alarm));
   const sp = host.sim.g[GI.SP];
   if (sp === SPIDER.WARN || sp === SPIDER.HUNT) lines.unshift(`<b class="spider">${t('spiderHud', { what: t(sp === SPIDER.WARN ? 'spiderComing' : 'spiderHunting'), kills: host.sim.g[GI.SP_KILLS] })}</b>`);
-  if (lines.length && newest) lines.push(`<small>${t('noWanted')}</small>`);
+  if (c && stats.resting) lines.push(t('freeCount', { n: num(stats.resting) }));
+  if (lines.length && newest && !c) lines.push(`<small>${t('noWanted')}</small>`);
   $('crew').innerHTML = lines.join('<br>');
   const ct = layer === SURFACE ? crewTrail() : null;
   $('crewCtl').classList.toggle('on', !!ct);
-  if (ct) { const n = stats.trails.slice().sort((a, b) => a.seq - b.seq).indexOf(ct) + 1; $('crewWho').innerHTML = t(ct.want === null ? 'crewWho' : 'crewWhoWant', { n, on: ct.on, want: ct.want }); }
+  if (ct) {
+    const n = stats.trails.slice().sort((a, b) => a.seq - b.seq).indexOf(ct) + 1;
+    $('crewWho').innerHTML = c ? `${t('crewCard', { n, on: ct.on, want: ct.want ?? 0, loads: ct.loads })}${ct.why ? `<br><small>${t('why_' + ct.why)}</small>` : ''}` : t(ct.want === null ? 'crewWho' : 'crewWhoWant', { n, on: ct.on, want: ct.want });
+    for (const b of document.querySelectorAll('#crewLevels button')) b.setAttribute('aria-pressed', String(Number(b.dataset.level) === ct.level));
+  }
   const d = host.day();
   $('goal').hidden = !d;
   if (d) { const s = Math.ceil(d.left / 20), time = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; $('goal').textContent = t('hudDay', { day: d.day, goal: goalHud(d), time }); $('goal').classList.toggle('done', d.won); }

@@ -44,8 +44,12 @@ export const C = {
   LAY_EVERY: 20, EGG_TICKS: 300, LARVA_TICKS: 500, MAJOR_FEEDS: 3, MAJOR_PROTEIN: 20,
   LARVA_STARVE: 1200, PUPA_TICKS: 400, ADULT_EAT_EVERY: 1200, ADULTS_PER_SUGAR: 10, NURSERY: 64,
 };
-// Jobs by birth order, out of ten: 7 forage, 2 dig, 1 guard (JOB values from sim.js: 0 forage, 1 dig, 2 guard).
-const JOB_ROUND = [0, 0, 1, 0, 0, 2, 0, 0, 1, 0];
+// Jobs by birth order, out of ten: 9 forage, 1 guard (JOB values from sim.js: 0 forage, 2 guard). Since sim 9 digging
+// is an auto job (02-spec 6.2, who goes): free ants take it while cells are marked, so no ant is born a digger.
+const JOB_ROUND = [0, 0, 0, 0, 0, 2, 0, 0, 0, 0];
+// Starvation (sim 9, 02-spec 3.2): at 0 sugar adults move at half speed; after STARVE_AFTER ticks at 0, one adult in a
+// hundred (at least one) dies every STARVE_EVERY ticks, lowest index (oldest) first; the queen dies once no adult is left.
+export const STARVE_AFTER = 1200, STARVE_EVERY = 200;
 
 export function makeBrood() {
   return { n: 0, stage: new Uint8Array(BROOD_MAX), age: new Uint16Array(BROOD_MAX), fed: new Uint8Array(BROOD_MAX), hunger: new Uint16Array(BROOD_MAX), cell: new Int32Array(BROOD_MAX) };
@@ -83,7 +87,8 @@ export function startColony(sim) {
     if (k < cfg.surface) {
       let cell = -1;
       for (let t = 0; t < 16 && cell < 0; t++) { const c = cellAt(L, SURFACE, ex - 3 + below(r, A, 7), ey - 3 + below(r, A, 7)); if (c >= 0 && sim.mat[c] === MAT.OPEN) cell = c; }
-      sim.spawn(0 /* JOB.FORAGE */, CASTE.WORKER, 0, cell >= 0 ? cell : cellAt(L, SURFACE, ex, ey));
+      const i = sim.spawn(0 /* JOB.FORAGE */, CASTE.WORKER, 0, cell >= 0 ? cell : cellAt(L, SURFACE, ex, ey));
+      if (i >= 0) sim.mode[i] = 3; // MODE.REST: free, waiting by the door for a trail (sim 9, who goes)
     } else sim.spawn(3 /* JOB.NURSE */, CASTE.WORKER, 0, chamberCell(sim));
   }
   g[G.QUEEN] = 1; g[G.SUGAR] = cfg.sugar; g[G.PROTEIN] = cfg.protein;
@@ -149,6 +154,21 @@ export function stepColony(sim) {
     const need = Math.floor((sim.n + C.ADULTS_PER_SUGAR - 1) / C.ADULTS_PER_SUGAR);
     if (g[G.SUGAR] >= need) g[G.SUGAR] -= need; else { g[G.SUGAR] = 0; g[G.HUNGRY]++; }
   }
+  starve(sim);
+}
+
+/** Starvation (STARVE_AFTER): counts ticks at 0 sugar; past the line, kills the oldest adults of the colony's team. */
+function starve(sim) {
+  const g = sim.g;
+  if (g[G.SUGAR] > 0 || !g[G.QUEEN]) { g[G.STARVE] = 0; return; }
+  if (g[G.STARVE] < 0x7FFFFFFF) g[G.STARVE]++;
+  const t = g[G.STARVE] - STARVE_AFTER;
+  if (t <= 0 || t % STARVE_EVERY !== 0) return;
+  let adults = 0;
+  for (let i = 0; i < sim.n; i++) if (sim.hp[i] > 0 && sim.team[i] === 0) adults++;
+  if (adults === 0) { g[G.QUEEN] = 0; return; } // the queen dies last, after all workers
+  let kill = Math.max(1, Math.floor(adults / 100));
+  for (let i = 0; i < sim.n && kill > 0; i++) if (sim.hp[i] > 0 && sim.team[i] === 0) { sim.hp[i] = 0; sim.anyDead = true; g[G.DIED]++; kill--; }
 }
 
 /** The fight pass, after every ant has moved this tick. The hook battles plug into. */

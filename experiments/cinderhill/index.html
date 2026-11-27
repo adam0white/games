@@ -27,6 +27,8 @@
   #crewCtl { position: fixed; right: calc(8px + env(safe-area-inset-right)); bottom: calc(150px + env(safe-area-inset-bottom)); display: none; align-items: center; gap: 6px; background: #f4ecdcee; color: #2b1d12; border: 1.5px solid #2b1d12; border-radius: 14px; padding: 4px; font-size: 13px; font-weight: 600; touch-action: none; }
   .playing #crewCtl.on { display: flex; }
   #crewWho { min-width: 6.5em; text-align: center; line-height: 1.2; }
+  #crewLevels { display: none; gap: 3px; } .colony #crewLevels { display: flex; }
+  #crewLevels button { padding: 4px 6px; font-size: 12px; } #crewLevels button[aria-pressed="true"] { background: #2b1d12; color: #f4ecdc; }
   #recall[aria-pressed="true"] { background: #b8432f; color: #fff; border-color: #5a1a10; }
   #hold[aria-pressed="true"] { background: #2f5b8a; color: #fff; border-color: #16304d; }
   .playing #top, .playing #tools, .playing #hud { display: flex; }
@@ -69,7 +71,7 @@
   <button id="pause" data-i18n-aria="pause">II</button>
 </div>
 <div id="antCard" role="status"><button id="antClose" aria-label="Close">×</button><div id="antText"></div></div>
-<div id="crewCtl"><button id="crewMinus" data-i18n-aria="crewMinus">−</button><span id="crewWho"></span><button id="crewPlus" data-i18n-aria="crewPlus">+</button></div>
+<div id="crewCtl"><span id="crewLevels"><button data-level="1" data-i18n="crewLight"></button><button data-level="2" data-i18n="crewSteady"></button><button data-level="3" data-i18n="crewSurge"></button></span><button id="crewMinus" data-i18n-aria="crewMinus">−</button><span id="crewWho"></span><button id="crewPlus" data-i18n-aria="crewPlus">+</button></div>
 <div id="toast" aria-live="polite"></div>
 <div id="tools">
   <button data-tool="camera" data-i18n="camera"></button>
