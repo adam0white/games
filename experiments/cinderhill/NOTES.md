@@ -1051,3 +1051,19 @@ Not known: the bot's deep stores sit far deeper (20 steps and more) than a perso
 for safety than the bot does and the default may be an easy call for one who reads the green line. The rival in the
 campaign does not keep its stores deep, so it feeds the weevil. On The Stones a deep bot lost 12 of 12 with or without
 the weevil (points decide there, not seeds), which is why the weevil is not on that mission. No person has played it.
+
+### The weevil after a check against the default rival and a blinded read
+
+- Against the Timid rival (the default) the first default weevil (fill 60) left both hills at about 10 ants at the thaw,
+  against 67 and 63 with none. The default now eats half as much (fill 30, 150 seeds at most): 51 and 42 ants at the
+  thaw. With it the deep-store bot wins 3 of 12 against the plain bot (hungry: 9 of 12, none: 1 of 12), so taking the
+  loss is the better call at the default and deep stores are the better call against the hungry one. The table above
+  holds the first default's numbers.
+- A person's safe store is 17 steps down; the bot's deep stores start at 20. The answer is not much cheaper for a person.
+- A warning toast now holds against a hint that comes while it shows. In the phone browser the arrival warning had
+  been replaced by a hint.
+- A blinded outside read (card text and one Nest screenshot) gave the rule back correctly and planned the right steps.
+  It called the choice a chore because the card told it what to do and gave no cost. The card now gives the most the
+  weevil can eat, the walk the deep stores cost, and the three ways to answer, without saying which. The weevil is
+  labelled in the Nest view.
+- `node war/measure.mjs visitor [seeds] [mission] [comes|hungry]` gives these tables.

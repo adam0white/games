@@ -120,7 +120,7 @@ export const LOSS_ANTS = 8;
 // A page picks one for a mission with `visitor`. Stores dug deeper than its reach are the answer, at the cost of a longer
 // walk for every load; soldiers beside it are the other.
 export const VISITOR = {
-  comes: { at: [1500, 3000, 4500, 6000, 7500], warn: 200, hp: 420, every: 10, fill: 60, reach: 16, step: 8, bite: 8, biteEvery: 20, press: 4, meat: 20 },
+  comes: { at: [1500, 3000, 4500, 6000, 7500], warn: 200, hp: 420, every: 10, fill: 30, reach: 16, step: 8, bite: 8, biteEvery: 20, press: 4, meat: 20 },
   hungry: { at: [1500, 3000, 4500, 6000, 7500], warn: 200, hp: 600, every: 10, fill: 80, reach: 16, step: 8, bite: 8, biteEvery: 20, press: 4, meat: 20 },
 };
 
