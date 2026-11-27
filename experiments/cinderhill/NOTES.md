@@ -853,3 +853,24 @@ against 5 of 10. The card says "the harder way". Not tried: a feint at the pass 
 what a person would do. No person has played either way.
 
 Tried and dropped: free digging at 120 ticks a cell (1 and 3 of 10 before the other fixes).
+
+## The first fork measured: the Deep hill lost everywhere, so its workers are tougher
+
+Steady bots, ten seeds, both seats, counting only games where both hills took the craft their mind asked for.
+Before (War with Legion against Deep with Granary): The Crossing 10 to 5, First Frost 15 to 5 (bots with frost
+planning off, or they never grow), The Hunt 11 to 9, The Narrows 19 to 1, The Wall 20 to 0. Deep led nowhere. Thrift
+against Swift on a War hill was about even (8 to 9, 8 to 12, 9 to 11, 7 to 13, 10 to 10).
+
+Rows that say nothing: on The Larder no bot ever took a craft, and on The Stones none of the twenty games had both.
+Seat 0 wins 18 of 20 on The Stones whatever the minds, and 16 of 20 on First Frost with frost planning on: a seat
+bias on mirrored maps, cause not looked for.
+
+Tried on the Deep hill, six seeds on The Crossing, The Wall and The Hunt (Deep wins of 12): meals a quarter or a
+half cheaper (4, 0, 3), gardens paying double from the first growth (4, 0, 4), every caste a fifth tougher (11, 1,
+6: too strong on open ground), workers a seventh faster (6, 0, 5), workers half again as tough (8, 2, 8).
+
+Taken: Deep workers half again as tough (`['hp', 0, 150]`). At ten seeds, Deep with Granary against War with
+Legion: The Crossing 13 to 7 for Deep, The Hunt 14 to 6 for Deep, The Wall 17 to 3 for War, The Narrows 17 to 3
+for War, First Frost 13 to 7 for War. With Swift on both sides it is closer and mixed. So the fork now reads: Deep
+for open ground and long games over food, War for sieges and tunnels. Workers at a third tougher was not enough
+(Deep 9 to 7 on The Crossing but 2 to 18 and 0 to 20 in the sieges, and behind on The Hunt).
