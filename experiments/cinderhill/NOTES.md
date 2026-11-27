@@ -244,7 +244,7 @@ What changed, all in the sim:
 
 The page shows each new thing: a toast and sound for a new pile, the first birth and every tenth, and "larvae are hungry" when there are larvae and no protein (lab events `pile` and `hungry`).
 
-**Acceptance** (the coordinator's brief, written before tuning): the first load home 10 to 15 s after the first trail; the first new ant within 60 s; no stretch over 45 s in the first five minutes with nothing new. Measured by `spikes/pace.mjs` on 24 seeds with two passive players like the owner (one trail at 3 s, then nothing): "near" draws to the nearest pile, "owner" to the nearest protein.
+**Acceptance** (the coordinator's brief, written before tuning): the first load home 10 to 15 s after the first trail; the first new ant within 60 s; no stretch over 45 s in the first five minutes with nothing new. Measured by `spikes/pace.mjs` (retired in R0 for `spikes/pace-gate.mjs`) on 24 seeds with two passive players like the owner (one trail at 3 s, then nothing): "near" draws to the nearest pile, "owner" to the nearest protein.
 
 | Player | Pile distance (cells) | First load after the trail: median / worst | First birth, worst | Longest quiet stretch, worst | Ants at 5 min (median) | Larvae lost (median) |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -267,6 +267,36 @@ The page shows each new thing: a toast and sound for a new pile, the first birth
 Both acceptance lines miss on one seed of twelve, on day 3. Day 3 was 60 at first; idle won it on seed 3 of a five-seed run, so it went to 110, and now careful loses one seed and idle still wins one. The next fix would be to count only loads brought along a trail on day 3, as day 1 does. It is not made: the round-3 spec drops days (above), so tuning them further is spent on code that R1 replaces. On a both-foods day the careful bots now take the food with fewer loads since dawn and redraw every 600 ticks (1,500 before).
 
 `test/pace.test.mjs`: three births within 60 s; new piles at the windfall times, protein first, each with food. Mutations shown to fail: no windfalls; no pupae at the start.
+
+## The pace gate (R0, 2026-11-26)
+
+`spikes/pace-gate.mjs` reads the pace budget of 02-spec section 3.1 from scripted players. CI runs it in the `changes` job when `experiments/cinderhill`, `.node-version` or `ci.yml` changes (`scripts/affected.mjs`), and nightly, with 3-minute games (`--minutes=3`); a run with no flag plays 12 minutes and reads every line.
+
+- **Bots** (02 section 3.1, adapted to what the build has). Median: every 15 s, a trail from the entrance to the nearest pile of the food the colony has less of in store, skipped when a live trail already ends there; the sim keeps four trails and reuses the oldest, so it never has more than six; Recall on at the spider's warning and off when it leaves; it taps on at every dusk card. Passive: one trail at 1 s to the nearest pile, then nothing. Idle: no order; it does not play yet because no line the build can measure reads it (chapters are not built).
+- **Watching**: replay-lab's `Observer`, the same one a lab record's replay uses, attached to the bot's Host. It now keeps births, deliveries in the first 2 min, decision events (new source seen, source empty, threat telegraphed, brood short of protein; the spec's other kinds are not built; the spider arriving and leaving are kept for the threat and quiet lines but are not decision events, since they offer no new choice) and the wasted-labour share (a forager with no load, no trail, no remembered pile and no find for 10 s, or a digger resting, or seeking with no marked dig, for 10 s, while a trail has no crew size or is short of it, or marked dig cells have room in the dig crew).
+- **Worst seed**: a line's value is its worst seed of 20 ("every line passes for the scripted bots on 20 seeds", 02 section 0). A line that never happens on some seed fails.
+- **Staging** (02 section 3.1, "Which lines block what", round 4): each line names the stage it blocks from (`stage`); `STAGE` in the file is where the build is. At R0 four lines block: first delivery (median and passive), deliveries in minute 1, first birth. Every other line is read and reported with its status: pass, fail, "not read" (the run is too short for it) or "not built" (the build has nothing to read). Raise `STAGE` in the pull request that builds the next step.
+- **Ratchet** (`spikes/pace-baseline.json`) on the blocking lines: a line that passes must keep passing; a failing line may not get worse than its recorded value by more than a twentieth (plus a quarter unit), or stop happening; a line that starts to pass fails until `--update` records it, so progress is kept. CI also passes the base commit (`--base-ref`): the baseline a pull request records may not be worse on a blocking line than the base commit's, so `--update` cannot hide a regression. A blocking line must be read in every run. The roadmap says the current build fails the gate: it does (first delivery 16.2 s on the worst seed), and the gate prints "Pace budget at R0: FAILS". Only at R0 does the baseline allow a failing blocking line (otherwise no pull request could merge before R1 step 2); from R1 step 2 (`STAGE = 'R1.2'`) every blocking line must pass whatever the baseline says.
+- **Quota opening** (fault injection, no sim change): 20 workers, 40 sugar, 4 larvae, no pupae, a 40-load first day of 10 minutes. It must fail a blocking line the build passes. It fails the first birth.
+- **Brood x10 plant**: every brood stage ten times as long. It must fail a blocking line. The starting pupae now start a third of the pupa stage apart (the same ages as before with a 900-tick stage, so the same hashes), so a slower stage delays them too: the first birth moves from 15 s to 150 s.
+- **First player-funded birth** stands in as the first birth after the starting pupae that comes after the first protein load home by a drawn trail. The sim does not track which load fed which larva, so this is an approximation, not the spec's exact event.
+- **Quiet stretches** (round 4): no structures exist yet, so the events are deliveries, births, new sources and threat changes.
+- **Limits**: a restart in a lab record rolls the sim's counters back, so the minute it falls in undercounts deliveries (bots never restart). At R1 step 3 the idle-share line (12-minute horizon) starts to block, so CI must then play 12 minutes or the line needs a shorter horizon. The people line reads sim seconds, so a lab session played at 2x or 4x reads later than it was; first delivery from records counts only sessions that replayed to their hashes. **Not built**: first real choice and its consequence (chapter scripts), consequential choices (needs a paired-replay tool), doors, chapters. Input ready, human first order and human chapter 1 length are listed as people and page lines, "not built". **People lines**: `--records <files>` replays lab records and reports first order within 10 s and first delivery from the first trail.
+
+Sim 7, 20 seeds, 12 minutes, worst seed:
+
+| Line | Target | Sim 7 | Blocks from |
+| --- | --- | --- | --- |
+| First delivery from the first trail (median / passive) | <= 10 s | 16.2 / 13.25 s: fail | R0 |
+| Deliveries in minute 1 | >= 25 | 39: pass | R0 |
+| First birth | <= 15 s | 15 s: pass | R0 |
+| First funded birth | <= 90 s | 135 s: fail | R1 |
+| Quiet stretch, first 2 min | <= 15 s | 21 s: fail | R1 |
+| First threat telegraphed / resolved | <= 60 s / 3 min | 52.55 / 94.55 s: pass | R1 step 5 |
+| Longest gap between decision events, 0 to 10 min / after | <= 30 / 45 s | 157.5 / 82.55 s: fail | R1 |
+| Wasted labour | <= 15% | 0.261: fail (the starting diggers wait in SEEK with nothing marked; counted after the second review) | R1 step 3 |
+
+Decisions (agent): the gate runs only when `experiments/cinderhill` changes, since nothing else can move these numbers, and CI plays 3-minute games (every blocking line fits in 1 minute; 12-minute games cost about 20 s of a core each).
 
 ## Speed (2026-11-26, page only)
 

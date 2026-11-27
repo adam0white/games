@@ -17,7 +17,7 @@ const every = process.env.EVENT === 'schedule' || process.env.EVENT === 'workflo
 const phoneOnly = push ? '' : every ? 'all' : phoneChecks(paths);
 // Slow suites that only a few paths reach. Nightly and by hand they always run.
 const touched = prefixes => every || paths.some(path => prefixes.some(prefix => path.startsWith(prefix)));
-const cinderhill = touched(['experiments/cinderhill/', 'workers/cinderhill/']);
+const cinderhill = touched(['experiments/cinderhill/', 'workers/cinderhill/', '.node-version', '.github/workflows/ci.yml']);
 const workers = touched(['workers/', 'experiments/cinderhill/', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml']);
 const phone = phoneOnly !== '';
 if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `games=${matrix}\ncount=${games.length}\ntotal=${registry.games.length}\nphone=${phone}\nphoneOnly=${phoneOnly}\ncinderhill=${cinderhill}\nworkers=${workers}\n`);
