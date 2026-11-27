@@ -47,6 +47,10 @@ const TOOLS = [
 ];
 const tools = (() => { const o = readJson(TOOLS_KEY, null), ids = TOOLS.map(x => x.id); const own = Array.isArray(o?.own) ? o.own.filter(x => ids.includes(x)) : []; if (!own.includes('chef')) own.unshift('chef'); return { own, use: ids.includes(o?.use) && own.includes(o.use) ? o.use : 'chef' }; })();
 const storeTools = () => writeJson(TOOLS_KEY, tools);
+// Staff (own key): guests hired with the wheel, or beaten in a fist fight and owing a free shift.
+const STAFF_KEY = 'kitchen-staff';
+const staff = (() => { const o = readJson(STAFF_KEY, null); return Array.isArray(o) ? o.filter(x => x && Number.isFinite(x.look) && (x.kind === 'hired' || x.kind === 'owed')).slice(0, sim.STAFF_MAX).map(x => ({ look: x.look | 0, kind: x.kind, name: String(x.name ?? 'Pip').slice(0, 12) })) : []; })();
+const storeStaff = () => writeJson(STAFF_KEY, staff.map(({ look, kind, name }) => ({ look, kind, name })));
 let lookId = LOOK_IDS.includes(query.get('look')) ? query.get('look') : LOOK_IDS.includes(read(LOOK_KEY)) ? read(LOOK_KEY) : 'diner';
 
 // ---------- sound: made in code (kit/audio.js); music from kit/music.js
@@ -82,6 +86,14 @@ const SFX = {
   star() { [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => later(i * 110, () => { tone(f, 0.4, 0.08, 'triangle'); tone(f / 2, 0.35, 0.04); })); },
   happy() { tone(880, 0.1, 0.05, 'sine', 300); later(110, () => tone(1175, 0.15, 0.05, 'sine', 200)); },
   step() { noise(0.03, 0.02, 700); },
+  // Slapstick: the wheel's sounds.
+  spin() { for (let i = 0; i < 10; i++) later(i * 60, () => tone(900 - i * 40, 0.04, 0.03, 'square')); },
+  slap() { noise(0.05, 0.25, 3200); tone(300, 0.08, 0.06, 'triangle', -200); },
+  boing() { tone(180, 0.45, 0.09, 'sine', 500); },
+  crash() { noise(0.35, 0.16, 900); later(120, () => noise(0.2, 0.1, 2400)); tone(90, 0.2, 0.1, 'square', -30); },
+  punch() { noise(0.06, 0.22, 700); tone(120, 0.08, 0.12, 'square', -60); },
+  splat() { noise(0.18, 0.2, 500); tone(200, 0.2, 0.07, 'sine', -150); },
+  jingle() { for (let i = 0; i < 8; i++) later(i * 70, () => tone(1800 + Math.random() * 900, 0.06, 0.03, 'square')); },
 };
 const buzz = ms => { if (save.sound && navigator.vibrate) try { navigator.vibrate(ms); } catch {} };
 
@@ -129,7 +141,7 @@ function labels() {
   for (const id of ['sound1', 'sound2']) { $(id).textContent = t(save.sound ? 'soundOn' : 'soundOff'); $(id).setAttribute('aria-pressed', String(save.sound)); }
   for (const id of ['music1', 'music2']) { $(id).textContent = t(musicOn ? 'musicOn' : 'musicOff'); $(id).setAttribute('aria-pressed', String(musicOn)); }
   $('look').textContent = t('look', { name: t('looks_' + lookId) });
-  $('chopBtnText').textContent = t('chop');
+  $('chopBtnText').textContent = t('chop'); $('wheelBtnText').textContent = t('wheelBtn');
 }
 const rankName = tier => t('rank_' + TIERS[tier].name);
 // Five stars, then a moon for each rank above the clouds.
@@ -169,8 +181,13 @@ function beginDay() {
     const menuNow = sim.menuFor(save);
     story.pickSpecial(save, storyBook.specials, menuNow, seed);
     plan = story.forceDishes(plan, story.wantedDishes(save), menuNow);
+    if (save.tier >= sim.MOOD_FROM) plan = sim.forceMoods(plan, story.wantedMoods(save));
   }
-  day = { plan, i: -1, served: 0, earned: 0, tips: 0, stars: [], seed, t0: clock, extras: 0 };
+  day = { plan, i: -1, served: 0, earned: 0, tips: 0, stars: [], seed, t0: clock, extras: 0, robbed: 0, rebels: [] };
+  // Staff come in for the shift. A guest who owes a shift may rebel at some point today.
+  const rr = sim.rng(seed ^ 0xbad);
+  staff.forEach(m => { m.model = null; if (m.kind === 'owed' && rr() < sim.REBEL_CHANCE) day.rebels.push({ at: 1 + Math.floor(rr() * Math.max(1, plan.length - 1)), who: m }); });
+  staffIn();
   song?.start(seed);
   rec.start({ day: save.day, tier: save.tier, tutorial: !save.tutorial });
   paused = false; snd.release(); show('play'); hud();
@@ -182,8 +199,10 @@ async function nextGuest() {
   day.i++;
   clearCatch(); g = null;
   if (day.i >= day.plan.length) return endDay();
+  const reb = day.rebels.find(x => x.at === day.i && staff.includes(x.who));
+  if (reb) { day.rebels = day.rebels.filter(x => x !== reb); day.i--; return rebel(reb.who); }
   const p = day.plan[day.i], r = RECIPES[p.recipe];
-  g = { recipe: p.recipe, q: [], steps: r.steps.slice(), step: -1, wait: 0, extras: 0, restarts: 0, paid: 0, model: null, tut: !save.tutorial ? day.i : -1 };
+  g = { mood: p.mood ?? null, look: p.look, recipe: p.recipe, q: [], steps: r.steps.slice(), step: -1, wait: 0, extras: 0, restarts: 0, paid: 0, model: null, tut: !save.tutorial ? day.i : -1 };
   // A golden recipe: rare, more ingredients, a harder catch, and triple pay if every step is clean.
   g.golden = goldenNext || (save.tutorial && save.tier >= 1 && day.i > 0 && sim.rng(day.seed * 7 + day.i * 131)() < sim.TUNE.golden);
   goldenNext = false;
@@ -205,7 +224,9 @@ function order() {
   $('ticket').style.display = 'block'; $('ticket').classList.remove('pop'); void $('ticket').offsetWidth; $('ticket').classList.add('pop');
   SFX.happy();
   if (g.tut === 0) coach(t('t1'));
-  wait(g.tut === 0 ? 2.2 : 1.1, () => { if (storyOpen()) pendingCatch = g; else startCatch(); });
+  if (g.mood) { g.model?.bubble.show(null, g.mood); coach(t('mood_' + g.mood), 3); later(1100, () => { if (g?.model && phase === 'order') g.model.bubble.show(art.thumb(dishModel(g.recipe))); }); }
+  wheelBtn(wheelOn());
+  wait(g.tut === 0 ? 2.2 : g.mood ? 3.2 : wheelOn() ? 1.6 : 1.1, () => { if (phase !== 'order') return; wheelBtn(false); if (storyOpen()) pendingCatch = g; else startCatch(); });
 }
 function dishModel(id) { const r = RECIPES[id]; if (r.dish) return r.dish; if (r.bowl) return 'bowl'; const first = Object.keys(r.need)[0]; return ING[first]?.chop ?? ING[first]?.model ?? 'carrot'; }
 const itemModel = id => (ING[id] ?? JUNK[id]).model;
@@ -576,23 +597,34 @@ function serve() {
   slide = { from: dish.position.clone(), to: new art.THREE.Vector3(2.9, TOP, 0.42), t: 0 };
   const q = g.q.reduce((a, b) => a + b, 0) / g.q.length;
   g.bill = sim.bill(save, g.recipe, q, g.wait);
+  if (g.sorted != null) { g.bill.tip = Math.round(g.bill.tip * g.sorted); g.bill.total = g.bill.price + g.bill.tip; }
+  else if (g.mood) g.bill = sim.moodBill(g.bill, g.mood);
+  if (staff.length && g.bill.tip) { g.bill.tip = Math.round(g.bill.tip * sim.staffTip(staff.length)); g.bill.total = g.bill.price + g.bill.tip; }
+  if (g.q.some(x => x === 0)) g.bill.thrown = true; // burnt food comes back, whoever ordered it
+  if (throwNext) { throwNext = false; g.bill.thrown = true; }
   if (g.golden) {
     g.goldenWon = g.extras === 0 && g.paid === 0 && g.q.every(x => x >= 0.75);
     if (g.goldenWon) { g.bill.price *= 3; g.bill.tip *= 3; g.bill.total = g.bill.price + g.bill.tip; }
   }
-  wait(0.6, () => {
-    g.model?.play('emote-yes', true); g.model?.bubble.show(null, 'happy'); SFX.happy();
+  wait(0.6, () => (g.bill.thrown ? thrown() : payUp()));
+}
+// The guest is happy (or at least paying): stars, the total keyed in, then the register.
+function payUp() {
+  phase = 'serve';
+  {
+    g.model?.play('emote-yes', true); g.model?.bubble.show(null, g.bill.thrown ? 'rude' : 'happy'); if (!g.bill.thrown) SFX.happy();
     floater(worldPx(3.25, 1.9, 0.95), '★'.repeat(g.bill.stars), 'gold');
     if (g.golden) { banner(t(g.goldenWon ? 'goldenWon' : 'goldenLost')); if (g.goldenWon) { flash(); SFX.star(); } }
     // The total is keyed in digit by digit, a click a key.
     const digits = String(g.bill.total);
     for (let i = 1; i <= digits.length; i++) later(i * 85, () => { if (!g) return; art.register.press(i * 5 + (+digits[i - 1])); art.register.display(digits.slice(0, i)); SFX.key(); });
     wait(0.8, ringUp);
-  });
+  }
 }
 let slide = null;
 function ringUp() {
   phase = 'ring'; banner(t('ring'), t('ringSub'));
+  if (g.bill.dashed) coach(t('dashed'), 3);
   if (g.tut === 0) coach(t('t4'));
   if (g.tut === 0 || save.day <= 2) { fingerTap(art.register.group.position.clone().add(new art.THREE.Vector3(0, 0.45, 0))); }
   art.view('serve');
@@ -627,7 +659,8 @@ function closeRegister() {
   wait(0.5, () => {
     if (d) art.world.remove(d);
     $('ticket').style.display = 'none';
-    if (m) { m.bubble.hide(); art.walkTo(m, 6.5, 1.6, () => { m.gone = true; }); }
+    if (m && g.joinAfter && addStaff('owed', m)) { m.bubble.hide(); }
+    else if (m) { m.bubble.hide(); if (g.bill.dashed) { m.speed = 4.2; m.play('sprint'); } art.walkTo(m, 6.5, 1.6, () => { m.gone = true; }); if (g.bill.dashed) m.play('sprint'); }
     wait(0.7, nextGuest);
   });
 }
@@ -645,12 +678,17 @@ function endDay() {
   const fin = save.tutorial ? tally({ type: 'dayEnd', extras: day.extras }) ?? [] : [];
   save.tutorial = true; save.day++; save.dayAtTier++;
   save.best = Math.max(save.best, day.earned + day.tips);
+  // Wages for hired staff (as much as there is); owed shifts are done.
+  let wages = 0;
+  for (const m of staff) if (m.kind === 'hired') { const w = Math.min(save.coins, sim.wage(save.tier)); save.coins -= w; wages += w; }
+  const freed = staff.filter(m => m.kind === 'owed'); for (const m of freed) staff.splice(staff.indexOf(m), 1);
+  storeStaff(); hud();
   store();
   const stars = day.stars.length ? Math.round(day.stars.reduce((a, b) => a + b, 0) / day.stars.length) : 0;
   rec.end('day', { day: save.day - 1, tier: save.tier, served: day.served, coins: day.earned + day.tips, stars });
   $('dayTitle').textContent = t('dayDone', { n: save.day - 1 });
   $('dayStars').textContent = '★'.repeat(stars) + '☆'.repeat(3 - stars);
-  $('ledger').innerHTML = `<tr><td>${t('served')}</td><td>${day.served}</td></tr><tr><td>${t('earned')}</td><td>${day.earned}</td></tr><tr><td>${t('tips')}</td><td>${day.tips}</td></tr><tr class="total"><td><i class="coin"></i></td><td>${save.coins}</td></tr>`;
+  $('ledger').innerHTML = `<tr><td>${t('served')}</td><td>${day.served}</td></tr><tr><td>${t('earned')}</td><td>${day.earned}</td></tr><tr><td>${t('tips')}</td><td>${day.tips}</td></tr>${day.robbed ? `<tr><td>${t('robbed')}</td><td>${day.robbed}</td></tr>` : ''}${wages ? `<tr><td>${t('wages')}</td><td>−${wages}</td></tr>` : ''}<tr class="total"><td><i class="coin"></i></td><td>${save.coins}</td></tr>`;
   $('dayLine').textContent = first ? t('t7') : '';
   $('dayMissions').innerHTML = fin.map(o => `<li class="won">✓ ${esc(o.text)} <b>+${o.reward}</b></li>`).join('') + (save.story?.open ?? []).slice(0, 3).map(o => `<li>${esc(o.text)} <b>${story.progress(o)}</b></li>`).join('');
   coach(null); fingerOff(); gauge(null);
@@ -724,6 +762,141 @@ function starUp() {
   if (added.length) floater({ x: innerWidth / 2, y: innerHeight * 0.3 }, t('unlocked', { what: added.join(', ') }), 'gold');
   const tw = sim.twistFor(save.tier);
   if (tw) floater({ x: innerWidth / 2, y: innerHeight * 0.38 }, `${t('twistNew')}: ${t('tw_' + tw.id)}`, 'gold');
+}
+
+
+// ---------- the Manners Wheel: "Feed everyone. Throw food? Spin first. THEN feed."
+const WHEEL_ICON = { kick_out: '🥾', slap: '🐟', fridge: '🧊', pan: '🍳', microwave: '⏲️', cook_self: '👨‍🍳', lock_out: '🔒', trash: '🗑️', rob: '💰', hire: '🤝', fight: '🥊' };
+const NAMES = ['Gus', 'Pip', 'Mo', 'Dot', 'Bo', 'Fig', 'Lou', 'Tib', 'Nell', 'Ozzy', 'Rue', 'Wim'];
+let wheelCtx = null, fight = null, throwNext = false;
+const wheelOn = () => save.tutorial && save.tier >= sim.MOOD_FROM && !!g?.model;
+function wheelBtn(on) { $('wheelBtn').style.display = on ? 'flex' : 'none'; $('wheelBtn').classList.toggle('hot', on && !!g?.mood); }
+function openWheel(ctx) {
+  if (!g?.model) return;
+  wheelCtx = ctx; phase = 'wheel'; wheelBtn(false); coach(null); fingerOff(); SFX.spin();
+  const ids = sim.WHEEL_IDS.filter(id => !(ctx === 'payback' && (id === 'rob' || id === 'hire')));
+  $('wheelItems').innerHTML = ids.map((id, i) => {
+    const a = (i / ids.length) * Math.PI * 2 - Math.PI / 2, r = 40, off = id === 'hire' && staff.length >= sim.STAFF_MAX;
+    return `<button data-w="${id}" style="left:${50 + Math.cos(a) * r}%;top:${50 + Math.sin(a) * r}%" ${off ? 'disabled' : ''}><span>${WHEEL_ICON[id]}</span><small>${t('w_' + id)}</small></button>`;
+  }).join('');
+  $('wheelMid').textContent = ctx === 'payback' ? t('letGo') : '✖';
+  $('wheel').style.display = 'block'; $('wheelRing').style.animation = 'none'; void $('wheelRing').offsetWidth; $('wheelRing').style.animation = '';
+  for (const b of $('wheelItems').querySelectorAll('button')) b.addEventListener('click', e => { e.stopPropagation(); pickWheel(b.dataset.w); });
+}
+function closeWheel() { $('wheel').style.display = 'none'; }
+$('wheelMid').addEventListener('click', e => { e.stopPropagation(); SFX.tap(); closeWheel(); if (!g) return; if (wheelCtx === 'payback') { phase = 'serve'; payUp(); } else { phase = 'order'; wait(0.4, () => { if (phase === 'order') startCatch(); }); } });
+$('wheelBtn').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if (phase === 'order' && wheelOn()) openWheel('order'); });
+function pickWheel(id) {
+  const ctx = wheelCtx, me = g, w = sim.WHEEL[id];
+  closeWheel(); if (!g?.model || !w) return;
+  if (id === 'hire' && staff.length >= sim.STAFF_MAX) return;
+  phase = 'stunt'; g.model.bubble.hide(); g.wheeled = id;
+  const fin = tally({ type: 'wheel', action: id }); rec.event('wheel', { action: id, mood: g.mood, when: ctx });
+  for (const o of fin ?? []) floater({ x: innerWidth / 2, y: innerHeight * 0.3 }, `✓ ${o.text} +${o.reward}`, 'gold');
+  ({ kick_out: SFX.boing, slap: SFX.slap, fridge: SFX.whoosh, pan: SFX.sizzle, microwave: SFX.hum, cook_self: SFX.sizzle, lock_out: SFX.clunk, trash: SFX.crash, rob: SFX.jingle, hire: SFX.happy, fight: SFX.punch }[id] ?? SFX.tap)();
+  if (w.stunt === 'fight') return fightStart(won => afterFight(won, me, ctx));
+  art.view(['fridge', 'microwave', 'cook_self'].includes(id) ? 'left' : ['fly', 'into', 'out', 'join', 'shake'].includes(w.stunt) ? 'stunt' : 'serve');
+  if (id === 'microwave') later(1100, () => SFX.ding()); if (id === 'trash') later(800, () => SFX.crash());
+  art.stunt(g.model, w.stunt, { at: w.at, staffSlot: staff.length }, () => afterStunt(id, me, ctx));
+}
+function afterStunt(id, me, ctx) {
+  if (me !== g) return;
+  coach(t('p_' + id), 4);
+  if (id === 'rob') { const n = sim.robTake(save, g.recipe); save.coins += n; day.robbed += n; hud(); store(); floater(worldPx(3.25, 1.9, 0.95), `+${n}`, 'gold'); return leaveNow(); }
+  if (id === 'hire') { addStaff('hired', g.model); $('ticket').style.display = 'none'; return wait(1.0, nextGuest); }
+  resumeAfter(ctx);
+}
+function afterFight(won, me, ctx) {
+  if (me !== g) return;
+  if (won) {
+    coach(t('p_fight'), 4);
+    if (ctx === 'payback') { g.joinAfter = true; phase = 'serve'; return payUp(); }
+    if (addStaff('owed', g.model)) { $('ticket').style.display = 'none'; return wait(1.0, nextGuest); }
+    return resumeAfter(ctx);
+  }
+  coach(t('fightLostLine'), 3); g.model?.play('emote-yes', true);
+  if (ctx === 'payback') { phase = 'serve'; return payUp(); }
+  g.sorted = 0; g.mood = null; phase = 'order'; art.view('serve'); wait(1.2, () => { if (phase === 'order') startCatch(); });
+}
+function resumeAfter(ctx) {
+  art.view('serve');
+  if (ctx === 'payback') { phase = 'serve'; return payUp(); }
+  g.sorted = sim.wheelTip(g.mood); g.mood = null; phase = 'order';
+  if (g.model) { g.model.face = -Math.PI * 0.6; g.model.bubble.show(null, g.sorted ? 'sorry' : 'angry'); }
+  later(1000, () => { if (g?.model && phase === 'order') g.model.bubble.show(art.thumb(dishModel(g.recipe))); });
+  wait(1.5, () => { if (phase === 'order') startCatch(); });
+}
+function leaveNow() {
+  const m = g.model; $('ticket').style.display = 'none';
+  if (m) { m.bubble.hide(); m.speed = 4; art.walkTo(m, 6.5, 1.6, () => { m.gone = true; }); m.play('sprint'); }
+  wait(0.9, nextGuest);
+}
+// Burnt food, or a rude guest's dish under three stars, comes back: in your face.
+function thrown() {
+  phase = 'thrown'; const m = g.model;
+  m?.play('attack-melee-right', true); m?.bubble.show(null, 'rude');
+  g.bill.tip = 0; g.bill.total = g.bill.price;
+  later(320, () => { SFX.splat(); splat(); art.shake(0.9); buzz([40, 30, 60]); if (dish) { art.world.remove(dish); dish = null; } });
+  banner(t('thrown'), wheelOn() ? t('thrownSub') : '');
+  rec.event('thrown', { recipe: g.recipe, mood: g.mood });
+  wait(1.1, () => { if (phase !== 'thrown') return; if (wheelOn()) openWheel('payback'); else payUp(); });
+}
+function splat() {
+  const el = $('splat'); el.innerHTML = '';
+  const col = ['#ff6b4a', '#ffb347', '#a3d65c', '#e8524a'][Math.floor(Math.random() * 4)];
+  for (let i = 0; i < 7; i++) { const b = document.createElement('i'); const r = 60 + Math.random() * 140; b.style.cssText = `left:${15 + Math.random() * 70}%;top:${20 + Math.random() * 55}%;width:${r}px;height:${r * (0.7 + Math.random() * 0.5)}px;background:${col}`; el.append(b); }
+  if (g) { const img = document.createElement('img'); img.src = art.thumb(dishModel(g.recipe), 160); el.append(img); }
+  el.style.display = 'block'; el.classList.remove('go'); void el.offsetWidth; el.classList.add('go');
+  clearTimeout(splat.t); splat.t = setTimeout(() => { el.style.display = 'none'; }, 1900);
+}
+// A fist fight: tap faster than they can swing.
+function fightStart(done) {
+  fight = { t: 0, taps: 0, need: sim.fightTaps(save.tier), done, over: false };
+  g?.model?.play('attack-melee-right'); art.view('serve');
+  $('fightTitle').textContent = t('fight'); $('fightHint').textContent = t('fightHint', { n: fight.need });
+  $('fight').style.display = 'flex'; fightBars();
+}
+function fightBars() { $('fightYou').style.width = `${Math.min(100, (fight.taps / fight.need) * 100)}%`; $('fightThem').style.width = `${Math.min(100, (fight.t / sim.FIGHT_SECS) * 100)}%`; }
+function fightTap() {
+  if (!fight || fight.over) return;
+  fight.taps++; SFX.punch(); art.shake(0.25); buzz(8); fightBars();
+  if (fight.taps >= fight.need) fightEnd(true);
+}
+function stepFight(dt) { if (!fight || fight.over) return; fight.t += dt; fightBars(); if (fight.t >= sim.FIGHT_SECS) fightEnd(false); }
+function fightEnd(won) {
+  const f = fight; f.over = true; fight = null;
+  $('fight').style.display = 'none'; banner(t(won ? 'fightWon' : 'fightLost'));
+  if (won) { SFX.star(); g?.model?.play('die', true); } else { SFX.wrong(); }
+  rec.event('fight', { won, taps: f.taps, need: f.need });
+  setTimeout(() => f.done(won), 900);
+}
+$('fightTap').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); fightTap(); });
+// Staff stand in the dining room: hired ones cost a wage at day end; a beaten guest works one free shift.
+function addStaff(kind, model) {
+  if (staff.length >= sim.STAFF_MAX) { coach(t('staffFull'), 3); return false; }
+  const m = { look: g?.look ?? 0, kind, name: NAMES[Math.floor(Math.random() * NAMES.length)], model };
+  staff.push(m); storeStaff();
+  if (model) { model.bubble.hide(); art.stunt(model, 'join', { staffSlot: staff.length - 1 }); }
+  floater({ x: innerWidth / 2, y: innerHeight * 0.36 }, t(kind === 'hired' ? 'hiredLine' : 'owedLine', { name: m.name }), 'gold');
+  rec.event('staff', { kind, n: staff.length });
+  return true;
+}
+function staffIn() {
+  staff.forEach((m, i) => art.guest(m.look).then(model => {
+    if (!model || !staff.includes(m)) { if (model) model.gone = true; return; }
+    m.model = model; const [x, z] = art.staffSpots[i % art.staffSpots.length]; model.g.position.set(x, 0, z); model.face = 0; model.play('idle');
+  }));
+}
+function rebel(who) {
+  phase = 'rebel'; g = null; art.view('serve');
+  banner(t('rebel', { name: who.name }), t('rebelSub'));
+  if (who.model) { art.walkTo(who.model, 3.25, 0.95, () => who.model?.play('attack-melee-right')); }
+  rec.event('rebel', { name: who.name });
+  wait(1.6, () => fightStart(won => {
+    if (won) { coach(t('rebelWon', { name: who.name }), 3); if (who.model) { const [x, z] = art.staffSpots[staff.indexOf(who) % art.staffSpots.length]; art.walkTo(who.model, x, z, () => { who.model.face = 0; }); } }
+    else { coach(t('rebelQuit', { name: who.name }), 3); staff.splice(staff.indexOf(who), 1); storeStaff(); if (who.model) { who.model.speed = 4; art.walkTo(who.model, 6.5, 1.6, () => { who.model.gone = true; }); } }
+    wait(1.2, nextGuest);
+  }));
 }
 
 // ---------- the story: cards before the first catch, toasts, missions
@@ -848,6 +1021,7 @@ addEventListener('keydown', e => {
   if (e.repeat) return;
   if (e.key === ' ' || e.key === 'Enter') {
     e.preventDefault();
+    if (fight) { fightTap(); return; }
     if (phase === 'fry' && cook && !cook.over) cook.held = true;
     else if (phase === 'micro') stopMicro();
     else if (phase === 'blend') tapBlend();
@@ -913,6 +1087,7 @@ function frame(now) {
     else if (phase === 'fry' && cook) stepFry(dt);
     else if (phase === 'micro' && cook) stepMicro(dt);
     else if (phase === 'chop' && cook) { if (cook.slide) stepChop(dt); stepKnife(dt); }
+    if (fight) stepFight(dt);
     else if (phase === 'blend' && cook) stepBlend(dt);
     if (!(g && phase === 'catch')) { const bar = $('patience').firstElementChild; bar.style.transform = ''; bar.style.background = ''; }
     if (g && phase === 'catch') { const w = (clock - g.catchT0) / TUNE.patience; $('patience').firstElementChild.style.transform = `scaleX(${Math.max(0, 1 - w)})`; $('patience').firstElementChild.style.background = w > 0.75 ? '#ff6b6b' : w > 0.5 ? '#ffb347' : ''; }
@@ -926,6 +1101,7 @@ function frame(now) {
     stepFinger(dt);
   }
   if (art) chopBtn(live && phase === 'chop' && !cook?.over);
+  if ((phase !== 'order' || !live) && $('wheelBtn').style.display === 'flex') wheelBtn(false);
   song?.set({ on: musicOn && live, progress: day ? Math.min(1, (day.i + 0.5) / day.plan.length) : 0, danger: phase === 'catch' && g?.catch ? Math.min(1, (clock - g.catchT0) / TUNE.patience) * 0.6 : 0, light: 1 });
   art.frame(paused ? 0 : dt);
 }
@@ -948,12 +1124,18 @@ window.kitchenState = () => art && peopleIn && ({
   extra: g?.catch?.extra?.id ?? null, items: g?.catch ? g.catch.items.map(it => ({ id: it.id, x: it.x, y: it.y })) : [], half: g?.catch?.half ?? 0,
   cook: cook ? { kind: cook.kind, d: cook.d, p: cook.p, band: cook.band, fill: cook.fill, left: cook.pieces?.filter(p => !p.done).length, misses: cook.misses ?? 0, striking: !!cook.strike, cuts: cook.pieces?.reduce((n, p) => n + p.cuts, 0), xs: cook.pieces?.map(p => p.done ? null : [p.m.position.x, p.m.position.z]), aim } : null, q: g?.q,
   look: lookId, hint: !!document.querySelector('.kit-hint.on'),
+  mood: g?.mood ?? null, staff: staff.map(m => m.kind), wheel: $('wheel').style.display === 'block', fight: fight ? { taps: fight.taps, need: fight.need } : null,
 });
 window.kitchenMusic = () => song && { ...song.melody, on: song.state.on, step: song.step, notes: song.log.length, kinds: song.log.map(l => l.kind) };
 // Keeps a catch going for checks that wait on the hint: nothing is caught or finished while it runs.
 // Checks only: finish the current catch at once, to reach the cooking steps of any dish.
 // Test hook: put the knife over the next uncut piece.
 window.kitchenAim = () => { const p = cook?.kind === 'chop' && cook.pieces.find(q => !q.done); if (p) { aim = p.m.position.x; art.knife.position.x = aim; } return !!p; };
+// Test hooks: open the wheel and pick an action; settle a fight.
+window.kitchenWheel = id => { if (phase === 'order' || phase === 'thrown') openWheel(phase === 'order' ? 'order' : 'payback'); if (phase === 'wheel') pickWheel(id); return phase; };
+window.kitchenFight = win => { if (!fight) return false; if (win) { fight.taps = fight.need - 1; fightTap(); } else fight.t = sim.FIGHT_SECS; return true; };
+window.kitchenThrow = () => { throwNext = true; };
+window.kitchenMood = m => { if (g) g.mood = m; return !!g; };
 window.kitchenSkipCatch = () => { skipCatch = true; };
 window.kitchenGolden = () => { goldenNext = true; };
 window.kitchenAlive = () => { if (g?.catch) { g.catch.got = {}; g.catch.tray = []; g.catch.done = false; } };
