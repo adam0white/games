@@ -985,3 +985,20 @@ How the sizes were chosen, bots, wins seat 0 v seat 1, the change against seat 0
 Read: the beetle's health is one change for both hills, so it does not move who wins; it moves what the mission is. At 4200 the kill often does not come before dusk and the carry phase is reached in fewer games; at 5600 it is never reached, which is too much. On The Stones equal bots race so evenly that any lead decides, so the size was set by the bolder bot: at 40 it wins half, at 80 one in ten. Twelve more workers for the rival moved nothing clearly and was dropped. Against the timid rival a steady bot won every game at 80 and 140; 40 against timid was not run.
 
 Not known: whether a person finds either late mission fair, and whether the choice is felt as a choice. Seen in a phone browser: both cards before the choice, The Stones played first by bot, then The Hunt's card naming the road taken. No person has played it.
+
+### The fork corrected: three faults found in review of PR 421
+
+- The late Hunt's health bar divided by the table's 2800 and so began at 150 per cent. It now divides by the health the game began with.
+- A device that had finished one mission of the pair before the change never gets a road taken, yet its cards promised a change. The fork line now shows only while neither is finished.
+- The fork was one-sided: the tougher beetle is one change for both hills and moved no result, while 40 points moved The Stones from 9 v 1 to 0 v 10 between steady bots. The late Hunt now also starts the rival 400 harm ahead (`harmBy`). Ten seeds, change against seat 0:
+
+| Mission, late | steady v timid | bold v steady |
+| --- | --- | --- |
+| The Hunt, unchanged | 7 v 3 | 10 v 0 |
+| The Hunt, beetle 4200 | 9 v 1 | 10 v 0 |
+| The Hunt, beetle 4200 and rival 400 harm ahead | 6 v 4 | 10 v 0 |
+| The Hunt, beetle 4200 and rival 800 harm ahead | 5 v 5 | 10 v 0 |
+| The Stones, unchanged | 8 v 0 (8 seeds) | 9 v 1 |
+| The Stones, rival 40 ahead | 10 v 0 | 5 v 5 |
+
+Read: each late mission now costs something, in different pairings. The late Hunt bites against the timid rival (the default) and not when a bold hill meets a steady one; the late Stones the other way round. They are not equal costs, and no pairing shows both. Recorded as open in bead lab-5w7.76.
