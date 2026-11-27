@@ -57,12 +57,23 @@ export function findRooms(sim) {
   return out;
 }
 
-/** Grows 0..1 for one brood item: an egg by age, a larva by meals (and age within its meal), a pupa by age. */
+/** Grows 0..1 for one brood item: an egg by age; a larva by age once fed (an unfed one stays at a quarter); a pupa by age.
+ *  Since sim 8 a major's first meal takes all three loads, so meals no longer mark growth: her size shows in larvaScale. */
 export function growth(B, k) {
   const age = B.age[k];
   if (B.stage[k] === STAGE.EGG) return Math.min(1, age / C.EGG_TICKS);
-  if (B.stage[k] === STAGE.LARVA) return Math.min(1, Math.max(age / C.LARVA_TICKS, B.fed[k] / C.MAJOR_FEEDS));
+  if (B.stage[k] === STAGE.LARVA) return B.fed[k] > 0 ? Math.min(1, age / C.LARVA_TICKS) : Math.min(0.25, age / C.LARVA_TICKS);
   return Math.min(1, age / C.PUPA_TICKS);
+}
+
+/** A larva fed to be a major is drawn this much bigger (as the adult major is). */
+export const larvaScale = (B, k) => (B.fed[k] >= C.MAJOR_FEEDS ? 1.35 : 1);
+
+/** Where the stores are drawn: the porch in a colony game, even when digging joins it to a room; otherwise the room
+ *  holding the store cell, or the queen's room. Null: nowhere to draw them. */
+export function storeRoom(sim, rooms) {
+  const ph = sim.home, porch = sim.nursery ? { x0: ph.x, y0: ph.y, x1: ph.x + ph.w - 1, y1: ph.y + ph.h - 1, cx: ph.x + ph.w / 2 } : null;
+  return porch ?? rooms.find(r => r.store) ?? rooms.find(r => r.queen) ?? null;
 }
 
 /** Draws rooms, stores, brood and the queen on a 2D context. v: { ctx, sim, toScreen, z, W, H, now, t, rooms, g, look } */
@@ -86,8 +97,7 @@ export function drawNest(v) {
   });
   // Stores in the store room (the porch in a colony game, sim 8; the queen's chamber when the porch is too small to be
   // a room, or in the sandbox): sugar as pale grains along the left wall, protein as red-brown bits along the right.
-  const ph = sim.home, porch = sim.nursery ? { x0: ph.x, y0: ph.y, x1: ph.x + ph.w - 1, y1: ph.y + ph.h - 1, cx: ph.x + ph.w / 2 } : null;
-  const qr = porch ?? rooms.find(r => r.store) ?? rooms.find(r => r.queen); // the porch even when digging joins it to a room
+  const qr = storeRoom(sim, rooms);
   if (qr) {
     for (const [amount, x, col, rr] of [[sim.g[g.SUGAR], qr.x0 + 0.2, L.sugar, 0.16], [sim.g[g.PROTEIN], qr.x1 + 0.8, L.protein, 0.2]]) {
       const n = Math.min(60, amount); // a grain a load (sim 8: a load is a unit)
@@ -110,7 +120,7 @@ export function drawNest(v) {
     ctx.beginPath();
     if (st === STAGE.EGG) { ctx.fillStyle = L.egg; ctx.ellipse(p.x, p.y, Math.max(1.5, z * (0.14 + 0.06 * gr)), Math.max(1.2, z * (0.1 + 0.04 * gr)), 0.4, 0, 7); }
     else if (st === STAGE.LARVA) {
-      const r = Math.max(2.5, z * (0.26 + 0.24 * gr)), hungry = B.hunger[k] > C.LARVA_STARVE / 2;
+      const r = Math.max(2.5, z * (0.26 + 0.24 * gr) * larvaScale(B, k)), hungry = B.hunger[k] > C.LARVA_STARVE / 2;
       ctx.fillStyle = hungry ? L.larvaHungry : L.larva;
       ctx.arc(p.x, p.y, r, 0.5, 0.5 + Math.PI * (1.3 + 0.4 * gr)); ctx.lineTo(p.x, p.y); // a C-shaped grub that closes as it grows
       ctx.fill(); if (z > 5) ctx.stroke();
