@@ -55,7 +55,7 @@ const labrec = new LabRecord(rec);
 const lookName = () => `game:${set.view}/${set.light}/${set.style}`;
 let running = false;
 function startRecord() {
-  labrec.start(host, { mode: free ? 'sandbox' : 'colony', look: lookName(), viewport: [innerWidth, innerHeight, Math.round(devicePixelRatio * 100) / 100] });
+  labrec.start(host, { ...set, mode: free ? 'sandbox' : 'colony', look: lookName(), viewport: [innerWidth, innerHeight, Math.round(devicePixelRatio * 100) / 100] });
   labrec.emit('client', { c: 'game', v: 1, set: { ...set }, changed: Object.keys(DEFAULTS).filter(k => set[k] !== DEFAULTS[k]) });
 }
 addEventListener('error', e => labrec.error(e.message ?? 'error'));
@@ -213,7 +213,7 @@ function paintSettings() { for (const seg of document.querySelectorAll('.seg')) 
 for (const seg of document.querySelectorAll('.seg')) for (const b of seg.children) b.addEventListener('click', () => {
   const k = seg.dataset.set, v = b.dataset.v; if (set[k] === v) return;
   const from = set[k]; set[k] = v; persist(); paintSettings();
-  labrec.emit('setting', { k, v, from, at: host.tick });
+  labrec.emit('setting', { name: k, to: v, from, id: k, value: v, def: DEFAULTS[k], k, v, at: host.tick });   // name/from/to is what the lab's Settings report counts
   if (k === 'sound') { if (v === 'off') snd.hold(); else { snd.release(); startSong(); } tuneSong(); }
   tone(660, 0.06, 0.03, 'triangle', 80);
 });
