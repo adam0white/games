@@ -421,3 +421,25 @@ Every S4 snapshot restores to the same hash. The smaller snapshots most likely c
 **Independent review** (Codex, read-only): eight findings, all fixed and listed in the pull request (an order lost at a recording rollover, overlapping windfalls, a reused pile slot redirecting ants, the starter pupae hatching together, three phone lines on sim 6 outcomes, a zero crew change accepted by the room, a crew test that missed same-tick drift).
 
 **Mutations shown to fail**: no windfalls; the pupae pre-aging removed; the windfall near-pile check removed; the windfall memory clear removed; the room accepting a zero change; the give-up decrement removed (296 mismatches in the crew-count invariant test); pickup over the crew size; a short crew order kept; no clamp on a huge change; the buffered order at rollover (labrec test).
+
+## Starting values (SIM_VERSION 8, snapshot format 8, 2026-11-26)
+
+R1 step 2 (`../NOTES.md`, Starting values): the spec's colony start (30 adults, 20 eggs, 20 larvae, 12 brood due from 8 s, 10 sugar, 5 protein), a 64-cell nursery in the snapshot header, free eggs, 60 s egg to adult, walk 45 on a trail and 32 off it, run 64, trail half-life 1,200 ticks, food 8 to 12 cells out, a late find at tick 2,400, no days unless asked. New totals: `EXPECTED` 1050544814, `EXPECTED_LONG` 3244743503, `EXPECTED_COLONY` 1243466984.
+
+| Measure | Before (SIM_VERSION 7) | After |
+| --- | --- | --- |
+| S2 sandbox: Node, workerd, Chromium 156.0.8078.4, WebKit 27.2 on all 600 records | agree (final total 2162690173) | agree (final total 3244743503) |
+| S2 colony (`--colony`) | agree (final total 3567596222) | agree (final total 3700489822) |
+| S2 planted fault | tick 20, `ants` | the same |
+| S2 Firefox | not run | not run (Playwright's Firefox is not installed here) |
+| S1 Node, 2,000 ants, mean / p95 / max | 1.64 / 1.75 / 3.82 ms | 1.60 / 1.72 / 4.60 ms (load average about 12 to 18) |
+| S1 Node, 5,000 ants | 1.93 / 2.10 / 3.68 ms | 1.89 / 2.06 / 4.38 ms |
+| S1 all 9 fields at once | 11.94 ms | 11.55 ms |
+| S1 workerd, 2,000 / 5,000 ants, mean | 1.77 / 2.05 ms | 2.20 / 2.65 ms (colony build: 2.38 / 3.21 ms; round trip with no ticks 3.0 to 4.0 ms, included) |
+| S4, 5,000 ants, 3,000 / 8,000 / 24,000 ticks | 41.1 / 40.1 / 41.1 KB | 39.9 / 39.4 / 37.7 KB (margin 24.1 KB to 64 KB) |
+
+Every S4 snapshot restores to the same hash. The workerd means rose with the request round trip (1.5 to 2.2 ms before, 3.0 to 4.0 ms now) while the machine's load average was 12 to 18; the Node means, measured on the same run, did not rise. Most likely load, not the sim; not rerun on a quiet machine.
+
+**Independent review** (Codex, read-only): nine findings, all fixed and listed in `../NOTES.md`, Starting values.
+
+**Mutations shown to fail**: eggs costing sugar (3 colony tests fail); foragers starting in the nest (the pace gate fails first delivery, 19.55 s); brood placed without the cell check (the start test fails).
