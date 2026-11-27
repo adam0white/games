@@ -41,8 +41,9 @@ export function generate(sim, layoutOnly = false) {
   // Food, mirrored.
   const piles = [[27, 49, FOOD_SUGAR, 60], [45, 66, FOOD_PROTEIN, 50], [50, 34, FOOD_SUGAR, 80], [30, 84, FOOD_PROTEIN, 70], [58, 70, FOOD_SUGAR, 70], [20, 22, FOOD_PROTEIN, 60]];
   const spots = [];
-  for (const [x, y, kind, amount] of piles) { sim.drop(S(x, y), kind, amount); sim.drop(S(mx(x), y), kind, amount); spots.push([x, y], [mx(x), y]); }
-  sim.drop(S(mid - 1, FORDS[0]), FOOD_PROTEIN, 160); sim.drop(S(mid, FORDS[1]), FOOD_SUGAR, 160);
+  const glut = cfg.glut || 1; // a mission's seed fall: every seed pile this many times as big
+  for (const [x, y, kind, a] of piles) { const amount = kind === FOOD_SUGAR ? a * glut : a; sim.drop(S(x, y), kind, amount); sim.drop(S(mx(x), y), kind, amount); spots.push([x, y], [mx(x), y]); }
+  sim.drop(S(mid - 1, FORDS[0]), FOOD_PROTEIN, 160); sim.drop(S(mid, FORDS[1]), FOOD_SUGAR, 160 * glut);
   spots.push([mid, FORDS[0]], [mid, FORDS[1]]);
   // Stones, mirrored: small clumps away from doors, food and the fords.
   const clear = (x, y) => {

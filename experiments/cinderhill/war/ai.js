@@ -35,6 +35,9 @@ export function think(sim, t, mind = 1) {
   const may = k => typeof mind === 'number' || !mind.rooms || mind.rooms.includes(k); // rooms: the only kinds this mind digs
   const out = [], L = sim.L, sw = L.sw, o = t * CG.SIZE, cg = sim.cg;
   if (cg[o + CG.QUEEN_HP] <= 0 || sim.result) return out;
+  // Before a frost it plans for the winter: stores for every mouth first, and no more housing than the stores can feed.
+  const cfg = sim.cfg, winter = cfg.frostTick > 0 && (typeof mind === 'number' || mind.winter !== false), frozen = winter && sim.tick >= cfg.frostTick;
+  const meals = winter ? Math.ceil((cfg.duskTick - Math.max(sim.tick, cfg.frostTick)) / cfg.frostEat) : 0, feed = mouths => Math.ceil(mouths / 10) * meals;
   const door = sim.door[t], dx = door % sw, dy = Math.floor(door / sw);
   const ends = [], live = [];
   for (let k = 0; k < TRAILS; k++) {
@@ -47,12 +50,13 @@ export function think(sim, t, mind = 1) {
   const near = (c, r) => ends.some(e => Math.abs((e % sw) - (c % sw)) <= r && Math.abs(Math.floor(e / sw) - Math.floor(c / sw)) <= r);
   // Forage: up to three trails, to the nearest pile of the food it is shorter of.
   if (forage.length < 3) {
-    const want = cg[o + CG.SUGAR] <= cg[o + CG.PROTEIN] * 2 ? FOOD.SUGAR : FOOD.PROTEIN;
+    const want = (winter ? cg[o + CG.PROTEIN] >= 6 : cg[o + CG.SUGAR] <= cg[o + CG.PROTEIN] * 2) ? FOOD.SUGAR : FOOD.PROTEIN;
     let best = -1, bd = 1e9;
     for (let p = 0; p < MAX_PILES; p++) {
       if (sim.pileAmount[p] < 6) continue;
       const c = sim.pileCell[p];
       if (near(c, 2)) continue;
+      if (winter && sim.pileKind[p] === FOOD.PROTEIN && cg[o + CG.PROTEIN] >= 12) continue; // meat does not keep a hill through the frost
       const d = sim.doorF[t][c] + (sim.pileKind[p] === want ? 0 : 40);
       if (d < bd) { bd = d; best = c; }
     }
@@ -77,8 +81,8 @@ export function think(sim, t, mind = 1) {
     const capF = cg[o + CG.CAP_FOOD];
     // Every kind it wants now, most pressing first; it digs the first that still has a slot.
     const wants = [];
-    if (may(ROOM.STORE) && Math.max(cg[o + CG.SUGAR], cg[o + CG.PROTEIN]) * 5 >= capF * 4) wants.push(ROOM.STORE);
-    if (may(ROOM.REST) && adults + brood >= cg[o + CG.CAP_ADULTS] - 10) wants.push(ROOM.REST);
+    if (may(ROOM.STORE) && (winter ? !frozen && cg[o + CG.SUGAR] >= 30 && capF < (feed(adults + brood + 2 * majors) * 5 >> 2) + 16 : Math.max(cg[o + CG.SUGAR], cg[o + CG.PROTEIN]) * 5 >= capF * 4)) wants.push(ROOM.STORE);
+    if (may(ROOM.REST) && adults + brood >= cg[o + CG.CAP_ADULTS] - 10 && (!winter || (frozen ? cg[o + CG.SUGAR] : capF) >= feed(cg[o + CG.CAP_ADULTS] + 20))) wants.push(ROOM.REST);
     if (may(ROOM.NURSERY) && brood >= cg[o + CG.CAP_BROOD] - 4) wants.push(ROOM.NURSERY);
     for (const kind of wants) { const b = buildNext(sim, t, kind); if (b.length) { out.push(...b); break; } }
   }

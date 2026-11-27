@@ -86,6 +86,22 @@
   .sub { color: #e9d2b6; margin: 0 0 18px; text-shadow: 0 1px 8px #000; }
   .goals { text-align: left; padding: 12px 14px; border-radius: 18px; margin: 0 0 16px; font-size: 14px; }
   .goals p { margin: 5px 0; display: flex; gap: 8px; } .goals p::before { content: "◆"; color: var(--ember); }
+  #path { display: grid; gap: 6px; margin: 10px 0 16px; text-align: left; }
+  #path .step { display: grid; grid-template-columns: 26px 1fr auto; align-items: center; gap: 8px; width: 100%; min-height: 46px; padding: 6px 12px; border-radius: 16px; background: rgba(255, 255, 255, 0.08); border: 1px solid var(--line); font-weight: 800; text-align: left; }
+  #path .step i { font-style: normal; width: 24px; height: 24px; border-radius: 12px; background: rgba(255, 255, 255, 0.14); display: grid; place-items: center; font-size: 12px; }
+  #path .step em { font-style: normal; font-weight: 700; font-size: 12px; color: var(--dim); }
+  #path .step[aria-pressed="true"] { background: rgba(255, 176, 87, 0.28); border-color: rgba(255, 176, 87, 0.7); color: #ffe2b8; }
+  #path .step:disabled { opacity: 0.45; }
+  #path .step.won em { color: #b8f28a; } #path .step.lost em { color: #c9d6ff; }
+  #path .fork { padding: 8px 12px; border-radius: 16px; border: 1px dashed rgba(255, 176, 87, 0.5); background: rgba(40, 22, 10, 0.5); }
+  #path .fork b { display: block; font-size: 12px; color: var(--hot); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px; }
+  #path .fork div { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  #path .fork button { min-height: 58px; padding: 6px 8px; border-radius: 12px; background: rgba(255, 255, 255, 0.08); font-weight: 800; font-size: 14px; }
+  #path .fork button small { display: block; font-weight: 600; font-size: 11px; color: var(--dim); margin-top: 2px; }
+  #path .fork button[aria-pressed="true"] { background: linear-gradient(#ffb057, #e06a1c); color: #1b0f08; } #path .fork button[aria-pressed="true"] small { color: #3a1c08; }
+  #path .fork button:disabled:not([aria-pressed="true"]) { opacity: 0.35; }
+  #path .fork p { margin: 6px 0 0; font-size: 12px; color: var(--dim); }
+  body.frost #gl { filter: saturate(0.45) brightness(1.18) contrast(0.95) hue-rotate(-12deg); transition: filter 3s; }
   .big { display: block; width: 100%; height: 58px; border-radius: 29px; font-weight: 800; font-size: 19px; background: linear-gradient(#ffbe6b, #e2691a); color: #1b0f08; box-shadow: 0 0 34px rgba(255, 130, 40, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.5); }
   .plain { display: block; width: 100%; height: 46px; border-radius: 23px; margin-top: 8px; font-weight: 700; background: rgba(255, 255, 255, 0.09); border: 1px solid var(--line); line-height: 46px; text-decoration: none; color: inherit; }
   .panel { padding: 12px 14px; border-radius: 22px; margin-top: 14px; text-align: left; }
@@ -173,14 +189,12 @@
 <div id="menu" class="scrim on">
   <div class="card">
     <h1>Cinderhill</h1>
-    <p class="kicker">The Crossing</p>
-    <p class="sub">Two hills. One creek. Not enough food for both.</p>
-    <div class="goals glass">
-      <p>Have the larger colony at dusk, or kill the rival queen.</p>
-      <p>Lose your queen and the hill is lost.</p>
-      <p>The big food lies on the two fords. So does the rival.</p>
-    </div>
+    <div id="path"></div>
+    <p class="kicker" id="mKicker">The Crossing</p>
+    <p class="sub" id="mSub"></p>
+    <div class="goals glass" id="mGoals"></div>
     <button class="big" id="play">Play</button>
+    <button class="plain" id="fresh">New campaign</button>
     <div class="lab" id="menuLab"></div>
   </div>
 </div>
@@ -191,6 +205,7 @@
     <div class="panel glass" id="settings"></div>
     <div class="lab" id="pauseLab"></div>
     <button class="plain" id="restart">Start again</button>
+    <button class="plain" id="toMenu">Missions</button>
     <a class="plain" href="../game/">The first hill (one colony)</a>
   </div>
 </div>
@@ -201,7 +216,8 @@
     <h2 id="overTitle">The hill is yours</h2>
     <p class="sub" id="overWhy"></p>
     <div class="panel glass"><div class="tally" id="tally"></div></div>
-    <button class="big" id="again" style="margin-top:14px">Play again</button>
+    <button class="big" id="next" style="margin-top:14px">Next</button>
+    <button class="plain" id="again">Play again</button>
     <button class="plain" id="harder">Play a bolder rival</button>
   </div>
 </div>
