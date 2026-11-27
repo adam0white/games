@@ -10,7 +10,7 @@
 // An ant walks from cell to cell: on arriving at a cell she picks the next one from her task, usually by walking down
 // a distance field (home, door, a trail, the rally point). Fighters steer straight at an enemy they can see.
 
-import { CASTE, CASTES, ROOM, ROOMS, MISSIONS, TRAITS, TIERS, BRANCH } from './tables.js';
+import { CASTE, CASTES, ROOM, ROOMS, MISSIONS, MAPS, TRAITS, TIERS, BRANCH } from './tables.js';
 import { makeLayout, cellAt, diagOpen, MAT, SURFACE, NEST } from '../sim/grid.js';
 import { seedStreams, below, STREAM } from '../sim/rng.js';
 import { angleOf } from '../sim/math.js';
@@ -71,6 +71,7 @@ export const EVENT = {
   BEAST_BIT: 22, // the beast's cell, ants it bit this time, its health left
   BEAST_DEAD: 23, // the beast's cell, the colony that did it more harm
   DOOR: 25, // team, its cell on the surface, the column of the nest it opens from
+  FALL: 26, // a windfall: its cell on the surface, the food kind, loads landed (0: it is about to fall there)
   PEST: 24, // the team whose nest it is in, what (PEST), a number: seeds eaten so far, or its health left
   BREACH: 18, // the team that dug the last cell, cell: the two nests are joined under ground
 };
@@ -118,6 +119,8 @@ export const DEFAULTS = {
   queenHp: C.QUEEN_HP,
   digTicks: C.DIG_TICKS, digSugar: C.DIG_SUGAR, // one cell of clay: the ticks of digging and the seeds it costs (a mission's kit may make its ground soft)
   starveAfter: 1200, starveDiv: 100, // ticks at no seeds before ants die, and the share that die every ten seconds (one in starveDiv)
+  truce: 0, // a long mission's morning: until this tick no raid goes down the other hill's door and no queen takes harm, so the first lost fight does not end it
+  reserve: false, // the queen's reserve: a hill with almost no workers left sends its nurses out and feeds a larva without meat, so a long mission is not lost for good in one fight
   tiers: true, // growth inside the mission (TIERS): rooms beyond the first three, the third caste and the nodes wait on the queen's chamber
   blank: false, // an empty map for tests: no stones, creek or food
 };
@@ -748,6 +751,7 @@ export class Sim {
     if (this.tick % 50 === 49) this.checkTrails();
     if (this.sites.length && this.tick % TICK_HZ === TICK_HZ - 1) this.paySites();
     if (this.cfg.frostTick && this.tick + 1 === this.cfg.frostTick) this.frost();
+    if (this.cfg.falls) this.windfall(this.cfg.falls);
     this.judge();
     this.tick++;
   }
@@ -798,6 +802,7 @@ export class Sim {
             const meal = major ? this.stat[t].food[this.bMajor[k]] : 1;
             this.take(t, FOOD.PROTEIN, meal); this.bFed[k] = meal; this.bHunger[k] = 0; fedThisTick[t] = true;
           } else this.bHunger[k]++;
+        } else if (this.bFed[k] === 0 && this.cfg.reserve && !fedThisTick[t] && cg[o + CG.WORKERS] < 6) { this.bFed[k] = 1; this.bHunger[k] = 0; fedThisTick[t] = true; /* the queen's reserve: with no meat and almost no workers she feeds a larva herself, and it grows up a worker */
         } else if (this.bFed[k] === 0 && this.bHunger[k] < 0xFFFF) this.bHunger[k]++;
         if (this.bHunger[k] >= C.LARVA_STARVE) keep = false;
         else if (this.bFed[k] > 0 && age >= C.LARVA_TICKS) { stage = STAGE.PUPA; this.bAge[k] = 0; }
@@ -933,6 +938,9 @@ export class Sim {
     // A carrier walks to a cell with room for her load; everyone else to the stores.
     const cg = this.cg, task = this.task[i], load = this.carry[i] & CARRY.KIND, pf = load ? t * 2 + (load === CARRY.PROTEIN ? 1 : 0) : -1, home = pf >= 0 && this.putAny[pf] ? this.putF[pf] : this.homeF[t];
     const recall = cg[o + CG.RECALL] === 1;
+    // The queen's reserve (cfg.reserve, a long mission's rule): a hill with almost no worker left outside sends its nurses out,
+    // since with nobody to carry meat home there is no brood to nurse.
+    if (this.cfg.reserve && task === TASK.NURSE && cg[o + CG.WORKERS] < 4 && !cg[o + CG.RECALL]) { this.task[i] = TASK.REST; return this.assign(i, c, t, o); }
     if (task === TASK.NURSE) return this.mill(i, c, m => m >= this.L.nestBase && this.room[m - this.L.nestBase] === ROOM.NURSERY, 24);
     if (task === TASK.DIG) {
       const F = this.digF[t], L0 = this.L;
@@ -1052,7 +1060,7 @@ export class Sim {
       }
     }
     if (raid) {
-      if (this.trMode[s] !== MODE.HOLD) for (let e = 0; e < TEAMS; e++) if (e !== t && this.cg[e * CG.SIZE + CG.QUEEN_HP] > 0 && (this.doorF[e][c] <= 4 || (c >= this.L.nestBase && this.owner(c - this.L.nestBase) === e))) { this.inv[i] = 1 + e; return this.invade(i, c, t); }
+      if (this.trMode[s] !== MODE.HOLD && this.tick >= this.cfg.truce) for (let e = 0; e < TEAMS; e++) if (e !== t && this.cg[e * CG.SIZE + CG.QUEEN_HP] > 0 && (this.doorF[e][c] <= 4 || (c >= this.L.nestBase && this.owner(c - this.L.nestBase) === e))) { this.inv[i] = 1 + e; return this.invade(i, c, t); }
       return this.mill(i, c, m => this.trF[s] && this.trF[s][m] <= 2, 16);
     }
     if (this.since[i] > C.WAIT_AT_END) { this.task[i] = TASK.BACK; this.tr[i] = -1; return this.next(this.homeF[t], c); }
@@ -1182,7 +1190,7 @@ export class Sim {
       }
       // No ant to bite: an enemy queen within a cell.
       if (layer === NEST) for (let e = 0; e < TEAMS; e++) {
-        if (e === t || cg[e * CG.SIZE + CG.QUEEN_HP] <= 0 || this.queenF[e][this.cellOf(i)] > 1) continue;
+        if (e === t || cg[e * CG.SIZE + CG.QUEEN_HP] <= 0 || this.queenF[e][this.cellOf(i)] > 1 || this.tick < this.cfg.truce) continue; // before a mission's noon (cfg.truce) no queen can be harmed
         const hp = (cg[e * CG.SIZE + CG.QUEEN_HP] = Math.max(0, cg[e * CG.SIZE + CG.QUEEN_HP] - this.stat[t].bite[this.caste[i]]));
         this.cool[i] = C.BITE_EVERY; this.event(EVENT.QUEEN_HIT, e, hp); break;
       }
@@ -1255,6 +1263,39 @@ export class Sim {
     for (let k = 0; k < this.cfg.pest.meat; k++) if (!this.put(t, FOOD.PROTEIN, c)) break;
     this.event(EVENT.PEST, t, PEST.DIED, by);
     this.pest[po + 1] = -1; this.pest[po + 3] = 0; this.pest[po + 6]++;
+  }
+
+  /** Windfalls (cfg.falls): food that keeps arriving, so a long mission is not over when the first piles are carried
+   *  home. Fall n lands at tick from + n * every, and is told `warn` ticks before. Two falls in three land as a pair,
+   *  one on each colony's own ground at mirrored cells; the third lands once, on the middle line, and is larger.
+   *  Where and what follow from n and the seed alone, so nothing here is kept in a save. */
+  windfall(fl) {
+    const M = MAPS[this.mission.map], at = this.tick + 1 - fl.from, sw = this.L.sw;
+    if (!M || !M.falls || at + fl.warn < 0) return;
+    const landed = at >= 0 && at % fl.every === 0, told = (at + fl.warn) % fl.every === 0;
+    if (!landed && !told) return;
+    const n = landed ? at / fl.every : (at + fl.warn) / fl.every, seed = this.cfg.seed >>> 0;
+    const mid = n % 3 === 2 && M.fallsMid && M.fallsMid.length, kind = mid || (((n / 3) | 0) + (n % 3) + seed) & 1 ? FOOD.PROTEIN : FOOD.SUGAR; // the fords get meat: it is what a hill runs short of
+    const cells = [];
+    if (mid) { const f = M.fallsMid[(((n / 3) | 0) + seed) % M.fallsMid.length]; cells.push(this.openNear((sw >> 1) + f[0], f[1])); }
+    else { const f = M.falls[(n * 3 + seed) % M.falls.length], c = this.openNear(f[0], f[1]); cells.push(c, c < 0 ? -1 : c - (c % sw) + (sw - 1 - (c % sw))); }
+    for (const c of cells) {
+      if (c < 0 || this.mat[c] !== MAT.OPEN) continue;
+      const amount = mid ? fl.mid : fl.amount;
+      if (landed) this.drop(c, kind, amount);
+      this.event(EVENT.FALL, c, kind, landed ? amount : 0);
+    }
+  }
+
+  /** The open surface cell nearest (x, y), looking a little way round it, or -1. */
+  openNear(x, y) {
+    const sw = this.L.sw, sh = this.L.sh;
+    for (let r = 0; r <= 4; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+      const cx = x + dx, cy = y + dy; if (cx < 1 || cy < 1 || cx >= sw - 1 || cy >= sh - 1) continue;
+      if (this.mat[cy * sw + cx] === MAT.OPEN) return cy * sw + cx;
+    }
+    return -1;
   }
 
   /** The beast is dead: its body is meat where it fell, and where the mission says so the colony that did it more harm wins. */

@@ -123,13 +123,14 @@ export function think(sim, t, mind = 1) {
   const forage = live.filter(k => sim.trKind[t * TRAILS + k] === KIND.FORAGE), raids = live.filter(k => sim.trKind[t * TRAILS + k] === KIND.RAID);
   const near = (c, r) => ends.some(e => Math.abs((e % sw) - (c % sw)) <= r && Math.abs(Math.floor(e / sw) - Math.floor(c / sw)) <= r);
   // Forage: up to three trails, to the nearest pile of the food it is shorter of.
+  const fends = forage.map(k => { const s2 = t * TRAILS + k; return sim.trPath[s2 * PATH_MAX + sim.trLen[s2] - 1]; }), fnear = (c, r) => fends.some(e => Math.abs((e % sw) - (c % sw)) <= r && Math.abs(Math.floor(e / sw) - Math.floor(c / sw)) <= r);
   if (forage.length < 3) {
     const want = (winter ? cg[o + CG.PROTEIN] >= 6 : cg[o + CG.SUGAR] <= cg[o + CG.PROTEIN] * 2) ? FOOD.SUGAR : FOOD.PROTEIN;
     let best = -1, bd = 1e9;
     for (let p = 0; p < MAX_PILES; p++) {
       if (sim.pileAmount[p] < 6) continue;
       const c = sim.pileCell[p];
-      if (near(c, 2)) continue;
+      if (sim.cfg.falls ? fnear(c, 2) : near(c, 2)) continue; // where food keeps falling it carries from a pile its soldiers hold
       if (sealed && (c % sw < sw >> 1) !== (dx < sw >> 1)) continue; // the far side of a wall with no gap
       if (winter && sim.pileKind[p] === FOOD.PROTEIN && cg[o + CG.PROTEIN] >= 12) continue; // meat does not keep a hill through the frost
       const d = sim.doorF[t][c] + (sim.pileKind[p] === want ? 0 : 40);
@@ -140,7 +141,8 @@ export function think(sim, t, mind = 1) {
   // Diet: workers first, then one in four a major, then two in four.
   const adults = cg[o + CG.ADULTS], majors = cg[o + CG.MAJORS];
   // Bold raises soldiers from the first brood: it means to strike before a growing hill's rooms have paid.
-  const diet = mood === 2 || sim.sites.length || sim.mission.goals.haul ? (adults < 34 ? 1 : 2) : adults < 36 ? 0 : adults < 60 ? 1 : 2;
+  // In a long mission a hill that raised soldiers without end would have nobody left to carry: one soldier to two workers, no more.
+  const diet = sim.cfg.falls && majors * 2 >= cg[o + CG.WORKERS] ? 0 : mood === 2 || sim.sites.length || sim.mission.goals.haul ? (adults < 34 ? 1 : 2) : adults < 36 ? 0 : adults < 60 ? 1 : 2;
   // Its chosen caste (mind.pick), if the mission allows one: picked at the start, then raised beside the soldiers.
   const pick = typeof mind === 'number' ? 0 : mind.pick | 0, special = pick && diet ? Math.min(4 - diet, mind.special ?? 1) : 0;
   if (pick && !cg[o + CG.PICK] && sim.mayPick(t)) out.push({ team: t, type: CMD.PICK, caste: pick });
@@ -240,7 +242,7 @@ export function think(sim, t, mind = 1) {
     // thief needs). A rival that fights breaks in with everything when it has the numbers, workers along to carry.
     let foe = -1, foeMajors = 0; for (let e = 0; e < TEAMS; e++) if (e !== t && cg[e * CG.SIZE + CG.QUEEN_HP] > 0) { foe = e; foeMajors = cg[e * CG.SIZE + CG.MAJORS]; }
     const atDoor = k => { const s2 = t * TRAILS + k, e = sim.trPath[s2 * PATH_MAX + sim.trLen[s2] - 1]; return foe >= 0 && sim.doorF[foe][e] <= 4; };
-    const strike = mood > 0 && foe >= 0 && majors >= (mood === 2 ? Math.max(6, Math.ceil(foeMajors * 1.25)) : Math.max(8, Math.ceil(foeMajors * 1.5)));
+    const strike = mood > 0 && foe >= 0 && sim.tick >= sim.cfg.truce && majors >= (mood === 2 ? Math.max(6, Math.ceil(foeMajors * 1.25)) : Math.max(8, Math.ceil(foeMajors * 1.5)));
     if (raids.length && (majors < 3 || (strike && !atDoor(raids[0])) || (atDoor(raids[0]) && majors * 2 < foeMajors))) for (const k of raids) out.push({ team: t, type: CMD.ERASE, trail: k });
     else if (!raids.length && live.length < TRAILS && foe >= 0) {
       if (strike) { const ed = sim.door[foe]; out.push({ team: t, type: CMD.TRAIL, kind: KIND.RAID, level: 3, points: [ed % sw, Math.floor(ed / sw)] }); }
@@ -260,7 +262,7 @@ export function think(sim, t, mind = 1) {
   // A siege: the colony under attack never marches on the other hill; the attacker must, and goes at the half-way mark
   // with what it has if it has not found the numbers before.
   const siege = sim.mission.goals.dusk === 'holder', late = siege && t !== 1 && sim.tick * 2 >= cfg.duskTick && majors >= 6;
-  const strike = !(siege && t === 1) && foe >= 0 && (late || (mood > 0 && majors >= need && sim.tick >= from && (mood === 2 ? majors >= foeMajors : majors * 4 >= foeMajors * 5)));
+  const strike = !(siege && t === 1) && foe >= 0 && sim.tick >= sim.cfg.truce && (late || (mood > 0 && majors >= need && sim.tick >= from && (mood === 2 ? majors >= foeMajors : majors * 4 >= foeMajors * 5)));
   // A hunt: its soldiers go for the beast and not for the other hill. Bold goes with four, steady with six, timid with ten.
   if (sim.mission.goals.beast && (sim.beast[0] > 0 || (sim.mission.goals.carry && sim.beast[1] >= 0)) && (typeof mind === 'number' || mind.hunt !== false)) {
     const bc = sim.beast[1], atBeast = k => { const s2 = t * TRAILS + k; return sim.trPath[s2 * PATH_MAX + sim.trLen[s2] - 1] === bc; };

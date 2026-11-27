@@ -1121,9 +1121,10 @@ is not short of. With the door open a pile 71 steps from the first door is 29 fr
 from the start. When the nearest pile runs dry (about tick 1100) the shut hill opens a trail to a pile 16 steps out,
 which brings 143 loads by tick 2000; the open hill's third trail is already on the far pile and its free one goes to
 a pile 50 steps out (73 loads). The second-door trail itself carries what the same crew carried on a 35-step trail
-from the first door (17, 24, 34 loads at ticks 1250, 1500, 1750 on both hills). The forward store is not full (30 of
+from the first door (17, 24, 34 loads at ticks 1250, 1500, 1750 on both hills). This rests on seed 1 alone. The forward store is not full (30 of
 120). One rule was tried and reverted: a free ant under ground takes a trail from her nearer door (loads unchanged,
-107 and 181). So a second door pays where it brings a pile much nearer than any other, as on The Stones, and a bot
+107 and 181). So a second door probably pays where it brings a pile much nearer than any other (an inference: The Stones was not
+traced by trail), and a bot
 that takes the far pile first loses by it. The bot is left as it is. The cost in the mission where it is dug: 16 to
 69 fewer adults at tick 5000 in four traced games (154 v 170, 111 v 180, 155 v 174, 130 v 132).
 
@@ -1150,3 +1151,57 @@ Rule for the next tree nodes: prefer what pays after the ground is bare or is du
 over what is carried (three missions). A carried thing must be a place or an order in the next mission, not more
 ants or seeds. A node both hills can have is accepted when its measure moves at a fixed tick, its cost is
 measurable, and the person's path is seen in a phone browser.
+
+## High Summer: a long mission where the food keeps falling (war build)
+
+**Why.** The pace trace above: the seven missions are over by minute eight and the ground is bare by minute three and
+a half, so nothing dug after minute two pays. More tree nodes would not change that. This mission changes the clock.
+
+**What it is.** Mission `summer` on a new map `meadow` (a creek with three fords, little food at dawn). It is a side
+mission: its row sits under The Crossing, opens when The Crossing has been played, and never blocks the road.
+
+| Rule | Sim option | Value | What it is for |
+| --- | --- | --- | --- |
+| Windfalls | `falls` | from tick 2000, every 1200, told 300 before; 70 loads a side, 160 on a ford | Food that does not run out. Two falls in three land as a mirrored pair on each hill's own ground; the third lands alone on a ford and is meat. Place and kind follow from the fall's number and the seed, so a save keeps nothing |
+| Truce | `truce` | tick 9600 (two fifths of the day) | Until noon no raid goes down the other door and no queen is hurt. Without it bot games ended in minute five with one hill wiped |
+| The queen's reserve | `reserve` | on | A hill with fewer than four workers outside sends its nurses out; with no meat and fewer than six workers a larva is fed free and grows up a worker. Without it a hill that lost its workers never carried again (58 soldiers, no worker, 169 seeds, loads 0 for 8000 ticks) |
+| Length | `duskTick` | 24000 | Twenty minutes |
+| Queen | `queenHp` | 6400 | A raid thins a hill before it ends one |
+
+All three options default to off, and a test asserts the seven older missions have none of them.
+
+**Settings** (new keys, recorded in the run's start): `cinderhill:war:day` 12, 20 (default) or 30 minutes; noon stays
+at two fifths. `cinderhill:war:falls` lean (two thirds), fair (default), rich (half as much again).
+
+**The bot, in a mission with falls only.** It carries from a pile its own soldiers hold (before, it never drew a
+forage trail to a pile where a raid trail ended, and 1941 seeds lay on a ford). It raises no more than one soldier to
+two workers (before, it drifted to all soldiers). It does not strike a door before noon.
+
+**Numbers** (bots, four seeds, before the first fall moved from tick 1800 to 2000):
+
+| Game | Ends | Adults through the day (seed 1, each 2000 ticks) |
+| --- | --- | --- |
+| Timid v Timid | dusk, all four | 108, 154, 181, 226, 329, 409, 429, 435 against 98, 118, 139, 165, 209, 209, 214, 213 |
+| Steady v Steady | queen, ticks 11044 to 11334 | one hill is down to about ten ants by tick 8000 |
+| Bold v Timid | queen, ticks 11051 to 16115 | |
+
+Loads home stay at 100 to 250 each 2000 ticks to the end in Timid games (the older missions fall to under 20 by tick
+6000). Food left on the ground at dusk: 55 to 123.
+
+**Seen in a phone browser** (the bot playing the player's hill): the row and its card, the clock ("Noon in", then
+"Dusk in"), the told and landed messages, the noon message, the end screen, a deed done. No page errors. Frames 16.7
+ms median and 16.8 at the 95th centile with 415 ants.
+
+**Not checked, or open.**
+- No person has played it. Whether twenty minutes holds attention on a phone is unknown; that is why length is a setting.
+- Against Steady the fight in the field is decided before noon in every bot game, and the loser is wiped soon after.
+  The truce moves the end from minute five to minute nine; it does not make the fight even.
+- The Timid rival loses most of its ants in the field to a Steady player before noon.
+- The rule that a second door pays in a long mission was not measured: in a long game the binding limits are the
+  caps that rooms raise (quarters, stores), not haul speed, so loads are the wrong measure. No measure replaced it.
+- A told fall shows a ring for fifteen seconds and a message; nothing is drawn on the ground where it will land.
+- Twelve minutes with lean falls and thirty with rich falls each ran once in the sim to dusk (Timid v Timid, seed 3:
+  353 v 171 and 414 v 265 adults). Neither was walked in the browser.
+
+**A fault found on the way.** The trail sheet's rows for raid modes and "Raise soldiers" showed on forage trails:
+`.opts { display: grid }` beat the `hidden` attribute. Fixed with `.opts[hidden] { display: none }`.
