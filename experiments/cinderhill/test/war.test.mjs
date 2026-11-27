@@ -433,7 +433,7 @@ test('The Wall: the rival digs for the other nest, and a guard post where a brea
   assert.equal(joined, true);
   // The same strike, with and without the answer: seat 0 digs and sends every soldier through at 6000.
   const fight = guard => {
-    const meek = { mood: 0, meek: true, caches: false, breach: false, plug: false };
+    const meek = { mood: 0, meek: true, caches: false, breach: false, plug: false, grow: 0 }; // neither hill grows: the post alone is the difference
     const h = new Host({ seed: 3, mission: 'wall', ai: { 0: meek, 1: { ...meek, guard } } }), s = h.sim, L = s.L; let sent = false, posts = 0;
     while (!s.result && s.tick < 9600) {
       if (s.tick === 600) h.order({ team: 0, type: CMD.DIG, cells: rowRun(s, 12) });
@@ -515,7 +515,7 @@ test('Growth: the chamber grows for seeds and a pause in laying; the first growt
   const s = new Sim({ seed: 4, mission: 'crossing', tiers: true, sugar: 100 }), L = s.L, row = TIERS.grow[0];
   const off = new Sim({ seed: 4, mission: 'crossing', sugar: 100, tiers: false }); off.order({ team: 0, type: CMD.GROW, branch: BRANCH.WAR }); off.step(); assert.equal(off.g(0, CG.GROW), 0, 'not without tiers');
   s.order({ team: 0, type: CMD.GROW }); s.step(); assert.equal(s.g(0, CG.GROW), 0, 'the first growth needs a branch');
-  const sugar = s.g(0, CG.SUGAR), open = () => { let n = 0; for (let k = 0; k < L.nw * L.nh; k++) if (s.owner(k) === 0 && s.mat[L.nestBase + k] === MAT.OPEN) n++; return n; }, was = open();
+  const sugar = s.g(0, CG.SUGAR);
   s.order({ team: 0, type: CMD.GROW, branch: BRANCH.DEEP }); s.step();
   assert.equal(s.g(0, CG.SUGAR), sugar - row.sugar); assert.equal(s.g(0, CG.BRANCH), BRANCH.DEEP); assert.ok(s.g(0, CG.GROW) > 0);
   s.order({ team: 0, type: CMD.GROW }); s.step(); assert.equal(s.g(0, CG.TIER), 0, 'one growth at a time');
@@ -524,7 +524,7 @@ test('Growth: the chamber grows for seeds and a pause in laying; the first growt
   let told = null; while (s.g(0, CG.GROW) > 0) { s.step(); mid.step(); const ev = s.drainEvents(); assert.equal(ev.length % 4, 0); for (let k = 0; k < ev.length; k += 4) if (ev[k] === EVENT.TIER) told = ev.slice(k, k + 4); }
   assert.deepEqual(told, [EVENT.TIER, 0, 2, BRANCH.DEEP]);
   assert.equal(mid.hash(), s.hash(), 'a save in the middle of a growth carries on the same');
-  assert.equal(s.g(0, CG.TIER), 1); assert.ok(open() > was, 'the chamber is wider'); assert.ok(s.stat[0].pupa < s.stat[1].pupa);
+  assert.equal(s.g(0, CG.TIER), 1); assert.ok(s.stat[0].pupa < s.stat[1].pupa);
   assert.equal(s.g(1, CG.TIER), 0);
   const again = copyOf(s); assert.equal(again.stat[0].pupa, s.stat[0].pupa, 'a save keeps what the colony grew into'); assert.equal(again.hash(), s.hash());
   // the second growth takes no branch, and there is no third
@@ -552,7 +552,7 @@ test('Growth: a branch opens its own things at the first growth, and the other b
   assert.ok(s.stat[0].hp[CASTE.MAJOR] > s.stat[1].hp[CASTE.MAJOR], 'war: tougher soldiers'); assert.ok(s.stat[1].pupa < s.stat[0].pupa, 'deep: brood hatches sooner');
   grow(s, 0); grow(s, 1);
   assert.deepEqual(has(0), [true, true, true, true]); assert.deepEqual(has(1), [true, true, true, true]);
-  assert.equal(s.stat[0].hp[CASTE.MAJOR], s.stat[1].hp[CASTE.MAJOR]);
+  assert.ok(s.stat[0].hp[CASTE.MAJOR] > s.stat[1].hp[CASTE.MAJOR], 'the branch keeps its own numbers'); assert.ok(s.stat[1].per[ROOM.STORE] > s.stat[0].per[ROOM.STORE]);
   // without tiers the nodes are open from the start, as before
   const old = new Sim({ seed: 4, mission: 'crossing', tiers: false, traits: [['post', 'raiders', 'sappers'], []] });
   assert.equal(old.mayRoom(0, ROOM.POST), true); assert.equal(!!old.has(0, 'loot'), true); assert.equal(old.mayBreach(0), true); assert.equal(old.mayPick(0), true);
@@ -562,7 +562,30 @@ test('Growth: a deep hill\'s stores and quarters hold more in the same cells', (
   const s = new Sim({ seed: 4, mission: 'crossing', tiers: true, sugar: 100 }), L = s.L, dx = s.door[0] % L.sw;
   const cells = []; for (let x = 1; x <= 4; x++) cells.push(dx + x, 8); s.order({ team: 0, type: CMD.ROOM, cells, kind: ROOM.REST, dig: true });
   for (let j = 0; j < 3000; j++) s.step();
-  const before = s.g(0, CG.CAP_ADULTS) - s.stat[0].house; assert.ok(before > 0, 'quarters dug');
+  const before = s.g(0, CG.CAP_ADULTS) - C.REST_BASE, food = s.g(0, CG.CAP_FOOD); assert.ok(before > 0, 'quarters dug');
   s.order({ team: 0, type: CMD.GROW, branch: BRANCH.DEEP }); for (let j = 0; j < TIERS.grow[0].ticks + 2; j++) s.step();
-  assert.equal(s.g(0, CG.CAP_ADULTS) - s.stat[0].house, (before / 4) * TIERS.widePer[ROOM.REST]);
+  assert.equal(s.g(0, CG.CAP_ADULTS) - C.REST_BASE, (before / 4) * 6);
+  // the stores really hold it: the cap and what the cells take are one number
+  assert.equal(s.g(0, CG.CAP_FOOD), (food / 8) * 12);
+  let room = 0; for (const k of s.bins[0]) room += s.binCap(0, k); assert.equal(room, s.g(0, CG.CAP_FOOD));
+});
+
+test('Growth: with growFreeze the brood waits while the chamber grows, and living soldiers toughen with a War hill', () => {
+  const s = new Sim({ seed: 4, mission: 'crossing', tiers: true, growFreeze: true, sugar: 100 });
+  const i = s.spawn(0, CASTE.MAJOR, s.door[0]); s.hp[i] -= 7; const hp = s.hp[i];
+  const ages = () => { let a = 0; for (let b = 0; b < s.bn; b++) if (s.bTeam[b] === 0) a += s.bAge[b]; return a; }, mine = () => { let n = 0; for (let b = 0; b < s.bn; b++) if (s.bTeam[b] === 0) n++; return n; };
+  s.order({ team: 0, type: CMD.GROW, branch: BRANCH.WAR }); s.step(); const a0 = ages(), n0 = mine();
+  for (let j = 0; j < 100; j++) s.step();
+  assert.equal(mine(), n0, 'none hatched, none laid'); assert.equal(ages(), a0, 'the brood did not age');
+  while (s.g(0, CG.GROW) > 0) s.step();
+  assert.equal(s.hp[i], hp + s.stat[0].hp[CASTE.MAJOR] - 40, 'a living soldier gains what a new one has, less her wounds');
+  assert.equal(new Sim({ seed: 4, tiers: false }).mayGrow(0), -1); assert.ok(new Sim({ seed: 4, sugar: 5 }).mayGrow(0) > 2); assert.equal(new Sim({ seed: 4, sugar: 100 }).mayGrow(0), 0);
+});
+
+test('Growth: seeds that are counted but not in the store cells do not pay for a growth', () => {
+  const s = new Sim({ seed: 4, mission: 'crossing', tiers: true, sugar: 100 });
+  for (const k of s.bins[0]) s.binS[k] = Math.min(s.binS[k], 1); // the count still says 100
+  assert.equal(s.mayGrow(0), 0);
+  s.order({ team: 0, type: CMD.GROW, branch: BRANCH.WAR }); s.step();
+  assert.equal(s.g(0, CG.GROW), 0); assert.equal(s.g(0, CG.BRANCH), 0);
 });

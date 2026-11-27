@@ -652,46 +652,50 @@ Not built, in the order the reviews put them: stores robbed cell by cell with de
 Spec 13 section 4 already says it: enlarging the queen's chamber raises the colony's tier, which opens room kinds and
 castes inside a mission, stops laying for a while and spends stores. This is that, in its first form.
 
-- `CMD.GROW` widens the chamber. It is paid in seeds at once (`TIERS.grow`: 18, then 36) and the queen lays nothing
-  for a fixed time (20 s, then 30 s). The pause is a timer and not a dig, so nothing can cancel or stall it. When it
-  ends the sim opens a ring of the colony's own clay round the chamber, so the growth shows in the nest.
-- The first growth takes a branch. **War hill**: soldiers a quarter tougher, the third caste, and the raid nodes
-  (Raiders, Hold fast). **Deep hill**: store and quarters cells hold half as much again, pupae hatch 13% sooner, and
-  the Guard post node. The second growth opens the other branch's things, and Sappers.
-- A node of the Lineage now says where it opens (`at: [tier, branch]` in TRAITS). So a deed still opens a node for the
+- `CMD.GROW` grows the chamber. It is paid in seeds at once (`TIERS.grow`: 18, then 36, on top of the digging
+  reserve) and the queen lays nothing for a fixed time (15 s, then 20 s). The pause is a timer and not a dig, so
+  nothing can cancel or stall it. The seeds must really lie in the store cells: the count alone does not pay.
+- The first growth takes a branch. **War hill**: soldiers a quarter tougher (living ones too), the third caste, and
+  the raid nodes (Raiders, Hold fast). **Deep hill**: store and quarters cells hold half as much again, pupae hatch
+  13% sooner, and the Guard post node. The second growth opens the other branch's nodes and caste, and Sappers. It
+  does not give the other branch's numbers: those stay the mark of the branch (`restat`).
+- A node of the Lineage says where it opens (`at: [tier, branch]` in TRAITS). A deed still opens a node for the
   campaign, and the colony must still grow to it in each mission. What a mission itself grants (The Wall's digging
   and its Guard post) is open from the start, as before.
-- One gate: `Sim.open(t, at)`, read by `has`, `mayPick`, `mayRoom`, `mayBreach`, and by the client and the rival.
-- The rival grows too: a mind that names no branch takes one by seed and seat; `grow: 0` never grows.
-- State: three spare `cg` slots (TIER, GROW, BRANCH). `WAR_VERSION` is 7, because every mission plays differently now.
-  The option `tiers: false` gives the old rules (tests of single nodes use it).
+- One gate: `Sim.open(t, at)`, read by `has`, `mayPick`, `mayRoom`, `mayBreach`, `mayGrow`, the client and the rival.
+- The rival grows too. With a caste to pick it takes the War hill, else a branch by seed and seat. It does not grow
+  when it stores for a frost. `grow: 0` never grows.
+- State: three `cg` slots (TIER, GROW, BRANCH). `WAR_VERSION` is 7, because every mission plays differently now.
+  `tiers: false` gives the old rules (tests of single nodes use it).
 
-Build decisions that differ from the spec's words: the pause is 20 and 30 seconds, not a minute (matches last about
-five minutes, and at a minute growing lost 0 of 12); the cost is seeds only (meat sits near zero all match, so a meat
-cost only set the moment by luck); two growths, not three.
+Tried and dropped (do not retry without a new reason):
+- A general gain per growth (faster laying, more housing): growing won 11 of 12 and early beat late 12 of 12. A build
+  order, not a choice.
+- A meat cost, and a one-minute pause: growers lost every match.
+- Opening a ring of clay round the chamber when it grows. More open cells beside the queen let more attackers press
+  her (`PRESS_OPEN`), and the Wall's guard post stopped holding a breach. Growth changes no nest geometry; the client
+  should draw it instead (not drawn yet).
+- The brood waiting while the chamber grows (a reviewer's fix for a pause that costs nothing when the nursery is
+  full). Measured: growers lost 10 of 10 on The Crossing and The Stones. It is kept behind `growFreeze` and is off.
+  The dodge it meant to close is still open.
 
-How the numbers were set (The Crossing, steady minds, 6 seeds, both seats):
-- With a general gain for growing (faster laying, more housing) growing was a must: 11 of 12 over a hill that never
-  grew, and growing early beat growing late 12 of 12. That is a build order and not a choice, so the general gain was
-  cut. A growth now gives only its branch.
-- With a branch alone: War hill v never 6 of 12, Deep hill v never between 4 and 10 of 12 as the pupa number moved
-  from 90% to 85%. The result is that sensitive, so 87% is a guess between two measured points.
-- The second growth changed no bot result (6 of 12). Bots barely use the other branch's things.
+Shipped numbers (5 seeds, both seats; W: war grower with spitters, D: deep grower, N: never grows):
 
-All six missions at the shipped numbers (5 seeds, both seats; W: war grower with spitters, D: deep grower, N: never
-grows, M: timid):
+| mission | W v D | W v N | D v N | default v N |
+|---|---|---|---|---|
+| crossing | 5–5 | 4–6 | 6–4 | 5–5 |
+| frost | not run | not run | not run | 5–5 |
+| stones | 2–8 | 4–6 | 5–5 | 6–4 |
+| larder | 6–4 | 4–6 | 7–3 | 7–3 |
+| narrows | not run | not run | not run | 7–3 |
+| wall | 9–1 | 7–3 | 8–2 | 5–5 |
 
-| mission | W v D | W v N | D v N | default v N | bold v steady | steady v M |
-|---|---|---|---|---|---|---|
-| crossing | 8–2 | 5–5 | 4–6 | 5–5 | 3–7 | 9–1 |
-| frost | 5–5 | 6–4 | 7–3 | 7–3 | 4–6 | 6–4 |
-| stones | 2–8 | 6–4 | 7–3 | 5–5 | 10–0 | 10–0 |
-| larder | 6–4 | 6–4 | 4–6 | 6–4 | 4–6 | 5–5 |
-| narrows | 4–6 | 5–5 | 5–5 | 5–5 | 2–8 | 10–0 |
-| wall | 10–0 | 10–0 | 6–4 | 6–4 | 8–2 | 8–2 |
+Read: growing is close to even against not growing for a bot, so it is neither a tax nor a must. Which branch is
+better depends on the mission. On The Wall the War hill beats the Deep hill 9 of 10: not fixed. The Wall's guard
+post with growth on: the queen held in 4 of 5 controlled strikes with a guard (seed 5 ended at 320 of 800).
 
-Read: which branch is better depends on the mission (war on The Crossing and The Wall, deep on The Stones), and
-growing is close to even against not growing, so it is neither a tax nor a must for a bot. On The Wall the War hill
-wins every time: tougher soldiers decide a fight in a tunnel. Not fixed here.
+Open from the two outside reviews: the second growth opens nothing for a colony with no Lineage nodes; a locked raid
+mode is turned into Press without a word; the rival retries a refused plug each think; the campaign caste is ordered
+by the client on the tier event, so a headless replay lacks it; the Larder haul test moved seed (2 to 1) to pass.
 
 Not known: how any of this plays for a person. Bots take a branch by seed, not by reading the map.

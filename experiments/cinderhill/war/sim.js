@@ -27,7 +27,7 @@ export const CASTE_HP = CASTES.map(c => c.hp), CASTE_BITE = CASTES.map(c => c.bi
 const FIGHTS = CASTES.map(c => c.fights);
 /** One colony's numbers: the tables' rows, then its traits (`cfg.traits[team]`, ids of TRAITS) laid over them. */
 function statsFor(traits = [], grown = []) {
-  const st = { hp: CASTES.map(c => c.hp), bite: CASTES.map(c => c.bite), speed: CASTES.map(c => c.speed), food: CASTES.map(c => c.food), reach: CASTES.map(c => c.reach), per: ROOMS.map(r => (r ? r.per : 0)), eatPer: C.ADULTS_PER_SUGAR, pupa: C.PUPA_TICKS, room: ROOMS.map(() => 0), loot: 0, hold: 0, breach: 0, at: {}, lay: C.LAY_EVERY, house: C.REST_BASE };
+  const st = { hp: CASTES.map(c => c.hp), bite: CASTES.map(c => c.bite), speed: CASTES.map(c => c.speed), food: CASTES.map(c => c.food), reach: CASTES.map(c => c.reach), per: ROOMS.map(r => (r ? r.per : 0)), eatPer: C.ADULTS_PER_SUGAR, pupa: C.PUPA_TICKS, room: ROOMS.map(() => 0), loot: 0, hold: 0, breach: 0, at: {} };
   for (const id of traits) { const tr = TRAITS[id]; if (!tr) throw new Error(`no trait ${id}`); for (const [key, a, b] of tr.set) { if (b === undefined) st[key] = a; else st[key][a] = b; if (tr.at) st.at[b === undefined ? key : key + a] = tr.at; } }
   // What its chamber has grown into (TIERS): [key, per cent] or [key, index, per cent] of the number as it stands.
   for (const [key, a, b] of grown) { if (b === undefined) st[key] = Math.floor((st[key] * a) / 100); else st[key][a] = Math.floor((st[key][a] * b) / 100); }
@@ -212,13 +212,14 @@ export class Sim {
     for (let t = 0; t < TEAMS; t++) {
       const o = t * CG.SIZE;
       const cap = { food: 0, brood: 0, ants: 0 };
-      const wide = this.cfg.tiers && this.cg[o + CG.TIER] > 0 && this.open(t, TIERS.wide) ? TIERS.widePer : null; // the deep branch: a store or quarters cell holds more
-      for (let r = 1; r < ROOMS.length; r++) if (ROOMS[r].cap) cap[ROOMS[r].cap] += (wide?.[r] ?? this.stat[t].per[r]) * n[t * 8 + r];
+      for (let r = 1; r < ROOMS.length; r++) if (ROOMS[r].cap) cap[ROOMS[r].cap] += this.stat[t].per[r] * n[t * 8 + r];
       this.floor[t] = Math.max(0, C.STORE_MIN - cap.food); // a hill with few store cells keeps this much in a heap on its founding cell
-      cg[o + CG.CAP_FOOD] = Math.max(C.STORE_MIN, cap.food); cg[o + CG.CAP_BROOD] = Math.max(C.BROOD_MIN, cap.brood); cg[o + CG.CAP_ADULTS] = this.stat[t].house + cap.ants;
+      cg[o + CG.CAP_FOOD] = Math.max(C.STORE_MIN, cap.food); cg[o + CG.CAP_BROOD] = Math.max(C.BROOD_MIN, cap.brood); cg[o + CG.CAP_ADULTS] = C.REST_BASE + cap.ants;
       cg[o + CG.MARKS] = marks[t];
     }
-    this.dirty = true; // the cells that hold food are in index order until the fields are rebuilt, which sorts them by the walk from the door
+    // The cells that hold food stay in door order, so a meal or a cost paid before the fields are rebuilt comes from the same cells.
+    if (this.doorF) for (let t = 0; t < TEAMS; t++) { const D = this.doorF[t], base = L.nestBase; if (D) this.bins[t].sort((a, b) => D[base + a] - D[base + b] || a - b); }
+    this.dirty = true;
   }
 
   /** How many loads of one food a nest cell holds. */
@@ -254,21 +255,19 @@ export class Sim {
   /** A colony's numbers again, from its traits and what its chamber has grown into. */
   restat(t) {
     const o = t * CG.SIZE, tier = this.cfg.tiers ? this.cg[o + CG.TIER] : 0, br = this.cg[o + CG.BRANCH], sets = [];
-    for (let i = 0; i < tier; i++) sets.push(...TIERS.grow[i].set);
-    for (const b of [BRANCH.WAR, BRANCH.DEEP]) if (tier >= 2 || (tier === 1 && b === br)) sets.push(...TIERS.branch[b].set);
+    // The branch's own numbers stay its own: the second growth brings the other branch's nodes and caste, not these.
+    if (tier >= 1 && TIERS.branch[br]) sets.push(...TIERS.branch[br].set);
     this.stat[t] = statsFor(this.cfg.traits?.[t], sets);
   }
 
-  /** A chamber growth is done: the colony is a tier up, and the chamber itself is a ring wider in its own clay. */
+  /** A chamber growth is done: the colony is a tier up. The nest's cells do not change (a wider chamber lets more
+   *  attackers press on the queen at once, and a guard post no longer held a breach), so the client draws the growth. */
   grown(t) {
-    const L = this.L, o = t * CG.SIZE, tier = ++this.cg[o + CG.TIER], q = this.queen[t] - L.nestBase, qx = q % L.nw, qy = Math.floor(q / L.nw);
-    for (let dy = -1 - tier; dy <= 1 + tier; dy++) for (let dx = -2 - tier; dx <= 2 + tier; dx++) {
-      const x = qx + dx, y = qy + dy, k = y * L.nw + x;
-      if (x < 1 || x >= L.nw - 1 || y < 4 || y >= L.nh - 1 || this.owner(k) !== t || this.mat[L.nestBase + k] !== MAT.CLAY || this.room[k] === PLUG) continue;
-      this.mat[L.nestBase + k] = MAT.OPEN; this.mark[k] = 0;
-    }
+    const o = t * CG.SIZE, tier = ++this.cg[o + CG.TIER];
     this.events.push(EVENT.TIER, t, tier + 1, this.cg[o + CG.BRANCH]);
-    this.restat(t);
+    const was = this.stat[t].hp.slice(); this.restat(t);
+    // Its living ants grow into the new numbers too, keeping the wounds they have.
+    for (let i = 0; i < this.n; i++) if (this.team[i] === t && this.hp[i] > 0) this.hp[i] += this.stat[t].hp[this.caste[i]] - was[this.caste[i]];
     this.recount(); this.dirty = true;
   }
 
@@ -355,6 +354,14 @@ export class Sim {
   }
   /** A node's number (loot, hold, breach), if the colony has the node and has grown to where it opens. */
   has(t, key) { const st = this.stat[t]; return st[key] && this.open(t, st.at[key]) ? st[key] : 0; }
+  /** May this colony grow its chamber now? 0: yes. -1: never (no tiers, or full grown). 1: one is under way. Else 2 + the seeds it is short of. */
+  mayGrow(t) {
+    const o = t * CG.SIZE, row = this.cfg.tiers ? TIERS.grow[this.cg[o + CG.TIER]] : null;
+    if (!row || this.cg[o + CG.QUEEN_HP] <= 0) return -1;
+    if (this.cg[o + CG.GROW] > 0) return 1;
+    const short = Math.max(row.sugar + C.DIG_KEEP - this.cg[o + CG.SUGAR], row.protein - this.cg[o + CG.PROTEIN]);
+    return short > 0 ? 2 + short : 0;
+  }
   /** May this colony choose its third caste yet? */
   mayPick(t) { return this.open(t, TIERS.pick); }
   /** May this colony dig this kind of room here? The mission's list, and the rooms its own nodes open. */
@@ -436,12 +443,14 @@ export class Sim {
       cg[base + CG.PICK] = o.caste | 0;
     } else if (o.type === CMD.GROW) {
       // Grow the queen's chamber a tier. It is paid from the stores at once, and she lays nothing while it is done.
-      const tier = cg[base + CG.TIER], row = this.cfg.tiers ? TIERS.grow[tier] : null, br = o.branch | 0;
-      if (!row) return no(WHY.NONE);
-      if (cg[base + CG.GROW] > 0) return no(WHY.BLOCKED);
+      const tier = cg[base + CG.TIER], row = TIERS.grow[tier], br = o.branch | 0, may = this.mayGrow(t);
+      if (may < 0) return no(WHY.NONE);
       if (tier === 0 && br !== BRANCH.WAR && br !== BRANCH.DEEP) return no(WHY.NONE);
-      if (cg[base + CG.SUGAR] < row.sugar + C.DIG_KEEP || cg[base + CG.PROTEIN] < row.protein) return no(WHY.BLOCKED);
-      this.take(t, FOOD.SUGAR, row.sugar); this.take(t, FOOD.PROTEIN, row.protein);
+      if (may !== 0) return no(WHY.BLOCKED);
+      // The count can run ahead of the cells for a tick (a store cleared this tick): the seeds must really be there.
+      let held = 0; for (const k of this.bins[t]) held += this.binS[k];
+      if (held < row.sugar) return no(WHY.BLOCKED);
+      this.take(t, FOOD.SUGAR, row.sugar); if (row.protein) this.take(t, FOOD.PROTEIN, row.protein);
       if (tier === 0) cg[base + CG.BRANCH] = br;
       cg[base + CG.GROW] = row.ticks;
     } else if (o.type === CMD.RALLY) {
@@ -691,7 +700,7 @@ export class Sim {
     for (let k = 0; k < this.bn; k++) {
       const t = this.bTeam[k], o = t * CG.SIZE;
       let keep = cg[o + CG.QUEEN_HP] > 0, stage = this.bStage[k];
-      if (this.bAge[k] < 0xFFFF) this.bAge[k]++;
+      if (this.bAge[k] < 0xFFFF && !(this.cfg.growFreeze && cg[this.bTeam[k] * CG.SIZE + CG.GROW])) this.bAge[k]++; // while the chamber grows the nurses dig: the brood waits
       const age = this.bAge[k];
       if (stage === STAGE.EGG) { if (age >= C.EGG_TICKS) { stage = STAGE.LARVA; this.bAge[k] = 0; } }
       else if (stage === STAGE.LARVA) {
@@ -723,7 +732,7 @@ export class Sim {
       if (cg[o + CG.QUEEN_HP] <= 0) continue;
       if (cg[o + CG.GROW] > 0 && --cg[o + CG.GROW] === 0) this.grown(t);
       if (cg[o + CG.LAY] > 0) cg[o + CG.LAY]--;
-      if (cg[o + CG.LAY] === 0 && cg[o + CG.GROW] === 0 && cg[o + CG.SUGAR] > 0 && count[t] < cg[o + CG.CAP_BROOD] && cg[o + CG.ADULTS] + count[t] < cg[o + CG.CAP_ADULTS] && this.n + this.bn < this.cfg.maxAnts) { if (this.addBrood(t, STAGE.EGG) >= 0) cg[o + CG.LAY] = this.stat[t].lay; }
+      if (cg[o + CG.LAY] === 0 && cg[o + CG.GROW] === 0 && cg[o + CG.SUGAR] > 0 && count[t] < cg[o + CG.CAP_BROOD] && cg[o + CG.ADULTS] + count[t] < cg[o + CG.CAP_ADULTS] && this.n + this.bn < this.cfg.maxAnts) { if (this.addBrood(t, STAGE.EGG) >= 0) cg[o + CG.LAY] = C.LAY_EVERY; }
       // Meals: a major eats as three.
       const eat = this.cfg.frostTick && this.tick >= this.cfg.frostTick ? this.cfg.frostEat : C.EAT_EVERY;
       if (this.tick % eat === eat - 1) {

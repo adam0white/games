@@ -41,18 +41,18 @@ export const TRAITS = {
 };
 
 /** Growth inside a mission (the option `tiers`). A colony starts at tier 1 with stores, nurseries, quarters, workers
- *  and soldiers. Growing the queen's chamber costs `grow[tier - 1]` from the stores and stops her laying for `ticks`.
- *  The first growth takes a branch. War hill: the third caste, and the raid nodes. Deep hill: wider stores and
- *  quarters (`widePer`, by room), and the building nodes. The second growth opens the other branch's things too.
- *  A node of the Lineage says where it opens with `at: [tier, branch]` (branch 0: either). */
+ *  and soldiers. Growing the queen's chamber costs `grow[tier - 1]` from the stores; for `ticks` the queen lays nothing
+ *  and the brood does not age. The first growth takes a branch, whose numbers (`set`, per cent of what stands) are the
+ *  colony's for the rest of the mission. War hill: tougher soldiers, the third caste, the raid nodes. Deep hill: wider
+ *  stores and quarters, quicker pupae, the building nodes. The second growth opens the other branch's caste and nodes,
+ *  not its numbers. A node of the Lineage says where it opens with `at: [tier, branch]` (branch 0: either). */
 export const BRANCH = { NONE: 0, WAR: 1, DEEP: 2 };
 export const TIERS = {
-  // Each growth: the queen lays faster and the chamber itself houses more.
-  grow: [{ sugar: 18, protein: 0, ticks: 400, set: [] }, { sugar: 36, protein: 0, ticks: 600, set: [] }],
+  grow: [{ sugar: 18, protein: 0, ticks: 300 }, { sugar: 36, protein: 0, ticks: 400 }],
   branch: [null,
-    { id: 'war', name: 'War hill', text: 'Tougher soldiers, and a third caste.', set: [['hp', 1, 125]] },
-    { id: 'deep', name: 'Deep hill', text: 'Wider stores and quarters, and brood that hatches sooner.', set: [['pupa', 87]] }],
-  pick: [2, 1], wide: [2, 2], widePer: [0, 12, null, 6],
+    { id: 'war', name: 'War hill', text: 'Soldiers a quarter tougher', set: [['hp', 1, 125]] },
+    { id: 'deep', name: 'Deep hill', text: 'Stores and quarters hold half as much again, and pupae hatch sooner', set: [['pupa', 87], ['per', 1, 150], ['per', 3, 150]] }],
+  pick: [2, 1],
 };
 
 /** Maps, in cells of a 160 by 112 field, mirrored left to right. wall: what runs down the middle ('water', 'stone' or

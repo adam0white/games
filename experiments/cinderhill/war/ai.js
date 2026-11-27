@@ -145,11 +145,8 @@ export function think(sim, t, mind = 1) {
   // Growing the chamber (missions with tiers): the branch its mind names, once the hill is `growAt` strong and the
   // stores can pay with a meal to spare; the second growth when it can pay again.
   // (A mind that names no branch takes one by the seed and its seat; `grow: 0` never grows.)
-  const grow = mind.grow ?? 1 + ((Math.abs(cfg.seed | 0) + t) & 1);
-  if (cfg.tiers && grow && !cg[o + CG.GROW]) {
-    const row = TIERS.grow[cg[o + CG.TIER]];
-    if (row && (cg[o + CG.TIER] === 0 || mind.grow2 !== false) && adults >= (mind.growAt ?? 45) + 40 * cg[o + CG.TIER] && cg[o + CG.SUGAR] >= row.sugar + 6 && cg[o + CG.PROTEIN] >= row.protein) out.push({ team: t, type: CMD.GROW, branch: grow });
-  }
+  const grow = mind.grow ?? (mind.pick ? 1 : 1 + ((Math.abs(cfg.seed | 0) + t) & 1)); // a mind with a caste to raise goes to war for it; one that plans for a frost keeps its seeds
+  if (grow && !winter && sim.mayGrow(t) === 0 && (cg[o + CG.TIER] === 0 || mind.grow2 !== false) && adults >= (mind.growAt ?? 45) + 40 * cg[o + CG.TIER] && cg[o + CG.SUGAR] >= TIERS.grow[cg[o + CG.TIER]].sugar + 6) out.push({ team: t, type: CMD.GROW, branch: grow });
   if (cg[o + CG.DIET] !== diet || (cg[o + CG.PICK] && cg[o + CG.DIET2] !== special)) out.push({ team: t, type: CMD.DIET, share: diet, special });
   const outnumbered = cg[(1 - t) * CG.SIZE + CG.MAJORS] * 2 > cg[o + CG.MAJORS] * 3 + 4; // the other hill has half as many soldiers again, and more
   // Building, one room at a time: a store when the stores are nearly full, quarters when the hill is, a nursery wing when the brood is.
@@ -251,7 +248,7 @@ export function think(sim, t, mind = 1) {
   const away = () => { let n = 0; for (let k = 0; k < TRAILS; k++) { const s2 = foe * TRAILS + k; if (sim.trLive[s2] && sim.trKind[s2] === KIND.RAID) n += sim.crew[s2]; } return n; };
   const atDoor = k => { const s2 = t * TRAILS + k, e = sim.trPath[s2 * PATH_MAX + sim.trLen[s2] - 1]; return foe >= 0 && (e >= L.nestBase || sim.doorF[foe][e] <= 4); };
   // Joined under ground, it goes through the breach for the queen. Behind a whole wall there is no other way, and it waits for one.
-  if (sim.linked && foe >= 0) {
+  if (sim.linked && foe >= 0 && sim.mayBreach(t)) {
     // Steady waits for a quarter more soldiers than the other hill, and no longer than three fifths of the day.
     const go = mood > 0 && majors >= (mood === 2 ? 6 : 8) && (mood === 2 ? majors >= foeMajors : majors * 4 >= foeMajors * 5 || sim.tick * 5 >= cfg.duskTick * 3);
     if (raids.length && (majors < 3 || (!go && majors * 2 < foeMajors))) for (const k of raids) out.push({ team: t, type: CMD.ERASE, trail: k });
