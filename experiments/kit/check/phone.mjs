@@ -397,7 +397,7 @@ const GAMES = {
     // A save in the format players already have.
     await page.goto(`${base}/lantern/`);
     await page.evaluate(LAB_LOCAL);
-    await page.evaluate(() => { localStorage.setItem('lantern-night', '3'); localStorage.setItem('lantern-bank', '120'); localStorage.setItem('lantern-owned', '["red"]'); localStorage.setItem('lantern-worn', '{"boat":"red"}'); localStorage.setItem('lantern-best-3', '40'); localStorage.setItem('lantern-best-endless', '55'); localStorage.setItem('lantern-best-tower', '4'); localStorage.setItem('lantern-stats', '{"red":1}'); localStorage.setItem('lantern-off', '[]'); localStorage.setItem('lantern-best-level', '0'); localStorage.setItem('lantern-tower-at', '1'); localStorage.setItem('lantern-rebirths', '0'); localStorage.setItem('lantern-crash', '[]'); localStorage.setItem('lantern-hint', '1'); localStorage.setItem('notes.k', 'check'); localStorage.removeItem('lantern-start'); }); // the first visit above wrote a new player's lantern-start; this save is from before that key
+    await page.evaluate(() => { localStorage.setItem('lantern:set:river', 'classic'); localStorage.setItem('lantern-night', '3'); localStorage.setItem('lantern-bank', '120'); localStorage.setItem('lantern-owned', '["red"]'); localStorage.setItem('lantern-worn', '{"boat":"red"}'); localStorage.setItem('lantern-best-3', '40'); localStorage.setItem('lantern-best-endless', '55'); localStorage.setItem('lantern-best-tower', '4'); localStorage.setItem('lantern-stats', '{"red":1}'); localStorage.setItem('lantern-off', '[]'); localStorage.setItem('lantern-best-level', '0'); localStorage.setItem('lantern-tower-at', '1'); localStorage.setItem('lantern-rebirths', '0'); localStorage.setItem('lantern-crash', '[]'); localStorage.setItem('lantern-hint', '1'); localStorage.setItem('notes.k', 'check'); localStorage.removeItem('lantern-start'); }); // the first visit above wrote a new player's lantern-start; this save is from before that key
     await page.reload();
     // One drawing error must not freeze the game: the next frame is asked for before this one draws.
     page.context().badFrame = true; // the error below is meant, so it is not a page error
@@ -414,8 +414,9 @@ const GAMES = {
     assert.equal(await page.textContent('#play'), 'Play night 3'); assert.match(await page.textContent('#about'), /Best 40%/);
     assert.deepEqual(st.board.map(r => r.s), [55], 'old save: the endless best starts the leaderboard'); assert.deepEqual(st.winOn, []);
     assert.equal(st.start, 'boost', 'old save: a player from before lantern-start keeps Boost'); assert.ok(st.owned.includes('boost')); assert.equal((await saved())['lantern-start'], 'boost');
-    // Settings (kit/settings.js, 2026-11-27): the river option's default was decided on the first visit above, when there was no save (gentle), and stays; nothing is changed yet.
-    { const set = await page.evaluate(() => window.lanternSet()); assert.equal(set.defaults.river, 'gentle', 'settings: a default decided once'); assert.equal(set.river, 'gentle'); assert.deepEqual(set.changed, [], 'settings: nothing changed'); assert.equal(set.gain, 1.3); }
+    // Settings (kit/settings.js, 2026-11-27): the river option's default was decided on the first visit above, when there was no save (gentle), and stays.
+    // The save seeded above picks Classic, because the checks below end runs on the bank.
+    { const set = await page.evaluate(() => window.lanternSet()); assert.equal(set.defaults.river, 'gentle', 'settings: a default decided once'); assert.equal(set.river, 'classic'); assert.deepEqual(set.changed, ['river'], 'settings: only the river differs from its default'); assert.equal(set.gain, 1.3); }
     await until(page, () => document.getElementById('notes-button'), 'notes button');
     await noZoomed(page);
     // Play, steer by a relative drag, and a tap alone does not steer.
