@@ -182,12 +182,12 @@ export const MISSIONS = {
   // A siege. The rival (team 1) starts larger, behind a ridge with one pass, and wins by lasting until dusk. Its queen
   // is frail: reach her and it is over.
   narrows: {
-    id: 'narrows', name: 'The Narrows', map: 'pass',
+    id: 'narrows', name: 'The Narrows', map: 'pass', breach: true,
     kit: { ants: 36, foeAnts: 40, sugar: 10, protein: 5, eggs: 20, larvae: 20, pupae: 12, duskTick: 9600, queenHp: 1200 },
     goals: { queen: true, dusk: 'holder' },
     deeds: [{ id: 'a', text: 'Kill the queen inside five minutes.', won: true, by: 6000, opens: 'hold' }, { id: 'b', text: 'Kill the queen with fewer than sixty dead.', won: true, max: { DIED: 59 }, opens: 'post' }],
     picks: [CASTE.SPITTER, CASTE.WARDEN],
-    rooms: [ROOM.STORE, ROOM.NURSERY, ROOM.REST],
+    rooms: [ROOM.STORE, ROOM.NURSERY, ROOM.REST, ROOM.POST],
   },
   // No way over: the wall is whole. Either hill may dig through the clay under it and into the other's nest. A dig on
   // your side is heard. Soldiers sent through go for the queen; a guard post where the tunnel comes in stops them.

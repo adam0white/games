@@ -808,3 +808,15 @@ From the same review, not built: crafts that change orders (soldiers escorting a
 build requirements for a craft; a preview of the build against the mission clock; a beetle that lunges; The Narrows
 as the weakest mission (one pass, a defender that never attacks); quarters as a free pick over a bare alcove;
 carrying the queen out through a tunnel as a wildcard.
+
+## The Narrows: two ways in (war build)
+
+The outside review named The Narrows the weakest mission: one pass, a defender that never attacks, and a card that
+gave the whole plan. It now has `breach: true` and the Guard post room, so the attacker may storm the pass or
+tunnel under the ridge and strike from below, and the defender may post a guard where the tunnel comes in. No new
+rule: The Wall's tunnel rules on the pass map.
+
+Numbers, 5 seeds both seats (seat 0 attacks): steady v steady, attacker won 2 of 10 before and 4 of 10 after; with
+bold on one side 4 of 10 before and 3 of 10 after. The rival tunnelled through in 1 game of 10, so the second way in
+is mostly a player's choice for now. No person has dug it on this map; whether the tunnel can be finished before
+dusk by hand is not known.
