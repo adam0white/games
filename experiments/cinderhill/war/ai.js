@@ -3,7 +3,7 @@
 //
 // It knows where every pile is (there is no fog yet; when sight arrives it gets the same sight as a player).
 
-import { CMD, KIND, CG, TRAILS, PATH_MAX, MAX_PILES, FOOD, TEAMS, ROOM, MODE, MAT, C } from './sim.js';
+import { CMD, KIND, CG, TRAILS, PATH_MAX, MAX_PILES, FOOD, TEAMS, ROOM, MODE, MAT, C, PLUG } from './sim.js';
 import { MAPS } from './tables.js';
 
 const FAR = 0xFFFF;
@@ -143,6 +143,7 @@ export function think(sim, t, mind = 1) {
   const pick = typeof mind === 'number' ? 0 : mind.pick | 0, special = pick && diet ? Math.min(4 - diet, mind.special ?? 1) : 0;
   if (pick && !cg[o + CG.PICK]) out.push({ team: t, type: CMD.PICK, caste: pick });
   if (cg[o + CG.DIET] !== diet || (cg[o + CG.PICK] && cg[o + CG.DIET2] !== special)) out.push({ team: t, type: CMD.DIET, share: diet, special });
+  const outnumbered = cg[(1 - t) * CG.SIZE + CG.MAJORS] * 2 > cg[o + CG.MAJORS] * 3 + 4; // the other hill has half as many soldiers again, and more
   // Building, one room at a time: a store when the stores are nearly full, quarters when the hill is, a nursery wing when the brood is.
   if (build && cg[o + CG.MARKS] > 0 && !sim.digF[t]) {
     // Marks no worker can reach would stall it for good: take them off.
@@ -176,11 +177,16 @@ export function think(sim, t, mind = 1) {
     }
     // A breach: where the mission lets it, a rival that raids digs for the other nest, eight cells at a time so that a
     // room it comes to need is not kept waiting. Where it aims (the nearest room, the queen, the stores) goes by the seed.
-    if (!dug && breach && mood > 0 && !sim.linked && adults >= 40 && sim.tick >= (mood === 2 ? 600 : 1500) && cg[o + CG.SUGAR] >= 8 * C.DIG_SUGAR + C.DIG_KEEP + 4) {
+    if (!dug && breach && mood > 0 && !sim.linked && !outnumbered && adults >= 40 && sim.tick >= (mood === 2 ? 600 : 1500) && cg[o + CG.SUGAR] >= 8 * C.DIG_SUGAR + C.DIG_KEEP + 4) {
       const foe2 = 1 - t, aim = mind.aim ?? (Math.abs(cfg.seed | 0) + t) % 3;
       let run = breachRun(sim, t, foe2, aim); if (!run.length && aim) run = breachRun(sim, t, foe2, 0); // no stores to aim at, or no way to them: the nearest room will do
       if (run.length) out.push({ team: t, type: CMD.DIG, cells: run.slice(0, 16) });
     }
+  }
+  // Badly outnumbered in soldiers and joined: it packs the tunnel shut where it comes in (a few seeds), and digs no way back while that lasts.
+  if (sim.linked && outnumbered && build && sim.mayPlug() && mind.plug !== false && cg[o + CG.SUGAR] >= C.PLUG_SUGAR + C.DIG_KEEP + 4) {
+    const cells = mouth(sim, t, 1 - t, 99);
+    for (let j = 0; j + 1 < cells.length; j += 2) if (!sim.room[cells[j + 1] * L.nw + cells[j]]) { out.push({ team: t, type: CMD.FILL, cells: [cells[j], cells[j + 1]] }); break; }
   }
   // A breach is answered with a guard post where it comes in, as soon as the nests are joined and there are soldiers to stand on it.
   if (sim.linked && build && may(ROOM.POST) && sim.mayRoom(t, ROOM.POST) && cg[o + CG.MAJORS] >= 2 && (typeof mind === 'number' || mind.guard !== false)) {

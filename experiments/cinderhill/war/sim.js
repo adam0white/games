@@ -41,7 +41,9 @@ export const KIND = { FORAGE: 0, RAID: 1 };
 // the store and carry a load home (the colony needs the Raiders node). HOLD: stand at the end and never go down a door
 // (the Hold fast node).
 export const MODE = { PRESS: 0, LOOT: 1, HOLD: 2 };
-export const CMD = { TRAIL: 1, ERASE: 2, CREW: 3, DIET: 4, RALLY: 5, RECALL: 6, DIG: 7, ROOM: 8, PICK: 9 };
+export const CMD = { TRAIL: 1, ERASE: 2, CREW: 3, DIET: 4, RALLY: 5, RECALL: 6, DIG: 7, ROOM: 8, PICK: 9, FILL: 10 };
+/** A plug: an open tunnel cell packed shut again. It is clay with this in `room`, slow and dear to dig. */
+export const PLUG = 15;
 // Events: [type, a, b, c].
 export const EVENT = {
   HOME: 1, // team, food kind, trail
@@ -61,6 +63,7 @@ export const EVENT = {
   SITE: 15, // site, the team that holds it now (-1: no one), the team that held it
   FOUND: 16, // team, cell, loads * 2 + food kind: a cache in the clay was dug open
   HEARD: 17, // the team whose ground it is, cell, the team digging: a rival opened a cell on this colony's side
+  PLUG: 19, // team, cell: an open cell was packed shut
   BREACH: 18, // the team that dug the last cell, cell: the two nests are joined under ground
 };
 export const REASON = { QUEEN: 1, DUSK: 2, STARVED: 3, POINTS: 4, HAUL: 5 };
@@ -92,7 +95,7 @@ export const C = {
   SITE_R: 3, SITE_MIN: 3,
   EAT_EVERY: 1200, ADULTS_PER_SUGAR: 10, STARVE_AFTER: 1200, STARVE_EVERY: 200,
   // Rooms: a store cell holds eight loads of each food, a nursery cell one brood, a quarters cell four ants (adults and brood together; the queen stops laying at the cap).
-  STORE_MIN: 24, BROOD_MIN: 8, REST_BASE: 90, DIG_TICKS: 120, DIG_SUGAR: 1, DIG_KEEP: 3, DIG_CREW: 8, MARKS_MAX: 96,
+  STORE_MIN: 24, BROOD_MIN: 8, REST_BASE: 90, DIG_TICKS: 120, DIG_SUGAR: 1, DIG_KEEP: 3, DIG_CREW: 8, MARKS_MAX: 96, PLUGS_MAX: 3, PLUG_SUGAR: 3, PLUG_SLOW: 5, PLUG_BREAK: 4, PLUG_CLEAR: 8,
   QUEEN_HP: 800, BITE_EVERY: 10, BITE_R: 200, SEE: 3, PRESS_OPEN: 5, PRESS_TUNNEL: 2, WAIT_AT_END: 60, GUARD_R: 4,
 };
 
@@ -154,7 +157,7 @@ export class Sim {
     this.queenF = Array.from({ length: TEAMS }, () => new Uint16Array(n)); this.rallyF = Array.from({ length: TEAMS }, () => null);
     this.crew = new Int32Array(T); this.want = new Int32Array(T);
     this.digF = Array.from({ length: TEAMS }, () => null); this.storeCells = [[], []]; this.nurseryCells = [[], []]; this.postCells = [[], []]; this.postF = [null, null]; this.dirty = false;
-    this.underF = [null, null]; this.linked = false; this.lastDug = null; // under ground only: steps to each queen with no door used, and whether the two nests are joined
+    this.underF = [null, null]; this.linked = false; this.lastDug = null; this.plugTick = -1; this.plugHit = new Set(); // (the plugs struck this tick: within a tick only) // under ground only: steps to each queen with no door used, and whether the two nests are joined
     this.bins = [[], []]; this.floor = [0, 0]; this.dirtyStore = false; // bins: the nest cells that hold food, nearest the door first
     this.putF = Array.from({ length: TEAMS * 2 }, () => new Uint16Array(n)); this.lootF = Array.from({ length: TEAMS }, () => new Uint16Array(n)); this.putAny = new Uint8Array(TEAMS * 2); this.lootAny = new Uint8Array(TEAMS);
     this.head = new Int32Array(n).fill(-1); this.nextAnt = new Int32Array(A); this.occ = new Uint8Array(n);
@@ -321,6 +324,8 @@ export class Sim {
 
   /** May this colony dig past its own ground, into the rival's? The mission says, or a node of its own. */
   mayBreach(t) { return !!this.mission.breach || !!this.stat[t].breach; }
+  /** Where either colony may tunnel into the other, both may pack a tunnel shut. */
+  mayPlug() { return this.mayBreach(0) || this.mayBreach(1); }
 
   apply(o) {
     const t = o.team | 0, cg = this.cg, base = t * CG.SIZE;
@@ -358,6 +363,35 @@ export class Sim {
       cg[base + CG.DIET] = Math.max(0, Math.min(4, o.share | 0));
       if (o.special != null) cg[base + CG.DIET2] = cg[base + CG.PICK] ? Math.max(0, Math.min(4 - cg[base + CG.DIET], o.special | 0)) : 0;
       else if (cg[base + CG.DIET] + cg[base + CG.DIET2] > 4) cg[base + CG.DIET2] = 4 - cg[base + CG.DIET];
+    } else if (o.type === CMD.FILL) {
+      // cells: nest [x, y, ...] of its own open tunnel to pack shut, a few seeds each. Refused: in a room or the shaft, with a
+      // rival near, past the few a colony may keep, or where it would cut the queen from her door or her rooms.
+      if (!this.mayPlug()) return no(WHY.NONE);
+      const L = this.L, pts = o.cells || [], e = 1 - t; let done = 0, have = 0;
+      for (let k = 0; k < this.room.length; k++) if (this.room[k] === PLUG && this.mat[L.nestBase + k] === MAT.CLAY && this.owner(k) === t) have++;
+      for (let j = 0; j + 1 < pts.length && j < 16; j += 2) {
+        const x = pts[j] | 0, y = pts[j + 1] | 0, k = y * L.nw + x, m = L.nestBase + k;
+        if (x < 1 || x >= L.nw - 1 || y < 4 || y >= L.nh - 1 || this.owner(k) !== t || this.mat[m] !== MAT.OPEN || this.room[k] || m === this.queen[t] || m === this.store[t]) continue;
+        if (have >= C.PLUGS_MAX || cg[base + CG.SUGAR] < C.PLUG_SUGAR + C.DIG_KEEP) break;
+        let clear = true;
+        for (let i = 0; i < this.n && clear; i++) {
+          if (this.hp[i] <= 0 || this.layer[i] !== NEST) continue;
+          const ax = this.x[i] >> 8, ay = this.y[i] >> 8;
+          if (this.team[i] === e && Math.abs(ax - x) <= C.PLUG_CLEAR && Math.abs(ay - y) <= C.PLUG_CLEAR) clear = false;
+        }
+        if (!clear) continue;
+        this.mat[m] = MAT.CLAY;
+        const F = this.field(null, [this.queen[t]], true); let whole = F[this.door[t]] !== FAR;
+        for (let c = 0; c < this.room.length && whole; c++) if (this.room[c] && this.room[c] !== PLUG && this.mat[L.nestBase + c] === MAT.OPEN && this.owner(c) === t && F[L.nestBase + c] === FAR) whole = false;
+        // (Ants of its own left on the far side are its own loss: they wait there until the plug is dug out.)
+        if (!whole) { this.mat[m] = MAT.OPEN; continue; }
+        // Its own ants standing there step back toward the queen.
+        let back = -1; for (let d = 0; d < 4; d++) { const a = L.nb[m * 4 + d]; if (a >= L.nestBase && this.mat[a] === MAT.OPEN && F[a] !== FAR && (back < 0 || F[a] < F[back])) back = a; }
+        if (back >= 0) for (let i = 0; i < this.n; i++) if (this.hp[i] > 0 && this.layer[i] === NEST && (this.x[i] >> 8) === x && (this.y[i] >> 8) === y) { const bk = back - L.nestBase; this.x[i] = ((bk % L.nw) << 8) + 128; this.y[i] = (Math.floor(bk / L.nw) << 8) + 128; this.to[i] = -1; }
+        this.take(t, FOOD.SUGAR, C.PLUG_SUGAR); this.room[k] = PLUG; this.mark[k] = 0; have++; done++; this.event(EVENT.PLUG, t, m);
+      }
+      if (!done) return no(WHY.BLOCKED);
+      this.recount(); this.dirty = true;
     } else if (o.type === CMD.PICK) {
       // One caste beyond workers and soldiers, chosen once from the mission's list.
       if (cg[base + CG.PICK] || !this.mission.picks.includes(o.caste | 0)) return no(WHY.NONE);
@@ -391,6 +425,7 @@ export class Sim {
           if (o.on === 0 || o.on === false) { if (this.mark[k] === t + 1) { this.mark[k] = 0; marks--; done++; if (this.room[k]) use(k, ROOM.NONE); } }
           else if (m === MAT.CLAY && this.mark[k] !== t + 1 && marks < C.MARKS_MAX) { this.mark[k] = t + 1; this.digLeft[k] = C.DIG_TICKS; marks++; done++; } // on its own ground a colony takes a rival's mark over
         } else {
+          if (this.room[k] === PLUG && m !== MAT.OPEN) { if (!kind && this.mark[k] === t + 1) { this.mark[k] = 0; marks--; done++; } continue; } // a plug is not a room: it is dug out or left
           if (o.dig && kind && m === MAT.CLAY && this.mark[k] !== t + 1 && marks < C.MARKS_MAX) { this.mark[k] = t + 1; this.digLeft[k] = C.DIG_TICKS; marks++; done++; }
           if (!kind && this.mark[k] === t + 1) { this.mark[k] = 0; marks--; done++; }
           if ((m === MAT.OPEN || this.mark[k] === t + 1 || !kind) && this.room[k] !== kind) use(k, kind);
@@ -756,8 +791,14 @@ export class Sim {
         if (m < L.nestBase || this.mark[k] !== t + 1) continue;
         this.to[i] = -1;
         // The opening stroke costs a seed: earth is carried out on food. The last few seeds are kept for the colony to eat: the cell waits.
-        if (this.digLeft[k] === 1) { if (cg[o + CG.SUGAR] < C.DIG_SUGAR + C.DIG_KEEP) return c; this.take(t, FOOD.SUGAR, C.DIG_SUGAR); }
-        if (--this.digLeft[k] === 0) { this.mat[m] = MAT.OPEN; this.mark[k] = 0; this.recount(); this.dirty = true; this.event(EVENT.DUG, t, m);
+        const plug = this.room[k] === PLUG, cost = plug ? C.PLUG_BREAK : C.DIG_SUGAR;
+        if (plug) { // packed earth: one stroke on it every fifth tick, however many dig
+          if (this.tick % C.PLUG_SLOW) return c;
+          if (this.plugTick !== this.tick) { this.plugTick = this.tick; this.plugHit.clear(); }
+          if (this.plugHit.has(k)) return c; this.plugHit.add(k);
+        }
+        if (this.digLeft[k] === 1) { if (cg[o + CG.SUGAR] < cost + C.DIG_KEEP) return c; this.take(t, FOOD.SUGAR, cost); }
+        if (--this.digLeft[k] === 0) { this.mat[m] = MAT.OPEN; this.mark[k] = 0; if (plug) this.room[k] = 0; this.recount(); this.dirty = true; this.event(EVENT.DUG, t, m);
           if (this.owner(k) !== t) this.event(EVENT.HEARD, this.owner(k), m, t);
           this.lastDug = [t, m]; // if this stroke joins the nests, the rebuild at the end of the tick says whose it was
           // A cache: its loads join the stores (the next rebuild finds them cells; what finds no room spoils).

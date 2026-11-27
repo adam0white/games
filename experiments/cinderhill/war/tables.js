@@ -36,6 +36,7 @@ export const TRAITS = {
   post: { id: 'post', name: 'Guard post', text: 'A new room. Each cell keeps one soldier in eight inside the nest, where you paint it.', set: [['room', 4, 1]] },
   raiders: { id: 'raiders', name: 'Raiders', text: 'A raid may be sent for the store. Its soldiers carry loads home and leave the queen be.', set: [['loot', 1]] },
   hold: { id: 'hold', name: 'Hold fast', text: 'A raid may be told to hold. Its soldiers stand at the trail\'s end and never go down a door.', set: [['hold', 1]] },
+  sappers: { id: 'sappers', name: 'Sappers', text: 'Your workers may tunnel into the other nest on any ground. It is a long dig, and it is heard.', set: [['breach', 1]] },
   stride: { id: 'stride', name: 'Long stride', text: 'Wardens keep pace with the soldiers.', needs: 'warden', set: [['speed', CASTE.WARDEN, 34]] },
 };
 
@@ -90,6 +91,7 @@ export const LINEAGE = [
   { id: 'brood', name: 'Brood', nodes: [{ fork: 'way' }] },
   { id: 'build', name: 'Build', nodes: [{ node: 'post' }] },
   { id: 'raid', name: 'Raid', nodes: [{ node: 'raiders' }, { node: 'hold' }] },
+  { id: 'dig', name: 'Dig', nodes: [{ node: 'sappers' }] },
 ];
 
 /** Missions. kit: what each colony starts with (a sim option of the same name overrides it). goals: how it ends.
@@ -151,7 +153,7 @@ export const MISSIONS = {
     id: 'wall', name: 'The Wall', map: 'wall', breach: true, rivalMood: 1,
     kit: { ants: 30, sugar: 14, protein: 5, eggs: 20, larvae: 20, pupae: 12, duskTick: 9600 },
     goals: { queen: true, dusk: 'adults' },
-    deeds: [{ id: 'a', text: 'Kill the queen inside seven minutes.', won: true, why: 'QUEEN', by: 8400, opens: 'hold' }, { id: 'b', text: 'Win with fewer than 120 dead.', won: true, max: { DIED: 119 }, opens: 'post' }],
+    deeds: [{ id: 'a', text: 'Kill the queen inside seven minutes.', won: true, why: 'QUEEN', by: 8400, opens: 'sappers' }, { id: 'b', text: 'Win with fewer than 120 dead.', won: true, max: { DIED: 119 }, opens: 'post' }],
     picks: [CASTE.SPITTER, CASTE.WARDEN],
     rooms: [ROOM.STORE, ROOM.NURSERY, ROOM.REST, ROOM.POST],
   },

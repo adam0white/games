@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { Sim, CG, CMD, KIND, MODE, CASTE, TEAMS, ROOM, EVENT, MAT } from '../war/sim.js';
 import { Host } from '../war/host.js';
 import { think, THINK_EVERY, cacheRun, breachRun, mouth } from '../war/ai.js';
+import { PLUG, C } from '../war/sim.js';
 import { CAMPAIGN, TRAITS, MISSIONS, MAPS } from '../war/tables.js';
 
 test('an idle colony loses to the rival', () => {
@@ -428,11 +429,11 @@ test('The Wall: a raid sent under ground goes through the breach to the queen; b
 
 test('The Wall: the rival digs for the other nest, and a guard post where a breach comes in decides the fight', { timeout: 120000 }, () => {
   // Minds alone: two steady rivals join their nests.
-  const m = new Host({ seed: 2, mission: 'wall', ai: { 0: 1, 1: 1 } }); m.run(9600);
-  assert.equal(m.sim.linked, true);
+  const m = new Host({ seed: 2, mission: 'wall', ai: { 0: 1, 1: 1 } }); let joined = false; while (!m.sim.result && m.sim.tick < 9600) { m.run(20); joined ||= m.sim.linked; }
+  assert.equal(joined, true);
   // The same strike, with and without the answer: seat 0 digs and sends every soldier through at 6000.
   const fight = guard => {
-    const meek = { mood: 0, meek: true, caches: false, breach: false };
+    const meek = { mood: 0, meek: true, caches: false, breach: false, plug: false };
     const h = new Host({ seed: 3, mission: 'wall', ai: { 0: meek, 1: { ...meek, guard } } }), s = h.sim, L = s.L; let sent = false, posts = 0;
     while (!s.result && s.tick < 9600) {
       if (s.tick === 600) h.order({ team: 0, type: CMD.DIG, cells: rowRun(s, 12) });
@@ -474,4 +475,38 @@ test('The Wall: on its own ground a colony takes a rival\'s dig mark over, so a 
   // And the digger's own unmark takes off only its own marks, there or at home.
   s.order({ team: 0, type: CMD.DIG, on: 0, cells }); s.step();
   assert.equal(s.g(1, CG.MARKS), 2);
+});
+
+test('The Wall: a plug packs a tunnel shut; it is slow and dear to dig out, and cannot wall the queen in', () => {
+  const s = new Sim({ seed: 5, mission: 'wall', sugar: 60 }), L = s.L, cells = rowRun(s, 12);
+  for (let j = 0; j < cells.length; j += 2) s.mat[L.nestBase + 12 * L.nw + cells[j]] = MAT.OPEN;
+  s.recount(); s.rebuildFields(); assert.equal(s.linked, true);
+  const mine = []; for (let j = 0; j < cells.length; j += 2) if (s.owner(12 * L.nw + cells[j]) === 1) mine.push(cells[j]);
+  const x = mine[2], k = 12 * L.nw + x, sugar = s.g(1, CG.SUGAR);
+  // not the rival's to pack, not the shaft, not a room
+  s.order({ team: 0, type: CMD.FILL, cells: [x, 12] }); s.step(); assert.equal(s.mat[L.nestBase + k], MAT.OPEN);
+  const dx = s.door[1] % L.sw; s.order({ team: 1, type: CMD.FILL, cells: [dx, 8] }); s.step(); assert.equal(s.mat[L.nestBase + 8 * L.nw + dx], MAT.OPEN, 'the shaft to the door stays open');
+  s.order({ team: 1, type: CMD.FILL, cells: [dx, 11] }); s.step(); assert.equal(s.mat[L.nestBase + 11 * L.nw + dx], MAT.OPEN, 'a room cell is not packed');
+  s.order({ team: 1, type: CMD.FILL, cells: [x, 12] }); s.step();
+  assert.equal(s.mat[L.nestBase + k], MAT.CLAY); assert.equal(s.room[k], PLUG); assert.equal(s.linked, false); assert.equal(s.g(1, CG.SUGAR), sugar - C.PLUG_SUGAR);
+  const twin = copyOf(s); assert.equal(twin.hash(), s.hash()); assert.equal(twin.room[k], PLUG);
+  // Seat 0 digs it out: it takes far longer than clay, and costs more.
+  const before = s.g(0, CG.SUGAR), eaten = () => 0; void eaten;
+  s.order({ team: 0, type: CMD.DIG, cells: [x, 12] }); let t0 = s.tick, open = -1;
+  for (let j = 0; j < 4000 && open < 0; j++) { s.step(); if (s.mat[L.nestBase + k] === MAT.OPEN) open = s.tick - t0; }
+  assert.ok(open >= C.DIG_TICKS * C.PLUG_SLOW, `dug out in ${open} ticks`); assert.equal(s.room[k], 0); assert.equal(s.linked, true);
+  // no more than a few at once
+  // with the rival's diggers at the face, no packing it again
+  s.order({ team: 1, type: CMD.FILL, cells: [mine[3], 12] }); s.step(); assert.equal(s.mat[L.nestBase + 12 * L.nw + mine[3]], MAT.OPEN, 'not in their faces');
+  // no more than a few at once
+  for (let j = 0; j < 6; j++) twin.order({ team: 1, type: CMD.FILL, cells: [mine[j], 12] }); twin.step();
+  let n = 0; for (const mx of mine) if (twin.room[12 * L.nw + mx] === PLUG) n++; assert.equal(n, C.PLUGS_MAX);
+});
+
+test('Sappers: a colony with the node may dig for the other nest on any ground; one without may not', () => {
+  const s = new Sim({ seed: 3, mission: 'crossing', traits: [['sappers'], []] }), L = s.L;
+  assert.equal(s.mayBreach(0), true); assert.equal(s.mayBreach(1), false); assert.equal(s.mayPlug(), true);
+  const x = L.nw - 20; s.order({ team: 0, type: CMD.DIG, cells: [x, 20] }); s.order({ team: 1, type: CMD.DIG, cells: [20, 20] }); s.step();
+  assert.equal(s.mark[20 * L.nw + x], 1); assert.equal(s.mark[20 * L.nw + 20], 0);
+  assert.equal(new Sim({ seed: 3, mission: 'crossing' }).mayPlug(), false);
 });
