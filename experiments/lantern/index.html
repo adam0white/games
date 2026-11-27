@@ -18,6 +18,7 @@
   h3 { font-weight: normal; font-size: 1.1em; letter-spacing: .06em; color: #ffd9a0; margin: .6em 0 0; }
   #steers button { min-width: 0; min-height: 44px; margin: .15em; padding: .4em .8em; font-size: .85em; } #steers button.on { color: #2a1606; background: #ffb45a; border-color: #ffb45a; }
   #views button.on { color: #2a1606; background: #ffb45a; border-color: #ffb45a; }
+  #dareCard { margin: .5em auto; padding: .6em .8em; max-width: 19em; border: 1px solid #ffb45a88; border-radius: 14px; background: #ffb45a14; } #dareCard button { margin-top: .5em; } #dareUrl { display: block; box-sizing: border-box; width: 100%; max-width: 19em; margin: .4em auto 0; padding: .5em; font: inherit; font-size: .8em; color: inherit; background: #0006; border: 1px solid #fff4; border-radius: 8px; } #dareUrl[hidden] { display: none; }
   #settings > div { max-height: 100dvh; box-sizing: border-box; overflow-y: auto; touch-action: pan-y; } #settings h2 { margin: 0; } .setting { margin: .7em 0; } .setting b { font-weight: normal; letter-spacing: .06em; color: #ffd9a0; } .setting small { display: inline-block; opacity: .75; font-size: .82em; line-height: 1.3; max-width: 19em; }
   .setting button { min-width: 0; min-height: 44px; margin: .15em; padding: .4em .9em; font-size: .9em; } .setting button.on { color: #2a1606; background: #ffb45a; border-color: #ffb45a; }
   .screen { position: fixed; inset: 0; display: none; place-items: center; text-align: center; pointer-events: none; }
@@ -95,6 +96,7 @@
   <button id="menuLanguage" class="language"></button>
   <h1 data-i18n="title">Lantern</h1>
   <p data-i18n="tagline">Carry the light down the river to dawn.</p>
+  <p id="dareCard" hidden><span id="dareText"></span><br><button id="dareGo" class="main" data-i18n="dareGo">Take the dare</button></p>
   <p class="bank"><span class="dot"></span><span id="bank">0</span> <span data-i18n="embers">embers</span><span id="stars"></span></p>
   <p><button id="less" class="small" aria-label="Earlier night" data-i18n-aria="earlier">&lsaquo;</button><button id="play" class="main">Play</button><button id="more" class="small" aria-label="Later night" data-i18n-aria="later">&rsaquo;</button></p>
   <p id="about"></p>
@@ -167,7 +169,7 @@
 </div></div>
 <div id="card" class="screen"><div><button id="pauseLanguage" class="language" hidden></button><h1 id="title"></h1><p id="line"></p><p id="sub"></p>
   <div id="ask" hidden><p data-i18n="ask">Show your endless scores to everyone on the leaderboard? After a yes, every run from the next one goes up by itself.</p><p><input id="askName" maxlength="16" autocomplete="nickname" enterkeyhint="done" placeholder="Type a name"></p><p class="hint" id="askNote">Your name and your score are sent, and a signal when a run starts. Nothing else.</p><p><button id="askYes" data-i18n="askYes">Yes, show them</button><button id="askNo" data-i18n="askNo">No</button></p></div>
-  <p><button id="go" class="main">Play again</button></p><p><button id="toMenu">Menu</button><button class="music"></button></p><p><button id="viewNext" hidden></button></p><p class="steerRow" hidden><button class="steer"></button></p></div></div>
+  <p><button id="go" class="main">Play again</button></p><p id="dareRow" hidden><button id="dareSend"></button><br><span class="hint" id="dareNote"></span><input id="dareUrl" readonly hidden aria-label="Link"></p><p><button id="toMenu">Menu</button><button class="music"></button></p><p><button id="viewNext" hidden></button></p><p class="steerRow" hidden><button class="steer"></button></p></div></div>
 <script type="module">
 import { create, step, centre, half, sight, fall, fog, wind, rain, dazzle, level, score, boat, progress, DT, GOAL, BOAT, NIGHTS, STATS, POWERS, LAST, FLOORS, LEVELS, SECTORS, towerStage, climbPace, FIELD, REBORN_PACE, GIFTS, ABILITIES, startAt, pace } from './sim.js?v=15'; // raise v when sim.js changes its exports, so a cached copy cannot break the page
 import { read, readNumber, readJson, write } from '../kit/save.js';
@@ -179,6 +181,7 @@ import { drag } from '../kit/drag.js';
 import { sides } from '../kit/sides.js';
 import { tiltSteer } from '../kit/tilt.js';
 import { hint } from '../kit/hint.js';
+import { dareLink, dareRead, shareLink } from '../kit/dare.js'; // a dare by link: the same river for a friend, no account (dare below)
 import { lab } from '../kit/lab.js'; // lab recording: the rec lines below
 import { settings } from '../kit/settings.js'; // options with a default, and a record of each change: opts below
 import { noZoom } from '../kit/zoom.js'; noZoom(); // no double-tap or pinch zoom (note #74)
@@ -354,6 +357,7 @@ async function setView(v, keep = true) {
   view = v; snap3 = true; canvas3.hidden = v === '2d'; pads.drop(); steer.drop(); if (keep) store.set('lantern-view', v); views();
 }
 function menu() {
+  $('dareCard').hidden = !dare; if (dare) $('dareText').textContent = t('dareCard', { name: dare.name || t('dareAnon'), n: dare.score });
   $('stars').textContent = reborn ? ` · ${'★'.repeat(Math.min(5, reborn))}${reborn > 5 ? reborn : ''}` : '';
   $('modesNow').textContent = t('modesNow'); $('shopNow').textContent = t('shopNow'); $('bank').textContent = bank; $('play').textContent = t('playNight', { n: stage });
   $('less').disabled = stage <= 1; $('more').disabled = stage >= opened;
@@ -633,25 +637,39 @@ function begin() {
   // leaderboard is fair: an endless run neither uses them nor spends them, and they wait for the next night or climb.
   const fresh = !tutor && (!tower || !onward); onward = false; if (tutor) runStats = {}; else if (fresh) { runStats = endless || mod ? {} : stats; if (!endless && !mod) { stats = {}; store.set('lantern-stats', '{}'); } } // a mode neither uses nor spends stats
   const waiting = (endless || mod) && Object.values(stats).some(v => v > 0);
+  const daring = dareRun && endless && !tower && !daily && !mod && !tutor ? dareRun : null; // a friend's river (dare below): their seed and the things their river held
   if (mod) setView('2d', false);
-  s = mod ? mod.start(powersOwned()) : create(daily && endless && !tower ? daySeed(ranDay = today()) : (Math.random() * 2 ** 31) | 0, tower ? towerStage(climb) : endless || tutor ? 1 : stage, tower ? 'tower' : endless, tutor ? [] : powersOwned(), runStats, climb, tutor ? 0 : reborn); // after a rebirth the story nights run faster
+  s = mod ? mod.start(powersOwned()) : create(daily && endless && !tower ? daySeed(ranDay = today()) : daring ? daring.seed : (Math.random() * 2 ** 31) | 0, tower ? towerStage(climb) : endless || tutor ? 1 : stage, tower ? 'tower' : endless, tutor ? [] : daring ? dareThings(daring.extra) : powersOwned(), runStats, climb, tutor ? 0 : reborn); // after a rebirth the story nights run faster
   if (!tower) fromFloor = 0; else if (fromFloor) startAt(s, fromFloor); // part-way up the level (note #142)
   song?.start(s.seed); // a new tune for each river; today's river has the same tune for everyone
-  if (endless && !tower) boardTicket(); else ticket = null; // the shared board's run ticket, only for a player who shares
+  if (daring) s.dare = daring; $('dareRow').hidden = true;
+  if (endless && !tower && !daring) boardTicket(); else ticket = null; // the shared board's run ticket, only for a player who shares; a dare is never on a board
   const boosted = fresh && Object.values(runStats).some(v => v > 0);
   target = s.x; crash = null; victory = null; playing = true; paused = false; acc = 0; streak = 0; sparks = []; lastLevel = 1; size = 1; fire0 = flame(); nearFall = false; weather = ''; steer.reset(); pads.drop(); snap3 = true; slide = 0; tilt.zero();
   if (tutor) { s.next = Infinity; s.rocks = []; s.embers = []; s.powers = []; s.calm = 0.75; s.hearts = 2; } // an empty, slow river
   if (gentleRun()) { s.gentle = true; s.hearts = Math.max(s.hearts, 2); } // story nights on a gentle river: the banks push the boat back (sim.js), and there is a spare heart
   $('tip').textContent = ''; shown = ''; show('play'); hud();
   if (tutor) { floor = 0; rec.start({ view, mode: 'tutorial', night: 0, set: opts.snapshot() }); return; }
-  say(mod ? mod.hello() : (tower ? t(climb > LEVELS ? (fromFloor ? 'saySectorFloor' : 'saySector') : (fromFloor ? 'sayTowerFloor' : 'sayTower'), { n: climb > LEVELS ? climb - LEVELS : climb, of: LEVELS, f: fromFloor }) : endless ? t('endless') : t('sayNight', { n: stage })) + (boosted ? '. ' + t('statsOn') : waiting ? '. ' + t('statsWait') : ''), waiting ? 2800 : 1800); floor = fromFloor;
-  rec.start({ view, mode: mode(), night: mod ? mod.night() : tower || endless ? 0 : stage, ...(tower ? { level: climb, floor: fromFloor } : {}), set: opts.snapshot(), gentle: !!s.gentle });
+  say(mod ? mod.hello() : (tower ? t(climb > LEVELS ? (fromFloor ? 'saySectorFloor' : 'saySector') : (fromFloor ? 'sayTowerFloor' : 'sayTower'), { n: climb > LEVELS ? climb - LEVELS : climb, of: LEVELS, f: fromFloor }) : daring ? t('sayDare', { n: daring.score }) : endless ? t('endless') : t('sayNight', { n: stage })) + (boosted ? '. ' + t('statsOn') : waiting ? '. ' + t('statsWait') : ''), waiting ? 2800 : 1800); floor = fromFloor;
+  rec.start({ view, mode: mode(), night: mod ? mod.night() : tower || endless ? 0 : stage, ...(tower ? { level: climb, floor: fromFloor } : {}), set: opts.snapshot(), gentle: !!s.gentle, ...(daring ? { their: daring.score } : {}) });
 }
 // The gentle river (the lab's own change, 2026-11-27; NOTES.md): play records showed new players ending their first runs on the bank
 // within seconds. On story nights a gentle river's banks push the boat back and dim the flame a little; rocks, ice and the dark are as
 // they were. The endless river, today's river, the tower and the modes always have classic banks, so every board stays fair.
 const gentleRun = () => !tutor && !endless && !tower && !daily && !mod && opts.get('river') === 'gentle';
-const mode = () => mod ? mod.id : tutor ? 'tutorial' : tower ? 'tower' : endless ? 'endless' : 'night';
+const mode = () => mod ? mod.id : tutor ? 'tutorial' : tower ? 'tower' : s.dare ? 'dare' : endless ? 'endless' : 'night';
+// A dare by link (kit/dare.js; the lab's own change, 2026-11-27, for play between friends with no account). The card after an endless
+// run, a run on today's river or a dare has "Dare a friend": a link that carries the river's seed, the score, the name and which
+// abilities lay in that river. The friend's menu shows the dare; their run is the same river with the same abilities in it, takes no
+// board ticket and is on no board, and its card compares the two scores and offers to send theirs back.
+const dare = dareRead(); let dareRun = null;
+const dareThings = n => ABILITIES.filter((k, i) => n & (1 << i)), dareExtra = st => ABILITIES.reduce((n, k, i) => n | (st.on.includes(k) || st.gifts.includes(k) ? 1 << i : 0), 0);
+async function dareSend() {
+  const pts = score(s), url = dareLink({ seed: s.seed, score: pts, extra: s.dare ? s.dare.extra : dareExtra(s), name: boardName(playerName()) }); if (!url) return;
+  const how = await shareLink(url, t('dareWords', { n: pts }));
+  rec.event('dare_send', { how, score: pts, back: !!s.dare });
+  $('dareNote').textContent = t(how === 'copied' ? 'dareCopied' : how === 'shown' ? 'dareShown' : 'dareNote'); $('dareUrl').hidden = how !== 'shown'; $('dareUrl').value = url; if (how === 'shown') $('dareUrl').select();
+}
 function bankRun() { s.banked = Math.round(s.taken * boon() * (mod?.share ?? 1)); bank += s.banked; store.set('lantern-bank', bank); } // a rebirth's bonus is added as the run banks; a mode can bank a share (Duet's rope takes about twice a night's embers)
 function finish() {
   const paid = s.over === 'dawn' && !tower && !endless && !mod && reborn ? 10 * Math.min(5, reborn) : 0; s.taken += paid; // a reborn night pays more at dawn
@@ -674,6 +692,9 @@ function finish() {
       $('title').textContent = t('levelCleared', { n: climb > LEVELS ? climb - LEVELS : climb }); $('line').textContent = t(faster >= 5 ? 'towerHarderPct' : 'towerHarder', { Tag: Tag(climb + 1), tag: tag(climb + 1), pct: faster, joins }); // the card's title stays on one line; the line under it names the sector
       $('go').textContent = t('climbOn', { tag: tag(climb + 1) }); $('toMenu').textContent = t('stop');
     } else { $('title').textContent = head(climb); $('line').textContent = t(back ? 'towerLostFloor' : 'towerLost', { why, best: best > LEVELS ? tag(best) : t('nOf', { n: best, of: LEVELS }), tag: tag(climb), back, at }); $('go').textContent = back ? t('tryFloor', { n: back }) : t('tryLevel', { tag: tag(climb) }); }
+  } else if (s.dare) { // a friend's river: on no board, and it does not change the best endless score
+    const pts = score(s), their = s.dare.score, name = s.dare.name || t('dareAnon');
+    $('title').textContent = `${pts}`; $('line').textContent = t(pts > their ? 'dareWon' : pts === their ? 'dareTie' : 'dareLost', { why, name, n: pts, their }); $('go').textContent = t('dareAgain');
   } else if (endless && daily) {
     // A run that ends after midnight UTC was on yesterday's river: it counts for neither day and is not sent.
     const late = ranDay !== today(), pts = score(s), was = plain(store.json('lantern-daily', {})), best = Math.max(late ? 0 : pts, was.d === today() ? Math.floor(was.s) || 0 : 0); if (!late) store.set('lantern-daily', JSON.stringify({ d: today(), s: best }));
@@ -693,6 +714,7 @@ function finish() {
     else if (won) { $('line').textContent = t('wonNight', { n: stage, next: stage + 1, ahead: ahead(stage + 1) }); stage++; opened = Math.max(opened, stage); store.set('lantern-night', opened); $('go').textContent = t('playNight', { n: stage }); }
     else { $('line').textContent = t('nightLost', { why, pct, best }); $('go').textContent = t('playAgain'); }
   }
+  { const can = endless && !tower && !mod && score(s) > 0; $('dareRow').hidden = !can; $('dareUrl').hidden = true; if (can) { $('dareSend').textContent = t(s.dare && score(s) > s.dare.score ? 'dareBack' : 'dareFriend'); $('dareNote').textContent = t('dareNote'); } }
   const tune = song && song.melody, laid = tune ? tune.played + tune.missed : 0; // the share of tonight's melody the embers played
   $('sub').textContent = gained + (musicOn && laid >= 4 ? ' ' + t('melodyPlayed', { pct: Math.round(tune.share * 100) }) : '');
   setTimeout(() => { if (!playing && screen === 'play') show('card'); }, won ? 2600 : crash ? 1300 : 700); // a crash plays out before the card
@@ -896,12 +918,14 @@ function glide() { if (steering === 'slide') { slide = 0; aim(target); return; }
 hint(canvas, { kind: 'drag', label: t('hint'), key: 'lantern-hint', delay: 1500, bottom: () => mod ? 120 : 56, when: () => playing && !paused && screen === 'play' && dragging() && !mod?.steers, played: read('lantern-bank') !== null }); // a first-time player who does not touch sees how (experiments/kit/hint.js); 1.5 s, as a boat left alone meets a rock in 3 to 9 s; low, below the boat
 
 // Buttons.
-$('play').addEventListener('click', () => { endless = tower = daily = false; if (newcomer()) { show('tutor'); return; } begin(); });
+$('dareGo').addEventListener('click', () => { dareRun = dare; endless = true; tower = daily = false; if (newcomer()) { show('tutor'); return; } begin(); });
+$('dareSend').addEventListener('click', dareSend);
+$('play').addEventListener('click', () => { dareRun = null; endless = tower = daily = false; if (newcomer()) { show('tutor'); return; } begin(); });
 $('toTutor').addEventListener('click', () => tutorial());
 $('tutorYes').addEventListener('click', () => tutorial());
-$('tutorNo').addEventListener('click', () => { store.set('lantern-tutorial', '1'); endless = tower = daily = false; begin(); });
-$('endless').addEventListener('click', () => { endless = true; tower = daily = false; begin(); });
-$('daily').addEventListener('click', () => { endless = daily = true; tower = false; begin(); });
+$('tutorNo').addEventListener('click', () => { store.set('lantern-tutorial', '1'); if (dareRun) { endless = true; tower = daily = false; } else endless = tower = daily = false; begin(); }); // a newcomer who came by a dare goes on to it
+$('endless').addEventListener('click', () => { dareRun = null; endless = true; tower = daily = false; begin(); });
+$('daily').addEventListener('click', () => { dareRun = null; endless = daily = true; tower = false; begin(); });
 $('tower').addEventListener('click', () => { tower = true; endless = daily = false; climb = towerAt(); fromFloor = towerFloor(); begin(); });
 $('anew').addEventListener('click', () => { // two taps: the first only asks, so a stray tap does not lose the climb
   const b = $('anew'); if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = t('anewSure'); return; }
@@ -933,7 +957,7 @@ $('askYes').addEventListener('click', () => {
   store.set('lantern-name', n); $('ask').hidden = true; if (lastRun) { lastRun.n = n; store.set('lantern-board', JSON.stringify(board)); } share(true);
 });
 $('askNo').addEventListener('click', () => { $('ask').hidden = true; share(false); });
-$('boardPlay').addEventListener('click', () => { if (busy) return; endless = true; tower = false; daily = tab === 'day' && !!shared; begin(); });
+$('boardPlay').addEventListener('click', () => { if (busy) return; dareRun = null; endless = true; tower = false; daily = tab === 'day' && !!shared; begin(); });
 $('name').addEventListener('input', () => { store.set('lantern-name', cleanName($('name').value)); });
 $('name').addEventListener('change', () => { $('name').value = playerName(); boardShow(); });
 $('name').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') $('name').blur(); });

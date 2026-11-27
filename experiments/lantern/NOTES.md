@@ -1038,3 +1038,15 @@ The lab asked whether tilting the phone should also steer in 2D and 3D. The answ
 
 **Not verified.** A person playing it; whether Gentle is too easy for a second week of play (a player can switch); the Turkish of the new lines (AI-written).
 
+## 2026-11-27: dare a friend by link (the lab's own change)
+
+**What.** The card after an endless run, a run on today's river or a dare has "Dare a friend". It makes a link, `/lantern/?dare=<seed in base 36>.<score>.<abilities>.<name>`, and hands it to the phone's share sheet, else the clipboard, else shows it to copy. A player who opens the link sees "Sam scored 412 on this river. Can you beat it?" on the menu. Their run is that river (same seed) with the same abilities lying in it (`<abilities>` is a bit per entry of `ABILITIES`), so both met the same river. A newcomer is offered the tutorial first and goes on to the dare. The card compares the two scores and offers "Send your score back".
+
+**Rules.** No account, no server, nothing stored: the link is the whole message (`kit/dare.js`). A dare run takes no board ticket, sends no score, is not on this phone's board and leaves `lantern-best-endless` alone, because a river can be learnt by playing it again and a score in a link is only what the sender says. It still banks embers. No new save key.
+
+**Records.** A dare run starts with `mode: 'dare'` and `their` (the score to beat). A send is the event `dare_send` with `how` (`shared`, `copied` or `shown`), `score`, and `back` (true when it answers a dare). So the lab can count links made and dare runs played; it cannot see who a link went to.
+
+**Checked.** `phone.mjs "lantern dare"` and a scratch two-player script in WebKit iPhone 13 and Chromium Pixel 7 profiles: sender, newcomer by link, a sharing player (nothing sent on the dare, the endless river still sends), broken links, a name with markup in it (shown as text).
+
+**Not verified.** A real share sheet on a phone; how the link looks in a chat app before the page has link-preview tags; the Turkish lines (AI-written).
+
