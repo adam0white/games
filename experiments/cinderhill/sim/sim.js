@@ -3,24 +3,24 @@
 //
 // One tick (20 a second, fixed):
 //   1. apply the commands queued for this tick, in (tick, seat, id) order
-//   2. rebuild dirty flow fields (so new goals are usable this tick)
+//   2. rebuild dirty flow fields (so new goals are usable this tick), at most REBUILDS, oldest marked first
 //   3. world: food piles and a held alarm lay scent
 //   4. ants, in index order (separation reads a spatial hash built at the start of this step)
 //   5. scent spreads and decays
-//   6. rebuild dirty flow fields again, so no field is stale at the tick boundary
+//   6. rebuild dirty flow fields again; any still marked are blank, so no field is stale at the tick boundary
 // The state at a tick boundary is everything hashed by hashes() and written by snapshot().
 
 import { ANGLES, COS, SIN, angleOf, turnTo } from './math.js';
 import { HARDNESS, MAT, NEST, SUB, SURFACE, baseOf, cellAt, cellXY, heightOf, makeLayout, widthOf } from './grid.js';
 import { STREAM, STREAMS, below, seedStreams } from './rng.js';
-import { DIAG, G, GOAL, INF, MAX_GOALS, PATH_MAX, SLOT, STEP, TRAIL_OFF, backCell, backDist, distAt, dropGoal, isTrailSlot, makeFlow, nextCell, rebuild, rebuildDirty, setGoal, terrainChanged } from './flow.js';
+import { DIAG, G, GOAL, INF, MAX_GOALS, PATH_MAX, REBUILDS, SLOT, STEP, TRAIL_OFF, backCell, backDist, distAt, dropGoal, isTrailSlot, makeFlow, markDirty, nextCell, rebuild, rebuildDirty, setGoal, terrainChanged } from './flow.js';
 import { FIELD, FIELDS, deposit, makeScent, smell, stepScent } from './scent.js';
 import { SUBSYSTEMS, finish, hashArray, hashInt } from './hash.js';
 import { LATE_FIND_AT, WINDFALL_AT, generate, lateFind, windfall } from './world.js';
 import { stepSpider } from './spider.js';
 import { BROOD_MAX, C, CASTE, CASTE_HP, DAY_TICKS, FOOD, LOAD, STAGE, addBrood, fight, makeBrood, startColony, startDays, stepColony, stepDay } from './colony.js';
 
-export const SIM_VERSION = 10; // 2: trails keep their drawn shape (a path per trail, `via` per ant); 3: eight directions; 4: the colony (colony.js); 5: days; 6: the spider, and foragers stay in under Recall; 7: crews (CMD.CREW); 8: the spec's starting values (02-spec 3.2): a porch store, a 64-cell nursery, 30 ants, fast brood, no days; 9: who goes (02-spec 6.2): crew levels (Steady by default), free foragers on the nearest trail one in three at a time, the dig as an auto job, adult starvation; 10: doors (02-spec 3.2): a 3-cell entrance in colony games, two lanes a cell at 6 ants a second, queues and jams; an ant with a load is not free
+export const SIM_VERSION = 11; // 11: the goal manager (05-tech): 64 goal slots (a pool from slot 16), 32-bit distances, at most REBUILDS fields rebuilt per rebuild point, oldest marked first, the rest blank (ants keep their heading); same play as 10; 2: trails keep their drawn shape (a path per trail, `via` per ant); 3: eight directions; 4: the colony (colony.js); 5: days; 6: the spider, and foragers stay in under Recall; 7: crews (CMD.CREW); 8: the spec's starting values (02-spec 3.2): a porch store, a 64-cell nursery, 30 ants, fast brood, no days; 9: who goes (02-spec 6.2): crew levels (Steady by default), free foragers on the nearest trail one in three at a time, the dig as an auto job, adult starvation; 10: doors (02-spec 3.2): a 3-cell entrance in colony games, two lanes a cell at 6 ants a second, queues and jams; an ant with a load is not free
 export const TICK_HZ = 20;
 export { G, GOAL, SLOT, INF, STEP, DIAG, FIELD, MAT, SURFACE, NEST, SUB, SUBSYSTEMS, CASTE, CASTE_HP, FOOD, LOAD, STAGE, BROOD_MAX };
 
@@ -97,7 +97,7 @@ export class Sim {
     this.job = new Uint8Array(A); this.mode = new Uint8Array(A); this.carry = new Uint8Array(A);
     this.mem = new Int8Array(A); // food slot this ant last took from, or -1
     this.goal = new Int8Array(A); // slot followed last tick, or -1
-    this.best = new Uint16Array(A); // closest distance to that goal so far
+    this.best = new Uint32Array(A); // closest distance to that goal so far (32-bit with the fields, sim 11)
     this.stall = new Uint16Array(A); // ticks without progress
     this.since = new Uint16Array(A); // ticks in the current mode (saturates)
     this.lastCell = new Int32Array(A);
@@ -129,7 +129,7 @@ export class Sim {
       startColony(this);
       if (cfg.dayTicks > 0) startDays(this);
     }
-    rebuildDirty(this);
+    rebuildDirty(this, Infinity); // every field exact before the first tick
   }
 
   startGoals() {
@@ -214,7 +214,7 @@ export class Sim {
         this.dig[c] = 1; this.g[G.DIG_COUNT]++; marked++;
       }
       if (!marked) return this.event(EVENT.REJECTED, e[1], e[2]);
-      if (!this.flow.live[SLOT.DIG]) setGoal(this, SLOT.DIG, GOAL.DIG); else this.flow.dirty[SLOT.DIG] = 1;
+      if (!this.flow.live[SLOT.DIG]) setGoal(this, SLOT.DIG, GOAL.DIG); else markDirty(this, SLOT.DIG);
     } else if (type === CMD.ALARM) {
       // [layer, x, y, hold ticks]
       const c = cellAt(L, e[4] === NEST ? NEST : SURFACE, e[5], e[6]);
@@ -401,12 +401,7 @@ export class Sim {
    *  distances it remembered belong to the old field. (Restore rebuilds fields without this: the
    *  restored field equals the old one, so nothing is forgotten.) */
   rebuildFields() {
-    const F = this.flow;
-    for (let s = 0; s < MAX_GOALS; s++) {
-      if (!F.live[s] || !F.dirty[s]) continue;
-      rebuild(this, s);
-      for (let i = 0; i < this.n; i++) if (this.goal[i] === s) this.best[i] = INF;
-    }
+    rebuildDirty(this, REBUILDS, s => { for (let i = 0; i < this.n; i++) if (this.goal[i] === s) this.best[i] = INF; });
   }
 
   stepWorld() {
@@ -604,7 +599,8 @@ export class Sim {
 
     // A goal this ant cannot reach (walled off, or on a layer with no way through) is dropped for this
     // tick, the same way on every machine: the ant wanders instead of standing still.
-    if (follow >= 0 && distAt(this, follow, c) === INF) { follow = -1; wander = true; still = false; }
+    if (follow >= 0 && this.flow.blank[follow]) { follow = -1; want = -1; wander = false; } // blank until its rebuild (sim 11): she keeps her heading
+    else if (follow >= 0 && distAt(this, follow, c) === INF) { follow = -1; wander = true; still = false; }
     if (follow >= 0) {
       if (this.goal[i] !== follow) { this.goal[i] = follow; this.best[i] = INF; }
       // `back`: walking a trail toward its start (a carrier on her way home).
@@ -834,7 +830,7 @@ export class Sim {
       this.g[G.DIG_COUNT]--; this.g[G.DUG]++;
       this.event(EVENT.DUG, m, 0);
       terrainChanged(this, m);
-      this.flow.dirty[SLOT.DIG] = 1;
+      markDirty(this, SLOT.DIG);
       if (this.g[G.DIG_COUNT] === 0) dropGoal(this, SLOT.DIG);
       return;
     }
@@ -869,7 +865,7 @@ export class Sim {
     out.terrain = finish(h);
     h = 0xF1;
     for (const a of [F.kind, F.live, F.dirty, F.cell, F.seq]) h = hashArray(h, a);
-    for (let s = 0; s < MAX_GOALS; s++) if (F.live[s]) h = hashArray(h, F.dist.subarray(s * this.L.n, (s + 1) * this.L.n));
+    for (let s = 0; s < MAX_GOALS; s++) if (F.live[s] && !F.dirty[s]) h = hashArray(h, F.dist[s]); // a marked field is blank at a tick boundary
     h = hashArray(h, F.pathLen);
     for (let k = 0; k < SLOT.TRAILS; k++) h = hashArray(h, F.path.subarray(k * PATH_MAX, k * PATH_MAX + Math.min(F.pathLen[k], PATH_MAX)));
     out.flow = finish(h);

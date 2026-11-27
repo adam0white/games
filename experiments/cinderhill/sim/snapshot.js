@@ -28,18 +28,20 @@ import { MAT, SUB } from './grid.js';
 import { SIM_VERSION, Sim } from './sim.js';
 import { Decoder, Encoder, intModel, probs, sint, tree, uint } from './rangecoder.js';
 
-export const SNAPSHOT_VERSION = 10; // 10: door lanes and jams (globals); 9: crew levels, the workforce and the starving count (globals); 8: the nursery rectangle in the header; 3: lastCell codes the diagonal neighbours; 4: the colony (pile kinds, caste, hit points, team, brood; colony flag in the header); 5: days (the day length in the header, more globals); 6: the spider's globals; 7: crew sizes (globals)
+export const SNAPSHOT_VERSION = 11; // 11: 64 goal slots, 32-bit distances and best, dirty marks as an order (the goal manager); 10: door lanes and jams (globals); 9: crew levels, the workforce and the starving count (globals); 8: the nursery rectangle in the header; 3: lastCell codes the diagonal neighbours; 4: the colony (pile kinds, caste, hit points, team, brood; colony flag in the header); 5: days (the day length in the header, more globals); 6: the spider's globals; 7: crew sizes (globals)
 const SCTX = 24; // scent contexts per field
 const LIST_MAX = 1 << 20; // a longer command queue, command or event list is a corrupt payload, not an allocation
 const RANK_BITS = 12; // measured: 6, 8, 10, 12, 14 bits; 12 is near the best (ants share cells, so a fine model pays)
 const MAGIC = [0x43, 0x48, 0x53, 0x4D]; // "CHSM"
 
-/** Every live goal's distances, rebuilt into a fresh array from terrain, links, dig marks and goals. */
+/** Every live goal's distances, rebuilt into fresh arrays from terrain, links, dig marks and goals: one per
+ *  live slot (a slot with no goal shares one INF array). A field marked for a rebuild is blank at a tick
+ *  boundary (flow.js), so it is left all INF here too. */
 function rebuiltDistances(sim) {
-  const F = sim.flow, n = sim.L.n;
-  const flow = { kind: F.kind, live: F.live, dirty: F.dirty.slice(), cell: F.cell, seq: F.seq, pathLen: F.pathLen, path: F.path, dist: new Uint16Array(MAX_GOALS * n).fill(INF), queue: new Int32Array(n), buckets: F.buckets, btail: F.btail, pending: 0, rebuilds: 0 };
+  const F = sim.flow, n = sim.L.n, none = new Uint32Array(n).fill(INF);
+  const flow = { kind: F.kind, live: F.live, dirty: F.dirty.slice(), blank: new Uint8Array(MAX_GOALS), cell: F.cell, seq: F.seq, pathLen: F.pathLen, path: F.path, dist: Array.from({ length: MAX_GOALS }, () => none), none, queue: new Int32Array(n), buckets: F.buckets, btail: F.btail, pending: 0, rebuilds: 0 };
   const view = { L: sim.L, mat: sim.mat, link: sim.link, dig: sim.dig, home: sim.home, flow };
-  for (let s = 0; s < MAX_GOALS; s++) if (F.live[s]) rebuild(view, s);
+  for (let s = 0; s < MAX_GOALS; s++) if (F.live[s]) { flow.dist[s] = new Uint32Array(n).fill(INF); if (!F.dirty[s]) rebuild(view, s); }
   return flow.dist;
 }
 
@@ -107,7 +109,7 @@ function walk(sim, io, mark = () => {}) {
   // distances hold. The decoder installs them (as before: the sim's fields equal a rebuild at a tick
   // boundary); both sides predict the ants' `best` from them. Dirty marks are kept as coded.
   const dist = rebuiltDistances(sim);
-  if (io.decoding) F.dist.set(dist);
+  if (io.decoding) for (let s = 0; s < MAX_GOALS; s++) { F.dist[s] = F.live[s] ? dist[s] : F.none; F.blank[s] = F.live[s] && F.dirty[s] ? 1 : 0; }
 
   mark('globals');
 
@@ -190,7 +192,7 @@ function walk(sim, io, mark = () => {}) {
     sim.lastCell[i] = code < 10 ? near : sint(io, AM, 21, lc);
     // best: the difference from the rebuilt distance at lastCell on the followed field (INF for no field).
     const g = sim.goal[i], l = sim.lastCell[i];
-    const pred = g >= 0 && g < MAX_GOALS && l >= 0 && l < n ? dist[g * n + l] : INF;
+    const pred = g >= 0 && g < MAX_GOALS && l >= 0 && l < n ? dist[g][l] : INF;
     sim.best[i] = sint(io, AM, 22 + (g >= 0 ? 1 : 0), sim.best[i] - pred) + pred;
     sim.stall[i] = uint(io, AM, 44 + mode, sim.stall[i]);
     // since counts ticks in the current mode and saturates; an ant that never changed mode has since equal

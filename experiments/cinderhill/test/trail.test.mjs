@@ -53,9 +53,9 @@ test('the path is open, 8-connected without cutting a corner, holds each cell on
   assert.ok(path.some((c, j) => j && Math.abs((c % 64) - (path[j - 1] % 64)) === 1 && Math.abs(Math.floor(c / 64) - Math.floor(path[j - 1] / 64)) === 1), 'the diagonal leg takes diagonal steps');
   // The field: on the path the steps left to the end; off it TRAIL_OFF plus the distance to the path (5 a
   // straight step, 7 a diagonal one).
-  const d = j => F.dist[SLOT.TRAIL0 * s.L.n + path[j]];
+  const d = j => F.dist[SLOT.TRAIL0][path[j]];
   for (let j = 0; j < len; j++) assert.equal(d(j), len - 1 - j);
-  assert.equal(F.dist[SLOT.TRAIL0 * s.L.n + cellAt(s.L, SURFACE, 5, 19)], TRAIL_OFF + 2 * STEP);
+  assert.equal(F.dist[SLOT.TRAIL0][cellAt(s.L, SURFACE, 5, 19)], TRAIL_OFF + 2 * STEP);
 });
 
 test('a rejected stroke leaves the four live trails as they were, and restore still matches', () => {

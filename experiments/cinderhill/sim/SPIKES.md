@@ -489,3 +489,31 @@ Every S4 snapshot restores to the same hash. S1 times the sandbox, which has no 
 **Mutations shown to fail** (each fails a doors test unless noted): no lanes; one lane for both ways; 7 twentieths a tick; no Recall exemption; a jam at 99 ticks; a jam that never clears; the queue counted twice; a 2-cell colony door; the queued marks not following a death; no jam reason on the route card; queued ants counted idle; carriers counted free (crew tests); a free forager's pickup leaving her free (crew tests); an unloaded free ant not counted free again (crew tests). In the pace gate: the one-cell door fixture must jam (18 jams over 5 seeds), and `door-jams` must read 0 in chapter 1 play.
 
 **After the review** (the totals above are unchanged: the quick runs have no death in a queue and no free forager sent to rest with a route). Thirteen more mutations, each failing a test: a dead queued ant left in the count; the jam judged before the deaths; a resting ant keeping her free route; the card counting carriers free; a queued guard not reported; the HUD jam line dropped; `< PASS` for `<= PASS`; one shared lane for all three cells; a jam at 11; a jam clearing only at 0; ants queued inside left out of the share; the minute table's queued column left empty; shares rounded to nearest. In the gate, a `door1` fixture that does not narrow the door (fault injection) fails: "7 vs 7 jams, 0.057 vs 0.057 queued". The real fixture: 18 jams and 0.154 summed share against the 3-cell control's 7 and 0.057. The gate holds against main (20 seeds, 12 minutes, 100 s). S2 rerun after the fixes: sandbox 2727923730 and colony 1148962020, Node, workerd, Chromium and WebKit agree.
+
+## Goal manager (SIM_VERSION 11, snapshot format 11, 2026-11-26)
+
+R1 step 4 (`../NOTES.md`, Goal manager): 64 goal slots with a pool from slot 16, 32-bit distances, at most 2 fields rebuilt at each rebuild point (oldest marked first), the rest blank until their turn. Play is unchanged: the quick, colony and long runs match sim 10 in ants, globals and terrain at every 50th tick (`cmp` against a sim 10 checkout, not kept). The hashes change because the fields and `best` are wider and the globals one longer. New totals: `EXPECTED` 105530017, `EXPECTED_COLONY` 3373107091, `EXPECTED_LONG` 2076515634.
+
+| Measure | Before (SIM_VERSION 10) | After |
+| --- | --- | --- |
+| S2 sandbox: Node, workerd, Chromium 156.0.8078.4, WebKit 27.2 on all 600 records | agree (final total 2727923730) | agree (final total 2076515634) |
+| S2 colony (`--colony`) | agree (final total 1148962020) | agree (final total 353723614) |
+| S1 Node, 2,000 ants, mean / p95 / max | 1.60 / 1.68 / 4.57 ms | 1.61 / 1.69 / 3.73 ms (load average about 11) |
+| S1 Node, 5,000 ants | 1.88 / 2.05 / 3.49 ms | 1.89 / 2.07 / 3.54 ms |
+| S1 all 9 fields at once | 11.32 ms | 11.28 ms |
+| S1 workerd, 2,000 / 5,000 ants, mean | 1.54 / 1.90 ms | 1.56 / 1.91 ms |
+| S4, 5,000 ants, 3,000 / 8,000 / 24,000 ticks | 39.9 / 39.4 / 37.7 KB | 39.9 / 39.5 / 37.7 KB |
+
+**64 goals** (`spikes/goals.mjs`, 2,000 ants, S1's world and orders, every free slot but the trails' filled with food goals at tick 600, all 64 fields marked at once at tick 1,800):
+
+| Quota a rebuild point | Steady ticks, mean / p95 / max | 20 ticks after the burst, mean / max | Ticks until every field is exact |
+| --- | --- | --- | --- |
+| 1 | 1.59 / 1.66 / 4.13 ms | 4.46 / 5.98 ms | 31 |
+| **2 (kept)** | 1.60 / 1.69 / 3.69 ms | 5.74 / 9.14 ms | 16 |
+| 3 | 1.58 / 1.66 / 3.16 ms | 5.43 / 9.83 ms | 11 |
+| 4 | 1.57 / 1.65 / 3.67 ms | 5.53 / 14.19 ms | 8 |
+| none | 1.60 / 1.68 / 3.25 ms | 5.41 / 77.20 ms | 1 |
+
+64 live goals cost nothing in steady play (no field is rebuilt without a change). The quota is what keeps a burst under the 10 ms line. Every S4 snapshot restores to the same hash.
+
+**Mutations shown to fail** (`test/goals.test.mjs`): no quota; newest marked first; a re-marked field moved to the back; wandering on a blank field; a 16-bit ceiling in the search; the flow hash covering marked fields; a dropped goal keeping its memory; no blanking. Equivalent, so not caught: restore rebuilding marked fields as well (the field is exact but flagged blank, and nothing reads it before its turn). `test/flow.test.mjs`'s repair test now rebuilds every marked field directly, since the quota is not what it checks.

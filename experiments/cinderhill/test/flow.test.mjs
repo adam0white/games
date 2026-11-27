@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { GOAL, MAT, NEST, SURFACE, SLOT, Sim } from '../sim/sim.js';
-import { INF, nextCell, setGoal, distAt } from '../sim/flow.js';
+import { INF, nextCell, rebuildDirty, setGoal, distAt } from '../sim/flow.js';
 import { cellAt } from '../sim/grid.js';
 
 // Reference: its own grid walk from (layer, x, y) coordinates, an array scan for the next cell (no buckets),
@@ -104,7 +104,7 @@ test('after terrain changes, the updated fields equal fresh searches', () => {
   const s = tinyMap(9);
   const goals = [[SLOT.ALARM, cellAt(s.L, NEST, 7, 4)], [SLOT.FOOD0, cellAt(s.L, SURFACE, 11, 9)], [SLOT.FOOD0 + 1, cellAt(s.L, SURFACE, 0, 0)]];
   for (const [slot, c] of goals) { s.mat[c] = MAT.OPEN; setGoal(s, slot, GOAL.FOOD, c); }
-  s.rebuildFields();
+  rebuildDirty(s, Infinity); // every marked field, past the per-point quota (test/goals.test.mjs has the quota)
   let r = 99, rebuilt = 0;
   for (let k = 0; k < 200; k++) {
     r = (r * 48271) % 2147483647;
@@ -112,7 +112,7 @@ test('after terrain changes, the updated fields equal fresh searches', () => {
     if (goals.some(([, g]) => g === c) || s.link[c] >= 0) continue;
     s.setCell(c, s.mat[c] === MAT.OPEN ? MAT.STONE : MAT.OPEN);
     const before = s.flow.rebuilds;
-    s.rebuildFields();
+    rebuildDirty(s, Infinity);
     rebuilt += s.flow.rebuilds - before;
     for (const [slot, g] of goals) check(s, slot, [g]);
   }
