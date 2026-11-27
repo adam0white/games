@@ -646,3 +646,56 @@ Not built, in the order the reviews put them: stores robbed cell by cell with de
 - **The rival** packs the mouth shut when the other hill has half as many soldiers again and more, and digs no way through while that lasts. In bot matches this changed no result (steady v steady 6 and 6 with or without it; bold v steady 11 and 1): a plug buys about thirty seconds, and a bot does nothing with thirty seconds that it would not have done. Whether a person does is not known.
 - **Forks** have a setting (`cinderhill:war:forks`): kept for the campaign (default) or free to change between missions. A changed caste drops the craft that belonged to it. A change is recorded as `refork`.
 - **Not done:** the in-mission tree itself; a side door; looting the shallowest store first; soldiers hatching where they were raised.
+
+## Growth inside a mission: the queen's chamber, two growths, a branch
+
+Spec 13 section 4 already says it: enlarging the queen's chamber raises the colony's tier, which opens room kinds and
+castes inside a mission, stops laying for a while and spends stores. This is that, in its first form.
+
+- `CMD.GROW` grows the chamber. It is paid in seeds at once (`TIERS.grow`: 18, then 36, on top of the digging
+  reserve) and the queen lays nothing for a fixed time (15 s, then 20 s). The pause is a timer and not a dig, so
+  nothing can cancel or stall it. The seeds must really lie in the store cells: the count alone does not pay.
+- The first growth takes a branch. **War hill**: soldiers a quarter tougher (living ones too), the third caste, and
+  the raid nodes (Raiders, Hold fast). **Deep hill**: store and quarters cells hold half as much again, pupae hatch
+  13% sooner, and the Guard post node. The second growth opens the other branch's nodes and caste, and Sappers. It
+  does not give the other branch's numbers: those stay the mark of the branch (`restat`).
+- A node of the Lineage says where it opens (`at: [tier, branch]` in TRAITS). A deed still opens a node for the
+  campaign, and the colony must still grow to it in each mission. What a mission itself grants (The Wall's digging
+  and its Guard post) is open from the start, as before.
+- One gate: `Sim.open(t, at)`, read by `has`, `mayPick`, `mayRoom`, `mayBreach`, `mayGrow`, the client and the rival.
+- The rival grows too. With a caste to pick it takes the War hill, else a branch by seed and seat. It does not grow
+  when it stores for a frost. `grow: 0` never grows.
+- State: three `cg` slots (TIER, GROW, BRANCH). `WAR_VERSION` is 7, because every mission plays differently now.
+  `tiers: false` gives the old rules (tests of single nodes use it).
+
+Tried and dropped (do not retry without a new reason):
+- A general gain per growth (faster laying, more housing): growing won 11 of 12 and early beat late 12 of 12. A build
+  order, not a choice.
+- A meat cost, and a one-minute pause: growers lost every match.
+- Opening a ring of clay round the chamber when it grows. More open cells beside the queen let more attackers press
+  her (`PRESS_OPEN`), and the Wall's guard post stopped holding a breach. Growth changes no nest geometry; the client
+  should draw it instead (not drawn yet).
+- The brood waiting while the chamber grows (a reviewer's fix for a pause that costs nothing when the nursery is
+  full). Measured: growers lost 10 of 10 on The Crossing and The Stones. It is kept behind `growFreeze` and is off.
+  The dodge it meant to close is still open.
+
+Shipped numbers (5 seeds, both seats; W: war grower with spitters, D: deep grower, N: never grows):
+
+| mission | W v D | W v N | D v N | default v N |
+|---|---|---|---|---|
+| crossing | 5–5 | 4–6 | 6–4 | 5–5 |
+| frost | not run | not run | not run | 5–5 |
+| stones | 2–8 | 4–6 | 5–5 | 6–4 |
+| larder | 6–4 | 4–6 | 7–3 | 7–3 |
+| narrows | not run | not run | not run | 7–3 |
+| wall | 9–1 | 7–3 | 8–2 | 5–5 |
+
+Read: growing is close to even against not growing for a bot, so it is neither a tax nor a must. Which branch is
+better depends on the mission. On The Wall the War hill beats the Deep hill 9 of 10: not fixed. The Wall's guard
+post with growth on: the queen held in 4 of 5 controlled strikes with a guard (seed 5 ended at 320 of 800).
+
+Open from the two outside reviews: the second growth opens nothing for a colony with no Lineage nodes; a locked raid
+mode is turned into Press without a word; the rival retries a refused plug each think; the campaign caste is ordered
+by the client on the tier event, so a headless replay lacks it; the Larder haul test moved seed (2 to 1) to pass.
+
+Not known: how any of this plays for a person. Bots take a branch by seed, not by reading the map.

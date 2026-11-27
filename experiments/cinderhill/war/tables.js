@@ -33,11 +33,26 @@ export const TRAITS = {
   acid: { id: 'acid', name: 'Strong spit', text: 'A spit bites as hard as a soldier.', needs: 'spitter', set: [['bite', CASTE.SPITTER, 5]] },
   iron: { id: 'iron', name: 'Iron shell', text: 'Wardens take half as much again to kill.', needs: 'warden', set: [['hp', CASTE.WARDEN, 144]] },
   // Nodes of the Lineage that a deed opens. Each gives the colony something new to do, not a better number.
-  post: { id: 'post', name: 'Guard post', text: 'A new room. Each cell keeps one soldier in eight inside the nest, where you paint it.', set: [['room', 4, 1]] },
-  raiders: { id: 'raiders', name: 'Raiders', text: 'A raid may be sent for the store. Its soldiers carry loads home and leave the queen be.', set: [['loot', 1]] },
-  hold: { id: 'hold', name: 'Hold fast', text: 'A raid may be told to hold. Its soldiers stand at the trail\'s end and never go down a door.', set: [['hold', 1]] },
-  sappers: { id: 'sappers', name: 'Sappers', text: 'Your workers may tunnel into the other nest on any ground. It is a long dig, and it is heard.', set: [['breach', 1]] },
+  post: { id: 'post', name: 'Guard post', text: 'A new room. Each cell keeps one soldier in eight inside the nest, where you paint it.', at: [2, 2], set: [['room', 4, 1]] },
+  raiders: { id: 'raiders', name: 'Raiders', text: 'A raid may be sent for the store. Its soldiers carry loads home and leave the queen be.', at: [2, 1], set: [['loot', 1]] },
+  hold: { id: 'hold', name: 'Hold fast', text: 'A raid may be told to hold. Its soldiers stand at the trail\'s end and never go down a door.', at: [2, 1], set: [['hold', 1]] },
+  sappers: { id: 'sappers', name: 'Sappers', text: 'Your workers may tunnel into the other nest on any ground. It is a long dig, and it is heard.', at: [3, 0], set: [['breach', 1]] },
   stride: { id: 'stride', name: 'Long stride', text: 'Wardens keep pace with the soldiers.', needs: 'warden', set: [['speed', CASTE.WARDEN, 34]] },
+};
+
+/** Growth inside a mission (the option `tiers`). A colony starts at tier 1 with stores, nurseries, quarters, workers
+ *  and soldiers. Growing the queen's chamber costs `grow[tier - 1]` from the stores; for `ticks` the queen lays nothing
+ *  and the brood does not age. The first growth takes a branch, whose numbers (`set`, per cent of what stands) are the
+ *  colony's for the rest of the mission. War hill: tougher soldiers, the third caste, the raid nodes. Deep hill: wider
+ *  stores and quarters, quicker pupae, the building nodes. The second growth opens the other branch's caste and nodes,
+ *  not its numbers. A node of the Lineage says where it opens with `at: [tier, branch]` (branch 0: either). */
+export const BRANCH = { NONE: 0, WAR: 1, DEEP: 2 };
+export const TIERS = {
+  grow: [{ sugar: 18, protein: 0, ticks: 300 }, { sugar: 36, protein: 0, ticks: 400 }],
+  branch: [null,
+    { id: 'war', name: 'War hill', text: 'Soldiers a quarter tougher', set: [['hp', 1, 125]] },
+    { id: 'deep', name: 'Deep hill', text: 'Stores and quarters hold half as much again, and pupae hatch sooner', set: [['pupa', 87], ['per', 1, 150], ['per', 3, 150]] }],
+  pick: [2, 1],
 };
 
 /** Maps, in cells of a 160 by 112 field, mirrored left to right. wall: what runs down the middle ('water', 'stone' or
