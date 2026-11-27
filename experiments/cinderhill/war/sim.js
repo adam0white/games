@@ -17,7 +17,7 @@ import { angleOf } from '../sim/math.js';
 import { hashArray, hashInt, finish } from '../sim/hash.js';
 import { generate } from './world.js';
 
-export const WAR_VERSION = 7;
+export const WAR_VERSION = 8;
 export const TICK_HZ = 20;
 export { MAT, SURFACE, NEST };
 

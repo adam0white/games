@@ -742,14 +742,17 @@ The hill that does the beetle more harm wins when it falls; at dusk, more harm w
   bar in place of the count of ants.
 - Deeds open Hold fast and the Guard post, which The Stones opened before; The Stones still opens them too.
 
-Numbers at 4 seeds, both seats: steady v steady 4 to 4, bold v steady 2 to 6, steady v timid 4 to 4, bold v timid 3 to 5.
-The beetle falls between ticks 4061 and 8512 in most games; about a third run to dusk. 43 to 81 dead a side.
+When to go is the decision. A rival that sends at 6 soldiers loses 0 to 12 to one that sends at 12; one that waits
+for 24 also loses 0 to 12 to one that sends at 12; 16 beats 12 by 8 to 4. So the rivals send at 4 (timid), 10 (steady)
+and 12 (bold). The first tuning (4 bold, 6 steady, 10 timid) made the bold rival the easiest one.
+Numbers at 6 seeds, both seats: steady v steady 6 to 6, bold v steady 12 to 0, steady v timid 9 to 3, bold v timid 12 to 0.
+The bold rival kills the beetle alone near tick 2850 with about 13 dead, so a player facing it has under two and a
+half minutes. Whether that is fair for a person is not known.
 
 Tried and dropped: the beetle sitting on the central food pile with bite 12, three ants, every 10 ticks. About 100
 dead a side and both hills starved.
 
-Known and accepted: a player part way through the campaign now needs The Hunt before The Stones. Bold loses to
-steady here more often than it wins, because it sends soldiers before it has enough. No person has played it yet.
+Known and accepted: a player part way through the campaign now needs The Hunt before The Stones. No person has played it yet.
 
 Review fixes (outside adversarial review, same pull request): a garden pays only for full minutes its cells were
 gardens (`CG.GROWN` accrues; painting a room for the last tick before the harvest earned a full harvest before).
