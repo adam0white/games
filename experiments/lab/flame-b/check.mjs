@@ -1,12 +1,13 @@
 // node check.mjs — the link and the river, without a browser.
 //   1. link encode and decode round trip (and through a real URL)
-//   2. hostile links are refused
+//   2. hostile links are refused; a signed link edited in any field is refused; an unsigned link is held to what real
+//      legs make, and its chain count is clamped
 //   3. a policy that steers toward embers finishes the leg in at least 80% of 200 seeds
 //   4. doing nothing lasts at least 20 s (every seed, from a full flame and from a weak 25% flame)
 //   5. a known bad case does worse: doing nothing finishes far fewer seeds than the seeker
 // Add --mutate to prove the checks can fail: it breaks the validator and the river, and expects failures.
 import assert from 'node:assert/strict';
-import { encode, decode, linkFor, readLink, passOn, valid, cleanName } from './link.js';
+import { encode, decode, linkFor, readLink, passOn, valid, cleanName, checksum } from './link.js';
 import { leg, step, run, seeker, NO_ROCKS, SPEED } from './sim.js';
 
 const mutate = process.argv.includes('--mutate');
@@ -26,6 +27,7 @@ check('round trip', () => {
     const url = linkFor(f, 'http://localhost:8931/lab/flame-b/?lang=tr&labRunSource=agent#x');
     assert.ok(!url.includes('lang=') && !url.includes('labRunSource') && !url.includes('#'), 'only origin and path travel');
     assert.deepEqual(readLink(url), f);
+    assert.ok(encode(f).includes('~'), 'every link made here is signed');
   }
   // passOn: chain grows, eight names kept, flame and distance carried
   let f = null;
@@ -58,6 +60,41 @@ check('hostile links refused', () => {
   assert.equal(readLink('not a url'), null);
   assert.equal(readLink('http://x/'), null);
   if (mutate) assert.equal(decode('1.3.50.5400.rr.<b>*1800'), null, 'mutation: a name with < is refused');
+});
+
+check('signed links: any edit is refused', () => {
+  const f = { chain: 23, flame: 64, total: 41200, seed: 424242, carriers: ['Ana', 'Bo', 'Cem', 'Dee', 'Eli', 'Fay', 'Gus', 'Sam'].map((name, i) => ({ name, dist: 1700 + i * 20 })) };
+  const text = encode(f), [body, sum] = text.split('~');
+  assert.match(sum, /^[0-9a-z]{8}$/);
+  assert.deepEqual(decode(text, { detail: true }), { flame: f, signed: true, clamped: false });
+  const edits = [
+    body.replace('1.23.', '1.99999.'), body.replace('.64.', '.100.'), body.replace('.41200.', '.99999.'), body.replace('.93ci.', '.93cj.'),
+    body.replace('Sam*1840', 'Sam*9999'), body.replace('Sam', 'Max'), body.replace('Ana*1700*', ''),
+  ];
+  for (const e of edits) { assert.notEqual(e, body, 'the edit changed something'); assert.equal(decode(`${e}~${sum}`), null, `edited and refused: ${e.slice(0, 40)}`); }
+  for (const bad of [`${body}~`, `${body}~${sum.slice(1)}`, `${body}~${sum}0`, `${body}~${sum.toUpperCase()}`, `${body}~~${sum}`, `${text}~${sum}`]) assert.equal(decode(bad), null, `bad checksum: ${bad.slice(-14)}`);
+  // the playtester's forgeries, as edits of a real link
+  assert.equal(decode(body.replace('.64.', '.100.') + '~' + sum), null, 'pct=100 refused');
+  // a forger who also recomputes the checksum gets through: it only deters casual editing (NOTES says so)
+  const forged = body.replace('.64.', '.100.'); assert.ok(decode(`${forged}~${checksum(forged)}`));
+});
+
+check('unsigned links: strict ranges, chain clamped', () => {
+  const ok = '1.3.50.5400.rr.A*1800*B*1800*C*1800';
+  assert.deepEqual(decode(ok, { detail: true }), { flame: { chain: 3, flame: 50, total: 5400, seed: parseInt('rr', 36), carriers: ['A', 'B', 'C'].map(name => ({ name, dist: 1800 })) }, signed: false, clamped: false });
+  // chain 99999 with two names: clamped to two, the most those names can support
+  const c = decode('1.99999.50.3600.rr.A*1800*B*1800', { detail: true });
+  assert.equal(c.flame.chain, 2); assert.equal(c.clamped, true);
+  // eight names: unlisted carriers each rowed at least 1,700 m
+  const eight = Array.from({ length: 8 }, (_, i) => `n${i}*1800`).join('*');
+  assert.equal(decode(`1.99999.50.${8 * 1800 + 5 * 1700}.rr.${eight}`).chain, 13);
+  assert.equal(decode(`1.13.50.${8 * 1800 + 5 * 1700}.rr.${eight}`, { detail: true }).clamped, false);
+  for (const b of [
+    '1.2.50.3600.rr.A*0*B*3600',          // a leg no river is that short
+    '1.2.50.3800.rr.A*1800*B*2000',       // or that long
+    '1.2.50.9000.rr.A*1800*B*1800',       // more metres than two carriers could row
+    `1.9.50.99999999.rr.${eight}`,         // the same for eight names
+  ]) assert.equal(decode(b), null, `refused: ${b}`);
 });
 
 // 3. the seeker finishes

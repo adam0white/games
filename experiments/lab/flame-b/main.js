@@ -32,7 +32,8 @@ const randSeed = () => { const a = new Uint32Array(1); crypto.getRandomValues(a)
 
 // ---- the flame that arrived
 const linked = hasLink(location.href);
-let prev = readLink(location.href);           // null: no link, or a link refused whole
+const read0 = readLink(location.href, { detail: true });   // null: no link, or a link refused whole
+let prev = read0 ? read0.flame : null;        // an unsigned link's chain count is already clamped to what it can support
 const badLink = linked && !prev;
 let source = prev ? 'link' : 'new';           // 'link' (a boat hands it over), 'new' (a lamp post), 'coals' (try again)
 let startFlame = prev ? prev.flame / 100 : 1;
@@ -41,7 +42,7 @@ let s = leg(seed, { flame: startFlame });
 
 // ---- view and state
 const canvas = $('c'), view = createView(canvas);
-let screen = 'arrive', paused = false, taking = false, takeT = 0, introT = 0, endT = 0, T = 0, acc = 0;
+let screen = 'arrive', paused = false, taking = false, takeT = 0, introT = 0, endT = 0, T = 0, acc = 0, lastHow = null;
 let target = null, vis = 0, made = null, madeUrl = '', settingsOpen = false, retries = 0, safeTop = 0;
 const cam = { d: 0, x: 0, z: 1 };
 const boat = { d: 0, x: 0, ang: 0, flame: 0, vo: 0 };
@@ -85,45 +86,62 @@ function soundFrame() {
 }
 
 // ---- the scene for each screen
+const land = () => view.size.W > view.size.H * 1.15;
+// camera that puts metre dTop at screen height yTop and metre dBot at yBot (fractions of the height); never closer than z 1
+function fit(dTop, yTop, dBot, yBot, zMax = 1) {
+  const H = view.size.H, kk = Math.min(view.k * zMax, (yBot - yTop) * H / (dTop - dBot));
+  return { d: dTop - (view.ay - yTop * H) / kk, z: kk / view.k };
+}
+// arrival: first the two boats and a stretch of river, then the camera pulls back down the line of lights
+let homeCam = null, farCam = null;
 function setupArrival() {
   const n = prev ? prev.carriers.length : 0;
-  chain = []; sam = null; dock = null; buoy = { d: s.L + 19, x: s.river.center(s.L + 19) + 6, lit: 0, label: t('buoy') };   // the boat's glide (30 m/s easing out) ends beside it
+  chain = []; sam = null; dock = null; buoy = { d: s.L + 19, x: s.river.center(s.L + 19) + 6, lit: 0 };   // the boat's glide (30 m/s easing out) ends beside it
   boat.d = 0; boat.x = 0; boat.ang = 0; boat.flame = source === 'coals' ? 0.02 : 0; boat.vo = 0; vis = boat.flame;
   if (source === 'link') {
     const last = prev.carriers[n - 1];
-    sam = { d: -70, x: 6.5, ang: 0, flame: Math.max(0.2, startFlame), label: last.name || t('someone'), sub: `${fmt(last.dist)}\u00a0m`, labelA: 1 };
-    for (let j = 0; j < n - 1; j++) { const c = prev.carriers[n - 2 - j]; chain.push({ d: -38 - j * 34, x: Math.sin(j * 1.7) * 6, lit: 1, label: c.name || t('someone'), sub: `${fmt(c.dist)}\u00a0m` }); }
-    for (let j = 0; j < Math.min(6, prev.chain - n); j++) chain.push({ d: -38 - (n - 1) * 34 - j * 14, x: Math.sin((n + j) * 1.7) * 6, lit: 0.45 - j * 0.06 });
+    sam = { d: -26, x: 11, ang: 0, flame: Math.max(0.2, startFlame), label: last.name || t('someone'), sub: `${fmt(last.dist)}\u00a0m`, labelA: 1 };
+    for (let j = 0; j < n - 1; j++) { const c = prev.carriers[n - 2 - j], d = -48 - j * 22; chain.push({ d, x: Math.sin(j * 1.7) * 6, lit: 1, label: c.name || t('someone'), sub: `${fmt(c.dist)}\u00a0m` }); }
+    for (let j = 0; j < Math.min(6, prev.chain - n); j++) chain.push({ d: -48 - (n - 1) * 22 - j * 11, x: Math.sin((n + j) * 1.7) * 6, lit: 0.45 - j * 0.06, small: true });
   } else if (source === 'new') dock = { d: -4, x: -(s.river.half(0) - 3.5), lit: 1 };
-  const far = chain.length ? chain[chain.length - 1].d : -40;
-  cam.d = source === 'coals' ? 0 : far - 10; cam.x = 0; cam.z = source === 'coals' ? 1 : chain.length ? 0.52 : 0.75;
-  introT = source === 'coals' ? 9 : 0; fade = source === 'coals' ? 0 : 1; taking = false; jump = null;
+  const boatY = land() ? 0.6 : 0.44;
+  // close enough to read the boats, far enough that both banks show across the width
+  let hw = 0; for (let d = -60; d <= 30; d += 5) hw = Math.max(hw, s.river.half(d));
+  const zFit = Math.min(0.92, view.size.W / (2 * (hw + 3)) / view.k);
+  homeCam = fit(0, boatY, -60, boatY + 0.5, zFit);
+  const far = chain.length ? chain[chain.length - 1].d - 10 : null;
+  const yTop = land() ? 0.45 : 0.4;
+  farCam = far === null ? homeCam : fit(0, yTop, far, land() ? 0.68 : 0.8, zFit);   // landscape keeps the last name above the lab notice
+  // never so far out that two names (22 m apart) come closer than 30 px: on a short screen the tail runs off the bottom
+  const kMin = 30 / 22;
+  if (farCam.z * view.k < kMin) farCam = { d: 0 - (view.ay - yTop * view.size.H) / kMin, z: kMin / view.k };
+  cam.d = homeCam.d; cam.z = homeCam.z; cam.x = 0;
+  introT = 0; fade = 0.5; taking = false; jump = null;
   setupArrivalWords();
-  $('arrive').classList.remove('gone', 'in'); $('touch').classList.remove('on');
-  requestAnimationFrame(() => $('arrive').classList.add('in'));
+  $('arrive').classList.remove('gone'); $('arrive').classList.add('in'); $('touch').classList.remove('on');
   view.event('reset');
 }
 const ease = u => u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u);
 
 function arrivalFrame(dt) {
   introT += dt;
-  fade = Math.max(0, fade - dt * 1.2);
-  const far = chain.length ? chain[chain.length - 1].d - 10 : -40, u = ease(introT / 4.4);
+  fade = Math.max(0, fade - dt * 2.5);
   if (!taking) {
-    cam.d = source === 'coals' ? 0 : far + (0 - far) * u;
-    cam.z = source === 'coals' ? 1 : (chain.length ? 0.52 : 0.75) + ((chain.length ? 0.48 : 0.25)) * ease((introT - 1.8) / 2.6);
+    const u = ease((introT - 1.6) / 3.2);
+    cam.d = homeCam.d + (farCam.d - homeCam.d) * u; cam.z = homeCam.z + (farCam.z - homeCam.z) * u;
   }
-  if (sam) { const su = ease((introT - 0.8) / 3.6); if (!taking || takeT < 0.01) { sam.d = Math.max(sam.d, -70 + 68.5 * su); } sam.ang = (1 - su) * -0.05; }
-  if (introT > (source === 'coals' ? 9.2 : 4.5) && !taking) $('touch').classList.add('on');
+  if (sam) { const su = ease(introT / 1.2); if (!taking) sam.d = -26 + 24.5 * su; sam.ang = (1 - su) * -0.05; }
+  if (introT > 0.4 && !taking) $('touch').classList.add('on');
   if (taking) {
     takeT += dt;
-    cam.d += (0 - cam.d) * Math.min(1, dt * 7); cam.z += (1 - cam.z) * Math.min(1, dt * 7);
+    cam.d += (6 - cam.d) * Math.min(1, dt * 6); cam.z += (1 - cam.z) * Math.min(1, dt * 6);
     if (sam) sam.d += (-1.5 - sam.d) * Math.min(1, dt * 7);
     const from = source === 'link' ? lanternAt(sam.d, sam.x, 3.2) : source === 'new' ? lanternAt(dock.d, dock.x, 3, false) : lanternAt(boat.d, boat.x, 2.75);
-    const to = lanternAt(boat.d, boat.x, 2.75), u2 = Math.min(1, Math.max(0, (takeT - 0.12) / 0.55));
+    const to = lanternAt(boat.d, boat.x, 2.75), u2 = Math.min(1, Math.max(0, (takeT - 0.1) / 0.65));
     jump = source === 'coals' ? null : { ax: from.x, ay: from.y, bx: to.x, by: to.y, u: u2, x: from.x + (to.x - from.x) * u2, y: from.y + (to.y - from.y) * u2 };
     if (u2 >= 1) {
       jump = null; boat.flame = startFlame; vis = startFlame;
+      view.event('lit', { d: boat.d + 1, x: boat.x });
       if (sam) { sam.flame = Math.max(0.12, sam.flame * 0.35); }
       if (dock) dock.lit = 0.4;
       beginLeg();
@@ -155,7 +173,8 @@ function legFrame(dt) {
   }
   boat.d = s.d; boat.x = s.x; boat.vo = s.vo; boat.ang = Math.atan2(s.vo, SPEED) * 0.9;
   vis += (s.flame - vis) * Math.min(1, dt * 6); boat.flame = vis;
-  cam.d = s.d + 6; cam.x += ((s.x * 0.65 + s.river.center(s.d + 40) * 0.35) - cam.x) * Math.min(1, dt * 3); cam.z += (1 - cam.z) * Math.min(1, dt * 2);
+  // the camera follows the river's line ahead more than the boat, so both banks and the next bend stay in view
+  cam.d = s.d + 6; cam.x += ((s.x * 0.3 + s.river.center(s.d + 45) * 0.7) - cam.x) * Math.min(1, dt * 2.5); cam.z += (1 - cam.z) * Math.min(1, dt * 2);
   if (sam) { sam.d += 4 * dt; sam.flame = Math.max(0, sam.flame - dt * 0.03); sam.labelA = Math.max(0, sam.labelA - dt * 0.4); if (s.d - sam.d > 160) sam = null; }
   if (dock && s.d > 160) dock = null;
   chain = chain.filter(c => s.d - c.d < 200);
@@ -178,16 +197,18 @@ function endHandoff() {
   rec.event('handoff', { dist: Math.round(s.L), flame: Math.round(s.flame * 100) });
   rec.end('handoff', { dist: Math.round(s.L), flame: Math.round(s.flame * 100), embers: s.taken, hits: s.hits, bumps: s.bumps, chain: (prev ? prev.chain : 0) + 1 });
   $('name').value = read(NAME_KEY, '') || ''; $('name').placeholder = t('namePh');
-  made = null; madeUrl = ''; $('status').textContent = ''; $('linkOut').style.display = 'none'; $('pass').textContent = t('pass');
+  made = null; madeUrl = ''; lastHow = null; $('status').textContent = ''; $('linkOut').style.display = 'none'; $('pass').textContent = t('pass');
 }
 let handSpeed = SPEED;
 function handoffFrame(dt) {
   endT += dt;
   handSpeed = Math.max(0, handSpeed - dt * 22);
   boat.d += handSpeed * dt; boat.x += ((buoy.x - 5.5) - boat.x) * Math.min(1, dt * 1.5); boat.ang *= 0.95;
-  // once the card is coming, lift boat and buoy into the top fifth of the screen, above the card
-  const lift = endT > 1.2 ? 0.5 * view.size.H / (view.k * 0.85) : -4;
-  cam.d += ((buoy.d - lift) - cam.d) * Math.min(1, dt * 2); cam.x += ((boat.x + buoy.x) / 2 - cam.x) * Math.min(1, dt * 2); cam.z += (0.85 - cam.z) * Math.min(1, dt * 1.5);
+  // once the card is coming, lift boat and buoy into the top fifth of the screen above the card (portrait), or to the
+  // left half beside it (landscape)
+  const kk = view.k * 0.85, side = land(), yAt = side ? 0.5 : endT > 1.2 ? 0.2 : 0.55;
+  const goalD = buoy.d - (view.ay - yAt * view.size.H) / kk, goalX = (boat.x + buoy.x) / 2 + (side && endT > 1.2 ? 0.23 * view.size.W / kk : 0);
+  cam.d += (goalD - cam.d) * Math.min(1, dt * 2); cam.x += (goalX - cam.x) * Math.min(1, dt * 2); cam.z += (0.85 - cam.z) * Math.min(1, dt * 1.5);
   const from = lanternAt(boat.d, boat.x, 2.75), to = lanternAt(buoy.d, buoy.x, 3.4, false), u = Math.min(1, Math.max(0, (endT - 0.7) / 0.6));
   if (endT > 0.7 && endT - dt <= 0.7) { sfx.hand(); buzz([20, 40, 20]); }
   jump = u > 0 && u < 1 ? { ax: from.x, ay: from.y, bx: to.x, by: to.y, u, x: from.x + (to.x - from.x) * u, y: from.y + (to.y - from.y) * u } : null;
@@ -200,27 +221,29 @@ function showHand() {
   $('handTitle').textContent = t('carried', { m: fmt(s.L) });
   $('handOn').textContent = t('handOn', { p: f.flame });
   $('handFlame').style.height = `${Math.round(8 + 28 * f.flame / 100)}px`;
-  $('handTotal').textContent = t('total', { m: fmt(f.total), n: fmt(f.chain) });
-  drawNames(f);
+  $('handTotal').textContent = f.chain === 1 ? t('totalOne', { m: fmt(f.total) }) : t('total', { m: fmt(f.total), n: fmt(f.chain) });
+  drawNames($('names'), f);
   $('hand').classList.add('on');
 }
-function drawNames(f, darkFrom = Infinity) {
-  const ul = $('names'); ul.textContent = '';
+function drawNames(ul, f, dark = false) {
+  ul.textContent = '';
   f.carriers.forEach((c, i) => {
     const li = document.createElement('li'), me = i === f.carriers.length - 1 && screen === 'handoff';
     li.textContent = `${c.name || (me ? t('you') : t('someone'))} · ${fmt(c.dist)}\u00a0m`;
-    if (me) li.className = 'me'; if (i >= darkFrom) li.className = 'dark';
+    if (me) li.className = 'me'; if (dark) li.className = 'dark';
     ul.append(li);
   });
 }
-$('name').addEventListener('input', () => { if (screen === 'handoff') drawNames(preview()); });
+$('name').addEventListener('input', () => { if (screen === 'handoff') drawNames($('names'), preview()); });
 $('name').addEventListener('keydown', e => { if (e.key === 'Enter') $('name').blur(); });
 $('pass').addEventListener('click', () => {
   const name = cleanName($('name').value); $('name').value = name; write(NAME_KEY, name);
   made = preview(); madeUrl = linkFor(made, location.href);
-  const p = shareLink(madeUrl, t('shareText', { n: made.chain }));   // no await before it: the share sheet needs the tap
+  const text = made.chain === 1 ? t('shareTextOne', { m: fmt(made.total) }) : t('shareText', { n: fmt(made.chain) });
+  const p = shareLink(madeUrl, text);   // no await before it: the share sheet needs the tap
   $('linkOut').value = madeUrl;
   p.then(how => {
+    lastHow = how;
     $('status').textContent = t(how === 'shared' ? 'shared' : how === 'copied' ? 'copied' : 'shown');
     if (how !== 'shared') { $('linkOut').style.display = 'block'; if (how === 'shown') { $('linkOut').focus(); $('linkOut').select(); } }
     $('pass').textContent = t('passAgain');
@@ -229,39 +252,53 @@ $('pass').addEventListener('click', () => {
 });
 
 // ---- the drop
+// The lights of the chain line up behind the boat and go dark one by one, newest first, back to the first, each with a
+// falling note. A flame you lit yourself has one light behind it: the dock lamp it came from.
+let dropCam = null;
 function endDrop() {
   screen = 'drop'; endT = 0; steer.reset(); write(PLAYED_KEY, '1');
-  boat.d = s.d; boat.x = s.x; cam.d = s.d + 6;
+  boat.d = s.d; boat.x = s.x;
   sfx.gutter(); buzz([30, 60, 30]);
   view.event('drop', { d: s.d, x: s.x });
   rec.event('drop', { dist: Math.round(s.d) });
   rec.end('drop', { dist: Math.round(s.d), embers: s.taken, hits: s.hits, bumps: s.bumps, chain: (prev ? prev.chain : 0) + 1, rule: set.get('drop') });
-  // the chain as lights behind the boat, newest first: they go dark one by one back to the first
-  const cs = prev ? prev.carriers : [];
+  const cs = prev ? prev.carriers : [], at = d => s.river.center(d);
+  // spacing in screen px, so names never sit on each other: 34 px a named light, 14 px an unnamed one (less in landscape)
+  const small = Math.min(6, (prev ? prev.chain : 0) - cs.length), need = 34 * cs.length + 14 * small + 40;
+  const squeeze = Math.min(1, (land() ? 0.8 : 0.5) * view.size.H / need), kk = view.k * (land() ? 0.6 : 0.55);
+  const gapN = 34 * Math.max(squeeze, 0.7) / kk, gapS = 14 * squeeze / kk;
   dropLights = [];
-  for (let j = 0; j < cs.length; j++) { const c = cs[cs.length - 1 - j]; dropLights.push({ d: s.d - 34 - j * 34, x: s.river.center(s.d - 34 - j * 34) + Math.sin(j * 1.7) * 6, lit: 0, label: c.name || t('someone'), sub: `${fmt(c.dist)}\u00a0m` }); }
-  for (let j = 0; j < Math.min(6, (prev ? prev.chain : 0) - cs.length); j++) { const d = s.d - 34 - (cs.length + j) * 16; dropLights.push({ d, x: s.river.center(d) + Math.sin((cs.length + j) * 1.7) * 6, lit: 0, small: true }); }
-  chain = dropLights; sam = null;
+  let d = s.d - 30 / kk;
+  for (let j = 0; j < cs.length; j++, d -= gapN) { const c = cs[cs.length - 1 - j]; dropLights.push({ d, x: at(d) + Math.sin(j * 1.7) * 5, lit: 0, label: c.name || t('someone'), sub: `${fmt(c.dist)}\u00a0m` }); }
+  for (let j = 0; j < small; j++, d -= gapS) dropLights.push({ d, x: at(d) + Math.sin((cs.length + j) * 1.7) * 5, lit: 0, small: true });
+  if (!prev) dropLights.push({ d, x: at(d) - (s.river.half(d) - 4), lit: 0 });
+  chain = dropLights; sam = null; dock = null; outIndex = -1;
+  dropCam = { d: boat.d + 8 - (view.ay - (land() ? 0.1 : 0.12) * view.size.H) / kk, z: kk / view.k };
 }
 let dropSpeed = SPEED, outIndex = -1;
+const DROP = { start: 0.7, gap: n => Math.min(0.42, 3.2 / Math.max(1, n)) };
 function dropFrame(dt) {
   endT += dt;
-  dropSpeed = Math.max(0, dropSpeed - dt * 26); boat.d += dropSpeed * dt;
-  vis = Math.max(0, vis - dt); boat.flame = vis;
-  const n = dropLights.length, START = 1.3, GAP = Math.min(0.5, 4 / Math.max(1, n));   // the whole walk back stays near 4 s
-  for (const c of dropLights) if (endT < START + 0.2) c.lit = Math.min(1, (endT - 0.4) * 1.5);
-  const i = Math.floor((endT - START) / GAP);
-  if (i > outIndex && i < n) { outIndex = i; dropLights[i].lit = 0.999; sfx.out(i); }
-  for (let j = 0; j < n; j++) if (j <= outIndex && endT > START) dropLights[j].lit = Math.max(0, dropLights[j].lit - dt * 2.2);
-  const focus = n ? dropLights[Math.max(0, Math.min(n - 1, outIndex))].d : boat.d;
-  const goal = endT < START ? boat.d : focus + 30;
-  cam.d += (goal - cam.d) * Math.min(1, dt * 1.6); cam.z += ((n > 1 ? 0.6 : 0.85) - cam.z) * Math.min(1, dt * 1.2);
-  cam.x += (s.river.center(cam.d) - cam.x) * Math.min(1, dt * 1.5);
-  if (endT > START + GAP * n + 0.9 && !$('drop').classList.contains('on')) showDrop();
+  dropSpeed = Math.max(0, dropSpeed - dt * 40); boat.d += dropSpeed * dt;
+  vis = Math.max(0, vis - dt * 2); boat.flame = vis;
+  const n = dropLights.length, GAP = DROP.gap(n);
+  for (let j = 0; j < n; j++) if (j > outIndex) dropLights[j].lit = Math.min(1, endT * 2.5);
+  const i = Math.floor((endT - DROP.start) / GAP);
+  if (endT >= DROP.start && i > outIndex && i < n) { outIndex = i; sfx.out(i); view.event('out', { d: dropLights[i].d, x: dropLights[i].x }); }
+  for (let j = 0; j <= outIndex && j < n; j++) dropLights[j].lit = Math.max(0, dropLights[j].lit - dt * 2.6);
+  cam.d += (dropCam.d - cam.d) * Math.min(1, dt * 4); cam.z += (dropCam.z - cam.z) * Math.min(1, dt * 4);
+  const kk = view.k * cam.z, goalX = s.river.center(cam.d) + (land() ? 0.23 * view.size.W / kk : 0);
+  cam.x += (goalX - cam.x) * Math.min(1, dt * 3);
+  if (endT > DROP.start + GAP * n + 0.6 && !$('drop').classList.contains('on')) showDrop();
 }
 function showDrop() {
+  for (const c of dropLights) c.label = null;   // the card lists the names; canvas labels would show through it
   $('dropTitle').textContent = t('out', { m: fmt(s.d) });
-  $('dropLine').textContent = t('outChain', { n: fmt(prev ? prev.chain : 1) })   // the same number the arrival named;
+  const cs = prev ? prev.carriers : [], last = cs[cs.length - 1];
+  $('dropLine').textContent = !prev ? t('outSelf')
+    : prev.chain === 1 ? t('outOne', { name: last.name || t('Someone'), m: fmt(last.dist) })
+    : t('outMany', { n: fmt(prev.chain), total: fmt(prev.total), name: last.name || t('Someone') });
+  if (prev) drawNames($('dropNames'), prev, true); else $('dropNames').textContent = '';
   const dims = set.get('drop') === 'dims';
   $('dropRule').textContent = t(dims ? 'outDims' : 'outEnds');
   $('again').style.display = dims ? '' : 'none';
@@ -285,14 +322,25 @@ function restart(newSeed) {
 }
 
 // ---- input
+const GAIN = 0.16;   // metres of steering per CSS px of finger travel, the same in portrait and landscape
+let mouseX = null, mouseRun = 0, help = null;
+// The steering hint goes for good on the first deliberate steer: a finger that has slid 10 px, a mouse that has moved
+// 10 px over the river in play, or a steering key. The touch that takes the flame happens before play, and a thumb held
+// down from it never sends another pointerdown, so the hint's own pointerdown listener cannot be what ends it.
+function steered() { help?.done(); }
 const steer = drag(canvas, {
   playing: () => screen === 'leg' && !paused && !settingsOpen,
   paused: () => paused,
   resume,
   from: () => target ?? s.o,
-  travel: dx => dx / view.k * 1.2,
+  travel: dx => { if (Math.abs(dx) > 10) steered(); return dx * GAIN; },
   aim: v => { const hw = s.river.half(s.d) - 1.5; target = Math.max(-hw, Math.min(hw, v)); },
-  mouse: e => { if (screen !== 'leg') return; const c = view.project(cam, s.d, s.river.center(s.d)); const hw = s.river.half(s.d) - 1.5; target = Math.max(-hw, Math.min(hw, (e.clientX - c.x) / (view.k * cam.z))); },
+  mouse: e => {
+    if (screen !== 'leg') return;
+    if (mouseX !== null && (mouseRun += Math.abs(e.clientX - mouseX)) > 10) steered();
+    mouseX = e.clientX;
+    const c = view.project(cam, s.d, s.river.center(s.d)); const hw = s.river.half(s.d) - 1.5; target = Math.max(-hw, Math.min(hw, (e.clientX - c.x) / (view.k * cam.z)));
+  },
   settle: 12,
 });
 // registered after drag.js, and take() sets the screen at once; a second listener in capture order would race, so
@@ -313,6 +361,7 @@ function keySteer(dt) {
   if (screen !== 'leg' || paused || taking) return;
   const dir = (keys.has('ArrowRight') || keys.has('KeyD') ? 1 : 0) - (keys.has('ArrowLeft') || keys.has('KeyA') ? 1 : 0);
   if (!dir) return;
+  steered();
   const hw = s.river.half(s.d) - 1.5; target = Math.max(-hw, Math.min(hw, (target ?? s.o) + dir * 32 * dt));
 }
 
@@ -342,17 +391,17 @@ function langButton() { $('lang').textContent = t('language'); }
 $('lang').addEventListener('click', () => {
   setLang(lang() === 'en' ? 'tr' : 'en'); apply(); drawPanel(); langButton(); rec.retext?.();
   if (screen === 'arrive') setupArrivalWords();
-  if ($('hand').classList.contains('on')) showHand();
+  if ($('hand').classList.contains('on')) { showHand(); if (lastHow) { $('status').textContent = t(lastHow === 'shared' ? 'shared' : lastHow === 'copied' ? 'copied' : 'shown'); $('pass').textContent = t('passAgain'); } }
   if ($('drop').classList.contains('on')) showDrop();
 });
 function setupArrivalWords() {
   const n = prev ? prev.carriers.length : 0;
   $('line1').textContent = source === 'coals' ? t('arriveRetry', { n: fmt(prev ? prev.chain : 1) }) : prev ? t('arrive', { n: fmt(prev.chain), name: prev.carriers[n - 1].name || t('someone'), m: fmt(prev.carriers[n - 1].dist) }) : badLink && !made ? t('arriveBad') : t('arriveNew');
   $('line2').textContent = t('carrier', { n: fmt((prev ? prev.chain : 0) + 1) });
-  $('touch').textContent = t(source === 'link' ? 'touch' : 'touchNew');
+  $('touch').textContent = t(source === 'link' ? 'touch' : source === 'coals' ? 'touchRetry' : 'touchNew');
 }
 apply(); langButton();
-hint(canvas, { kind: 'drag', key: 'flame:hint', when: () => screen === 'leg' && !taking && !paused && !settingsOpen, played: read(PLAYED_KEY) === '1' });
+help = hint(canvas, { kind: 'drag', key: 'flame:hint', manual: true, when: () => screen === 'leg' && !taking && !paused && !settingsOpen, played: read(PLAYED_KEY) === '1' });
 
 // ---- test hooks
 window.flameState = () => ({ screen, playing: screen === 'leg' && !taking && !paused, flame: Math.round(s.flame * 1000) / 1000, progress: Math.round(s.progress * 1000) / 1000, chain: (prev ? prev.chain : 0) + (screen === 'handoff' ? 1 : 0), carrier: (prev ? prev.chain : 0) + 1, paused, taking, source, link: madeUrl, look: set.get('look'), target });
@@ -373,7 +422,8 @@ function frame(now) {
   soundFrame();
   view.draw({
     look: set.get('look'), t: T, dt: paused ? 0 : dt, sim: s, cam, boat, sam, dock, chain, buoy, jump, top: safeTop,
-    wake: screen === 'leg' && !taking, threats: screen === 'leg', ambient: screen === 'arrive' || taking ? 0.12 : screen === 'drop' ? 0.06 : 0,
+    wake: screen === 'leg' && !taking, threats: screen === 'leg', ambient: screen === 'arrive' || taking ? 0.55 : screen === 'drop' ? 0.2 : screen === 'handoff' ? 0.3 : 0,
+    cue: screen === 'arrive' && !taking && introT > 0.4 ? 1 : 0,
     progress: screen === 'leg' && !taking ? s.progress : null, flameNow: vis, fade,
   });
   requestAnimationFrame(frame);

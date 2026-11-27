@@ -1,20 +1,22 @@
 // Pass the Flame: the river drawn on a 2D canvas, in three looks. Pure drawing: it reads the scene and keeps only its
 // own effects (wake, rain rings, sparks, pleats). Nothing here changes the rules.
 import { radius } from './sim.js';
+// The pool of light around the lantern, in metres: wide with a full flame, a small circle near the end.
+export const pool = flame => 7 + 25 * Math.max(0, Math.min(1, flame));
 
 export const LOOKS = {
   paper: {
-    water: '#101B32', fiber: 'rgba(243,230,200,0.16)', dark: '7,12,26', darkA: 0.94,
+    water: '#101B32', fiber: 'rgba(243,230,200,0.16)', dark: '7,12,26', night: [0.82, 0.5], edge: '243,230,200',
     bank: ['#F3E6C8', '#367C77', '#0c152b'], foam: '243,230,200', rock: '#F3E6C8', rockShade: '#2a3654', ember: '#FFC34D', emberCore: '#fff3cf',
     hull: '#0a1020', trim: '#CD4838', deck: '#172036', flame: '#FFC34D', glass: '255,195,77', text: '#F3E6C8', line: 'rgba(243,230,200,0.28)', wake: '243,230,200', pleat: ['#E9A23B', '#FFC34D', '#d98a2b'],
-    hard: true,
+    hard: true, rockTop: '#fffaf0', wakeRock: '243,230,200',
   },
   thermal: {
-    water: '#050C16', dark: '2,6,12', darkA: 0.9, bank: ['#244D93', '#0a1730', '#071022'], current: '98,228,236', foam: '98,228,236', rock: '#0b1a2f', rockShade: '#62E4EC',
+    water: '#050C16', dark: '2,6,12', night: [0.8, 0.42], edge: '98,228,236', bank: ['#244D93', '#0a1730', '#071022'], current: '98,228,236', foam: '98,228,236', rock: '#1d3f78', rockShade: '#0b1a2f', rockTop: '#62E4EC', wakeRock: '98,228,236',
     ember: '#FF682B', emberCore: '#FFF3CF', hull: '#08101d', trim: '#FF682B', deck: '#122038', flame: '#FFF3CF', glass: '255,104,43', text: '#e9f6f8', line: 'rgba(98,228,236,0.3)', wake: '98,228,236',
   },
   storm: {
-    water: '#123E40', dark: '6,20,21', darkA: 0.9, bank: ['#526672', '#22292A', '#1a2021'], foam: '120,140,150', rock: '#22292A', rockShade: '#E8AB50', rain: '138,158,168', rainLit: '232,171,80',
+    water: '#123E40', dark: '6,20,21', night: [0.82, 0.48], edge: '160,180,190', bank: ['#526672', '#22292A', '#1a2021'], foam: '150,170,178', rock: '#22292A', rockShade: '#141a1b', rockTop: '#8da1ab', wakeRock: '190,205,212', rain: '138,158,168', rainLit: '214,228,234',
     ember: '#E8AB50', emberCore: '#fff0cf', hull: '#111515', trim: '#AF302B', deck: '#262e2f', flame: '#E8AB50', glass: '232,171,80', text: '#efe6d3', line: 'rgba(232,171,80,0.3)', wake: '200,210,205',
   },
 };
@@ -28,7 +30,10 @@ const mix = (a, b, u) => a + (b - a) * u;
 export function createView(canvas) {
   const ctx = canvas.getContext('2d');
   const dark = document.createElement('canvas'), dctx = dark.getContext('2d');
-  let W = 1, Hh = 1, dpr = 1, k = 6;
+  // The boat sits at A of the height. k (px a metre) is chosen so that AHEAD metres of river show above the boat in
+  // portrait and in landscape alike (the same reaction time), and the river's width fits across a phone held upright.
+  const AHEAD = 96;
+  let W = 1, Hh = 1, dpr = 1, k = 6, A = 0.72;
   const fx = { wake: [], sparks: [], pleats: [], rain: [], rings: [], smoke: [], shake: 0, hit: -9, ember: -9, lastWake: 0 };
   const streaks = Array.from({ length: 46 }, (_, i) => ({ x: hash(i * 3 + 1), y: hash(i * 7 + 2), s: 0.6 + hash(i * 11 + 3) * 0.8 }));
 
@@ -37,7 +42,8 @@ export function createView(canvas) {
     W = innerWidth; Hh = innerHeight;
     canvas.width = Math.round(W * dpr); canvas.height = Math.round(Hh * dpr);
     dark.width = Math.max(1, Math.round(W / 2)); dark.height = Math.max(1, Math.round(Hh / 2));
-    k = clamp(Math.min(W, Hh * 0.62) / 56, 4.5, 11);
+    A = W > Hh * 1.15 ? 0.8 : 0.72;
+    k = clamp(Math.min(W / 64, Hh * A / AHEAD), 2.4, 11);
   }
   resize();
 
@@ -46,12 +52,14 @@ export function createView(canvas) {
     if (type === 'ember') { fx.ember = data.t; for (let i = 0; i < 18; i++) { const a = Math.random() * 6.283, v = 4 + Math.random() * 9; fx.sparks.push({ d: data.d, x: data.x, vd: Math.sin(a) * v, vx: Math.cos(a) * v, life: 0.5 + Math.random() * 0.5, age: 0 }); } fx.pleats.push({ age: 0 }); fx.rings.push({ d: data.d, x: data.x, age: 0, kind: 'ember' }); }
     if (type === 'hit') { fx.hit = data.t; fx.shake = data.what === 'rock' ? 1 : 0.45; for (let i = 0; i < 10; i++) { const a = Math.random() * 6.283; fx.sparks.push({ d: data.d, x: data.x, vd: Math.sin(a) * 6, vx: Math.cos(a) * 6, life: 0.4, age: 0, ash: true }); } }
     if (type === 'drop') { for (let i = 0; i < 26; i++) fx.smoke.push({ d: data.d, x: data.x, age: -i * 0.07, vx: (Math.random() - 0.5) * 1.6, r: 0.6 + Math.random() * 0.8 }); }
+    if (type === 'lit') { for (let i = 0; i < 22; i++) { const a = Math.random() * 6.283, v = 5 + Math.random() * 10; fx.sparks.push({ d: data.d, x: data.x, vd: Math.sin(a) * v, vx: Math.cos(a) * v, life: 0.5 + Math.random() * 0.6, age: 0 }); } fx.rings.push({ d: data.d, x: data.x, age: 0 }); }
+    if (type === 'out') { for (let i = 0; i < 6; i++) fx.smoke.push({ d: data.d, x: data.x, age: -i * 0.06, vx: (Math.random() - 0.5) * 1.2, r: 0.3 + Math.random() * 0.4, small: true }); }
     if (type === 'reset') { fx.wake.length = 0; fx.sparks.length = 0; fx.pleats.length = 0; fx.rings.length = 0; fx.smoke.length = 0; fx.shake = 0; }
   }
 
   function draw(sc) {
     const L = LOOKS[sc.look] ?? LOOKS.paper, t = sc.t, dt = sc.dt ?? 1 / 60, s = sc.sim, rv = s.river;
-    const z = sc.cam.z, kk = k * z, ay = Hh * 0.7;
+    const z = sc.cam.z, kk = k * z, ay = Hh * A;
     fx.shake = Math.max(0, fx.shake - dt * 3);
     const shx = fx.shake ? (Math.random() - 0.5) * fx.shake * 7 : 0, shy = fx.shake ? (Math.random() - 0.5) * fx.shake * 7 : 0;
     const X = (d, x) => W / 2 + (x - sc.cam.x) * kk + shx, Y = d => ay - (d - sc.cam.d) * kk + shy;
@@ -84,7 +92,7 @@ export function createView(canvas) {
           for (const q of near) { const dd = (r.d - q.d) / (q.r + 6), dx = x - (rv.center(q.d) + q.o); const push = (q.r + 3.2) * Math.exp(-dd * dd) * Math.exp(-(dx * dx) / ((q.r + 7) ** 2)); x += (dx >= 0 ? 1 : -1) * push; }
           i ? ctx.lineTo(X(r.d, x), r.y) : ctx.moveTo(X(r.d, x), r.y);
         }
-        ctx.strokeStyle = `rgba(${L.current},${0.3 + 0.08 * Math.sin(f * 9 + t)})`; ctx.stroke();
+        ctx.strokeStyle = `rgba(${L.current},${0.42 + 0.1 * Math.sin(f * 9 + t)})`; ctx.stroke();
       }
       ctx.setLineDash([]);
     } else {
@@ -116,8 +124,9 @@ export function createView(canvas) {
     const lights = [];
     for (const c of sc.chain ?? []) {
       const sx = X(c.d, c.x), sy = Y(c.d);
-      drawFloat(L, sx, sy, kk, c.lit, t + c.d);
-      if (c.lit > 0.02) lights.push([sx + H[0] * 1.6 * kk, sy + H[1] * 1.6 * kk, (c.small ? 4 : 7) * kk * c.lit, c.lit]);
+      const fk = Math.max(kk, c.small ? 3.6 : 4.6);
+      drawFloat(L, sx, sy, fk, c.lit, t + c.d);
+      if (c.lit > 0.02) lights.push([sx + H[0] * 1.6 * fk, sy + H[1] * 1.6 * fk, (c.small ? 4 : 7) * fk * c.lit, c.lit]);
     }
     if (sc.buoy && sc.buoy.d > dBot - 10 && sc.buoy.d < dTop + 20) {
       const sx = X(sc.buoy.d, sc.buoy.x), sy = Y(sc.buoy.d);
@@ -130,14 +139,15 @@ export function createView(canvas) {
     if (sc.boat) {
       const b = sc.boat, hitAgo = t - fx.hit;
       lantern = drawBoat(L, X(b.d, b.x), Y(b.d), kk, b.ang, b.flame, t, false, hitAgo);
-      const R = b.flame > 0 ? radius(b.flame) * kk * (1 + 0.025 * Math.sin(t * 9) + 0.02 * Math.sin(t * 23)) * (hitAgo < 0.3 ? 0.82 + hitAgo * 0.6 : 1) : 0;
+      const R = b.flame > 0 ? pool(b.flame) * kk * (1 + 0.025 * Math.sin(t * 9) + 0.02 * Math.sin(t * 23)) * (hitAgo < 0.3 ? 0.82 + hitAgo * 0.6 : 1) : 0;
       if (R > 0) lights.push([lantern.lx, lantern.ly, R, 1, true]);
     }
     for (const e of s.embers) if (!e.taken && e.d > dBot && e.d < dTop) lights.push([X(e.d, rv.center(e.d) + e.o), Y(e.d), 5.5 * kk, 0.7]);
     if (sc.jump) lights.push([sc.jump.x, sc.jump.y, 10 * kk, 1]);
 
     // the dark, with holes where the light is
-    drawDark(L, lights, sc.ambient ?? 0);
+    drawDark(L, lights, sc.ambient ?? 0, sc.boat ? sc.boat.flame : 0);
+    drawEdges(L, rows, X, sc.ambient ?? 0);
 
     // after the dark: what must stay readable, and what gives light
     if (sc.boat && sc.threats) drawThreats(L, sc, s, rv, X, Y, kk, t);
@@ -147,19 +157,29 @@ export function createView(canvas) {
     if (lantern && sc.boat.flame > 0) { drawReflection(L, lantern, kk, t, t - fx.hit, sc.boat.vo ?? 0); drawGlow(L, lantern.lx, lantern.ly, kk, sc.boat.flame, t); }
     if (lantern && sc.look === 'paper') drawPleats(L, lantern, sc.boat, X, Y, kk, dt);
     if (sc.sam && sc.sam.flame > 0.01) { const [sx, sy] = boatLantern(X(sc.sam.d, sc.sam.x), Y(sc.sam.d), kk, sc.sam.ang ?? 0); drawGlow(L, sx, sy, kk, sc.sam.flame, t + 2); }
-    for (const c of sc.chain ?? []) if (c.lit > 0.02) drawGlow(L, X(c.d, c.x) + H[0] * 1.6 * kk, Y(c.d) + H[1] * 1.6 * kk, kk * 0.55, c.lit, t + c.d);
+    for (const c of sc.chain ?? []) { const fk = Math.max(kk, c.small ? 3.6 : 4.6); if (c.lit > 0.02) drawGlow(L, X(c.d, c.x) + H[0] * 1.6 * fk, Y(c.d) + H[1] * 1.6 * fk, fk * 0.6, c.lit, t + c.d); }
+    if (sc.cue && lantern) drawCue(L, lantern, kk, t, sc.cue);
     if (sc.dock && sc.dock.lit > 0.02) drawGlow(L, X(sc.dock.d, sc.dock.x) + H[0] * 3 * kk, Y(sc.dock.d) + H[1] * 3 * kk, kk * 0.7, sc.dock.lit, t);
     if (sc.buoy && sc.buoy.lit > 0.02) drawGlow(L, X(sc.buoy.d, sc.buoy.x) + H[0] * 3.4 * kk, Y(sc.buoy.d) + H[1] * 3.4 * kk, kk * 0.8, sc.buoy.lit, t);
     drawSmoke(L, X, Y, kk, dt);
     if (sc.jump) drawJump(L, sc.jump, kk, t);
     // names
-    ctx.textAlign = 'center';
-    for (const c of sc.chain ?? []) if (c.label) label(L, c.label, c.sub, X(c.d, c.x) + H[0] * 1.6 * kk, Y(c.d) + H[1] * 1.6 * kk - 12 - 6 * z, 0.35 + 0.65 * Math.max(c.lit, 0.25), z);
-    if (sc.sam?.label) { const [sx, sy] = boatLantern(X(sc.sam.d, sc.sam.x), Y(sc.sam.d), kk, sc.sam.ang ?? 0); label(L, sc.sam.label, sc.sam.sub, sx + 6, sy - 34, sc.sam.labelA ?? 1, 1); }
-    if (sc.buoy && sc.buoy.label && sc.buoy.d < dTop + 20) label(L, sc.buoy.label, '', X(sc.buoy.d, sc.buoy.x) + H[0] * 3.4 * kk, Y(sc.buoy.d) + H[1] * 3.4 * kk - 18, 0.8, 1);
+    // names beside the lights (right of a float, flipped left near the edge) and under the stern of the boat that brings it
+    for (const c of sc.chain ?? []) if (c.label) { const fk = Math.max(kk, 4.6); label(L, c.label, c.sub, X(c.d, c.x) + 1.7 * fk + 8, Y(c.d) + H[1] * 1.6 * fk + 4, 0.4 + 0.6 * Math.max(c.lit, 0.2), 'side', X(c.d, c.x) - 1.4 * fk - 8); }
+    if (sc.sam?.label) { const bk = boatK(kk); label(L, sc.sam.label, sc.sam.sub, X(sc.sam.d, sc.sam.x), Y(sc.sam.d) + 3.7 * bk + 16, sc.sam.labelA ?? 1, 'center'); }
     if (sc.look === 'storm') drawStreaks(L, t, lantern);
     if (sc.progress !== null && sc.progress !== undefined) drawProgress(L, sc.progress, sc.flameNow ?? 0, sc.top ?? 0);
     if (sc.fade) { ctx.fillStyle = `rgba(0,0,0,${sc.fade})`; ctx.fillRect(0, 0, W, Hh); }
+  }
+
+  // the waterline of both banks, drawn over the dark: the river's shape stays readable upriver at any flame
+  function drawEdges(L, rows, X, ambient) {
+    ctx.lineWidth = 1.2; ctx.lineJoin = 'round';
+    for (const side of [-1, 1]) {
+      ctx.beginPath();
+      rows.forEach((r, i) => { const x = X(r.d, r.c + side * r.h); i ? ctx.lineTo(x, r.y) : ctx.moveTo(x, r.y); });
+      ctx.strokeStyle = `rgba(${L.edge},${0.28 * (1 - ambient)})`; ctx.stroke();
+    }
   }
 
   function drawBanks(L, look, rows, X, kk) {
@@ -207,24 +227,27 @@ export function createView(canvas) {
   }
 
   function drawRock(L, look, q, x, y, kk, t) {
-    const rr = q.r * kk;
-    // ripples around the rock
-    for (let i = 0; i < 2; i++) {
-      const u = ((t * 0.55 + q.spin + i * 0.5) % 1);
-      ctx.beginPath(); ctx.ellipse(x, y, rr + (0.8 + u * 3.6) * kk, rr * 0.92 + (0.8 + u * 3.2) * kk, 0, 0, 6.283);
-      ctx.strokeStyle = `rgba(${L.foam},${0.32 * (1 - u)})`; ctx.lineWidth = look === 'paper' ? 1.6 : 1.1;
-      if (look === 'paper') ctx.setLineDash([5, 4]); ctx.stroke(); ctx.setLineDash([]);
+    const rr = q.r * kk, seed = Math.floor(q.d * 10);
+    // the wake: two lines of broken water trailing downstream (up the screen), and the cushion on the upstream side
+    ctx.lineCap = 'round';
+    for (const side of [-1, 1]) {
+      ctx.beginPath();
+      for (let i = 0; i <= 6; i++) { const u = i / 6, wx = x + side * (rr * (0.75 + 0.9 * u)) + Math.sin(t * 4 + i + q.spin) * kk * 0.25 * u, wy = y - rr * 0.3 - u * rr * 3.4; i ? ctx.lineTo(wx, wy) : ctx.moveTo(wx, wy); }
+      ctx.strokeStyle = `rgba(${L.wakeRock},0.5)`; ctx.lineWidth = Math.max(1.2, kk * 0.28);
+      if (look === 'paper') ctx.setLineDash([6, 4]); ctx.stroke(); ctx.setLineDash([]);
     }
-    // water break on the side the boat comes from
-    ctx.beginPath(); ctx.ellipse(x, y + rr * 0.35, rr * 1.25, rr * 0.85, 0, 0.15 * Math.PI, 0.85 * Math.PI);
-    ctx.strokeStyle = `rgba(${L.foam},0.55)`; ctx.lineWidth = Math.max(1.5, kk * 0.35); ctx.stroke();
-    // the rock
-    ctx.beginPath();
-    for (let i = 0; i < 8; i++) { const a = i / 8 * 6.283 + q.spin, m = 0.8 + 0.28 * hash(Math.floor(q.d * 10) + i); ctx.lineTo(x + Math.cos(a) * rr * m, y + Math.sin(a) * rr * m * 0.85); }
-    ctx.closePath();
-    if (look === 'paper') { ctx.save(); ctx.translate(2, 4); ctx.fillStyle = L.rockShade; ctx.fill(); ctx.restore(); ctx.fillStyle = L.rock; ctx.fill(); ctx.strokeStyle = 'rgba(16,27,50,0.35)'; ctx.lineWidth = 1; ctx.stroke(); }
-    else if (look === 'thermal') { ctx.fillStyle = L.rock; ctx.fill(); ctx.strokeStyle = 'rgba(98,228,236,0.85)'; ctx.lineWidth = 1.5; ctx.stroke(); }
-    else { ctx.fillStyle = L.rock; ctx.fill(); ctx.save(); ctx.clip(); ctx.beginPath(); ctx.arc(x - rr * 0.3, y + rr * 0.4, rr * 1.05, 0, 6.283); ctx.fillStyle = 'rgba(82,102,114,0.55)'; ctx.fill(); ctx.restore(); ctx.strokeStyle = 'rgba(232,171,80,0.45)'; ctx.lineWidth = 1.2; ctx.stroke(); }
+    for (let i = 0; i < 2; i++) { const u = (t * 0.9 + q.spin + i * 0.5) % 1; ctx.beginPath(); ctx.moveTo(x - rr * 0.4, y - rr * (1.1 + u * 2.2)); ctx.lineTo(x + rr * 0.4, y - rr * (1.1 + u * 2.2)); ctx.strokeStyle = `rgba(${L.wakeRock},${0.45 * (1 - u)})`; ctx.lineWidth = Math.max(1, kk * 0.22); ctx.stroke(); }
+    ctx.beginPath(); ctx.ellipse(x, y + rr * 0.35, rr * 1.3, rr * 0.85, 0, 0.12 * Math.PI, 0.88 * Math.PI);
+    ctx.strokeStyle = `rgba(${L.foam},0.6)`; ctx.lineWidth = Math.max(1.5, kk * 0.35); ctx.stroke();
+    ctx.lineCap = 'butt';
+    // the rock: an irregular crown of ten points, a shade under it and a lit top facet
+    const pts = [];
+    for (let i = 0; i < 10; i++) { const a = i / 10 * 6.283 + q.spin, m = 0.72 + 0.4 * hash(seed + i * 13); pts.push([x + Math.cos(a) * rr * m, y + Math.sin(a) * rr * m * 0.86]); }
+    const path = (dx, dy, sc = 1) => { ctx.beginPath(); pts.forEach(([px, py], i) => { const X2 = x + (px - x) * sc + dx, Y2 = y + (py - y) * sc + dy; i ? ctx.lineTo(X2, Y2) : ctx.moveTo(X2, Y2); }); ctx.closePath(); };
+    path(rr * 0.12, rr * 0.22); ctx.fillStyle = L.rockShade; ctx.fill();
+    path(0, 0); ctx.fillStyle = L.rock; ctx.fill();
+    ctx.strokeStyle = look === 'thermal' ? 'rgba(98,228,236,0.95)' : look === 'storm' ? 'rgba(170,190,200,0.75)' : 'rgba(16,27,50,0.45)'; ctx.lineWidth = look === 'paper' ? 1 : 1.6; ctx.stroke();
+    path(-rr * 0.12, -rr * 0.16, 0.52); ctx.fillStyle = L.rockTop; ctx.globalAlpha = look === 'paper' ? 0.9 : 0.55; ctx.fill(); ctx.globalAlpha = 1;
     if (q.hit && t - q.hit >= 0 && t - q.hit < 0.5) { ctx.beginPath(); ctx.arc(x, y, rr + (t - q.hit) * 30, 0, 6.283); ctx.strokeStyle = `rgba(${L.foam},${0.8 * (1 - (t - q.hit) * 2)})`; ctx.lineWidth = 2; ctx.stroke(); }
   }
 
@@ -250,20 +273,32 @@ export function createView(canvas) {
     g.addColorStop(0, L.ember); g.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = g; ctx.globalAlpha = 0.55; ctx.fillRect(x - kk * 4, y - kk * 4, kk * 8, kk * 8); ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
+    kk = Math.max(kk, 4.4);
     if (L === LOOKS.paper) { ctx.beginPath(); ctx.moveTo(x, y - kk * 1.1); ctx.lineTo(x + kk * 0.75, y); ctx.lineTo(x, y + kk * 1.1); ctx.lineTo(x - kk * 0.75, y); ctx.closePath(); ctx.fillStyle = L.ember; ctx.fill(); ctx.beginPath(); ctx.moveTo(x, y - kk * 0.5); ctx.lineTo(x + kk * 0.3, y); ctx.lineTo(x, y + kk * 0.5); ctx.lineTo(x - kk * 0.3, y); ctx.fillStyle = L.emberCore; ctx.fill(); }
-    else { ctx.beginPath(); ctx.arc(x, y, kk * 0.75 * p, 0, 6.283); ctx.fillStyle = L.ember; ctx.fill(); ctx.beginPath(); ctx.arc(x, y, kk * 0.38, 0, 6.283); ctx.fillStyle = L.emberCore; ctx.fill(); }
+    else if (L === LOOKS.thermal) {
+      // a white-hot four-point spark that turns slowly
+      const a0 = t * 1.5 + seed, o = kk * 1.25 * p, i2 = kk * 0.32;
+      ctx.beginPath(); for (let i = 0; i < 8; i++) { const a = a0 + i * Math.PI / 4, m = i % 2 ? i2 : o; ctx.lineTo(x + Math.cos(a) * m, y + Math.sin(a) * m); } ctx.closePath(); ctx.fillStyle = L.ember; ctx.fill();
+      ctx.beginPath(); ctx.arc(x, y, kk * 0.32, 0, 6.283); ctx.fillStyle = L.emberCore; ctx.fill();
+    } else {
+      // a brass teardrop, point up, like a small flame on the water
+      const hgt = kk * 1.5 * p, wd = kk * 0.7;
+      ctx.beginPath(); ctx.moveTo(x, y - hgt); ctx.quadraticCurveTo(x + wd * 1.2, y - hgt * 0.1, x, y + wd * 0.8); ctx.quadraticCurveTo(x - wd * 1.2, y - hgt * 0.1, x, y - hgt); ctx.fillStyle = L.ember; ctx.fill();
+      ctx.beginPath(); ctx.ellipse(x, y + wd * 0.05, wd * 0.32, wd * 0.5, 0, 0, 6.283); ctx.fillStyle = L.emberCore; ctx.fill();
+    }
   }
 
   // the boat: dark hull, high prow, a square lantern hung from a crook with a gap above the hull
   const BOAT = 1.45, LAN_H = 3.1;
-  function boatLantern(x, y, kk, ang) { kk *= BOAT; const c = Math.cos(ang), s = Math.sin(ang), px = 0.7, py = 0.6; return [x + (px * c - py * s) * kk + H[0] * LAN_H * kk, y + (px * s + py * c) * kk + H[1] * LAN_H * kk]; }
+  const boatK = kk => Math.max(kk, 4.2) * BOAT;   // never smaller than this on screen (landscape, wide arrival)
+  function boatLantern(x, y, kk, ang) { kk = boatK(kk); const c = Math.cos(ang), s = Math.sin(ang), px = 0.7, py = 0.6; return [x + (px * c - py * s) * kk + H[0] * LAN_H * kk, y + (px * s + py * c) * kk + H[1] * LAN_H * kk]; }
   function drawBoat(L, x, y, kk0, ang, flame, t, other, hitAgo = 9) {
-    const kk = kk0 * BOAT;
+    const kk = boatK(kk0);
     const c = Math.cos(ang), s = Math.sin(ang), P = (px, py) => [x + (px * c - py * s) * kk, y + (px * s + py * c) * kk];
     const up = (p, h) => [p[0] + H[0] * h * kk, p[1] + H[1] * h * kk];
     const bob = Math.sin(t * 2.1) * 0.06;
     const bow = P(0, -3.7), mast = P(0.3, 2.5);
-    const rim = L === LOOKS.thermal ? 'rgba(98,228,236,0.7)' : L === LOOKS.storm ? 'rgba(232,171,80,0.55)' : 'rgba(243,230,200,0.75)';
+    const rim = L === LOOKS.thermal ? 'rgba(98,228,236,0.7)' : L === LOOKS.storm ? 'rgba(200,215,222,0.55)' : 'rgba(243,230,200,0.75)';
     // shadows on the water, thrown down and left: hull, then the prow and lantern that stand up above it
     ctx.fillStyle = 'rgba(0,0,0,0.3)';
     ctx.beginPath(); ctx.ellipse(x - 0.5 * kk, y + 0.9 * kk, 1.5 * kk, 3.9 * kk, ang, 0, 6.283); ctx.fill();
@@ -377,26 +412,37 @@ export function createView(canvas) {
     ctx.stroke();
   }
 
-  function drawDark(L, lights, ambient) {
+  // The dark: a night that lets the river be read upriver (darker as the flame weakens), and a local pool of light around
+  // the lantern whose size is the flame. Paper cuts the pool in two hard tones; thermal and storm fade it.
+  function drawDark(L, lights, ambient, flame) {
     const dw = dark.width, dh = dark.height, sx = dw / W, sy = dh / Hh;
+    const night = mix(L.night[0], L.night[1], clamp(flame, 0, 1)) * (1 - ambient);
     dctx.globalCompositeOperation = 'source-over'; dctx.clearRect(0, 0, dw, dh);
-    dctx.fillStyle = `rgba(${L.dark},${L.darkA * (1 - ambient)})`; dctx.fillRect(0, 0, dw, dh);
+    dctx.fillStyle = `rgba(${L.dark},${night})`; dctx.fillRect(0, 0, dw, dh);
     dctx.globalCompositeOperation = 'destination-out';
-    for (const [x, y, r, a] of lights) {
+    for (const [x, y, r, a, main] of lights) {
       if (r < 1) continue;
       const cx = x * sx, cy = y * sy, rr = r * sx, g = dctx.createRadialGradient(cx, cy, 0, cx, cy, rr);
-      if (L.hard) { g.addColorStop(0, `rgba(0,0,0,${a})`); g.addColorStop(0.5, `rgba(0,0,0,${a})`); g.addColorStop(0.505, `rgba(0,0,0,${a * 0.66})`); g.addColorStop(0.76, `rgba(0,0,0,${a * 0.66})`); g.addColorStop(0.765, `rgba(0,0,0,${a * 0.34})`); g.addColorStop(0.995, `rgba(0,0,0,${a * 0.34})`); g.addColorStop(1, 'rgba(0,0,0,0)'); }
-      else { g.addColorStop(0, `rgba(0,0,0,${a})`); g.addColorStop(0.42, `rgba(0,0,0,${a * 0.86})`); g.addColorStop(0.75, `rgba(0,0,0,${a * 0.35})`); g.addColorStop(1, 'rgba(0,0,0,0)'); }
+      if (L.hard && main) { g.addColorStop(0, `rgba(0,0,0,${a})`); g.addColorStop(0.58, `rgba(0,0,0,${a})`); g.addColorStop(0.585, `rgba(0,0,0,${a * 0.55})`); g.addColorStop(0.99, `rgba(0,0,0,${a * 0.55})`); g.addColorStop(1, 'rgba(0,0,0,0)'); }
+      else { g.addColorStop(0, `rgba(0,0,0,${a})`); g.addColorStop(0.45, `rgba(0,0,0,${a * 0.8})`); g.addColorStop(1, 'rgba(0,0,0,0)'); }
       dctx.fillStyle = g; dctx.fillRect(cx - rr, cy - rr, rr * 2, rr * 2);
     }
     ctx.imageSmoothingEnabled = true; ctx.drawImage(dark, 0, 0, W, Hh);
-    // a warm tint inside the main pool
+    // a faint warm tint inside the pool
     const main = lights.find(l => l[4]);
     if (main) {
       const [x, y, r] = main;
-      if (L.hard) { ctx.globalCompositeOperation = 'lighter'; ctx.beginPath(); ctx.arc(x, y, r * 0.76, 0, 6.283); ctx.fillStyle = 'rgb(8,10,16)'; ctx.fill(); ctx.beginPath(); ctx.arc(x, y, r * 0.5, 0, 6.283); ctx.fillStyle = 'rgb(14,15,20)'; ctx.fill(); ctx.globalCompositeOperation = 'source-over'; }
-      else { ctx.globalCompositeOperation = 'lighter'; const g = ctx.createRadialGradient(x, y, 0, x, y, r * 0.9); if (L === LOOKS.thermal) { g.addColorStop(0, 'rgba(255,104,43,0.3)'); g.addColorStop(0.3, 'rgba(160,60,60,0.16)'); g.addColorStop(0.62, 'rgba(36,77,147,0.2)'); } else g.addColorStop(0, `rgba(${L.glass},0.16)`); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2); ctx.globalCompositeOperation = 'source-over'; }
+      ctx.globalCompositeOperation = 'lighter';
+      if (L.hard) { ctx.beginPath(); ctx.arc(x, y, r * 0.58, 0, 6.283); ctx.fillStyle = 'rgba(255,195,77,0.05)'; ctx.fill(); }
+      else { const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, `rgba(${L.glass},0.12)`); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2); }
+      ctx.globalCompositeOperation = 'source-over';
     }
+  }
+
+  // the arrival's one cue: a ring that breathes around your own dark lantern
+  function drawCue(L, lan, kk, t, a) {
+    const u = (t * 0.8) % 1, r = Math.max(kk, 4.2) * (1.6 + u * 3);
+    ctx.beginPath(); ctx.arc(lan.lx, lan.ly, r, 0, 6.283); ctx.strokeStyle = `rgba(${L.glass},${a * 0.8 * (1 - u)})`; ctx.lineWidth = 2; ctx.stroke();
   }
 
   function drawGlow(L, x, y, kk, flame, t) {
@@ -455,17 +501,24 @@ export function createView(canvas) {
   }
   function drawJump(L, j, kk, t) {
     ctx.globalCompositeOperation = 'lighter';
-    for (let i = 0; i < 6; i++) {
-      const u = Math.max(0, j.u - i * 0.04), x = mix(j.ax, j.bx, u), y = mix(j.ay, j.by, u) - Math.sin(u * Math.PI) * 5 * kk;
-      ctx.beginPath(); ctx.arc(x, y, kk * (1.1 - i * 0.15), 0, 6.283); ctx.fillStyle = `rgba(${L.glass},${0.8 - i * 0.12})`; ctx.fill();
+    const kj = Math.max(kk, 4.4), lift = Math.max(5 * kj, Math.hypot(j.bx - j.ax, j.by - j.ay) * 0.45);
+    for (let i = 0; i < 10; i++) {
+      const u = Math.max(0, j.u - i * 0.03), x = mix(j.ax, j.bx, u), y = mix(j.ay, j.by, u) - Math.sin(u * Math.PI) * lift;
+      ctx.beginPath(); ctx.arc(x, y, kj * (1.5 - i * 0.12), 0, 6.283); ctx.fillStyle = `rgba(${L.glass},${0.9 - i * 0.08})`; ctx.fill();
     }
+    const hx = mix(j.ax, j.bx, j.u), hy = mix(j.ay, j.by, j.u) - Math.sin(j.u * Math.PI) * lift;
+    ctx.beginPath(); ctx.arc(hx, hy, kj * 0.7, 0, 6.283); ctx.fillStyle = '#fff8e0'; ctx.fill();
     ctx.globalCompositeOperation = 'source-over';
   }
-  function label(L, name, sub, x, y, a, z) {
-    ctx.globalAlpha = a; ctx.fillStyle = L.text; ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 6;
-    ctx.font = `${Math.round(12 + 3 * z)}px "Iowan Old Style", Palatino, Georgia, serif`; ctx.fillText(name, x, y);
-    if (sub) { ctx.font = `${Math.round(10 + 1 * z)}px system-ui, sans-serif`; ctx.globalAlpha = a * 0.7; ctx.fillText(sub, x, y + 13 + z * 2); }
-    ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+  // align 'center' at x, or 'side': left-aligned at x, or right-aligned at alt when it would run off the screen
+  function label(L, name, sub, x, y, a, align = 'center', alt = x) {
+    ctx.font = '15px "Iowan Old Style", Palatino, Georgia, serif';
+    const w = Math.max(ctx.measureText(name).width, sub ? 60 : 0);
+    if (align === 'side') { if (x + w > W - 8) { ctx.textAlign = 'right'; x = alt; } else ctx.textAlign = 'left'; } else ctx.textAlign = 'center';
+    ctx.globalAlpha = a; ctx.fillStyle = L.text; ctx.shadowColor = 'rgba(0,0,0,0.95)'; ctx.shadowBlur = 6;
+    ctx.fillText(name, x, y);
+    if (sub) { ctx.font = '11px system-ui, sans-serif'; ctx.globalAlpha = a * 0.75; ctx.fillText(sub, x, y + 14); }
+    ctx.shadowBlur = 0; ctx.globalAlpha = 1; ctx.textAlign = 'center';
   }
   function drawProgress(L, p, flame, top) {
     const x0 = 18, x1 = W - 60, y = Math.max(10, top) + 21;
@@ -475,5 +528,5 @@ export function createView(canvas) {
     ctx.fillStyle = L.trim; ctx.fillRect(x1 - 1.5, y - 4, 3, 9);
   }
 
-  return { resize, draw, event, lantern: (cam, d, x, ang = 0) => boatLantern(W / 2 + (x - cam.x) * k * cam.z, Hh * 0.7 - (d - cam.d) * k * cam.z, k * cam.z, ang), get k() { return k; }, get size() { return { W, H: Hh } }, project: (cam, d, x) => ({ x: W / 2 + (x - cam.x) * k * cam.z, y: Hh * 0.7 - (d - cam.d) * k * cam.z }) };
+  return { resize, draw, event, lantern: (cam, d, x, ang = 0) => boatLantern(W / 2 + (x - cam.x) * k * cam.z, Hh * A - (d - cam.d) * k * cam.z, k * cam.z, ang), get k() { return k; }, get ay() { return Hh * A; }, get ahead() { return AHEAD; }, get size() { return { W, H: Hh } }, project: (cam, d, x) => ({ x: W / 2 + (x - cam.x) * k * cam.z, y: Hh * A - (d - cam.d) * k * cam.z }) };
 }
