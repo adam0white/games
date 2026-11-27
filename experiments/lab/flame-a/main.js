@@ -168,7 +168,7 @@ function resume() {
 }
 canvas.addEventListener('pointerdown', e => {
   if (!e.isPrimary || e.button !== 0) return;
-  canvas.setPointerCapture(e.pointerId);
+  try { canvas.setPointerCapture(e.pointerId); } catch { /* the pointer ended before this handler ran */ }
   start();
 });
 const steer = drag(canvas, {
@@ -297,7 +297,7 @@ function frame(now) {
     hitAge: run.elapsed - run.lastHit, transferAge: screen === 'leg' ? age : Infinity });
   requestAnimationFrame(frame);
 }
-window.flameState = () => ({ screen, playing: screen === 'leg' && !paused, flame: run.flame, progress: run.progress, chain: chain.count });
+window.flameState = () => ({ screen, playing: screen === 'leg' && !paused, flame: run.flame, progress: run.progress, chain: chain.count, paused, target });
 window.flameSim = () => run;
 document.documentElement.dataset.look = options.look;
 updateText();

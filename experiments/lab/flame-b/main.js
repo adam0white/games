@@ -355,7 +355,7 @@ apply(); langButton();
 hint(canvas, { kind: 'drag', key: 'flame:hint', when: () => screen === 'leg' && !taking && !paused && !settingsOpen, played: read(PLAYED_KEY) === '1' });
 
 // ---- test hooks
-window.flameState = () => ({ screen, playing: screen === 'leg' && !taking && !paused, flame: Math.round(s.flame * 1000) / 1000, progress: Math.round(s.progress * 1000) / 1000, chain: (prev ? prev.chain : 0) + (screen === 'handoff' ? 1 : 0), carrier: (prev ? prev.chain : 0) + 1, paused, taking, source, link: madeUrl, look: set.get('look') });
+window.flameState = () => ({ screen, playing: screen === 'leg' && !taking && !paused, flame: Math.round(s.flame * 1000) / 1000, progress: Math.round(s.progress * 1000) / 1000, chain: (prev ? prev.chain : 0) + (screen === 'handoff' ? 1 : 0), carrier: (prev ? prev.chain : 0) + 1, paused, taking, source, link: madeUrl, look: set.get('look'), target });
 window.flameSim = () => s;
 // for checks: run the leg on without waiting, steering as the last aim says
 window.flameWarp = (sec, policy) => { if (screen !== 'leg' || taking || paused) return false; for (let i = 0; i < sec / DT && !s.done; i++) { if (policy) target = policy(s); for (const e of step(s, target)) onEvent(e); } return true; };

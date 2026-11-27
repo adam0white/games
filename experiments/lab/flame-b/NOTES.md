@@ -44,7 +44,7 @@ Decoding is all-or-nothing: the whole field must match one anchored pattern (max
 - `flame:played`: set after the first finished leg (turns the drag hint off)
 - `flame:hint`: the drag hint's own state (`kit/hint.js`)
 - `flame:set:look`, `flame:set:drop`, `flame:set:sound`, `flame:set:haptics`: settings
-- `kit/lab.js` keeps its own recording switch
+- `kit/lab.js` keeps its own recording switch. This page records under its own lab slug, `flame-b` (flame-a records under `flame-a`); the settings slug `flame` is shared with flame-a.
 
 ## Test hooks
 
@@ -58,7 +58,7 @@ Decoding is all-or-nothing: the whole field must match one anchored pattern (max
 ## Faked or not done
 
 - The `flame` slug is not registered in human-framework's lab prototypes, so a live recording would be refused. Registering it is outside this folder.
-- No entry in `games.json`, `lab/index.html`, or the phone check list (`kit/check/phone.mjs`): outside this folder.
+- No entry in `games.json` or `lab/index.html`: outside this folder. The phone check entry (`kit/check/lab-pages.mjs`, 2026-11-27) exists.
 - Sam's boat in the arrival, and the chain lights behind it, are staged from the link's names and distances. They are not replays of anyone's leg.
 - Carriers older than the last 8 have no names in the link. They show as up to 6 small unnamed lights.
 - Links are not signed. Anyone can write a link with any chain, names and distances inside the valid ranges, so the numbers are a story, not a record.

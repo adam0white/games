@@ -27,7 +27,7 @@ Paper, Thermal and Storm share one seeded simulation. Paper is the default. The 
 | `flame:set:sound`, `flame:set:haptics` | `on`, `off` |
 | `kit:lang` | Shared English or Turkish preference |
 
-The standard kit recorder uses its shared player, recording-off and queue keys and its per-game session and privacy keys. Its notice appears on arrival. Its switch is in Settings. Runs carry the five settings, incoming count, link-arrival flag, ember/hit events and outcome. A share records the kit’s result in `pass_send`. Carrier names and link fragments are omitted from these event payloads. Assets load from the static host. When enabled, lab recording uses its usual external endpoint. The relay itself uses no server.
+The standard kit recorder uses its shared player, recording-off and queue keys and its per-game session and privacy keys. This page records under its own lab slug, `flame-a` (flame-b records under `flame-b`). Its notice appears on arrival. Its switch is in Settings. Runs carry the five settings, incoming count, link-arrival flag, ember/hit events and outcome. A share records the kit’s result in `pass_send`. Carrier names and link fragments are omitted from these event payloads. Assets load from the static host. When enabled, lab recording uses its usual external endpoint. The relay itself uses no server.
 
 ## What is simulated
 
@@ -39,4 +39,4 @@ Run `node experiments/lab/flame-a/check.mjs` from the repository root. The check
 
 A separate integration exercise drove the actual handlers and renderer with DOM and canvas test doubles. It completed a handoff, reopened the generated manual-copy link, hit the bank, passed a weak flame, retried the incoming chain and started a fresh one. It also exercised pause and resume. Each look was drawn and inspected with a native Canvas 2D implementation.
 
-This session could not start the shared phone test’s local HTTP listener, launch an isolated browser, or reach the browser host. Static-server browser load, real touch, native share, clipboard permissions, audio, vibration, load time on a phone connection and 60 fps on a midrange phone still need device verification. The live recording endpoint and its game registration also remain unverified.
+On 2026-11-27 `kit/check/phone.mjs lab/flame-a` passed on Chromium Pixel 7 and WebKit iPhone 13 (seeded save survives, a finger steers, pause stops time, one audio context after the first tap, sound switch). A script also ran a leg to the handoff in both engines and opened the made link in a second page. Not checked: real touch on a phone, native share, clipboard permissions, audio, vibration, load time on a phone connection and 60 fps on a midrange phone still need device verification. The live recording endpoint and its game registration also remain unverified.

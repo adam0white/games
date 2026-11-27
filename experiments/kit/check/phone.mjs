@@ -156,7 +156,8 @@ async function savedPhone(page, g) {
     else assert.equal(await page.evaluate(k => localStorage.getItem(k), g.soundKey), g.soundOff, 'sound off saved');
   };
   if (g.sound && !g.soundOnMenu) await toggleSound();
-  await page.click(g.resume ?? '#resume'); await wait(s => s.screen === 'play' && !s.paused, 'resume');
+  if (g.resumeWith) await g.resumeWith(page); else await page.click(g.resume ?? '#resume');
+  await wait(s => s.screen === 'play' && !s.paused, 'resume');
   if (g.resumeTouch) await g.touch(page, { finger, until, sleep });
   await wait(s => s.screen === 'play' && !s.paused && s.t > t, 'play state advances after resume');
   if (g.music) {
@@ -294,7 +295,8 @@ async function hinted(page, g) {
     await page.evaluate(() => dispatchEvent(new Event('blur')));
     if (g.waitHintState) await until(page, sel => !document.querySelector(sel), 'hint: hidden under the pause card', 8000, visible);
     else { await sleep(200); assert.equal(await on(), false, 'hint: hidden under the pause card'); }
-    await page.click(g.resume); await waitOn('hint: back after resume (a tap on a card is not play input)', 2000);
+    if (g.resumeWith) await g.resumeWith(page); else await page.click(g.resume);
+    await waitOn('hint: back after resume (a tap on a card is not play input)', 2000);
   }
   if (g.alive) await page.evaluate(g.alive);
   if (g.input) {

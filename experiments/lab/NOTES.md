@@ -197,3 +197,12 @@ The note answers #232 (what should come next in Ant Draft): bigger explosions. T
 | Date | Experiment | Idea tested | Checked | Verdict |
 | --- | --- | --- | --- | --- |
 | 2026-11-26 | [Cinderhill battle toy](cinderhill-battle/NOTES.md) | Head-on colony battle using trails, Alarm and Recall. Open ground admits swarm grapples. The rock gap admits two pairs and the tunnel admits one. Compare held Alarm with a persistent rally flag. | In 48 rounds per terrain, 20 majors lost all open fights against 60 minors and won 32 at the two-cell gap with 11 draws. Nine rules tests pass. The phone runner could not bind localhost in this workspace. | Open. Play both variants on a phone and pick which Alarm control to keep. |
+
+## 2026-11-27
+
+| Date | Experiment | Idea tested | Checked | Verdict |
+| --- | --- | --- | --- | --- |
+| 2026-11-27 | [Pass the Flame A](flame-a/NOTES.md) | A relay flame carried one 60 s leg down a river and passed on as a link (fragment `#f=1~...`, up to eight names). Paper, Thermal and Storm looks; drop rule and retry rule are settings. Records under lab slug `flame-a`. | `node check.mjs`: link round trip, hostile links, 200/200 seeds finished by the ember policy, idle survival. `kit/check/phone.mjs lab/flame-a` on Chromium Pixel 7 and WebKit iPhone 13: seeded `flame:*` save survives, a finger steers, pause stops time, one audio context after the first tap, sound switch keeps its key. Made link opened in a second page in both engines. Not checked: a real phone, share sheet, audio by ear, live recording endpoint. | Open. Owner compares A and B on a phone. |
+| 2026-11-27 | [Pass the Flame B](flame-b/NOTES.md) | The same brief with the camera running back down the named lights, and the link in the query (`?flame=1.<chain>...`). Same three looks; drop rule is a setting. Records under lab slug `flame-b`. | `node check.mjs`: link round trip, 35+ hostile links, seeker 200/200, idle survival. `kit/check/phone.mjs lab/flame-b` on Chromium Pixel 7 and WebKit iPhone 13, including the first-time hint: seeded save survives, a finger steers, pause stops time, one audio context, sound switch. Made link opened in a second page in both engines. Not checked: a real phone, share sheet, audio by ear, live recording endpoint. | Open. Owner compares A and B on a phone. |
+
+Both pages share the settings slug `flame` (keys `flame:set:*`) and the nickname key `flame:name`, so a setting changed in one shows in the other.
