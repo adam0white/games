@@ -60,6 +60,8 @@
   .opts button small { display: block; font-weight: 600; font-size: 10px; opacity: 0.75; }
   .opts button[aria-pressed="true"] { background: linear-gradient(#ffb057, #e06a1c); color: #1b0f08; }
   .opts button.danger { color: #ff9a8a; }
+  #caps span { margin-left: 6px; white-space: nowrap; } #caps b { font-weight: 800; font-size: inherit; } #caps .tight { color: #ff9a8a; }
+  #rooms button { font-size: 12px; } #rooms button small { font-size: 9px; }
 
   #nestWrap { position: fixed; left: 0; right: 0; bottom: 0; height: calc(44vh + 70px + env(safe-area-inset-bottom)); transform: translateY(102%); transition: transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1); border-top: 2px solid rgba(255, 180, 100, 0.5); box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.55); z-index: 3; background: #1b130f; }
   body.nest #nestWrap { transform: none; }
@@ -131,6 +133,14 @@
     <button data-diet="1">1 in 4<small>soldiers</small></button>
     <button data-diet="2">Half<small>soldiers</small></button>
     <button data-diet="3">3 in 4<small>soldiers</small></button>
+  </div>
+  <div class="head" style="margin-top:8px"><i style="background:#8cd696"></i><b>Dig</b><span id="caps"><span>stores <b id="capFood">0</b></span> <span>young <b id="capBrood">0</b></span> <span>ants <b id="capAnts">0</b></span></span></div>
+  <div class="opts" id="rooms">
+    <button data-room="look" aria-pressed="true">Look<small>drag to move</small></button>
+    <button data-room="store">Store<small>8 food each</small></button>
+    <button data-room="nursery">Nursery<small>1 young each</small></button>
+    <button data-room="rest">Quarters<small>4 ants each</small></button>
+    <button data-room="clear" class="danger">Clear<small>unmark</small></button>
   </div>
 </div>
 

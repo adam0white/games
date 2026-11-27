@@ -16,19 +16,21 @@ import { angleOf } from '../sim/math.js';
 import { hashArray, hashInt, finish } from '../sim/hash.js';
 import { generate } from './world.js';
 
-export const WAR_VERSION = 1;
+export const WAR_VERSION = 2;
 export const TICK_HZ = 20;
 export { MAT, SURFACE, NEST };
 
 export const TEAMS = 2;
 export const CASTE = { WORKER: 0, MAJOR: 1 };
 export const CASTE_HP = [12, 40], CASTE_BITE = [2, 6], CASTE_SPEED = [45, 34], CASTE_FOOD = [1, 3]; // FOOD: protein to raise, and sugar weight when eating
-export const TASK = { REST: 0, OUT: 1, BACK: 2, GUARD: 3, NURSE: 4 };
+export const TASK = { REST: 0, OUT: 1, BACK: 2, GUARD: 3, NURSE: 4, DIG: 5 };
+// What a nest cell is used for. A room counts once its cell is dug open.
+export const ROOM = { NONE: 0, STORE: 1, NURSERY: 2, REST: 3 };
 export const CARRY = { NONE: 0, SUGAR: 1, PROTEIN: 2 };
 export const FOOD = { SUGAR: 0, PROTEIN: 1 };
 export const STAGE = { EGG: 0, LARVA: 1, PUPA: 2 };
 export const KIND = { FORAGE: 0, RAID: 1 };
-export const CMD = { TRAIL: 1, ERASE: 2, CREW: 3, DIET: 4, RALLY: 5, RECALL: 6 };
+export const CMD = { TRAIL: 1, ERASE: 2, CREW: 3, DIET: 4, RALLY: 5, RECALL: 6, DIG: 7, ROOM: 8 };
 // Events: [type, a, b, c].
 export const EVENT = {
   HOME: 1, // team, food kind, trail
@@ -42,6 +44,8 @@ export const EVENT = {
   STOLEN: 9, // from team, by team, food kind
   DRY: 10, // team, trail: nothing left at its end
   RALLY: 11, // team, cell
+  DUG: 12, // team, cell: a marked cell was dug open
+  FULL: 13, // team, food kind: a load came home to full stores and was lost
 };
 export const REASON = { QUEEN: 1, DUSK: 2, STARVED: 3 };
 export const WHY = { FULL: 1, BLOCKED: 2, LONG: 3, NONE: 4 };
@@ -49,7 +53,7 @@ export const WHY = { FULL: 1, BLOCKED: 2, LONG: 3, NONE: 4 };
 export const TRAILS = 6; // per colony
 export const PATH_MAX = 1024;
 export const MAX_PILES = 48;
-export const BROOD_MAX = 256; // all colonies together
+export const BROOD_MAX = 640; // all colonies together
 export const OFF = 8192; // a trail field's value off the path: OFF + steps to the path
 const FAR = 0xFFFF;
 export const LEVEL_SHARE = [0, 10, 25, 50]; // percent of the workers: none, Light, Steady, Surge
@@ -58,11 +62,14 @@ export const RAID_SHARE = [0, 25, 50, 100]; // percent of the majors on a raid t
 // Per-colony numbers, CG.SIZE each, in sim.cg.
 export const CG = {
   SUGAR: 0, PROTEIN: 1, QUEEN_HP: 2, LAY: 3, STARVE: 4, BORN: 5, DIED: 6, KILLS: 7, LOADS_S: 8, LOADS_P: 9, STOLEN: 10, LOST: 11,
-  DIET: 12, RECALL: 13, RALLY_CELL: 14, RALLY_HOLD: 15, ADULTS: 16, MAJORS: 17, WORKERS: 18, RESTING: 19, LAID: 20, SEQ: 21, SIZE: 24,
+  DIET: 12, RECALL: 13, RALLY_CELL: 14, RALLY_HOLD: 15, ADULTS: 16, MAJORS: 17, WORKERS: 18, RESTING: 19, LAID: 20, SEQ: 21,
+  CAP_FOOD: 22, CAP_BROOD: 23, CAP_ADULTS: 24, MARKS: 25, DIGGERS: 26, SIZE: 32,
 };
 export const C = {
-  LAY_EVERY: 20, EGG_TICKS: 300, LARVA_TICKS: 500, PUPA_TICKS: 400, LARVA_STARVE: 1200, MAJOR_WAIT: 600,
-  EAT_EVERY: 1200, ADULTS_PER_SUGAR: 10, STARVE_AFTER: 1200, STARVE_EVERY: 200, NURSERY: 48,
+  LAY_EVERY: 14, EGG_TICKS: 300, LARVA_TICKS: 500, PUPA_TICKS: 400, LARVA_STARVE: 1200, MAJOR_WAIT: 600,
+  EAT_EVERY: 1200, ADULTS_PER_SUGAR: 10, STARVE_AFTER: 1200, STARVE_EVERY: 200,
+  // Rooms: a store cell holds eight loads of each food, a nursery cell one brood, a quarters cell four ants (adults and brood together; the queen stops laying at the cap).
+  STORE_PER: 8, STORE_MIN: 24, BROOD_MIN: 8, REST_PER: 4, REST_BASE: 90, DIG_TICKS: 120, DIG_CREW: 8, MARKS_MAX: 96,
   QUEEN_HP: 800, BITE_EVERY: 10, BITE_R: 200, SEE: 3, PRESS_OPEN: 5, PRESS_TUNNEL: 2, WAIT_AT_END: 60, GUARD_R: 4,
 };
 
@@ -83,6 +90,9 @@ export class Sim {
     this.result = 0; // 0: running; else 1 + the winning team
     this.rng = seedStreams(cfg.seed);
     this.mat = new Uint8Array(n);
+    // Nest cells only (index: cell - L.nestBase): the room painted there, the colony that marked it to dig (1 + team), work left.
+    const NN = n - L.nestBase;
+    this.room = new Uint8Array(NN); this.mark = new Uint8Array(NN); this.digLeft = new Uint8Array(NN);
     this.link = new Int32Array(n).fill(-1);
     // Per colony, fixed by the map: the door (surface cell), the store and the queen (nest cells), the nursery rectangle.
     this.door = new Int32Array(TEAMS).fill(-1); this.store = new Int32Array(TEAMS).fill(-1); this.queen = new Int32Array(TEAMS).fill(-1);
@@ -111,12 +121,14 @@ export class Sim {
     this.homeF = Array.from({ length: TEAMS }, () => new Uint16Array(n)); this.doorF = Array.from({ length: TEAMS }, () => new Uint16Array(n));
     this.queenF = Array.from({ length: TEAMS }, () => new Uint16Array(n)); this.rallyF = Array.from({ length: TEAMS }, () => null);
     this.crew = new Int32Array(T); this.want = new Int32Array(T);
+    this.digF = Array.from({ length: TEAMS }, () => null); this.storeCells = [[], []]; this.nurseryCells = [[], []]; this.dirty = false;
     this.head = new Int32Array(n).fill(-1); this.nextAnt = new Int32Array(A); this.occ = new Uint8Array(n);
     this.bq = new Int32Array(n); this.prev = new Int32Array(n);
     this.queue = []; this.events = []; this.anyDead = false;
     if (options.restoring) return;
     if (cfg.blank) { this.mat.fill(MAT.OPEN, 0, L.nestBase); this.mat.fill(MAT.CLAY, L.nestBase); }
     generate(this);
+    this.recount();
     for (let t = 0; t < TEAMS; t++) this.startColony(t);
     this.rebuildFields();
   }
@@ -135,13 +147,35 @@ export class Sim {
     for (let k = 0; k < cfg.eggs; k++) { const b = this.addBrood(t, STAGE.EGG); if (b >= 0) this.bAge[b] = Math.floor((200 * k) / Math.max(1, cfg.eggs)); }
   }
 
-  nurseryCell(t) {
-    const h = this.nursery[t];
-    for (let tries = 0; tries < 8; tries++) {
-      const c = cellAt(this.L, NEST, h.x + below(this.rng, STREAM.spare, h.w), h.y + below(this.rng, STREAM.spare, h.h));
-      if (c >= 0 && this.mat[c] === MAT.OPEN) return c;
+  /** The colony that owns a nest cell: the one whose door is nearer in x. */
+  owner(k) { const x = k % this.L.nw; let best = 0, bd = 1e9; for (let t = 0; t < TEAMS; t++) { const d = Math.abs(x - (this.door[t] % this.L.sw)); if (d < bd) { bd = d; best = t; } } return best; }
+
+  /** Count each colony's open rooms into its caps and its lists of store and nursery cells. */
+  recount() {
+    const L = this.L, cg = this.cg, NN = this.room.length, n = [0, 0, 0, 0, 0, 0, 0, 0], marks = [0, 0];
+    for (let t = 0; t < TEAMS; t++) { this.storeCells[t].length = 0; this.nurseryCells[t].length = 0; }
+    for (let k = 0; k < NN; k++) {
+      if (this.mark[k]) marks[this.mark[k] - 1]++;
+      const r = this.room[k];
+      if (!r || this.mat[L.nestBase + k] !== MAT.OPEN) continue;
+      const t = this.owner(k); n[t * 4 + r]++;
+      if (r === ROOM.STORE) this.storeCells[t].push(L.nestBase + k); else if (r === ROOM.NURSERY) this.nurseryCells[t].push(L.nestBase + k);
     }
-    return this.store[t];
+    for (let t = 0; t < TEAMS; t++) {
+      const o = t * CG.SIZE;
+      cg[o + CG.CAP_FOOD] = Math.max(C.STORE_MIN, C.STORE_PER * n[t * 4 + ROOM.STORE]);
+      cg[o + CG.CAP_BROOD] = Math.max(C.BROOD_MIN, n[t * 4 + ROOM.NURSERY]);
+      cg[o + CG.CAP_ADULTS] = C.REST_BASE + C.REST_PER * n[t * 4 + ROOM.REST];
+      cg[o + CG.MARKS] = marks[t];
+    }
+  }
+
+  /** Food with no store cell left to lie in spoils: called when a colony's rooms are repainted. */
+  spoil(t) { const cg = this.cg, o = t * CG.SIZE, cap = cg[o + CG.CAP_FOOD]; if (cg[o + CG.SUGAR] > cap) cg[o + CG.SUGAR] = cap; if (cg[o + CG.PROTEIN] > cap) cg[o + CG.PROTEIN] = cap; }
+
+  nurseryCell(t) {
+    const list = this.nurseryCells[t];
+    return list.length ? list[below(this.rng, STREAM.spare, list.length)] : this.store[t];
   }
 
   addBrood(t, stage) {
@@ -171,6 +205,7 @@ export class Sim {
   /** Queue an order: { team, type, id?, tick?, ... }. It applies at the start of its tick (the next one by default). */
   order(o) {
     const e = { ...o, tick: Math.max(o.tick ?? this.tick, this.tick) };
+    if (o.points) e.points = Array.from(o.points); if (o.cells) e.cells = Array.from(o.cells); // the log keeps its own copy
     let at = this.queue.length;
     while (at > 0 && this.queue[at - 1].tick > e.tick) at--;
     this.queue.splice(at, 0, e);
@@ -209,6 +244,32 @@ export class Sim {
       this.rallyF[t] = this.field(this.rallyF[t], [c]);
       this.event(EVENT.RALLY, t, c);
     } else if (o.type === CMD.RECALL) cg[base + CG.RECALL] = o.on ? 1 : 0;
+    else if (o.type === CMD.DIG || o.type === CMD.ROOM) {
+      // cells: nest [x, y, ...]. DIG marks clay to be dug (on: 0 takes the mark off). ROOM paints a use on open or marked cells;
+      // with dig: 1 it marks clay first, and with kind NONE it also takes marks off, so one stroke is one order.
+      const L = this.L, pts = o.cells || [], dig = o.type === CMD.DIG, kind = o.kind | 0;
+      if (!dig && !(kind >= 0 && kind <= 3)) return no(WHY.NONE);
+      let done = 0, marks = cg[base + CG.MARKS], stores = false;
+      const use = (k, to) => { if (this.room[k] === ROOM.STORE || to === ROOM.STORE) stores = true; this.room[k] = to; done++; };
+      for (let j = 0; j + 1 < pts.length && j < 512; j += 2) {
+        const x = pts[j] | 0, y = pts[j + 1] | 0;
+        if (x < 1 || x >= L.nw - 1 || y < 2 || y >= L.nh - 1) continue;
+        const k = y * L.nw + x, m = this.mat[L.nestBase + k];
+        if (this.owner(k) !== t) continue;
+        if (dig) {
+          if (o.on === 0 || o.on === false) { if (this.mark[k] === t + 1) { this.mark[k] = 0; marks--; done++; if (this.room[k]) use(k, ROOM.NONE); } }
+          else if (m === MAT.CLAY && !this.mark[k] && marks < C.MARKS_MAX) { this.mark[k] = t + 1; this.digLeft[k] = C.DIG_TICKS; marks++; done++; }
+        } else {
+          if (o.dig && kind && m === MAT.CLAY && !this.mark[k] && marks < C.MARKS_MAX) { this.mark[k] = t + 1; this.digLeft[k] = C.DIG_TICKS; marks++; done++; }
+          if (!kind && this.mark[k] === t + 1) { this.mark[k] = 0; marks--; done++; }
+          if ((m === MAT.OPEN || this.mark[k] === t + 1 || !kind) && this.room[k] !== kind) use(k, kind);
+        }
+      }
+      if (!done) return no(WHY.BLOCKED);
+      this.recount(); if (stores) this.spoil(t);
+      // Marks change only where the diggers go; the way home changes only with the stores.
+      if (stores) this.dirty = true; else this.rebuildDig();
+    }
   }
 
   /** The open surface cell at or nearest (x, y) within two cells, or -1. */
@@ -315,11 +376,26 @@ export class Sim {
 
   rebuildFields() {
     for (let t = 0; t < TEAMS; t++) {
-      this.field(this.homeF[t], [this.store[t]]); this.field(this.doorF[t], [this.door[t]]); this.field(this.queenF[t], [this.queen[t]]);
+      this.field(this.homeF[t], this.storeCells[t].length ? this.storeCells[t] : [this.store[t]]); this.field(this.doorF[t], [this.door[t]]); this.field(this.queenF[t], [this.queen[t]]);
       const r = this.cg[t * CG.SIZE + CG.RALLY_CELL];
       this.rallyF[t] = r >= 0 ? this.field(this.rallyF[t], [r]) : null;
     }
     for (let s = 0; s < TEAMS * TRAILS; s++) if (this.trLive[s]) this.buildTrailField(s); else this.trF[s] = null;
+    this.rebuildDig();
+  }
+
+  /** Per colony: steps to the nearest open nest cell beside a cell it has marked to dig, or null with nothing to dig. */
+  rebuildDig() {
+    const L = this.L, NN = this.mark.length;
+    for (let t = 0; t < TEAMS; t++) {
+      const src = [];
+      if (this.cg[t * CG.SIZE + CG.MARKS] > 0) for (let k = 0; k < NN; k++) {
+        if (this.mark[k] !== t + 1) continue;
+        // Only from its own earth: a mark on the border is not a way into the rival's nest.
+        for (let d = 0; d < 4; d++) { const m = L.nb[(L.nestBase + k) * 4 + d]; if (m >= L.nestBase && this.mat[m] === MAT.OPEN && this.owner(m - L.nestBase) === t) src.push(m); }
+      }
+      this.digF[t] = src.length ? this.field(this.digF[t], src) : null;
+    }
   }
 
   /** The neighbour of c to step to: the lowest value of F (up: the highest value under OFF), among open cells four ways, the
@@ -340,6 +416,7 @@ export class Sim {
 
   step() {
     while (this.queue.length && this.queue[0].tick <= this.tick) this.apply(this.queue.shift());
+    if (this.dirty) { this.dirty = false; this.rebuildFields(); }
     this.census();
     this.stepColonies();
     this.buildBuckets();
@@ -347,6 +424,7 @@ export class Sim {
     for (let i = 0; i < this.n; i++) this.stepAnt(i);
     this.fight();
     if (this.anyDead) this.removeDead();
+    if (this.dirty) { this.dirty = false; this.rebuildFields(); }
     if (this.tick % 50 === 49) this.checkTrails();
     this.judge();
     this.tick++;
@@ -354,13 +432,13 @@ export class Sim {
 
   census() {
     const cg = this.cg, crew = this.crew.fill(0);
-    for (let t = 0; t < TEAMS; t++) { const o = t * CG.SIZE; cg[o + CG.ADULTS] = cg[o + CG.MAJORS] = cg[o + CG.WORKERS] = cg[o + CG.RESTING] = 0; }
+    for (let t = 0; t < TEAMS; t++) { const o = t * CG.SIZE; cg[o + CG.ADULTS] = cg[o + CG.MAJORS] = cg[o + CG.WORKERS] = cg[o + CG.RESTING] = cg[o + CG.DIGGERS] = 0; }
     for (let i = 0; i < this.n; i++) {
       if (this.hp[i] === 0) continue;
       const t = this.team[i], o = t * CG.SIZE;
       cg[o + CG.ADULTS]++;
       if (this.caste[i] === CASTE.MAJOR) cg[o + CG.MAJORS]++; else if (this.task[i] !== TASK.NURSE) cg[o + CG.WORKERS]++;
-      if (this.task[i] === TASK.REST) cg[o + CG.RESTING]++;
+      if (this.task[i] === TASK.REST) cg[o + CG.RESTING]++; else if (this.task[i] === TASK.DIG) cg[o + CG.DIGGERS]++;
       if (this.tr[i] >= 0) crew[t * TRAILS + this.tr[i]]++;
     }
     for (let t = 0; t < TEAMS; t++) {
@@ -418,7 +496,7 @@ export class Sim {
       const o = t * CG.SIZE;
       if (cg[o + CG.QUEEN_HP] <= 0) continue;
       if (cg[o + CG.LAY] > 0) cg[o + CG.LAY]--;
-      if (cg[o + CG.LAY] === 0 && cg[o + CG.SUGAR] > 0 && count[t] < C.NURSERY && this.n + this.bn < this.cfg.maxAnts) { if (this.addBrood(t, STAGE.EGG) >= 0) cg[o + CG.LAY] = C.LAY_EVERY; }
+      if (cg[o + CG.LAY] === 0 && cg[o + CG.SUGAR] > 0 && count[t] < cg[o + CG.CAP_BROOD] && cg[o + CG.ADULTS] + count[t] < cg[o + CG.CAP_ADULTS] && this.n + this.bn < this.cfg.maxAnts) { if (this.addBrood(t, STAGE.EGG) >= 0) cg[o + CG.LAY] = C.LAY_EVERY; }
       // Meals: a major eats as three.
       if (this.tick % C.EAT_EVERY === C.EAT_EVERY - 1) {
         const mouths = cg[o + CG.ADULTS] + 2 * cg[o + CG.MAJORS], need = Math.floor((mouths + C.ADULTS_PER_SUGAR - 1) / C.ADULTS_PER_SUGAR);
@@ -520,7 +598,22 @@ export class Sim {
   decide(i, c, t, o, s) {
     const cg = this.cg, task = this.task[i], home = this.homeF[t];
     const recall = cg[o + CG.RECALL] === 1;
-    if (task === TASK.NURSE) { const h = this.nursery[t]; return this.mill(i, c, m => { const k = m - this.L.nestBase, x = k % this.L.nw, y = Math.floor(k / this.L.nw); return m >= this.L.nestBase && x >= h.x && x < h.x + h.w && y >= h.y && y < h.y + h.h; }, 24); }
+    if (task === TASK.NURSE) return this.mill(i, c, m => m >= this.L.nestBase && this.room[m - this.L.nestBase] === ROOM.NURSERY, 24);
+    if (task === TASK.DIG) {
+      const F = this.digF[t], L0 = this.L;
+      if (!F || recall || F[c] === FAR) { this.task[i] = TASK.REST; return c; }
+      if (F[c] > 0) { const m = this.next(F, c); if (m >= L0.nestBase) return m; this.task[i] = TASK.REST; return c; } // a digger never leaves the nest
+      // Beside a marked cell: dig it. The last stroke opens it.
+      const L = L0;
+      for (let d = 0; d < 4; d++) {
+        const m = L.nb[c * 4 + d], k = m - L.nestBase;
+        if (m < L.nestBase || this.mark[k] !== t + 1) continue;
+        this.to[i] = -1;
+        if (--this.digLeft[k] === 0) { this.mat[m] = MAT.OPEN; this.mark[k] = 0; this.recount(); this.dirty = true; this.event(EVENT.DUG, t, m); }
+        return c;
+      }
+      this.task[i] = TASK.REST; return c;
+    }
     if (this.inv[i]) return this.invade(i, c, t);
     if (task === TASK.OUT) {
       if (s < 0 || !this.trLive[s] || recall) { this.task[i] = TASK.BACK; this.tr[i] = -1; return this.next(home, c); }
@@ -535,8 +628,10 @@ export class Sim {
         const kind = this.carry[i];
         if (kind) {
           const food = kind === CARRY.PROTEIN ? FOOD.PROTEIN : FOOD.SUGAR;
-          cg[o + (food === FOOD.PROTEIN ? CG.PROTEIN : CG.SUGAR)]++; cg[o + (food === FOOD.PROTEIN ? CG.LOADS_P : CG.LOADS_S)]++;
-          this.carry[i] = 0; this.event(EVENT.HOME, t, food, this.tr[i]);
+          const slot = o + (food === FOOD.PROTEIN ? CG.PROTEIN : CG.SUGAR);
+          this.carry[i] = 0;
+          if (cg[slot] >= cg[o + CG.CAP_FOOD]) this.event(EVENT.FULL, t, food); // no room in the stores: the load is lost
+          else { cg[slot]++; cg[o + (food === FOOD.PROTEIN ? CG.LOADS_P : CG.LOADS_S)]++; this.event(EVENT.HOME, t, food, this.tr[i]); }
         }
         // Home: she leaves her crew, so a trail's count is of ants at work and the next free ant can take the place.
         if (this.tr[i] >= 0) { const q = t * TRAILS + this.tr[i]; if (this.crew[q] > 0) this.crew[q]--; this.tr[i] = -1; }
@@ -576,6 +671,7 @@ export class Sim {
   assign(i, c, t, o) {
     if (this.cg[o + CG.RECALL]) return c;
     const major = this.caste[i] === CASTE.MAJOR;
+    if (!major && this.digF[t] && this.layer[i] === NEST && this.digF[t][c] !== FAR && this.cg[o + CG.DIGGERS] < Math.min(C.DIG_CREW, 2 * this.cg[o + CG.MARKS])) { this.cg[o + CG.DIGGERS]++; this.task[i] = TASK.DIG; this.since[i] = 0; return this.next(this.digF[t], c); }
     let best = -1, gap = 0;
     for (let k = 0; k < TRAILS; k++) {
       const s = t * TRAILS + k;
@@ -693,7 +789,7 @@ export class Sim {
           if (d < bd) { bd = d; target = j; }
         }
       }
-      if (target >= 0) { this.press[target]++; dmg[target] += CASTE_BITE[this.caste[i]]; by[target] = t; any = true; this.cool[i] = C.BITE_EVERY; continue; }
+      if (target >= 0) { this.press[target]++; dmg[target] += CASTE_BITE[this.caste[i]]; by[target] = t; any = true; this.cool[i] = C.BITE_EVERY - 1 + below(this.rng, STREAM.ants, 3); continue; }
       // No ant to bite: an enemy queen within a cell.
       if (layer === NEST) for (let e = 0; e < TEAMS; e++) {
         if (e === t || cg[e * CG.SIZE + CG.QUEEN_HP] <= 0 || this.queenF[e][this.cellOf(i)] > 1) continue;
@@ -744,7 +840,7 @@ export class Sim {
   stateArrays() {
     const n = this.n, b = this.bn;
     return [
-      ['mat', this.mat], ['cg', this.cg], ['rng', this.rng], ['pileCell', this.pileCell], ['pileAmount', this.pileAmount], ['pileKind', this.pileKind],
+      ['mat', this.mat], ['room', this.room], ['mark', this.mark], ['digLeft', this.digLeft], ['cg', this.cg], ['rng', this.rng], ['pileCell', this.pileCell], ['pileAmount', this.pileAmount], ['pileKind', this.pileKind],
       ...['x', 'y', 'layer', 'heading', 'team', 'caste', 'hp', 'task', 'carry', 'tr', 'cool', 'press', 'to', 'tx', 'ty', 'since', 'inv', 'id'].map(k => [k, this[k], n]),
       ...['bTeam', 'bStage', 'bAge', 'bFed', 'bHunger', 'bCell', 'bMajor'].map(k => [k, this[k], b]),
       ['trLive', this.trLive], ['trKind', this.trKind], ['trLevel', this.trLevel], ['trDry', this.trDry], ['trLen', this.trLen], ['trSeq', this.trSeq], ['trPath', this.trPath],
@@ -772,7 +868,7 @@ export class Sim {
     generate(sim, true); // the fixed layout (doors, stores, rooms); the terrain itself comes from the save
     sim.tick = s.tick; sim.n = s.n; sim.bn = s.bn; sim.result = s.result; sim.nextId = s.nextId;
     for (const k of Object.keys(s.a)) sim[k].set(s.a[k]);
-    sim.rebuildFields();
+    sim.recount(); sim.rebuildFields();
     return sim;
   }
 }

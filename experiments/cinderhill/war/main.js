@@ -1,7 +1,7 @@
 // Cinderhill: The Crossing. The page for the war sim (./sim.js): two colonies on one hill. No game rule lives here:
 // everything on screen is read from the sim or its events, and every order goes through host.order() under seat 0.
 import { Host } from './host.js';
-import { CMD, KIND, CG, EVENT, REASON, TASK, CASTE, STAGE, MAT, TRAILS, PATH_MAX, MAX_PILES, C, LEVEL_SHARE, RAID_SHARE } from './sim.js';
+import { CMD, KIND, CG, EVENT, REASON, TASK, CASTE, STAGE, MAT, ROOM, TRAILS, PATH_MAX, MAX_PILES, C, LEVEL_SHARE, RAID_SHARE } from './sim.js';
 import { makeGestures } from '../gestures.js';
 import { GameRenderer, sky } from '../game/gl.js';
 import { noZoom } from '../../kit/zoom.js';
@@ -155,7 +155,7 @@ function restart(newSeed = true) {
   dropTouches();
   if (running) rec.end('restart', summary());
   if (newSeed && !(qSeed > 0)) seed = 1 + Math.floor(Math.random() * 9999);
-  host = newHost(); sim = host.sim; sel = -1; floats = []; pulses = []; beacon = null; parts.length = 0; trailSig = '?'; told.clear(); firstTrail = false; danger = 0; setSpeed(1);
+  host = newHost(); sim = host.sim; sel = -1; floats = []; pulses = []; beacon = null; parts.length = 0; trailSig = '?'; told.clear(); told.fullAt = told.popAt = told.qAt = 0; builds.clear(); firstTrail = false; danger = 0; setSpeed(1);
   if (tool !== 'trail') setTool('trail'); if (nestOpen) setNest(false);
   uploadTerrain(); uploadAnts(); startRun(); resume();
 }
@@ -253,10 +253,42 @@ ui.addEventListener('lostpointercapture', e => run(Gs.cancel(e.pointerId, 'lostp
 ui.addEventListener('contextmenu', e => e.preventDefault());
 ui.addEventListener('wheel', e => { if (screen !== 'play') return; e.preventDefault(); act({ type: 'zoom', f: Math.exp(-e.deltaY * 0.0015), x: e.clientX, y: e.clientY }); }, { passive: false });
 $('mini').addEventListener('pointerdown', e => { const r = $('mini').getBoundingClientRect(); camGoal = null; cam.x = (e.clientX - r.left) / r.width * L0.sw; cam.y = (e.clientY - r.top) / r.height * L0.sh; clampCam(); e.stopPropagation(); });
-let nestDrag = null;
-nestCanvas.addEventListener('pointerdown', e => { try { nestCanvas.setPointerCapture(e.pointerId); } catch { /* synthetic */ } nestDrag = { id: e.pointerId, x: e.clientX, y: e.clientY }; });
-nestCanvas.addEventListener('pointermove', e => { if (!nestDrag || e.pointerId !== nestDrag.id) return; nestCam.x = Math.max(8, Math.min(L0.nw - 8, nestCam.x - (e.clientX - nestDrag.x) / nestCam.z)); nestCam.y = Math.max(0, Math.min(L0.nh - 10, nestCam.y - (e.clientY - nestDrag.y) / nestCam.z)); nestDrag.x = e.clientX; nestDrag.y = e.clientY; });
-for (const n of ['pointerup', 'pointercancel', 'lostpointercapture']) nestCanvas.addEventListener(n, () => { nestDrag = null; });
+// The nest: with Look, a drag moves the view; with a room tool, a drag paints cells and lifting the finger sends the orders.
+let nestDrag = null, nestTool = 'look', paint = null;
+const builds = new Set(); // ids of the build orders sent, to tell a refused one from a refused trail
+const ROOM_OF = { store: ROOM.STORE, nursery: ROOM.NURSERY, rest: ROOM.REST };
+const ROOM_CSS = ['', '255, 196, 90', '240, 232, 214', '140, 214, 150'];
+const nestCell = e => { const r = nestCanvas.getBoundingClientRect(); return [Math.floor((e.clientX - r.left - NW / 2) / nestCam.z + nestCam.x), Math.floor((e.clientY - r.top - 26) / nestCam.z + nestCam.y)]; };
+function paintAt(e) {
+  const r = nestCanvas.getBoundingClientRect(); if (e.clientY < r.top + 26 || e.clientY > r.bottom || e.clientX < r.left || e.clientX > r.right) return; // only what is on screen
+  const [x, y] = nestCell(e), k = y * L0.nw + x;
+  if (x < 0 || x >= L0.nw || y < 0 || y >= L0.nh || sim.owner(k) !== ME || paint.seen.has(k)) return; // the sim refuses what it must
+  paint.seen.add(k); paint.cells.push(x, y);
+}
+function setNestTool(t) { nestTool = t; for (const b of document.querySelectorAll('#rooms [data-room]')) b.setAttribute('aria-pressed', String(b.dataset.room === t)); if (t !== 'look') toast(t === 'clear' ? 'Drag over marks or rooms to clear them' : 'Drag in the earth: workers dig it out', 2400); }
+for (const b of document.querySelectorAll('#rooms [data-room]')) b.addEventListener('click', () => { setNestTool(b.dataset.room); tone(500, 0.06, 0.03, 'triangle'); });
+nestCanvas.addEventListener('pointerdown', e => {
+  if (nestDrag) return; // one finger at a time
+  try { nestCanvas.setPointerCapture(e.pointerId); } catch { /* synthetic */ }
+  nestDrag = { id: e.pointerId, x: e.clientX, y: e.clientY };
+  if (nestTool !== 'look' && running) { paint = { cells: [], seen: new Set(), tool: nestTool }; paintAt(e); }
+});
+nestCanvas.addEventListener('pointermove', e => {
+  if (!nestDrag || e.pointerId !== nestDrag.id) return;
+  if (paint) { const n = Math.max(1, Math.ceil(Math.hypot(e.clientX - nestDrag.x, e.clientY - nestDrag.y) / (nestCam.z * 0.5))); for (let j = 1; j <= n; j++) paintAt({ clientX: nestDrag.x + (e.clientX - nestDrag.x) * j / n, clientY: nestDrag.y + (e.clientY - nestDrag.y) * j / n }); }
+  else { nestCam.x = Math.max(8, Math.min(L0.nw - 8, nestCam.x - (e.clientX - nestDrag.x) / nestCam.z)); nestCam.y = Math.max(0, Math.min(L0.nh - 10, nestCam.y - (e.clientY - nestDrag.y) / nestCam.z)); }
+  nestDrag.x = e.clientX; nestDrag.y = e.clientY;
+});
+nestCanvas.addEventListener('pointerup', e => {
+  if (!nestDrag || e.pointerId !== nestDrag.id) return;
+  if (paint && paint.cells.length) {
+    const cells = paint.cells, nestTool = paint.tool; // the tool the stroke began with
+    builds.add(order({ type: CMD.ROOM, cells, kind: nestTool === 'clear' ? ROOM.NONE : ROOM_OF[nestTool], dig: 1 }));
+    rec.event('build', { tool: nestTool, cells: cells.length / 2, at: sim.tick }); tone(380, 0.1, 0.04, 'triangle', 90); navigator.vibrate?.(8);
+  }
+  paint = null; nestDrag = null;
+});
+for (const n of ['pointercancel', 'lostpointercapture']) nestCanvas.addEventListener(n, e => { if (nestDrag && e.pointerId !== nestDrag.id) return; nestDrag = null; paint = null; });
 
 // ---- what the sim reports, shown ----
 const told = new Set();
@@ -281,7 +313,10 @@ function news() {
       if (a === ME) deaths++;
     } else if (type === EVENT.PILE_EMPTY) { /* its trail goes dry: see DRY */ }
     else if (type === EVENT.DRY && a === ME) { toast('That food is gone. The trail waits for more.'); tone(300, 0.2, 0.04, 'triangle', -90); }
+    else if (type === EVENT.DUG && a === ME) { if (nestOpen) tone(210 + Math.random() * 60, 0.05, 0.03, 'square', -60); }
+    else if (type === EVENT.FULL && a === ME) { if (now - (told.fullAt ?? 0) > 20000) { told.fullAt = now; toast(`No room for more ${b ? 'meat' : 'seeds'}. Dig a store in the Nest.`, 3600, true); } }
     else if (type === EVENT.REJECTED && a === ME) {
+      if (builds.has(b)) { builds.delete(b); tone(150, 0.12, 0.05, 'sawtooth', -40); toast(nestTool === 'clear' ? 'Nothing to clear there.' : 'Nothing to dig or change there.', 2200); continue; }
       const q = pending.find(q => q.id === b); if (q) { pulses.push({ pts: q.points, at: now, bad: true }); q.done = true; }
       tone(150, 0.22, 0.07, 'sawtooth', -40); toast(c === 1 ? 'Six trails is the most. Erase one first.' : 'No ant can walk that.', 2600, true);
     } else if (type === EVENT.TRAIL) {
@@ -338,6 +373,10 @@ function hud() {
   const diet = g(ME, CG.DIET);
   for (const b of document.querySelectorAll('#diets [data-diet]')) b.setAttribute('aria-pressed', String(Number(b.dataset.diet) === diet));
   $('dietInfo').textContent = g(ME, CG.PROTEIN) === 0 ? 'no meat: bring red food' : `${g(ME, CG.PROTEIN)} meat in store · a soldier eats 3`;
+  const capA = g(ME, CG.CAP_ADULTS), capB = g(ME, CG.CAP_BROOD), capF = g(ME, CG.CAP_FOOD), pop = g(ME, CG.ADULTS) + brood;
+  const cap = (id, n, of) => { const el = $(id); el.textContent = `${n}/${of}`; el.parentElement.classList.toggle('tight', n >= of); };
+  cap('capFood', Math.max(g(ME, CG.SUGAR), g(ME, CG.PROTEIN)), capF); cap('capBrood', brood, capB); cap('capAnts', pop, capA);
+  if (pop >= capA && sim.tick > 200 && performance.now() - (told.popAt ?? 0) > 45000) { told.popAt = performance.now(); toast('The hill is full: the queen stops laying. Dig quarters in the Nest.', 4200, true); }
   $('recall').setAttribute('aria-pressed', String(!!g(ME, CG.RECALL)));
   drawMini(); tuneSong();
 }
@@ -464,6 +503,15 @@ function drawNest(now) {
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const r = hash(x + 91, y + 17); if (r > 0.82) { c.fillStyle = 'rgba(20, 14, 10, 0.3)'; c.beginPath(); c.ellipse(sx(x + r), sy(y + hash(x, y + 5)), z * 0.2, z * 0.13, r * 6, 0, 7); c.fill(); } else if (r < 0.12) { c.fillStyle = 'rgba(255, 226, 190, 0.09)'; c.beginPath(); c.ellipse(sx(x + r * 5), sy(y + hash(x + 3, y)), z * 0.12, z * 0.08, r * 40, 0, 7); c.fill(); } }
   const open = (x, y) => sim.mat[base + y * w + x] === MAT.OPEN;
   for (const [r, col] of [[0.78, '#120c09'], [0.62, '#2a1c14']]) { c.fillStyle = col; c.beginPath(); for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (open(x, y)) { const px = sx(x + 0.5), py = sy(y + 0.5); c.moveTo(px + z * r, py); c.arc(px, py, z * r, 0, 7); } c.fill(); }
+  // Rooms by tint, cells waiting to be dug as hatched squares, the stroke under the finger brighter.
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    const k = y * w + x, r = sim.room[k], m = sim.mark[k];
+    if (!r && !m) continue;
+    const px = sx(x), py = sy(y);
+    if (r && open(x, y)) { c.fillStyle = `rgba(${ROOM_CSS[r]}, 0.16)`; c.fillRect(px + 0.5, py + 0.5, z - 1, z - 1); }
+    if (m) { c.fillStyle = `rgba(${ROOM_CSS[r] || '255, 255, 255'}, ${0.2 + 0.08 * Math.sin(now / 260 + x + y)})`; c.fillRect(px + 1, py + 1, z - 2, z - 2); c.strokeStyle = `rgba(${ROOM_CSS[r] || '255, 255, 255'}, 0.8)`; c.lineWidth = 1; c.beginPath(); c.moveTo(px + 2, py + z - 2); c.lineTo(px + z - 2, py + 2); c.stroke(); const left = sim.digLeft[k] / C.DIG_TICKS; if (left < 1) { c.fillStyle = '#120c09'; c.fillRect(px + 1, py + 1, (z - 2) * (1 - left), z - 2); } }
+  }
+  if (paint) { c.fillStyle = paint.tool === 'clear' ? 'rgba(255, 90, 60, 0.4)' : `rgba(${ROOM_CSS[ROOM_OF[paint.tool]]}, 0.45)`; for (let j = 0; j < paint.cells.length; j += 2) c.fillRect(sx(paint.cells[j]) + 1, sy(paint.cells[j + 1]) + 1, z - 2, z - 2); }
   for (const t of [ME, FOE]) {
     const st = sim.store[t] - base, stx = st % w, sty = Math.floor(st / w), q = sim.queen[t] - base, qx = sx(q % w + 0.5), qy = sy(Math.floor(q / w) + 0.5), tint = t ? '120, 150, 255' : '255, 170, 80';
     const gl = c.createRadialGradient(qx, qy, 0, qx, qy, z * 7); gl.addColorStop(0, `rgba(${tint}, ${0.28 + 0.05 * Math.sin(now / 700)})`); gl.addColorStop(1, `rgba(${tint}, 0)`); c.fillStyle = gl; c.fillRect(qx - z * 7, qy - z * 7, z * 14, z * 14);
@@ -542,6 +590,6 @@ window.game = {
   state: () => ({ screen, tool, nest: nestOpen, t: sim.tick, ants: sim.n, drawn: drawnAnts, gl: !!renderer && !renderer.lost, glFailed, frames, result: sim.result, sel, set: set.snapshot(), ...summary() }),
   toScreen: (x, y, h) => toScreen(x, y, h), camera: () => ({ ...cam }), setCamera: c => { camGoal = null; Object.assign(cam, c); clampCam(); },
   door: t => doorXY(t), piles: () => { const o = []; for (let p = 0; p < MAX_PILES; p++) if (sim.pileAmount[p] > 0) o.push({ x: sim.pileCell[p] % L0.sw, y: Math.floor(sim.pileCell[p] / L0.sw), kind: sim.pileKind[p], amount: sim.pileAmount[p] }); return o; },
-  setTool, setNest, setSpeed, order, run: n => { host.run(n); news(); uploadAnts(); }, log: () => JSON.parse(JSON.stringify(host.log)), hash: () => sim.hash(),
+  setTool, setNest, setNestTool, nestXY: (x, y) => { const r = nestCanvas.getBoundingClientRect(); return [r.left + (x + 0.5 - nestCam.x) * nestCam.z + NW / 2, r.top + (y + 0.5 - nestCam.y) * nestCam.z + 26]; }, setSpeed, order, run: n => { host.run(n); news(); uploadAnts(); }, log: () => JSON.parse(JSON.stringify(host.log)), hash: () => sim.hash(),
 };
 void TASK;
