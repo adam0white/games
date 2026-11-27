@@ -102,13 +102,14 @@ function trailTo(sim, c) {
  *  - quota: the old quota opening of 02 section 3.1: 20 workers, 40 sugar, 4 larvae and no pupae, a 40-load first
  *    day of 10 minutes. It must fail a line the current build passes.
  *  - brood10: every brood stage ten times as long (the roadmap's planted slow-down). It must fail the gate.
- *  - door1: a one-cell door and 300 adults (02-spec 3.2 Doors: bots test congestion in a separate fixture). It must jam. */
+ *  - door1: a one-cell door and 300 adults (02-spec 3.2 Doors: bots test congestion in a separate fixture). It must jam.
+ *  - door3: the same crowd at the real 3-cell door, door1's control. */
 export function withFixture(fixture, fn) {
   if (!fixture) return fn({});
   const keep = { start: { ...START }, goal: DAY_GOALS[0].slice(), c: { ...C }, door: { ...DOOR } };
   try {
     if (fixture === 'quota') { Object.assign(START, { ants: 20, surface: 20, sugar: 40, protein: 0, eggs: 0, larvae: 4, pupae: 0 }); DAY_GOALS[0] = [GOAL_KIND.TRAIL_LOADS, 40]; return fn({ dayTicks: 12000 }); }
-    if (fixture === 'door1') { DOOR.wide = 1; Object.assign(START, { ants: 300, surface: 200, sugar: 400 }); return fn({}); }
+    if (fixture === 'door1' || fixture === 'door3') { if (fixture === 'door1') DOOR.wide = 1; Object.assign(START, { ants: 300, surface: 200, sugar: 400 }); return fn({}); }
     if (fixture === 'brood10') { for (const k of ['EGG_TICKS', 'LARVA_TICKS', 'LARVA_STARVE', 'PUPA_TICKS']) C[k] *= 10; return fn({}); }
     throw new Error(`no fixture ${fixture}`);
   } finally { Object.assign(START, keep.start); DAY_GOALS[0] = keep.goal; Object.assign(C, keep.c); Object.assign(DOOR, keep.door); }
@@ -150,6 +151,9 @@ function quiet(st) {
   return g / HZ;
 }
 
+/** A share to 3 places, rounded up: a value over a limit never rounds down to it (10.04% stays over 10%). */
+export const up = x => Math.ceil(x * 1000 - 1e-9) / 1000;
+
 export function measure(st, ticks = st.steps) {
   const first = st.trails.find(t => t.state === 'applied');
   // Decision events are the kinds 02 section 3.1 lists (a threat arriving or leaving offers no new choice).
@@ -165,10 +169,10 @@ export function measure(st, ticks = st.steps) {
     fundedBirth: (() => { if (st.firstTrailProtein < 0) return null; const b = st.births.slice(START.pupae + START.protein).find(t => t > st.firstTrailProtein); return b === undefined ? null : b / HZ; })(),
     threat: at('threat telegraphed'), resolved: at('threat resolved'),
     gapEarly: gap(0, Math.min(ticks, ten)), gapLate: ticks > ten + 60 * HZ ? gap(ten, ticks) : null,
-    idleMax: Math.round(st.idleMax * 1000) / 1000,
+    idleMax: up(st.idleMax),
     firstOrder: st.firstOrder >= 0 ? st.firstOrder / HZ : null,
     quiet: ticks >= 2 * 60 * HZ ? quiet(st) : null,
-    queuedShare: Math.round(st.queuedShare * 1000) / 1000, queuedMax: Math.round(st.queuedMax * 1000) / 1000, jams: st.jams,
+    queuedShare: up(st.queuedShare), queuedMax: up(st.queuedMax), jams: st.jams,
   };
 }
 
@@ -269,9 +273,12 @@ if (isMainThread && import.meta.url === `file://${process.argv[1]}`) {
     // The fixtures play 3 minutes on 5 seeds, and only lines that fit in 3 minutes are read.
     const short = { seeds: Math.min(seeds, 5), minutes: Math.min(minutes, 3) };
     const quota = await gate({ ...short, fixture: 'quota' }), brood = await gate({ ...short, fixture: 'brood10' });
-    // The one-cell door must jam on some seed, and the real door on none (chapter 1 cannot jam it: 02-spec 3.2).
-    const door = await runAll(Array.from({ length: short.seeds }, (_, k) => ({ bot: 'median', seed: k + 1, minutes: short.minutes, fixture: 'door1' })));
-    const doorJams = door.reduce((a, r) => a + r.jams, 0);
+    // The one-cell door must jam on some seed, and the real door on none (chapter 1 cannot jam it: 02-spec 3.2). The
+    // same crowd at the real 3-cell door is the control: the one-cell door must queue at least twice as much and jam
+    // more, or the narrowing does nothing (a crowd of 300 jams a 3-cell door now and then too).
+    const doors = await runAll(['door1', 'door3'].flatMap(fixture => Array.from({ length: short.seeds }, (_, k) => ({ bot: 'median', seed: k + 1, minutes: short.minutes, fixture }))));
+    const door = doors.slice(0, short.seeds), wide = doors.slice(short.seeds), sum = (a, f) => a.reduce((x, r) => x + f(r), 0);
+    const doorJams = sum(door, r => r.jams), wideJams = sum(wide, r => r.jams), doorQ = sum(door, r => r.queuedShare), wideQ = sum(wide, r => r.queuedShare);
     if (!args.includes('--quiet')) console.log(table(res));
     const block = LINES.filter(l => blocks(l));
     const quotaFails = block.filter(l => res[l.id].status === 'pass' && quota[l.id].status === 'fail').map(l => l.id);
@@ -292,8 +299,9 @@ if (isMainThread && import.meta.url === `file://${process.argv[1]}`) {
         try { old = JSON.parse(execFileSync('git', ['show', `${ref}:experiments/cinderhill/spikes/pace-baseline.json`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })); } catch { console.log(`no baseline at ${ref}: nothing to compare`); }
         if (old) problems.push(...slack(base, old).map(p => `baseline: ${p}`));
       }
-      console.log(`One-cell door: ${doorJams} jam(s) over ${short.seeds} seeds, ${short.minutes} min (it must jam).`);
+      console.log(`One-cell door: ${doorJams} jam(s) over ${short.seeds} seeds, ${short.minutes} min, queued share summed ${doorQ.toFixed(3)}; the same crowd at the 3-cell door: ${wideJams} jam(s), ${wideQ.toFixed(3)} (the one-cell door must jam, and more, and queue twice as much).`);
       if (!doorJams) problems.push('the one-cell door fixture never jams: the door lanes limit nothing');
+      else if (doorJams <= wideJams || doorQ < 2 * wideQ) problems.push(`the one-cell door queues no more than the 3-cell door (${doorJams} vs ${wideJams} jams, ${doorQ.toFixed(3)} vs ${wideQ.toFixed(3)} queued): the door width limits nothing`);
       if (!quotaFails.length) problems.push('the quota opening fails no blocking line the current build passes: the table is too loose');
       // Only lines the short fixture run can read: a line past its horizon is "not read" there, and that is no catch.
       const broodBad = ratchet(brood, base, block.filter(l => brood[l.id].status !== 'not read')).filter(p => !/passes now|in this run/.test(p));

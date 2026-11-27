@@ -387,13 +387,14 @@ test('the route card: a level capped short by older crews says so; free ants wal
   assert.ok(back.length > 0, 'some walk back');
   assert.equal(h.inspect(back[0]).why, 'toRest');
   h.order({ type: CMD.CREW, seq: seqs[2], delta: 0, level: 1 }); // room for free ants
-  let marked = 0; // free ants sent to rest keep the trail they worked in `via` until they pick again
+  let marked = 0, laden = 0; // a free ant sent to rest drops the trail she worked; one carrying home is not free (6.2)
   for (let k = 0; k < 600; k++) {
     if (k % 47 === 46) h.order({ type: CMD.CREW, seq: seqs[0], delta: 0, level: 1 + (k / 47 | 0) % 3 }); // crews grow and shrink: the third with them
     const st = h.stats(), free = new Map();
     let door = 0;
     for (let i = 0; i < s.n; i++) if (s.hp[i] > 0 && s.job[i] === JOB.FORAGE) {
-      if (s.via[i] >= FREE_VIA && s.mode[i] !== MODE.REST) free.set(s.via[i] - FREE_VIA, (free.get(s.via[i] - FREE_VIA) ?? 0) + 1);
+      if (s.via[i] >= FREE_VIA && s.carry[i]) laden++;
+      if (s.via[i] >= FREE_VIA && s.mode[i] !== MODE.REST && !s.carry[i]) free.set(s.via[i] - FREE_VIA, (free.get(s.via[i] - FREE_VIA) ?? 0) + 1);
       if (s.via[i] >= FREE_VIA && s.mode[i] === MODE.REST) marked++;
       if (s.mode[i] === MODE.REST && s.goal[i] < 0) door++;
     }
@@ -401,7 +402,8 @@ test('the route card: a level capped short by older crews says so; free ants wal
     assert.equal(st.resting, door);
     h.step();
   }
-  assert.ok(marked > 0, 'the case the card must not count came up');
+  assert.equal(marked, 0, 'no ant rests with a free route');
+  assert.ok(laden > 0, 'the case the card must not count came up: a free ant carrying home');
   // A restart at day 2's dawn keeps the loads home in the minute before it.
   while (h.sim.g[G.DAY] < 2 || h.sim.tick < 1300) { h.step(); if (h.dusk) h.goOn(); }
   const dawn = restore(h.dawns.get(2).bytes).tick, before = h.homeAt.filter(x => x[0] <= dawn).length;

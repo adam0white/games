@@ -94,7 +94,7 @@ export class Observer {
   get s() { return this.h.sim; }
   newMinute() {
     const g = this.s.g;
-    this.cur = { from: this.steps, tick: this.s.tick, sugar0: g[G.SUGAR_LOADS], protein0: g[G.PROTEIN_LOADS], died0: g[G.DIED], born0: g[G.BORN], lost0: g[G.BROOD_LOST], dug0: g[G.DUG], idle: 0, working: 0, other: 0, looks: 0 };
+    this.cur = { from: this.steps, tick: this.s.tick, sugar0: g[G.SUGAR_LOADS], protein0: g[G.PROTEIN_LOADS], died0: g[G.DIED], born0: g[G.BORN], lost0: g[G.BROOD_LOST], dug0: g[G.DUG], idle: 0, working: 0, other: 0, queued: 0, looks: 0 };
   }
   before() {
     const s = this.s, n = s.n;
@@ -154,13 +154,14 @@ export class Observer {
     let q = 0, outside = 0;
     for (let i = 0; i < s.n; i++) {
       if (s.layer[i] === SURFACE) outside++;
-      if (queued?.[i]) { q++; continue; } // queued at a door: counted apart (02-spec 3.1), not idle
+      if (queued?.[i]) { q++; if (s.layer[i] !== SURFACE) outside++; continue; } // queued at a door: counted apart (02-spec 3.1), not idle
       if (s.carry[i] || s.mode[i] === MODE.WORK || s.via[i] >= 0 || s.goal[i] === SLOT.ALARM) working++;
       else if (s.mode[i] === MODE.REST || (s.mode[i] === MODE.SEEK && s.since[i] >= 600)) idle++;
       else other++;
     }
-    this.cur.idle += idle; this.cur.working += working; this.cur.other += other; this.cur.looks++;
-    // Queued at doors, outside a jam (02-spec 3.1): ants waiting at a door lane over ants on the surface, summed over the looks.
+    this.cur.idle += idle; this.cur.working += working; this.cur.other += other; this.cur.queued += q; this.cur.looks++;
+    // Queued at doors, outside a jam (02-spec 3.1): ants waiting at a door lane over the ants out or waiting to go out
+    // (on the surface, or queued inside), summed over the looks.
     if (!s.g[G.JAMMED]) { this.queuedSum += q; this.outsideSum += outside; if (outside && q / outside > this.queuedMax) this.queuedMax = q / outside; }
     // The pace gate's idle share (02-spec 3.1): idle for IDLE_FOR ticks while some job has a gap.
     const gap = this.gapRun >= GAP_FOR;
@@ -185,7 +186,7 @@ export class Observer {
     for (let k = 0; k < (s.brood?.n ?? 0); k++) b[s.brood.stage[k]]++;
     let majors = 0; for (let i = 0; i < s.n; i++) if (s.caste[i] & 1) majors++;
     const L = Math.max(1, c.looks);
-    this.minutes.push({ minute: this.minutes.length + 1, tick: s.tick, sugar: g[G.SUGAR_LOADS] - c.sugar0, protein: g[G.PROTEIN_LOADS] - c.protein0, idle: Math.round(c.idle / L), working: Math.round(c.working / L), other: Math.round(c.other / L),
+    this.minutes.push({ minute: this.minutes.length + 1, tick: s.tick, sugar: g[G.SUGAR_LOADS] - c.sugar0, protein: g[G.PROTEIN_LOADS] - c.protein0, idle: Math.round(c.idle / L), working: Math.round(c.working / L), other: Math.round(c.other / L), queued: Math.round(c.queued / L),
       workers: s.n - majors, majors, eggs: b[STAGE.EGG], larvae: b[STAGE.LARVA], pupae: b[STAGE.PUPA], born: g[G.BORN] - c.born0, died: g[G.DIED] - c.died0, broodLost: g[G.BROOD_LOST] - c.lost0, dug: g[G.DUG] - c.dug0, sugarStore: g[G.SUGAR], proteinStore: g[G.PROTEIN] });
     this.newMinute();
   }
@@ -244,9 +245,9 @@ function report(s0, end, divergence, checks, notes, st, parts) {
   L.push('', divergence ? `**Replay diverged** at ${divergence.what}, tick ${divergence.tick}: the record says ${divergence.want}, the replay ${divergence.got}. Everything below is from the replay and may not be the game played.` : `**Replay matches**: ${checks} hash checks, all equal.`);
   for (const n of notes) L.push(`- ${n}`);
   if (end) L.push('', `Final: tick ${end.tick}, ${end.workers} workers, ${end.majors} majors, ${end.delivered} loads home, sugar ${end.sugar}, protein ${end.protein}, brood ${end.brood}; orders ${JSON.stringify(end.orders)}; longest play with no order ${sec(end.idleTicks)}${end.daysWon !== null ? `; day ${end.day}, days won ${end.daysWon}` : ''}.`);
-  L.push('', '## Per minute', '', '| Min | Tick | Sugar loads | Protein loads | Working | Idle | Other | Workers | Majors | Eggs / larvae / pupae | Born | Died | Brood lost | Dug |', '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |');
-  for (const m of st.minutes) L.push(`| ${m.minute} | ${m.tick} | ${m.sugar} | ${m.protein} | ${m.working} | ${m.idle} | ${m.other} | ${m.workers} | ${m.majors} | ${m.eggs} / ${m.larvae} / ${m.pupae} | ${m.born} | ${m.died} | ${m.broodLost} | ${m.dug} |`);
-  L.push('', 'Working: carrying, on a trail route, digging or answering an alarm. Idle: resting, or seeking for over 30 s.');
+  L.push('', '## Per minute', '', '| Min | Tick | Sugar loads | Protein loads | Working | Idle | Other | Queued | Workers | Majors | Eggs / larvae / pupae | Born | Died | Brood lost | Dug |', '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |');
+  for (const m of st.minutes) L.push(`| ${m.minute} | ${m.tick} | ${m.sugar} | ${m.protein} | ${m.working} | ${m.idle} | ${m.other} | ${m.queued ?? 0} | ${m.workers} | ${m.majors} | ${m.eggs} / ${m.larvae} / ${m.pupae} | ${m.born} | ${m.died} | ${m.broodLost} | ${m.dug} |`);
+  L.push('', 'Working: carrying, on a trail route, digging or answering an alarm. Idle: resting, or seeking for over 30 s. Queued: waiting at a door lane (counted apart).');
   L.push('', '## Trails', '', '| # | Tick | Length | Ends at | Ants on it, mean / most | Trips | First delivery after | Lasted | Ended |', '| --- | --- | --- | --- | --- | --- | --- | --- | --- |');
   st.trails.forEach((t, k) => L.push(`| ${k + 1} | ${t.tick} | ${t.len} | ${t.food < 0 ? 'no food' : t.food === FOOD.PROTEIN ? 'protein' : 'sugar'} | ${t.onMean} / ${t.onMax} | ${t.trips} | ${t.first < 0 ? 'never' : sec(t.first)} | ${sec(t.ticks)} | ${t.how || t.state} |`));
   if (st.unattributedTicks) L.push('', `Trips are not counted on the ${st.unattributedTicks} ticks where an ant died (the ants renumber).`);

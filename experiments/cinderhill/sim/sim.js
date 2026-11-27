@@ -387,10 +387,10 @@ export class Sim {
     this.census();
     if (this.cfg.colony) this.openLanes();
     for (let i = 0; i < this.n; i++) this.stepAnt(i);
-    if (this.cfg.colony) this.judgeJam();
     fight(this);
     if (this.cfg.colony && this.cfg.dayTicks > 0) stepSpider(this, EVENT.SPIDER); // the spider comes by day (chapter 3 in the spec)
     if (this.anyDead) { this.removeDead(); this.census(); } // the counts are read between ticks too (route cards, the observer)
+    if (this.cfg.colony) this.judgeJam(); // after the deaths: a queued ant killed this tick no longer waits
     stepScent(this);
     this.rebuildFields();
     if (this.cfg.colony && this.cfg.dayTicks > 0) stepDay(this, EVENT.DUSK);
@@ -477,7 +477,7 @@ export class Sim {
     const arrays = this.antArrays();
     let w = 0;
     for (let i = 0; i < this.n; i++) {
-      if (this.hp[i] === 0) { if (this.job[i] === JOB.DIG && this.mode[i] === MODE.WORK) this.g[G.DIG_CREW]--; continue; } // her place in the dig crew frees up
+      if (this.hp[i] === 0) { if (this.job[i] === JOB.DIG && this.mode[i] === MODE.WORK) this.g[G.DIG_CREW]--; if (this.queued[i]) this.g[G.QUEUED]--; continue; } // her place in the dig crew (or the door queue) frees up
       if (w !== i) { for (const a of arrays) a[w] = a[i]; this.queued[w] = this.queued[i]; }
       w++;
     }
@@ -753,7 +753,7 @@ export class Sim {
     let trail = false;
     for (let s = SLOT.TRAIL0; s < SLOT.TRAIL0 + SLOT.TRAILS; s++) if (F.live[s]) trail = true;
     if (resting && trail && this.freeOut < quota) { this.setMode(i, MODE.SEEK); this.freeOut++; }
-    else if (!resting && (!trail || this.freeOut > quota)) { this.setMode(i, MODE.REST); this.freeOut--; } // over the third (a crew cut frees many at once): back to the door
+    else if (!resting && (!trail || this.freeOut > quota)) { this.setMode(i, MODE.REST); this.freeOut--; if (this.via[i] >= FREE_VIA) this.via[i] = -1; } // over the third (a crew cut frees many at once): back to the door
     if (this.mode[i] === MODE.REST) {
       // Resting by the door: in the porch, or on the surface within 3 steps of the entrance; otherwise walk home.
       if (atHome || (layer === SURFACE && distAt(this, SLOT.EXIT, c) <= 3 * STEP)) o.still = true; else o.follow = SLOT.HOME; // `since` runs on: the idle line reads it

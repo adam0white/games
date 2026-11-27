@@ -162,7 +162,7 @@ export class Host {
     for (let i = 0; i < n; i++) {
       if (s.goal[i] >= 0) slots[s.goal[i]]++;
       if (s.hp[i] > 0 && s.job[i] === JOB.FORAGE && s.via[i] >= SLOT.TRAIL0 && s.via[i] < SLOT.TRAIL0 + SLOT.TRAILS) onIt[s.via[i] - SLOT.TRAIL0]++;
-      if (s.hp[i] > 0 && s.job[i] === JOB.FORAGE && s.via[i] >= FREE_VIA && s.mode[i] !== MODE.REST) freeOn[s.via[i] - FREE_VIA - SLOT.TRAIL0]++;
+      if (s.hp[i] > 0 && s.job[i] === JOB.FORAGE && s.via[i] >= FREE_VIA && s.mode[i] !== MODE.REST && !s.carry[i]) freeOn[s.via[i] - FREE_VIA - SLOT.TRAIL0]++;
       if (this.colony && s.hp[i] > 0 && s.job[i] === JOB.FORAGE && s.mode[i] === MODE.REST && s.goal[i] < 0) resting++; // at the door, not walking back to it
       const out = s.layer[i] === SURFACE;
       if (out) surface++;
@@ -213,9 +213,9 @@ export class Host {
     else if (goal >= SLOT.FOOD0) to = 'food';
     let why;
     if (s.g[G.RECALL] && layer === SURFACE) why = 'recalled';
+    else if (s.queued[i]) why = 'queued'; // any job: waiting at a door lane (sim 10)
     else if (s.job[i] === JOB.FORAGE) {
-      if (s.queued[i]) why = 'queued'; // waiting at a door lane (sim 10)
-      else if (s.mode[i] === MODE.REST) why = goal >= 0 ? 'toRest' : 'resting'; // free: walking back to the door, or by it (sim 9)
+      if (s.mode[i] === MODE.REST) why = goal >= 0 ? 'toRest' : 'resting'; // free: walking back to the door, or by it (sim 9)
       else if (s.mode[i] === MODE.RETURN) why = s.carry[i] ? 'carrying' : 'gaveUp';
       else if (layer === NEST) why = s.g[G.RECALL] ? 'waitingIn' : 'goingOut';
       else if (to === 'trail') why = 'onTrail';

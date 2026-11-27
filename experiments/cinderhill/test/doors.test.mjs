@@ -9,13 +9,13 @@ import { cellAt } from '../sim/grid.js';
 import { restore, snapshot } from '../sim/snapshot.js';
 
 /** A small colony with a one-cell door: the nest's porch under it, `workers` foragers in the porch, one long trail. */
-function oneDoor(workers) {
+function oneDoor(workers, cells = 1) {
   const s = new Sim({ seed: 5, sw: 48, sh: 48, nw: 32, nh: 24, ants: 0, maxAnts: 400, blank: true, colony: 1, dayTicks: 20000 });
   s.home = { x: 10, y: 10, w: 8, h: 4 };
   for (let y = 10; y < 14; y++) for (let x = 10; x < 18; x++) s.mat[cellAt(s.L, NEST, x, y)] = MAT.OPEN;
-  for (let y = 0; y < 10; y++) s.mat[cellAt(s.L, NEST, 14, y)] = MAT.OPEN;
+  for (let k = 0; k < cells; k++) for (let y = 0; y < 10; y++) s.mat[cellAt(s.L, NEST, 14 + k, y)] = MAT.OPEN;
   const e = cellAt(s.L, SURFACE, 24, 24), top = cellAt(s.L, NEST, 14, 0);
-  s.link[e] = top; s.link[top] = e;
+  for (let k = 0; k < cells; k++) { const a = cellAt(s.L, SURFACE, 24 + k, 24), b = cellAt(s.L, NEST, 14 + k, 0); s.link[a] = b; s.link[b] = a; }
   s.startGoals(); s.rebuildFields();
   for (let k = 0; k < workers; k++) s.spawn(JOB.FORAGE);
   s.g[G.SUGAR] = 4000; s.g[G.PROTEIN] = 400; s.g[G.QUEEN] = 0; s.brood.n = 0;
@@ -110,7 +110,70 @@ test('the sandbox has no lanes: 60 ants at a one-cell door all pass', () => {
   s.cfg.colony = 0;
   for (let i = 0; i < s.n; i++) { s.mode[i] = MODE.SEEK; s.x[i] = (14 << 8) + 128; s.y[i] = 128; s.layer[i] = NEST; s.lastCell[i] = top; }
   for (let t = 0; t < 10; t++) s.step();
-  assert.ok(outside(s) > 40, `${outside(s)} out in half a second`);
+  assert.equal(outside(s), 60, `${outside(s)} of 60 out in half a second`);
+});
+
+test('a rested lane lets two ants through on the same tick, and a third waits', () => {
+  const { s, top } = oneDoor(3);
+  order(s, { type: CMD.TRAIL, layer: SURFACE, points: [25, 24, 40, 24] });
+  order(s, { type: CMD.CREW, seq: 0, delta: 3, level: 0 });
+  s.step();
+  for (let i = 0; i < s.n; i++) { s.mode[i] = MODE.SEEK; s.x[i] = (14 << 8) + 128; s.y[i] = 128; s.layer[i] = NEST; s.lastCell[i] = top; }
+  for (let k = 0; k < 8; k++) s.g[G.LANE0 + k] = 0;
+  s.step();
+  assert.equal(outside(s), 2, 'debt 0, then 20: both pass (a lane passes while its debt is 20 or less)');
+  assert.equal(s.g[G.QUEUED], 1, 'the third: debt 40');
+});
+
+test('each cell of a 3-cell door has its own lanes: 18 ants a second out', () => {
+  const { s } = oneDoor(150, 3);
+  order(s, { type: CMD.TRAIL, layer: SURFACE, points: [26, 24, 40, 24] });
+  order(s, { type: CMD.CREW, seq: 0, delta: 150, level: 0 });
+  for (let i = 0; i < s.n; i++) { const k = i % 3, top = cellAt(s.L, NEST, 14 + k, 0); s.mode[i] = MODE.SEEK; s.x[i] = ((14 + k) << 8) + 128; s.y[i] = 128; s.layer[i] = NEST; s.lastCell[i] = top; }
+  s.step();
+  const before = outside(s);
+  for (let t = 0; t < 100; t++) s.step();
+  const out = outside(s) - before;
+  assert.ok(out >= 87 && out <= 93, `5 s at 3 x 6 a second: ${out} out`);
+});
+
+test('a jam starts at exactly 10 queued for 5 s (9 never jams), and clears at 9', () => {
+  // The counts the sim keeps, set by hand each tick (the ants' own queue is in the tests above): judgeJam alone.
+  const s = oneDoor(0).s;
+  const run = (q, ticks) => { for (let t = 0; t < ticks; t++) { s.g[G.QUEUED] = q; s.judgeJam(); } };
+  run(JAM_AT - 1, 3 * JAM_FOR);
+  assert.equal(s.g[G.JAMMED], 0, '9 waiting for 15 s: no jam');
+  run(JAM_AT, JAM_FOR - 1);
+  assert.equal(s.g[G.JAMMED], 0, '10 for 99 ticks: not yet');
+  run(JAM_AT, 1);
+  assert.equal(s.g[G.JAMMED], 1, '10 for 100 ticks: jammed');
+  run(JAM_AT, 50);
+  assert.equal(s.g[G.JAMMED], 1, 'still 10: still jammed');
+  run(JAM_AT - 1, 1);
+  assert.equal(s.g[G.JAMMED], 0, 'down to 9: clear');
+  assert.equal(s.g[G.JAMS], 1);
+});
+
+test('a queued ant killed this tick leaves the queue: no false jam', () => {
+  const { s, top } = oneDoor(12);
+  order(s, { type: CMD.TRAIL, layer: SURFACE, points: [25, 24, 40, 24] });
+  order(s, { type: CMD.CREW, seq: 0, delta: 12, level: 0 });
+  s.step();
+  for (let i = 0; i < s.n; i++) { s.mode[i] = MODE.SEEK; s.x[i] = (14 << 8) + 128; s.y[i] = 128; s.layer[i] = NEST; s.lastCell[i] = top; }
+  for (let k = 0; k < 8; k++) s.g[G.LANE0 + k] = 0;
+  s.g[G.JAM_RUN] = JAM_FOR - 1; // one tick from a jam, if 10 still wait at its end
+  // Kill one of the ten who will queue this tick, after the ants move (as a bite would): wrap the fight.
+  const judge = s.judgeJam.bind(s);
+  const step = s.stepAnt.bind(s);
+  let killed = false;
+  s.stepAnt = i => { step(i); if (!killed && i === s.n - 1) { for (let j = 0; j < s.n; j++) if (s.queued[j]) { s.hp[j] = 0; s.anyDead = true; killed = true; break; } } };
+  s.step();
+  s.stepAnt = step; void judge;
+  assert.ok(killed);
+  let flags = 0; for (let i = 0; i < s.n; i++) flags += s.queued[i];
+  assert.equal(s.g[G.QUEUED], flags, 'the count is the live queued ants');
+  assert.equal(flags, JAM_AT - 1, '2 passed, 10 queued, one died');
+  assert.equal(s.g[G.JAMMED], 0, '9 wait at the end of the tick: no jam');
 });
 
 test('a snapshot taken with a queue at the door plays on the same', () => {
@@ -138,6 +201,13 @@ test('the route card says the door is jammed; the inspector says she waits her t
   assert.equal(st.jammed, true); assert.equal(st.queued, 12);
   assert.equal(st.trails[0].why, 'jammed');
   assert.equal(h.inspect(0).why, 'queued');
+  // A guard waiting at a lane on her way to an alarm is queued too.
+  s.job[0] = JOB.GUARD; assert.equal(h.inspect(0).why, 'queued');
+  // The HUD line the painter draws.
+  const { crewLines } = await import('../hud.js');
+  const { WORDS } = await import('../words.js');
+  assert.ok(crewLines(st, { t: WORDS.t }).includes('<b class="spider">Door jammed: 12 waiting</b>'), 'the HUD says the door is jammed');
+  assert.ok(!crewLines({ ...st, jammed: false, trails: [] }, { t: WORDS.t }).some(l => /jammed/.test(l)), 'and says nothing of it otherwise');
 });
 
 test('the queued marks follow the ants when one dies', () => {
@@ -169,4 +239,27 @@ test('an ant queued at a door is not idle, even resting with no route while a jo
   assert.equal(o.idleMax, 1, 'resting with no route: idle');
   sim.queued[0] = 1; o.idleMax = 0; o.look();
   assert.equal(o.idleMax, 0, 'queued: counted apart');
+});
+
+test('ants queued inside count in the queued share: a blocked way out with no one outside is not 0', async () => {
+  const { Observer } = await import('../spikes/replay-lab.mjs');
+  const N = 9, arr = T => new T(N);
+  const sim = {
+    n: N, tick: 0, g: new Int32Array(G.SIZE), pileCell: [], pileAmount: [], brood: { n: 0 }, cfg: { maxAnts: N, colony: 1 }, caste: arr(Uint8Array),
+    carry: arr(Uint8Array), via: arr(Int8Array).fill(-1), mode: arr(Uint8Array), job: arr(Uint8Array), mem: arr(Int16Array).fill(-1), since: arr(Uint16Array), goal: arr(Int8Array).fill(-1), layer: arr(Uint8Array).fill(NEST),
+    queued: arr(Uint8Array).fill(1), flow: { live: new Uint8Array(16), seq: new Uint32Array(16) }, crew: new Uint16Array(4), mat: new Uint8Array(1),
+  };
+  const o = new Observer({ sim, lastEvents: [] });
+  for (let k = 0; k < 10; k++) o.look();
+  assert.equal(o.stats().queuedShare, 1, 'nine waiting to go out, none out: all of them queued');
+  o.closeMinute();
+  assert.equal(o.minutes[0].queued, 9, 'the minute table counts them');
+});
+
+test('the gate rounds shares up: 10.04% queued and 15.04% wasted stay over their limits', async () => {
+  const { measure, up } = await import('../spikes/pace-gate.mjs');
+  assert.equal(up(0.1), 0.1); assert.equal(up(251 / 2500), 0.101);
+  const m = measure({ steps: 100, trails: [], decisions: [], minutes: [], births: [], firstTrailProtein: -1, firstOrder: -1, idleMax: 0.1504, queuedShare: 251 / 2500, queuedMax: 0, jams: 0 });
+  assert.ok(m.queuedShare > 0.10, `${m.queuedShare}`);
+  assert.ok(m.idleMax > 0.15, `${m.idleMax}`);
 });
