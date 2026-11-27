@@ -395,3 +395,16 @@ The Hold button (Durdur in Turkish) stops time on the page: the host stops advan
 - A field rebuild is a whole-field search (about 1.3 ms on the full map with octile costs, 0.7 ms before). Rebuilding all 9 live fields in one tick now takes about 12 ms, over the 10 ms tick budget. Regional rebuilds and a per-tick rebuild budget are not built.
 - Ants in a crowd pass through one another. Separation bends a path but never cancels the step.
 - No duplicate-command check in the sim; the room drops duplicates (05-tech, room protocol).
+
+## The war sim, beside sim 11 (2026-11-27)
+
+Owner direction: the game should be of the colony-strategy genre in full (missions, base building worth doing, strategy, variety, a tech tree, branching decisions); see `docs/design/colony/13-full-game.md`. Sim 11 has one colony baked in, so the contested game is a new sim in `war/` and sim 11 is untouched. Sim 11 and its two pages retire only after a one-colony config of the war sim passes the pace gate.
+
+- `war/sim.js`: any number of seats (two now), integers only, 20 Hz, one order queue. The rival (`war/ai.js`) issues the same orders a player can, so a log replays without it. `war/host.js` runs it for a page or a test. `war/world.js` is the first map, The Crossing: mirror-fair, two fords, the big food on the fords.
+- It imports only the modules of `sim/` that hold no colony state: grid, rng, math, hash.
+- Slice 1 leaves out digging, rooms, fog, heat and air, water as a weapon, and follow-one-ant. The rival knows every pile and the player sees the rival's nest and trails until sight is built.
+- The page `war/` reuses `game/gl.js` (now two doors, sixteen piles, a rival body colour on ant kind +16) and `gestures.js`. Settings go through the kit under slug `cinderhill` with keys `cinderhill:war:*`; plays record under `cinderhill` with `mode: 'war'`.
+- Rival mood (timid, steady, bold) is a player setting, default steady.
+- Meat is held back for a larva waiting on the soldier diet. Before this, worker larvae ate each load as it came and no soldier was ever raised from a trickle.
+- Balance as first shipped: queen 800 hit points, dusk at 9,600 ticks, the steady rival raids from tick 4,200 with ten soldiers. Bot matches end by a queen's death near tick 5,500 to 5,900. Not yet tuned with players.
+- A tap is a short order: Raid sends soldiers to the tapped spot, Forage sends workers to a pile under the finger. The sim routes from the door.
