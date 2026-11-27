@@ -20,12 +20,30 @@ export const ROOMS = [
 ];
 export const ROOM = { NONE: 0, STORE: 1, NURSERY: 2, REST: 3 };
 
+/** The campaign, in order. A fork is a choice kept for the whole campaign; it opens when the mission before it has been
+ *  played to its end, won or lost. A lost mission costs the next one `LOSS_ANTS` of its starting workers. */
+export const CAMPAIGN = [
+  { mission: 'crossing' },
+  { fork: 'caste', options: ['spitter', 'warden'] },
+  { mission: 'frost' },
+];
+export const LOSS_ANTS = 8;
+
 /** Missions. kit: what each colony starts with (a sim option of the same name overrides it). goals: how it ends.
  *  picks: the castes a colony may choose one of, once. rooms: what may be dug. */
 export const MISSIONS = {
   crossing: {
     id: 'crossing', name: 'The Crossing', map: 'crossing',
     kit: { ants: 30, sugar: 10, protein: 5, eggs: 20, larvae: 20, pupae: 12, duskTick: 9600 },
+    goals: { queen: true, dusk: 'adults' },
+    picks: [CASTE.SPITTER, CASTE.WARDEN],
+    rooms: [ROOM.STORE, ROOM.NURSERY, ROOM.REST],
+  },
+  // Half way through, the frost takes the food outside. Meals come four times as often and hunger kills fast: the hill
+  // lives on what it stored, or on what it steals.
+  frost: {
+    id: 'frost', name: 'First Frost', map: 'crossing',
+    kit: { ants: 30, sugar: 10, protein: 5, eggs: 20, larvae: 20, pupae: 12, duskTick: 10800, frostTick: 4800, frostEat: 300, starveAfter: 300, starveDiv: 10, queenHp: 3200, glut: 3 },
     goals: { queen: true, dusk: 'adults' },
     picks: [CASTE.SPITTER, CASTE.WARDEN],
     rooms: [ROOM.STORE, ROOM.NURSERY, ROOM.REST],

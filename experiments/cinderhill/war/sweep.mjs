@@ -4,7 +4,7 @@
 import { Host } from './host.js';
 import { CG, CMD, KIND, MAX_PILES } from './sim.js';
 
-const seeds = Number(process.argv[2]) || 30;
+const seeds = Number(process.argv[2]) || 30, mission = process.argv[4] || 'crossing';
 function novice(h) {
   const s = h.sim, sw = s.L.sw, d = s.door[0], piles = [];
   for (let p = 0; p < MAX_PILES; p++) if (s.pileAmount[p] > 0) piles.push([s.doorF[0][s.pileCell[p]], s.pileCell[p]]);
@@ -15,7 +15,7 @@ function novice(h) {
 }
 function match(a, b, seed) {
   const ai = { 1: b }; if (typeof a !== 'string') ai[0] = a;
-  const h = new Host({ seed, ai, swap: seed % 2 === 0 }); // even seeds change sides, so a bias of the side cancels
+  const h = new Host({ seed, ai, swap: seed % 2 === 0, mission }); // even seeds change sides, so a bias of the side cancels
   if (a === 'novice') novice(h);
   h.run(20000);
   const s = h.sim, q = s.g(0, CG.QUEEN_HP) <= 0 || s.g(1, CG.QUEEN_HP) <= 0;

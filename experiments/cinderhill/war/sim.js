@@ -47,6 +47,7 @@ export const EVENT = {
   RALLY: 11, // team, cell
   DUG: 12, // team, cell: a marked cell was dug open
   FULL: 13, // team, food kind: a load came home to full stores and was lost
+  FROST: 14, // the frost came: the food outside is gone
 };
 export const REASON = { QUEEN: 1, DUSK: 2, STARVED: 3 };
 export const WHY = { FULL: 1, BLOCKED: 2, LONG: 3, NONE: 4 };
@@ -79,6 +80,9 @@ export const C = {
 export const DEFAULTS = {
   seed: 1, sw: 160, sh: 112, nw: 160, nh: 64, maxAnts: 4000,
   mission: 'crossing', // a row of MISSIONS; its kit (ants, food, brood, duskTick: 0 for no dusk) sits under these options
+  frostTick: 0, frostEat: 1200, // a mission's frost: from this tick the food outside is gone and a meal comes this often
+  queenHp: C.QUEEN_HP,
+  starveAfter: 1200, starveDiv: 100, // ticks at no seeds before ants die, and the share that die every ten seconds (one in starveDiv)
   blank: false, // an empty map for tests: no stones, creek or food
 };
 
@@ -141,8 +145,9 @@ export class Sim {
 
   startColony(t) {
     const cfg = this.cfg, o = t * CG.SIZE, cg = this.cg;
-    cg[o + CG.SUGAR] = cfg.sugar; cg[o + CG.PROTEIN] = cfg.protein; cg[o + CG.QUEEN_HP] = C.QUEEN_HP; cg[o + CG.DIET] = 0; cg[o + CG.RALLY_CELL] = -1;
-    for (let k = 0; k < cfg.ants; k++) {
+    cg[o + CG.SUGAR] = cfg.sugar; cg[o + CG.PROTEIN] = cfg.protein; cg[o + CG.QUEEN_HP] = cfg.queenHp; cg[o + CG.DIET] = 0; cg[o + CG.RALLY_CELL] = -1;
+    const ants = cfg.antsBy ? cfg.antsBy[t] : cfg.ants; // antsBy: a start that differs by colony
+    for (let k = 0; k < ants; k++) {
       const i = this.spawn(t, CASTE.WORKER, k % 10 === 9 ? this.nurseryCell(t) : this.store[t]);
       if (i >= 0 && k % 10 === 9) this.task[i] = TASK.NURSE;
     }
@@ -438,6 +443,7 @@ export class Sim {
     if (this.anyDead) this.removeDead();
     if (this.dirty) { this.dirty = false; this.rebuildFields(); }
     if (this.tick % 50 === 49) this.checkTrails();
+    if (this.cfg.frostTick && this.tick + 1 === this.cfg.frostTick) this.frost();
     this.judge();
     this.tick++;
   }
@@ -510,16 +516,17 @@ export class Sim {
       if (cg[o + CG.LAY] > 0) cg[o + CG.LAY]--;
       if (cg[o + CG.LAY] === 0 && cg[o + CG.SUGAR] > 0 && count[t] < cg[o + CG.CAP_BROOD] && cg[o + CG.ADULTS] + count[t] < cg[o + CG.CAP_ADULTS] && this.n + this.bn < this.cfg.maxAnts) { if (this.addBrood(t, STAGE.EGG) >= 0) cg[o + CG.LAY] = C.LAY_EVERY; }
       // Meals: a major eats as three.
-      if (this.tick % C.EAT_EVERY === C.EAT_EVERY - 1) {
+      const eat = this.cfg.frostTick && this.tick >= this.cfg.frostTick ? this.cfg.frostEat : C.EAT_EVERY;
+      if (this.tick % eat === eat - 1) {
         const mouths = cg[o + CG.ADULTS] + 2 * cg[o + CG.MAJORS], need = Math.floor((mouths + C.ADULTS_PER_SUGAR - 1) / C.ADULTS_PER_SUGAR);
         cg[o + CG.SUGAR] = Math.max(0, cg[o + CG.SUGAR] - need);
       }
       // Starving: after a minute at no sugar the oldest die, one in a hundred every ten seconds.
       if (cg[o + CG.SUGAR] > 0) cg[o + CG.STARVE] = 0;
       else {
-        const s = ++cg[o + CG.STARVE] - C.STARVE_AFTER;
+        const s = ++cg[o + CG.STARVE] - this.cfg.starveAfter;
         if (s >= 0 && s % C.STARVE_EVERY === 0) {
-          let kill = Math.max(1, Math.floor(cg[o + CG.ADULTS] / 100));
+          let kill = Math.max(1, Math.floor(cg[o + CG.ADULTS] / this.cfg.starveDiv));
           if (cg[o + CG.ADULTS] === 0) cg[o + CG.QUEEN_HP] = 0;
           for (let i = 0; i < this.n && kill > 0; i++) if (this.hp[i] > 0 && this.team[i] === t) { this.hurt(i, 255, -1); kill--; }
         }
@@ -843,6 +850,12 @@ export class Sim {
       if (dry && !this.trDry[s]) this.event(EVENT.DRY, Math.floor(s / TRAILS), s % TRAILS);
       this.trDry[s] = dry;
     }
+  }
+
+  /** The frost: every pile outside is gone. Trails to them run dry at the next check. */
+  frost() {
+    for (let p = 0; p < MAX_PILES; p++) if (this.pileAmount[p] > 0) { this.pileAmount[p] = 0; this.pileCell[p] = -1; }
+    this.event(EVENT.FROST);
   }
 
   /** The mission: a colony whose queen dies loses at once; at dusk the colony with more adults wins (a tie goes to team 0). */

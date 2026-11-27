@@ -2,6 +2,7 @@
 // everything on screen is read from the sim or its events, and every order goes through host.order() under seat 0.
 import { Host } from './host.js';
 import { CMD, KIND, CG, EVENT, REASON, TASK, CASTE, STAGE, MAT, ROOM, TRAILS, PATH_MAX, MAX_PILES, C, LEVEL_SHARE, RAID_SHARE } from './sim.js';
+import { CAMPAIGN, LOSS_ANTS, MISSIONS } from './tables.js';
 import { makeGestures } from '../gestures.js';
 import { GameRenderer, sky } from '../game/gl.js';
 import { noZoom } from '../../kit/zoom.js';
@@ -31,15 +32,34 @@ const set = settings('cinderhill', {
 const LABEL = { caste: 'Your third caste', rival: 'Rival', view: 'View', light: 'Light', style: 'Style', size: 'Ants', sound: 'Sound' };
 const NAME = { spitter: 'Spitters', warden: 'Wardens', timid: 'Timid', steady: 'Steady', bold: 'Bold', tilt: 'Tilted', top: 'Top down', low: 'Low', cycle: 'Day to dusk', day: 'Day', ember: 'Ember', relief: 'Painted', ink: 'Ink', 1: 'True size', 1.5: 'Larger', all: 'Music & effects', fx: 'Effects', off: 'Off' };
 const MOOD = { timid: 0, steady: 1, bold: 2 };
-const redraw = set.panel($('settings'), { label: id => LABEL[id], name: (id, v) => NAME[v] ?? v, what: (id, v) => (id === 'caste' ? (v === 'spitter' ? 'Frail, but they spit from two cells away, over the front line. Applies from the next start.' : 'Slow and very hard to kill: they hold a tunnel. Applies from the next start.') : id === 'rival' ? (v === 'timid' ? 'It never attacks your hill. Applies from the next start.' : v === 'bold' ? 'It raids early, even at even odds. Applies from the next start.' : 'It holds the fords, and raids when it has the numbers. Applies from the next start.') : null), onChange: (id, v) => { if (id === 'sound') { if (v === 'off') snd.hold(); else { snd.release(); startSong(); } } tone(660, 0.06, 0.03, 'triangle', 80); } });
+const redraw = set.panel($('settings'), { only: set.ids.filter(id => id !== 'caste'), label: id => LABEL[id], name: (id, v) => NAME[v] ?? v, what: (id, v) => (id === 'caste' ? (v === 'spitter' ? 'Frail, but they spit from two cells away, over the front line. Applies from the next start.' : 'Slow and very hard to kill: they hold a tunnel. Applies from the next start.') : id === 'rival' ? (v === 'timid' ? 'It never attacks your hill. Applies from the next start.' : v === 'bold' ? 'It raids early, even at even odds. Applies from the next start.' : 'It holds the fords, and raids when it has the numbers. Applies from the next start.') : null), onChange: (id, v) => { if (id === 'sound') { if (v === 'off') snd.hold(); else { snd.release(); startSong(); } } tone(660, 0.06, 0.03, 'triangle', 80); } });
 
 // ---- the game ----
 const qSeed = Math.floor(Number(query.get('seed')));
 let seed = qSeed > 0 ? qSeed : 1 + Math.floor(Math.random() * 9999);
 const PICK = { spitter: CASTE.SPITTER, warden: CASTE.WARDEN };
 // A rival that fights takes the caste you did not. Both are set when the run starts, so the menu's settings count.
-const rivalMind = () => { const mood = MOOD[set.get('rival')]; return mood ? { mood, pick: set.get('caste') === 'spitter' ? CASTE.WARDEN : CASTE.SPITTER } : mood; };
-const newHost = () => new Host({ seed, ai: { [FOE]: MOOD[set.get('rival')] } });
+// The campaign: what has been played to its end, and the forks taken. Its own key; nothing else reads it.
+const CAMP_KEY = 'cinderhill:war:campaign';
+const TEXT = {
+  crossing: { sub: 'Two hills. One creek. Not enough food for both.', goals: ['Have the larger colony at dusk, or kill the rival queen.', 'Lose your queen and the hill is lost.', 'The big food lies on the two fords. So does the rival.'], clock: ['Dusk'], won: 'The crossing is yours', end: 'dusk' },
+  frost: { sub: 'The seeds are falling. The frost is coming.', goals: ['Half way through, the frost takes all the food outside.', 'In the cold the hill eats four times as fast. Dig stores and fill them with seeds.', 'Have the larger colony at the thaw. A small hill with full stores outlives a big hungry one.', 'Raiders can carry off the rival\'s stores.'], clock: ['Frost', 'Thaw'], won: 'The hill sees the thaw', end: 'the thaw' },
+};
+const FORK = { spitter: ['Spitters', 'Frail. They spit from two cells away, over the front line.'], warden: ['Wardens', 'Slow and very hard to kill. They hold a tunnel.'] };
+function loadCamp() { try { const c = JSON.parse(localStorage.getItem(CAMP_KEY)); if (c && c.v === 1 && c.done) return c; } catch { /* a fresh campaign */ } return { v: 1, done: {}, caste: null }; }
+let camp = loadCamp();
+const saveCamp = () => { try { localStorage.setItem(CAMP_KEY, JSON.stringify(camp)); } catch { /* private mode: the campaign lasts the visit */ } };
+const STEPS = CAMPAIGN.filter(s => s.mission).map(s => s.mission);
+const before = id => STEPS[STEPS.indexOf(id) - 1];
+/** A mission is open when the one before it was played to its end and every fork before it is taken. */
+function isOpen(id) { if (id === query.get('mission')) return true; for (const s of CAMPAIGN) { if (s.mission === id) return true; if (s.mission && !camp.done[s.mission]) return false; if (s.fork === 'caste' && !camp.caste) return false; } return false; }
+const firstOpen = () => { let last = STEPS[0]; for (const id of STEPS) { if (!isOpen(id)) break; last = id; if (!camp.done[id]) break; } return last; };
+const qMission = query.get('mission');
+let missionId = MISSIONS[qMission] ? qMission : firstOpen();
+const rivalMind = () => { const mood = MOOD[set.get('rival')]; return mood && camp.caste ? { mood, pick: camp.caste === 'spitter' ? CASTE.WARDEN : CASTE.SPITTER } : mood; };
+// A mission lost costs the next one some of its first workers: the colony carries on smaller.
+const startAnts = () => { const prev = before(missionId), ants = MISSIONS[missionId].kit.ants; return prev && camp.done[prev] && !camp.done[prev].won ? [Math.max(10, ants - LOSS_ANTS), ants] : [ants, ants]; };
+const newHost = () => new Host({ seed, mission: missionId, antsBy: startAnts(), ai: { [FOE]: MOOD[set.get('rival')] } });
 let host = newHost(), sim = host.sim;
 let screen = 'menu', tool = 'trail', nestOpen = false, running = false, speed = 1, lastT = 0;
 const Gs = makeGestures();
@@ -148,11 +168,46 @@ function setScreen(s) {
 }
 function opening() { const e = doorXY(ME); cam.x = e.x; cam.y = e.y; cam.z = 24; clampCam(); camGoal = { x: e.x + 4, y: e.y, z: startZoom(), rate: 0.8 }; }
 function startRun() {
-  rec.start({ ...set.snapshot(), mode: 'war', mission: 'crossing', look: `war:${set.get('view')}/${set.get('light')}/${set.get('style')}`, seed, v: 1 });
-  host.ai[FOE] = rivalMind(); host.order({ team: ME, type: CMD.PICK, caste: PICK[set.get('caste')] });
+  rec.start({ ...set.snapshot(), caste: camp.caste ?? 'none', mode: 'war', mission: missionId, ants: sim.cfg.antsBy[ME], look: `war:${set.get('view')}/${set.get('light')}/${set.get('style')}`, seed, v: 1 });
+  host.ai[FOE] = rivalMind(); if (camp.caste) host.order({ team: ME, type: CMD.PICK, caste: PICK[camp.caste] });
   running = true; opening();
 }
-function play() { snd.unlock(); startSong(); if (!running) startRun(); setScreen('play'); lastT = 0; snd.release(); }
+function play() { snd.unlock(); startSong(); if (!isOpen(missionId)) return; if (!running) restart(false); else { setScreen('play'); lastT = 0; snd.release(); } }
+// The menu: the campaign's missions in order, the fork between them, and what the chosen mission asks.
+function renderPath() {
+  const el = $('path'); el.textContent = '';
+  let n = 0;
+  for (const s of CAMPAIGN) {
+    if (s.mission) {
+      const m = MISSIONS[s.mission], d = camp.done[s.mission], b = document.createElement('button');
+      b.className = 'step' + (d ? (d.won ? ' won' : ' lost') : ''); b.disabled = !isOpen(s.mission); b.setAttribute('aria-pressed', String(s.mission === missionId));
+      const i = document.createElement('i'), name = document.createElement('span'), em = document.createElement('em');
+      i.textContent = String(++n); name.textContent = m.name; em.textContent = d ? (d.won ? `Won · best ${d.best}` : 'Lost') : b.disabled ? 'Closed' : 'New';
+      b.append(i, name, em); b.addEventListener('click', () => { missionId = s.mission; renderPath(); tone(560, 0.06, 0.03, 'triangle'); });
+      el.append(b);
+    } else if (s.fork === 'caste') {
+      const open = !!camp.done[before(STEPS[n])], box = document.createElement('div'), head = document.createElement('b'), row = document.createElement('div'), note = document.createElement('p');
+      box.className = 'fork'; head.textContent = 'A third caste';
+      for (const v of s.options) {
+        const b = document.createElement('button'), small = document.createElement('small');
+        b.textContent = FORK[v][0]; small.textContent = FORK[v][1]; b.append(small);
+        b.setAttribute('aria-pressed', String(camp.caste === v)); b.disabled = !open || !!camp.caste;
+        b.addEventListener('click', () => { camp.caste = v; saveCamp(); set.set('caste', v); rec.event('fork', { fork: 'caste', pick: v }); missionId = firstOpen(); renderPath(); tone(700, 0.2, 0.05, 'triangle', 120); });
+        row.append(b);
+      }
+      note.textContent = camp.caste ? 'Chosen for this campaign. The rival raises the other.' : open ? 'Choose one. It is kept for the whole campaign, and the rival raises the other.' : 'Opens when the first mission has been played to its end.';
+      box.append(head, row, note); el.append(box);
+    }
+  }
+  const m = MISSIONS[missionId], t = TEXT[missionId], lost = startAnts()[0] < m.kit.ants;
+  $('mKicker').textContent = m.name; $('mSub').textContent = t.sub;
+  $('mGoals').textContent = ''; for (const line of lost ? [...t.goals, `The last mission was lost: you start with ${startAnts()[0]} workers, not ${m.kit.ants}.`] : t.goals) { const p = document.createElement('p'); p.textContent = line; $('mGoals').append(p); }
+  $('play').textContent = running && host.sim.mission.id === missionId ? 'Resume' : 'Play'; $('play').disabled = !isOpen(missionId);
+  $('fresh').hidden = !Object.keys(camp.done).length; $('fresh').textContent = 'New campaign'; freshArmed = false;
+}
+let freshArmed = false;
+renderPath();
+function toMenu() { dropTouches(); if (running) rec.end('left', summary()); running = false; document.body.classList.remove('frost'); if (nestOpen) setNest(false); $('toast').classList.remove('on'); setScreen('menu'); renderPath(); }
 function dropTouches() { run(Gs.reset('pause')); strokeW = []; nestDrag = null; }
 function pauseGame() { if (screen !== 'play') return; dropTouches(); redraw(); setScreen('paused'); snd.hold(); }
 function resume() { if (renderer?.lost) return; setScreen('play'); lastT = 0; snd.release(); startSong(); }
@@ -160,7 +215,7 @@ function restart(newSeed = true) {
   dropTouches();
   if (running) rec.end('restart', summary());
   if (newSeed && !(qSeed > 0)) seed = 1 + Math.floor(Math.random() * 9999);
-  host = newHost(); sim = host.sim; sel = -1; floats = []; pulses = []; beacon = null; parts.length = 0; trailSig = '?'; told.clear(); told.fullAt = told.popAt = told.qAt = 0; builds.clear(); firstTrail = false; danger = 0; setSpeed(1);
+  host = newHost(); sim = host.sim; document.body.classList.remove('frost'); sel = -1; floats = []; pulses = []; beacon = null; parts.length = 0; trailSig = '?'; told.clear(); told.fullAt = told.popAt = told.qAt = 0; builds.clear(); firstTrail = false; danger = 0; setSpeed(1);
   if (tool !== 'trail') setTool('trail'); if (nestOpen) setNest(false);
   uploadTerrain(); uploadAnts(); startRun(); resume();
 }
@@ -169,6 +224,9 @@ $('pause').addEventListener('click', pauseGame);
 $('resume').addEventListener('click', resume);
 $('restart').addEventListener('click', () => restart());
 $('again').addEventListener('click', () => restart());
+$('toMenu').addEventListener('click', toMenu);
+$('next').addEventListener('click', () => { missionId = firstOpen(); toMenu(); });
+$('fresh').addEventListener('click', () => { if (!freshArmed) { freshArmed = true; $('fresh').textContent = 'Tap again to erase the campaign'; return; } camp = { v: 1, done: {}, caste: null }; saveCamp(); rec.event('campaign', { fresh: 1 }); missionId = STEPS[0]; renderPath(); });
 $('harder').addEventListener('click', () => { const v = set.get('rival'); set.set('rival', won ? (v === 'timid' ? 'steady' : 'bold') : v === 'bold' ? 'steady' : 'timid'); restart(); });
 onLeave(pauseGame);
 addEventListener('keydown', e => { if (isPauseKey(e)) { if (screen === 'play') pauseGame(); else if (screen === 'paused') resume(); e.preventDefault(); } });
@@ -339,6 +397,7 @@ function news() {
       if (a === ME) { shake = 0.3; danger = 1; if (!told.has('qhit') || now - (told.qAt ?? 0) > 6000) { told.add('qhit'); told.qAt = now; toast('Your queen is being bitten!', 3200, true); tone(120, 0.4, 0.08, 'sawtooth'); } }
       else once('fqhit', 'Your soldiers have reached the rival queen', 3200);
     } else if (type === EVENT.STOLEN) { if (a === ME) once('robbed', 'Raiders are carrying off your stores', 3200, true); else once('stole', 'Your raiders are bringing home their stores', 3200); }
+    else if (type === EVENT.FROST) { document.body.classList.add('frost'); toast('The frost has come. Nothing is left outside: the hill lives on its stores.', 5200, true); tone(1200, 0.9, 0.05, 'sine', -500); }
     else if (type === EVENT.RESULT) finish(a === ME, b);
   }
   if (deaths >= 3) { shake = Math.max(shake, 0.12); tone(170, 0.12, 0.04, 'square', -40); }
@@ -349,9 +408,13 @@ function finish(w, reason) {
   won = w;
   const s = summary(), T = (t, k) => g(t, k);
   rec.end(w ? 'won' : 'lost', { ...s, reason });
-  $('overKicker').textContent = reason === REASON.QUEEN ? (w ? 'The rival queen is dead' : 'Your queen is dead') : 'Dusk';
-  $('overTitle').textContent = w ? 'The crossing is yours' : 'The hill is lost'; $('overTitle').classList.toggle('lost', !w);
-  $('overWhy').textContent = reason === REASON.QUEEN ? (w ? 'Her colony scatters. Both fords are yours now.' : 'Without her the colony has no tomorrow.') : w ? `At dusk you stood ${s.adults} to ${s.foe}.` : `At dusk the rival stood ${s.foe} to your ${s.adults}.`;
+  const text = TEXT[missionId], was = camp.done[missionId];
+  camp.done[missionId] = { won: w || !!was?.won, best: Math.max(was?.best ?? 0, w ? s.adults : 0) }; saveCamp();
+  const upNext = CAMPAIGN[CAMPAIGN.findIndex(c => c.mission === missionId) + 1];
+  $('next').hidden = !upNext; $('next').textContent = upNext?.fork && !camp.caste ? 'Choose a third caste' : upNext ? `Next: ${MISSIONS[upNext.mission ?? STEPS[STEPS.indexOf(missionId) + 1]]?.name ?? 'the missions'}` : '';
+  $('overKicker').textContent = reason === REASON.QUEEN ? (w ? 'The rival queen is dead' : 'Your queen is dead') : text.end === 'dusk' ? 'Dusk' : 'The thaw';
+  $('overTitle').textContent = w ? text.won : 'The hill is lost'; $('overTitle').classList.toggle('lost', !w);
+  $('overWhy').textContent = reason === REASON.QUEEN ? (w ? 'Her colony scatters. Both fords are yours now.' : 'Without her the colony has no tomorrow.') : w ? `At ${text.end} you stood ${s.adults} to ${s.foe}.` : `At ${text.end} the rival stood ${s.foe} to your ${s.adults}.`;
   const rows = [['', 'You', 'Rival'], ['Ants at the end', T(ME, CG.ADULTS), T(FOE, CG.ADULTS)], ['Soldiers', T(ME, CG.MAJORS), T(FOE, CG.MAJORS)], ['Born', T(ME, CG.BORN), T(FOE, CG.BORN)], ['Fallen', T(ME, CG.DIED), T(FOE, CG.DIED)], ['Loads carried home', T(ME, CG.LOADS_S) + T(ME, CG.LOADS_P), T(FOE, CG.LOADS_S) + T(FOE, CG.LOADS_P)], ['Loads stolen', T(ME, CG.STOLEN), T(FOE, CG.STOLEN)]];
   $('tally').textContent = '';
   rows.forEach((r, i) => r.forEach((v, j) => { const el = document.createElement(j ? 'b' : 'span'); el.textContent = v; if (!i) el.className = 'h'; if (j === 2) el.classList.add('foe'); $('tally').append(el); }));
@@ -367,7 +430,7 @@ function hud() {
   bump('chipAnts', g(ME, CG.ADULTS) - g(ME, CG.MAJORS)); bump('chipMajors', g(ME, CG.MAJORS)); bump('chipSugar', g(ME, CG.SUGAR)); bump('chipProtein', g(ME, CG.PROTEIN)); bump('chipBrood', brood);
   const us = g(ME, CG.ADULTS), them = g(FOE, CG.ADULTS);
   $('vsUs').textContent = `You ${us}`; $('vsThem').textContent = `${them} Rival`; $('bar2').firstElementChild.style.width = `${(100 * us / Math.max(1, us + them)).toFixed(1)}%`;
-  const left = Math.max(0, sim.cfg.duskTick - sim.tick) / 20; $('dusk').textContent = `Dusk in ${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}`;
+  const toFrost = sim.cfg.frostTick > sim.tick, left = Math.max(0, (toFrost ? sim.cfg.frostTick : sim.cfg.duskTick) - sim.tick) / 20; $('dusk').textContent = `${TEXT[sim.mission.id].clock[toFrost ? 0 : TEXT[sim.mission.id].clock.length - 1]} in ${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}`;
   if (g(ME, CG.SUGAR) === 0 && sim.tick > 600) once('hungry', 'No seeds in store. The colony starves without them.', 3600, true);
   trailMesh();
   const s = sel >= 0 && sim.trLive[ME * TRAILS + sel] ? ME * TRAILS + sel : -1;
@@ -467,7 +530,7 @@ function drawOverlay(now) {
     // The two doors: a banner over each, and the queen's strength when she has been hurt.
     for (const t of [ME, FOE]) {
       const d = doorXY(t), p = toScreen(d.x, d.y, 3.2); if (!p.s) continue;
-      const hp = g(t, CG.QUEEN_HP) / C.QUEEN_HP, col = t ? '#8fb0ff' : '#ffb057';
+      const hp = g(t, CG.QUEEN_HP) / sim.cfg.queenHp, col = t ? '#8fb0ff' : '#ffb057';
       ctx.fillStyle = 'rgba(20, 14, 10, 0.85)'; ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.roundRect(p.x - 26, p.y - 9, 52, 18, 9); ctx.fill(); ctx.stroke();
       ctx.fillStyle = col; ctx.font = '800 10.5px ui-rounded, system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(t ? 'RIVAL' : 'HOME', p.x, p.y);
       if (hp < 1) { ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(p.x - 24, p.y + 12, 48, 5); ctx.fillStyle = hp > 0.4 ? '#9ef252' : '#ff5a3c'; ctx.fillRect(p.x - 24, p.y + 12, 48 * hp, 5); }
@@ -540,7 +603,7 @@ function drawNest(now) {
       c.fillStyle = t ? '#27345e' : '#6a2a16'; c.strokeStyle = t ? '#9fb8ff' : '#ffc070'; c.lineWidth = 1.5; c.shadowColor = t ? '#6a8cff' : '#ff9a3c'; c.shadowBlur = 14;
       for (const [dx, rx, ry] of [[-1.05, 0.9 * pulse, 0.55 * pulse], [0, 0.4, 0.3], [0.8, 0.32, 0.28]]) { c.beginPath(); c.ellipse(qx + dx * u, qy, rx * u, ry * u, 0, 0, 7); c.fill(); c.stroke(); }
       c.shadowBlur = 0;
-      const hp = g(t, CG.QUEEN_HP) / C.QUEEN_HP; if (hp < 1) { c.fillStyle = 'rgba(0,0,0,0.6)'; c.fillRect(qx - 24, qy - u - 6, 48, 5); c.fillStyle = hp > 0.4 ? '#9ef252' : '#ff5a3c'; c.fillRect(qx - 24, qy - u - 6, 48 * hp, 5); }
+      const hp = g(t, CG.QUEEN_HP) / sim.cfg.queenHp; if (hp < 1) { c.fillStyle = 'rgba(0,0,0,0.6)'; c.fillRect(qx - 24, qy - u - 6, 48, 5); c.fillStyle = hp > 0.4 ? '#9ef252' : '#ff5a3c'; c.fillRect(qx - 24, qy - u - 6, 48 * hp, 5); }
     }
   }
   for (let k = 0; k < sim.bn; k++) {
@@ -609,6 +672,7 @@ window.game = {
   state: () => ({ screen, tool, nest: nestOpen, t: sim.tick, ants: sim.n, drawn: drawnAnts, gl: !!renderer && !renderer.lost, glFailed, frames, result: sim.result, sel, set: set.snapshot(), ...summary() }),
   toScreen: (x, y, h) => toScreen(x, y, h), camera: () => ({ ...cam }), setCamera: c => { camGoal = null; Object.assign(cam, c); clampCam(); },
   door: t => doorXY(t), piles: () => { const o = []; for (let p = 0; p < MAX_PILES; p++) if (sim.pileAmount[p] > 0) o.push({ x: sim.pileCell[p] % L0.sw, y: Math.floor(sim.pileCell[p] / L0.sw), kind: sim.pileKind[p], amount: sim.pileAmount[p] }); return o; },
+  run: n => { host.run(n); }, // tests: run the sim ahead
   setTool, setNest, setNestTool, nestXY: (x, y) => { const r = nestCanvas.getBoundingClientRect(); return [r.left + (x + 0.5 - nestCam.x) * nestCam.z + NW / 2, r.top + (y + 0.5 - nestCam.y) * nestCam.z + 26]; }, setSpeed, order, run: n => { host.run(n); news(); uploadAnts(); }, log: () => JSON.parse(JSON.stringify(host.log)), hash: () => sim.hash(),
 };
 void TASK;

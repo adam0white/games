@@ -154,3 +154,28 @@ test('a spitter hits from two cells away, and not through earth', () => {
   assert.ok(fight(false) < 12, 'the spit should land');
   assert.equal(fight(true), 12);
 });
+
+test('First Frost: the frost takes the food outside, the cold eats faster, and a save across it carries on', () => {
+  const drive = (s, to) => { while (s.tick < to && !s.result) { if (s.tick % THINK_EVERY === 0) for (let t = 0; t < TEAMS; t++) for (const o of think(s, t, 0)) s.order(o); s.step(); } return s; };
+  const a = drive(new Sim({ seed: 4, mission: 'frost' }), 4700);
+  assert.ok(a.pileAmount.some(v => v > 0), 'food lies outside before the frost');
+  const b = Sim.load(JSON.parse(JSON.stringify(a.save(), (k, v) => (ArrayBuffer.isView(v) ? Array.from(v) : v))));
+  drive(a, 4800); a.drainEvents(); const before = a.g(0, CG.SUGAR);
+  assert.ok(a.pileAmount.every(v => v === 0), 'nothing is left outside');
+  drive(a, 5400); drive(b, 5400);
+  assert.equal(b.hash(), a.hash());
+  assert.ok(before - a.g(0, CG.SUGAR) >= Math.ceil(a.g(0, CG.ADULTS) / 10), 'two meals in thirty seconds of cold');
+});
+
+test('First Frost: a mind that stores for the winter ends larger than one that does not dig stores', () => {
+  for (const seed of [1, 2, 3]) {
+    const h = new Host({ seed, mission: 'frost', swap: seed % 2 === 0, ai: { 0: 0, 1: { mood: 0, rooms: [ROOM.NURSERY, ROOM.REST] } } }).run(12000);
+    assert.equal(h.sim.result, 1, `seed ${seed}`);
+  }
+});
+
+test('a colony can start smaller than its rival', () => {
+  const s = new Sim({ seed: 1, antsBy: [22, 30] });
+  s.census();
+  assert.deepEqual([s.g(0, CG.ADULTS), s.g(1, CG.ADULTS)], [22, 30]);
+});
