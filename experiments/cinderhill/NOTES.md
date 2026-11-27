@@ -1223,5 +1223,15 @@ Asked after the outside read said no room has a reason to be dug first. Two timi
 The Nest now carries one line above its tabs naming what holds the hill back (hill full, seeds running out with the meal
 and the income a minute, nursery full, store full, hill nearly full), and a tap on it opens Dig rooms with that room picked
 and ringed. It reads the sim's counts and limits and decides nothing. Seen on a phone profile: nursery, quarters and garden
-lines each appear in one bot game; the tap opens Quarters. Not checked: the store line, and whether the taller panel hides
-too much of the counts at the top.
+lines each appear in one bot game; the tap opens Quarters. Not checked: the store line.
+
+Second pass, after a look at the older missions. The line waits out the opening 400 ticks (the starting brood is over
+the nursery's count) and reads seed income only once it has a minute of it. A room the hill may not dig is not offered.
+On the Dig tab the line takes the help row's place while no room is picked, so the panel is no taller there and the
+counts and the pause button stay clear. Seen on a phone profile on The Crossing, First Frost and High Summer.
+
+**Open fault: a garden is a must-build once it opens.** A cell costs a seed and one ant's housing and pays a seed a minute
+with no upper bound, and late in High Summer carrying is limited by what falls, not by workers. So gardens add income at
+almost no cost, and enough of them would replace seed trails. The bot stops at sixteen cells, so the runs above do not
+show it. The only fork left is when the garden opens (a Deep hill at its first growth, any hill at its second). A bound
+on yield is owed before the garden is called a choice. Not built.
