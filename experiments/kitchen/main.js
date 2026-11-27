@@ -681,6 +681,7 @@ function flyCoin(from, to, done) {
 
 // ---------- the end of a day
 function endDay() {
+  showFocus(false);
   phase = 'idle'; g = null; $('line').style.display = 'none';
   const first = !save.tutorial;
   const fin = save.tutorial ? tally({ type: 'dayEnd', extras: day.extras }) ?? [] : [];
@@ -780,7 +781,7 @@ function starUp() {
 function lineDue() { return day?.line && day.next >= day.plan.length && !day.line.length; }
 function pickPhase() {
   if (lineDue()) return endDay();
-  phase = 'pick'; day.pickT = 0; art.view('room'); $('ticket').style.display = 'none';
+  phase = 'pick'; day.pickT = 0; day.looking = false; focusI = 0; art.view('room'); showFocus(true); $('ticket').style.display = 'none';
   if (!day.pickTold) { day.pickTold = true; coach(t('pickWho'), 3); }
   renderLine();
 }
@@ -799,7 +800,7 @@ async function arrive() {
 }
 function callGuest(e) {
   if (phase !== 'pick' || !day.line.includes(e)) return;
-  day.line.splice(day.line.indexOf(e), 1); e.called = true; renderLine(); SFX.tap(); coach(null);
+  day.line.splice(day.line.indexOf(e), 1); e.called = true; showFocus(false); renderLine(); SFX.tap(); coach(null);
   rec.event('call', { recipe: e.p.recipe, left: Math.round(e.left), waiting: day.line.length });
   art.view('serve');
   startGuest(e.p, e.model);
@@ -822,14 +823,25 @@ function stepLine(dt) {
   for (const e of sim.stepLine(day.line, dt)) walkOut(e);
   if (phase === 'pick') {
     if (lineDue()) return endDay();
-    if (day.line.length && (day.pickT += dt) > sim.AUTO_CALL) callGuest(sim.nextInLine(day.line));
+    if (day.line.length && !day.looking && (day.pickT += dt) > sim.AUTO_CALL) callGuest(sim.nextInLine(day.line));
   }
   lineBars();
 }
+// Look around while guests wait: swipe or the arrows walk the camera through the restaurant. Tap a guest to call them.
+const FOCUS = ['room', 'tables', 'serve', 'door', 'kitchen'];
+let focusI = 0;
+function focusTo(i) {
+  focusI = (i + FOCUS.length) % FOCUS.length; day.looking = true; // a player looking around picks for themselves: no auto-call
+  art.view(FOCUS[focusI]); flashFocusName(); SFX.tap();
+  rec.event('focus', { view: FOCUS[focusI] });
+}
+let focusNameT = 0;
+function flashFocusName() { const el = $('focusName'); el.textContent = t('focus_' + FOCUS[focusI]); el.classList.add('on'); clearTimeout(focusNameT); focusNameT = setTimeout(() => el.classList.remove('on'), 1100); }
+function showFocus(on) { $('focus').style.display = on ? 'block' : 'none'; if (!on) $('focusName').classList.remove('on'); }
 const MOOD_ICON = { rude: '😤', picky: '🧐', sneaky: '👀' };
 function renderLine() {
   const el = $('line');
-  if (!day?.line || screen !== 'play') { el.style.display = 'none'; return; }
+  if (!day?.line || screen !== 'play') { el.style.display = 'none'; showFocus(false); return; }
   el.style.display = 'flex'; el.classList.toggle('mini', phase !== 'pick');
   el.innerHTML = day.line.map((e, i) => `<button data-i="${i}" class="${e.p.mood ? 'mood' : ''}"><img alt="" src="${art.thumb(dishModel(e.p.recipe))}"><span class="nm">${esc(t('r_' + e.p.recipe))}</span><span class="pr"><i class="coin"></i>${sim.bill(save, e.p.recipe, 1, 0).price}${e.p.mood ? ' ' + MOOD_ICON[e.p.mood] : ''}</span><span class="pat"><i></i></span></button>`).join('');
   [...el.children].forEach((b, i) => b.addEventListener('pointerdown', ev => { ev.preventDefault(); ev.stopPropagation(); callGuest(day.line[i]); }));
@@ -861,6 +873,7 @@ function openWheel(ctx) {
 }
 function closeWheel() { $('wheel').style.display = 'none'; }
 $('wheelMid').addEventListener('click', e => { e.stopPropagation(); SFX.tap(); closeWheel(); if (!g) return; if (wheelCtx === 'payback') { phase = 'serve'; payUp(); } else { phase = 'order'; wait(0.4, () => { if (phase === 'order') goCatch(); }); } });
+for (const [id, d] of [['focusL', -1], ['focusR', 1]]) $(id).addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if (phase === 'pick') focusTo(focusI + d); });
 $('wheelBtn').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if (phase === 'order' && wheelOn()) openWheel('order'); });
 function pickWheel(id) {
   const ctx = wheelCtx, me = g, w = sim.WHEEL[id];
@@ -1070,6 +1083,7 @@ canvas.addEventListener('pointerdown', e => {
   try { canvas.setPointerCapture(e.pointerId); } catch {}
   finger = { id: e.pointerId };
   trayTarget = pointerX(e);
+  if (phase === 'pick') { pickStart = { x: e.clientX, y: e.clientY, id: e.pointerId }; return; }
   if (phase === 'chop') { aimAt(e.clientX, e.clientY); if (e.pointerType === 'mouse') strike(); else tapStart = { at: performance.now(), x: e.clientX, y: e.clientY, id: e.pointerId }; }
   else if (phase === 'fry' && cook && !cook.over) cook.held = true;
   else if (phase === 'micro') stopMicro();
@@ -1083,7 +1097,13 @@ canvas.addEventListener('pointermove', e => {
   if (finger && finger.id === e.pointerId) trayTarget = pointerX(e);
   else if (e.pointerType === 'mouse' && phase === 'catch') { trayTarget = pointerX(e); touched = true; }
 });
+let pickStart = null;
 const up = e => {
+  if (phase === 'pick' && pickStart?.id === e.pointerId && e.type === 'pointerup') {
+    const dx = e.clientX - pickStart.x; pickStart = null;
+    if (Math.abs(dx) > 50) focusTo(focusI + (dx < 0 ? 1 : -1));
+    else { const m = art.guestAt(e.clientX, e.clientY), hit = m && day.line.find(x => x.model === m); if (hit) callGuest(hit); }
+  }
   if (finger && finger.id === e.pointerId) finger = null;
   // A short touch that did not drag is a tap: strike where it landed. A drag only aims.
   if (tapStart?.id === e.pointerId && e.type === 'pointerup' && performance.now() - tapStart.at < 350) strike();
@@ -1096,6 +1116,7 @@ addEventListener('keydown', e => {
   if (screen !== 'play' || paused) return;
   keys.add(e.key); touched = true;
   if (e.repeat) return;
+  if (phase === 'pick' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { focusTo(focusI + (e.key === 'ArrowRight' ? 1 : -1)); return; }
   if (e.key === ' ' || e.key === 'Enter') {
     e.preventDefault();
     if (fight) { fightTap(); return; }

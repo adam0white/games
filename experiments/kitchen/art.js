@@ -145,7 +145,13 @@ export async function createView(canvas, lookId) {
   const awning = new THREE.Group(); world.add(awning);
   for (let i = 0; i < 18; i++) { const s = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 0.12, 16, 1, false, 0, Math.PI), i % 2 ? trimMat : new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.8 })); s.rotation.set(Math.PI / 2, 0, Math.PI / 2); s.position.set(-4.25 + i * 0.5, 2.42, -0.78); s.rotation.z = -Math.PI / 2; s.rotation.y = 0; s.rotation.x = 0; s.geometry.rotateX(Math.PI / 2); s.geometry.rotateZ(Math.PI); awning.add(s); }
   const sideL = new THREE.Mesh(new THREE.BoxGeometry(0.2, 2.45, 7), wallMat); sideL.position.set(-4.5, 1.225, 2.5); world.add(sideL);
-  const sideR = sideL.clone(); sideR.position.x = 4.5; world.add(sideR);
+  // The right wall has the way in: a doorway at z 0.9-2.4 that guests walk through (and get thrown out of).
+  const sideR1 = new THREE.Mesh(new THREE.BoxGeometry(0.2, 2.45, 1.9), wallMat); sideR1.position.set(4.5, 1.225, -0.05); world.add(sideR1);
+  const sideR2 = new THREE.Mesh(new THREE.BoxGeometry(0.2, 2.45, 3.6), wallMat); sideR2.position.set(4.5, 1.225, 4.2); world.add(sideR2);
+  const lintel = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.4, 1.5), wallMat); lintel.position.set(4.5, 2.25, 1.65); world.add(lintel);
+  for (const z of [0.9, 2.4]) { const post = new THREE.Mesh(new THREE.BoxGeometry(0.3, 2.1, 0.12), trimMat); post.position.set(4.5, 1.05, z); world.add(post); }
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.12, 1.62), trimMat); head.position.set(4.5, 2.1, 1.65); world.add(head);
+  const doormat = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.02, 1.2), new THREE.MeshStandardMaterial({ color: "#7a4b2a", roughness: 1 })); doormat.position.set(4.0, 0.012, 1.65); doormat.receiveShadow = true; world.add(doormat);
 
   // Counter: cabinets with the stove in the row.
   const counter = new THREE.Group(); world.add(counter);
@@ -278,6 +284,14 @@ export async function createView(canvas, lookId) {
     const me = { g, mixer, play, bubble, target: null, speed: 1.6, onArrive: null, face: null };
     play('walk'); guests.push(me); return me;
   }
+  // The guest under a screen point (CSS pixels), or null.
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+  function guestAt(sx, sy) {
+    ndc.set(sx / W * 2 - 1, -(sy / H * 2 - 1)); ray.setFromCamera(ndc, camera);
+    let best = null, bestD = Infinity;
+    for (const me of guests) { if (me.gone) continue; const hit = ray.intersectObject(me.g, true)[0]; if (hit && hit.distance < bestD) { best = me; bestD = hit.distance; } }
+    return best;
+  }
   function walkTo(me, x, z, done) { me.target = new THREE.Vector3(x, 0, z); me.onArrive = done; me.play('walk'); }
   function stepGuests(dt) {
     for (let i = guests.length - 1; i >= 0; i--) {
@@ -342,6 +356,10 @@ export async function createView(canvas, lookId) {
     stunt: { at: [3.4, 1.4, 1.3], half: [2.8, 1.9], dir: [-0.15, 0.45, 1] },
     left: { at: [-0.3, 1.3, 1.0], half: [4.0, 2.0], dir: [0.05, 0.45, 1] },
     menu: { at: [0.6, 1.5, 0.6], half: [2.0, 1.3], dir: [-0.25, 0.35, 1] },
+    // Focus views for looking around while guests wait: the line up close, the door, the kitchen side.
+    tables: { at: [-0.75, 0.9, 2.0], half: [2.7, 1.5], dir: [0.05, 0.8, 1] },
+    door: { at: [4.2, 1.1, 1.65], half: [1.5, 1.3], dir: [-0.9, 0.45, 0.6] },
+    kitchen: { at: [-2.4, 1.3, 0.6], half: [2.0, 1.4], dir: [0.45, 0.45, 1] },
   };
   const cam = { pos: new THREE.Vector3(0, 3, 9), at: new THREE.Vector3(0, 1, 0), wantPos: new THREE.Vector3(), wantAt: new THREE.Vector3(), name: 'menu', shake: 0, orbit: 0, bias: 0 };
   let W = 1, H = 1;
@@ -557,7 +575,7 @@ export async function createView(canvas, lookId) {
   resize(); view('menu', true);
   return {
     THREE, scene, camera, renderer, world, food, item, furniture, tray, register, board, knife, knifeLift, pan, panR, panGlow, micro, microLight, microGlass, blender, sign,
-    guest, walkTo, guests, stunt, staffSpots: STAFF_SPOTS, waitSpots: WAIT_SPOTS, view, cam, frame, resize, burst, steam, toScreen, toPlane, toY, setLook, setRestaurant, thumb, popIn,
+    guest, guestAt, walkTo, guests, stunt, staffSpots: STAFF_SPOTS, waitSpots: WAIT_SPOTS, view, cam, frame, resize, burst, steam, toScreen, toPlane, toY, setLook, setRestaurant, thumb, popIn,
     get look() { return look; }, peopleReady,
     shake(n = 1) { cam.shake = Math.max(cam.shake, n); },
     flashThumbs() { thumbCache.clear(); },

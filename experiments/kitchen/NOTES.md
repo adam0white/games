@@ -38,6 +38,13 @@ Guests no longer come one at a time. Two are waiting by the tables when the door
 
 Between guests the camera shows the room. Tap a chip (dish, price, mood, patience) to call that guest to the counter. Space or Enter calls the most impatient guest, and after 2.5 s that guest comes up on their own. While you cook, the chips shrink to the top right. Rules and a whole-day simulation (`simulateLine`) live in `sim.js`. `bots.mjs` checks that a good cook keeps everyone at the Diner and that a slow cook at the top loses guests. Hook: `kitchenCall(i)`. Nothing new is saved.
 
+## Looking around (focus views)
+
+While guests wait (the pick phase), the ◀ ▶ buttons on the screen edges, a swipe, or the arrow keys walk the camera through
+five views: Dining room, The line, Counter, Front door, Kitchen. Tapping a guest in any view calls them to the counter. Once the
+player looks around, the auto-call is off for that pick, so a guest is never pulled while the player is looking; patience still
+drains. The right wall now has a doorway (guests used to walk through the wall). Lab event: `focus {view}`.
+
 ## Moods and the Manners Wheel (from the Bistro, rank 2)
 
 Nana's rule: "Feed everyone. Throw food? Spin first. THEN feed." From the Bistro on, some guests arrive with a mood (rude, picky, sneaky; up to 1 a day at rank 2, 3 at the top). Moods come from their own seeded stream, so the day's dishes do not change. Missions that need a mood force one onto a guest.
