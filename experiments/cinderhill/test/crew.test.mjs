@@ -112,12 +112,12 @@ test('free ants: one in three at a time works the nearest trail at off-trail spe
   run(s, 1200, s => {
     let free = 0, out = 0;
     for (let i = 0; i < s.n; i++) {
-      if (s.job[i] !== JOB.FORAGE || isCrew(s.via[i])) continue;
+      if (s.job[i] !== JOB.FORAGE || isCrew(s.via[i]) || s.carry[i]) continue; // free: no crew and no load (6.2)
       free++;
       if (s.mode[i] !== MODE.REST) out++;
       if (s.via[i] === FREE_VIA + e.slot) eastFree++;
       if (s.via[i] === FREE_VIA + so.slot) southFree++;
-      if (s.mode[i] === MODE.REST && s.layer[i] === NEST && s.y[i] >> 8 >= 10) { resting++; if (s.x[i] !== px[i] || s.y[i] !== py[i]) moved++; }
+      if (s.mode[i] === MODE.REST && s.goal[i] < 0 && s.layer[i] === NEST && s.y[i] >> 8 >= 10) { resting++; /* at the door, not walking back to it */ if (s.x[i] !== px[i] || s.y[i] !== py[i]) moved++; }
     }
     outSum += out; freeSum += free;
     px.set(s.x.subarray(0, px.length)); py.set(s.y.subarray(0, py.length));
@@ -235,7 +235,7 @@ test('crew, free and dig counts match the ants after every ant\'s step, through 
       if (s.hp[j] === 0) continue;
       if (s.job[j] === JOB.DIG && s.mode[j] === MODE.WORK) dig++;
       if (s.job[j] !== JOB.FORAGE) continue;
-      if (isCrew(s.via[j])) crew[s.via[j] - SLOT.TRAIL0]++; else { free++; if (s.mode[j] !== MODE.REST) out++; }
+      if (isCrew(s.via[j])) crew[s.via[j] - SLOT.TRAIL0]++; else if (!s.carry[j]) { free++; if (s.mode[j] !== MODE.REST) out++; }
     }
     for (let k = 0; k < SLOT.TRAILS; k++) if (crew[k] !== s.crew[k]) bad.push(`tick ${s.tick} ant ${i}: crew ${k} ${s.crew[k]}, counted ${crew[k]}`);
     if (free !== s.freeAll || out !== s.freeOut) bad.push(`tick ${s.tick} ant ${i}: free ${s.freeAll}/${s.freeOut}, counted ${free}/${out}`);
@@ -300,7 +300,7 @@ test('cutting a crew sends the free ants over the third back to the door at once
   const e = draw(s, east);
   level(s, e.seq, 3); run(s, 400); // Surge: 15 on the crew, out on the trail
   level(s, e.seq, 1); run(s, 3); // Light: 3, so 12 more free ants, most of them outside
-  const count = s => { let free = 0, out = 0; for (let i = 0; i < s.n; i++) if (s.job[i] === JOB.FORAGE && !isCrew(s.via[i])) { free++; if (s.mode[i] === MODE.SEEK) out++; } return { free, out }; };
+  const count = s => { let free = 0, out = 0; for (let i = 0; i < s.n; i++) if (s.job[i] === JOB.FORAGE && !isCrew(s.via[i]) && !s.carry[i]) { free++; if (s.mode[i] === MODE.SEEK) out++; } return { free, out }; };
   let worst = -99;
   run(s, 60, s => { const { free, out } = count(s); worst = Math.max(worst, out - Math.floor((free + 2) / 3)); });
   assert.ok(worst <= 0, `free ants searching over a third: ${worst}`);
@@ -324,7 +324,7 @@ test('the counts are right between ticks after a death', () => {
   run(s, STARVE_AFTER + 2 * STARVE_EVERY + 20, s => {
     s.g[G.SUGAR] = 0;
     if (s.g[G.STARVE] % STARVE_EVERY === 0 && s.g[G.STARVE] >= STARVE_AFTER) deaths++;
-    let free = 0; for (let i = 0; i < s.n; i++) if (s.job[i] === JOB.FORAGE && !isCrew(s.via[i])) free++;
+    let free = 0; for (let i = 0; i < s.n; i++) if (s.job[i] === JOB.FORAGE && !isCrew(s.via[i]) && !s.carry[i]) free++;
     if (crewOf(s, e.slot) !== s.crew[e.slot - SLOT.TRAIL0] || free !== s.freeAll) bad++;
   });
   assert.ok(deaths >= 2 && s.g[G.DIED] >= 2);

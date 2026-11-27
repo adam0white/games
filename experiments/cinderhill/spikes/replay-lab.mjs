@@ -87,7 +87,7 @@ export class Observer {
     this.pageData = { samples: 0, fps: [], holds: [], hides: 0, errors: [], cams: 0 };
     this.prevCarry = new Uint8Array(0); this.prevVia = new Int8Array(0); this.prevN = 0;
     this.lastChange = 0; this.lastKey = ''; this.lastOrderStep = 0; this.pendingTrails = [];
-    this.births = []; this.decisions = []; this.idleMax = 0; this.idleSum = 0; this.idleLooks = 0; this.firstOrder = -1; this.hungry = false; this.bornSeen = this.s.g[G.BORN]; this.deliveries = []; this.firstTrailProtein = -1; this.loadsSeen = this.s.g[G.SUGAR_LOADS] + this.s.g[G.PROTEIN_LOADS];
+    this.births = []; this.decisions = []; this.idleMax = 0; this.idleSum = 0; this.idleLooks = 0; this.firstOrder = -1; this.hungry = false; this.bornSeen = this.s.g[G.BORN]; this.deliveries = []; this.firstTrailProtein = -1; this.queuedSum = 0; this.outsideSum = 0; this.queuedMax = 0; this.jams = 0; this.loadsSeen = this.s.g[G.SUGAR_LOADS] + this.s.g[G.PROTEIN_LOADS];
     this.newMinute();
     for (let p = 0; p < this.s.pileCell.length; p++) if (this.s.pileCell[p] >= 0 && this.s.pileAmount[p] > 0) { this.decisions.push({ step: 0, what: 'new source' }); break; }
   }
@@ -108,7 +108,8 @@ export class Observer {
     const loads = g[G.SUGAR_LOADS] + g[G.PROTEIN_LOADS]; if (loads < this.loadsSeen) this.loadsSeen = loads;
     if (loads > this.loadsSeen && this.steps <= 2 * MINUTE) this.deliveries.push(this.steps); this.loadsSeen = loads; // the first 2 min, for the quiet-stretch line
     for (const e of this.h.lastEvents ?? []) {
-      const what = e[0] === EVENT.PILE_NEW ? 'new source' : e[0] === EVENT.PILE_EMPTY ? 'source empty' : e[0] === EVENT.SPIDER && e[1] === SPIDER.WARN ? 'threat telegraphed' : e[0] === EVENT.SPIDER && e[1] === SPIDER.HUNT ? 'threat arrived' : e[0] === EVENT.SPIDER && e[1] === SPIDER.LEFT ? 'threat resolved' : null;
+      const what = e[0] === EVENT.PILE_NEW ? 'new source' : e[0] === EVENT.PILE_EMPTY ? 'source empty' : e[0] === EVENT.SPIDER && e[1] === SPIDER.WARN ? 'threat telegraphed' : e[0] === EVENT.SPIDER && e[1] === SPIDER.HUNT ? 'threat arrived' : e[0] === EVENT.SPIDER && e[1] === SPIDER.LEFT ? 'threat resolved' : e[0] === EVENT.JAM && e[1] === 1 ? 'route jammed' : null;
+      if (e[0] === EVENT.JAM && e[1] === 1) this.jams++;
       if (what) this.decisions.push({ step: this.steps, what });
     }
     let larvae = 0; for (let k = 0; k < (s.brood?.n ?? 0); k++) if (s.brood.stage[k] === STAGE.LARVA) larvae++;
@@ -149,16 +150,22 @@ export class Observer {
   }
   look() {
     const s = this.s; let idle = 0, working = 0, other = 0;
+    const queued = s.queued;
+    let q = 0, outside = 0;
     for (let i = 0; i < s.n; i++) {
+      if (s.layer[i] === SURFACE) outside++;
+      if (queued?.[i]) { q++; continue; } // queued at a door: counted apart (02-spec 3.1), not idle
       if (s.carry[i] || s.mode[i] === MODE.WORK || s.via[i] >= 0 || s.goal[i] === SLOT.ALARM) working++;
       else if (s.mode[i] === MODE.REST || (s.mode[i] === MODE.SEEK && s.since[i] >= 600)) idle++;
       else other++;
     }
     this.cur.idle += idle; this.cur.working += working; this.cur.other += other; this.cur.looks++;
+    // Queued at doors, outside a jam (02-spec 3.1): ants waiting at a door lane over ants on the surface, summed over the looks.
+    if (!s.g[G.JAMMED]) { this.queuedSum += q; this.outsideSum += outside; if (outside && q / outside > this.queuedMax) this.queuedMax = q / outside; }
     // The pace gate's idle share (02-spec 3.1): idle for IDLE_FOR ticks while some job has a gap.
     const gap = this.gapRun >= GAP_FOR;
     let wasted = 0;
-    if (gap) for (let i = 0; i < s.n; i++) if ((s.job[i] === JOB.FORAGE && !s.carry[i] && s.via[i] < 0 && s.goal[i] < 0 && (s.mode[i] === MODE.REST || (s.mode[i] === MODE.SEEK && s.mem[i] < 0)) && s.since[i] >= IDLE_FOR) || (s.job[i] === JOB.DIG && (s.mode[i] === MODE.REST || (s.mode[i] === MODE.SEEK && s.g[G.DIG_COUNT] === 0)) && s.since[i] >= IDLE_FOR)) wasted++;
+    if (gap) for (let i = 0; i < s.n; i++) if (!queued?.[i] && ((s.job[i] === JOB.FORAGE && !s.carry[i] && s.via[i] < 0 && s.goal[i] < 0 && (s.mode[i] === MODE.REST || (s.mode[i] === MODE.SEEK && s.mem[i] < 0)) && s.since[i] >= IDLE_FOR) || (s.job[i] === JOB.DIG && (s.mode[i] === MODE.REST || (s.mode[i] === MODE.SEEK && s.g[G.DIG_COUNT] === 0)) && s.since[i] >= IDLE_FOR))) wasted++;
     const share = s.n ? wasted / s.n : 0;
     if (share > this.idleMax) this.idleMax = share;
     this.idleSum += share; this.idleLooks++;
@@ -224,7 +231,8 @@ export class Observer {
   stats() {
     return { steps: this.steps, minutes: this.minutes, trails: this.trails.map(({ onSum, looks, ...t }) => ({ ...t, onMean: looks ? Math.round(onSum / looks * 10) / 10 : 0, ticks: (t.end < 0 ? this.steps : t.end) - t.step })),
       digs: this.digs.map(({ cells, ...d }) => ({ ...d, cells: cells.length })), alarms: this.alarms, recalls: this.recalls, stalls: this.stalls, marks: this.marks, page: this.pageData, unattributedTicks: this.unattributed ?? 0,
-      births: this.births, decisions: this.decisions, idleMax: this.idleMax, idleMean: this.idleLooks ? this.idleSum / this.idleLooks : 0, firstOrder: this.firstOrder, deliveries: this.deliveries, firstTrailProtein: this.firstTrailProtein };
+      births: this.births, decisions: this.decisions, idleMax: this.idleMax, idleMean: this.idleLooks ? this.idleSum / this.idleLooks : 0, firstOrder: this.firstOrder, deliveries: this.deliveries, firstTrailProtein: this.firstTrailProtein,
+      queuedShare: this.outsideSum ? this.queuedSum / this.outsideSum : 0, queuedMax: this.queuedMax, jams: this.jams };
   }
 }
 

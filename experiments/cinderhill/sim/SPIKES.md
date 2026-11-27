@@ -467,3 +467,23 @@ Every S4 snapshot restores to the same hash. The S1 run under load average 15 ea
 **Independent review** (Codex, read-only): eleven findings fixed and five left open, all listed in `../NOTES.md`, Who goes. A second review of the fixes found thirteen more: eleven fixed, two left open (same place). Neither round's fixes change the three totals; after the second, the pace gate holds against main and every test passes (142).
 
 **Mutations shown to fail** (each fails a crew test unless noted): all free ants out at once; no starving slow-down; no Steady default; sizes worked out on every change; youngest dying first; a give-up leaving the free count; no shorter-trail tie-break; no walk-in for the dig (the start-dig test: dug 0 of 6); the quota only in the nest; a count order not resizing; a sugar load not resetting starvation; no recount after a death; levels in the sandbox; a bad level accepted; a fractional level encoded; the first death at 70 s; restart keeping loads; no capacity reason on the card; no resting line in the inspector. In the pace gate test: resting ants at home never joining a short crew (idle share over 0.15); the job-goal check removed (0.5625).
+
+## Doors (SIM_VERSION 10, snapshot format 10, 2026-11-26)
+
+R1 step 3, second half (`../NOTES.md`, Doors): a 3-cell entrance in colony games, two lanes a cell at 6 ants a second, queues and jams, the way in free under Recall, and an ant with a load no longer free. Eight more globals, so the sandbox totals change too though its play does not. New totals: `EXPECTED` 2818045765, `EXPECTED_LONG` 2727923730, `EXPECTED_COLONY` 3105055635.
+
+| Measure | Before (SIM_VERSION 9) | After |
+| --- | --- | --- |
+| S2 sandbox: Node, workerd, Chromium 156.0.8078.4, WebKit 27.2 on all 600 records | agree (final total 62240356) | agree (final total 2727923730) |
+| S2 colony (`--colony`) | agree (final total 410145409) | agree (final total 1148962020) |
+| S2 planted fault | tick 20, `ants` | the same |
+| S2 Firefox | not run | not run (Playwright's Firefox is not installed here) |
+| S1 Node, 2,000 ants, mean / p95 / max | 1.60 / 1.68 / 4.55 ms | 1.60 / 1.68 / 4.57 ms (load average about 2.5) |
+| S1 Node, 5,000 ants | 1.88 / 2.06 / 3.54 ms | 1.88 / 2.05 / 3.49 ms |
+| S1 all 9 fields at once | 11.53 ms | 11.32 ms |
+| S1 workerd, 2,000 / 5,000 ants, mean | 1.55 / 1.90 ms | 1.54 / 1.90 ms (colony build: 1.55 / 1.90 ms) |
+| S4, 5,000 ants, 3,000 / 8,000 / 24,000 ticks | 39.9 / 39.4 / 37.7 KB | 39.9 / 39.4 / 37.7 KB (2 bytes more for the globals) |
+
+Every S4 snapshot restores to the same hash. S1 times the sandbox, which has no lanes; the lanes' cost in a large colony is not timed (one check of at most 4 cells per crossing).
+
+**Mutations shown to fail** (each fails a doors test unless noted): no lanes; one lane for both ways; 7 twentieths a tick; no Recall exemption; a jam at 99 ticks; a jam that never clears; the queue counted twice; a 2-cell colony door; the queued marks not following a death; no jam reason on the route card; queued ants counted idle; carriers counted free (crew tests); a free forager's pickup leaving her free (crew tests); an unloaded free ant not counted free again (crew tests). In the pace gate: the one-cell door fixture must jam (18 jams over 5 seeds), and `door-jams` must read 0 in chapter 1 play.

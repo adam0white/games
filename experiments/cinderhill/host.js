@@ -182,6 +182,7 @@ export class Host {
                 // A level whose share the older crews have taken, wholly or in part, says so too.
         const lv = s.g[G.LEVEL0 + k], wf = s.g[G.WORKFORCE], share = lv && wf > 0 ? Math.max(1, Math.floor((wf * LEVEL_SHARE[lv] + 50) / 100)) : 0;
         if (w && ((lv && w - 1 < share) || (onIt[k] < w - 1 && s.freeAll === 0))) why = 'noFree';
+        if (s.g[G.JAMMED]) why = 'jammed'; // sim 10: the door holds every route up (one door for now)
       } else if (slot !== newest && !w && onIt[k] === 0) why = 'older'; // no crew size and no one on it: free ants go to the newest
       else if (crew === 0) why = seeking === 0 ? 'noSeekers' : late >= seeking ? 'outTooLong' : 'none';
       // Loads a minute: those home by this trail in the last minute (or since it was drawn, scaled to a minute).
@@ -198,7 +199,7 @@ export class Host {
       for (let k = 0; k < B.n; k++) by[B.stage[k]]++;
       colony = { queen: s.g[G.QUEEN], sugar: s.g[G.SUGAR], protein: s.g[G.PROTEIN], eggs: by[STAGE.EGG], larvae: by[STAGE.LARVA], pupae: by[STAGE.PUPA], born: s.g[G.BORN], lost: s.g[G.BROOD_LOST], hungry: s.g[G.HUNGRY] };
     }
-    return { ants: n, surface, carrying, foragers, seeking, resting, trails, alarm, dig, piles, picked: s.g[G.PICKED], stores: s.g[G.STORES], recall: !!s.g[G.RECALL], tick: s.tick, colony };
+    return { ants: n, surface, carrying, foragers, seeking, resting, queued: this.colony ? s.g[G.QUEUED] : 0, jammed: this.colony && !!s.g[G.JAMMED], trails, alarm, dig, piles, picked: s.g[G.PICKED], stores: s.g[G.STORES], recall: !!s.g[G.RECALL], tick: s.tick, colony };
   }
 
   /** One ant, for the inspection card: what she is, what she carries, where she is going and why. Keys for words.js. */
@@ -213,7 +214,8 @@ export class Host {
     let why;
     if (s.g[G.RECALL] && layer === SURFACE) why = 'recalled';
     else if (s.job[i] === JOB.FORAGE) {
-      if (s.mode[i] === MODE.REST) why = goal >= 0 ? 'toRest' : 'resting'; // free: walking back to the door, or by it (sim 9)
+      if (s.queued[i]) why = 'queued'; // waiting at a door lane (sim 10)
+      else if (s.mode[i] === MODE.REST) why = goal >= 0 ? 'toRest' : 'resting'; // free: walking back to the door, or by it (sim 9)
       else if (s.mode[i] === MODE.RETURN) why = s.carry[i] ? 'carrying' : 'gaveUp';
       else if (layer === NEST) why = s.g[G.RECALL] ? 'waitingIn' : 'goingOut';
       else if (to === 'trail') why = 'onTrail';

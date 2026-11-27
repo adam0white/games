@@ -530,6 +530,7 @@ function hud() {
   const sp = host.sim.g[GI.SP];
   if (sp === SPIDER.WARN || sp === SPIDER.HUNT) lines.unshift(`<b class="spider">${t('spiderHud', { what: t(sp === SPIDER.WARN ? 'spiderComing' : 'spiderHunting'), kills: host.sim.g[GI.SP_KILLS] })}</b>`);
   if (c && stats.resting) lines.push(t('freeCount', { n: num(stats.resting) }));
+  if (stats.jammed) lines.unshift(`<b class="spider">${t('jamHud', { n: num(stats.queued) })}</b>`); // sim 10: only when a jam really happens
   if (lines.length && newest && !c) lines.push(`<small>${t('noWanted')}</small>`);
   $('crew').innerHTML = lines.join('<br>');
   const ct = layer === SURFACE ? crewTrail() : null;

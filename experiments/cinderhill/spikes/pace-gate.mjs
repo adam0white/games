@@ -24,6 +24,7 @@ import { availableParallelism } from 'node:os';
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
 import { Host } from '../host.js';
 import { CMD, FOOD, G, SURFACE } from '../sim/sim.js';
+import { DOOR } from '../sim/world.js';
 import { C, DAY_GOALS, GOAL_KIND, START } from '../sim/colony.js';
 import { SPIDER } from '../sim/spider.js';
 import { Observer, parts, replayChain } from './replay-lab.mjs';
@@ -34,7 +35,7 @@ const BASELINE = new URL('./pace-baseline.json', import.meta.url);
 
 /** Where the build is on the roadmap, and the order of the stages lines block from. */
 export const STAGES = ['R0', 'R1.2', 'R1.3', 'R1.3b', 'R1.5', 'R1', 'R2a', 'R2b'];
-export const STAGE = 'R1.3';
+export const STAGE = 'R1.3b';
 export const blocks = (line, stage = STAGE) => STAGES.indexOf(line.stage) <= STAGES.indexOf(stage);
 /** At R0 the roadmap says the build fails the gate: a failing blocking line is allowed by its baseline and may not
  *  get worse. From R1 step 2 (new starting values) every blocking line must pass. */
@@ -60,7 +61,9 @@ export const LINES = [
   { id: 'gap-0-10', stage: 'R1', horizon: 600, text: 'Longest gap between decision events, minutes 0 to 10, s', target: '<= 30', bot: 'median', get: r => r.gapEarly, ok: v => v <= 30, up: true },
   { id: 'gap-after-10', stage: 'R1', horizon: 720, text: 'Same gap after minute 10, s', target: '<= 45', bot: 'median', get: r => r.gapLate, ok: v => v <= 45, up: true },
   { id: 'idle-share', stage: 'R1.3', horizon: 720, text: 'Wasted labour: largest share of adults idle 10 s while a job has a gap', target: '<= 0.15', bot: 'median', get: r => r.idleMax, ok: v => v <= 0.15, up: true },
-  { id: 'queued-at-doors', stage: 'R1.3b', text: 'Queued at doors outside a jam', target: '<= 0.10', bot: 'median', get: () => null },
+  // Queued at doors (sim 10): ants waiting at a door lane over ants outside, summed over the looks outside a jam.
+  { id: 'queued-at-doors', stage: 'R1.3b', horizon: 720, text: 'Queued at doors outside a jam, share of ants outside (summed over the game)', target: '<= 0.10', bot: 'median', get: r => r.queuedShare, ok: v => v <= 0.10, up: true },
+  { id: 'door-jams', stage: 'R1.3b', horizon: 720, text: 'Door jams (chapter 1 cannot jam its 3-cell door: 02-spec 3.2)', target: '0', bot: 'median', get: r => r.jams, ok: v => v === 0, up: true },
   { id: 'chapter-1-length', stage: 'R1', text: 'Chapter 1 length, min', target: '4 to 6', bot: 'median', get: () => null },
   { id: 'passive-finishes', stage: 'R1', text: 'Passive bot finishes chapter 1', target: 'yes', bot: 'passive', get: () => null },
   { id: 'chapters-2-6-length', stage: 'R2a', text: 'Chapters 2 to 6 length, min', target: '6 to 12', bot: 'median', get: () => null },
@@ -98,15 +101,17 @@ function trailTo(sim, c) {
 /** Fixtures (fault injection, no sim change): set on the exported start values for one game, then put back.
  *  - quota: the old quota opening of 02 section 3.1: 20 workers, 40 sugar, 4 larvae and no pupae, a 40-load first
  *    day of 10 minutes. It must fail a line the current build passes.
- *  - brood10: every brood stage ten times as long (the roadmap's planted slow-down). It must fail the gate. */
+ *  - brood10: every brood stage ten times as long (the roadmap's planted slow-down). It must fail the gate.
+ *  - door1: a one-cell door and 300 adults (02-spec 3.2 Doors: bots test congestion in a separate fixture). It must jam. */
 export function withFixture(fixture, fn) {
   if (!fixture) return fn({});
-  const keep = { start: { ...START }, goal: DAY_GOALS[0].slice(), c: { ...C } };
+  const keep = { start: { ...START }, goal: DAY_GOALS[0].slice(), c: { ...C }, door: { ...DOOR } };
   try {
     if (fixture === 'quota') { Object.assign(START, { ants: 20, surface: 20, sugar: 40, protein: 0, eggs: 0, larvae: 4, pupae: 0 }); DAY_GOALS[0] = [GOAL_KIND.TRAIL_LOADS, 40]; return fn({ dayTicks: 12000 }); }
+    if (fixture === 'door1') { DOOR.wide = 1; Object.assign(START, { ants: 300, surface: 200, sugar: 400 }); return fn({}); }
     if (fixture === 'brood10') { for (const k of ['EGG_TICKS', 'LARVA_TICKS', 'LARVA_STARVE', 'PUPA_TICKS']) C[k] *= 10; return fn({}); }
     throw new Error(`no fixture ${fixture}`);
-  } finally { Object.assign(START, keep.start); DAY_GOALS[0] = keep.goal; Object.assign(C, keep.c); }
+  } finally { Object.assign(START, keep.start); DAY_GOALS[0] = keep.goal; Object.assign(C, keep.c); Object.assign(DOOR, keep.door); }
 }
 
 /** One bot game: the lines' raw values. */
@@ -163,6 +168,7 @@ export function measure(st, ticks = st.steps) {
     idleMax: Math.round(st.idleMax * 1000) / 1000,
     firstOrder: st.firstOrder >= 0 ? st.firstOrder / HZ : null,
     quiet: ticks >= 2 * 60 * HZ ? quiet(st) : null,
+    queuedShare: Math.round(st.queuedShare * 1000) / 1000, queuedMax: Math.round(st.queuedMax * 1000) / 1000, jams: st.jams,
   };
 }
 
@@ -263,6 +269,9 @@ if (isMainThread && import.meta.url === `file://${process.argv[1]}`) {
     // The fixtures play 3 minutes on 5 seeds, and only lines that fit in 3 minutes are read.
     const short = { seeds: Math.min(seeds, 5), minutes: Math.min(minutes, 3) };
     const quota = await gate({ ...short, fixture: 'quota' }), brood = await gate({ ...short, fixture: 'brood10' });
+    // The one-cell door must jam on some seed, and the real door on none (chapter 1 cannot jam it: 02-spec 3.2).
+    const door = await runAll(Array.from({ length: short.seeds }, (_, k) => ({ bot: 'median', seed: k + 1, minutes: short.minutes, fixture: 'door1' })));
+    const doorJams = door.reduce((a, r) => a + r.jams, 0);
     if (!args.includes('--quiet')) console.log(table(res));
     const block = LINES.filter(l => blocks(l));
     const quotaFails = block.filter(l => res[l.id].status === 'pass' && quota[l.id].status === 'fail').map(l => l.id);
@@ -283,6 +292,8 @@ if (isMainThread && import.meta.url === `file://${process.argv[1]}`) {
         try { old = JSON.parse(execFileSync('git', ['show', `${ref}:experiments/cinderhill/spikes/pace-baseline.json`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })); } catch { console.log(`no baseline at ${ref}: nothing to compare`); }
         if (old) problems.push(...slack(base, old).map(p => `baseline: ${p}`));
       }
+      console.log(`One-cell door: ${doorJams} jam(s) over ${short.seeds} seeds, ${short.minutes} min (it must jam).`);
+      if (!doorJams) problems.push('the one-cell door fixture never jams: the door lanes limit nothing');
       if (!quotaFails.length) problems.push('the quota opening fails no blocking line the current build passes: the table is too loose');
       // Only lines the short fixture run can read: a line past its horizon is "not read" there, and that is no catch.
       const broodBad = ratchet(brood, base, block.filter(l => brood[l.id].status !== 'not read')).filter(p => !/passes now|in this run/.test(p));

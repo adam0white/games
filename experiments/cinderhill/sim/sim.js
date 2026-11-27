@@ -20,14 +20,14 @@ import { LATE_FIND_AT, WINDFALL_AT, generate, lateFind, windfall } from './world
 import { stepSpider } from './spider.js';
 import { BROOD_MAX, C, CASTE, CASTE_HP, DAY_TICKS, FOOD, LOAD, STAGE, addBrood, fight, makeBrood, startColony, startDays, stepColony, stepDay } from './colony.js';
 
-export const SIM_VERSION = 9; // 2: trails keep their drawn shape (a path per trail, `via` per ant); 3: eight directions; 4: the colony (colony.js); 5: days; 6: the spider, and foragers stay in under Recall; 7: crews (CMD.CREW); 8: the spec's starting values (02-spec 3.2): a porch store, a 64-cell nursery, 30 ants, fast brood, no days; 9: who goes (02-spec 6.2): crew levels (Steady by default), free foragers on the nearest trail one in three at a time, the dig as an auto job, adult starvation
+export const SIM_VERSION = 10; // 2: trails keep their drawn shape (a path per trail, `via` per ant); 3: eight directions; 4: the colony (colony.js); 5: days; 6: the spider, and foragers stay in under Recall; 7: crews (CMD.CREW); 8: the spec's starting values (02-spec 3.2): a porch store, a 64-cell nursery, 30 ants, fast brood, no days; 9: who goes (02-spec 6.2): crew levels (Steady by default), free foragers on the nearest trail one in three at a time, the dig as an auto job, adult starvation; 10: doors (02-spec 3.2): a 3-cell entrance in colony games, two lanes a cell at 6 ants a second, queues and jams; an ant with a load is not free
 export const TICK_HZ = 20;
 export { G, GOAL, SLOT, INF, STEP, DIAG, FIELD, MAT, SURFACE, NEST, SUB, SUBSYSTEMS, CASTE, CASTE_HP, FOOD, LOAD, STAGE, BROOD_MAX };
 
 export const JOB = { FORAGE: 0, DIG: 1, GUARD: 2, NURSE: 3 }; // NURSE (sim 8): stays in the nursery
 export const MODE = { SEEK: 0, RETURN: 1, WORK: 2, REST: 3 };
 export const CMD = { TRAIL: 1, DIG: 2, ALARM: 3, RECALL: 4, CREW: 5 };
-export const EVENT = { DUG: 1, PILE_EMPTY: 2, REJECTED: 3, LATE: 4, DUSK: 5, SPIDER: 6, PILE_NEW: 7, HOME: 8 }; // DUSK: (day, won); SPIDER: (spider.js SPIDER state, slot or kills); PILE_NEW: (pile, kind); HOME (colony games): a load home (trail slot of her route or -1, kind)
+export const EVENT = { DUG: 1, PILE_EMPTY: 2, REJECTED: 3, LATE: 4, DUSK: 5, SPIDER: 6, PILE_NEW: 7, HOME: 8, JAM: 9 }; // DUSK: (day, won); SPIDER: (spider.js SPIDER state, slot or kills); PILE_NEW: (pile, kind); HOME (colony games): a load home (trail slot of her route or -1, kind); JAM (sim 10): (1 jammed or 0 clear, ants queued)
 export const MAX_PILES = 8;
 const EVENT_CAP = 1024; // events kept until the host drains them; older ones are dropped (counted in globals)
 
@@ -56,6 +56,8 @@ const BRIDGE_MARGIN = 12;
 // A free forager's route (sim 9, colony games): `via` FREE_VIA + slot while she works the nearest trail without being on
 // its crew. Crew members keep `via` = the slot, so `crew` counts only them.
 export const FREE_VIA = 16;
+// Doors (sim 10, 02-spec 3.2): debts in twentieths of a pass; a lane passes 6 ants a second; a jam is 10 queued for 5 s.
+export const PASS = 20, LANE_RATE = 6, DOOR_CELLS = 4, JAM_AT = 10, JAM_FOR = 100;
 export const LEVEL_SHARE = [0, 10, 25, 50]; // percent of the outside workforce: none, Light, Steady, Surge
 
 /** Trail k's crew size at its level for a workforce of wf, capped by what the other crews leave. */
@@ -113,6 +115,8 @@ export class Sim {
     this.seenMark = 0; this.pathBuf = new Int32Array(PATH_MAX);
     this.crew = new Int32Array(SLOT.TRAILS); // per tick: living foragers whose route is each trail (from `via`; not state)
     this.freeAll = 0; this.freeOut = 0; // per tick, colony games: free foragers, and those of them not resting (not state)
+    this.queued = new Uint8Array(A); // per tick, colony games: 1 for an ant waiting at a door lane this tick (not state; for the HUD and the observer)
+    this.doorCells = null; // the surface cells with a link, in cell order: each has two lanes (worked out on the first colony tick; links do not change in play)
     this.queue = []; // pending commands, each an Int32Array [tick, seat, id, type, ...payload], sorted
     this.events = []; // [type, a, b] triples not yet drained
     this.maxStall = 0; // a counter for tests and bots; not state
@@ -361,7 +365,7 @@ export class Sim {
     for (let i = 0; i < this.n; i++) {
       if (this.hp[i] === 0 || this.job[i] !== JOB.FORAGE) continue;
       if (isTrailSlot(this.via[i])) this.crew[this.via[i] - SLOT.TRAIL0]++;
-      else if (this.cfg.colony) { this.freeAll++; if (this.mode[i] !== MODE.REST) this.freeOut++; }
+      else if (this.cfg.colony && !this.carry[i]) { this.freeAll++; if (this.mode[i] !== MODE.REST) this.freeOut++; } // free: no crew and no load (6.2)
     }
   }
 
@@ -381,7 +385,9 @@ export class Sim {
     this.buildBuckets();
     if (this.cfg.colony) this.resizeCrews();
     this.census();
+    if (this.cfg.colony) this.openLanes();
     for (let i = 0; i < this.n; i++) this.stepAnt(i);
+    if (this.cfg.colony) this.judgeJam();
     fight(this);
     if (this.cfg.colony && this.cfg.dayTicks > 0) stepSpider(this, EVENT.SPIDER); // the spider comes by day (chapter 3 in the spec)
     if (this.anyDead) { this.removeDead(); this.census(); } // the counts are read between ticks too (route cards, the observer)
@@ -423,6 +429,44 @@ export class Sim {
 
   setMode(i, mode) { this.mode[i] = mode; this.since[i] = 0; }
 
+  /** Doors (sim 10, 02-spec 3.2): once a colony tick, before the ants move, every lane pays off LANE_RATE twentieths
+   *  of its debt (6 passes a second at 20 ticks a second) and the queue count starts again. */
+  openLanes() {
+    const g = this.g;
+    if (!this.doorCells) { const d = []; for (let c = 0; c < this.L.nestBase; c++) if (this.link[c] >= 0) d.push(c); this.doorCells = Int32Array.from(d); }
+    for (let k = 0; k < 2 * DOOR_CELLS; k++) g[G.LANE0 + k] = g[G.LANE0 + k] > LANE_RATE ? g[G.LANE0 + k] - LANE_RATE : 0;
+    g[G.QUEUED] = 0; this.queued.fill(0, 0, this.n);
+  }
+
+  /** Ant i at door cell c (either side) would cross. A lane with a debt of PASS or less lets her through and takes on
+   *  PASS more; otherwise she queues. Under Recall the way in is not limited (the ants crossing are at the door, so
+   *  within 2 cells of it: 02-spec 3.2 Recall). Entrance cells past DOOR_CELLS are not limited. */
+  passDoor(i, c, layer) {
+    const g = this.g, top = layer === SURFACE ? c : this.link[c], inward = layer === SURFACE ? 1 : 0;
+    if (inward && g[G.RECALL]) return true;
+    const D = this.doorCells;
+    let k = -1;
+    for (let j = 0; j < D.length && j < DOOR_CELLS; j++) if (D[j] === top) k = j;
+    if (k < 0) return true;
+    const lane = G.LANE0 + 2 * k + inward;
+    if (g[lane] <= PASS) { g[lane] += PASS; return true; }
+    if (!this.queued[i]) { this.queued[i] = 1; g[G.QUEUED]++; }
+    return false;
+  }
+
+  /** After the ants move: a door is jammed once JAM_AT or more ants have queued at it for JAM_FOR ticks (02-spec 3.2),
+   *  and clear when the queue drops below JAM_AT. One door for now: the colony's entrance (a second door is chapter 4). */
+  judgeJam() {
+    const g = this.g;
+    if (g[G.QUEUED] >= JAM_AT) {
+      if (g[G.JAM_RUN] < 0x7FFFFFFF) g[G.JAM_RUN]++;
+      if (g[G.JAM_RUN] === JAM_FOR) { g[G.JAMMED] = 1; g[G.JAMS]++; this.event(EVENT.JAM, 1, g[G.QUEUED]); }
+    } else {
+      if (g[G.JAMMED]) { g[G.JAMMED] = 0; this.event(EVENT.JAM, 0, g[G.QUEUED]); }
+      g[G.JAM_RUN] = 0;
+    }
+  }
+
   /** Every per-ant array, in hash order. */
   antArrays() {
     return [this.x, this.y, this.layer, this.heading, this.job, this.mode, this.carry, this.mem, this.goal, this.best, this.stall, this.since, this.lastCell, this.via, this.caste, this.hp, this.team, this.cool];
@@ -434,7 +478,7 @@ export class Sim {
     let w = 0;
     for (let i = 0; i < this.n; i++) {
       if (this.hp[i] === 0) { if (this.job[i] === JOB.DIG && this.mode[i] === MODE.WORK) this.g[G.DIG_CREW]--; continue; } // her place in the dig crew frees up
-      if (w !== i) for (const a of arrays) a[w] = a[i];
+      if (w !== i) { for (const a of arrays) a[w] = a[i]; this.queued[w] = this.queued[i]; }
       w++;
     }
     this.n = w; this.anyDead = false;
@@ -461,6 +505,7 @@ export class Sim {
             this.g[kind === FOOD.PROTEIN ? G.PROTEIN : G.SUGAR] += LOAD[kind];
             if (kind === FOOD.SUGAR) this.g[G.STARVE] = 0; // sugar home ends the starving, even if the colony eats it before the next check
             this.carry[i] = 0;
+            if (this.cfg.colony && !isTrailSlot(this.via[i])) { this.freeAll++; this.freeOut++; } // unloaded, off any crew: free again, and out (SEEK) until who-goes says
           }
           this.setMode(i, MODE.SEEK); this.heading[i] = (this.heading[i] + 128) & 255;
           still = true;
@@ -571,7 +616,7 @@ export class Sim {
       const n1 = back ? backCell(this, follow, c) : nextCell(this, follow, c);
       // A trail path broken by a cell closed after it was drawn leaves a dead end: wander off it.
       if (n1 < 0) { if (isTrailSlot(follow) && d !== 0) wander = true; else still = true; }
-      else if (this.link[c] === n1) { this.moveTo(i, n1); return; }
+      else if (this.link[c] === n1) { if (!this.cfg.colony || this.passDoor(i, c, layer)) { this.moveTo(i, n1); return; } still = true; } // a door lane with no room: she waits her turn
       else {
         // Aim two steps ahead when both are on this layer: ants then cut staircase corners on diagonals. On a
         // drawn bend that doubles back within one cell this cuts the bend too (measured: a lone ant passes 1.04
@@ -735,6 +780,7 @@ export class Sim {
     const p = this.pileAt(c);
     if (p >= 0) {
       this.carry[i] = this.pileKind[p] === FOOD.PROTEIN ? 2 : 1; this.mem[i] = SLOT.FOOD0 + p; this.setMode(i, MODE.RETURN);
+      if (free) { this.freeAll--; this.freeOut--; } // a load: no longer free (6.2)
       this.heading[i] = (this.heading[i] + 128) & 255; this.g[G.PICKED]++;
       if (--this.pileAmount[p] === 0) { dropGoal(this, SLOT.FOOD0 + p); this.event(EVENT.PILE_EMPTY, p, 0); }
       o.still = true; return o;

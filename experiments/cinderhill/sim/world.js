@@ -17,6 +17,9 @@ function disc(sim, layer, cx, cy, r, m, keep) {
  *  shaft. Fixed by the nest's width, so a snapshot needs no field for it. */
 export const nurseryRect = L => ({ x: (L.nw >> 1) - 8, y: Math.max(6, Math.min(12, L.nh - 5)), w: 16, h: 4 }); // higher in a shallow test nest
 
+/** The colony entrance's width in cells (02-spec 3.2: 3). A fixture may narrow it (the pace gate's one-cell door). */
+export const DOOR = { wide: 3 };
+
 export function generate(sim) {
   const { L, rng } = sim, ex = L.sw >> 1, ey = L.sh >> 1, sx = L.nw >> 1;
   const nearEntrance = (x, y) => Math.abs(x - ex) < 12 && Math.abs(y - ey) < 12;
@@ -48,13 +51,15 @@ export function generate(sim) {
       y++; x += below(rng, W, 3) - 1;
     }
   }
-  for (let y = 0; y < room.y; y++) for (let x = sx; x <= sx + 1; x++) sim.mat[cellAt(L, NEST, x, y)] = MAT.OPEN;
+  // The entrance (sim 10, 02-spec 3.2 Doors): 3 cells wide in a colony game, 2 in the sandbox; the shaft as wide.
+  const doorWide = colony ? DOOR.wide : 2;
+  for (let y = 0; y < room.y; y++) for (let x = sx; x < sx + doorWide; x++) sim.mat[cellAt(L, NEST, x, y)] = MAT.OPEN;
   for (const r of colony ? [home, room] : [home]) for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) sim.mat[cellAt(L, NEST, x, y)] = MAT.OPEN;
   sim.home = home;
   if (colony) sim.nursery = room;
 
-  // Two entrance links: surface (ex, ey) and (ex+1, ey) to the top of the shaft.
-  for (let k = 0; k < 2; k++) {
+  // Entrance links: surface (ex + k, ey) to the top of the shaft.
+  for (let k = 0; k < doorWide; k++) {
     const a = cellAt(L, SURFACE, ex + k, ey), b = cellAt(L, NEST, sx + k, 0);
     sim.mat[a] = MAT.OPEN;
     sim.link[a] = b; sim.link[b] = a;
