@@ -792,3 +792,19 @@ no use, and a hill ahead on harm had nothing left to decide.
   ticks 4900 and 5900, so the carry phase runs two to three minutes. In those games the loser carried nothing: the
   killer's soldiers hold the body. Whether a person can break that hold is not known. About a third of steady v
   steady games reach dusk with the beetle alive.
+
+## Branch crafts: Legion for a War hill, Granary for a Deep hill (war build)
+
+A second outside review (a game critic's read) said the first growth mostly decided what arrived early, because
+every hill was offered the same three crafts. Now a craft row may carry `branch`. Legion is a War hill's. Granary
+is new and a Deep hill's: every garden cell pays two seeds a minute (`stat.garden`). Swift and Thrift are for
+either. The Grow help says so before the first growth, so the second pick can be planned from the start. An order
+for another branch's craft takes none.
+
+Numbers on The Crossing, 6 seeds both seats, steady v steady: Deep with Granary v Deep with Swift 6 to 6; Deep with
+Granary v War with Legion 4 to 8; default picks, Deep v War 4 to 8. Small sample; other missions not run.
+
+From the same review, not built: crafts that change orders (soldiers escorting a forage trail, a second door);
+build requirements for a craft; a preview of the build against the mission clock; a beetle that lunges; The Narrows
+as the weakest mission (one pass, a defender that never attacks); quarters as a free pick over a bare alcove;
+carrying the queen out through a tunnel as a wildcard.
