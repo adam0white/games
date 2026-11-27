@@ -42,14 +42,21 @@ export function think(sim, t, mood = 1) {
   let foes = 0;
   for (let i = 0; i < sim.n; i++) if (sim.team[i] !== t && sim.hp[i] > 0 && sim.layer[i] === 0 && Math.abs((sim.x[i] >> 8) - dx) <= 10 && Math.abs((sim.y[i] >> 8) - dy) <= 10) foes++;
   if (foes >= 3 && cg[o + CG.RALLY_HOLD] < 100) out.push({ team: t, type: CMD.RALLY, x: dx, y: dy, hold: 400 });
-  // Attack: with enough majors, raid the enemy's door; pull back when the raid is spent.
+  // War. It breaks into the enemy nest only with the numbers for it (bold: at parity; steady: a quarter more), since a
+  // raid into an equal guard is thrown away. Short of that, its soldiers hold the richest food on the fords.
+  let foeMajors = 0, foe = -1;
+  for (let e = 0; e < TEAMS; e++) if (e !== t && cg[e * CG.SIZE + CG.QUEEN_HP] > 0) { foe = e; foeMajors = Math.max(foeMajors, cg[e * CG.SIZE + CG.MAJORS]); }
   const need = mood === 2 ? 6 : 10, from = mood === 2 ? 2400 : 4200;
-  if (mood > 0 && !raids.length && majors >= need && sim.tick >= from && live.length < TRAILS) {
-    for (let e = 0; e < TEAMS; e++) if (e !== t && cg[e * CG.SIZE + CG.QUEEN_HP] > 0) {
-      const ed = sim.door[e];
-      out.push({ team: t, type: CMD.TRAIL, kind: KIND.RAID, level: majors >= need * 2 ? 3 : 2, points: [ed % sw, Math.floor(ed / sw)] });
-      break;
+  const strike = mood > 0 && foe >= 0 && majors >= need && sim.tick >= from && (mood === 2 ? majors >= foeMajors : majors * 4 >= foeMajors * 5);
+  const atDoor = k => { const s2 = t * TRAILS + k, e = sim.trPath[s2 * PATH_MAX + sim.trLen[s2] - 1]; return foe >= 0 && sim.doorF[foe][e] <= 4; };
+  if (raids.length && (majors < 3 || (strike && !atDoor(raids[0])) || (!strike && atDoor(raids[0]) && majors * 2 < foeMajors))) for (const k of raids) out.push({ team: t, type: CMD.ERASE, trail: k });
+  else if (!raids.length && live.length < TRAILS && foe >= 0) {
+    if (strike) { const ed = sim.door[foe]; out.push({ team: t, type: CMD.TRAIL, kind: KIND.RAID, level: majors >= need * 2 ? 3 : 2, points: [ed % sw, Math.floor(ed / sw)] }); }
+    else if (mood > 0 && majors >= 4 && sim.tick >= 1500) {
+      let best = -1, amount = 20; const mid = sw >> 1;
+      for (let p = 0; p < MAX_PILES; p++) { const c = sim.pileCell[p]; if (c >= 0 && sim.pileAmount[p] > amount && Math.abs((c % sw) - mid) <= 6) { amount = sim.pileAmount[p]; best = c; } }
+      if (best >= 0) out.push({ team: t, type: CMD.TRAIL, kind: KIND.RAID, level: 2, points: [best % sw, Math.floor(best / sw)] });
     }
-  } else if (raids.length && majors < 3) for (const k of raids) out.push({ team: t, type: CMD.ERASE, trail: k });
+  }
   return out;
 }

@@ -673,8 +673,13 @@ export class Sim {
   /** Bites: an ant whose wait is over bites the nearest enemy she touches. An ant takes at most PRESS bites in each
    *  window of BITE_EVERY ticks: five in the open, two in a tunnel, so numbers win outside and a narrow way holds. */
   fight() {
-    const L = this.L, cg = this.cg;
-    for (let i = 0; i < this.n; i++) {
+    const L = this.L, cg = this.cg, n = this.n;
+    // Every bite of a tick lands together, and the scan runs forward and back by turns, so neither colony strikes first.
+    const dmg = this.dmg ?? (this.dmg = new Uint16Array(this.cfg.maxAnts)), by = this.dmgBy ?? (this.dmgBy = new Uint8Array(this.cfg.maxAnts));
+    let any = false;
+    const fwd = (this.tick & 1) === 0;
+    for (let q = 0; q < n; q++) {
+      const i = fwd ? q : n - 1 - q;
       if (this.cool[i]) { this.cool[i]--; continue; }
       if (this.hp[i] === 0) continue;
       const t = this.team[i], mine = 1 << t, layer = this.layer[i], cx = this.x[i] >> 8, cy = this.y[i] >> 8, cap = layer === NEST ? C.PRESS_TUNNEL : C.PRESS_OPEN;
@@ -688,7 +693,7 @@ export class Sim {
           if (d < bd) { bd = d; target = j; }
         }
       }
-      if (target >= 0) { this.press[target]++; this.hurt(target, CASTE_BITE[this.caste[i]], t); this.cool[i] = C.BITE_EVERY; continue; }
+      if (target >= 0) { this.press[target]++; dmg[target] += CASTE_BITE[this.caste[i]]; by[target] = t; any = true; this.cool[i] = C.BITE_EVERY; continue; }
       // No ant to bite: an enemy queen within a cell.
       if (layer === NEST) for (let e = 0; e < TEAMS; e++) {
         if (e === t || cg[e * CG.SIZE + CG.QUEEN_HP] <= 0 || this.queenF[e][this.cellOf(i)] > 1) continue;
@@ -696,6 +701,7 @@ export class Sim {
         this.cool[i] = C.BITE_EVERY; this.event(EVENT.QUEEN_HIT, e, hp); break;
       }
     }
+    if (any) for (let i = 0; i < n; i++) if (dmg[i]) { if (this.hp[i] > 0) this.hurt(i, dmg[i], by[i]); dmg[i] = 0; }
   }
 
   removeDead() {
