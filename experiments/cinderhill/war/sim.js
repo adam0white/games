@@ -224,6 +224,7 @@ export class Sim {
   startColony(t) {
     const cfg = this.cfg, o = t * CG.SIZE, cg = this.cg;
     cg[o + CG.SUGAR] = cfg.sugar; cg[o + CG.PROTEIN] = cfg.protein; cg[o + CG.QUEEN_HP] = cfg.queenHp; cg[o + CG.DIET] = 0; cg[o + CG.RALLY_CELL] = -1;
+    if (cfg.pointsBy) cg[o + CG.POINTS] = cfg.pointsBy[t] | 0; // a start that differs by colony: points already held
     const ants = cfg.antsBy ? cfg.antsBy[t] : t === 1 && cfg.foeAnts ? cfg.foeAnts : cfg.ants; // antsBy: a start that differs by colony
     for (let k = 0; k < ants; k++) {
       const i = this.spawn(t, CASTE.WORKER, k % 10 === 9 ? this.nurseryCell(t) : this.store[t]);

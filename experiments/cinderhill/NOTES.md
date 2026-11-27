@@ -960,3 +960,28 @@ Read:
 - The seat lean on Frost and The Stones (bead lab-5w7.74) is still there and moves about; ten seeds do not separate it from the effect measured here.
 
 Not known: how far a person's nest differs from the bot's at the end of a mission, so how large the lead is in play. A phone browser run played The Crossing by bot to its end, then opened First Frost: the card named the kept nest and the Nest view showed it. No person has played it.
+
+## A fork in the road: The Hunt or The Stones first (war build)
+
+The second step on the same row of `13-full-game.md` (a choice the campaign remembers). After First Frost, The Hunt and The Stones are both open (`ROAD` in `tables.js`). The one finished first is the road taken; the other has changed when the colony comes to it, on every later play. The Larder opens when both are done.
+
+- **The Hunt left for later:** the beetle has 4200 health, not 2800 (the option `beastHp`).
+- **The Stones left for later:** the rival starts 40 points ahead of the 400 (the option `pointsBy`).
+- The card of each says both costs before either is played, and says which was taken afterwards. The choice sits in the campaign's own record (`forks.road`), so no new key. A device that had finished both before this change has no road taken and sees neither changed. The record's start carries `road` (first, late or none).
+
+How the sizes were chosen, bots, wins seat 0 v seat 1, the change against seat 0:
+
+| Mission | Change | steady v steady | steady v timid | bold v steady |
+| --- | --- | --- | --- | --- |
+| The Hunt (8 seeds) | none | 4 v 4, beetle fell in 5 | 6 v 2, fell in 8 | |
+| | beetle 4200 | 4 v 4, fell in 2 | 7 v 1, fell in 5 | |
+| | beetle 5600 | 4 v 4, fell in 0 | 6 v 2, fell in 2 | |
+| The Stones (10 seeds) | none | 9 v 1 | 8 v 0 (8 seeds) | 9 v 1 |
+| | rival 40 ahead | 0 v 10 | | 5 v 5 |
+| | rival 80 ahead | 0 v 10 | 10 v 0 | 1 v 9 |
+| | rival 140 ahead | 0 v 10 | 10 v 0 | |
+| | rival 12 more workers (8 seeds) | 4 v 4 | 8 v 0 | |
+
+Read: the beetle's health is one change for both hills, so it does not move who wins; it moves what the mission is. At 4200 the kill often does not come before dusk and the carry phase is reached in fewer games; at 5600 it is never reached, which is too much. On The Stones equal bots race so evenly that any lead decides, so the size was set by the bolder bot: at 40 it wins half, at 80 one in ten. Twelve more workers for the rival moved nothing clearly and was dropped. Against the timid rival a steady bot won every game at 80 and 140; 40 against timid was not run.
+
+Not known: whether a person finds either late mission fair, and whether the choice is felt as a choice. Seen in a phone browser: both cards before the choice, The Stones played first by bot, then The Hunt's card naming the road taken. No person has played it.

@@ -5,7 +5,7 @@ import { Sim, CG, CMD, KIND, MODE, CASTE, TEAMS, ROOM, EVENT, MAT } from '../war
 import { Host } from '../war/host.js';
 import { think, THINK_EVERY, cacheRun, breachRun, mouth } from '../war/ai.js';
 import { PLUG, C, FOOD } from '../war/sim.js';
-import { CAMPAIGN, TRAITS, MISSIONS, MAPS, TIERS, BRANCH } from '../war/tables.js';
+import { CAMPAIGN, TRAITS, MISSIONS, MAPS, TIERS, BRANCH, ROAD } from '../war/tables.js';
 
 test('an idle colony loses to the rival', () => {
   const h = new Host({ seed: 3 }).run(7200);
@@ -688,4 +688,12 @@ test('a mission starts in the nests an earlier one left: rooms kept, nothing nea
   const mid = b.L.sw >> 1, far = mid - (b.door[0] % b.L.sw) - 2, c = new Sim({ seed: 4, mission: 'frost', nests: [[far, 20, 0], null] });
   assert.equal(c.mat[c.L.nestBase + 20 * c.L.nw + mid - 2], MAT.CLAY);
   assert.equal(MISSIONS.frost.from, 'crossing'); assert.equal(MISSIONS.hunt.from, undefined);
+});
+
+test('the fork in the road: the mission left for later starts changed', () => {
+  assert.deepEqual(ROAD.pair, ['hunt', 'stones']);
+  const hunt = new Sim({ seed: 2, mission: 'hunt', ...ROAD.late.hunt });
+  assert.equal(hunt.beast[0], 4200); assert.equal(new Sim({ seed: 2, mission: 'hunt' }).beast[0], MISSIONS.hunt.beast.hp);
+  const stones = new Sim({ seed: 2, mission: 'stones', pointsBy: [0, ROAD.late.stones.foePoints] });
+  assert.equal(stones.g(1, CG.POINTS), 40); assert.equal(stones.g(0, CG.POINTS), 0);
 });
