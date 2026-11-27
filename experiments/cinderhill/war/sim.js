@@ -69,7 +69,7 @@ export const C = {
   LAY_EVERY: 14, EGG_TICKS: 300, LARVA_TICKS: 500, PUPA_TICKS: 400, LARVA_STARVE: 1200, MAJOR_WAIT: 600,
   EAT_EVERY: 1200, ADULTS_PER_SUGAR: 10, STARVE_AFTER: 1200, STARVE_EVERY: 200,
   // Rooms: a store cell holds eight loads of each food, a nursery cell one brood, a quarters cell four ants (adults and brood together; the queen stops laying at the cap).
-  STORE_PER: 8, STORE_MIN: 24, BROOD_MIN: 8, REST_PER: 4, REST_BASE: 90, DIG_TICKS: 120, DIG_CREW: 8, MARKS_MAX: 96,
+  STORE_PER: 8, STORE_MIN: 24, BROOD_MIN: 8, REST_PER: 4, REST_BASE: 90, DIG_TICKS: 120, DIG_SUGAR: 1, DIG_CREW: 8, MARKS_MAX: 96,
   QUEEN_HP: 800, BITE_EVERY: 10, BITE_R: 200, SEE: 3, PRESS_OPEN: 5, PRESS_TUNNEL: 2, WAIT_AT_END: 60, GUARD_R: 4,
 };
 
@@ -609,6 +609,8 @@ export class Sim {
         const m = L.nb[c * 4 + d], k = m - L.nestBase;
         if (m < L.nestBase || this.mark[k] !== t + 1) continue;
         this.to[i] = -1;
+        // The opening stroke costs a seed: earth is carried out on food. With none in store the cell waits.
+        if (this.digLeft[k] === 1) { if (cg[o + CG.SUGAR] < C.DIG_SUGAR) return c; cg[o + CG.SUGAR] -= C.DIG_SUGAR; }
         if (--this.digLeft[k] === 0) { this.mat[m] = MAT.OPEN; this.mark[k] = 0; this.recount(); this.dirty = true; this.event(EVENT.DUG, t, m); }
         return c;
       }

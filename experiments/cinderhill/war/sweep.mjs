@@ -15,7 +15,7 @@ function novice(h) {
 }
 function match(a, b, seed) {
   const ai = { 1: b }; if (typeof a !== 'string') ai[0] = a;
-  const h = new Host({ seed, ai });
+  const h = new Host({ seed, ai, swap: seed % 2 === 0 }); // even seeds change sides, so a bias of the side cancels
   if (a === 'novice') novice(h);
   h.run(20000);
   const s = h.sim, q = s.g(0, CG.QUEEN_HP) <= 0 || s.g(1, CG.QUEEN_HP) <= 0;
@@ -29,6 +29,6 @@ const only = process.argv[3] ? process.argv[3].split(',').map(Number) : null;
 for (const [a, b] of [['idle', 1], ['novice', 0], ['novice', 1], ['novice', 2], [0, 1], [1, 1], [2, 1], [0, 2], [2, 2], [1, 0], [1, NB(1)], [2, NB(2)], [0, NB(0)], [NB(1), NB(1)], [1, R(1)], [1, R(2)], [1, R(3)], [1, R(1, 3)], [1, R(2, 3)]].filter((_, i) => !only || only.includes(i))) {
   let w = 0, q = 0, t = 0;
   for (let seed = 1; seed <= seeds; seed++) { const r = match(a, b, seed); if (r.win === 0) w++; if (r.queen) q++; t += r.tick; }
-  rows.push({ left: name(a), right: name(b), 'left wins %': Math.round(100 * w / seeds), 'by queen %': Math.round(100 * q / seeds), 'mean end (s)': Math.round(t / seeds / 20) });
+  rows.push({ first: name(a), second: name(b), 'first wins %': Math.round(100 * w / seeds), 'by queen %': Math.round(100 * q / seeds), 'mean end (s)': Math.round(t / seeds / 20) });
 }
 console.table(rows);

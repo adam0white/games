@@ -59,7 +59,8 @@ export function think(sim, t, mind = 1) {
   }
   // Diet: workers first, then one in four a major, then two in four.
   const adults = cg[o + CG.ADULTS], majors = cg[o + CG.MAJORS];
-  const diet = adults < 36 ? 0 : adults < 60 ? 1 : 2;
+  // Bold raises soldiers from the first brood: it means to strike before a growing hill's rooms have paid.
+  const diet = mood === 2 ? (adults < 34 ? 1 : 2) : adults < 36 ? 0 : adults < 60 ? 1 : 2;
   if (cg[o + CG.DIET] !== diet) out.push({ team: t, type: CMD.DIET, share: diet });
   // Building, one room at a time: a store when the stores are nearly full, quarters when the hill is, a nursery wing when the brood is.
   if (build && cg[o + CG.MARKS] > 0 && !sim.digF[t]) {
@@ -85,7 +86,7 @@ export function think(sim, t, mind = 1) {
   // raid into an equal guard is thrown away. Short of that, its soldiers hold the richest food on the fords.
   let foeMajors = 0, foe = -1;
   for (let e = 0; e < TEAMS; e++) if (e !== t && cg[e * CG.SIZE + CG.QUEEN_HP] > 0) { foe = e; foeMajors = Math.max(foeMajors, cg[e * CG.SIZE + CG.MAJORS]); }
-  const need = mood === 2 ? 6 : 10, from = mood === 2 ? 2400 : 4200;
+  const need = mood === 2 ? 8 : 10, from = mood === 2 ? 1600 : 4200;
   const strike = mood > 0 && foe >= 0 && majors >= need && sim.tick >= from && (mood === 2 ? majors >= foeMajors : majors * 4 >= foeMajors * 5);
   const atDoor = k => { const s2 = t * TRAILS + k, e = sim.trPath[s2 * PATH_MAX + sim.trLen[s2] - 1]; return foe >= 0 && sim.doorF[foe][e] <= 4; };
   if (raids.length && (majors < 3 || (strike && !atDoor(raids[0])) || (!strike && atDoor(raids[0]) && majors * 2 < foeMajors))) for (const k of raids) out.push({ team: t, type: CMD.ERASE, trail: k });
