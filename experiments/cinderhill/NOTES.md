@@ -1205,3 +1205,23 @@ ms median and 16.8 at the 95th centile with 415 ants.
 
 **A fault found on the way.** The trail sheet's rows for raid modes and "Raise soldiers" showed on forage trails:
 `.opts { display: grid }` beat the `hidden` attribute. Fixed with `.opts[hidden] { display: none }`.
+
+### What binds in High Summer, and the line that says so (war build)
+
+Asked after the outside read said no room has a reason to be dug first. Two timid bots, `summer`, default settings.
+
+- **Seat.** Six seeds end 3 to 3 by seat (the larger hill 427 to 433 adults, the smaller 258 to 296). Two steady bots over
+  eight seeds end 3 to 5. No seat bias shows.
+- **The larger hill stops at its quarters.** It sits at 430 to 435 adults under a housing limit of 434 from tick 16000 to dusk
+  in every game.
+- **Gardens decide whether a hill starves.** Seat 0 with no garden against seat 0 with sixteen cells, the rival unchanged,
+  adults at dusk: seed 2, 211 against 296; seed 4, 182 against 289; seeds 1 and 3 (the winning seat), 440 and 448 against
+  432 and 432. Without gardens the store reads 0 seeds at tick 16000 on three seeds of four and the starving counter runs;
+  with them it never runs. A mind asked for 48 garden cells still dug 16, so more than sixteen was not measured.
+- So in a long mission rooms bind, which they did not in the short ones. This is bots only: no person has dug in High Summer.
+
+The Nest now carries one line above its tabs naming what holds the hill back (hill full, seeds running out with the meal
+and the income a minute, nursery full, store full, hill nearly full), and a tap on it opens Dig rooms with that room picked
+and ringed. It reads the sim's counts and limits and decides nothing. Seen on a phone profile: nursery, quarters and garden
+lines each appear in one bot game; the tap opens Quarters. Not checked: the store line, and whether the taller panel hides
+too much of the counts at the top.
