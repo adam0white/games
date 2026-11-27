@@ -646,14 +646,19 @@ test('The Hunt: the beetle bites the two nearest ants, takes harm from both hill
   assert.equal(b.hash(), s.hash()); assert.equal(b.beast[0], s.beast[0]);
 });
 
-test('The Hunt: when the beetle falls the hill that did it more harm has won, and the deed is done', () => {
-  const s = new Host({ seed: 4, mission: 'hunt' }).sim, bc = s.beast[1];
+test('The Hunt: the fall ends nothing; the hill that hurt it more starts ahead, and forty loads of meat home win', () => {
+  const s = new Host({ seed: 4, mission: 'hunt' }).sim, bc = s.beast[1], G = s.mission.goals;
+  assert.equal(s.fallen, false); assert.equal(s.carried(0), 0);
   s.cg[1 * CG.SIZE + CG.HARM] = 900; s.cg[0 * CG.SIZE + CG.HARM] = 300; s.beast[0] = 5;
   s.spawn(0, CASTE.MAJOR, bc + 1);
-  for (let k = 0; k < 60 && !s.result; k++) s.step();
-  assert.equal(s.result, 2, 'the last bite does not decide it: the harm does');
-  assert.equal(s.beast[0], 0);
-  assert.equal(s.deeds(1)[0], true); assert.equal(s.deeds(0)[0], false);
+  for (let k = 0; k < 60 && !s.fallen; k++) s.step();
+  assert.equal(s.fallen, true); assert.equal(s.result, 0, 'the body is the prize, not the kill');
+  assert.equal(s.carried(1), G.lead, 'the last bite does not decide the head start: the harm does'); assert.equal(s.carried(0), 0);
+  const b = copyOf(s); assert.equal(b.hash(), s.hash()); assert.equal(b.carried(1), G.lead);
+  s.cg[0 * CG.SIZE + CG.LOADS_P] += 50; s.step(); assert.equal(s.result, 0, 'other meat does not count');
+  s.cg[0 * CG.SIZE + CG.MEAT0] = G.carry - 1; s.step(); assert.equal(s.result, 0);
+  s.cg[0 * CG.SIZE + CG.MEAT0] += 1; s.step();
+  assert.equal(s.result, 1); assert.equal(s.deeds(0)[0], true); assert.equal(s.deeds(1)[0], false);
 });
 
 test('The Hunt: two rivals play it to an end, and other missions have no beast', () => {
