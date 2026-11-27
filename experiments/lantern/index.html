@@ -664,9 +664,9 @@ function begin() {
   if (tutor) { s.next = Infinity; s.rocks = []; s.embers = []; s.powers = []; s.calm = 0.75; s.hearts = 2; } // an empty, slow river
   if (gentleRun()) { s.gentle = true; s.hearts = Math.max(s.hearts, 2); } // story nights on a gentle river: the banks push the boat back (sim.js), and there is a spare heart
   $('tip').textContent = ''; shown = ''; show('play'); hud();
-  if (tutor) { floor = 0; rec.start({ view, mode: 'tutorial', night: 0, set: opts.snapshot() }); return; }
+  if (tutor) { floor = 0; rec.start({ ...opts.snapshot(), view, mode: 'tutorial', night: 0 }); return; }
   say(mod ? mod.hello() : (tower ? t(climb > LEVELS ? (fromFloor ? 'saySectorFloor' : 'saySector') : (fromFloor ? 'sayTowerFloor' : 'sayTower'), { n: climb > LEVELS ? climb - LEVELS : climb, of: LEVELS, f: fromFloor }) : daring ? t('sayDare', { n: daring.score }) : endless ? t('endless') : t('sayNight', { n: stage })) + (boosted ? '. ' + t('statsOn') : waiting ? '. ' + t('statsWait') : ''), waiting ? 2800 : 1800); floor = fromFloor;
-  rec.start({ view, mode: mode(), night: mod ? mod.night() : tower || endless ? 0 : stage, ...(tower ? { level: climb, floor: fromFloor } : {}), set: opts.snapshot(), gentle: !!s.gentle, ...(daring ? { their: daring.score } : {}) });
+  rec.start({ ...opts.snapshot(), view, mode: mode(), night: mod ? mod.night() : tower || endless ? 0 : stage, ...(tower ? { level: climb, floor: fromFloor } : {}), gentle: !!s.gentle, ...(daring ? { their: daring.score } : {}) });
 }
 // The gentle river (the lab's own change, 2026-11-27; NOTES.md): play records showed new players ending their first runs on the bank
 // within seconds. On story nights a gentle river's banks push the boat back and dim the flame a little; rocks, ice and the dark are as

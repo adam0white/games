@@ -1030,7 +1030,7 @@ The lab asked whether tilting the phone should also steer in 2D and 3D. The answ
 - The page sets `s.gentle` and at least two hearts on story nights when the River setting is Gentle. The endless river, today's river, the tower, the tutorial and the modes are always Classic, so every board stays fair.
 - Settings card (menu, `#toSettings`), built on the new `kit/settings.js`: River (Gentle or Classic), Steering feel (Calm 1, Normal 1.3, Quick 1.7; the old `?gain=` still wins), Perspective and Music (their old keys `lantern-view` and `lantern-music`).
 - Default for River: Gentle for a player with no save, Classic for a player who has one. It is decided once and kept under `lantern:set:river~def`; the choice is under `lantern:set:river`, the steering feel under `lantern:set:gain`.
-- Records: every run's start carries `set` (the four values) and `gentle`; a change sends a `setting` event with `id`, `value`, `from`, `def`. This follows the owner's rule of 2026-11-27 (options as settings with a default, then count who changes them).
+- Records: every run's start carries the four values (`river`, `gain`, `view`, `music`) and `gentle`; a change sends a `setting` event with `name`, `from`, `to`, `def`, the shape `scripts/lab-mine.mjs` counts in its Settings section. This follows the owner's rule of 2026-11-27 (options as settings with a default, then count who changes them).
 
 **The gate for "strangers finish without help"** (not met or measured yet): of player ids first seen after this change, the share that reach a dawn in their first session. Before: 0 of 10. Read it with `node scripts/lab-mine.mjs <day> --game=lantern`.
 
