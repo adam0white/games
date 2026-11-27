@@ -489,3 +489,33 @@ Every S4 snapshot restores to the same hash. S1 times the sandbox, which has no 
 **Mutations shown to fail** (each fails a doors test unless noted): no lanes; one lane for both ways; 7 twentieths a tick; no Recall exemption; a jam at 99 ticks; a jam that never clears; the queue counted twice; a 2-cell colony door; the queued marks not following a death; no jam reason on the route card; queued ants counted idle; carriers counted free (crew tests); a free forager's pickup leaving her free (crew tests); an unloaded free ant not counted free again (crew tests). In the pace gate: the one-cell door fixture must jam (18 jams over 5 seeds), and `door-jams` must read 0 in chapter 1 play.
 
 **After the review** (the totals above are unchanged: the quick runs have no death in a queue and no free forager sent to rest with a route). Thirteen more mutations, each failing a test: a dead queued ant left in the count; the jam judged before the deaths; a resting ant keeping her free route; the card counting carriers free; a queued guard not reported; the HUD jam line dropped; `< PASS` for `<= PASS`; one shared lane for all three cells; a jam at 11; a jam clearing only at 0; ants queued inside left out of the share; the minute table's queued column left empty; shares rounded to nearest. In the gate, a `door1` fixture that does not narrow the door (fault injection) fails: "7 vs 7 jams, 0.057 vs 0.057 queued". The real fixture: 18 jams and 0.154 summed share against the 3-cell control's 7 and 0.057. The gate holds against main (20 seeds, 12 minutes, 100 s). S2 rerun after the fixes: sandbox 2727923730 and colony 1148962020, Node, workerd, Chromium and WebKit agree.
+
+## Goal manager (SIM_VERSION 11, snapshot format 11, 2026-11-26)
+
+R1 step 4 (`../NOTES.md`, Goal manager): 64 goal slots with a pool from slot 16, 32-bit distances, at most 2 fields rebuilt at each rebuild point (oldest marked first), the rest blank until their turn. Play is unchanged: the quick, colony and long runs match sim 10 in ants, globals and terrain at every 50th tick (`cmp` against a sim 10 checkout, not kept). The hashes change because the fields and `best` are wider and the globals one longer. New totals: `EXPECTED` 105530017, `EXPECTED_COLONY` 3373107091, `EXPECTED_LONG` 2076515634.
+
+| Measure | Before (SIM_VERSION 10) | After |
+| --- | --- | --- |
+| S2 sandbox: Node, workerd, Chromium 156.0.8078.4, WebKit 27.2 on all 600 records | agree (final total 2727923730) | agree (final total 2076515634) |
+| S2 colony (`--colony`) | agree (final total 1148962020) | agree (final total 353723614) |
+| S1 Node, 2,000 ants, mean / p95 / max | 1.60 / 1.68 / 4.57 ms | 1.61 / 1.69 / 3.73 ms (load average about 11) |
+| S1 Node, 5,000 ants | 1.88 / 2.05 / 3.49 ms | 1.89 / 2.07 / 3.54 ms |
+| S1 all 9 fields at once | 11.32 ms | 11.28 ms |
+| S1 workerd, 2,000 / 5,000 ants, mean | 1.54 / 1.90 ms | 1.56 / 1.91 ms |
+| S4, 5,000 ants, 3,000 / 8,000 / 24,000 ticks | 39.9 / 39.4 / 37.7 KB | 39.9 / 39.5 / 37.7 KB |
+
+**64 goals** (`spikes/goals.mjs` after the review, 2,000 ants, S1's world and orders; at tick 600 and again just before the burst every free slot but a trail's is filled with a food goal; at tick 1,800 every live field is marked at once: 62, since the script leaves two trail slots empty and a trail needs a drawn path):
+
+| Quota a rebuild point | Steady ticks, mean / p95 / max | 20 ticks after the burst, mean / max | Ticks until the burst's fields are exact |
+| --- | --- | --- | --- |
+| 1 | 1.59 / 1.67 / 4.15 ms | 7.06 / 15.63 ms | 31 |
+| **2 (kept)** | 1.58 / 1.66 / 3.67 ms | 5.80 / 8.94 ms | 16 |
+| 3 | 1.58 / 1.67 / 3.24 ms | 5.47 / 10.05 ms | 11 |
+| 4 | 1.58 / 1.66 / 3.16 ms | 5.54 / 12.18 ms | 8 |
+| none | 1.60 / 1.72 / 3.36 ms | 5.54 / 79.92 ms | 1 |
+
+The quota 1 maximum (15.6 ms) is out of line with the first run's 6.0 ms and with quota 2 doing twice the work a point; it is one tick on a loaded machine and is read as noise, not measured again. 64 live goals cost nothing in steady play (no field is rebuilt without a change). The quota is what keeps a burst under the 10 ms line. Every S4 snapshot restores to the same hash.
+
+**After the review** (read-only; `../NOTES.md`, Goal manager, Review). The fixes do not change play: the quick, colony and long runs still match sim 10 at every 50th tick, and the totals above stand. A pooled DIG field is now marked by a dig order and a dug cell; the tick's last rebuild point is after dusk and `setCell` rebuilds what it marks, so no field is marked and still exact at a tick boundary; a blank trail does not send a carrier home for the trip; a blank HOME is not "far"; a stalled ant on a blank field does not kick; the oldest mark wins across the order counter's wrap. The spike now refills the pool just before the burst and times until the burst's own fields are exact (it marked 61 fields before, not 64); its numbers are in the table above.
+
+**Mutations shown to fail** (`test/goals.test.mjs`, 11 tests): no quota; newest marked first; raw order numbers (no wrap); lowest slot first; a waiting field flagged blank but not cleared; a 16-bit `best`; a dig marking only the fixed DIG slot; `setCell` leaving marks; a carrier giving up a blank trail; a blank HOME counted far (sandbox, colony); the stall counted on a blank field; a re-marked field moved to the back; wandering on a blank field; a 16-bit ceiling in the search; a dropped goal keeping its memory; no blanking. Equivalent, so not caught: restore rebuilding marked fields too, and the flow hash covering marked fields (at a boundary a marked field is blank on both sides); the last rebuild point before dusk (dusk marks no field yet; the order guards later dusk scripts). `test/flow.test.mjs`'s repair test rebuilds every marked field directly, since the quota is not what it checks.

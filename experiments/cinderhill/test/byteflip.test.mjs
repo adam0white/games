@@ -14,7 +14,7 @@ const FLIPS = {
   ants: s => { byte(s.x)[2 * 7] ^= 1; },
   scent: s => { byte(s.scent.cur[0])[4 * 100] ^= 1; },
   terrain: s => { byte(s.mat)[s.L.n - 1] ^= 1; },
-  flow: s => { s.flow.dist[SLOT.HOME * s.L.n + 3] ^= 1; },
+  flow: s => { s.flow.dist[SLOT.HOME][3] ^= 1; },
   rng: s => { byte(s.rng)[0] ^= 1; },
   events: s => { s.events.push(9, 9, 9); },
   globals: s => { byte(s.g)[4 * G.STORES] ^= 1; },
