@@ -112,12 +112,12 @@ test('free ants: one in three at a time works the nearest trail at off-trail spe
   run(s, 1200, s => {
     let free = 0, out = 0;
     for (let i = 0; i < s.n; i++) {
-      if (s.job[i] !== JOB.FORAGE || isCrew(s.via[i])) continue;
+      if (s.job[i] !== JOB.FORAGE || isCrew(s.via[i]) || s.carry[i]) continue; // free: no crew and no load (6.2)
       free++;
       if (s.mode[i] !== MODE.REST) out++;
       if (s.via[i] === FREE_VIA + e.slot) eastFree++;
       if (s.via[i] === FREE_VIA + so.slot) southFree++;
-      if (s.mode[i] === MODE.REST && s.layer[i] === NEST && s.y[i] >> 8 >= 10) { resting++; if (s.x[i] !== px[i] || s.y[i] !== py[i]) moved++; }
+      if (s.mode[i] === MODE.REST && s.goal[i] < 0 && s.layer[i] === NEST && s.y[i] >> 8 >= 10) { resting++; /* at the door, not walking back to it */ if (s.x[i] !== px[i] || s.y[i] !== py[i]) moved++; }
     }
     outSum += out; freeSum += free;
     px.set(s.x.subarray(0, px.length)); py.set(s.y.subarray(0, py.length));
@@ -235,7 +235,7 @@ test('crew, free and dig counts match the ants after every ant\'s step, through 
       if (s.hp[j] === 0) continue;
       if (s.job[j] === JOB.DIG && s.mode[j] === MODE.WORK) dig++;
       if (s.job[j] !== JOB.FORAGE) continue;
-      if (isCrew(s.via[j])) crew[s.via[j] - SLOT.TRAIL0]++; else { free++; if (s.mode[j] !== MODE.REST) out++; }
+      if (isCrew(s.via[j])) crew[s.via[j] - SLOT.TRAIL0]++; else if (!s.carry[j]) { free++; if (s.mode[j] !== MODE.REST) out++; }
     }
     for (let k = 0; k < SLOT.TRAILS; k++) if (crew[k] !== s.crew[k]) bad.push(`tick ${s.tick} ant ${i}: crew ${k} ${s.crew[k]}, counted ${crew[k]}`);
     if (free !== s.freeAll || out !== s.freeOut) bad.push(`tick ${s.tick} ant ${i}: free ${s.freeAll}/${s.freeOut}, counted ${free}/${out}`);
@@ -300,7 +300,7 @@ test('cutting a crew sends the free ants over the third back to the door at once
   const e = draw(s, east);
   level(s, e.seq, 3); run(s, 400); // Surge: 15 on the crew, out on the trail
   level(s, e.seq, 1); run(s, 3); // Light: 3, so 12 more free ants, most of them outside
-  const count = s => { let free = 0, out = 0; for (let i = 0; i < s.n; i++) if (s.job[i] === JOB.FORAGE && !isCrew(s.via[i])) { free++; if (s.mode[i] === MODE.SEEK) out++; } return { free, out }; };
+  const count = s => { let free = 0, out = 0; for (let i = 0; i < s.n; i++) if (s.job[i] === JOB.FORAGE && !isCrew(s.via[i]) && !s.carry[i]) { free++; if (s.mode[i] === MODE.SEEK) out++; } return { free, out }; };
   let worst = -99;
   run(s, 60, s => { const { free, out } = count(s); worst = Math.max(worst, out - Math.floor((free + 2) / 3)); });
   assert.ok(worst <= 0, `free ants searching over a third: ${worst}`);
@@ -324,7 +324,7 @@ test('the counts are right between ticks after a death', () => {
   run(s, STARVE_AFTER + 2 * STARVE_EVERY + 20, s => {
     s.g[G.SUGAR] = 0;
     if (s.g[G.STARVE] % STARVE_EVERY === 0 && s.g[G.STARVE] >= STARVE_AFTER) deaths++;
-    let free = 0; for (let i = 0; i < s.n; i++) if (s.job[i] === JOB.FORAGE && !isCrew(s.via[i])) free++;
+    let free = 0; for (let i = 0; i < s.n; i++) if (s.job[i] === JOB.FORAGE && !isCrew(s.via[i]) && !s.carry[i]) free++;
     if (crewOf(s, e.slot) !== s.crew[e.slot - SLOT.TRAIL0] || free !== s.freeAll) bad++;
   });
   assert.ok(deaths >= 2 && s.g[G.DIED] >= 2);
@@ -387,13 +387,14 @@ test('the route card: a level capped short by older crews says so; free ants wal
   assert.ok(back.length > 0, 'some walk back');
   assert.equal(h.inspect(back[0]).why, 'toRest');
   h.order({ type: CMD.CREW, seq: seqs[2], delta: 0, level: 1 }); // room for free ants
-  let marked = 0; // free ants sent to rest keep the trail they worked in `via` until they pick again
+  let marked = 0, laden = 0; // a free ant sent to rest drops the trail she worked; one carrying home is not free (6.2)
   for (let k = 0; k < 600; k++) {
     if (k % 47 === 46) h.order({ type: CMD.CREW, seq: seqs[0], delta: 0, level: 1 + (k / 47 | 0) % 3 }); // crews grow and shrink: the third with them
     const st = h.stats(), free = new Map();
     let door = 0;
     for (let i = 0; i < s.n; i++) if (s.hp[i] > 0 && s.job[i] === JOB.FORAGE) {
-      if (s.via[i] >= FREE_VIA && s.mode[i] !== MODE.REST) free.set(s.via[i] - FREE_VIA, (free.get(s.via[i] - FREE_VIA) ?? 0) + 1);
+      if (s.via[i] >= FREE_VIA && s.carry[i]) laden++;
+      if (s.via[i] >= FREE_VIA && s.mode[i] !== MODE.REST && !s.carry[i]) free.set(s.via[i] - FREE_VIA, (free.get(s.via[i] - FREE_VIA) ?? 0) + 1);
       if (s.via[i] >= FREE_VIA && s.mode[i] === MODE.REST) marked++;
       if (s.mode[i] === MODE.REST && s.goal[i] < 0) door++;
     }
@@ -401,7 +402,8 @@ test('the route card: a level capped short by older crews says so; free ants wal
     assert.equal(st.resting, door);
     h.step();
   }
-  assert.ok(marked > 0, 'the case the card must not count came up');
+  assert.equal(marked, 0, 'no ant rests with a free route');
+  assert.ok(laden > 0, 'the case the card must not count came up: a free ant carrying home');
   // A restart at day 2's dawn keeps the loads home in the minute before it.
   while (h.sim.g[G.DAY] < 2 || h.sim.tick < 1300) { h.step(); if (h.dusk) h.goOn(); }
   const dawn = restore(h.dawns.get(2).bytes).tick, before = h.homeAt.filter(x => x[0] <= dawn).length;

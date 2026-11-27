@@ -16,6 +16,7 @@ import { hint } from '../kit/hint.js';
 import { lab } from '../kit/lab.js';
 import { LabRecord } from './labrec.js';
 import { findRooms, drawNest } from './nestview.js';
+import { crewLines } from './hud.js';
 import { readJson, writeJson } from '../kit/save.js';
 
 noZoom();
@@ -516,21 +517,7 @@ function hud() {
   $('stats').textContent = c
     ? t('hudColony', { ants: num(stats.ants), sugar: num(c.sugar), protein: num(c.protein), eggs: num(c.eggs), larvae: num(c.larvae), pupae: num(c.pupae) })
     : t('hud', { out: num(stats.surface), carrying: num(stats.carrying), home: num(stats.stores) });
-  const lines = [];
-  const newest = stats.trails.find(tr => tr.newest);
-  stats.trails.slice().sort((a, b) => b.seq - a.seq).forEach((tr, k) => {
-    if (k > 1) return;
-    const why = tr.why ? t('why_' + tr.why) : '';
-    lines.push(`${t('trailCrew', { n: stats.trails.length - k, crew: tr.on })}${why ? ` <small>· ${why}</small>` : ''}`);
-  });
-  const food = stats.piles.reduce((a, p) => a + p.crew, 0);
-  if (food) lines.push(t('foodCrew', { crew: food }));
-  if (stats.dig.marked) lines.push(`${t('digCrew', stats.dig)}${stats.dig.crew >= stats.dig.cap ? ` <small>· ${t('digFull')}</small>` : ''}`);
-  if (stats.alarm) lines.push(t('alarmCrew', stats.alarm));
-  const sp = host.sim.g[GI.SP];
-  if (sp === SPIDER.WARN || sp === SPIDER.HUNT) lines.unshift(`<b class="spider">${t('spiderHud', { what: t(sp === SPIDER.WARN ? 'spiderComing' : 'spiderHunting'), kills: host.sim.g[GI.SP_KILLS] })}</b>`);
-  if (c && stats.resting) lines.push(t('freeCount', { n: num(stats.resting) }));
-  if (lines.length && newest && !c) lines.push(`<small>${t('noWanted')}</small>`);
+  const lines = crewLines(stats, { t, num, spider: host.sim.g[GI.SP], kills: host.sim.g[GI.SP_KILLS] });
   $('crew').innerHTML = lines.join('<br>');
   const ct = layer === SURFACE ? crewTrail() : null;
   $('crewCtl').classList.toggle('on', !!ct);

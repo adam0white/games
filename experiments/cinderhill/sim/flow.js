@@ -76,7 +76,11 @@ export const G = { TICK: 0, STORES: 1, RECALL: 2, ALARM_HOLD: 3, GOAL_SEQ: 4, DI
   // Crew levels (sim 9, 02-spec 3.2 Crews): per trail slot 0 a set count, 1 Light, 2 Steady, 3 Surge; the outside
   // workforce when the levels' sizes were last worked out; ticks the sugar store has stood at 0 (starvation).
   LEVEL0: 44, WORKFORCE: 48, STARVE: 49,
-  SIZE: 50 };
+  // Doors (sim 10, 02-spec 3.2 Doors): per entrance cell (DOOR_CELLS, in cell order) two lanes, out then in, each a
+  // debt in twentieths of a pass (0: free to pass); ants queued at the doors this tick; ticks the queue has stood at
+  // JAM_AT or more; jammed now (0 or 1); jams ever.
+  LANE0: 50, QUEUED: 58, JAM_RUN: 59, JAMMED: 60, JAMS: 61,
+  SIZE: 62 };
 
 /** Push the goal's source cells (distance 0) in ascending cell order. */
 function sources(sim, slot, push) {

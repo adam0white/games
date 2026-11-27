@@ -1,11 +1,11 @@
 {
  "first-delivery": {
   "status": "pass",
-  "value": 7.1
+  "value": 7.2
  },
  "first-delivery-passive": {
   "status": "pass",
-  "value": 6.65,
+  "value": 6.85,
   "accepted": "sim 9 (who goes, 02-spec 6.2): foragers rest by the door until a trail is drawn, and one trail gets a Steady crew of a quarter, so the passive trail first delivers 0.65 s later (6 to 6.65 s; target 10 s)"
  },
  "minute-1-deliveries": {
@@ -22,7 +22,7 @@
  },
  "quiet-2-min": {
   "status": "fail",
-  "value": 61
+  "value": 60.5
  },
  "first-choice": {
   "status": "not built",
@@ -46,7 +46,7 @@
  },
  "gap-0-10": {
   "status": "fail",
-  "value": 379.75
+  "value": 377.95
  },
  "gap-after-10": {
   "status": "fail",
@@ -57,8 +57,12 @@
   "value": 0
  },
  "queued-at-doors": {
-  "status": "not built",
-  "value": null
+  "status": "pass",
+  "value": 0.001
+ },
+ "door-jams": {
+  "status": "pass",
+  "value": 0
  },
  "chapter-1-length": {
   "status": "not built",

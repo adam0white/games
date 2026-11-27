@@ -6,7 +6,7 @@ import { LINES, blocks, play, ratchet, slack } from '../spikes/pace-gate.mjs';
 
 test('the ratchet on blocking lines: a pass that fails, a fail that gets worse by a twentieth or never happens, unrecorded progress and an unread line all fail', () => {
   const base = Object.fromEntries(LINES.map(l => [l.id, { status: 'not built', value: null }]));
-  Object.assign(base, { 'first-birth': { status: 'pass', value: 15 }, 'first-delivery': { status: 'fail', value: 16 }, 'first-delivery-passive': { status: 'fail', value: 13 }, 'minute-1-deliveries': { status: 'pass', value: 39 }, 'idle-share': { status: 'pass', value: 0.1 } });
+  Object.assign(base, { 'first-birth': { status: 'pass', value: 15 }, 'first-delivery': { status: 'fail', value: 16 }, 'first-delivery-passive': { status: 'fail', value: 13 }, 'minute-1-deliveries': { status: 'pass', value: 39 }, 'idle-share': { status: 'pass', value: 0.1 }, 'queued-at-doors': { status: 'pass', value: 0.01 }, 'door-jams': { status: 'pass', value: 0 } });
   const now = JSON.parse(JSON.stringify(base)), r0 = (x, y) => ratchet(x, y, undefined, false); // R0: failing lines held by the baseline
   assert.deepEqual(r0(now, base), []);
   assert.equal(r0({ ...now, 'first-birth': { status: 'fail', value: 40 } }, base).length, 1, 'a passing line fails');
@@ -27,7 +27,7 @@ test('the ratchet on blocking lines: a pass that fails, a fail that gets worse b
   assert.equal(slack({ ...now, 'first-birth': { status: 'pass', value: 150, accepted: 'a reason' } }, b13).length, 1, 'nor a value past the target recorded as a pass');
   assert.equal(slack({ ...now, 'first-birth': { status: 'pass', value: 14.5, accepted: ['a reason'] } }, b13).length, 1, 'a reason is text');
   assert.equal(slack({ ...now, 'first-birth': { status: 'pass', value: 14.5, accepted: 'a reason' } }, { ...b13, 'first-birth': { status: 'pass', value: 13, accepted: 'a reason' } }).length, 1, 'an old reason excuses nothing new');
-  assert.deepEqual(LINES.filter(l => blocks(l)).map(l => l.id), ['first-delivery', 'first-delivery-passive', 'minute-1-deliveries', 'first-birth', 'idle-share'], 'R0 to R1 step 3 block on these (02 section 3.1)');
+  assert.deepEqual(LINES.filter(l => blocks(l)).map(l => l.id), ['first-delivery', 'first-delivery-passive', 'minute-1-deliveries', 'first-birth', 'idle-share', 'queued-at-doors', 'door-jams'], 'R0 to R1 step 3 with doors block on these (02 section 3.1)');
 });
 
 test('the quota opening misses the first birth; brood ten times slower misses the first birth', () => {
