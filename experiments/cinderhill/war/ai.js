@@ -179,13 +179,13 @@ export function think(sim, t, mind = 1) {
     // With nothing pressing to build and hands to spare, it digs for the nearest cache: a seed a cell, paid back at the end.
     if (!dug && adults >= 40 && (typeof mind === 'number' || mind.caches !== false)) {
       const run = cacheRun(sim, t, v => cg[o + (v & 1 ? CG.PROTEIN : CG.SUGAR)] + (v >> 1) <= capF), cells = run.length >> 1;
-      if (cells && cells <= 24 && cg[o + CG.SUGAR] >= cells * C.DIG_SUGAR + C.DIG_KEEP + 6 && !frozen) {
+      if (cells && cells <= 24 && cg[o + CG.SUGAR] >= cells * cfg.digSugar + C.DIG_KEEP + 6 && !frozen) {
         out.push({ team: t, type: CMD.DIG, cells: run }); dug = true;
       }
     }
     // A breach: where the mission lets it, a rival that raids digs for the other nest, eight cells at a time so that a
     // room it comes to need is not kept waiting. Where it aims (the nearest room, the queen, the stores) goes by the seed.
-    if (!dug && breach && mood > 0 && !sim.linked && !outnumbered && adults >= 40 && sim.tick >= (mood === 2 ? 600 : 1500) && cg[o + CG.SUGAR] >= 8 * C.DIG_SUGAR + C.DIG_KEEP + 4) {
+    if (!dug && breach && mood > 0 && !sim.linked && !outnumbered && adults >= 40 && sim.tick >= (mood === 2 ? 600 : 1500) && cg[o + CG.SUGAR] >= 8 * cfg.digSugar + C.DIG_KEEP + 4) {
       const foe2 = 1 - t, aim = mind.aim ?? (Math.abs(cfg.seed | 0) + t) % 3;
       let run = breachRun(sim, t, foe2, aim); if (!run.length && aim) run = breachRun(sim, t, foe2, 0); // no stores to aim at, or no way to them: the nearest room will do
       if (run.length) out.push({ team: t, type: CMD.DIG, cells: run.slice(0, 16) });

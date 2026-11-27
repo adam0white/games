@@ -667,3 +667,9 @@ test('The Hunt: two rivals play it to an end, and other missions have no beast',
   assert.ok(h.sim.result > 0); assert.ok(h.sim.g(0, CG.HARM) + h.sim.g(1, CG.HARM) > 0);
   const o = new Host({ seed: 2 }).sim; assert.equal(o.beast[1], -1); assert.equal(o.beast[0], 0);
 });
+
+test('The Narrows has soft ground: a cell of clay takes half the time and no seed; other missions keep the full price', () => {
+  const a = new Sim({ mission: 'narrows' }), b = new Sim({ mission: 'wall' });
+  assert.deepEqual([a.cfg.digTicks, a.cfg.digSugar], [60, 0]);
+  assert.deepEqual([b.cfg.digTicks, b.cfg.digSugar], [C.DIG_TICKS, C.DIG_SUGAR]);
+});

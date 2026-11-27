@@ -183,7 +183,7 @@ export const MISSIONS = {
   // is frail: reach her and it is over.
   narrows: {
     id: 'narrows', name: 'The Narrows', map: 'pass', breach: true,
-    kit: { ants: 36, foeAnts: 40, sugar: 10, protein: 5, eggs: 20, larvae: 20, pupae: 12, duskTick: 9600, queenHp: 1200 },
+    kit: { ants: 36, foeAnts: 40, sugar: 10, protein: 5, eggs: 20, larvae: 20, pupae: 12, duskTick: 9600, queenHp: 1200, digTicks: 60, digSugar: 0 },
     goals: { queen: true, dusk: 'holder' },
     deeds: [{ id: 'a', text: 'Kill the queen inside five minutes.', won: true, by: 6000, opens: 'hold' }, { id: 'b', text: 'Kill the queen with fewer than sixty dead.', won: true, max: { DIED: 59 }, opens: 'post' }],
     picks: [CASTE.SPITTER, CASTE.WARDEN],

@@ -820,3 +820,23 @@ Numbers, 5 seeds both seats (seat 0 attacks): steady v steady, attacker won 2 of
 bold on one side 4 of 10 before and 3 of 10 after. The rival tunnelled through in 1 game of 10, so the second way in
 is mostly a player's choice for now. No person has dug it on this map; whether the tunnel can be finished before
 dusk by hand is not known.
+
+## The Narrows: the tunnel was a trap, so its ground is soft
+
+Checked after the second way in went live. What held and what did not:
+
+- The strike order under ground works: it is taken, the soldiers go through the tunnel and fight (seed 2: fifteen
+  soldiers killed eleven and all died against fifty-five).
+- The rival did not march under ground in five seeds. It keeps its soldiers on the trail that holds the pass, and a
+  hill with a raid out sends no second one. That is how the rule falls out, not a rule of its own.
+- The dig is 75 cells along row 12. At a seed and 120 ticks a cell it joined the nests between ticks 4396 and 5488
+  of 9600, and it cost the hill its army: steady and bold bots that were also told to dig won 0 of 20, the same bots
+  left alone won 7 of 20 through the pass. The card offered a way in that lost.
+
+So the mission's kit now sets `digTicks: 60, digSugar: 0` (two new options; every other mission keeps 120 and 1).
+With that, over ten seeds: bold left alone 6, bold told to dig from the start 6 (joined near tick 3300), steady left
+alone 5, steady told to dig 1. The two ways are even for a bold attacker. Steady does badly under ground because
+once joined it waits for five soldiers to four or for three fifths of the day, and stops storming the pass while it
+waits; that is the bot, and it is not fixed. No person has played either way.
+
+Tried and dropped: free digging at 120 ticks a cell (1 and 3 of 10).

@@ -112,6 +112,7 @@ export const DEFAULTS = {
   mission: 'crossing', // a row of MISSIONS; its kit (ants, food, brood, duskTick: 0 for no dusk) sits under these options
   frostTick: 0, frostEat: 1200, // a mission's frost: from this tick the food outside is gone and a meal comes this often
   queenHp: C.QUEEN_HP,
+  digTicks: C.DIG_TICKS, digSugar: C.DIG_SUGAR, // one cell of clay: the ticks of digging and the seeds it costs (a mission's kit may make its ground soft)
   starveAfter: 1200, starveDiv: 100, // ticks at no seeds before ants die, and the share that die every ten seconds (one in starveDiv)
   tiers: true, // growth inside the mission (TIERS): rooms beyond the first three, the third caste and the nodes wait on the queen's chamber
   blank: false, // an empty map for tests: no stones, creek or food
@@ -483,16 +484,16 @@ export class Sim {
         if (this.owner(k) !== t) {
           // The rival's ground: a colony that may breach marks plain clay there and takes its own marks off, and no more.
           if (!this.mayBreach(t)) continue;
-          if (dig && o.on !== 0 && o.on !== false) { if (m === MAT.CLAY && !this.mark[k] && marks < C.MARKS_MAX) { this.mark[k] = t + 1; this.digLeft[k] = C.DIG_TICKS; marks++; done++; } }
+          if (dig && o.on !== 0 && o.on !== false) { if (m === MAT.CLAY && !this.mark[k] && marks < C.MARKS_MAX) { this.mark[k] = t + 1; this.digLeft[k] = this.cfg.digTicks; marks++; done++; } }
           else if ((dig || !kind) && this.mark[k] === t + 1) { this.mark[k] = 0; marks--; done++; }
           continue;
         }
         if (dig) {
           if (o.on === 0 || o.on === false) { if (this.mark[k] === t + 1) { this.mark[k] = 0; marks--; done++; if (this.room[k]) use(k, ROOM.NONE); } }
-          else if (m === MAT.CLAY && this.mark[k] !== t + 1 && marks < C.MARKS_MAX) { this.mark[k] = t + 1; this.digLeft[k] = C.DIG_TICKS; marks++; done++; } // on its own ground a colony takes a rival's mark over
+          else if (m === MAT.CLAY && this.mark[k] !== t + 1 && marks < C.MARKS_MAX) { this.mark[k] = t + 1; this.digLeft[k] = this.cfg.digTicks; marks++; done++; } // on its own ground a colony takes a rival's mark over
         } else {
           if (this.room[k] === PLUG && m !== MAT.OPEN) { if (!kind && this.mark[k] === t + 1) { this.mark[k] = 0; marks--; done++; } continue; } // a plug is not a room: it is dug out or left
-          if (o.dig && kind && m === MAT.CLAY && this.mark[k] !== t + 1 && marks < C.MARKS_MAX) { this.mark[k] = t + 1; this.digLeft[k] = C.DIG_TICKS; marks++; done++; }
+          if (o.dig && kind && m === MAT.CLAY && this.mark[k] !== t + 1 && marks < C.MARKS_MAX) { this.mark[k] = t + 1; this.digLeft[k] = this.cfg.digTicks; marks++; done++; }
           if (!kind && this.mark[k] === t + 1) { this.mark[k] = 0; marks--; done++; }
           if ((m === MAT.OPEN || this.mark[k] === t + 1 || !kind) && this.room[k] !== kind) use(k, kind);
         }
@@ -868,7 +869,7 @@ export class Sim {
         if (m < L.nestBase || this.mark[k] !== t + 1) continue;
         this.to[i] = -1;
         // The opening stroke costs a seed: earth is carried out on food. The last few seeds are kept for the colony to eat: the cell waits.
-        const plug = this.room[k] === PLUG, cost = plug ? C.PLUG_BREAK : C.DIG_SUGAR;
+        const plug = this.room[k] === PLUG, cost = plug ? C.PLUG_BREAK : this.cfg.digSugar;
         if (plug) { // packed earth: one stroke on it every fifth tick, however many dig
           if (this.tick % C.PLUG_SLOW) return c;
           if (this.plugTick !== this.tick) { this.plugTick = this.tick; this.plugHit.clear(); }
