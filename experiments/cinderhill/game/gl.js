@@ -262,6 +262,7 @@ void main() {
     float d = ell(p, vec2(0.0, 0.0), vec2(0.85, 0.45));
     float a = 1.0 - ss(-aa, aa, d);
     vec3 col = body * light + vec3(1.0, 0.55, 0.2) * uNight * 0.8;        // by night a far ant is a spark
+    if (d > 0.0) { col = mix(vec3(0.86, 0.82, 0.74) * light, vec3(0.9, 0.5, 0.2), uNight); a = (1.0 - ss(0.0, 0.3, d)) * 0.4; }
     if (vInfo.z > 0.5) { float f = length(p - vec2(0.7, 0.0)) - 0.52; a = max(a, 1.0 - ss(-aa, aa, f)); if (f < 0.0) col = seedCol * (light + uNight * 0.6); }
     if (a < 0.02) discard;
     outColor = vec4(col, a); return;
@@ -286,7 +287,13 @@ void main() {
   // Each body part is a small dome: a highlight toward the top of the part, a darker edge.
   float round_ = clamp(-d / 0.16, 0.0, 1.0);
   vec3 col = body * light * (0.55 + 0.75 * round_) + uSunCol * 0.35 * pow(round_, 6.0);
-  col += vec3(1.0, 0.5, 0.15) * uNight * (1.0 - round_) * 0.85 * step(d, 0.0);          // a hot rim by night
+  col = mix(col, (body * 1.6 + vec3(0.85, 0.42, 0.14)) * (0.3 + 0.7 * round_), uNight * 0.7);   // by night she is lit by the embers: a warm body, not a black one
+  col += vec3(1.0, 0.5, 0.15) * uNight * (1.0 - round_) * 0.6 * step(d, 0.0);           // and a hot rim
+  // A pale edge of ash dust just outside the body, so she reads on char, on the door's dark and on other ants.
+  float halo = (1.0 - ss(0.0, 0.085, d)) * step(0.0, d) * 0.5;
+  float legA = 1.0 - ss(lw - aa, lw + aa, legs);
+  col = mix(col, mix(mix(vec3(0.86, 0.82, 0.74) * light, vec3(0.9, 0.5, 0.2), uNight), mix(body * light * 0.7, vec3(0.8, 0.4, 0.15), uNight), legA), step(0.0, d));
+  a = max(a, halo);
   if (vInfo.z > 0.5) {                                          // the load, held in the jaws
     float f = ell(p, vec2(0.9, 0.0), vec2(0.23, 0.2));
     float fa = 1.0 - ss(-aa, aa, f);

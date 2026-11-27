@@ -78,7 +78,8 @@ const nestCam = { x: L0.nw / 2 + 0.5, y: 0, z: 10 };
 // gl.js does the same arithmetic in CAM; change both together.
 const VIEW = { top: { pitch: 0, fk: 2.2 }, tilt: { pitch: 0.72, fk: 1.7 }, low: { pitch: 1.24, fk: 0.86 } };
 const lens = { ...VIEW.low };
-function pose(c = cam) { const f = lens.fk * H, D = f / c.z, s = Math.sin(lens.pitch), co = Math.cos(lens.pitch); return { ex: c.x, ey: c.y + D * s, ez: D * co, sin: s, cos: co, f, dist: D }; }
+let nestLift = 0;   // CSS px the picture rides up while the nest panel covers the lower screen, so the door stays in view
+function pose(c = cam) { const f = lens.fk * H, D = f / c.z, s = Math.sin(lens.pitch), co = Math.cos(lens.pitch), y = c.y + nestLift / (c.z * Math.max(0.3, co)); return { ex: c.x, ey: y + D * s, ez: D * co, sin: s, cos: co, f, dist: D }; }
 let eye = null;   // this frame's pose, shared by the picture and by every pick
 const zMin = () => Math.min(W / L0.sw, H / L0.sh) * 1.2;
 function clampCam() { cam.z = Math.max(zMin(), Math.min(44, cam.z)); cam.x = Math.max(0, Math.min(L0.sw, cam.x)); cam.y = Math.max(0, Math.min(L0.sh, cam.y)); eye = pose(); }
@@ -200,7 +201,7 @@ function pauseGame() { if (screen !== 'play') return; dropTouches(); setScreen('
 function resume() { if (renderer?.lost) return; setScreen('play'); host.last = null; snd.release(); startSong(); }
 function restart() {
   dropTouches();
-  host = newHost(); stats = host.stats(); crewSeq = -1; seen = null; floats = []; pulses = []; flyers = []; pending = []; beacon = null; alarmAt = null; parts.length = 0; setSpeed(1);
+  host = newHost(); stats = host.stats(); crewSeq = -1; seen = null; floats = []; pulses = []; flyers = []; pending = []; beacon = null; endFollow(false); routeAfterLoad = false; proteinTold = false; alarmAt = null; parts.length = 0; setSpeed(1);
   pileTop.clear(); routeUntil = 0; trailSig = '?'; firstTrail = false; clearTimeout(toastTimer); $('toast').classList.remove('on');
   if (tool !== 'trail') setTool('trail'); if (nestOpen) setNest(false, true);
   startRecord(); running = true; uploadAll(); opening(); resume();
@@ -230,7 +231,7 @@ function setTool(next) {
   if (next === tool) { if (next === 'dig') setNest(!nestOpen); return; }
   run(Gs.reset('tool')); tool = next;
   for (const b of document.querySelectorAll('[data-tool]')) b.setAttribute('aria-pressed', String(b.dataset.tool === tool));
-  if (tool === 'dig') { setNest(true); toast('Drag in the nest to mark where to dig'); } else if (tool === 'alarm') toast('Hold a finger down to call the guards there');
+  if (tool === 'dig') { setNest(true); toast('Drag in the nest to mark where to dig'); } else if (tool === 'alarm') toast('Hold a finger down to call the guards there'); else if (tool === 'camera') toast('Drag to move the view. Pinch to zoom.');
   tone(520, 0.05, 0.03, 'triangle');
 }
 function setNest(on, auto = false) {
@@ -259,9 +260,54 @@ function crewStep(delta, level) {
 }
 $('crewPlus').addEventListener('click', () => crewStep(1)); $('crewMinus').addEventListener('click', () => crewStep(-1));
 for (const b of document.querySelectorAll('#levels [data-level]')) b.addEventListener('click', () => crewStep(0, Number(b.dataset.level)));
-function pickTrailAt(sx, sy) {
+// ---- following one ant: tap her, and the view comes down beside her and stays with her, into the nest and out ----
+let follow = null;
+const FOLLOW_LENS = { pitch: 1.1, fk: 1.0 };
+const WHY = { onTrail: 'walking her trail', carrying: 'carrying food home', searching: 'searching for food', resting: 'resting by the door', toRest: 'heading back to rest', remembers: 'going back to food she remembers', queued: 'waiting at the door', goingOut: 'on her way out', waitingIn: 'waiting inside', recalled: 'called home', gaveUp: 'coming home empty', stuck: 'stuck', tooLongForTrail: 'out too long, heading in', toDig: 'going to dig', digging: 'digging', crewFull: 'waiting for digging work', noDig: 'waiting for digging work', nursing: 'tending the brood', noAlarm: 'on guard', toAlarm: 'running to the alarm', atAlarm: 'holding the alarm' };
+function pickAntAt(sx, sy, probe = false) {
+  const s = host.sim; let best = -1, bd = 34 * 34;
+  for (let i = 0; i < s.n; i++) { if (s.layer[i] !== 0 || s.hp[i] === 0 || s.team[i] !== 0) continue; const p = toScreen(s.x[i] / 256, s.y[i] / 256, 0.1); if (!p.s) continue; const d = (p.x - sx) ** 2 + (p.y - sy) ** 2; if (d < bd) { bd = d; best = i; } }
+  if (probe) return best < 0 ? Infinity : bd;
+  if (best < 0) return false;
+  follow = { i: best, back: { ...cam }, z: Math.max(cam.z, 30), loads: 0, carry: s.carry[best], opened: false, since: host.tick };
+  camGoal = null; document.body.classList.add('follow'); tone(740, 0.12, 0.04, 'sine', 200); navigator.vibrate?.(10);
+  labrec.emit('follow', { at: host.tick, on: 1 }); followCard(); return true;
+}
+function endFollow(restore = true) {
+  if (!follow) return;
+  const f = follow; follow = null; document.body.classList.remove('follow');
+  if (f.opened && nestOpen) setNest(false, true);
+  if (restore) camGoal = { x: cam.x, y: cam.y, z: f.back.z, rate: 2.2 };
+  if (running) labrec.emit('follow', { at: host.tick, on: 0, loads: f.loads, ticks: host.tick - f.since });
+}
+function followCard() {
+  if (!follow) return;
+  const who = host.inspect(follow.i); if (!who) return;
+  $('whoName').textContent = `A ${who.job}`;
+  $('whoInfo').textContent = `${WHY[who.why] ?? who.why}${follow.loads ? ` · ${follow.loads} load${follow.loads > 1 ? 's' : ''} home` : ''}`;
+}
+/** Each frame: the view stays on her. Underground the nest opens and the surface view waits at the door. */
+function followStep(dt) {
+  const s = host.sim, f = follow;
+  if (f.i >= s.n || s.hp[f.i] <= 0) { endFollow(); toast('She is gone'); return; }
+  const c = s.carry[f.i]; if (f.carry && !c) f.loads++; f.carry = c;
+  const g = Math.min(1, dt * 5);
+  if (s.layer[f.i] === 0) {
+    const a = host.alpha ?? 1, x = (host.px[f.i] + (s.x[f.i] - host.px[f.i]) * a) / 256, y = (host.py[f.i] + (s.y[f.i] - host.py[f.i]) * a) / 256;
+    if (Math.hypot(x - cam.x, y - cam.y) > 12) { cam.x = x; cam.y = y; } else { cam.x += (x - cam.x) * g; cam.y += (y - 1.2 - cam.y) * g; }
+    cam.z *= Math.exp(Math.log(f.z / cam.z) * Math.min(1, dt * 2.5));
+    if (f.opened && nestOpen) { setNest(false, true); f.opened = false; }
+  } else {
+    if (!nestOpen) { setNest(true, true); f.opened = true; }
+    if (f.opened) nestAuto = 0;
+    nestCam.x += (Math.max(8, Math.min(L0.nw - 8, s.x[f.i] / 256)) - nestCam.x) * g;
+    nestCam.y += (Math.max(0, s.y[f.i] / 256 - 8) - nestCam.y) * g;
+  }
+}
+function pickTrailAt(sx, sy, probe = false) {
   let best = null, bd = 26 * 26;
   for (const tr of stats.trails) { const m = trailMid.get(tr.slot); if (!m) continue; const p = toScreen(m.x, m.y, 1.6), d = (p.x - sx) ** 2 + (p.y - sy) ** 2; if (d < bd) { bd = d; best = tr; } }
+  if (probe) return best ? bd : Infinity;
   if (!best) return false;
   crewSeq = best.seq; showRoute(); hud(); tone(600, 0.05, 0.03, 'triangle'); return true;
 }
@@ -281,8 +327,8 @@ function act(a) {
   switch (a.type) {
     case 'preview': preview = a; strokeTake(a.points); break;
     case 'clear': preview = null; break;
-    case 'pan': { const w = toWorld(W / 2 + a.dx, H / 2 + a.dy); cam.x -= w.x - cam.x; cam.y -= w.y - cam.y; camGoal = null; clampCam(); break; }
-    case 'zoom': { const b = toWorld(a.x, a.y); cam.z *= a.f; clampCam(); const c = toWorld(a.x, a.y); cam.x += b.x - c.x; cam.y += b.y - c.y; camGoal = null; clampCam(); break; }
+    case 'pan': { const w = toWorld(W / 2 + a.dx, H / 2 + a.dy); cam.x -= w.x - cam.x; cam.y -= w.y - cam.y; camGoal = null; endFollow(false); clampCam(); break; }
+    case 'zoom': { if (follow) { follow.z = Math.max(14, Math.min(44, follow.z * a.f)); break; } const b = toWorld(a.x, a.y); cam.z *= a.f; clampCam(); const c = toWorld(a.x, a.y); cam.x += b.x - c.x; cam.y += b.y - c.y; camGoal = null; clampCam(); break; }
     case 'order': {
       if (a.tool !== 'trail') break;
       strokeTake(a.points);
@@ -299,7 +345,7 @@ function act(a) {
       } else if (a.phase === 'end' && alarmAt) { alarmOrder(1); alarmAt = null; }   // the cell called at the start, wherever the view is now
       break;
     }
-    case 'tap': pickTrailAt(a.x, a.y); break;
+    case 'tap': if (follow) endFollow(); else if (pickAntAt(a.x, a.y, true) < pickTrailAt(a.x, a.y, true)) pickAntAt(a.x, a.y); else pickTrailAt(a.x, a.y); break;   // whichever is nearer the finger: an ant or a trail's badge
   }
 }
 /** What the sim said to the trails drawn since the last tick: only a trail it took is shown as laid. */
@@ -310,7 +356,8 @@ function settle() {
     pulses.push({ pts, at: performance.now(), bad: !ok });
     if (ok) {
       for (let i = 0; i < pts.length; i += 2) puff(pts[i] + 0.5, pts[i + 1] + 0.5, 0.2, { vx: rnd(0.5), vy: rnd(0.5), vh: 0.8, size: 0.5, grow: 0.5, col: [1, 0.7, 0.3], a: 0.7, life: 0.7 });
-      tone(620, 0.14, 0.06, 'triangle', -180); navigator.vibrate?.(8); ghostDone(); showRoute(6000);
+      tone(620, 0.14, 0.06, 'triangle', -180); setTimeout(() => tone(930, 0.18, 0.05, 'triangle', 120), 110); navigator.vibrate?.(30); ghostDone(); clearTimeout(toastTimer); $('toast').classList.remove('on');
+      if (firstTrail) showRoute(6000); else routeAfterLoad = true;   // the first trail's card waits for its first load, so the moment is the trail's
       if (!firstTrail) { firstTrail = true; frameTrail(pts); }
     } else {
       for (let i = 0; i < pts.length; i += 2) puff(pts[i] + 0.5, pts[i + 1] + 0.5, 0.2, { vx: rnd(0.3), vy: rnd(0.3), vh: 0.3, size: 0.45, grow: 0.3, col: [0.5, 0.45, 0.42], a: 0.6, add: false, life: 0.8 });
@@ -384,6 +431,8 @@ function news() {
       const now = performance.now(), kind = b ? 1 : 0, f = floats.find(f => f.kind === kind && now - f.at < 500);
       if (f) { f.n++; f.at = now; } else floats.push({ x: ent.x + (kind ? 1.6 : -1.6), y: ent.y, at: now, t0: now, n: 1, kind, col: b ? '#ff9d7a' : '#ffe08a' });
       if (flyers.length < 14) flyers.push({ at: now, kind, col: a >= SLOT.TRAIL0 ? TRAIL_CSS[(a - SLOT.TRAIL0) % 4] : b ? '#ff9d7a' : '#ffe08a', bend: rnd(60) });
+      if (routeAfterLoad) { routeAfterLoad = false; showRoute(7000); }
+      if (b && host.colony && g[GI.PROTEIN] === 0) { const el = $('chipBrood'); el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); if (!proteinTold) { proteinTold = true; toast('Red food goes straight to the hungry larvae', 3200); } }
       const n = set.sound === 'all' ? song?.ember?.() : null;
       if (!n) tone(1500 + Math.random() * 500, 0.04, 0.02, 'sine', 300);
     } else if (type === EVENT.PILE_NEW) {
@@ -413,7 +462,7 @@ function hud() {
   bump('chipSugar', c ? c.sugar : stats.stores);
   $('chipProtein').hidden = !c; $('chipBrood').hidden = !c;
   if (c) { bump('chipProtein', c.protein); bump('chipBrood', c.eggs + c.larvae + c.pupae); }
-  trailMesh();
+  trailMesh(); followCard();
   const tr = crewTrail();
   $('route').classList.toggle('on', !!tr && screen === 'play' && !nestOpen && performance.now() < routeUntil);
   if (tr) {
@@ -432,6 +481,7 @@ function hud() {
 const TRAIL_COL = [[1, 0.70, 0.22], [0.30, 0.82, 1], [1, 0.42, 0.72], [0.62, 0.95, 0.32]];
 const TRAIL_CSS = ['#ffb338', '#4dd1ff', '#ff6bb8', '#9ef252'];
 const trailMid = new Map();   // trail slot: where its badge stands (the middle of the path)
+let routeAfterLoad = false, proteinTold = false;
 let trailSig = '', trailBuf = new Float32Array(0);
 function trailMesh() {
   const F = host.sim.flow; let sig = '';
@@ -493,12 +543,16 @@ function drawOverlay(now) {
       ctx.font = '700 12px ui-rounded, system-ui, sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
       ctx.fillText(label, ax + 8, p.y - 0.5);
     }
+    if (follow && host.sim.layer[follow.i] === 0) {                      // her ring
+      const s = host.sim, a = host.alpha ?? 1, p = toScreen((host.px[follow.i] + (s.x[follow.i] - host.px[follow.i]) * a) / 256, (host.py[follow.i] + (s.y[follow.i] - host.py[follow.i]) * a) / 256, 0);
+      if (p.s) { ctx.strokeStyle = 'rgba(255, 226, 150, 0.85)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(p.x, p.y, p.s * 1.1, p.s * 1.1 * Math.max(0.3, eye.cos), 0, 0, 7); ctx.stroke(); }
+    }
     // Food off screen: a small arrow at the edge, in the food's colour.
     for (const p of stats.piles) {
       if (p.amount <= 0) continue;
       const s = toScreen(p.x + 0.5, p.y + 0.5); if (s.s && s.x > 12 && s.y > 60 && s.x < W - 12 && s.y < H - 90) continue;
       const cx = W / 2, cy = H / 2, a = s.s ? Math.atan2(s.y - cy, s.x - cx) : Math.PI / 2, m = 30;
-      const k = Math.min(Math.abs(Math.cos(a)) > 1e-6 ? (W / 2 - m) / Math.abs(Math.cos(a)) : Infinity, Math.abs(Math.sin(a)) > 1e-6 ? (H / 2 - m - 50) / Math.abs(Math.sin(a)) : Infinity);
+      const k = Math.min(Math.abs(Math.cos(a)) > 1e-6 ? (W / 2 - m) / Math.abs(Math.cos(a)) : Infinity, Math.abs(Math.sin(a)) > 1e-6 ? (H / 2 - m - 80) / Math.abs(Math.sin(a)) : Infinity);
       const x = cx + Math.cos(a) * k, y = cy + Math.sin(a) * k, kind = host.sim.pileKind?.[p.p] ? 1 : 0, beat = 1 + 0.15 * Math.sin(now / 240);
       ctx.fillStyle = kind ? '#e0603c' : '#f3d77a'; ctx.strokeStyle = 'rgba(20, 12, 8, 0.8)'; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * 13 * beat, y + Math.sin(a) * 13 * beat); ctx.lineTo(x + Math.cos(a + 2.5) * 11, y + Math.sin(a + 2.5) * 11); ctx.lineTo(x + Math.cos(a - 2.5) * 11, y + Math.sin(a - 2.5) * 11); ctx.closePath(); ctx.stroke(); ctx.fill();
@@ -556,7 +610,7 @@ function drawGhost(now) {
 }
 function drawNestPanel(now) {
   nctx.setTransform(dpr, 0, 0, dpr, 0, 0); nctx.clearRect(0, 0, NW, NH);
-  drawCutaway({ ctx: nctx, host, W: NW, H: NH, cam: nestCam, now, night: light.night, dig: digMarks?.cells });
+  drawCutaway({ ctx: nctx, host, W: NW, H: NH, cam: nestCam, now, night: light.night, dig: digMarks?.cells, mark: follow && host.sim.layer[follow.i] === 1 ? follow.i : -1 });
 }
 
 // ---- the frame ----
@@ -579,8 +633,10 @@ function frame(now) {
   news();
   if (stepped) { uploadAnts(); if (host.tick % 2 === 0 || stepped > 1) uploadScent(); if (host.terrainVersion !== uploadedTerrain) uploadTerrain(); }
   light = lightNow(now);
-  const want = screen === 'menu' ? VIEW.low : VIEW[set.view], e = Math.min(1, dt * 3.5); lens.pitch += (want.pitch - lens.pitch) * e; lens.fk += (want.fk - lens.fk) * e;
+  const want = screen === 'menu' ? VIEW.low : follow ? FOLLOW_LENS : VIEW[set.view], e = Math.min(1, dt * 3.5); lens.pitch += (want.pitch - lens.pitch) * e; lens.fk += (want.fk - lens.fk) * e;
   if (screen === 'menu') { const en = entrance(); cam.x = en.x + 5 * Math.sin(now / 7000); cam.y = en.y + 3; cam.z = startZoom() * 0.8; }
+  nestLift += ((nestOpen ? NH / 2 : 0) - nestLift) * Math.min(1, dt * 6);
+  if (screen === 'menu') ; else if (follow && screen === 'play') followStep(dt);
   else if (camGoal && screen === 'play') { const g = Math.min(1, dt * camGoal.rate); cam.x += (camGoal.x - cam.x) * g; cam.y += (camGoal.y - cam.y) * g; cam.z *= Math.exp(Math.log(camGoal.z / cam.z) * g); if (Math.abs(Math.log(camGoal.z / cam.z)) < 0.03 && Math.abs(camGoal.x - cam.x) < 0.05) camGoal = null; }
   clampCam();
   if (screen !== 'paused') { ambient(dt); stepParts(dt); }
@@ -606,6 +662,7 @@ requestAnimationFrame(frame);
 window.game = {
   ready: performance.now(),   // ms from navigation start to a page that takes input
   state: () => ({ screen, tool, nest: nestOpen, t: host.tick, ants: host.sim.n, drawn: drawnAnts, orders: host.log.length, gl: !!renderer && !renderer.lost, glFailed, frames: frames.drawn, set: { ...set }, lens: { ...lens }, night: light.night, dots: parts.length, help: ghostOn(), pending: pending.length, alarm: alarmAt ? [alarmAt.cx, alarmAt.cy] : null, route: $('route').classList.contains('on') }),
+  antScreen: () => { const s = host.sim; for (let i = 0; i < s.n; i++) if (s.layer[i] === 0 && s.carry[i] && s.hp[i] > 0 && s.team[i] === 0) { const p = toScreen(s.x[i] / 256, s.y[i] / 256, 0.1); if (p.s && p.y > 120 && p.y < H - 120 && p.x > 20 && p.x < W - 20) return { x: p.x, y: p.y, i }; } return null; }, following: () => follow && { i: follow.i, loads: follow.loads }, setSpeed: x => setSpeed(x),
   stats: () => host.stats(), log: () => JSON.parse(JSON.stringify(host.log)), hashes: () => host.sim.hashes(),
   toScreen: (x, y, h) => toScreen(x, y, h), toWorld: (x, y) => toWorld(x, y), camera: () => ({ ...cam }), setCamera: c => { camGoal = null; Object.assign(cam, c); clampCam(); },
   mat: (x, y) => host.sim.mat[y * L0.sw + x], size: () => [L0.sw, L0.sh], door: () => entrance(),
