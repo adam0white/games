@@ -95,7 +95,7 @@ const rivalMind = () => { const mood = MOOD[set.get('rival')]; return mood && ca
 const startAnts = () => { const prev = before(missionId), ants = MISSIONS[missionId].kit.ants; return prev && camp.done[prev] && !camp.done[prev].won ? [Math.max(10, ants - LOSS_ANTS), MISSIONS[missionId].kit.foeAnts ?? ants] : [ants, MISSIONS[missionId].kit.foeAnts ?? ants]; };
 // The fork in the road: the mission of the pair that was not finished first has changed by the time it is played.
 const late = id => ROAD.pair.includes(id) && !!camp.forks.road && camp.forks.road !== id;
-const lateOpts = id => { if (!late(id)) return {}; const { foePoints, ...o } = ROAD.late[id]; if (foePoints) { o.pointsBy = [0, 0]; o.pointsBy[FOE] = foePoints; } return o; };
+const lateOpts = id => { if (!late(id)) return {}; const { foePoints, foeHarm, ...o } = ROAD.late[id]; if (foePoints) { o.pointsBy = [0, 0]; o.pointsBy[FOE] = foePoints; } if (foeHarm) { o.harmBy = [0, 0]; o.harmBy[FOE] = foeHarm; } return o; };
 const newHost = () => new Host({ seed, mission: missionId, ...lateOpts(missionId), ...(hillOf(missionId) ? { nests: hillOf(missionId).nests } : {}), antsBy: startAnts(), traits: traitsNow(), tiers: set.get('growth') !== 'deeds', ai: { [FOE]: MOOD[set.get('rival')] } });
 let host = newHost(), sim = host.sim;
 let screen = 'menu', tool = 'trail', nestOpen = false, running = false, speed = 1, lastT = 0;
@@ -278,7 +278,7 @@ function renderPath() {
   const m = MISSIONS[missionId], t = TEXT[missionId], lost = startAnts()[0] < m.kit.ants;
   $('mKicker').textContent = m.name; $('mSub').textContent = t.sub;
   $('mGoals').textContent = ''; const hill = hillOf(missionId), kept = hill ? (() => { const n = [0, 0, 0, 0], l = hill.nests[ME] ?? []; for (let j = 2; j < l.length; j += 3) n[l[j] < 4 ? l[j] : 0]++; return `You start in your hill as you left it at ${MISSIONS[hill.from].name}: ${l.length / 3} cells dug, ${n[ROOM.STORE]} of them stores, ${n[ROOM.NURSERY]} nursery. Your ${n[ROOM.REST]} quarters cells are bare tunnels again: paint them as Quarters when you want the ants, with no digging to do. The rival starts in its own.`; })() : m.from && set.get('home') === 'carried' ? (camp.done[m.from] ? `This is the hill of ${MISSIONS[m.from].name}. Play that mission again to its end and you start here in the nest you dug there.` : `This is the hill of ${MISSIONS[m.from].name}. Finish that mission and you start here in the nest you dug there.`) : Object.values(MISSIONS).some(x => x.from === missionId) && set.get('home') === 'carried' ? 'What you dig here stays: the next mission on this hill starts in this nest.' : null;
-  const other = ROAD.pair.find(x => x !== missionId), road = !ROAD.pair.includes(missionId) ? null : late(missionId) ? `You went to ${MISSIONS[other].name} first. ${ROAD.text[missionId]}` : camp.forks.road ? null : `A fork in the road. ${MISSIONS[ROAD.pair[0]].name} and ${MISSIONS[ROAD.pair[1]].name} are both open, and the one you leave for later changes while you are away. Leave ${MISSIONS[ROAD.pair[0]].name}: ${ROAD.text[ROAD.pair[0]]} Leave ${MISSIONS[ROAD.pair[1]].name}: ${ROAD.text[ROAD.pair[1]]}`;
+  const other = ROAD.pair.find(x => x !== missionId), road = !ROAD.pair.includes(missionId) ? null : late(missionId) ? `You went to ${MISSIONS[other].name} first. ${ROAD.text[missionId]}` : camp.forks.road || ROAD.pair.some(x => camp.done[x]) ? null : `A fork in the road. ${MISSIONS[ROAD.pair[0]].name} and ${MISSIONS[ROAD.pair[1]].name} are both open, and the one you leave for later changes while you are away. Leave ${MISSIONS[ROAD.pair[0]].name}: ${ROAD.text[ROAD.pair[0]]} Leave ${MISSIONS[ROAD.pair[1]].name}: ${ROAD.text[ROAD.pair[1]]}`;
   for (const line of [...t.goals, ...(lost ? [`The last mission was lost: you start with ${startAnts()[0]} workers, not ${m.kit.ants}.`] : []), ...(kept ? [kept] : []), ...(road ? [road] : [])]) { const p = document.createElement('p'); p.textContent = line; $('mGoals').append(p); }
   $('play').textContent = running && host.sim.mission.id === missionId ? 'Resume' : 'Play'; $('play').disabled = !isOpen(missionId);
   $('fresh').hidden = !Object.keys(camp.done).length; $('fresh').textContent = 'New campaign'; freshArmed = false;
@@ -747,7 +747,7 @@ function drawOverlay(now) {
         ctx.strokeStyle = '#5a2c1e'; ctx.lineWidth = 1; const s0 = at(-1.3, 0), s1 = at(0.6, 0); ctx.beginPath(); ctx.moveTo(s0[0], s0[1]); ctx.lineTo(s1[0], s1[1]); ctx.stroke();
         ctx.strokeStyle = '#0d0806'; ctx.lineWidth = Math.max(2, Math.hypot(ux, uy) * 0.16);
         for (const side of [-1, 1]) { const j0 = at(1.3 + lunge * 0.35, side * 0.22), j1 = at(1.9 + lunge * 0.5, side * (0.5 - lunge * 0.3)), j2 = at(2.3 + lunge * 0.5, side * (0.15 - lunge * 0.1)); ctx.beginPath(); ctx.moveTo(j0[0], j0[1]); ctx.quadraticCurveTo(j1[0], j1[1], j2[0], j2[1]); ctx.stroke(); }
-        const hp = sim.beast[0] / B.hp, top = toScreen(x, y, 5.5);
+        const hp = sim.beast[0] / (sim.cfg.beastHp ?? B.hp), top = toScreen(x, y, 5.5);
         ctx.fillStyle = 'rgba(20, 14, 10, 0.85)'; ctx.strokeStyle = '#ff6048'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.roundRect(top.x - 30, top.y - 8, 60, 12, 6); ctx.fill(); ctx.stroke();
         ctx.fillStyle = '#ff6048'; ctx.beginPath(); ctx.roundRect(top.x - 28, top.y - 6, 56 * hp, 8, 4); ctx.fill();
       }

@@ -693,7 +693,7 @@ test('a mission starts in the nests an earlier one left: rooms kept, nothing nea
 test('the fork in the road: the mission left for later starts changed', () => {
   assert.deepEqual(ROAD.pair, ['hunt', 'stones']);
   const hunt = new Sim({ seed: 2, mission: 'hunt', ...ROAD.late.hunt });
-  assert.equal(hunt.beast[0], 4200); assert.equal(new Sim({ seed: 2, mission: 'hunt' }).beast[0], MISSIONS.hunt.beast.hp);
+  assert.equal(hunt.beast[0], 4200); assert.equal(new Sim({ seed: 2, mission: 'hunt', harmBy: [0, ROAD.late.hunt.foeHarm] }).g(1, CG.HARM), 400); assert.equal(new Sim({ seed: 2, mission: 'hunt' }).beast[0], MISSIONS.hunt.beast.hp);
   const stones = new Sim({ seed: 2, mission: 'stones', pointsBy: [0, ROAD.late.stones.foePoints] });
   assert.equal(stones.g(1, CG.POINTS), 40); assert.equal(stones.g(0, CG.POINTS), 0);
 });
