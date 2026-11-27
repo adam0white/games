@@ -32,6 +32,10 @@ export const TRAITS = {
   farspit: { id: 'farspit', name: 'Far spit', text: 'Spitters reach three and a half cells.', needs: 'spitter', set: [['reach', CASTE.SPITTER, 896]] },
   acid: { id: 'acid', name: 'Strong spit', text: 'A spit bites as hard as a soldier.', needs: 'spitter', set: [['bite', CASTE.SPITTER, 5]] },
   iron: { id: 'iron', name: 'Iron shell', text: 'Wardens take half as much again to kill.', needs: 'warden', set: [['hp', CASTE.WARDEN, 144]] },
+  // Nodes of the Lineage that a deed opens. Each gives the colony something new to do, not a better number.
+  post: { id: 'post', name: 'Guard post', text: 'A new room. Each cell keeps one soldier in eight inside the nest, where you paint it.', set: [['room', 4, 1]] },
+  raiders: { id: 'raiders', name: 'Raiders', text: 'A raid may be sent for the store. Its soldiers carry loads home and leave the queen be.', set: [['loot', 1]] },
+  hold: { id: 'hold', name: 'Hold fast', text: 'A raid may be told to hold. Its soldiers stand at the trail\'s end and never go down a door.', set: [['hold', 1]] },
   stride: { id: 'stride', name: 'Long stride', text: 'Wardens keep pace with the soldiers.', needs: 'warden', set: [['speed', CASTE.WARDEN, 34]] },
 };
 
@@ -69,13 +73,25 @@ export const CAMPAIGN = [
 ];
 export const LOSS_ANTS = 8;
 
+/** The Lineage: the colony's tree, bough by bough. A `fork` names a fork of CAMPAIGN (take one side; the rival has the
+ *  other). A `node` names a trait that a deed opens (see each mission's `deeds`); the rival is given the same nodes, so
+ *  a node is a new thing to do and not a lead. */
+export const LINEAGE = [
+  { id: 'fight', name: 'Fight', nodes: [{ fork: 'caste' }, { fork: 'craft' }] },
+  { id: 'brood', name: 'Brood', nodes: [{ fork: 'way' }] },
+  { id: 'build', name: 'Build', nodes: [{ node: 'post' }] },
+  { id: 'raid', name: 'Raid', nodes: [{ node: 'raiders' }, { node: 'hold' }] },
+];
+
 /** Missions. kit: what each colony starts with (a sim option of the same name overrides it). goals: how it ends.
- *  picks: the castes a colony may choose one of, once. rooms: what may be dug. */
+ *  picks: the castes a colony may choose one of, once. rooms: what may be dug. deeds: two things worth doing beyond
+ *  the goal, judged by the sim (see Sim.deeds); a deed done opens a node of the Lineage for the rest of the campaign. */
 export const MISSIONS = {
   crossing: {
     id: 'crossing', name: 'The Crossing', map: 'crossing',
     kit: { ants: 30, sugar: 10, protein: 5, eggs: 20, larvae: 20, pupae: 12, duskTick: 9600 },
     goals: { queen: true, dusk: 'adults' },
+    deeds: [{ id: 'a', text: 'Carry a stolen load home.', min: { HAUL: 1 }, opens: 'raiders' }, { id: 'b', text: 'Win by killing the rival queen.', won: true, why: 'QUEEN', opens: 'hold' }],
     picks: [CASTE.SPITTER, CASTE.WARDEN],
     rooms: [ROOM.STORE, ROOM.NURSERY, ROOM.REST],
   },
@@ -85,6 +101,7 @@ export const MISSIONS = {
     id: 'frost', name: 'First Frost', map: 'crossing',
     kit: { ants: 30, sugar: 10, protein: 5, eggs: 20, larvae: 20, pupae: 12, duskTick: 10800, frostTick: 4800, frostEat: 300, starveAfter: 300, starveDiv: 10, queenHp: 3200, glut: 3 },
     goals: { queen: true, dusk: 'adults' },
+    deeds: [{ id: 'a', text: 'See the thaw with a hundred ants or more.', won: true, min: { ADULTS: 100 }, opens: 'post' }, { id: 'b', text: 'Carry three stolen loads home.', min: { HAUL: 3 }, opens: 'raiders' }],
     picks: [CASTE.SPITTER, CASTE.WARDEN],
     rooms: [ROOM.STORE, ROOM.NURSERY, ROOM.REST],
   },
@@ -95,6 +112,7 @@ export const MISSIONS = {
     kit: { ants: 30, sugar: 10, protein: 5, eggs: 20, larvae: 20, pupae: 12, duskTick: 10800, queenHp: 2400 },
     goals: { queen: true, points: 400, dusk: 'points' },
     sites: [[79, 28], [80, 84], [54, 100], [105, 100]],
+    deeds: [{ id: 'a', text: 'Win on points with fewer than fifty dead.', won: true, why: 'POINTS', max: { DIED: 49 }, opens: 'hold' }, { id: 'b', text: 'Win with a hundred and thirty ants or more.', won: true, min: { ADULTS: 130 }, opens: 'post' }],
     picks: [CASTE.SPITTER, CASTE.WARDEN],
     rooms: [ROOM.STORE, ROOM.NURSERY, ROOM.REST],
   },
@@ -104,8 +122,9 @@ export const MISSIONS = {
     id: 'larder', name: 'The Larder', map: 'crossing',
     kit: { ants: 30, sugar: 40, protein: 20, eggs: 20, larvae: 20, pupae: 12, duskTick: 9600, queenHp: 6000, lean: 3 },
     goals: { queen: true, haul: 10, dusk: 'haul' },
+    deeds: [{ id: 'a', text: 'Win by ten loads, not by dusk.', won: true, why: 'HAUL', opens: 'post' }, { id: 'b', text: 'Win inside six minutes.', won: true, by: 7200, opens: 'raiders' }],
     picks: [CASTE.SPITTER, CASTE.WARDEN],
-    rooms: [ROOM.STORE, ROOM.NURSERY, ROOM.REST, ROOM.POST],
+    rooms: [ROOM.STORE, ROOM.NURSERY, ROOM.REST],
   },
   // A siege. The rival (team 1) starts larger, behind a ridge with one pass, and wins by lasting until dusk. Its queen
   // is frail: reach her and it is over.
@@ -113,7 +132,8 @@ export const MISSIONS = {
     id: 'narrows', name: 'The Narrows', map: 'pass',
     kit: { ants: 36, foeAnts: 40, sugar: 10, protein: 5, eggs: 20, larvae: 20, pupae: 12, duskTick: 9600, queenHp: 1200 },
     goals: { queen: true, dusk: 'holder' },
+    deeds: [{ id: 'a', text: 'Kill the queen inside five minutes.', won: true, by: 6000, opens: 'hold' }, { id: 'b', text: 'Kill the queen with fewer than sixty dead.', won: true, max: { DIED: 59 }, opens: 'post' }],
     picks: [CASTE.SPITTER, CASTE.WARDEN],
-    rooms: [ROOM.STORE, ROOM.NURSERY, ROOM.REST, ROOM.POST],
+    rooms: [ROOM.STORE, ROOM.NURSERY, ROOM.REST],
   },
 };

@@ -590,3 +590,19 @@ through. Bots only. The versus bar shows the rival queen's health in this missio
 ## A guard post
 
 A fourth room kind, `post`, has no cap and stores nothing. Each post cell holds one idle fighter in eight inside the nest, so four cells keep about half the guard underground beside whatever the player painted them next to. Without a post the guard stands at the door as before, and the eight reference hashes did not move. A mission lists the rooms it allows, and the dig menu hides the others: posts open with The Larder and stay for The Narrows. This is the first unlock that comes from reaching a mission and not from a fork. The rival does not paint posts yet, and no sweep has measured what a post is worth.
+
+The rival now paints a post in the throat of its shaft (three cells above the store, then three below) once it has four soldiers. Measured over 20 seeds on The Larder, a rival that posts against the same rival that does not: steady 10 wins of 20, bold 11 of 20. On The Narrows, 12 seeds, a steady attacker wins 4 with or without posts of its own. So in bot play a post is worth nothing that these runs can see. The likely reason is that the door guard already stands four cells from the store, and food is taken from one colony-wide count, so where the guard stands inside hardly matters. Posts will matter when stores are robbed cell by cell (lab-5w7.63); until then the room is a small choice, not a strong one.
+
+## The Lineage: deeds open nodes
+
+The three forks were all changes to a number. An outside design review (two reviewers, given the candidate list and asked to attack it) agreed on the direction: a visible tree, nodes opened by named deeds in missions, and every node a new order, room or rule. This slice builds the frame and three nodes.
+
+- **Deeds.** Each mission row has two `deeds`. The sim judges them from its own counts (`Sim.deeds(team)`); the page only stores which were done, under a new key, `cinderhill:war:lineage`. A deed done opens a node for the rest of the campaign. Each node has three or four deeds across the missions, so a missed one is not lost.
+- **Nodes.** Guard post (the room, which is no longer given by reaching The Larder). Raiders: a raid trail may be sent for the store, and its soldiers carry loads home and leave the queen be. Hold fast: a raid trail may be told to hold, and its soldiers never go down a door. The last two are a mode on the trail (`trMode`, set with the trail or by a crew order); a colony without the node gets the old behaviour whatever it asks for.
+- **The rival has the same nodes.** A node is a new thing to do, not a lead. The rival paints posts when it has the node. It does not yet use the two raid modes.
+- **The tree** is a panel in the menu: four boughs, the three forks shown beside the three nodes, a tap on any node says what it does and which deeds open it.
+- **Deed rates**, a steady bot against a steady rival, 12 seeds, deeds done out of wins: Crossing 0 and 6 of 6 wins; Frost 4 and 4 of 10; Stones 0 and 1 of 9; Larder 4 and 3 of 8; Narrows 1 and 2 of 3. The first set of deeds was thrown out because five of them were done by every win.
+- The three older missions give the same results as before for three seeds each (winner, end tick, adults, kills, stores). The Larder and The Narrows changed because their rivals no longer have posts without the node. The save version is 5 (a new array).
+
+Not built, in the order the reviews put them: stores robbed cell by cell with deep stores; a second door; trail stances beyond hold; sight and scouts. One reviewer's wildcard is worth a node of its own: both nests share one underground grid, so a colony could tunnel sideways into the other's nest.
+- Deeds count against any rival, the timid one included, where the bot does both Stones deeds in one win. Early nodes are meant to come easily; if records show every player holding every node after one pass, tie the later deeds to a steady rival.

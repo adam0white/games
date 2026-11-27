@@ -17,7 +17,7 @@ import { angleOf } from '../sim/math.js';
 import { hashArray, hashInt, finish } from '../sim/hash.js';
 import { generate } from './world.js';
 
-export const WAR_VERSION = 4;
+export const WAR_VERSION = 5;
 export const TICK_HZ = 20;
 export { MAT, SURFACE, NEST };
 
@@ -27,7 +27,7 @@ export const CASTE_HP = CASTES.map(c => c.hp), CASTE_BITE = CASTES.map(c => c.bi
 const FIGHTS = CASTES.map(c => c.fights);
 /** One colony's numbers: the tables' rows, then its traits (`cfg.traits[team]`, ids of TRAITS) laid over them. */
 function statsFor(traits = []) {
-  const st = { hp: CASTES.map(c => c.hp), bite: CASTES.map(c => c.bite), speed: CASTES.map(c => c.speed), food: CASTES.map(c => c.food), reach: CASTES.map(c => c.reach), per: ROOMS.map(r => (r ? r.per : 0)), eatPer: C.ADULTS_PER_SUGAR, pupa: C.PUPA_TICKS };
+  const st = { hp: CASTES.map(c => c.hp), bite: CASTES.map(c => c.bite), speed: CASTES.map(c => c.speed), food: CASTES.map(c => c.food), reach: CASTES.map(c => c.reach), per: ROOMS.map(r => (r ? r.per : 0)), eatPer: C.ADULTS_PER_SUGAR, pupa: C.PUPA_TICKS, room: ROOMS.map(() => 0), loot: 0, hold: 0 };
   for (const id of traits) { const tr = TRAITS[id]; if (!tr) throw new Error(`no trait ${id}`); for (const [key, a, b] of tr.set) { if (b === undefined) st[key] = a; else st[key][a] = b; } }
   return st;
 }
@@ -37,6 +37,10 @@ export const CARRY = { NONE: 0, SUGAR: 1, PROTEIN: 2, KIND: 3, LOOT: 4 }; // LOO
 export const FOOD = { SUGAR: 0, PROTEIN: 1 };
 export const STAGE = { EGG: 0, LARVA: 1, PUPA: 2 };
 export const KIND = { FORAGE: 0, RAID: 1 };
+// What a raid trail's fighters do at its end. PRESS: go down an enemy door close by, for the queen. LOOT: go down it for
+// the store and carry a load home (the colony needs the Raiders node). HOLD: stand at the end and never go down a door
+// (the Hold fast node).
+export const MODE = { PRESS: 0, LOOT: 1, HOLD: 2 };
 export const CMD = { TRAIL: 1, ERASE: 2, CREW: 3, DIET: 4, RALLY: 5, RECALL: 6, DIG: 7, ROOM: 8, PICK: 9 };
 // Events: [type, a, b, c].
 export const EVENT = {
@@ -108,6 +112,7 @@ export class Sim {
     this.stat = Array.from({ length: TEAMS }, (_, t) => statsFor(cfg.traits?.[t]));
     this.tick = 0;
     this.result = 0; // 0: running; else 1 + the winning team
+    this.why = 0; // how it ended (REASON)
     this.rng = seedStreams(cfg.seed);
     this.mat = new Uint8Array(n);
     // Nest cells only (index: cell - L.nestBase): the room painted there, the colony that marked it to dig (1 + team), work left.
@@ -134,7 +139,7 @@ export class Sim {
     this.bFed = new Uint8Array(BROOD_MAX); this.bHunger = new Uint16Array(BROOD_MAX); this.bCell = new Int32Array(BROOD_MAX); this.bMajor = new Uint8Array(BROOD_MAX);
     // Trails: TEAMS * TRAILS slots.
     const T = TEAMS * TRAILS;
-    this.trLive = new Uint8Array(T); this.trKind = new Uint8Array(T); this.trLevel = new Uint8Array(T); this.trDry = new Uint8Array(T);
+    this.trLive = new Uint8Array(T); this.trKind = new Uint8Array(T); this.trLevel = new Uint8Array(T); this.trDry = new Uint8Array(T); this.trMode = new Uint8Array(T);
     this.trLen = new Int32Array(T); this.trSeq = new Int32Array(T); this.trPath = new Int32Array(T * PATH_MAX);
     // Derived (rebuilt from the state above; not hashed): distance fields, counts, the spatial hash.
     this.trF = Array.from({ length: T }, () => null);
@@ -237,6 +242,11 @@ export class Sim {
     return e;
   }
 
+  /** The mode a raid trail may have: what was asked if the colony has the node for it, else PRESS. */
+  modeFor(t, kind, mode) { return kind !== KIND.RAID ? MODE.PRESS : mode === MODE.LOOT && this.stat[t].loot ? MODE.LOOT : mode === MODE.HOLD && this.stat[t].hold ? MODE.HOLD : MODE.PRESS; }
+  /** May this colony dig this kind of room here? The mission's list, and the rooms its own nodes open. */
+  mayRoom(t, kind) { return this.mission.rooms.includes(kind) || !!this.stat[t].room[kind]; }
+
   apply(o) {
     const t = o.team | 0, cg = this.cg, base = t * CG.SIZE;
     if (t < 0 || t >= TEAMS) return;
@@ -248,7 +258,7 @@ export class Sim {
       const s = t * TRAILS + k, len = this.buildPath(t, o.points || [], s * PATH_MAX);
       if (len < 0) return no(len === -2 ? WHY.LONG : WHY.BLOCKED);
       this.trLive[s] = 1; this.trKind[s] = o.kind === KIND.RAID ? KIND.RAID : KIND.FORAGE; this.trLevel[s] = o.level >= 1 && o.level <= 3 ? o.level : 2;
-      this.trLen[s] = len; this.trSeq[s] = ++cg[base + CG.SEQ]; this.trDry[s] = 0;
+      this.trLen[s] = len; this.trSeq[s] = ++cg[base + CG.SEQ]; this.trDry[s] = 0; this.trMode[s] = this.modeFor(t, this.trKind[s], o.mode);
       this.buildTrailField(s);
       this.event(EVENT.TRAIL, t, k, this.trKind[s]);
     } else if (o.type === CMD.ERASE) {
@@ -260,6 +270,7 @@ export class Sim {
       if (!(o.trail >= 0 && o.trail < TRAILS) || !this.trLive[s]) return no(WHY.NONE);
       if (o.level >= 0 && o.level <= 3) this.trLevel[s] = o.level;
       if (o.kind === KIND.RAID || o.kind === KIND.FORAGE) this.trKind[s] = o.kind;
+      if (o.mode != null || this.trKind[s] !== KIND.RAID) this.trMode[s] = this.modeFor(t, this.trKind[s], o.mode);
     } else if (o.type === CMD.DIET) {
       cg[base + CG.DIET] = Math.max(0, Math.min(4, o.share | 0));
       if (o.special != null) cg[base + CG.DIET2] = cg[base + CG.PICK] ? Math.max(0, Math.min(4 - cg[base + CG.DIET], o.special | 0)) : 0;
@@ -279,7 +290,7 @@ export class Sim {
       // cells: nest [x, y, ...]. DIG marks clay to be dug (on: 0 takes the mark off). ROOM paints a use on open or marked cells;
       // with dig: 1 it marks clay first, and with kind NONE it also takes marks off, so one stroke is one order.
       const L = this.L, pts = o.cells || [], dig = o.type === CMD.DIG, kind = o.kind | 0;
-      if (!dig && kind !== ROOM.NONE && !this.mission.rooms.includes(kind)) return no(WHY.NONE);
+      if (!dig && kind !== ROOM.NONE && !this.mayRoom(t, kind)) return no(WHY.NONE);
       let done = 0, marks = cg[base + CG.MARKS], stores = false;
       const use = (k, to) => { if (this.room[k] === ROOM.STORE || to === ROOM.STORE || this.room[k] === ROOM.POST || to === ROOM.POST) stores = true; this.room[k] = to; done++; };
       for (let j = 0; j + 1 < pts.length && j < 512; j += 2) {
@@ -742,7 +753,7 @@ export class Sim {
       }
     }
     if (raid) {
-      for (let e = 0; e < TEAMS; e++) if (e !== t && this.cg[e * CG.SIZE + CG.QUEEN_HP] > 0 && this.doorF[e][c] <= 4) { this.inv[i] = 1 + e; return this.invade(i, c, t); }
+      if (this.trMode[s] !== MODE.HOLD) for (let e = 0; e < TEAMS; e++) if (e !== t && this.cg[e * CG.SIZE + CG.QUEEN_HP] > 0 && this.doorF[e][c] <= 4) { this.inv[i] = 1 + e; return this.invade(i, c, t); }
       return this.mill(i, c, m => this.trF[s] && this.trF[s][m] <= 2, 16);
     }
     if (this.since[i] > C.WAIT_AT_END) { this.task[i] = TASK.BACK; this.tr[i] = -1; return this.next(this.homeF[t], c); }
@@ -753,7 +764,7 @@ export class Sim {
   invade(i, c, t) {
     const e = this.inv[i] - 1, eo = e * CG.SIZE, cg = this.cg, s = this.tr[i] >= 0 ? t * TRAILS + this.tr[i] : -1;
     if (s < 0 || !this.trLive[s] || cg[t * CG.SIZE + CG.RECALL] || cg[eo + CG.QUEEN_HP] <= 0) { this.inv[i] = 0; this.task[i] = TASK.BACK; return this.next(this.homeF[t], c); }
-    if (this.caste[i] === CASTE.WORKER) {
+    if (this.caste[i] === CASTE.WORKER || this.trMode[s] === MODE.LOOT) { // a thief: a worker, or a fighter on a raid sent for the store
       const F = this.homeF[e];
       if (F[c] <= 1 && this.layer[i] === NEST) {
         const kind = cg[eo + CG.PROTEIN] > cg[eo + CG.SUGAR] ? FOOD.PROTEIN : FOOD.SUGAR, k = eo + (kind === FOOD.PROTEIN ? CG.PROTEIN : CG.SUGAR);
@@ -905,11 +916,11 @@ export class Sim {
     const cg = this.cg;
     let alive = 0, last = -1;
     for (let t = 0; t < TEAMS; t++) if (cg[t * CG.SIZE + CG.QUEEN_HP] > 0) { alive++; last = t; }
-    if (this.mission.goals.queen && alive <= 1) { this.result = 1 + Math.max(0, last); this.event(EVENT.RESULT, Math.max(0, last), REASON.QUEEN); return; }
+    if (this.mission.goals.queen && alive <= 1) { this.result = 1 + Math.max(0, last); this.why = REASON.QUEEN; this.event(EVENT.RESULT, Math.max(0, last), REASON.QUEEN); return; }
     const goal = this.mission.goals.points | 0;
-    if (goal) for (let t = 0; t < TEAMS; t++) if (cg[t * CG.SIZE + CG.POINTS] >= goal) { this.result = 1 + t; this.event(EVENT.RESULT, t, REASON.POINTS); return; }
+    if (goal) for (let t = 0; t < TEAMS; t++) if (cg[t * CG.SIZE + CG.POINTS] >= goal) { this.result = 1 + t; this.why = REASON.POINTS; this.event(EVENT.RESULT, t, REASON.POINTS); return; }
     const haul = this.mission.goals.haul | 0;
-    if (haul) for (let t = 0; t < TEAMS; t++) if (cg[t * CG.SIZE + CG.HAUL] >= haul) { this.result = 1 + t; this.event(EVENT.RESULT, t, REASON.HAUL); return; }
+    if (haul) for (let t = 0; t < TEAMS; t++) if (cg[t * CG.SIZE + CG.HAUL] >= haul) { this.result = 1 + t; this.why = REASON.HAUL; this.event(EVENT.RESULT, t, REASON.HAUL); return; }
     if (this.mission.goals.dusk && this.cfg.duskTick > 0 && this.tick + 1 >= this.cfg.duskTick) {
       this.census(); // count this tick's births and deaths before the dusk score
       // Dusk: more points where the mission counts them, else (and on a tie of points) more adults.
@@ -917,8 +928,24 @@ export class Sim {
       let best = 0;
       for (let t = 1; t < TEAMS; t++) if (score(t) > score(best)) best = t;
       if (d === 'holder') best = 1; // a siege: the colony under attack (team 1) wins by lasting until dusk
-      this.result = 1 + best; this.event(EVENT.RESULT, best, REASON.DUSK);
+      this.result = 1 + best; this.why = REASON.DUSK; this.event(EVENT.RESULT, best, REASON.DUSK);
     }
+  }
+
+  /** Which of the mission's deeds colony t has done, one boolean each. A deed row asks for any of: won (it won), why (a
+   *  REASON name: how the mission ended), by (it ended by this tick), min and max (CG names and bounds on its counts).
+   *  A `min` alone is done the moment the count is reached; everything else is judged when the mission ends. */
+  deeds(t) {
+    const cg = this.cg, o = t * CG.SIZE;
+    return (this.mission.deeds || []).map(d => {
+      if ((d.won || d.why || d.by || d.max) && !this.result) return false;
+      if (d.won && this.result !== 1 + t) return false;
+      if (d.why && REASON[d.why] !== this.why) return false;
+      if (d.by && this.tick > d.by) return false;
+      for (const k in d.min || {}) if (cg[o + CG[k]] < d.min[k]) return false;
+      for (const k in d.max || {}) if (cg[o + CG[k]] > d.max[k]) return false;
+      return true;
+    });
   }
 
   // ---- Hash and save ----
@@ -929,7 +956,7 @@ export class Sim {
       ['mat', this.mat], ['room', this.room], ['mark', this.mark], ['digLeft', this.digLeft], ['cg', this.cg], ['rng', this.rng], ['pileCell', this.pileCell], ['pileAmount', this.pileAmount], ['pileKind', this.pileKind], ['siteHold', this.siteHold],
       ...['x', 'y', 'layer', 'heading', 'team', 'caste', 'hp', 'task', 'carry', 'tr', 'cool', 'press', 'to', 'tx', 'ty', 'since', 'inv', 'id'].map(k => [k, this[k], n]),
       ...['bTeam', 'bStage', 'bAge', 'bFed', 'bHunger', 'bCell', 'bMajor'].map(k => [k, this[k], b]),
-      ['trLive', this.trLive], ['trKind', this.trKind], ['trLevel', this.trLevel], ['trDry', this.trDry], ['trLen', this.trLen], ['trSeq', this.trSeq], ['trPath', this.trPath],
+      ['trLive', this.trLive], ['trKind', this.trKind], ['trLevel', this.trLevel], ['trDry', this.trDry], ['trMode', this.trMode], ['trLen', this.trLen], ['trSeq', this.trSeq], ['trPath', this.trPath],
     ];
   }
 
@@ -942,7 +969,7 @@ export class Sim {
 
   /** Everything needed to carry on from here: plain copies of the state arrays. Queued orders are not saved. */
   save() {
-    const out = { v: WAR_VERSION, cfg: { ...this.cfg }, tick: this.tick, n: this.n, bn: this.bn, result: this.result, nextId: this.nextId, a: {} };
+    const out = { v: WAR_VERSION, cfg: { ...this.cfg }, tick: this.tick, n: this.n, bn: this.bn, result: this.result, why: this.why, nextId: this.nextId, a: {} };
     for (const [k, a, len] of this.stateArrays()) out.a[k] = a.slice(0, len ?? a.length);
     return out;
   }
@@ -952,7 +979,7 @@ export class Sim {
     const sim = new Sim({ ...s.cfg, restoring: true });
     delete sim.cfg.restoring;
     generate(sim, true); // the fixed layout (doors, stores, rooms); the terrain itself comes from the save
-    sim.tick = s.tick; sim.n = s.n; sim.bn = s.bn; sim.result = s.result; sim.nextId = s.nextId;
+    sim.tick = s.tick; sim.n = s.n; sim.bn = s.bn; sim.result = s.result; sim.why = s.why | 0; sim.nextId = s.nextId;
     for (const k of Object.keys(s.a)) sim[k].set(s.a[k]);
     sim.recount(); sim.rebuildFields();
     return sim;
