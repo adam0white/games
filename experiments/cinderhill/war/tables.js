@@ -54,7 +54,7 @@ export const TIERS = {
   grow: [{ sugar: 18, protein: 0, ticks: 300 }, { sugar: 36, protein: 0, ticks: 400 }],
   branch: [null,
     { id: 'war', name: 'War hill', text: 'Soldiers a quarter tougher', set: [['hp', 1, 125]] },
-    { id: 'deep', name: 'Deep hill', text: 'Stores and quarters hold half as much again, pupae hatch sooner, and it may dig fungus gardens', set: [['pupa', 87], ['per', 1, 150], ['per', 3, 150]] }],
+    { id: 'deep', name: 'Deep hill', text: 'Workers half again as tough, stores and quarters hold half as much again, pupae hatch sooner, and it may dig fungus gardens', set: [['pupa', 87], ['per', 1, 150], ['per', 3, 150], ['hp', 0, 150]] }],
   // The second growth takes a craft for the rest of the mission. A row with `branch` is for that branch alone: a War
   // hill may take Legion, a Deep hill Granary, and either may take Swift or Thrift.
   craft: [null,
