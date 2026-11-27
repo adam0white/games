@@ -395,3 +395,64 @@ The Hold button (Durdur in Turkish) stops time on the page: the host stops advan
 - A field rebuild is a whole-field search (about 1.3 ms on the full map with octile costs, 0.7 ms before). Rebuilding all 9 live fields in one tick now takes about 12 ms, over the 10 ms tick budget. Regional rebuilds and a per-tick rebuild budget are not built.
 - Ants in a crowd pass through one another. Separation bends a path but never cancels the step.
 - No duplicate-command check in the sim; the room drops duplicates (05-tech, room protocol).
+
+## The war sim, beside sim 11 (2026-11-27)
+
+Owner direction: the game should be of the colony-strategy genre in full (missions, base building worth doing, strategy, variety, a tech tree, branching decisions); see `docs/design/colony/13-full-game.md`. Sim 11 has one colony baked in, so the contested game is a new sim in `war/` and sim 11 is untouched. Sim 11 and its two pages retire only after a one-colony config of the war sim passes the pace gate.
+
+- `war/sim.js`: any number of seats (two now), integers only, 20 Hz, one order queue. The rival (`war/ai.js`) issues the same orders a player can, so a log replays without it. `war/host.js` runs it for a page or a test. `war/world.js` is the first map, The Crossing: mirror-fair, two fords, the big food on the fords.
+- It imports only the modules of `sim/` that hold no colony state: grid, rng, math, hash.
+- Slice 1 leaves out digging, rooms, fog, heat and air, water as a weapon, and follow-one-ant. The rival knows every pile and the player sees the rival's nest and trails until sight is built.
+- The page `war/` reuses `game/gl.js` (now two doors, sixteen piles, a rival body colour on ant kind +16) and `gestures.js`. Settings go through the kit under slug `cinderhill` with keys `cinderhill:war:*`; plays record under `cinderhill` with `mode: 'war'`.
+- Rival mood (timid, steady, bold) is a player setting. It shipped with steady as the default; the sweeps below moved the default to timid.
+- Meat is held back for a larva waiting on the soldier diet. Before this, worker larvae ate each load as it came and no soldier was ever raised from a trickle.
+- Balance as first shipped: queen 800 hit points, dusk at 9,600 ticks, the steady rival raids from tick 4,200 with ten soldiers. Bot matches end by a queen's death near tick 5,500 to 5,900. Not yet tuned with players.
+- A tap is a short order: Raid sends soldiers to the tapped spot, Forage sends workers to a pile under the finger. The sim routes from the door.
+
+### Bot sweeps (2026-11-27)
+
+`node experiments/cinderhill/war/sweep.mjs 30` plays each pairing over 30 seeds. Findings and the changes they led to:
+
+- First sweep: the timid rival (never raids) beat the steady one 100 to 0, because a raid into an equal guard at the door is thrown away. Turtling was the best play.
+- Change: the rival breaks into a nest only with the numbers for it (bold at parity, steady with a quarter more soldiers). Short of that its soldiers hold the richest food on the fords. Bites of one tick now land together.
+- After: bold beats steady 77 to 23, steady beats timid 100 to 0, bold beats timid 93 to 7. Steady against steady is 43 to 57 and bold against bold 63 to 37 (30 seeds; a small side bias is not ruled out, lab-5w7.55).
+- A novice script (three trails and a soldier diet at the start, nothing after) loses to all three moods. Against timid it loses at dusk on count; against the others its queen dies near 3:30 to 4:30. So the default rival is timid, and the result card offers the next mood up after a win.
+
+## Digging and rooms in the war sim (2026-11-27)
+
+- A nest cell has a use (`room`: store, nursery, quarters), a mark to dig (`mark`: 1 + the colony) and work left (`digLeft`). All three are saved; `WAR_VERSION` is 2. A cell belongs to the colony whose door is nearer in x.
+- Orders: `CMD.DIG { cells, on }` marks own clay (at most 96 marks a colony); `CMD.ROOM { cells, kind }` paints a use on open or marked own cells. The page sends both from one drag, so a stroke digs and names a room.
+- Up to 8 resting workers dig. Each stroke takes a tick off a cell's 120; the opening stroke rebuilds the walking fields once that tick. A mark with no open cell beside it waits.
+- Caps: stores hold 8 loads of each food a store cell (the porch gives 120; a load over the cap is lost, event `FULL`); the brood cap is one a nursery cell (48 at the start); the hill holds 90 ants and brood plus 4 a quarters cell, and the queen stops laying at that cap. Laying is a little faster (every 14 ticks) so the nursery cap is what binds.
+- Carriers walk to the nearest store cell, nurses mill on nursery cells, brood lies on nursery cells.
+- The rival builds through the same orders, one room at a time, from fixed slots around its shaft (`ai.js` `SLOTS`): a store at 80% of the food cap, quarters within 10 of the hill's cap, a nursery wing within 4 of the brood cap.
+- A bite's wait now varies by a tick either way. Before, an even fight was settled by where each side stood, and with larger hills that decided most matches for one seat.
+- Sweep, 30 seeds a pairing (`war/sweep.mjs`): a steady mind that builds beats the same mind that never digs 100 to 0; so do bold and timid. A mind that digs only stores, only a nursery, only quarters, or stores and quarters loses 0 to 100 to the full builder. A mind that digs nursery and quarters and no store does as well as the full builder (30 to 70, the same as steady against steady).
+- What that says: nursery and quarters are worth building and are needed together. Stores do not matter yet, because food is eaten as fast as it comes. Digging costs only the diggers' time. Both are open (bead lab-5w7.47): a build is worthwhile but not yet a choice between builds.
+- Seat bias: steady against steady is 30 to 70 and bold against bold 57 to 43. Not explained (lab-5w7.55). The first big fight at a ford decides most matches.
+- The moods' order moved with the larger hills: bold now loses to steady (27 to 73), steady beats timid 93 to 7. The novice (three trails, no rooms) loses every match to every mood.
+- Page: the Nest sheet has Look, Store, Nursery, Quarters and Clear; a drag in the cutaway paints cells; marks are hatched and fill as they are dug; the sheet shows stores, young and ants against their caps. No setting was added.
+- Not verified: no person has dug a room on a phone. The scripted browser check drew quarters with the mouse and the cap rose from 90 to 130.
+
+## Tables, a caste pick and a price to dig (2026-11-27)
+
+- `war/tables.js` holds the castes, rooms and missions. The sim reads them: a caste is a row (hp, bite, speed, meat to raise, reach, fights), a room is a row (which cap, how much a cell), a mission is a row (map, starting kit, goals, castes to pick from, rooms allowed). The Crossing is the one mission. Moving it into the table left four seeded bot runs with the same hashes.
+- Two new castes. Spitters: 14 hp, bite 3, reach 2.5 cells, need a clear line, are not crowded out of a target, stop at their reach. Wardens: 96 hp, bite 3, slow. A colony picks one, once (`CMD.PICK`), from the mission's list. `CMD.DIET` takes `special`: its share of the brood in four, beside the soldiers' share.
+- On the page the pick is a player setting (`cinderhill:war:caste`, default spitters). A rival that fights takes the other caste. The Nest sheet has two tabs, Young and Dig rooms.
+- Digging costs a seed a cell, paid at the opening stroke; the last three seeds are never spent on earth.
+- Bold now raises soldiers from the first brood and may strike from tick 1,600 with eight.
+- Sweeps swap sides on even seeds (`cfg.swap`), so a bias of the side cancels: steady against steady is 53 to 47, bold against bold 50 to 50.
+- Sweep, 30 seeds a pairing: spitters against wardens 47 to 53 (steady minds) and 33 to 67 (bold minds). A mind with either caste beats the same mind with none 97 to 100 in 100: a pick is a plain gain, the choice is which. Bold against steady moved between 47 and 20 across two small changes to digging, so that pairing is noisy and not settled. Timid loses to both (7 in 100). The builder still beats every partial build except nursery and quarters (50 to 50): stores still do not matter.
+- A blind read of the nest screens (an outside model as a first-time player) led to: "housing" for the hill's cap, a line under the room tools saying what the chosen room does and costs, a small sign in each room cell, "Unmark" for Clear. Not done from that read: a hint for how to feed a starving hill beside the food counter, queued against digging marks, tap a room to see what it holds.
+- Not verified: no person has picked a caste or dug on a phone.
+
+## A second mission and the campaign menu (2026-11-27)
+
+- The owner's direction changed what done means: a campaign with missions, base building that is worth doing, variety, a tree, and branches that matter. From here the war sim grows by mission rows, forks and unlocks before it grows by rules for the one skirmish.
+- **First Frost** is a row in `war/tables.js` on the Crossing's map. Its kit: seed piles three times as big (`glut`), frost at tick 4,800 (`frostTick`): every pile outside is gone and a meal comes every 300 ticks, not 1,200 (`frostEat`). Hunger kills after 15 seconds, one in ten every ten seconds (`starveAfter`, `starveDiv`). The queen has 3,200 hit points (`queenHp`). The thaw (dusk) is at 10,800. All of these are sim options with the Crossing's old values as defaults: four seeded Crossing runs kept their hashes.
+- The rival plans for the winter on a frost mission: only seeds once it has 12 meat, a store before housing, enough stores for every mouth and a quarter over, no quarters the stores cannot feed. `{ mood, winter: false }` is the same mind without the plan.
+- Sweep, 30 seeds a pairing, sides swapped on even seeds (`node war/sweep.mjs` takes a mission as its third argument; the pairs below came from a small script on the same Host): the planner against the same mind without the plan 30 to 0 (72 adults to 47 at the thaw); against a planner that may not dig stores 30 to 0 (71 to 32). This is the first mission where stores decide the result. Timid against timid 18 to 12. Bold against timid 27 to 3 (it lives on what it steals: 108 adults to 72). Steady against timid 4 to 26 (its soldiers eat as three). Bold against steady 9 to 21. Steady against steady ends on a queen 25 times in 30, at 395 seconds, though she has four times the hit points: unresolved whether that is too often.
+- **Campaign** (`CAMPAIGN` in the tables, state on the page under the new key `cinderhill:war:campaign`): the Crossing, a fork, First Frost. The fork is the third caste: spitters or wardens, kept for the campaign; the rival raises the other. It opens when the Crossing has been played to its end, won or lost. A lost mission costs the next one 8 of its 30 first workers (`antsBy`). "New campaign" erases the state after a second tap.
+- The caste setting left the settings panel: the fork sets it, so the record still carries it (`caste` in `rec.start`, `none` before the fork; a `fork` event when chosen).
+- From a blind read of the campaign plan by an outside model: every finished mission grants its fork, win or lose (done); the second fork as first drawn (deeper stores or faster brood, after the frost) is a trap because stores stop mattering once the frost has passed (not built; to be redrawn); an unlock that needs both an earlier fork and a mission outcome is what makes it a tree (not built); trails that hold an objective (needed for the next mission, hold sites that pay).
+- Not verified: no person has played First Frost or used the menu. A scripted phone-size browser pass covered: frost closed at first, the Crossing lost, the fork chosen, First Frost started with 22 workers, the frost tint and "Thaw in", the result card; no page errors.
