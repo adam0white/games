@@ -726,3 +726,35 @@ only is 11–13. The second growth is a late-game buy, not a build order.
 
 Not known: whether a person finds the garden worth its housing; whether mending makes a defended nest too hard to
 take (no bot test separates it). The War hill still beats the Deep hill on The Wall (10–0 at 5 seeds).
+
+## The Hunt: a third thing on the map (war build)
+
+A sixth mission, third in the campaign: open ground, and a great beetle that never leaves a dead vole in the middle.
+The hill that does the beetle more harm wins when it falls; at dusk, more harm wins. Queens are hard to kill here
+(`queenHp: 6000`), so the mission is about the beetle and about what you can spare for it.
+
+- Rules live in the sim. `mission.beast` is a table row (`at`, `hp`, `bite`, `hits`, `every`, `range`, `press`, `girth`).
+  `sim.beast` is `[health, surface cell, bites taken this window]`. An ant on the surface with no ant to bite bites the
+  beetle if she is within reach plus its girth. Every `every` ticks it bites the `hits` nearest ants of either hill.
+  Harm is counted per hill in `CG.HARM`. `REASON.BEAST`, `EVENT.BEAST_BIT`, `EVENT.BEAST_DEAD`.
+- The rival draws one raid trail to the beetle once it has soldiers to spare (4, 6 or 10 by mood) and thickens it at 12.
+- The client draws the beetle, its reach as a dashed ring, its health over it, a dot on the small map, and the harm
+  bar in place of the count of ants.
+- Deeds open Hold fast and the Guard post, which The Stones opened before; The Stones still opens them too.
+
+Numbers at 4 seeds, both seats: steady v steady 4 to 4, bold v steady 2 to 6, steady v timid 4 to 4, bold v timid 3 to 5.
+The beetle falls between ticks 4061 and 8512 in most games; about a third run to dusk. 43 to 81 dead a side.
+
+Tried and dropped: the beetle sitting on the central food pile with bite 12, three ants, every 10 ticks. About 100
+dead a side and both hills starved.
+
+Known and accepted: a player part way through the campaign now needs The Hunt before The Stones. Bold loses to
+steady here more often than it wins, because it sends soldiers before it has enough. No person has played it yet.
+
+Review fixes (outside adversarial review, same pull request): a garden pays only for full minutes its cells were
+gardens (`CG.GROWN` accrues; painting a room for the last tick before the harvest earned a full harvest before).
+The beetle's reach is a circle, the one drawn. Equal harm goes to the larger hill, as at dusk. A hill whose queen
+is dead cannot win by the beetle. Each hill starts The Hunt with three soldiers (`kit.majors`). A Raid tap near
+the beetle snaps to it. The harm bar is labelled. Open from that review, not built: array order decides who gets
+the beetle's twelve bites a window when both hills crowd it; workers can be parked as bait; the carcass has no
+use because the mission ends at the fall (a kill, recover, deliver phase is the proposed fix).

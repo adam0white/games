@@ -32,6 +32,7 @@ export function generate(sim, layoutOnly = false) {
     sim.link[S(dx, dy)] = N(dx, 0); sim.link[N(dx, 0)] = S(dx, dy);
   }
   // Sites that pay while held: a mission's list, in cells of the 160 by 112 map.
+  if (sim.mission.beast) { const [bx, by] = sim.mission.beast.at; sim.beast[0] = sim.mission.beast.hp; sim.beast[1] = S(Math.round((bx * sw) / 160), Math.round((by * sh) / 112)); }
   sim.sites = (sim.mission.sites ?? []).map(([x, y]) => S(Math.round((x * sw) / 160), Math.round((y * sh) / 112)));
   if (layoutOnly || cfg.blank) return;
   // Caches in the clay: the left hill's lie as the table says, the right hill's as its mirror.
