@@ -76,8 +76,8 @@ export function replayChain(chain, { stopAtDivergence = false } = {}) {
  *    the start, then each new pile), a source empty, a threat telegraphed (the spider's warning), a threat arrived (it hunts) and resolved
  *    (it leaves), and brood short of protein (larvae waiting and no protein in store, each time it starts).
  *    The spec's other kinds (room full, rain, route jammed, build offered, sprout) are not built.
- *  - idle: at each look, the share of adults that are idle while some job has a gap. Idle: a forager with no load
- *    and no route (no crew trail, no free trail) who has rested, or searched with no remembered pile and no find,
+ *  - idle: at each look, the share of adults that are idle while some job has a gap. Idle: a forager with no load,
+ *    no route (no crew trail, no free trail) and no goal (02-spec 3.1: one walking in to the dig is not idle) who has rested, or searched with no remembered pile and no find,
  *    for IDLE_FOR ticks (her search timer; resting does not reset it), or a digger resting
  *    for IDLE_FOR ticks. A gap (hasGap), once it has lasted GAP_FOR ticks: a live trail
  *    with no crew size or short of it, or marked dig cells with room in the dig crew. */
@@ -120,7 +120,14 @@ export class Observer {
     if (done.length) { this.pendingTrails = this.pendingTrails.filter(p => p.entry.state === 'queued'); this.trailsApplied(done); }
     // Trips: an ant that carried with a trail route and carries nothing now, when no death renumbered the ants.
     // Births append new ants after the old ones, so they renumber no one.
-    if (g[G.DIED] === this.died && s.n >= this.prevN) {
+    // A colony game (sim 9) says which trail each load came home by (EVENT.HOME): the trail in that slot now, or -1
+    // when her trail was replaced on the way; that holds on a tick with a death too.
+    if (s.cfg?.colony && SIM_VERSION >= 9) {
+      for (const e of this.h.lastEvents ?? []) if (e[0] === EVENT.HOME && e[1] >= 0) {
+        const t = this.liveTrail(e[1]);
+        if (t && t.seq === s.flow.seq[e[1]]) { t.trips++; if (t.first < 0) t.first = this.steps - t.step; if (e[2] === FOOD.PROTEIN && this.firstTrailProtein < 0) this.firstTrailProtein = this.steps; }
+      }
+    } else if (g[G.DIED] === this.died && s.n >= this.prevN) {
       for (let i = 0; i < this.prevN; i++) if (this.prevCarry[i] && !s.carry[i]) {
         const v = this.prevVia[i], t = v >= FREE_VIA ? this.liveTrail(v - FREE_VIA) : v >= 0 ? this.liveTrail(v) : null; // a free forager's load counts for the trail she worked
         if (t) { t.trips++; if (t.first < 0) t.first = this.steps - t.step; if (this.prevCarry[i] === 2 && this.firstTrailProtein < 0) this.firstTrailProtein = this.steps; }
@@ -151,7 +158,7 @@ export class Observer {
     // The pace gate's idle share (02-spec 3.1): idle for IDLE_FOR ticks while some job has a gap.
     const gap = this.gapRun >= GAP_FOR;
     let wasted = 0;
-    if (gap) for (let i = 0; i < s.n; i++) if ((s.job[i] === JOB.FORAGE && !s.carry[i] && s.via[i] < 0 && (s.mode[i] === MODE.REST || (s.mode[i] === MODE.SEEK && s.mem[i] < 0)) && s.since[i] >= IDLE_FOR) || (s.job[i] === JOB.DIG && (s.mode[i] === MODE.REST || (s.mode[i] === MODE.SEEK && s.g[G.DIG_COUNT] === 0)) && s.since[i] >= IDLE_FOR)) wasted++;
+    if (gap) for (let i = 0; i < s.n; i++) if ((s.job[i] === JOB.FORAGE && !s.carry[i] && s.via[i] < 0 && s.goal[i] < 0 && (s.mode[i] === MODE.REST || (s.mode[i] === MODE.SEEK && s.mem[i] < 0)) && s.since[i] >= IDLE_FOR) || (s.job[i] === JOB.DIG && (s.mode[i] === MODE.REST || (s.mode[i] === MODE.SEEK && s.g[G.DIG_COUNT] === 0)) && s.since[i] >= IDLE_FOR)) wasted++;
     const share = s.n ? wasted / s.n : 0;
     if (share > this.idleMax) this.idleMax = share;
     this.idleSum += share; this.idleLooks++;
@@ -198,7 +205,12 @@ export class Observer {
     });
   }
   liveTrail(slot) { for (let k = this.trails.length - 1; k >= 0; k--) { const t = this.trails[k]; if (t.slot === slot && t.end < 0) return t; } return null; }
-  restart(day, tick) { this.marks.push({ step: this.steps, tick, what: `restart day ${day}` }); for (const t of this.trails) if (t.end < 0) { t.end = this.steps; t.how = 'restart'; } }
+  /** A restart closes the trails the restored game does not have; one live in it with the same sequence number plays on. */
+  restart(day, tick) {
+    this.marks.push({ step: this.steps, tick, what: `restart day ${day}` });
+    const F = this.s.flow;
+    for (const t of this.trails) if (t.end < 0 && !(F.live[t.slot] && F.seq[t.slot] === t.seq)) { t.end = this.steps; t.how = 'restart'; }
+  }
   mark(what, tick) { this.marks.push({ step: this.steps, tick, what }); }
   page(x) { this.pageData.samples++; if (x.f) this.pageData.fps.push(x.f); }
   pageEvent(type, x) { const p = this.pageData; if (type === 'hold') p.holds.push(x.ms); else if (type === 'hide') p.hides++; else if (type === 'error') p.errors.push(x.m); else if (type === 'cam') p.cams++; }

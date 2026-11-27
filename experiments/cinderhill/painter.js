@@ -536,7 +536,7 @@ function hud() {
   $('crewCtl').classList.toggle('on', !!ct);
   if (ct) {
     const n = stats.trails.slice().sort((a, b) => a.seq - b.seq).indexOf(ct) + 1;
-    $('crewWho').innerHTML = c ? `${t('crewCard', { n, on: ct.on, want: ct.want ?? 0, loads: ct.loads })}${ct.why ? `<br><small>${t('why_' + ct.why)}</small>` : ''}` : t(ct.want === null ? 'crewWho' : 'crewWhoWant', { n, on: ct.on, want: ct.want });
+    $('crewWho').innerHTML = c ? `${t('crewCard', { n, on: ct.on, want: ct.want ?? 0, free: ct.free, loads: ct.loads })}${ct.why ? `<br><small>${t('why_' + ct.why)}</small>` : ''}` : t(ct.want === null ? 'crewWho' : 'crewWhoWant', { n, on: ct.on, want: ct.want });
     for (const b of document.querySelectorAll('#crewLevels button')) b.setAttribute('aria-pressed', String(Number(b.dataset.level) === ct.level));
   }
   const d = host.day();

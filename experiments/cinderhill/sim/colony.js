@@ -163,7 +163,7 @@ function starve(sim) {
   if (g[G.SUGAR] > 0 || !g[G.QUEEN]) { g[G.STARVE] = 0; return; }
   if (g[G.STARVE] < 0x7FFFFFFF) g[G.STARVE]++;
   const t = g[G.STARVE] - STARVE_AFTER;
-  if (t <= 0 || t % STARVE_EVERY !== 0) return;
+  if (t < 0 || t % STARVE_EVERY !== 0) return; // the first death at 60 s, then one every 10 s
   let adults = 0;
   for (let i = 0; i < sim.n; i++) if (sim.hp[i] > 0 && sim.team[i] === 0) adults++;
   if (adults === 0) { g[G.QUEEN] = 0; return; } // the queen dies last, after all workers
@@ -263,6 +263,7 @@ export function stepDay(sim, duskEvent) {
   if (won) g[G.DAYS_WON]++;
   sim.event(duskEvent, day, won ? 1 : 0);
   if (sim.n < START.ants || g[G.SUGAR] < FLOOR_SUGAR) g[G.SUGAR] = g[G.SUGAR] > 0x7fffffff - GIFT_SUGAR ? 0x7fffffff : g[G.SUGAR] + GIFT_SUGAR; // saturates
+  if (g[G.SUGAR] > 0) g[G.STARVE] = 0; // the dusk gift ends the starving, as a load home does
   dawn(sim, day + 1, won ? 0 : 1);
   return true;
 }

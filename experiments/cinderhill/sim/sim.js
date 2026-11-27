@@ -56,7 +56,7 @@ const BRIDGE_MARGIN = 12;
 // A free forager's route (sim 9, colony games): `via` FREE_VIA + slot while she works the nearest trail without being on
 // its crew. Crew members keep `via` = the slot, so `crew` counts only them.
 export const FREE_VIA = 16;
-const LEVEL_SHARE = [0, 10, 25, 50]; // percent of the outside workforce: none, Light, Steady, Surge
+export const LEVEL_SHARE = [0, 10, 25, 50]; // percent of the outside workforce: none, Light, Steady, Surge
 
 /** Trail k's crew size at its level for a workforce of wf, capped by what the other crews leave. */
 function crewSize(sim, k, wf) {
@@ -228,13 +228,15 @@ export class Sim {
       let slot = -1;
       if (e[4] === 0) slot = this.newestTrail();
       else for (let s = SLOT.TRAIL0; s < SLOT.TRAIL0 + SLOT.TRAILS; s++) if (F.live[s] && F.seq[s] === (e[4] >>> 0)) slot = s;
-      if (slot >= 0 && level >= 1 && level <= 3) return this.setLevel(slot - SLOT.TRAIL0, level);
+      if (slot >= 0 && level >= 1 && level <= 3 && this.cfg.colony) return this.setLevel(slot - SLOT.TRAIL0, level);
+      if (level !== 0) return this.event(EVENT.REJECTED, e[1], e[2]); // a level outside 1 to 3, or in the sandbox
       if (slot < 0 || delta === 0 || e.length < 6) return this.event(EVENT.REJECTED, e[1], e[2]);
       const k = slot - SLOT.TRAIL0, w = this.g[G.WANT0 + k];
       this.g[G.LEVEL0 + k] = 0;
       let base = w - 1;
       if (w === 0) { base = 0; for (let i = 0; i < this.n; i++) if (this.hp[i] > 0 && this.job[i] === JOB.FORAGE && this.via[i] === slot) base++; }
       this.g[G.WANT0 + k] = Math.max(0, Math.min(9999, base + delta)) + 1;
+      if (this.cfg.colony) { this.g[G.WORKFORCE] = 0; this.resizeCrews(); } // the levelled crews take up what a count gives back, or give way
     } else this.event(EVENT.REJECTED, e[1], e[2]);
   }
 
@@ -353,6 +355,16 @@ export class Sim {
     for (const k of order) g[G.WANT0 + k] = crewSize(this, k, wf) + 1;
   }
 
+  /** Crew sizes on each trail and, in colony games, the free foragers and those of them not resting. */
+  census() {
+    this.crew.fill(0); this.freeAll = 0; this.freeOut = 0;
+    for (let i = 0; i < this.n; i++) {
+      if (this.hp[i] === 0 || this.job[i] !== JOB.FORAGE) continue;
+      if (isTrailSlot(this.via[i])) this.crew[this.via[i] - SLOT.TRAIL0]++;
+      else if (this.cfg.colony) { this.freeAll++; if (this.mode[i] !== MODE.REST) this.freeOut++; }
+    }
+  }
+
   // ---- the tick ----
 
   step() {
@@ -368,16 +380,11 @@ export class Sim {
     if (this.cfg.colony) stepColony(this);
     this.buildBuckets();
     if (this.cfg.colony) this.resizeCrews();
-    this.crew.fill(0); this.freeAll = 0; this.freeOut = 0;
-    for (let i = 0; i < this.n; i++) {
-      if (this.hp[i] === 0 || this.job[i] !== JOB.FORAGE) continue;
-      if (isTrailSlot(this.via[i])) this.crew[this.via[i] - SLOT.TRAIL0]++;
-      else if (this.cfg.colony) { this.freeAll++; if (this.mode[i] !== MODE.REST) this.freeOut++; }
-    }
+    this.census();
     for (let i = 0; i < this.n; i++) this.stepAnt(i);
     fight(this);
     if (this.cfg.colony && this.cfg.dayTicks > 0) stepSpider(this, EVENT.SPIDER); // the spider comes by day (chapter 3 in the spec)
-    if (this.anyDead) this.removeDead();
+    if (this.anyDead) { this.removeDead(); this.census(); } // the counts are read between ticks too (route cards, the observer)
     stepScent(this);
     this.rebuildFields();
     if (this.cfg.colony && this.cfg.dayTicks > 0) stepDay(this, EVENT.DUSK);
@@ -452,6 +459,7 @@ export class Sim {
             if (this.cfg.colony) { const v = this.via[i]; this.event(EVENT.HOME, isTrailSlot(v) ? v : v >= FREE_VIA ? v - FREE_VIA : -1, kind); } // loads a minute on the route card
             if (this.via[i] === -2 || this.via[i] >= FREE_VIA) this.via[i] = -1; // a free forager picks the nearest trail again
             this.g[kind === FOOD.PROTEIN ? G.PROTEIN : G.SUGAR] += LOAD[kind];
+            if (kind === FOOD.SUGAR) this.g[G.STARVE] = 0; // sugar home ends the starving, even if the colony eats it before the next check
             this.carry[i] = 0;
           }
           this.setMode(i, MODE.SEEK); this.heading[i] = (this.heading[i] + 128) & 255;
@@ -700,7 +708,7 @@ export class Sim {
     let trail = false;
     for (let s = SLOT.TRAIL0; s < SLOT.TRAIL0 + SLOT.TRAILS; s++) if (F.live[s]) trail = true;
     if (resting && trail && this.freeOut < quota) { this.setMode(i, MODE.SEEK); this.freeOut++; }
-    else if (!resting && (!trail || (layer === NEST && this.freeOut > quota))) { this.setMode(i, MODE.REST); this.freeOut--; }
+    else if (!resting && (!trail || this.freeOut > quota)) { this.setMode(i, MODE.REST); this.freeOut--; } // over the third (a crew cut frees many at once): back to the door
     if (this.mode[i] === MODE.REST) {
       // Resting by the door: in the porch, or on the surface within 3 steps of the entrance; otherwise walk home.
       if (atHome || (layer === SURFACE && distAt(this, SLOT.EXIT, c) <= 3 * STEP)) o.still = true; else o.follow = SLOT.HOME; // `since` runs on: the idle line reads it
@@ -859,8 +867,8 @@ export function encodeCommand(c) {
     case CMD.ALARM: return Int32Array.from([...head, c.layer ?? SURFACE, c.x, c.y, c.hold ?? 100]);
     case CMD.RECALL: return Int32Array.from([...head, c.on ? 1 : 0]);
     case CMD.CREW: { // clamped before it can wrap; a level (sim 9) only when given, so older records encode as before
-      const d = Number(c.delta), v = Number.isFinite(d) ? Math.max(-64, Math.min(64, Math.trunc(d))) : 0, lv = Number(c.level);
-      return Int32Array.from(lv >= 1 && lv <= 3 ? [...head, c.seq >>> 0, v, Math.trunc(lv)] : [...head, c.seq >>> 0, v]);
+      const d = Number(c.delta), v = Number.isFinite(d) ? Math.max(-64, Math.min(64, Math.trunc(d))) : 0, lv = typeof c.level === 'number' ? c.level : NaN;
+      return Int32Array.from(Number.isInteger(lv) && lv >= 1 && lv <= 3 ? [...head, c.seq >>> 0, v, Math.trunc(lv)] : [...head, c.seq >>> 0, v]);
     }
     default: return Int32Array.from(head);
   }

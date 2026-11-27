@@ -1,6 +1,6 @@
 // Runs the sim for the trail painter page: 20 ticks a second from the frame clock, the command log, and the
 // numbers the page shows (crews, the "why" for one ant). The sim in sim/ is unchanged and pure; this file is the host.
-import { Sim, JOB, MODE, CMD, EVENT, G, SLOT, MAX_PILES, SURFACE, NEST, MAT, FIELD, FREE_VIA } from './sim/sim.js';
+import { Sim, JOB, MODE, CMD, EVENT, G, SLOT, MAX_PILES, SURFACE, NEST, MAT, FIELD, FREE_VIA, LEVEL_SHARE } from './sim/sim.js';
 import { cellAt } from './sim/grid.js';
 import { START, STAGE, dayState } from './sim/colony.js';
 import { restore, snapshot } from './sim/snapshot.js';
@@ -74,7 +74,7 @@ export class Host {
     for (const [d] of this.dawns) if (d > day) this.dawns.delete(d);
     // Orders given after the save are gone; orders in the save still waiting for their tick run again.
     this.log.forEach((e, k) => { if (k >= save.log) e.state = 'undone'; else if (e.tick >= this.sim.tick) e.state = 'queued'; });
-    this.attach(); this.delivered = save.delivered; this.dusk = null; this.spiderNews = []; this.pileNews = []; this.shifted = true; this.terrainVersion++; this.acc = 0; this.last = null;
+    this.attach(); this.delivered = save.delivered; this.dusk = null; this.spiderNews = []; this.pileNews = []; this.homeAt = this.homeAt.filter(h => h[0] <= this.sim.tick); this.shifted = true; this.terrainVersion++; this.acc = 0; this.last = null;
     return true;
   }
 
@@ -162,8 +162,8 @@ export class Host {
     for (let i = 0; i < n; i++) {
       if (s.goal[i] >= 0) slots[s.goal[i]]++;
       if (s.hp[i] > 0 && s.job[i] === JOB.FORAGE && s.via[i] >= SLOT.TRAIL0 && s.via[i] < SLOT.TRAIL0 + SLOT.TRAILS) onIt[s.via[i] - SLOT.TRAIL0]++;
-      if (s.hp[i] > 0 && s.job[i] === JOB.FORAGE && s.via[i] >= FREE_VIA) freeOn[s.via[i] - FREE_VIA - SLOT.TRAIL0]++;
-      if (this.colony && s.hp[i] > 0 && s.job[i] === JOB.FORAGE && s.mode[i] === MODE.REST) resting++;
+      if (s.hp[i] > 0 && s.job[i] === JOB.FORAGE && s.via[i] >= FREE_VIA && s.mode[i] !== MODE.REST) freeOn[s.via[i] - FREE_VIA - SLOT.TRAIL0]++;
+      if (this.colony && s.hp[i] > 0 && s.job[i] === JOB.FORAGE && s.mode[i] === MODE.REST && s.goal[i] < 0) resting++; // at the door, not walking back to it
       const out = s.layer[i] === SURFACE;
       if (out) surface++;
       if (s.carry[i]) carrying++;
@@ -179,7 +179,9 @@ export class Host {
       let why = '';
       if (this.colony) {
         // Who goes (sim 9): a crew short of its size has a reason when no free ant is left to fill it.
-        if (w && onIt[k] < w - 1 && s.freeAll === 0) why = 'noFree';
+                // A level whose share the older crews have taken, wholly or in part, says so too.
+        const lv = s.g[G.LEVEL0 + k], wf = s.g[G.WORKFORCE], share = lv && wf > 0 ? Math.max(1, Math.floor((wf * LEVEL_SHARE[lv] + 50) / 100)) : 0;
+        if (w && ((lv && w - 1 < share) || (onIt[k] < w - 1 && s.freeAll === 0))) why = 'noFree';
       } else if (slot !== newest && !w && onIt[k] === 0) why = 'older'; // no crew size and no one on it: free ants go to the newest
       else if (crew === 0) why = seeking === 0 ? 'noSeekers' : late >= seeking ? 'outTooLong' : 'none';
       // Loads a minute: those home by this trail in the last minute (or since it was drawn, scaled to a minute).
@@ -211,7 +213,8 @@ export class Host {
     let why;
     if (s.g[G.RECALL] && layer === SURFACE) why = 'recalled';
     else if (s.job[i] === JOB.FORAGE) {
-      if (s.mode[i] === MODE.RETURN) why = s.carry[i] ? 'carrying' : 'gaveUp';
+      if (s.mode[i] === MODE.REST) why = goal >= 0 ? 'toRest' : 'resting'; // free: walking back to the door, or by it (sim 9)
+      else if (s.mode[i] === MODE.RETURN) why = s.carry[i] ? 'carrying' : 'gaveUp';
       else if (layer === NEST) why = s.g[G.RECALL] ? 'waitingIn' : 'goingOut';
       else if (to === 'trail') why = 'onTrail';
       else if (to === 'food') why = 'remembers';

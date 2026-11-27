@@ -203,13 +203,18 @@ export async function gate({ seeds = 20, minutes = 12, fixture = null } = {}) {
 
 /** Compare the blocking lines with the baseline. Returns a list of problems (empty: the gate holds). */
 /** The recorded baseline against the base commit's: on a blocking line a pass may not become a fail and a value may
- *  not get worse by more than a twentieth. Improvements are fine. */
+ *  not get worse by more than a twentieth, unless the recorded line carries a new `accepted` reason and still passes.
+ *  Improvements are fine. */
 export function slack(now, old, stage = STAGE) {
   const out = [];
   for (const l of LINES) {
     if (!blocks(l, stage) || !old[l.id] || old[l.id].value == null) continue;
     const a = now[l.id], b = old[l.id];
     if (!a || a.value == null) { out.push(`${l.id} was ${b.value}, no value now`); continue; }
+    // A step that changes the game on purpose may record a passing line worse, with its reason in the baseline
+    // (`accepted`), where review sees it. The next pull request compares against the new value as usual.
+    // The reason is a string, new on this branch, and the recorded value still meets the target.
+    if (typeof a.accepted === 'string' && a.accepted && a.accepted !== b.accepted && l.ok?.(a.value)) continue;
     if (b.status === 'pass' && a.status !== 'pass') out.push(`${l.id} passed at the base (${b.value}) and is recorded as ${a.status} (${a.value})`);
     else if (l.up ? a.value > b.value * 1.05 + 0.25 : a.value < b.value * 0.95 - 0.25) out.push(`${l.id} recorded worse than at the base: ${a.value} against ${b.value}`);
   }
@@ -267,7 +272,7 @@ if (isMainThread && import.meta.url === `file://${process.argv[1]}`) {
     if (args.includes('--update')) {
       const old = (() => { try { return JSON.parse(readFileSync(BASELINE, 'utf8')); } catch { return {}; } })();
       // Lines this run did not read keep their recorded values (a 12-minute run records them all).
-      writeFileSync(BASELINE, JSON.stringify(Object.fromEntries(Object.entries(res).map(([k, v]) => [k, v.status === 'not read' && old[k] ? old[k] : { status: v.status, value: v.value }])), null, 1) + '\n');
+      writeFileSync(BASELINE, JSON.stringify(Object.fromEntries(Object.entries(res).map(([k, v]) => [k, v.status === 'not read' && old[k] ? old[k] : { status: v.status, value: v.value, ...(old[k]?.accepted ? { accepted: old[k].accepted } : {}) }])), null, 1) + '\n');
       console.log('baseline written');
     } else {
       const base = JSON.parse(readFileSync(BASELINE, 'utf8')), problems = ratchet(res, base);

@@ -180,32 +180,44 @@ test('the dig is an auto job: free ants in the nest take it while cells are mark
 });
 
 test('starving: after a minute at 0 sugar the oldest adults die, one every 10 s here, the queen last', () => {
+  assert.equal(STARVE_AFTER, 1200, '60 s (02-spec 3.2)'); assert.equal(STARVE_EVERY, 200, '10 s');
   const s = colony(3);
   s.g[G.QUEEN] = 1; s.g[G.SUGAR] = 0; // no sugar, so the queen lays no eggs either
   order(s, { type: CMD.RECALL, on: true }); // everyone stays still in the nest, so the dead are easy to tell
   run(s, 300);
   const died = [];
   let xs = Array.from(s.x.subarray(0, s.n));
-  run(s, STARVE_AFTER + 3 * STARVE_EVERY + 10 - 300, s => { if (s.n < xs.length) { died.push(s.g[G.STARVE]); assert.deepEqual(Array.from(s.x.subarray(0, s.n)), xs.slice(1), 'the oldest (first) ant died'); } xs = Array.from(s.x.subarray(0, s.n)); });
-  assert.deepEqual(died, [STARVE_AFTER + STARVE_EVERY, STARVE_AFTER + 2 * STARVE_EVERY, STARVE_AFTER + 3 * STARVE_EVERY].map(t => t + 0));
+  run(s, 1600 + 10 - 300, s => { if (s.n < xs.length) { died.push(s.g[G.STARVE]); assert.deepEqual(Array.from(s.x.subarray(0, s.n)), xs.slice(1), 'the oldest (first) ant died'); } xs = Array.from(s.x.subarray(0, s.n)); });
+  assert.deepEqual(died, [1200, 1400, 1600], 'at 60, 70 and 80 s');
   assert.equal(s.n, 0); assert.equal(s.g[G.QUEEN], 1, 'the queen outlives the workers');
   run(s, STARVE_EVERY);
   assert.equal(s.g[G.QUEEN], 0);
   // Sugar again stops it.
   const t = colony(3); t.g[G.QUEEN] = 1; t.g[G.SUGAR] = 0;
   run(t, STARVE_AFTER + 100); t.g[G.SUGAR] = 5; run(t, 1); assert.equal(t.g[G.STARVE], 0);
-  t.g[G.SUGAR] = 0; run(t, STARVE_AFTER + STARVE_EVERY - 1); assert.equal(t.g[G.DIED], 0, 'the minute starts again');
+  const died0 = t.g[G.DIED]; t.g[G.SUGAR] = 0; run(t, STARVE_AFTER - 1); assert.equal(t.g[G.DIED], died0, 'the minute starts again');
+  // A sugar load home ends it too, even when the colony eats that sugar before the next check.
+  const u = colony(3); u.g[G.QUEEN] = 1; u.g[G.SUGAR] = 0; u.g[G.STARVE] = 1000; u.carry[0] = 1; u.mode[0] = MODE.RETURN; u.via[0] = -1; // she was born at home: she unloads on her first step
+  let reset = false; run(u, 400, u => { if (u.g[G.STARVE] < 5) reset = true; u.g[G.SUGAR] = 0; });
+  assert.ok(reset, 'a sugar load home resets the count');
+  // The dusk gift ends it too: upkeep may eat the gift on the next tick, before the count would see it.
+  const d = colony(3); d.cfg.dayTicks = 1200; d.g[G.QUEEN] = 1; d.g[G.SUGAR] = 0;
+  let dusk = false;
+  for (let k = 0; k < 1300 && !dusk; k++) { d.g[G.SUGAR] = 0; const st = d.g[G.STARVE]; d.step(); dusk = Array.from(d.drainEvents()).some((x, j) => j % 3 === 0 && x === EVENT.DUSK); if (dusk) assert.ok(st > 1000, `starving at dusk: ${st}`); }
+  assert.ok(dusk); assert.ok(d.g[G.SUGAR] > 0, 'the dusk gift'); assert.equal(d.g[G.STARVE], 0, 'dusk sugar resets the count');
 });
 
 test('a snapshot taken with levels, a count, a dig and starvation under way plays on the same', () => {
   const a = colony(30);
   const e = draw(a, east); run(a, 300); const so = draw(a, south); run(a, 300);
   level(a, e.seq, 3); order(a, { type: CMD.CREW, seq: so.seq, delta: 2 }); order(a, { type: CMD.DIG, cells: [13, 9] }); run(a, 150);
-  a.g[G.QUEEN] = 1; run(a, STARVE_AFTER + STARVE_EVERY + 50, a => { a.g[G.SUGAR] = 0; }); // one starving death
+  a.g[G.QUEEN] = 1; a.pileAmount[0] = 0; run(a, STARVE_AFTER + STARVE_EVERY + 300, a => { a.g[G.SUGAR] = 0; }); // no more sugar comes home: starving deaths
   kill(a, 4); run(a, 5);
-  assert.ok(a.g[G.WORKFORCE] > 0 && a.g[G.STARVE] > STARVE_AFTER + STARVE_EVERY && a.g[G.DIED] > 0);
+  assert.ok(a.g[G.WORKFORCE] > 0 && a.g[G.STARVE] > STARVE_AFTER && a.g[G.DIED] > 0, `workforce ${a.g[G.WORKFORCE]}, starving ${a.g[G.STARVE]}, died ${a.g[G.DIED]}`);
   const b = restore(snapshot(a));
   assert.deepEqual(b.hashes(), a.hashes());
+  assert.deepEqual([b.freeAll, b.freeOut, Array.from(b.crew)], [a.freeAll, a.freeOut, Array.from(a.crew)], 'the counts the route cards read, right after a restore');
+  assert.ok(a.freeAll > 0);
   run(a, 600); run(b, 600);
   assert.deepEqual(b.hashes(), a.hashes());
 });
@@ -259,6 +271,9 @@ test('encoded crew orders: a level rides along only when it is 1 to 3; a missing
   assert.equal(encodeCommand({ ...head, delta: 0, level: 3 }).at(-1), 3);
   assert.equal(encodeCommand({ ...head, delta: 0, level: 3 }).length, 7);
   assert.equal(encodeCommand({ ...head, delta: 1, level: 9 }).length, 6, 'no level 9');
+  assert.equal(encodeCommand({ ...head, delta: 2, level: true }).length, 6, 'a level is a number, not true');
+  assert.equal(encodeCommand({ ...head, delta: 0, level: [3] }).length, 6, 'nor a list');
+  assert.equal(encodeCommand({ ...head, delta: 0, level: '3' }).length, 6, 'nor text');
   const s = colony(4);
   const e = draw(s, east);
   assert.equal(want(s, e.slot), 1);
@@ -278,4 +293,119 @@ test('the game\'s start: a dig ordered before any trail gets diggers from the an
   h.order({ type: CMD.DIG, cells });
   while (s.tick < 250) h.step();
   assert.equal(s.g[G.DUG], cells.length / 2, `dug ${s.g[G.DUG]} of ${cells.length / 2} by 12.5 s`);
+});
+
+test('cutting a crew sends the free ants over the third back to the door at once', () => {
+  const s = colony(30);
+  const e = draw(s, east);
+  level(s, e.seq, 3); run(s, 400); // Surge: 15 on the crew, out on the trail
+  level(s, e.seq, 1); run(s, 3); // Light: 3, so 12 more free ants, most of them outside
+  const count = s => { let free = 0, out = 0; for (let i = 0; i < s.n; i++) if (s.job[i] === JOB.FORAGE && !isCrew(s.via[i])) { free++; if (s.mode[i] === MODE.SEEK) out++; } return { free, out }; };
+  let worst = -99;
+  run(s, 60, s => { const { free, out } = count(s); worst = Math.max(worst, out - Math.floor((free + 2) / 3)); });
+  assert.ok(worst <= 0, `free ants searching over a third: ${worst}`);
+});
+
+test('a smaller count gives its ants back to a levelled crew the older ones had squeezed out', () => {
+  const s = colony(20);
+  const a = draw(s, east), b = draw(s, south), c = draw(s, s => order(s, { type: CMD.TRAIL, layer: SURFACE, points: [23, 24, 12, 24] }));
+  level(s, a.seq, 3); level(s, b.seq, 3); run(s, 1);
+  assert.equal(want(s, c.slot), 0, 'two Surges of 10 take all 20');
+  order(s, { type: CMD.CREW, seq: a.seq, delta: -8 }); run(s, 1);
+  assert.equal(want(s, a.slot), 2);
+  assert.equal(want(s, c.slot), 5, 'Steady takes its quarter again');
+});
+
+test('the counts are right between ticks after a death', () => {
+  const s = colony(30);
+  const e = draw(s, east); run(s, 300);
+  s.g[G.QUEEN] = 1; s.pileAmount[0] = 0;
+  let deaths = 0, bad = 0;
+  run(s, STARVE_AFTER + 2 * STARVE_EVERY + 20, s => {
+    s.g[G.SUGAR] = 0;
+    if (s.g[G.STARVE] % STARVE_EVERY === 0 && s.g[G.STARVE] >= STARVE_AFTER) deaths++;
+    let free = 0; for (let i = 0; i < s.n; i++) if (s.job[i] === JOB.FORAGE && !isCrew(s.via[i])) free++;
+    if (crewOf(s, e.slot) !== s.crew[e.slot - SLOT.TRAIL0] || free !== s.freeAll) bad++;
+  });
+  assert.ok(deaths >= 2 && s.g[G.DIED] >= 2);
+  assert.equal(bad, 0);
+  // A death after the ants have moved (a fight, a spider): the counts at the end of the tick leave her out.
+  s.g[G.SUGAR] = 400;
+  const step = s.stepAnt.bind(s);
+  s.stepAnt = i => { step(i); if (i === s.n - 1) { const v = [...Array(s.n).keys()].find(j => isCrew(s.via[j])); s.hp[v] = 0; s.anyDead = true; } };
+  run(s, 1);
+  s.stepAnt = step;
+  assert.equal(s.crew[e.slot - SLOT.TRAIL0], crewOf(s, e.slot));
+});
+
+test('levels are for colony games only, and only whole levels 1 to 3', () => {
+  const sb = new Sim({ seed: 3, sw: 48, sh: 48, nw: 32, nh: 24, ants: 20 });
+  sb.queueCommand({ tick: 0, id: 1, seat: 0, type: CMD.TRAIL, layer: SURFACE, points: [25, 24, 38, 24] }); run(sb, 1);
+  sb.queueCommand({ tick: sb.tick, id: 2, seat: 0, type: CMD.CREW, seq: 0, delta: 0, level: 3 });
+  assert.equal(run(sb, 1).filter(x => x[0] === EVENT.REJECTED).length, 1, 'the sandbox refuses a level');
+  assert.equal(sb.g[G.LEVEL0 + sb.newestTrail() - SLOT.TRAIL0], 0);
+  const s = colony(20); const e = draw(s, east);
+  s.queueCommand(Int32Array.from([s.tick, 0, ++id, CMD.CREW, e.seq, 2, 7]));
+  assert.equal(run(s, 1).filter(x => x[0] === EVENT.REJECTED).length, 1, 'level 7 is refused, change or not');
+  assert.equal(want(s, e.slot), 5, 'and changes nothing');
+  assert.equal(encodeCommand({ tick: 0, id: 1, seat: 0, type: CMD.CREW, seq: 1, delta: 0, level: 1.5 }).length, 6, 'no level 1.5');
+});
+
+test('the route card: a level squeezed to 0 says no free foragers; a resting ant says she rests; a restart forgets loads', async () => {
+  const { Host } = await import('../host.js');
+  const h = new Host(0, 1, { colony: true, dayTicks: 1200 }), s = h.sim, ex = s.L.sw >> 1, ey = s.L.sh >> 1;
+  const rest = [...Array(s.n).keys()].find(i => s.mode[i] === MODE.REST);
+  assert.equal(h.inspect(rest).why, 'resting');
+  const piles = [0, 1].map(p => [s.pileCell[p] % s.L.sw, Math.floor(s.pileCell[p] / s.L.sw)]); // the two opening piles
+  for (const [x, y] of [...piles, [ex - 7, ey + 1]]) { h.order({ type: CMD.TRAIL, layer: SURFACE, points: [ex + 1, ey + 1, x, y] }); h.step(); }
+  const seqs = h.stats().trails.map(t => t.seq).sort((a, b) => a - b);
+  h.order({ type: CMD.CREW, seq: seqs[0], delta: 0, level: 3 }); h.order({ type: CMD.CREW, seq: seqs[1], delta: 0, level: 3 }); h.step();
+  const third = h.stats().trails.find(t => t.seq === seqs[2]);
+  assert.equal(third.want, 0); assert.equal(third.why, 'noFree');
+  while (s.tick < 600) h.step();
+  assert.ok(h.stats().trails.some(t => t.loads > 0), 'loads home');
+  assert.ok(h.restartDay(1));
+  assert.equal(h.homeAt.length, 0);
+});
+
+test('the route card: a level capped short by older crews says so; free ants walking back to rest are neither free on a trail nor at the door; a restart keeps the loads before its dawn', async () => {
+  const { Host } = await import('../host.js');
+  const h = new Host(0, 1, { colony: true, dayTicks: 1200 }), s = h.sim, ex = s.L.sw >> 1, ey = s.L.sh >> 1;
+  const piles = [0, 1].map(p => [s.pileCell[p] % s.L.sw, Math.floor(s.pileCell[p] / s.L.sw)]);
+  for (const [x, y] of [...piles, [ex - 7, ey + 1]]) { h.order({ type: CMD.TRAIL, layer: SURFACE, points: [ex + 1, ey + 1, x, y] }); h.step(); }
+  const seqs = h.stats().trails.map(t => t.seq).sort((a, b) => a - b);
+  h.order({ type: CMD.CREW, seq: seqs[0], delta: 0, level: 3 }); h.order({ type: CMD.CREW, seq: seqs[2], delta: 0, level: 3 }); h.step();
+  const wf = s.g[G.WORKFORCE], card = () => h.stats().trails.find(t => t.seq === seqs[2]);
+  const surge = Math.max(1, Math.floor((wf * 50 + 50) / 100));
+  assert.ok(card().want > 0 && card().want < surge, `the newest Surge gets part of its share: ${card().want} of ${surge}`);
+  for (let k = 0; k < 400 && card().on < card().want; k++) h.step();
+  assert.equal(card().on, card().want, 'its crew is full');
+  assert.equal(card().why, 'noFree', 'and still short of its level');
+  // Cut the first crew: its ants over the third walk back to the door.
+  h.order({ type: CMD.CREW, seq: seqs[0], delta: 0, level: 1 }); h.step();
+  const back = [...Array(s.n).keys()].filter(i => s.job[i] === JOB.FORAGE && s.mode[i] === MODE.REST && s.goal[i] >= 0);
+  assert.ok(back.length > 0, 'some walk back');
+  assert.equal(h.inspect(back[0]).why, 'toRest');
+  h.order({ type: CMD.CREW, seq: seqs[2], delta: 0, level: 1 }); // room for free ants
+  let marked = 0; // free ants sent to rest keep the trail they worked in `via` until they pick again
+  for (let k = 0; k < 600; k++) {
+    if (k % 47 === 46) h.order({ type: CMD.CREW, seq: seqs[0], delta: 0, level: 1 + (k / 47 | 0) % 3 }); // crews grow and shrink: the third with them
+    const st = h.stats(), free = new Map();
+    let door = 0;
+    for (let i = 0; i < s.n; i++) if (s.hp[i] > 0 && s.job[i] === JOB.FORAGE) {
+      if (s.via[i] >= FREE_VIA && s.mode[i] !== MODE.REST) free.set(s.via[i] - FREE_VIA, (free.get(s.via[i] - FREE_VIA) ?? 0) + 1);
+      if (s.via[i] >= FREE_VIA && s.mode[i] === MODE.REST) marked++;
+      if (s.mode[i] === MODE.REST && s.goal[i] < 0) door++;
+    }
+    for (const t of st.trails) assert.equal(t.free, free.get(t.slot) ?? 0, `free on trail ${t.slot} at tick ${s.tick}`);
+    assert.equal(st.resting, door);
+    h.step();
+  }
+  assert.ok(marked > 0, 'the case the card must not count came up');
+  // A restart at day 2's dawn keeps the loads home in the minute before it.
+  while (h.sim.g[G.DAY] < 2 || h.sim.tick < 1300) { h.step(); if (h.dusk) h.goOn(); }
+  const dawn = restore(h.dawns.get(2).bytes).tick, before = h.homeAt.filter(x => x[0] <= dawn).length;
+  assert.ok(before > 0, `loads home before dawn: ${before}`);
+  assert.ok(h.restartDay(2));
+  assert.equal(h.homeAt.length, before);
 });

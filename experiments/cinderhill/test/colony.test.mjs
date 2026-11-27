@@ -48,6 +48,7 @@ test('egg to adult takes EGG_TICKS + LARVA_TICKS + PUPA_TICKS (60 s), the larva 
   let laid = -1, larva = -1, pupa = -1, adult = -1;
   for (let t = 0; t < 14000 && adult < 0; t++) {
     s.step();
+    s.g[G.STARVE] = 0; // no adults and no sugar would starve the queen at 60 s, the birth's own tick (crew.test covers starving)
     const B = s.brood;
     if (laid < 0 && B.n === 1) { laid = s.tick; s.g[G.SUGAR] = 0; }
     if (larva < 0 && B.n && B.stage[0] === STAGE.LARVA) larva = s.tick;

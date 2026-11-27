@@ -290,5 +290,6 @@ export function restore(bytes) {
   walk(sim, dec);
   dec.finish();
   for (let i = 0; i < n && !sim.anyDead; i++) if (sim.hp[i] === 0) sim.anyDead = true; // hurt between ticks
+  sim.census(); // the crew and free counts, read between ticks (route cards); not hashed, the next step redoes them
   return sim;
 }
