@@ -73,7 +73,10 @@ export const G = { TICK: 0, STORES: 1, RECALL: 2, ALARM_HOLD: 3, GOAL_SEQ: 4, DI
   WINDFALLS: 39,
   // Crews (CMD.CREW): the ants each trail slot wants, plus one; 0 is "as many as come" (the newest trail recruits).
   WANT0: 40,
-  SIZE: 44 };
+  // Crew levels (sim 9, 02-spec 3.2 Crews): per trail slot 0 a set count, 1 Light, 2 Steady, 3 Surge; the outside
+  // workforce when the levels' sizes were last worked out; ticks the sugar store has stood at 0 (starvation).
+  LEVEL0: 44, WORKFORCE: 48, STARVE: 49,
+  SIZE: 50 };
 
 /** Push the goal's source cells (distance 0) in ascending cell order. */
 function sources(sim, slot, push) {

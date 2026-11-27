@@ -1,6 +1,6 @@
 // Runs the sim for the trail painter page: 20 ticks a second from the frame clock, the command log, and the
 // numbers the page shows (crews, the "why" for one ant). The sim in sim/ is unchanged and pure; this file is the host.
-import { Sim, JOB, MODE, CMD, EVENT, G, SLOT, MAX_PILES, SURFACE, NEST, MAT, FIELD } from './sim/sim.js';
+import { Sim, JOB, MODE, CMD, EVENT, G, SLOT, MAX_PILES, SURFACE, NEST, MAT, FIELD, FREE_VIA, LEVEL_SHARE } from './sim/sim.js';
 import { cellAt } from './sim/grid.js';
 import { START, STAGE, dayState } from './sim/colony.js';
 import { restore, snapshot } from './sim/snapshot.js';
@@ -41,6 +41,7 @@ export class Host {
     }
     this.attach();
     this.acc = 0; this.last = null; this.terrainVersion = 1; this.ticks = 0; this.tickMs = [];
+    this.homeAt = []; // [tick, trail slot, trail seq] of each load home by a trail in the last minute (route cards)
     // Days (colony.js): the dawn save of each day still open to a restart (today's, and yesterday's until the
     // player picks at dusk), and the dusk that has just happened, until the page has shown it. A dawn save is
     // { bytes, log: the order log's length then, delivered }.
@@ -73,7 +74,7 @@ export class Host {
     for (const [d] of this.dawns) if (d > day) this.dawns.delete(d);
     // Orders given after the save are gone; orders in the save still waiting for their tick run again.
     this.log.forEach((e, k) => { if (k >= save.log) e.state = 'undone'; else if (e.tick >= this.sim.tick) e.state = 'queued'; });
-    this.attach(); this.delivered = save.delivered; this.dusk = null; this.spiderNews = []; this.pileNews = []; this.shifted = true; this.terrainVersion++; this.acc = 0; this.last = null;
+    this.attach(); this.delivered = save.delivered; this.dusk = null; this.spiderNews = []; this.pileNews = []; this.homeAt = this.homeAt.filter(h => h[0] <= this.sim.tick); this.shifted = true; this.terrainVersion++; this.acc = 0; this.last = null;
     return true;
   }
 
@@ -119,6 +120,7 @@ export class Host {
     for (let k = 0; k < ev.length; k += 3) {
       const type = ev[k];
       this.lastEvents.push([type, ev[k + 1], ev[k + 2]]);
+      if (type === EVENT.HOME) { if (ev[k + 1] >= 0) this.homeAt.push([this.sim.tick, ev[k + 1], this.sim.flow.seq[ev[k + 1]]]); continue; }
       if (type === EVENT.PILE_NEW) this.pileNews.push({ pile: ev[k + 1], kind: ev[k + 2], tick: this.sim.tick });
       if (type === EVENT.DUG) this.terrainVersion++;
       else if (type === EVENT.SPIDER) this.spiderNews.push({ state: ev[k + 1], arg: ev[k + 2], tick: this.sim.tick });
@@ -133,6 +135,7 @@ export class Host {
       }
     }
     for (const e of this.log) if (e.state === 'queued' && e.tick < this.sim.tick) e.state = 'applied';
+    while (this.homeAt.length && this.homeAt[0][0] <= this.sim.tick - 1200) this.homeAt.shift();
     const stores = this.sim.g[G.STORES];
     this.delivered += stores - this.lastStores; this.lastStores = stores;
   }
@@ -154,10 +157,13 @@ export class Host {
     const s = this.sim, n = s.n, slots = new Int32Array(16);
     let surface = 0, carrying = 0, foragers = 0, seeking = 0, late = 0, guards = 0, guardsAt = 0, diggers = 0;
     const newest = s.newestTrail();
-    const onIt = new Int32Array(SLOT.TRAILS);
+    const onIt = new Int32Array(SLOT.TRAILS), freeOn = new Int32Array(SLOT.TRAILS);
+    let resting = 0;
     for (let i = 0; i < n; i++) {
       if (s.goal[i] >= 0) slots[s.goal[i]]++;
       if (s.hp[i] > 0 && s.job[i] === JOB.FORAGE && s.via[i] >= SLOT.TRAIL0 && s.via[i] < SLOT.TRAIL0 + SLOT.TRAILS) onIt[s.via[i] - SLOT.TRAIL0]++;
+      if (s.hp[i] > 0 && s.job[i] === JOB.FORAGE && s.via[i] >= FREE_VIA && s.mode[i] !== MODE.REST) freeOn[s.via[i] - FREE_VIA - SLOT.TRAIL0]++;
+      if (this.colony && s.hp[i] > 0 && s.job[i] === JOB.FORAGE && s.mode[i] === MODE.REST && s.goal[i] < 0) resting++; // at the door, not walking back to it
       const out = s.layer[i] === SURFACE;
       if (out) surface++;
       if (s.carry[i]) carrying++;
@@ -171,9 +177,16 @@ export class Host {
       const slot = SLOT.TRAIL0 + k; if (!F.live[slot]) continue;
       const c = F.cell[slot], crew = slots[slot], w = s.g[G.WANT0 + k]; // w: crew size plus one; 0: none
       let why = '';
-      if (slot !== newest && !w && onIt[k] === 0) why = 'older'; // no crew size and no one on it: free ants go to the newest
+      if (this.colony) {
+        // Who goes (sim 9): a crew short of its size has a reason when no free ant is left to fill it.
+                // A level whose share the older crews have taken, wholly or in part, says so too.
+        const lv = s.g[G.LEVEL0 + k], wf = s.g[G.WORKFORCE], share = lv && wf > 0 ? Math.max(1, Math.floor((wf * LEVEL_SHARE[lv] + 50) / 100)) : 0;
+        if (w && ((lv && w - 1 < share) || (onIt[k] < w - 1 && s.freeAll === 0))) why = 'noFree';
+      } else if (slot !== newest && !w && onIt[k] === 0) why = 'older'; // no crew size and no one on it: free ants go to the newest
       else if (crew === 0) why = seeking === 0 ? 'noSeekers' : late >= seeking ? 'outTooLong' : 'none';
-      trails.push({ slot, x: c % s.L.sw, y: Math.floor(c / s.L.sw), crew, on: onIt[k], want: w ? w - 1 : null, newest: slot === newest, why, seq: F.seq[slot] });
+      // Loads a minute: those home by this trail in the last minute (or since it was drawn, scaled to a minute).
+      const loads = this.homeAt.reduce((a, h) => a + (h[1] === slot && h[2] === F.seq[slot] ? 1 : 0), 0);
+      trails.push({ slot, x: c % s.L.sw, y: Math.floor(c / s.L.sw), crew, on: onIt[k], free: freeOn[k], want: w ? w - 1 : null, level: s.g[G.LEVEL0 + k], loads, newest: slot === newest, why, seq: F.seq[slot] });
     }
     const alarm = F.live[SLOT.ALARM] ? { cell: F.cell[SLOT.ALARM], coming: slots[SLOT.ALARM], guards, held: s.g[G.ALARM_HOLD] } : null;
     const dig = { marked: s.g[G.DIG_COUNT], crew: s.g[G.DIG_CREW], cap: Math.min(24, 4 * s.g[G.DIG_COUNT]), diggers, dug: s.g[G.DUG] };
@@ -185,7 +198,7 @@ export class Host {
       for (let k = 0; k < B.n; k++) by[B.stage[k]]++;
       colony = { queen: s.g[G.QUEEN], sugar: s.g[G.SUGAR], protein: s.g[G.PROTEIN], eggs: by[STAGE.EGG], larvae: by[STAGE.LARVA], pupae: by[STAGE.PUPA], born: s.g[G.BORN], lost: s.g[G.BROOD_LOST], hungry: s.g[G.HUNGRY] };
     }
-    return { ants: n, surface, carrying, foragers, seeking, trails, alarm, dig, piles, picked: s.g[G.PICKED], stores: s.g[G.STORES], recall: !!s.g[G.RECALL], tick: s.tick, colony };
+    return { ants: n, surface, carrying, foragers, seeking, resting, trails, alarm, dig, piles, picked: s.g[G.PICKED], stores: s.g[G.STORES], recall: !!s.g[G.RECALL], tick: s.tick, colony };
   }
 
   /** One ant, for the inspection card: what she is, what she carries, where she is going and why. Keys for words.js. */
@@ -200,7 +213,8 @@ export class Host {
     let why;
     if (s.g[G.RECALL] && layer === SURFACE) why = 'recalled';
     else if (s.job[i] === JOB.FORAGE) {
-      if (s.mode[i] === MODE.RETURN) why = s.carry[i] ? 'carrying' : 'gaveUp';
+      if (s.mode[i] === MODE.REST) why = goal >= 0 ? 'toRest' : 'resting'; // free: walking back to the door, or by it (sim 9)
+      else if (s.mode[i] === MODE.RETURN) why = s.carry[i] ? 'carrying' : 'gaveUp';
       else if (layer === NEST) why = s.g[G.RECALL] ? 'waitingIn' : 'goingOut';
       else if (to === 'trail') why = 'onTrail';
       else if (to === 'food') why = 'remembers';

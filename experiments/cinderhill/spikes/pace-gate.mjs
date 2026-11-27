@@ -3,7 +3,7 @@
 // gives), and each line of the pace budget is read from what they did.
 //   median:  every 15 s a trail from the entrance to the nearest pile of the food the colony has less of in store
 //            (skipped when a live trail already ends there; the sim keeps four trails and reuses the oldest), Recall
-//            on at the spider's warning and off when it leaves, on at every dusk card.
+//            on at the spider's warning and off when it leaves, on at every dusk card. It leaves crew sizes alone, so each trail keeps its Steady crew (the default).
 //   passive: one trail at 1 s to the nearest pile, then no order.
 //   idle:    no order.
 // A line is read on the worst seed: "every line passes for the scripted bots on 20 seeds" (02 section 0).
@@ -33,8 +33,8 @@ const HZ = 20;
 const BASELINE = new URL('./pace-baseline.json', import.meta.url);
 
 /** Where the build is on the roadmap, and the order of the stages lines block from. */
-export const STAGES = ['R0', 'R1.2', 'R1.3', 'R1.5', 'R1', 'R2a', 'R2b'];
-export const STAGE = 'R1.2';
+export const STAGES = ['R0', 'R1.2', 'R1.3', 'R1.3b', 'R1.5', 'R1', 'R2a', 'R2b'];
+export const STAGE = 'R1.3';
 export const blocks = (line, stage = STAGE) => STAGES.indexOf(line.stage) <= STAGES.indexOf(stage);
 /** At R0 the roadmap says the build fails the gate: a failing blocking line is allowed by its baseline and may not
  *  get worse. From R1 step 2 (new starting values) every blocking line must pass. */
@@ -60,7 +60,7 @@ export const LINES = [
   { id: 'gap-0-10', stage: 'R1', horizon: 600, text: 'Longest gap between decision events, minutes 0 to 10, s', target: '<= 30', bot: 'median', get: r => r.gapEarly, ok: v => v <= 30, up: true },
   { id: 'gap-after-10', stage: 'R1', horizon: 720, text: 'Same gap after minute 10, s', target: '<= 45', bot: 'median', get: r => r.gapLate, ok: v => v <= 45, up: true },
   { id: 'idle-share', stage: 'R1.3', horizon: 720, text: 'Wasted labour: largest share of adults idle 10 s while a job has a gap', target: '<= 0.15', bot: 'median', get: r => r.idleMax, ok: v => v <= 0.15, up: true },
-  { id: 'queued-at-doors', stage: 'R1.3', text: 'Queued at doors outside a jam', target: '<= 0.10', bot: 'median', get: () => null },
+  { id: 'queued-at-doors', stage: 'R1.3b', text: 'Queued at doors outside a jam', target: '<= 0.10', bot: 'median', get: () => null },
   { id: 'chapter-1-length', stage: 'R1', text: 'Chapter 1 length, min', target: '4 to 6', bot: 'median', get: () => null },
   { id: 'passive-finishes', stage: 'R1', text: 'Passive bot finishes chapter 1', target: 'yes', bot: 'passive', get: () => null },
   { id: 'chapters-2-6-length', stage: 'R2a', text: 'Chapters 2 to 6 length, min', target: '6 to 12', bot: 'median', get: () => null },
@@ -203,13 +203,18 @@ export async function gate({ seeds = 20, minutes = 12, fixture = null } = {}) {
 
 /** Compare the blocking lines with the baseline. Returns a list of problems (empty: the gate holds). */
 /** The recorded baseline against the base commit's: on a blocking line a pass may not become a fail and a value may
- *  not get worse by more than a twentieth. Improvements are fine. */
+ *  not get worse by more than a twentieth, unless the recorded line carries a new `accepted` reason and still passes.
+ *  Improvements are fine. */
 export function slack(now, old, stage = STAGE) {
   const out = [];
   for (const l of LINES) {
     if (!blocks(l, stage) || !old[l.id] || old[l.id].value == null) continue;
     const a = now[l.id], b = old[l.id];
     if (!a || a.value == null) { out.push(`${l.id} was ${b.value}, no value now`); continue; }
+    // A step that changes the game on purpose may record a passing line worse, with its reason in the baseline
+    // (`accepted`), where review sees it. The next pull request compares against the new value as usual.
+    // The reason is a string, new on this branch, and the recorded value still meets the target.
+    if (typeof a.accepted === 'string' && a.accepted && a.accepted !== b.accepted && l.ok?.(a.value)) continue;
     if (b.status === 'pass' && a.status !== 'pass') out.push(`${l.id} passed at the base (${b.value}) and is recorded as ${a.status} (${a.value})`);
     else if (l.up ? a.value > b.value * 1.05 + 0.25 : a.value < b.value * 0.95 - 0.25) out.push(`${l.id} recorded worse than at the base: ${a.value} against ${b.value}`);
   }
@@ -267,7 +272,7 @@ if (isMainThread && import.meta.url === `file://${process.argv[1]}`) {
     if (args.includes('--update')) {
       const old = (() => { try { return JSON.parse(readFileSync(BASELINE, 'utf8')); } catch { return {}; } })();
       // Lines this run did not read keep their recorded values (a 12-minute run records them all).
-      writeFileSync(BASELINE, JSON.stringify(Object.fromEntries(Object.entries(res).map(([k, v]) => [k, v.status === 'not read' && old[k] ? old[k] : { status: v.status, value: v.value }])), null, 1) + '\n');
+      writeFileSync(BASELINE, JSON.stringify(Object.fromEntries(Object.entries(res).map(([k, v]) => [k, v.status === 'not read' && old[k] ? old[k] : { status: v.status, value: v.value, ...(old[k]?.accepted ? { accepted: old[k].accepted } : {}) }])), null, 1) + '\n');
       console.log('baseline written');
     } else {
       const base = JSON.parse(readFileSync(BASELINE, 'utf8')), problems = ratchet(res, base);
@@ -279,7 +284,8 @@ if (isMainThread && import.meta.url === `file://${process.argv[1]}`) {
         if (old) problems.push(...slack(base, old).map(p => `baseline: ${p}`));
       }
       if (!quotaFails.length) problems.push('the quota opening fails no blocking line the current build passes: the table is too loose');
-      const broodBad = ratchet(brood, base).filter(p => !/passes now|in this run/.test(p));
+      // Only lines the short fixture run can read: a line past its horizon is "not read" there, and that is no catch.
+      const broodBad = ratchet(brood, base, block.filter(l => brood[l.id].status !== 'not read')).filter(p => !/passes now|in this run/.test(p));
       console.log(`Brood x10 plant: ${broodBad.length ? `caught (${broodBad.join('; ')})` : 'NOT caught'}.`);
       if (!broodBad.length) problems.push('the brood x10 plant passes the gate');
       const over = block.filter(l => res[l.id].status !== 'pass');

@@ -47,9 +47,11 @@ test('trail loads count only loads whose carrier came out on a trail; a trail wi
   const idle = colony({ dayTicks: 1200 }), drawn = colony({ dayTicks: 1200 });
   drawn.queueCommand({ tick: 0, type: CMD.TRAIL, layer: SURFACE, points: [24, 24, 32, 24] });
   const a = run(idle, 1200), b = run(drawn, 1200);
-  assert.ok(idle.g[G.STORES] > 0, 'wanderers bring food home');
-  assert.equal(idle.g[G.TRAIL_LOADS], 0, 'but none along a trail');
+  // Sim 9 (who goes): free foragers work only drawn trails, so with none drawn the colony waits by the door.
+  assert.equal(idle.g[G.STORES], 0, 'no trail, no foraging');
+  assert.equal(idle.g[G.TRAIL_LOADS], 0);
   assert.ok(drawn.g[G.TRAIL_LOADS] > 0);
+  assert.equal(drawn.g[G.TRAIL_LOADS], drawn.g[G.STORES], 'crew and free foragers both came out on the trail');
   assert.equal(drawn.g[G.SUGAR_LOADS] + drawn.g[G.PROTEIN_LOADS], drawn.g[G.STORES]);
   assert.equal(a[0].won, 0);
   // The target is out of reach of this little colony in 1,200 ticks unless the goal is lowered: check the count.

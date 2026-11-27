@@ -445,3 +445,25 @@ Every S4 snapshot restores to the same hash. The workerd means rose with the req
 A second review of the fixes found five more (`../NOTES.md`, Starting values). Its fixes leave every total above unchanged: after them the pace gate (20 seeds, 12 minutes) gives the same table, S2 colony agrees again at 3700489822, and S4 gives the same sizes, each restoring to the same hash.
 
 **Mutations shown to fail**: eggs costing sugar (3 colony tests fail); foragers starting in the nest (the pace gate fails first delivery, 19.55 s); brood placed without the cell check (the start test fails).
+
+## Who goes (SIM_VERSION 9, snapshot format 9, 2026-11-26)
+
+R1 step 3 (`../NOTES.md`, Who goes): crew levels (Light, Steady, Surge), the who-goes rule with a third of the free ants out at a time, the dig as an auto job, adult starvation. New totals: `EXPECTED` 1108677350, `EXPECTED_LONG` 62240356, `EXPECTED_COLONY` 3485865693.
+
+| Measure | Before (SIM_VERSION 8) | After |
+| --- | --- | --- |
+| S2 sandbox: Node, workerd, Chromium 156.0.8078.4, WebKit 27.2 on all 600 records | agree (final total 3244743503) | agree (final total 62240356) |
+| S2 colony (`--colony`) | agree (final total 3700489822) | agree (final total 410145409) |
+| S2 planted fault | tick 20, `ants` | the same |
+| S2 Firefox | not run | not run (Playwright's Firefox is not installed here) |
+| S1 Node, 2,000 ants, mean / p95 / max | 1.60 / 1.72 / 4.60 ms | 1.60 / 1.68 / 4.55 ms (load average about 2) |
+| S1 Node, 5,000 ants | 1.89 / 2.06 / 4.38 ms | 1.88 / 2.06 / 3.54 ms |
+| S1 all 9 fields at once | 11.55 ms | 11.53 ms |
+| S1 workerd, 2,000 / 5,000 ants, mean | 2.20 / 2.65 ms | 1.55 / 1.90 ms (colony build: 1.55 / 1.90 ms; round trip with no ticks 1.3 to 1.4 ms, included) |
+| S4, 5,000 ants, 3,000 / 8,000 / 24,000 ticks | 39.9 / 39.4 / 37.7 KB | 39.9 / 39.4 / 37.7 KB |
+
+Every S4 snapshot restores to the same hash. The S1 run under load average 15 earlier in this step (3.09 / 3.13 ms) was load; this rerun at load average 2 matches sim 8. The lower workerd means come with a shorter round trip (1.3 ms against 3.0 to 4.0 ms under load), not from the sim.
+
+**Independent review** (Codex, read-only): eleven findings fixed and five left open, all listed in `../NOTES.md`, Who goes. A second review of the fixes found thirteen more: eleven fixed, two left open (same place). Neither round's fixes change the three totals; after the second, the pace gate holds against main and every test passes (142).
+
+**Mutations shown to fail** (each fails a crew test unless noted): all free ants out at once; no starving slow-down; no Steady default; sizes worked out on every change; youngest dying first; a give-up leaving the free count; no shorter-trail tie-break; no walk-in for the dig (the start-dig test: dug 0 of 6); the quota only in the nest; a count order not resizing; a sugar load not resetting starvation; no recount after a death; levels in the sandbox; a bad level accepted; a fractional level encoded; the first death at 70 s; restart keeping loads; no capacity reason on the card; no resting line in the inspector. In the pace gate test: resting ants at home never joining a short crew (idle share over 0.15); the job-goal check removed (0.5625).

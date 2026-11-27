@@ -28,7 +28,7 @@ import { MAT, SUB } from './grid.js';
 import { SIM_VERSION, Sim } from './sim.js';
 import { Decoder, Encoder, intModel, probs, sint, tree, uint } from './rangecoder.js';
 
-export const SNAPSHOT_VERSION = 8; // 8: the nursery rectangle in the header; 3: lastCell codes the diagonal neighbours; 4: the colony (pile kinds, caste, hit points, team, brood; colony flag in the header); 5: days (the day length in the header, more globals); 6: the spider's globals; 7: crew sizes (globals)
+export const SNAPSHOT_VERSION = 9; // 9: crew levels, the workforce and the starving count (globals); 8: the nursery rectangle in the header; 3: lastCell codes the diagonal neighbours; 4: the colony (pile kinds, caste, hit points, team, brood; colony flag in the header); 5: days (the day length in the header, more globals); 6: the spider's globals; 7: crew sizes (globals)
 const SCTX = 24; // scent contexts per field
 const LIST_MAX = 1 << 20; // a longer command queue, command or event list is a corrupt payload, not an allocation
 const RANK_BITS = 12; // measured: 6, 8, 10, 12, 14 bits; 12 is near the best (ants share cells, so a fine model pays)
@@ -290,5 +290,6 @@ export function restore(bytes) {
   walk(sim, dec);
   dec.finish();
   for (let i = 0; i < n && !sim.anyDead; i++) if (sim.hp[i] === 0) sim.anyDead = true; // hurt between ticks
+  sim.census(); // the crew and free counts, read between ticks (route cards); not hashed, the next step redoes them
   return sim;
 }
