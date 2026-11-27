@@ -8,8 +8,8 @@ This file sets the size and shape of the whole game. [02-spec.md](02-spec.md) st
 
 | 02 said | Now |
 | --- | --- |
-| Done is six Spring chapters on one hill | Done is a campaign of 19 missions on a branching map, a home nest worth building, a tech tree with exclusive picks, nine castes, twelve kinds of enemy and three rival colonies. A first-time player finishes mission 3 without help and starts mission 4. Two playthroughs can differ in the order of six missions, in which two of four they play at the second fork, and in all eight tree picks |
-| "Progress is the colony itself and the bloom". No currency between chapters | The colony still carries. Added: **amber** (earned per mission) and **bloom** (regions regrown) pay for and gate a tech tree, the **Lineage** |
+| Done is six Spring chapters on one hill | Done is a campaign of 19 missions on a branching map, a home nest worth building, a tech tree with exclusive picks, ten castes (seven or eight in any one playthrough), twelve kinds of enemy and three rival colonies. A first-time player finishes mission 3 without help and starts mission 4. Two playthroughs can differ in the order of six missions, in which two of four they play at the second fork, and in all eight tree picks |
+| "Progress is the colony itself and the bloom". No currency between chapters | The colony still carries. Added: a tech tree, the **Lineage**. A node opens by a **deed** (something the colony did) and is paid for in real stores from the home nest. There is no separate currency |
 | A room's worth comes from depth, size and dryness only | Rooms have a function, a capacity and a **supply time** (walking time to what the room needs, read from the flow fields). Layout decides output |
 | Wordless play | No narrator and no story text. Mission goals, room names and Lineage picks have short labels, because a strategy choice the player cannot read is not a choice |
 | Six chapters with one new verb each | Missions of six types on seven regions, each with a main goal, two side goals and one dilemma |
@@ -39,9 +39,9 @@ flowchart LR
   A --> C["Creek Bed<br/>4b The aphid meadow<br/>5b High water<br/>6b The frog"]
   B --> D["Root Maze<br/>7 Termite galleries<br/>8 The mole"]
   C --> D
-  B --> E["Stone Wall<br/>9a The brood raiders<br/>10a The dark"]
-  C --> F["Meadow Edge<br/>9b Neighbours<br/>10b The carcass"]
-  D --> G["Old Stump<br/>11 The pale edge<br/>12 Cut the roads<br/>13 A hundred doors"]
+  D --> E["Stone Wall<br/>9a The brood raiders<br/>10a The dark"]
+  D --> F["Meadow Edge<br/>9b Neighbours<br/>10b The carcass"]
+  D -.-> G["Old Stump<br/>11 The pale edge<br/>12 Cut the roads<br/>13 A hundred doors"]
   E --> G
   F --> G
   G --> H["Home<br/>14 Storm night and the wedding flight"]
@@ -49,7 +49,7 @@ flowchart LR
 
 **Forks.** After mission 3 the player settles Dry Slope or Creek Bed first. The other stays open, but it changes while the colony is away: the pale colony's scouts reach it, so its missions start with a rival already holding the best site. After the Root Maze the player goes to Stone Wall or Meadow Edge; the one not chosen falls to the pale colony and becomes one of its nests in the last region. A playthrough is 17 missions out of 19.
 
-**Mission types.** Every mission has one main goal, two side goals (each pays one amber) and one dilemma.
+**Mission types.** Every mission has one main goal, two side goals (each is a deed that opens or cheapens a Lineage node) and one dilemma.
 
 | Type | Main goal | Missions |
 | --- | --- | --- |
@@ -60,16 +60,18 @@ flowchart LR
 | Move | Carry the queen and brood to a new nest before the old one is lost | 5b, 10a |
 | Contest | Take or hold a site against another colony | 7, 9b, 10b, 13, 14 |
 
-**Dilemmas** are choices inside a mission that the campaign remembers. Each is made by play, not by a dialog. Examples: in *Termite galleries* the player can break into the termite nest for protein (fast food now, termite soldiers in every later underground mission) or wall it off and share the wood (slower, and a quiet flank later). In *Neighbours* a beaten rival can be finished, left alone, or fed; a fed neighbour holds one road in mission 11. In *The carcass* three colonies want one dead vole; holding all of it starves the smallest, who then joins the pale colony.
+**The second and third mission of a region start in the daughter nest the player built there in the first**, with its rooms, tunnels and stores. A founding happens once per region, not once per mission.
+
+**Dilemmas** are choices inside a mission that the campaign remembers. Each is made by play, not by a dialog. The rule for every dilemma: each option pays something now and costs something later, in the same measure, and the cost is shown before the choice. Examples: in *Termite galleries* the player can break into the termite nest for protein (protein now and a permanent shortcut through their galleries; termite soldiers come up that shortcut in mission 8) or wall it off (no protein; the wall holds in mission 8 but the Root Maze road stays long). In *Neighbours* a beaten rival can be finished (its brood is protein now; its survivors join the pale colony) or fed from the stores meant for the next escort (a smaller start next mission; the neighbour holds one road in mission 11). In *The carcass* three colonies want one dead vole; holding all of it pays the most protein and starves the smallest colony, who then joins the pale colony; the card shows how much the smallest needs before the player takes its share.
 
 ## 3. The home nest
 
-Between missions the player is at the **home nest**, the same sim as a mission with no clock. It persists. What it is for:
+Between missions the player is at the **home nest**, the same sim as a mission. It persists. Home has no clock of its own: **nothing accrues while the player waits.** Each mission played pays home once (the harvest of every daughter nest, plus what the escort brought back), and that harvest is all there is to spend on three things that compete: raising the next escort, digging and building, and Lineage nodes.
 
-- **The expedition.** Each mission's escort is drawn from home: a number of slots set by the home rest halls, filled by caste from what the home nurseries have raised. A better home sends a stronger start.
-- **The trickle.** Daughter nests send food home. Home granaries and larders cap what can be kept.
-- **It is attacked.** Missions 9a and 14 are fought in the home nest as the player built it, with its real doors, tunnels and stores. Nothing else makes layout matter as much.
-- **Repair.** Any room can be repainted and any tunnel refilled, at a cost in loads. No early mistake is permanent.
+- **The expedition.** Each mission's escort is drawn from home: a number of slots set by the home rest halls, filled by caste from what the home nurseries have raised and the home stores can provision. A better home sends a stronger start.
+- **It is attacked.** Missions 9a and 14 are fought in the home nest as the player built it, with its real doors, tunnels and stores.
+- **Repair.** Any room can be repainted and any tunnel refilled, at a cost in loads from the same harvest. No early mistake is permanent.
+- **A floor.** A lost escort still brings back its scout map and whatever brood its carriers physically got out. Home never sends fewer than a floor escort.
 
 ## 4. Base building
 
@@ -89,46 +91,57 @@ Free digging stays. A **room** is a dug space painted with a kind. Its output is
 | Honey hall | Repletes hang here as living stores that can walk to a new nest | Deep | Lineage |
 | Thatch dome | Warms the top nursery so brood grows faster; burns in a dry storm | The surface mound | Lineage (Thatch) |
 
+**Layout has no single right answer because rooms pull against each other:**
+
+- Supply time is path time through the tunnels as dug, read from the flow fields. It is never a count of neighbouring rooms.
+- Water pools low: the deepest rooms flood last but drain last, and a flooded approach strands the stores behind it.
+- Larders and fungus gardens give off heat and stale air (an integer diffusion layer on the nest grid). Brood near them sickens unless a second shaft to the surface draws a draught, and every shaft is a way in for rain and raiders.
+- A granary by the door has the shortest supply time and is the first thing a raid reaches.
+- Raising the queen's chamber a tier stops laying for a minute and spends stores, so tiering late is sometimes right. The ledger shows when one more worker will repay her food before dusk.
+- A rest hall is a muster point: war crews (section 6) form at the rest hall nearest their trail, so where it sits decides how fast the colony answers.
+
 Tunnels have a width the player chooses. Narrow tunnels are cheap and easy to hold; wide ones carry traffic. Doors have throughput (already in the sim), so a second door is a real trade between speed and exposure. Water, cave-ins and the structures of 02 section 6.5 stay.
 
 ## 5. The Lineage (tech tree)
 
-Four boughs of four levels. A level opens when enough regions have bloomed. Each node costs amber. At levels 2 and 4 each bough **forks**: the player takes one side and the other is closed for this campaign. That is eight exclusive picks. The wedding flight at the end carries one chosen fork pick into a new campaign on a harder hill.
+Four boughs of four levels. A node opens by a **deed**: a region bloomed, an enemy kind beaten, a side goal met, a dilemma's outcome. It is then bought with stores from the home harvest (seed, sugar, protein, or raised brood of a set caste), so the tree competes with the escort and the home for the same food. At levels 2 and 3 each bough **forks**: the player takes one side and the other is closed for this campaign. That is eight exclusive picks, all reachable by the middle of the campaign. Level 4 nodes are capstones that read both earlier picks. The wedding flight at the end carries one fork pick into a new campaign on a harder hill.
 
 ```mermaid
 flowchart LR
   subgraph Forage
-    F1[Scouts] --> F2{Herders<br/>or Harvesters} --> F3[Repletes] --> F4{Gardeners<br/>or Raiders}
+    F1[Scouts] --> F2{Herders<br/>or Harvesters} --> F3{Gardeners<br/>or Raiders} --> F4[Repletes]
   end
   subgraph Build
-    B1[Mound and plugs] --> B2{Deep rooms<br/>or Many doors} --> B3[Daughter outposts] --> B4{Thatch<br/>or Living doors}
+    B1[Mound and plugs] --> B2{Deep rooms<br/>or Many doors} --> B3{Thatch<br/>or Living doors} --> B4[Daughter outposts]
   end
   subgraph Fight
-    C1[Majors] --> C2{Sprayers<br/>or Heavies} --> C3[Decoy trails] --> C4{The swarm<br/>or The guard}
+    C1[Majors] --> C2{Sprayers<br/>or Heavies} --> C3{The swarm<br/>or The guard} --> C4[War scent]
   end
   subgraph Scent
-    S1[Six trails] --> S2{Long memory<br/>or Quick scent} --> S3[Borrowed scent] --> S4{False trails<br/>or Adoption}
+    S1[Six trails] --> S2{Long memory<br/>or Quick scent} --> S3{Scent theft<br/>or Adoption} --> S4[Borrowed scent]
   end
 ```
 
+No pick removes a threat or a system. Each side is strong against about half the roster and half the mission types. Numbers here are starting values for the equal-cost test of 02 section 6.4, which counts the foraging given up.
+
 | Fork | One side | Other side |
 | --- | --- | --- |
-| Forage 2 | **Herders**: aphid herds on plants and roots give steady sugar and must be moved and guarded | **Harvesters**: seeds keep through any dry spell; majors crack them; granaries hold twice as much |
-| Forage 4 | **Gardeners**: the leaf to fungus chain feeds a huge colony from a safe room, slowly | **Raiders**: rival and termite brood carried home becomes protein or, with Adoption, workers |
-| Build 2 | **Deep rooms**: rooms far down are worth more and never flood; every trip is longer | **Many doors**: extra doors are cheap and jams end; every door must be held |
-| Build 4 | **Thatch**: brood grows a third faster under a warm dome that can burn | **Living doors**: a door caste whose heads close a tunnel; a held door loses no ants |
-| Fight 2 | **Sprayers**: acid from a distance, strong in the open, useless in a tunnel one cell wide | **Heavies**: slow giants that pin large animals and hold a tunnel alone |
-| Fight 4 | **The swarm**: workers cost half the protein and fight in the open by weight of numbers | **The guard**: fighters that have survived a fight grow stronger and are kept between missions |
-| Scent 2 | **Long memory**: trails last all day and strengthen with use; rivals read them easily | **Quick scent**: trails answer at once and fade in a minute; little for a rival to read |
-| Scent 4 | **False trails**: a trail that rivals follow and your own ants ignore | **Adoption**: workers of a beaten colony join yours |
+| Forage 2 | **Herders**: aphid herds give steady sugar that walks with the colony in a Move mission and pays a cold-night bill; a herd on the surface must be guarded, a root herd gives less | **Harvesters**: seeds keep and pay a dry-spell bill; they must be cracked, which takes majors off the line; a full granary draws pests and raids |
+| Forage 3 | **Gardeners**: leaves become food on a delay in a safe room; the leaf trail is long and exposed, and the waste must reach a midden | **Raiders**: brood and stores taken from rivals and termites come home as food or as workers; a quick raid on a supply line pays even when losing; it pays nothing against animals |
+| Build 2 | **Deep rooms**: worth more with depth; water reaches them half as fast; every trip is longer and brood grows slower in the cold unless vented | **Many doors**: doors are cheap and each adds throughput and a flanking exit; each also draws one more rival scout, and raids go for the least guarded door |
+| Build 3 | **Thatch**: brood grows a third faster and the dome sheds rain; it can burn in any dry mission and in the last one | **Living doors**: a door caste (two protein each) closes a tunnel one cell wide and takes twenty bites before she falls; a sealed door also stops the colony's own traffic, so a small siege can starve a large nest |
+| Fight 2 | **Sprayers**: acid at range; strong in the open, over a plug and against anything holding a narrow tunnel; weak when reached | **Heavies**: slow giants that pin large animals and hold a tunnel; too slow to guard a long trail and costly to feed |
+| Fight 3 | **The swarm**: two larvae to a nursery cell and workers at half the protein; numbers in the open | **The guard**: fighters who survive a fight grow stronger and carry over; each takes two escort slots and eats double; a dead veteran is gone |
+| Scent 2 | **Long memory**: trails last all day and become highways (faster, bigger loads) with use; rivals and the spider read them easily | **Quick scent**: trails cost nothing to redraw, fade in a minute, cannot be followed by scouts and are not wiped by slime; no highway bonus |
+| Scent 3 | **Scent theft**: scouts read where a rival's crews are going and what its nurseries are raising | **Adoption**: workers of a colony defect to the player during a fight that is going the player's way, and stay |
 
-Nodes that do not fork: Scouts (fast, see far, mark food and danger on the map), Repletes, Mound and plugs, Daughter outposts (a second small nest inside a mission), Majors, Decoy trails, Six trails (up from four, with crew presets), Borrowed scent (walk a rival's trail unnoticed for a while).
+Nodes that do not fork: Scouts (fast, see far, lift the fog, mark food and danger), Mound and plugs, Majors, Six trails (up from four, with crew presets), Repletes (living stores that walk), Daughter outposts (a second small nest inside a mission), War scent (three war trails released on one tick), Borrowed scent (walk a rival's trail unnoticed for a while).
 
-Inside a mission none of this is free: a pick opens a room or a caste, and the colony must still reach the tier, dig the room and feed the brood.
+Inside a mission none of this is free: a pick opens a room or a caste, and the colony must still reach the tier, dig the room and feed the brood. A scout's report (what the rival is raising, when a convoy leaves) arrives early enough to change a nursery's diet and hatch the answer.
 
 ## 6. Castes and enemies
 
-**Castes.** Worker, nurse (the youngest workers, by age), scout, major, sprayer or heavy, replete, door caste, gardener (tiny, cannot fight), and the winged ones of the last mission. A beaten colony's adopted workers are a tenth kind.
+**Castes.** Worker (the youngest nurse; that is an age, not a caste), scout, major, sprayer or heavy, replete, door caste, gardener (tiny, cannot fight), adopted workers, and the winged ones of the last mission. Ten exist; one playthrough raises seven or eight.
 
 **Enemies**, each with one rule the player can see and one clean answer:
 
@@ -147,17 +160,38 @@ Inside a mission none of this is free: a pick opens a room or a caste, and the c
 | Neighbour colonies (three temperaments: harvesters that turtle, a small fast colony that raids, a large slow one that claims food sites) | The player's own orders and rules | Everything above |
 | The pale colony | Many nests, one scent, no borders between them | Cut its roads; take nests one at a time |
 
-Combat keeps the contact rule of 02 section 6.4: numbers win in the open, quality and doors win in a tunnel.
+Combat keeps the contact rule of 02 section 6.4: numbers win in the open, quality and doors win in a tunnel. Large animals go for the largest colony on the map first, which slows a runaway leader.
+
+### Orders for war
+
+Trails, crews, Alarm and Recall are not enough to fight a colony. Five additions, all on the route card, and the rival uses the same five:
+
+| Order | What it does |
+| --- | --- |
+| **Raid** | A toggle on a trail. Its crew fights at the trail's end and carries the dead, brood and stores home |
+| **Who goes** | Caste chips on the crew (workers, majors, sprayers or heavies). The crew musters at the nearest rest hall |
+| **Stance** | Press (fight through), Hold (guard the trail's end), Fall back (return to the trail's start when losses pass two to one) |
+| **Pull back** | Recall for one trail |
+| **Together** | Orders set in pause are released on one tick, so two trails can break in from two sides |
+
+### The map as strategy
+
+- **Sight.** Ground the colony has not walked is hidden. Scouts and trails lift the fog; it returns slowly where no ant goes.
+- **Sites that pay while held.** A root with aphids, a seeding plant, a sunny stone, a carcass: each pays per minute to the colony whose ants hold it, so the map has places worth fighting over and a front between them.
+- **Supply lines are visible.** A busy trail shows a rival where the food is and where the door is. Cutting a road delays the reinforcements that use it, and the colony that owns it must reroute in the open.
+- **Water as a weapon.** Digging the last cell of a channel sends the creek down a rival's road or into its nest, and into the player's low rooms unless a spillway is ready.
+- **Planting.** Seeds dropped on purpose sprout into cover and root-braced soil, in this mission and in the region's later missions.
+- **Evacuation.** In a Move mission the queen, pupae and repletes share the exits; the rear guard can plug once; every carrier still outside changes the next start.
 
 ## 7. Build order
 
-No dates. Each step is played by the owner before the next is called done.
+No dates. Each step is played by the owner before the next is called done. Three reviews (section 9) agreed that the strategy game has to be proven before the campaign is wrapped around it, so the first step is one contested hill.
 
-1. **One full loop, thin.** Missions 1 to 3 with goals, side goals and a result card; amber; the campaign map with the first fork; one Lineage fork (Forage 2); missions 4a and 4b, which play differently under each pick. This proves missions, progression and a branch together.
-2. **Rooms.** Painted room kinds with capacity and supply time; stores that live in rooms; the population cap; colony tiers.
-3. **The home nest** and the expedition.
-4. **A rival colony** that plays by the same orders, with sight and scouting. Then missions 9b and 10b.
-5. **The roster**: the remaining castes and enemies, one mission at a time, each with its mission.
+1. **One contested mission, complete.** "The crossing": a creek hill with finite food, one rival colony that plays by the player's orders, sight and scouts, sites that pay while held, rooms (queen's chamber, nursery with a diet, granary, rest hall) with stores that live in them, colony tiers, the five war orders, rising water at the ford, a main goal, two side goals, one dilemma and a result card. One pick before the start (Sprayers or Heavies). It passes when a player can win the same seed with either pick by different plans.
+2. **The aftermath.** A short second mission that starts from what the first left: the nest as built, the survivors, the dilemma's result. Then the campaign map with its first fork and the home harvest.
+3. **The opening.** Missions 1 to 3 as gentler configurations of the same engine, each teaching part of it.
+4. **The home nest** and the expedition.
+5. **The roster**: the remaining castes, enemies and rooms, each arriving with its mission.
 6. **The remaining regions**, the pale colony and the last mission.
 7. Free hill (the old painter page folds into the new client as this mode), the daily founding run, friends by link (02 section 9).
 
@@ -173,3 +207,21 @@ Building goes ahead on the first option of each. Each can be changed later at th
 | How hard forks lock | **A. Closed for the campaign; the wedding flight carries one pick into the next.** B. Closed until you pay amber to switch. C. Everything can be had in the end and only the order differs (the freeciv way). A makes each pick matter most |
 | The region not taken | **A. Stays open but a rival settles it first** (first fork); **falls to the pale colony** (second fork). B. Always stays open unchanged |
 | Labels | **A. Short labels on goals, rooms and picks; no story text.** B. Fully wordless with icons only |
+
+## 9. Review record (2026-11-27)
+
+Three reviewers from three model families read the first draft of this file for depth, with an instruction not to cut scope. Adopted:
+
+- **No spendable meta-currency.** The first draft paid for the tree in "amber" earned per mission. With one-of-two picks and a defended home, that stacked too close to the reference game's own progression. Nodes now open by deeds and cost real stores.
+- **No pick deletes a system.** "Never floods", "jams end" and "a held door loses no ants" were rewritten; every fork side now has a cost that fires often and a share of the roster it answers.
+- **Home accrues nothing while idle**; one harvest per mission pays for escort, building and the tree together.
+- **Forks moved to levels 2 and 3** so picks are in use for most of the campaign.
+- **One founding per region**, a rule for dilemmas, a floor after a lost escort, large animals that go for the leader.
+- **Orders for war** and **the map as strategy** (sight, held sites, visible supply lines, water as a weapon).
+- **Room conflict** through heat and air, so there is no single best layout.
+- **The first build** is one contested mission, not the opening of the campaign.
+- The map's second fork was drawn from the wrong regions; fixed.
+
+Not adopted: living bridges and rafts (excluded in 07 as too close to the reference); a stationary bucket brigade and scent hijacking (kept as lab ideas; hijacking overlaps Scent theft).
+
+Not checked: every number here is a starting value that no bot or player has run.
