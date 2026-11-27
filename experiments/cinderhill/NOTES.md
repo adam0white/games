@@ -820,3 +820,36 @@ Numbers, 5 seeds both seats (seat 0 attacks): steady v steady, attacker won 2 of
 bold on one side 4 of 10 before and 3 of 10 after. The rival tunnelled through in 1 game of 10, so the second way in
 is mostly a player's choice for now. No person has dug it on this map; whether the tunnel can be finished before
 dusk by hand is not known.
+
+## The Narrows: the tunnel was a trap; what was fixed and what it is now
+
+Checked after the second way in went live. Three faults, all fixed in one change:
+
+1. **The dig cost the hill its army.** 75 cells along row 12 at a seed and 120 ticks a cell joined the nests between
+   ticks 4396 and 5488 of 9600. Steady and bold bots also told to dig won 0 of 20; left alone they won 7 of 20
+   through the pass. The mission's kit now sets `digTicks: 60, digSugar: 0` (two new options; every other mission
+   keeps 120 and 1). The nests now join near tick 3300.
+2. **Half a strike sent under ground walked over the top.** A raid's field is the shortest way from where each
+   soldier stands, and for a soldier outside that was the pass and the rival door (seed 2: 9 of 17 went over, 8
+   under, all died apart). A raid sent under ground now builds its field without the other hill's door
+   (`field(..., shut)`), so everyone goes home and down. Same seed after: 17 of 17 under.
+3. **With digging free the rival dug to your hill.** In half of thirty games its tunnel joined the nests late in
+   the day. It never sent a soldier down and never hurt the queen, but the card says it will not march. The hill a
+   siege is laid to (`holds` in ai.js) now digs no tunnel out and sends no raid under ground. After: 0 joins by the
+   rival and 0 games with the attacker's queen hurt in forty.
+
+What the tunnel is worth now, ten seeds each, seat 0 attacking:
+
+| attacker | wins |
+| --- | --- |
+| steady bot, left alone (storms the pass) | 5 |
+| bold bot, left alone | 5 |
+| bold bot, also told to dig | 5, all of them over the top: it keeps a surface raid and never strikes under |
+| steady bot, also told to dig | 1: once joined it waits and stops storming |
+| steady economy, no surface raids, strikes under at 10 or 16 soldiers | 2, both through the tunnel (ticks 6833 and 6871) |
+
+So the tunnel can win and no longer loses the game for the digger, but with bots it is the weaker way: 2 of 10
+against 5 of 10. The card says "the harder way". Not tried: a feint at the pass with the strike under it, which is
+what a person would do. No person has played either way.
+
+Tried and dropped: free digging at 120 ticks a cell (1 and 3 of 10 before the other fixes).

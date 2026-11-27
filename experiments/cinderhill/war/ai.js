@@ -109,6 +109,7 @@ export function think(sim, t, mind = 1) {
   // breach: it may dig for the other nest. sealed: the map has a wall with no gap, so there is no way over the ground.
   const M = MAPS[sim.mission.map], sealed = !!M && !!M.wall && !M.gaps.length, breach = sim.mayBreach(t) && mind.breach !== false;
   // Before a frost it plans for the winter: stores for every mouth first, and no more housing than the stores can feed.
+  const holds = sim.mission.goals.dusk === 'holder' && t === 1; // the hill a siege is laid to: it wins by lasting, so it digs no tunnel out and sends no one down one
   const cfg = sim.cfg, winter = cfg.frostTick > 0 && (typeof mind === 'number' || mind.winter !== false), frozen = winter && sim.tick >= cfg.frostTick;
   const meals = winter ? Math.ceil((cfg.duskTick - Math.max(sim.tick, cfg.frostTick)) / cfg.frostEat) : 0, feed = mouths => Math.ceil(mouths / sim.stat[t].eatPer) * meals;
   const door = sim.door[t], dx = door % sw, dy = Math.floor(door / sw);
@@ -179,13 +180,13 @@ export function think(sim, t, mind = 1) {
     // With nothing pressing to build and hands to spare, it digs for the nearest cache: a seed a cell, paid back at the end.
     if (!dug && adults >= 40 && (typeof mind === 'number' || mind.caches !== false)) {
       const run = cacheRun(sim, t, v => cg[o + (v & 1 ? CG.PROTEIN : CG.SUGAR)] + (v >> 1) <= capF), cells = run.length >> 1;
-      if (cells && cells <= 24 && cg[o + CG.SUGAR] >= cells * C.DIG_SUGAR + C.DIG_KEEP + 6 && !frozen) {
+      if (cells && cells <= 24 && cg[o + CG.SUGAR] >= cells * cfg.digSugar + C.DIG_KEEP + 6 && !frozen) {
         out.push({ team: t, type: CMD.DIG, cells: run }); dug = true;
       }
     }
     // A breach: where the mission lets it, a rival that raids digs for the other nest, eight cells at a time so that a
     // room it comes to need is not kept waiting. Where it aims (the nearest room, the queen, the stores) goes by the seed.
-    if (!dug && breach && mood > 0 && !sim.linked && !outnumbered && adults >= 40 && sim.tick >= (mood === 2 ? 600 : 1500) && cg[o + CG.SUGAR] >= 8 * C.DIG_SUGAR + C.DIG_KEEP + 4) {
+    if (!dug && breach && !holds && mood > 0 && !sim.linked && !outnumbered && adults >= 40 && sim.tick >= (mood === 2 ? 600 : 1500) && cg[o + CG.SUGAR] >= 8 * cfg.digSugar + C.DIG_KEEP + 4) {
       const foe2 = 1 - t, aim = mind.aim ?? (Math.abs(cfg.seed | 0) + t) % 3;
       let run = breachRun(sim, t, foe2, aim); if (!run.length && aim) run = breachRun(sim, t, foe2, 0); // no stores to aim at, or no way to them: the nearest room will do
       if (run.length) out.push({ team: t, type: CMD.DIG, cells: run.slice(0, 16) });
@@ -258,7 +259,7 @@ export function think(sim, t, mind = 1) {
   const away = () => { let n = 0; for (let k = 0; k < TRAILS; k++) { const s2 = foe * TRAILS + k; if (sim.trLive[s2] && sim.trKind[s2] === KIND.RAID) n += sim.crew[s2]; } return n; };
   const atDoor = k => { const s2 = t * TRAILS + k, e = sim.trPath[s2 * PATH_MAX + sim.trLen[s2] - 1]; return foe >= 0 && (e >= L.nestBase || sim.doorF[foe][e] <= 4); };
   // Joined under ground, it goes through the breach for the queen. Behind a whole wall there is no other way, and it waits for one.
-  if (sim.linked && foe >= 0 && sim.mayBreach(t)) {
+  if (sim.linked && foe >= 0 && sim.mayBreach(t) && !holds) {
     // Steady waits for a quarter more soldiers than the other hill, and no longer than three fifths of the day.
     const go = mood > 0 && majors >= (mood === 2 ? 6 : 8) && (mood === 2 ? majors >= foeMajors : majors * 4 >= foeMajors * 5 || sim.tick * 5 >= cfg.duskTick * 3);
     if (raids.length && (majors < 3 || (!go && majors * 2 < foeMajors))) for (const k of raids) out.push({ team: t, type: CMD.ERASE, trail: k });

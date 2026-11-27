@@ -112,6 +112,7 @@ export const DEFAULTS = {
   mission: 'crossing', // a row of MISSIONS; its kit (ants, food, brood, duskTick: 0 for no dusk) sits under these options
   frostTick: 0, frostEat: 1200, // a mission's frost: from this tick the food outside is gone and a meal comes this often
   queenHp: C.QUEEN_HP,
+  digTicks: C.DIG_TICKS, digSugar: C.DIG_SUGAR, // one cell of clay: the ticks of digging and the seeds it costs (a mission's kit may make its ground soft)
   starveAfter: 1200, starveDiv: 100, // ticks at no seeds before ants die, and the share that die every ten seconds (one in starveDiv)
   tiers: true, // growth inside the mission (TIERS): rooms beyond the first three, the third caste and the nodes wait on the queen's chamber
   blank: false, // an empty map for tests: no stones, creek or food
@@ -483,16 +484,16 @@ export class Sim {
         if (this.owner(k) !== t) {
           // The rival's ground: a colony that may breach marks plain clay there and takes its own marks off, and no more.
           if (!this.mayBreach(t)) continue;
-          if (dig && o.on !== 0 && o.on !== false) { if (m === MAT.CLAY && !this.mark[k] && marks < C.MARKS_MAX) { this.mark[k] = t + 1; this.digLeft[k] = C.DIG_TICKS; marks++; done++; } }
+          if (dig && o.on !== 0 && o.on !== false) { if (m === MAT.CLAY && !this.mark[k] && marks < C.MARKS_MAX) { this.mark[k] = t + 1; this.digLeft[k] = this.cfg.digTicks; marks++; done++; } }
           else if ((dig || !kind) && this.mark[k] === t + 1) { this.mark[k] = 0; marks--; done++; }
           continue;
         }
         if (dig) {
           if (o.on === 0 || o.on === false) { if (this.mark[k] === t + 1) { this.mark[k] = 0; marks--; done++; if (this.room[k]) use(k, ROOM.NONE); } }
-          else if (m === MAT.CLAY && this.mark[k] !== t + 1 && marks < C.MARKS_MAX) { this.mark[k] = t + 1; this.digLeft[k] = C.DIG_TICKS; marks++; done++; } // on its own ground a colony takes a rival's mark over
+          else if (m === MAT.CLAY && this.mark[k] !== t + 1 && marks < C.MARKS_MAX) { this.mark[k] = t + 1; this.digLeft[k] = this.cfg.digTicks; marks++; done++; } // on its own ground a colony takes a rival's mark over
         } else {
           if (this.room[k] === PLUG && m !== MAT.OPEN) { if (!kind && this.mark[k] === t + 1) { this.mark[k] = 0; marks--; done++; } continue; } // a plug is not a room: it is dug out or left
-          if (o.dig && kind && m === MAT.CLAY && this.mark[k] !== t + 1 && marks < C.MARKS_MAX) { this.mark[k] = t + 1; this.digLeft[k] = C.DIG_TICKS; marks++; done++; }
+          if (o.dig && kind && m === MAT.CLAY && this.mark[k] !== t + 1 && marks < C.MARKS_MAX) { this.mark[k] = t + 1; this.digLeft[k] = this.cfg.digTicks; marks++; done++; }
           if (!kind && this.mark[k] === t + 1) { this.mark[k] = 0; marks--; done++; }
           if ((m === MAT.OPEN || this.mark[k] === t + 1 || !kind) && this.room[k] !== kind) use(k, kind);
         }
@@ -584,7 +585,7 @@ export class Sim {
   // ---- Fields ----
 
   /** Steps to the nearest source over open cells (four ways and through doors), FAR where there is no way. */
-  field(out, sources, doors = true) {
+  field(out, sources, doors = true, shut = -1) {
     const L = this.L, n = L.n, mat = this.mat, q = this.bq, link = this.link, nb = L.nb;
     const d = out || new Uint16Array(n);
     d.fill(FAR);
@@ -593,7 +594,7 @@ export class Sim {
     while (qh < qt) {
       const c = q[qh++], v = d[c] + 1;
       for (let k = 0; k < 4; k++) { const m = nb[c * 4 + k]; if (m >= 0 && d[m] === FAR && mat[m] === MAT.OPEN) { d[m] = v; q[qt++] = m; } }
-      const m = doors ? link[c] : -1;
+      const m = doors && c !== shut && link[c] !== shut ? link[c] : -1; // shut: one door this field does not use
       if (m >= 0 && d[m] === FAR && mat[m] === MAT.OPEN) { d[m] = v; q[qt++] = m; }
     }
     return d;
@@ -601,7 +602,10 @@ export class Sim {
 
   buildTrailField(s) {
     const len = this.trLen[s], at = s * PATH_MAX, P = this.trPath;
-    const d = (this.trF[s] = this.field(this.trF[s], P.subarray(at, at + len)));
+    // A raid sent under ground goes under ground: its field does not use the other hill's door, so a soldier standing
+    // outside walks home and down the tunnel with the rest, not over the top alone into the guard at the pass.
+    const t = Math.floor(s / TRAILS), under = len === 1 && P[at] >= this.L.nestBase && this.owner(P[at] - this.L.nestBase) !== t;
+    const d = (this.trF[s] = this.field(this.trF[s], P.subarray(at, at + len), true, under ? this.door[1 - t] : -1));
     for (let c = 0; c < d.length; c++) if (d[c] !== FAR) d[c] = Math.min(FAR - 1, d[c] + OFF);
     for (let j = 0; j < len; j++) { const c = P[at + j], left = len - 1 - j; if (d[c] >= OFF || left < d[c]) d[c] = left; } // on the path: steps left to its end
   }
@@ -868,7 +872,7 @@ export class Sim {
         if (m < L.nestBase || this.mark[k] !== t + 1) continue;
         this.to[i] = -1;
         // The opening stroke costs a seed: earth is carried out on food. The last few seeds are kept for the colony to eat: the cell waits.
-        const plug = this.room[k] === PLUG, cost = plug ? C.PLUG_BREAK : C.DIG_SUGAR;
+        const plug = this.room[k] === PLUG, cost = plug ? C.PLUG_BREAK : this.cfg.digSugar;
         if (plug) { // packed earth: one stroke on it every fifth tick, however many dig
           if (this.tick % C.PLUG_SLOW) return c;
           if (this.plugTick !== this.tick) { this.plugTick = this.tick; this.plugHit.clear(); }
