@@ -65,7 +65,7 @@ export function think(sim, t, mind = 1) {
   // Diet: workers first, then one in four a major, then two in four.
   const adults = cg[o + CG.ADULTS], majors = cg[o + CG.MAJORS];
   // Bold raises soldiers from the first brood: it means to strike before a growing hill's rooms have paid.
-  const diet = mood === 2 ? (adults < 34 ? 1 : 2) : adults < 36 ? 0 : adults < 60 ? 1 : 2;
+  const diet = mood === 2 || sim.sites.length ? (adults < 34 ? 1 : 2) : adults < 36 ? 0 : adults < 60 ? 1 : 2;
   // Its chosen caste (mind.pick), if the mission allows one: picked at the start, then raised beside the soldiers.
   const pick = typeof mind === 'number' ? 0 : mind.pick | 0, special = pick && diet ? Math.min(4 - diet, mind.special ?? 1) : 0;
   if (pick && !cg[o + CG.PICK]) out.push({ team: t, type: CMD.PICK, caste: pick });
@@ -90,6 +90,17 @@ export function think(sim, t, mind = 1) {
   let foes = 0;
   for (let i = 0; i < sim.n; i++) if (sim.team[i] !== t && sim.hp[i] > 0 && sim.layer[i] === 0 && Math.abs((sim.x[i] >> 8) - dx) <= 10 && Math.abs((sim.y[i] >> 8) - dy) <= 10) foes++;
   if (foes >= 3 && cg[o + CG.RALLY_HOLD] < 100) out.push({ team: t, type: CMD.RALLY, x: dx, y: dy, hold: 400 });
+  // Stones that pay while held: its soldiers stand on the nearest ones (timid one, steady two, bold three), a raid trail each.
+  if (sim.sites.length) {
+    const want = sim.sites.map(c => [sim.doorF[t][c], c]).sort((a, b) => a[0] - b[0]).slice(0, 1 + mood).map(e => e[1]);
+    const by = (e, c) => Math.abs((e % sw) - (c % sw)) <= 2 && Math.abs(Math.floor(e / sw) - Math.floor(c / sw)) <= 2;
+    const end = k => { const s2 = t * TRAILS + k; return sim.trPath[s2 * PATH_MAX + sim.trLen[s2] - 1]; };
+    const kept = raids.filter(k => majors >= 2 && want.some(c => by(end(k), c)));
+    for (const k of raids) if (!kept.includes(k)) out.push({ team: t, type: CMD.ERASE, trail: k });
+    let room = TRAILS - live.length;
+    if (majors >= 3) for (const c of want) if (room > 0 && !kept.some(k => by(end(k), c))) { out.push({ team: t, type: CMD.TRAIL, kind: KIND.RAID, level: mood ? 1 : 2, points: [c % sw, Math.floor(c / sw)] }); room--; }
+    return out;
+  }
   // War. It breaks into the enemy nest only with the numbers for it (bold: at parity; steady: a quarter more), since a
   // raid into an equal guard is thrown away. Short of that, its soldiers hold the richest food on the fords.
   let foeMajors = 0, foe = -1;
