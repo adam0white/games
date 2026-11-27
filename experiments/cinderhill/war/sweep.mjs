@@ -23,10 +23,12 @@ function match(a, b, seed) {
 }
 const NB = mood => ({ mood, build: false }); // a mind that never digs
 const R = (...rooms) => ({ mood: 1, rooms }); // a steady mind that digs only these: 1 stores, 2 nursery, 3 quarters
-const name = m => typeof m !== 'object' ? String(m) : m.rooms ? '1 only ' + m.rooms.map(r => ['', 'stores', 'nursery', 'quarters'][r]).join('+') : m.mood + ' no rooms';
+const P = (mood, pick, special = 1) => ({ mood, pick, special }); // a mind with a chosen caste: 2 spitters, 3 wardens
+const name = m => typeof m !== 'object' ? String(m) : m.pick ? `${m.mood} ${['', '', 'spitters', 'wardens'][m.pick]} x${m.special}` : m.rooms ? '1 only ' + m.rooms.map(r => ['', 'stores', 'nursery', 'quarters'][r]).join('+') : m.mood + ' no rooms';
 const rows = [];
 const only = process.argv[3] ? process.argv[3].split(',').map(Number) : null;
-for (const [a, b] of [['idle', 1], ['novice', 0], ['novice', 1], ['novice', 2], [0, 1], [1, 1], [2, 1], [0, 2], [2, 2], [1, 0], [1, NB(1)], [2, NB(2)], [0, NB(0)], [NB(1), NB(1)], [1, R(1)], [1, R(2)], [1, R(3)], [1, R(1, 3)], [1, R(2, 3)]].filter((_, i) => !only || only.includes(i))) {
+for (const [a, b] of [['idle', 1], ['novice', 0], ['novice', 1], ['novice', 2], [0, 1], [1, 1], [2, 1], [0, 2], [2, 2], [1, 0], [1, NB(1)], [2, NB(2)], [0, NB(0)], [NB(1), NB(1)], [1, R(1)], [1, R(2)], [1, R(3)], [1, R(1, 3)], [1, R(2, 3)],
+  [P(1, 2), 1], [P(1, 3), 1], [P(1, 2), P(1, 3)], [P(2, 2), P(2, 3)], [P(1, 2, 2), 1], [P(1, 3, 2), 1]].filter((_, i) => !only || only.includes(i))) {
   let w = 0, q = 0, t = 0;
   for (let seed = 1; seed <= seeds; seed++) { const r = match(a, b, seed); if (r.win === 0) w++; if (r.queen) q++; t += r.tick; }
   rows.push({ first: name(a), second: name(b), 'first wins %': Math.round(100 * w / seeds), 'by queen %': Math.round(100 * q / seeds), 'mean end (s)': Math.round(t / seeds / 20) });

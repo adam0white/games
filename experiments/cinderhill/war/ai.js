@@ -28,7 +28,8 @@ export function buildNext(sim, t, kind) {
 }
 
 /** The orders this seat gives now. `mood`: 0 timid (never raids), 1 steady, 2 bold (raids early); or { mood, build: false }
- *  for a mind that never digs, or { mood, rooms: [kinds] } for one that digs only those. */
+ *  for a mind that never digs, or { mood, rooms: [kinds] } for one that digs only those;
+ *  { mood, pick, special } chooses a caste and its share of the brood in four. */
 export function think(sim, t, mind = 1) {
   const mood = typeof mind === 'number' ? mind : mind.mood ?? 1, build = typeof mind === 'number' ? true : mind.build !== false;
   const may = k => typeof mind === 'number' || !mind.rooms || mind.rooms.includes(k); // rooms: the only kinds this mind digs
@@ -61,7 +62,10 @@ export function think(sim, t, mind = 1) {
   const adults = cg[o + CG.ADULTS], majors = cg[o + CG.MAJORS];
   // Bold raises soldiers from the first brood: it means to strike before a growing hill's rooms have paid.
   const diet = mood === 2 ? (adults < 34 ? 1 : 2) : adults < 36 ? 0 : adults < 60 ? 1 : 2;
-  if (cg[o + CG.DIET] !== diet) out.push({ team: t, type: CMD.DIET, share: diet });
+  // Its chosen caste (mind.pick), if the mission allows one: picked at the start, then raised beside the soldiers.
+  const pick = typeof mind === 'number' ? 0 : mind.pick | 0, special = pick && diet ? Math.min(4 - diet, mind.special ?? 1) : 0;
+  if (pick && !cg[o + CG.PICK]) out.push({ team: t, type: CMD.PICK, caste: pick });
+  if (cg[o + CG.DIET] !== diet || (cg[o + CG.PICK] && cg[o + CG.DIET2] !== special)) out.push({ team: t, type: CMD.DIET, share: diet, special });
   // Building, one room at a time: a store when the stores are nearly full, quarters when the hill is, a nursery wing when the brood is.
   if (build && cg[o + CG.MARKS] > 0 && !sim.digF[t]) {
     // Marks no worker can reach would stall it for good: take them off.

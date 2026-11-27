@@ -21,20 +21,24 @@ const rec = lab('cinderhill', { lang: () => 'en' });
 rec.notice($('menuLab')); rec.toggle($('menuLab')); rec.toggle($('pauseLab'));
 const set = settings('cinderhill', {
   rival: { values: ['timid', 'steady', 'bold'], def: 'timid', key: 'cinderhill:war:rival' },
+  caste: { values: ['spitter', 'warden'], def: 'spitter', key: 'cinderhill:war:caste' },
   view: { values: ['tilt', 'top', 'low'], def: 'tilt', key: 'cinderhill:war:view' },
   light: { values: ['cycle', 'day', 'ember'], def: 'cycle', key: 'cinderhill:war:light' },
   style: { values: ['relief', 'ink'], def: 'relief', key: 'cinderhill:war:style' },
   size: { values: ['1', '1.5'], def: '1.5', key: 'cinderhill:war:size' },
   sound: { values: ['all', 'fx', 'off'], def: 'all', key: 'cinderhill:war:sound' },
 }, { rec });
-const LABEL = { rival: 'Rival', view: 'View', light: 'Light', style: 'Style', size: 'Ants', sound: 'Sound' };
-const NAME = { timid: 'Timid', steady: 'Steady', bold: 'Bold', tilt: 'Tilted', top: 'Top down', low: 'Low', cycle: 'Day to dusk', day: 'Day', ember: 'Ember', relief: 'Painted', ink: 'Ink', 1: 'True size', 1.5: 'Larger', all: 'Music & effects', fx: 'Effects', off: 'Off' };
+const LABEL = { caste: 'Your third caste', rival: 'Rival', view: 'View', light: 'Light', style: 'Style', size: 'Ants', sound: 'Sound' };
+const NAME = { spitter: 'Spitters', warden: 'Wardens', timid: 'Timid', steady: 'Steady', bold: 'Bold', tilt: 'Tilted', top: 'Top down', low: 'Low', cycle: 'Day to dusk', day: 'Day', ember: 'Ember', relief: 'Painted', ink: 'Ink', 1: 'True size', 1.5: 'Larger', all: 'Music & effects', fx: 'Effects', off: 'Off' };
 const MOOD = { timid: 0, steady: 1, bold: 2 };
-const redraw = set.panel($('settings'), { label: id => LABEL[id], name: (id, v) => NAME[v] ?? v, what: (id, v) => (id === 'rival' ? (v === 'timid' ? 'It never attacks your hill. Applies from the next start.' : v === 'bold' ? 'It raids early, even at even odds. Applies from the next start.' : 'It holds the fords, and raids when it has the numbers. Applies from the next start.') : null), onChange: (id, v) => { if (id === 'sound') { if (v === 'off') snd.hold(); else { snd.release(); startSong(); } } tone(660, 0.06, 0.03, 'triangle', 80); } });
+const redraw = set.panel($('settings'), { label: id => LABEL[id], name: (id, v) => NAME[v] ?? v, what: (id, v) => (id === 'caste' ? (v === 'spitter' ? 'Frail, but they spit from two cells away, over the front line. Applies from the next start.' : 'Slow and very hard to kill: they hold a tunnel. Applies from the next start.') : id === 'rival' ? (v === 'timid' ? 'It never attacks your hill. Applies from the next start.' : v === 'bold' ? 'It raids early, even at even odds. Applies from the next start.' : 'It holds the fords, and raids when it has the numbers. Applies from the next start.') : null), onChange: (id, v) => { if (id === 'sound') { if (v === 'off') snd.hold(); else { snd.release(); startSong(); } } tone(660, 0.06, 0.03, 'triangle', 80); } });
 
 // ---- the game ----
 const qSeed = Math.floor(Number(query.get('seed')));
 let seed = qSeed > 0 ? qSeed : 1 + Math.floor(Math.random() * 9999);
+const PICK = { spitter: CASTE.SPITTER, warden: CASTE.WARDEN };
+// A rival that fights takes the caste you did not. Both are set when the run starts, so the menu's settings count.
+const rivalMind = () => { const mood = MOOD[set.get('rival')]; return mood ? { mood, pick: set.get('caste') === 'spitter' ? CASTE.WARDEN : CASTE.SPITTER } : mood; };
 const newHost = () => new Host({ seed, ai: { [FOE]: MOOD[set.get('rival')] } });
 let host = newHost(), sim = host.sim;
 let screen = 'menu', tool = 'trail', nestOpen = false, running = false, speed = 1, lastT = 0;
@@ -103,9 +107,9 @@ function uploadAnts() {
   let k = 0;
   for (let i = 0; i < sim.n; i++) {
     if (sim.layer[i] !== 0) continue;
-    const p = prevOf[i], jump = p < 0 || host.pl[p] !== 0, x = sim.x[i] / 256, y = sim.y[i] / 256, major = sim.caste[i] === CASTE.MAJOR;
+    const p = prevOf[i], jump = p < 0 || host.pl[p] !== 0, x = sim.x[i] / 256, y = sim.y[i] / 256, ca = sim.caste[i], major = ca === CASTE.MAJOR || ca === CASTE.WARDEN;
     inst[k] = jump ? x : host.px[p] / 256; inst[k + 1] = jump ? y : host.py[p] / 256; inst[k + 2] = x; inst[k + 3] = y;
-    inst[k + 4] = sim.heading[i] * (Math.PI / 128); inst[k + 5] = (major ? 2 + 8 : 0) + (sim.team[i] ? 16 : 0); inst[k + 6] = sim.carry[i]; inst[k + 7] = (sim.id[i] * 0.618034) % 1;
+    inst[k + 4] = sim.heading[i] * (Math.PI / 128); inst[k + 5] = (ca === CASTE.WARDEN ? 3 + 8 : major ? 2 + 8 : ca === CASTE.SPITTER ? 1 : 0) + (sim.team[i] ? 16 : 0); inst[k + 6] = sim.carry[i]; inst[k + 7] = (sim.id[i] * 0.618034) % 1;
     k += 8;
   }
   drawnAnts = k / 8; renderer.setAnts(inst, drawnAnts);
@@ -145,6 +149,7 @@ function setScreen(s) {
 function opening() { const e = doorXY(ME); cam.x = e.x; cam.y = e.y; cam.z = 24; clampCam(); camGoal = { x: e.x + 4, y: e.y, z: startZoom(), rate: 0.8 }; }
 function startRun() {
   rec.start({ ...set.snapshot(), mode: 'war', mission: 'crossing', look: `war:${set.get('view')}/${set.get('light')}/${set.get('style')}`, seed, v: 1 });
+  host.ai[FOE] = rivalMind(); host.order({ team: ME, type: CMD.PICK, caste: PICK[set.get('caste')] });
   running = true; opening();
 }
 function play() { snd.unlock(); startSong(); if (!running) startRun(); setScreen('play'); lastT = 0; snd.release(); }
@@ -187,6 +192,7 @@ $('recall').addEventListener('click', () => { const on = !g(ME, CG.RECALL); orde
 const SPEEDS = [1, 2, 4];
 function setSpeed(x) { speed = x; $('speedText').textContent = `${x}×`; $('speed').setAttribute('aria-pressed', String(x > 1)); }
 $('speed').addEventListener('click', () => { setSpeed(SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length]); rec.event('speed', { at: sim.tick, x: speed }); tone(500 + 150 * speed, 0.06, 0.03, 'triangle'); });
+for (const b of document.querySelectorAll('#specials [data-special]')) b.addEventListener('click', () => { order({ type: CMD.DIET, share: Math.min(g(ME, CG.DIET), 4 - Number(b.dataset.special)), special: Number(b.dataset.special) }); tone(600 + 60 * Number(b.dataset.special), 0.08, 0.04, 'triangle'); setTimeout(hud, 80); });
 for (const b of document.querySelectorAll('#diets [data-diet]')) b.addEventListener('click', () => { order({ type: CMD.DIET, share: Number(b.dataset.diet) }); tone(560 + 60 * Number(b.dataset.diet), 0.08, 0.04, 'triangle'); setTimeout(hud, 80); });
 let sel = -1, routeUntil = 0, firstTrail = false;
 const showRoute = (ms = 6000) => { routeUntil = performance.now() + ms; };
@@ -265,7 +271,10 @@ function paintAt(e) {
   if (x < 0 || x >= L0.nw || y < 0 || y >= L0.nh || sim.owner(k) !== ME || paint.seen.has(k)) return; // the sim refuses what it must
   paint.seen.add(k); paint.cells.push(x, y);
 }
-function setNestTool(t) { nestTool = t; for (const b of document.querySelectorAll('#rooms [data-room]')) b.setAttribute('aria-pressed', String(b.dataset.room === t)); if (t !== 'look') toast(t === 'clear' ? 'Drag over marks or rooms to clear them' : 'Drag in the earth: workers dig it out', 2400); }
+function setNestTab(t) { $('diet').dataset.tab = t; for (const b of document.querySelectorAll('#diet .tabs [data-tab]')) b.setAttribute('aria-pressed', String(b.dataset.tab === t)); if (t !== 'dig' && nestTool !== 'look') setNestTool('look'); }
+for (const b of document.querySelectorAll('#diet .tabs [data-tab]')) b.addEventListener('click', () => { setNestTab(b.dataset.tab); tone(480, 0.05, 0.03, 'triangle'); });
+const DIG_HELP = { look: 'Pick a room, then drag in the earth beside a tunnel.', store: 'Store: each cell holds 8 more seeds and 8 more meat. A seed to dig a cell.', nursery: 'Nursery: each cell holds one more egg or grub. A seed to dig a cell.', rest: 'Quarters: each cell houses 4 more ants. A full hill stops the queen laying.', clear: 'Drag over marks or rooms to take them off. Dug earth stays dug.' };
+function setNestTool(t) { nestTool = t; $('digHelp').textContent = DIG_HELP[t]; if (t !== 'look' && $('diet').dataset.tab !== 'dig') setNestTab('dig'); for (const b of document.querySelectorAll('#rooms [data-room]')) b.setAttribute('aria-pressed', String(b.dataset.room === t)); if (t !== 'look') toast(t === 'clear' ? 'Drag over marks or rooms to clear them' : 'Drag in the earth: workers dig it out, a seed a cell', 2400); }
 for (const b of document.querySelectorAll('#rooms [data-room]')) b.addEventListener('click', () => { setNestTool(b.dataset.room); tone(500, 0.06, 0.03, 'triangle'); });
 nestCanvas.addEventListener('pointerdown', e => {
   if (nestDrag) return; // one finger at a time
@@ -307,7 +316,8 @@ function news() {
       if (!(set.get('sound') === 'all' && song?.ember?.())) tone(1500 + Math.random() * 500, 0.04, 0.02, 'sine', 300);
     } else if (type === EVENT.BORN && a === ME) {
       const e = doorXY(ME); burst(e.x, e.y, b ? [1, 0.5, 0.35] : [1, 0.95, 0.7], b ? 14 : 6, { vh: 5, life: 1.1 });
-      if (b) { once('major', 'A soldier is born. She guards the door until you draw a raid.', 3600); tone(440, 0.2, 0.05, 'sawtooth', 200); }
+      if (b === CASTE.MAJOR) { once('major', 'A soldier is born. She guards the door until you draw a raid.', 3600); tone(440, 0.2, 0.05, 'sawtooth', 200); }
+      else if (b) { once('special', b === CASTE.SPITTER ? 'A spitter is born. She spits from two cells away.' : 'A warden is born. Slow, and very hard to kill.', 3600); tone(520, 0.2, 0.05, 'sawtooth', 240); }
     } else if (type === EVENT.DIED) {
       if (b < L0.nestBase) { const x = b % sw + 0.5, y = Math.floor(b / sw) + 0.5; burst(x, y, a === ME ? [1, 0.45, 0.2] : [0.45, 0.6, 1], c ? 9 : 5, { vh: 3, size: 0.3 }); }
       if (a === ME) deaths++;
@@ -372,6 +382,9 @@ function hud() {
   }
   const diet = g(ME, CG.DIET);
   for (const b of document.querySelectorAll('#diets [data-diet]')) b.setAttribute('aria-pressed', String(Number(b.dataset.diet) === diet));
+  const d2 = g(ME, CG.DIET2), pk = g(ME, CG.PICK);
+  for (const b of document.querySelectorAll('#specials [data-special]')) { b.setAttribute('aria-pressed', String(Number(b.dataset.special) === d2)); const sm = b.querySelector('small'); if (sm && Number(b.dataset.special)) sm.textContent = pk === CASTE.WARDEN ? 'wardens' : 'spitters'; }
+  $('specialName').textContent = pk === CASTE.WARDEN ? 'Wardens · 4 meat each' : 'Spitters · 2 meat each';
   $('dietInfo').textContent = g(ME, CG.PROTEIN) === 0 ? 'no meat: bring red food' : `${g(ME, CG.PROTEIN)} meat in store · a soldier eats 3`;
   const capA = g(ME, CG.CAP_ADULTS), capB = g(ME, CG.CAP_BROOD), capF = g(ME, CG.CAP_FOOD), pop = g(ME, CG.ADULTS) + brood;
   const cap = (id, n, of) => { const el = $(id); el.textContent = `${n}/${of}`; el.parentElement.classList.toggle('tight', n >= of); };
@@ -508,7 +521,13 @@ function drawNest(now) {
     const k = y * w + x, r = sim.room[k], m = sim.mark[k];
     if (!r && !m) continue;
     const px = sx(x), py = sy(y);
-    if (r && open(x, y)) { c.fillStyle = `rgba(${ROOM_CSS[r]}, 0.16)`; c.fillRect(px + 0.5, py + 0.5, z - 1, z - 1); }
+    if (r && open(x, y)) {
+      c.fillStyle = `rgba(${ROOM_CSS[r]}, 0.16)`; c.fillRect(px + 0.5, py + 0.5, z - 1, z - 1);
+      // A small sign of the room's use in each cell's corner, so an empty room still reads: a seed, an egg, a bed.
+      c.fillStyle = `rgba(${ROOM_CSS[r]}, 0.55)`; c.beginPath();
+      if (r === ROOM.STORE) c.arc(px + z * 0.22, py + z * 0.22, z * 0.09, 0, 7); else if (r === ROOM.NURSERY) c.ellipse(px + z * 0.22, py + z * 0.22, z * 0.11, z * 0.07, 0.6, 0, 7); else c.rect(px + z * 0.12, py + z * 0.17, z * 0.22, z * 0.09);
+      c.fill();
+    }
     if (m) { c.fillStyle = `rgba(${ROOM_CSS[r] || '255, 255, 255'}, ${0.2 + 0.08 * Math.sin(now / 260 + x + y)})`; c.fillRect(px + 1, py + 1, z - 2, z - 2); c.strokeStyle = `rgba(${ROOM_CSS[r] || '255, 255, 255'}, 0.8)`; c.lineWidth = 1; c.beginPath(); c.moveTo(px + 2, py + z - 2); c.lineTo(px + z - 2, py + 2); c.stroke(); const left = sim.digLeft[k] / C.DIG_TICKS; if (left < 1) { c.fillStyle = '#120c09'; c.fillRect(px + 1, py + 1, (z - 2) * (1 - left), z - 2); } }
   }
   if (paint) { c.fillStyle = paint.tool === 'clear' ? 'rgba(255, 90, 60, 0.4)' : `rgba(${ROOM_CSS[ROOM_OF[paint.tool]]}, 0.45)`; for (let j = 0; j < paint.cells.length; j += 2) c.fillRect(sx(paint.cells[j]) + 1, sy(paint.cells[j + 1]) + 1, z - 2, z - 2); }
@@ -538,8 +557,8 @@ function drawNest(now) {
     if (sim.layer[i] !== 1) continue;
     const p = prevOf[i], jump = p < 0 || host.pl[p] !== 1, ax = sx((jump ? sim.x[i] : host.px[p] + (sim.x[i] - host.px[p]) * a) / 256), ay = sy((jump ? sim.y[i] : host.py[p] + (sim.y[i] - host.py[p]) * a) / 256);
     if (ax < -8 || ax > NW + 8 || ay > NH + 8) continue;
-    const th = sim.heading[i] * (Math.PI / 128), co = Math.cos(th), si = Math.sin(th), u = Math.max(2.2, z * 0.5) * (sim.caste[i] ? 1.5 : 1);
-    c.fillStyle = sim.team[i] ? '#3a4f9a' : sim.caste[i] ? '#5a1410' : '#0d0705';
+    const th = sim.heading[i] * (Math.PI / 128), co = Math.cos(th), si = Math.sin(th), u = Math.max(2.2, z * 0.5) * (sim.caste[i] === CASTE.WARDEN ? 1.8 : sim.caste[i] === CASTE.SPITTER ? 1.1 : sim.caste[i] ? 1.5 : 1);
+    c.fillStyle = sim.team[i] ? (sim.caste[i] === CASTE.SPITTER ? '#5f7fd8' : '#3a4f9a') : sim.caste[i] === CASTE.SPITTER ? '#8a5a1c' : sim.caste[i] ? '#5a1410' : '#0d0705';
     c.beginPath(); c.ellipse(ax - co * u * 0.55, ay - si * u * 0.55, u * 0.5, u * 0.34, th, 0, 7); c.fill();
     c.beginPath(); c.arc(ax + co * u * 0.1, ay + si * u * 0.1, u * 0.24, 0, 7); c.fill();
     c.beginPath(); c.arc(ax + co * u * 0.55, ay + si * u * 0.55, u * (sim.caste[i] ? 0.36 : 0.27), 0, 7); c.fill();

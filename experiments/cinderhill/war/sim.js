@@ -10,27 +10,28 @@
 // An ant walks from cell to cell: on arriving at a cell she picks the next one from her task, usually by walking down
 // a distance field (home, door, a trail, the rally point). Fighters steer straight at an enemy they can see.
 
+import { CASTE, CASTES, ROOM, ROOMS, MISSIONS } from './tables.js';
 import { makeLayout, cellAt, diagOpen, MAT, SURFACE, NEST } from '../sim/grid.js';
 import { seedStreams, below, STREAM } from '../sim/rng.js';
 import { angleOf } from '../sim/math.js';
 import { hashArray, hashInt, finish } from '../sim/hash.js';
 import { generate } from './world.js';
 
-export const WAR_VERSION = 2;
+export const WAR_VERSION = 3;
 export const TICK_HZ = 20;
 export { MAT, SURFACE, NEST };
 
 export const TEAMS = 2;
-export const CASTE = { WORKER: 0, MAJOR: 1 };
-export const CASTE_HP = [12, 40], CASTE_BITE = [2, 6], CASTE_SPEED = [45, 34], CASTE_FOOD = [1, 3]; // FOOD: protein to raise, and sugar weight when eating
+export { CASTE, CASTES, ROOM, ROOMS, MISSIONS };
+export const CASTE_HP = CASTES.map(c => c.hp), CASTE_BITE = CASTES.map(c => c.bite), CASTE_SPEED = CASTES.map(c => c.speed), CASTE_FOOD = CASTES.map(c => c.food); // FOOD: meat to raise one
+const CASTE_REACH = CASTES.map(c => c.reach), FIGHTS = CASTES.map(c => c.fights);
 export const TASK = { REST: 0, OUT: 1, BACK: 2, GUARD: 3, NURSE: 4, DIG: 5 };
-// What a nest cell is used for. A room counts once its cell is dug open.
-export const ROOM = { NONE: 0, STORE: 1, NURSERY: 2, REST: 3 };
+// What a nest cell is used for is in tables.js (ROOM). A room counts once its cell is dug open.
 export const CARRY = { NONE: 0, SUGAR: 1, PROTEIN: 2 };
 export const FOOD = { SUGAR: 0, PROTEIN: 1 };
 export const STAGE = { EGG: 0, LARVA: 1, PUPA: 2 };
 export const KIND = { FORAGE: 0, RAID: 1 };
-export const CMD = { TRAIL: 1, ERASE: 2, CREW: 3, DIET: 4, RALLY: 5, RECALL: 6, DIG: 7, ROOM: 8 };
+export const CMD = { TRAIL: 1, ERASE: 2, CREW: 3, DIET: 4, RALLY: 5, RECALL: 6, DIG: 7, ROOM: 8, PICK: 9 };
 // Events: [type, a, b, c].
 export const EVENT = {
   HOME: 1, // team, food kind, trail
@@ -63,20 +64,21 @@ export const RAID_SHARE = [0, 25, 50, 100]; // percent of the majors on a raid t
 export const CG = {
   SUGAR: 0, PROTEIN: 1, QUEEN_HP: 2, LAY: 3, STARVE: 4, BORN: 5, DIED: 6, KILLS: 7, LOADS_S: 8, LOADS_P: 9, STOLEN: 10, LOST: 11,
   DIET: 12, RECALL: 13, RALLY_CELL: 14, RALLY_HOLD: 15, ADULTS: 16, MAJORS: 17, WORKERS: 18, RESTING: 19, LAID: 20, SEQ: 21,
-  CAP_FOOD: 22, CAP_BROOD: 23, CAP_ADULTS: 24, MARKS: 25, DIGGERS: 26, SIZE: 32,
+  CAP_FOOD: 22, CAP_BROOD: 23, CAP_ADULTS: 24, MARKS: 25, DIGGERS: 26,
+  PICK: 27, DIET2: 28, SPECIALS: 29, // the caste this colony chose (0: none yet), its share of the brood in four, how many live
+  SIZE: 32,
 };
 export const C = {
   LAY_EVERY: 14, EGG_TICKS: 300, LARVA_TICKS: 500, PUPA_TICKS: 400, LARVA_STARVE: 1200, MAJOR_WAIT: 600,
   EAT_EVERY: 1200, ADULTS_PER_SUGAR: 10, STARVE_AFTER: 1200, STARVE_EVERY: 200,
   // Rooms: a store cell holds eight loads of each food, a nursery cell one brood, a quarters cell four ants (adults and brood together; the queen stops laying at the cap).
-  STORE_PER: 8, STORE_MIN: 24, BROOD_MIN: 8, REST_PER: 4, REST_BASE: 90, DIG_TICKS: 120, DIG_SUGAR: 1, DIG_CREW: 8, MARKS_MAX: 96,
+  STORE_MIN: 24, BROOD_MIN: 8, REST_BASE: 90, DIG_TICKS: 120, DIG_SUGAR: 1, DIG_KEEP: 3, DIG_CREW: 8, MARKS_MAX: 96,
   QUEEN_HP: 800, BITE_EVERY: 10, BITE_R: 200, SEE: 3, PRESS_OPEN: 5, PRESS_TUNNEL: 2, WAIT_AT_END: 60, GUARD_R: 4,
 };
 
 export const DEFAULTS = {
   seed: 1, sw: 160, sh: 112, nw: 160, nh: 64, maxAnts: 4000,
-  ants: 30, sugar: 10, protein: 5, eggs: 20, larvae: 20, pupae: 12,
-  duskTick: 9600, // the mission ends here (eight minutes); 0: never
+  mission: 'crossing', // a row of MISSIONS; its kit (ants, food, brood, duskTick: 0 for no dusk) sits under these options
   blank: false, // an empty map for tests: no stones, creek or food
 };
 
@@ -84,7 +86,9 @@ const est = (dx, dy) => { const ax = dx < 0 ? -dx : dx, ay = dy < 0 ? -dy : dy; 
 
 export class Sim {
   constructor(options = {}) {
-    const cfg = (this.cfg = { ...DEFAULTS, ...options });
+    const mission = (this.mission = MISSIONS[options.mission ?? DEFAULTS.mission]);
+    if (!mission) throw new Error(`no mission ${options.mission}`);
+    const cfg = (this.cfg = { ...DEFAULTS, ...mission.kit, ...options });
     const L = (this.L = makeLayout(cfg)), n = L.n, A = cfg.maxAnts;
     this.tick = 0;
     this.result = 0; // 0: running; else 1 + the winning team
@@ -163,9 +167,9 @@ export class Sim {
     }
     for (let t = 0; t < TEAMS; t++) {
       const o = t * CG.SIZE;
-      cg[o + CG.CAP_FOOD] = Math.max(C.STORE_MIN, C.STORE_PER * n[t * 4 + ROOM.STORE]);
-      cg[o + CG.CAP_BROOD] = Math.max(C.BROOD_MIN, n[t * 4 + ROOM.NURSERY]);
-      cg[o + CG.CAP_ADULTS] = C.REST_BASE + C.REST_PER * n[t * 4 + ROOM.REST];
+      const cap = { food: 0, brood: 0, ants: 0 };
+      for (let r = 1; r < ROOMS.length; r++) cap[ROOMS[r].cap] += ROOMS[r].per * n[t * 4 + r];
+      cg[o + CG.CAP_FOOD] = Math.max(C.STORE_MIN, cap.food); cg[o + CG.CAP_BROOD] = Math.max(C.BROOD_MIN, cap.brood); cg[o + CG.CAP_ADULTS] = C.REST_BASE + cap.ants;
       cg[o + CG.MARKS] = marks[t];
     }
   }
@@ -182,7 +186,9 @@ export class Sim {
     if (this.bn >= BROOD_MAX) return -1;
     const k = this.bn++, laid = this.cg[t * CG.SIZE + CG.LAID]++;
     this.bTeam[k] = t; this.bStage[k] = stage; this.bAge[k] = 0; this.bFed[k] = 0; this.bHunger[k] = 0; this.bCell[k] = this.nurseryCell(t);
-    this.bMajor[k] = (laid & 3) < this.cg[t * CG.SIZE + CG.DIET] ? 1 : 0; // the diet: this many larvae in four are fed to be majors
+    // The diet: of every four larvae, this many are fed to be soldiers and (from the other end) this many the chosen caste.
+    const o = t * CG.SIZE, slot = laid & 3;
+    this.bMajor[k] = slot < this.cg[o + CG.DIET] ? CASTE.MAJOR : this.cg[o + CG.PICK] && slot >= 4 - this.cg[o + CG.DIET2] ? this.cg[o + CG.PICK] : 0;
     return k;
   }
 
@@ -190,7 +196,7 @@ export class Sim {
     if (this.n >= this.cfg.maxAnts || cell < 0) return -1;
     const i = this.n++, L = this.L, nest = cell >= L.nestBase, w = nest ? L.nw : L.sw, k = nest ? cell - L.nestBase : cell;
     this.x[i] = ((k % w) << 8) + 128; this.y[i] = (Math.floor(k / w) << 8) + 128; this.layer[i] = nest ? NEST : SURFACE; this.heading[i] = below(this.rng, STREAM.ants, 256);
-    this.team[i] = team; this.caste[i] = caste; this.hp[i] = CASTE_HP[caste]; this.task[i] = caste === CASTE.MAJOR ? TASK.GUARD : TASK.BACK;
+    this.team[i] = team; this.caste[i] = caste; this.hp[i] = CASTE_HP[caste]; this.task[i] = FIGHTS[caste] ? TASK.GUARD : TASK.BACK;
     this.carry[i] = 0; this.tr[i] = -1; this.cool[i] = 0; this.press[i] = 0; this.to[i] = -1; this.since[i] = 0; this.inv[i] = 0; this.id[i] = this.nextId++;
     return i;
   }
@@ -237,6 +243,12 @@ export class Sim {
       if (o.kind === KIND.RAID || o.kind === KIND.FORAGE) this.trKind[s] = o.kind;
     } else if (o.type === CMD.DIET) {
       cg[base + CG.DIET] = Math.max(0, Math.min(4, o.share | 0));
+      if (o.special != null) cg[base + CG.DIET2] = cg[base + CG.PICK] ? Math.max(0, Math.min(4 - cg[base + CG.DIET], o.special | 0)) : 0;
+      else if (cg[base + CG.DIET] + cg[base + CG.DIET2] > 4) cg[base + CG.DIET2] = 4 - cg[base + CG.DIET];
+    } else if (o.type === CMD.PICK) {
+      // One caste beyond workers and soldiers, chosen once from the mission's list.
+      if (cg[base + CG.PICK] || !this.mission.picks.includes(o.caste | 0)) return no(WHY.NONE);
+      cg[base + CG.PICK] = o.caste | 0;
     } else if (o.type === CMD.RALLY) {
       const c = this.snap(o.x | 0, o.y | 0);
       if (c < 0 || o.hold <= 0) { cg[base + CG.RALLY_CELL] = -1; cg[base + CG.RALLY_HOLD] = 0; this.rallyF[t] = null; return; }
@@ -248,7 +260,7 @@ export class Sim {
       // cells: nest [x, y, ...]. DIG marks clay to be dug (on: 0 takes the mark off). ROOM paints a use on open or marked cells;
       // with dig: 1 it marks clay first, and with kind NONE it also takes marks off, so one stroke is one order.
       const L = this.L, pts = o.cells || [], dig = o.type === CMD.DIG, kind = o.kind | 0;
-      if (!dig && !(kind >= 0 && kind <= 3)) return no(WHY.NONE);
+      if (!dig && kind !== ROOM.NONE && !this.mission.rooms.includes(kind)) return no(WHY.NONE);
       let done = 0, marks = cg[base + CG.MARKS], stores = false;
       const use = (k, to) => { if (this.room[k] === ROOM.STORE || to === ROOM.STORE) stores = true; this.room[k] = to; done++; };
       for (let j = 0; j + 1 < pts.length && j < 512; j += 2) {
@@ -432,12 +444,12 @@ export class Sim {
 
   census() {
     const cg = this.cg, crew = this.crew.fill(0);
-    for (let t = 0; t < TEAMS; t++) { const o = t * CG.SIZE; cg[o + CG.ADULTS] = cg[o + CG.MAJORS] = cg[o + CG.WORKERS] = cg[o + CG.RESTING] = cg[o + CG.DIGGERS] = 0; }
+    for (let t = 0; t < TEAMS; t++) { const o = t * CG.SIZE; cg[o + CG.ADULTS] = cg[o + CG.MAJORS] = cg[o + CG.WORKERS] = cg[o + CG.RESTING] = cg[o + CG.DIGGERS] = cg[o + CG.SPECIALS] = 0; }
     for (let i = 0; i < this.n; i++) {
       if (this.hp[i] === 0) continue;
       const t = this.team[i], o = t * CG.SIZE;
       cg[o + CG.ADULTS]++;
-      if (this.caste[i] === CASTE.MAJOR) cg[o + CG.MAJORS]++; else if (this.task[i] !== TASK.NURSE) cg[o + CG.WORKERS]++;
+      if (FIGHTS[this.caste[i]]) { cg[o + CG.MAJORS]++; if (this.caste[i] !== CASTE.MAJOR) cg[o + CG.SPECIALS]++; } else if (this.task[i] !== TASK.NURSE) cg[o + CG.WORKERS]++;
       if (this.task[i] === TASK.REST) cg[o + CG.RESTING]++; else if (this.task[i] === TASK.DIG) cg[o + CG.DIGGERS]++;
       if (this.tr[i] >= 0) crew[t * TRAILS + this.tr[i]]++;
     }
@@ -460,7 +472,7 @@ export class Sim {
     const fedThisTick = [false, false, false, false];
     // Meat is kept back for a larva waiting on the major diet, so a slow trickle still raises soldiers.
     const held = [0, 0, 0, 0];
-    for (let k = 0; k < this.bn; k++) if (this.bStage[k] === STAGE.LARVA && this.bMajor[k] && this.bFed[k] === 0 && this.bHunger[k] < C.MAJOR_WAIT) held[this.bTeam[k]] = CASTE_FOOD[CASTE.MAJOR];
+    for (let k = 0; k < this.bn; k++) if (this.bStage[k] === STAGE.LARVA && this.bMajor[k] && this.bFed[k] === 0 && this.bHunger[k] < C.MAJOR_WAIT) held[this.bTeam[k]] = Math.max(held[this.bTeam[k]], CASTE_FOOD[this.bMajor[k]]);
     let w = 0;
     for (let k = 0; k < this.bn; k++) {
       const t = this.bTeam[k], o = t * CG.SIZE;
@@ -471,16 +483,16 @@ export class Sim {
       else if (stage === STAGE.LARVA) {
         if (this.bFed[k] === 0 && !fedThisTick[t] && cg[o + CG.PROTEIN] > 0) {
           // A larva on the major diet waits for three loads; after MAJOR_WAIT hungry she takes one and grows up a worker.
-          const major = this.bMajor[k] && cg[o + CG.PROTEIN] >= CASTE_FOOD[CASTE.MAJOR];
+          const major = this.bMajor[k] && cg[o + CG.PROTEIN] >= CASTE_FOOD[this.bMajor[k]];
           if (major || ((!this.bMajor[k] || this.bHunger[k] >= C.MAJOR_WAIT) && cg[o + CG.PROTEIN] > held[t])) {
-            const meal = major ? CASTE_FOOD[CASTE.MAJOR] : 1;
+            const meal = major ? CASTE_FOOD[this.bMajor[k]] : 1;
             cg[o + CG.PROTEIN] -= meal; this.bFed[k] = meal; this.bHunger[k] = 0; fedThisTick[t] = true;
           } else this.bHunger[k]++;
         } else if (this.bFed[k] === 0 && this.bHunger[k] < 0xFFFF) this.bHunger[k]++;
         if (this.bHunger[k] >= C.LARVA_STARVE) keep = false;
         else if (this.bFed[k] > 0 && age >= C.LARVA_TICKS) { stage = STAGE.PUPA; this.bAge[k] = 0; }
       } else if (age >= C.PUPA_TICKS) {
-        const caste = this.bFed[k] >= CASTE_FOOD[CASTE.MAJOR] ? CASTE.MAJOR : CASTE.WORKER;
+        const caste = this.bMajor[k] && this.bFed[k] >= CASTE_FOOD[this.bMajor[k]] ? this.bMajor[k] : CASTE.WORKER;
         const i = this.spawn(t, caste, this.bCell[k]);
         if (i >= 0) { keep = false; const born = cg[o + CG.BORN]++; if (caste === CASTE.WORKER && born % 10 === 9) this.task[i] = TASK.NURSE; this.event(EVENT.BORN, t, caste, this.bCell[k]); }
       }
@@ -546,15 +558,16 @@ export class Sim {
     if (this.since[i] < 0xFFFF) this.since[i]++;
     const t = this.team[i], o = t * CG.SIZE, cg = this.cg, c = this.cellOf(i);
     const tr = this.tr[i], s = tr >= 0 ? t * TRAILS + tr : -1;
-    const fighter = this.caste[i] === CASTE.MAJOR || (s >= 0 && this.trKind[s] === KIND.RAID);
+    const fighter = FIGHTS[this.caste[i]] || (s >= 0 && this.trKind[s] === KIND.RAID);
     // Fighters go straight at an enemy they can see, unless they carry something home.
     if (fighter && !this.carry[i]) {
       const e = this.enemyNear(i, C.SEE);
       if (e >= 0 && !(cg[o + CG.RECALL] && this.layer[i] === SURFACE)) {
         // Straight at her, unless a stone is in the way: then she walks on by her task and meets her round it.
         const x0 = this.x[i], y0 = this.y[i];
-        this.steer(i, this.x[e], this.y[e], C.BITE_R - 40);
-        if (this.x[i] !== x0 || this.y[i] !== y0 || est(this.x[e] - x0, this.y[e] - y0) <= C.BITE_R) { this.to[i] = -1; this.since[i] = 0; return; }
+        const reach = CASTE_REACH[this.caste[i]]; // a spitter stops at her own reach and spits from there
+        this.steer(i, this.x[e], this.y[e], reach - 40);
+        if (this.x[i] !== x0 || this.y[i] !== y0 || est(this.x[e] - x0, this.y[e] - y0) <= reach) { this.to[i] = -1; this.since[i] = 0; return; }
       }
     }
     if (this.to[i] >= 0 && this.mat[this.to[i]] !== MAT.OPEN) this.to[i] = -1;
@@ -609,8 +622,8 @@ export class Sim {
         const m = L.nb[c * 4 + d], k = m - L.nestBase;
         if (m < L.nestBase || this.mark[k] !== t + 1) continue;
         this.to[i] = -1;
-        // The opening stroke costs a seed: earth is carried out on food. With none in store the cell waits.
-        if (this.digLeft[k] === 1) { if (cg[o + CG.SUGAR] < C.DIG_SUGAR) return c; cg[o + CG.SUGAR] -= C.DIG_SUGAR; }
+        // The opening stroke costs a seed: earth is carried out on food. The last few seeds are kept for the colony to eat: the cell waits.
+        if (this.digLeft[k] === 1) { if (cg[o + CG.SUGAR] < C.DIG_SUGAR + C.DIG_KEEP) return c; cg[o + CG.SUGAR] -= C.DIG_SUGAR; }
         if (--this.digLeft[k] === 0) { this.mat[m] = MAT.OPEN; this.mark[k] = 0; this.recount(); this.dirty = true; this.event(EVENT.DUG, t, m); }
         return c;
       }
@@ -637,7 +650,7 @@ export class Sim {
         }
         // Home: she leaves her crew, so a trail's count is of ants at work and the next free ant can take the place.
         if (this.tr[i] >= 0) { const q = t * TRAILS + this.tr[i]; if (this.crew[q] > 0) this.crew[q]--; this.tr[i] = -1; }
-        this.task[i] = this.caste[i] === CASTE.MAJOR ? TASK.GUARD : TASK.REST; this.since[i] = 0;
+        this.task[i] = FIGHTS[this.caste[i]] ? TASK.GUARD : TASK.REST; this.since[i] = 0;
         return this.assign(i, c, t, o);
       }
       // A carrier who came by a trail walks it back to its start, so a trail is one stream both ways.
@@ -672,7 +685,7 @@ export class Sim {
   /** Give a free ant at home a trail that is short of its crew (the largest gap first). Returns her next cell. */
   assign(i, c, t, o) {
     if (this.cg[o + CG.RECALL]) return c;
-    const major = this.caste[i] === CASTE.MAJOR;
+    const major = FIGHTS[this.caste[i]];
     if (!major && this.digF[t] && this.layer[i] === NEST && this.digF[t][c] !== FAR && this.cg[o + CG.DIGGERS] < Math.min(C.DIG_CREW, 2 * this.cg[o + CG.MARKS])) { this.cg[o + CG.DIGGERS]++; this.task[i] = TASK.DIG; this.since[i] = 0; return this.next(this.digF[t], c); }
     let best = -1, gap = 0;
     for (let k = 0; k < TRAILS; k++) {
@@ -781,17 +794,19 @@ export class Sim {
       if (this.cool[i]) { this.cool[i]--; continue; }
       if (this.hp[i] === 0) continue;
       const t = this.team[i], mine = 1 << t, layer = this.layer[i], cx = this.x[i] >> 8, cy = this.y[i] >> 8, cap = layer === NEST ? C.PRESS_TUNNEL : C.PRESS_OPEN;
-      let target = -1, bd = C.BITE_R;
-      for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) {
+      const reach = CASTE_REACH[this.caste[i]], far = reach > 256, R = far ? 3 : 1;
+      let target = -1, bd = reach;
+      for (let oy = -R; oy <= R; oy++) for (let ox = -R; ox <= R; ox++) {
         const cc = cellAt(L, layer, cx + ox, cy + oy);
         if (cc < 0 || !(this.occ[cc] & ~mine)) continue;
+        if (far && (ox < -1 || ox > 1 || oy < -1 || oy > 1) && !this.clear(layer, cx, cy, ox, oy)) continue; // a spit needs a clear line
         for (let j = this.head[cc]; j >= 0; j = this.nextAnt[j]) {
-          if (this.team[j] === t || this.hp[j] === 0 || this.press[j] >= cap) continue;
+          if (this.team[j] === t || this.hp[j] === 0 || (!far && this.press[j] >= cap)) continue;
           const d = est(this.x[i] - this.x[j], this.y[i] - this.y[j]);
           if (d < bd) { bd = d; target = j; }
         }
       }
-      if (target >= 0) { this.press[target]++; dmg[target] += CASTE_BITE[this.caste[i]]; by[target] = t; any = true; this.cool[i] = C.BITE_EVERY - 1 + below(this.rng, STREAM.ants, 3); continue; }
+      if (target >= 0) { if (!far) this.press[target]++; dmg[target] += CASTE_BITE[this.caste[i]]; by[target] = t; any = true; this.cool[i] = C.BITE_EVERY - 1 + below(this.rng, STREAM.ants, 3); continue; }
       // No ant to bite: an enemy queen within a cell.
       if (layer === NEST) for (let e = 0; e < TEAMS; e++) {
         if (e === t || cg[e * CG.SIZE + CG.QUEEN_HP] <= 0 || this.queenF[e][this.cellOf(i)] > 1) continue;
@@ -800,6 +815,13 @@ export class Sim {
       }
     }
     if (any) for (let i = 0; i < n; i++) if (dmg[i]) { if (this.hp[i] > 0) this.hurt(i, dmg[i], by[i]); dmg[i] = 0; }
+  }
+
+  /** No clay or stone on the straight line from a cell to the cell (ox, oy) away. */
+  clear(layer, cx, cy, ox, oy) {
+    const n = Math.max(Math.abs(ox), Math.abs(oy));
+    for (let k = 1; k < n; k++) { const c = cellAt(this.L, layer, cx + Math.round(ox * k / n), cy + Math.round(oy * k / n)); if (c < 0 || this.mat[c] === MAT.CLAY || this.mat[c] === MAT.STONE) return false; }
+    return true;
   }
 
   removeDead() {
@@ -829,8 +851,8 @@ export class Sim {
     const cg = this.cg;
     let alive = 0, last = -1;
     for (let t = 0; t < TEAMS; t++) if (cg[t * CG.SIZE + CG.QUEEN_HP] > 0) { alive++; last = t; }
-    if (alive <= 1) { this.result = 1 + Math.max(0, last); this.event(EVENT.RESULT, Math.max(0, last), REASON.QUEEN); return; }
-    if (this.cfg.duskTick > 0 && this.tick + 1 >= this.cfg.duskTick) {
+    if (this.mission.goals.queen && alive <= 1) { this.result = 1 + Math.max(0, last); this.event(EVENT.RESULT, Math.max(0, last), REASON.QUEEN); return; }
+    if (this.mission.goals.dusk && this.cfg.duskTick > 0 && this.tick + 1 >= this.cfg.duskTick) {
       let best = 0;
       for (let t = 1; t < TEAMS; t++) if (cg[t * CG.SIZE + CG.ADULTS] > cg[best * CG.SIZE + CG.ADULTS]) best = t;
       this.result = 1 + best; this.event(EVENT.RESULT, best, REASON.DUSK);
