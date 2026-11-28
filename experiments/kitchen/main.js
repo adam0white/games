@@ -1023,7 +1023,7 @@ const rings = new Map();                               // falling item n -> ring
 let ringGeo = null;
 function clearRush() {
   for (const n of [...rings.keys()]) dropRing(n);
-  $('rail').style.display = 'none'; $('rushHud').style.display = 'none'; $('rail').innerHTML = '';
+  $('rail').style.display = 'none'; $('rushHud').style.display = 'none'; $('rail').innerHTML = ''; $('acts').style.display = 'none'; actsFor = null; if (fight) { fight.over = true; fight = null; $('fight').style.display = 'none'; }
 }
 function beginRush() {
   art.register.reset?.();
@@ -1057,23 +1057,58 @@ function rail() {
   const s = rush; if (!s) return;
   $('rail').innerHTML = s.line.map(e => {
     const icons = Object.entries(e.need).flatMap(([id, n]) => Array.from({ length: n }, (_, i) => `<img alt="" class="${i < (e.got[id] ?? 0) ? 'got' : ''}" src="${art.thumb(itemModel(id))}">`)).join('');
-    return `<div class="chip${e.ready ? ' ready' : ''}${e.kind === 'rich' ? ' rich' : ''}" data-n="${e.n}" style="--c:${SEAT_COLOR[seatOf(e)]}"><div class="top"><img alt="" src="${art.thumb(dishModel(e.recipe))}"><b>${e.kind === 'rich' ? '💎' : ''}${e.mood ? MOOD_ICON[e.mood] : ''}<i class="coin"></i>${e.price}</b></div><div class="need">${icons}</div><div class="pat"><i></i></div></div>`;
+    return `<div class="chip${e.ready ? ' ready' : ''}${e.kind === 'rich' ? ' rich' : ''}" data-n="${e.n}" style="--c:${SEAT_COLOR[seatOf(e)]}"><div class="top"><img alt="" src="${art.thumb(dishModel(e.recipe))}"><b>${e.kind === 'rich' ? '💎' : ''}${e.mood ? MOOD_ICON[e.mood] : ''}${e.frozen > 0 ? '🧊' : ''}${e.self ? '👨‍🍳' : ''}<i class="coin"></i>${e.price}</b></div><div class="need">${icons}</div><div class="pat"><i></i></div></div>`;
   }).join('');
+  for (const c of $('rail').children) c.addEventListener('click', ev => { ev.stopPropagation(); const e = rush?.line.find(x => x.n === Number(c.dataset.n)); if (e) openActs(e); });   // click, not pointerdown: the same tap must not land on the sheet that opens under the finger
   railBars();
 }
+// ---------- the wheel in a Rush: tap a guest's ticket. The rules and the prices are in shift.js (act).
+let actsFor = null, actsAt = 0, rushHinted = false;
+function openActs(e) {
+  const s = rush; if (!s || phase !== 'sky' || s.at || paused || fight || actsFor) return;
+  if (s.nerve <= 0) { floater({ x: innerWidth / 2, y: innerHeight * 0.3 }, t('actsNone'), 'bad'); SFX.wrong(); return; }
+  if (e.ready) return;
+  actsFor = e; actsAt = performance.now(); s.hold = true; SFX.spin(); coach(null);
+  $('actsHead').innerHTML = `<img alt="" src="${art.thumb(dishModel(e.recipe))}"><b style="color:${SEAT_COLOR[seatOf(e)]}">●</b> ${esc(t('r_' + e.recipe))} <span>${esc(t('actsLeft', { n: s.nerve }))}</span>`;
+  $('actsList').innerHTML = sh.ACTS.map(id => `<button data-a="${id}" ${sh.canAct(s, e, id) ? '' : 'disabled'}><span>${WHEEL_ICON[id]}</span><b>${esc(t('w_' + id))}</b><small>${esc(t((sh.canAct(s, e, id) ? 'ra_' : 'rn_') + id))}</small></button>`).join('');
+  for (const b of $('actsList').children) b.addEventListener('click', ev => { ev.stopPropagation(); doAct(b.dataset.a); });
+  $('acts').style.display = 'flex';
+}
+function closeActs() { $('acts').style.display = 'none'; actsFor = null; if (rush && !fight) rush.hold = false; }
+$('actsClose').addEventListener('click', e => { e.stopPropagation(); SFX.tap(); closeActs(); });
+function doAct(id) {
+  const s = rush, e = actsFor; if (!s || !e || performance.now() - actsAt < 250) return;
+  if (id === 'fight') { $('acts').style.display = 'none'; actsFor = null; if (!sh.canAct(s, e, id)) { s.hold = false; return; } return fightStart(won => { if (rush !== s) return; s.hold = false; art.view('catch'); applyAct(e, id, won); }); }
+  closeActs(); applyAct(e, id, false);
+}
+function applyAct(e, id, won) {
+  const s = rush, out = sh.act(s, e, id, won); if (!out) return;
+  ({ kick_out: SFX.boing, slap: SFX.slap, fridge: SFX.whoosh, pan: SFX.sizzle, microwave: SFX.ding, cook_self: SFX.sizzle, lock_out: SFX.clunk, trash: SFX.crash, rob: SFX.jingle, hire: SFX.happy, fight: SFX.punch }[id] ?? SFX.tap)();
+  const fin = tally({ type: 'wheel', action: id }); for (const o of fin ?? []) floater({ x: innerWidth / 2, y: innerHeight * 0.36 }, `✓ ${o.text} +${o.reward}`, 'gold');
+  rec.event('wheel', { action: id, mood: e.mood, when: 'rush', left: Math.round(e.left), won: id === 'fight' ? won : undefined });
+  const at = { x: innerWidth / 2, y: innerHeight * 0.3 };
+  floater(at, `${WHEEL_ICON[id]} ${t('rd_' + id + (id === 'fight' && !won ? '_lost' : ''), { n: out.coins })}`, out.closed || (id === 'fight' && !won) ? 'bad' : 'gold');
+  art.shake(id === 'pan' || id === 'slap' || id === 'fight' ? 0.9 : 0.4); buzz(25);
+  if (out.coins) { SFX.coin(); }
+  if (out.closed) { banner(t('rushClosed'), t('rushClosedSub')); }
+  redrawTray(); rail();
+}
+
 function railBars() {
   const s = rush, el = $('rail');
   s.line.forEach((e, i) => {
     const c = el.children[i]; if (!c) return;
     const f = Math.max(0, e.left / e.full), bar = c.lastElementChild.firstElementChild;
     bar.style.transform = `scaleX(${f})`; bar.style.background = f < 0.2 ? '#ff5a5a' : f < 0.5 ? '#ffb347' : '#6fd36f';
-    c.classList.toggle('hot', f < 0.2);
+    c.classList.toggle('hot', f < 0.2 && !(e.frozen > 0)); c.classList.toggle('iced', e.frozen > 0);
+    if (f < 0.35 && s.nerve > 0 && !e.ready && !rushHinted && !actsFor && phase === 'sky' && !s.at && Object.keys(s.acts).length === 0 && rushSave.plays < 4) { rushHinted = true; const r = c.getBoundingClientRect(); floater({ x: r.left + r.width / 2, y: r.bottom + 26 }, t('actsHint'), 'gold'); }
   });
   const left = Math.max(0, sh.RUSH.secs - s.t), tg = sh.targets(save), next = tg.find(x => s.coins < x);
   $('rushClock').textContent = s.doors ? `${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}` : t('rushLast');
   $('rushClock').classList.toggle('low', s.doors && left < 15);
   $('rushStrikes').textContent = '✗'.repeat(Math.min(3, s.strikes)) + '·'.repeat(Math.max(0, 3 - s.strikes));
   $('rushBuzz').textContent = s.buzz ? `🔥${s.buzz}` : '';
+  $('rushNerve').textContent = `🎡${s.nerve}`; document.body.classList.toggle('nerve', s.nerve > 0);
   $('rushCoins').textContent = next ? `${s.coins}/${next}` : `${s.coins}`;
   $('rushStars').textContent = '★'.repeat(tg.filter(x => s.coins >= x).length);
   $('rushTray').textContent = `${s.sky.tray.length}/${s.holds}`;
@@ -1104,6 +1139,11 @@ function stepRush(dt) {
       if (e.lost) flyAway(art.item(itemModel(e.lost.id), 0.25), trayX);
       SFX.wrong(); buzz([40, 60, 40]); art.shake(1); floater(worldPx(trayX, LANE.y0 + 0.35), '✗', 'bad'); song?.hit();
     } else if (e.type === 'ready') { changed = true; SFX.good(); }
+    else if (e.type === 'selfserved') {
+      changed = redraw = true; day.served++; save.served++; day.earned += e.bill.price; day.stars.push(e.bill.stars);
+      floater({ x: innerWidth / 2, y: innerHeight * 0.26 }, `👨‍🍳 +${e.bill.total}`, 'gold'); SFX.coin();
+      rec.event('serve', { recipe: e.e.recipe, stars: e.bill.stars, coins: e.bill.total, buzz: s.buzz, self: true });
+    }
     else if (e.type === 'missed') { dropMesh(e.it.n); }
   }
   if (redraw) redrawTray();
@@ -1127,7 +1167,8 @@ function stepRush(dt) {
   for (const n of [...meshes.keys()]) if (!live.has(n)) dropMesh(n);
   railBars();
   if (phase === 'sky' && !s.at) { const e = s.line.filter(x => x.ready).sort((a, b) => a.left - b.left)[0]; if (e) rushCook(e); }
-  if (s.over && phase === 'sky') rushEnd();
+  if (actsFor && (s.over || actsFor.ready || !s.line.includes(actsFor))) closeActs();   // the guest left, or the shift ended, under the open sheet
+  if (s.over && phase === 'sky' && !fight) rushEnd();
 }
 function dropRing(n) { const r = rings.get(n); if (r) { art.world.remove(r); r.material.dispose(); rings.delete(n); } }
 function dropMesh(n) { const m = meshes.get(n); if (m) { art.world.remove(m); meshes.delete(n); } dropRing(n); }
@@ -1301,11 +1342,14 @@ const up = e => {
 };
 canvas.addEventListener('pointerup', up); canvas.addEventListener('pointercancel', up);
 addEventListener('keydown', e => {
+  if (actsFor && e.key === 'Escape') { closeActs(); return; }   // Escape shuts the sheet before it pauses
   if (isPauseKey(e)) { if (screen === 'paused') resume(); else if (screen === 'play') pause(); return; }
   if (screen !== 'play' || paused) return;
   keys.add(e.key); touched = true;
   if (e.repeat) return;
   if (phase === 'pick' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { focusTo(focusI + (e.key === 'ArrowRight' ? 1 : -1)); return; }
+  if (actsFor) { if (e.key === 'Escape') closeActs(); return; }   // the sheet's own buttons take Space and Enter
+  if (phase === 'sky' && rush && !actsFor && '123'.includes(e.key)) { const el = rush.line.find(x => seatOf(x) === Number(e.key) - 1); if (el) openActs(el); return; }
   if (e.key === ' ' || e.key === 'Enter') {
     e.preventDefault();
     if (fight) { fightTap(); return; }
@@ -1325,6 +1369,7 @@ $('chopBtn').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPr
 // ---------- pause
 function pause() {
   if (paused || (screen !== 'play' && screen !== 'extra')) return;
+  if (actsFor) closeActs();
   before = screen; paused = true; snd.hold(); finger = null; tapStart = null; if (cook?.kind === 'fry') cook.held = false;
   show('paused');
 }
@@ -1419,7 +1464,7 @@ window.kitchenState = () => art && peopleIn && ({
   cook: cook ? { kind: cook.kind, d: cook.d, p: cook.p, band: cook.band, fill: cook.fill, left: cook.pieces?.filter(p => !p.done).length, misses: cook.misses ?? 0, striking: !!cook.strike, cuts: cook.pieces?.reduce((n, p) => n + p.cuts, 0), xs: cook.pieces?.map(p => p.done ? null : [p.m.position.x, p.m.position.z]), aim } : null, q: g?.q,
   look: lookId, hint: !!document.querySelector('.kit-hint.on'),
   line: day?.line ? day.line.map(e => ({ recipe: e.p.recipe, left: +e.left.toFixed(1) })) : null, lost: day?.lost ?? 0,
-  rush: rush ? { t: +rush.t.toFixed(2), coins: rush.coins, strikes: rush.strikes, buzz: rush.buzz, served: rush.served, turned: rush.turned, doors: rush.doors, over: rush.over, holds: rush.holds, at: rush.at?.recipe ?? null, tray: rush.sky.tray.map(it => it.id), line: rush.line.map(e => ({ n: e.n, recipe: e.recipe, kind: e.kind, left: +e.left.toFixed(1), full: e.full, need: { ...e.need }, got: { ...e.got }, ready: e.ready, price: e.price })), items: rush.sky.items.map(it => ({ id: it.id, x: it.x, y: it.y, owner: sh.ownerOf(rush, it.id)?.n ?? null })) } : null,
+  rush: rush ? { t: +rush.t.toFixed(2), coins: rush.coins, strikes: rush.strikes, buzz: rush.buzz, nerve: rush.nerve, acts: { ...rush.acts }, served: rush.served, turned: rush.turned, doors: rush.doors, over: rush.over, holds: rush.holds, at: rush.at?.recipe ?? null, tray: rush.sky.tray.map(it => it.id), line: rush.line.map(e => ({ n: e.n, recipe: e.recipe, kind: e.kind, left: +e.left.toFixed(1), full: e.full, need: { ...e.need }, got: { ...e.got }, ready: e.ready, price: e.price, mood: e.mood ?? null, frozen: e.frozen > 0, self: !!e.self })), sheet: !!actsFor, hold: rush.hold, calm: rush.calm > 0, locked: rush.locked > 0, items: rush.sky.items.map(it => ({ id: it.id, x: it.x, y: it.y, owner: sh.ownerOf(rush, it.id)?.n ?? null })) } : null,
   mood: g?.mood ?? null, staff: staff.map(m => m.kind), wheel: $('wheel').style.display === 'block', fight: fight ? { taps: fight.taps, need: fight.need } : null,
 });
 window.kitchenMusic = () => song && { ...song.melody, on: song.state.on, step: song.step, notes: song.log.length, kinds: song.log.map(l => l.kind) };
@@ -1434,6 +1479,7 @@ window.kitchenCall = i => { const e = day?.line?.[i]; if (e) callGuest(e); retur
 window.kitchenThrow = () => { throwNext = true; };
 window.kitchenMood = m => { if (g) g.mood = m; return !!g; };
 window.kitchenRush = seed => { if (screen !== 'menu' && phase !== 'sky') return false; if (seed != null) rushSeed = seed; beginRush(); return true; };
+window.kitchenRushAct = (n, id, won = true) => { const e = rush?.line.find(x => x.n === n); if (!e || phase !== 'sky' || actsFor) return false; openActs(e); if (actsFor !== e) return false; actsAt = 0; doAct(id); if (id === 'fight' && fight) window.kitchenFight(won); return true; };
 window.kitchenSkipCatch = () => { skipCatch = true; };
 window.kitchenGolden = () => { goldenNext = true; };
 window.kitchenAlive = () => { if (g?.catch) { g.catch.got = {}; g.catch.tray = []; g.catch.done = false; } };
