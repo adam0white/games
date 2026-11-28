@@ -77,7 +77,7 @@
 body.playing #guide:not([hidden]) { display: flex; } #guide b { color: #ffcf7a; } #guideText { flex: 1; } #guideSide { display: flex; flex-direction: column; align-items: center; gap: 4px; } #guideN { opacity: 0.7; font-size: 11px; white-space: nowrap; }
 #guideSkip { font: inherit; font-size: 12px; color: inherit; background: rgba(255, 255, 255, 0.1); border: 0; border-radius: 10px; padding: 7px 10px; }
 body.guided[data-nest="full"] #nestWrap { top: calc(204px + env(safe-area-inset-top)); }
-body.room #restart { display: none; }
+body.room #restart, body.room #again, body.room #harder, body.room #overDeeds, body.room #speed { display: none !important; }
 body.room #roomPause { display: block; margin: 8px 4px 2px; font-size: 13px; color: #ffd9a8; text-align: center; }
   #digQueue { margin: 4px 2px 0; font-size: 12px; color: var(--dim); } #digQueue:empty { display: none; } #digQueue b { color: #ffcf7a; } #digQueue b.short { color: #ff9a8a; }
   #digHelp { margin: 7px 2px 0; font-size: 12px; color: var(--dim); min-height: 15px; }
