@@ -1059,11 +1059,20 @@ function rail() {
     const icons = Object.entries(e.need).flatMap(([id, n]) => Array.from({ length: n }, (_, i) => `<img alt="" class="${i < (e.got[id] ?? 0) ? 'got' : ''}" src="${art.thumb(itemModel(id))}">`)).join('');
     return `<div class="chip${e.ready ? ' ready' : ''}${e.kind === 'rich' ? ' rich' : ''}" data-n="${e.n}" style="--c:${SEAT_COLOR[seatOf(e)]}"><div class="top"><img alt="" src="${art.thumb(dishModel(e.recipe))}"><b>${e.kind === 'rich' ? '💎' : ''}${e.mood ? MOOD_ICON[e.mood] : ''}${e.frozen > 0 ? '🧊' : ''}${e.self ? '👨‍🍳' : ''}<i class="coin"></i>${e.price}</b></div><div class="need">${icons}</div><div class="pat"><i></i></div></div>`;
   }).join('');
-  for (const c of $('rail').children) c.addEventListener('click', ev => { ev.stopPropagation(); const e = rush?.line.find(x => x.n === Number(c.dataset.n)); if (e) openActs(e); });   // click, not pointerdown: the same tap must not land on the sheet that opens under the finger
   railBars();
 }
 // ---------- the wheel in a Rush: tap a guest's ticket. The rules and the prices are in shift.js (act).
 let actsFor = null, actsAt = 0, rushHinted = false;
+// A tap on a ticket. The tickets are redrawn whenever anything is caught, so the node under the finger can be replaced
+// between press and release and a click on it would be lost: remember the guest at the press and open at the release.
+let chipDown = null;
+$('rail').addEventListener('pointerdown', ev => { const c = ev.target.closest?.('.chip'); chipDown = c ? { n: Number(c.dataset.n), x: ev.clientX, y: ev.clientY, t: performance.now(), id: ev.pointerId } : null; ev.stopPropagation(); });
+addEventListener('pointerup', ev => {
+  const d = chipDown; if (!d || d.id !== ev.pointerId) return; chipDown = null;
+  if (performance.now() - d.t > 700 || Math.hypot(ev.clientX - d.x, ev.clientY - d.y) > 16) return;
+  const e = rush?.line.find(x => x.n === d.n); if (e) openActs(e);
+}, true);
+addEventListener('pointercancel', () => { chipDown = null; }, true);
 function openActs(e) {
   const s = rush; if (!s || phase !== 'sky' || s.at || paused || fight || actsFor) return;
   if (s.nerve <= 0) { floater({ x: innerWidth / 2, y: innerHeight * 0.3 }, t('actsNone'), 'bad'); SFX.wrong(); return; }
