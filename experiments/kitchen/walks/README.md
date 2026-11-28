@@ -17,6 +17,7 @@ Run from anywhere, one at a time (two walks at once starve each other's frames):
 | `trays.mjs` | tray unlocks at six and at all stamps, kept after reload, junk storage | `PART=looks LOOKS=diner,toon` |
 | `shop.mjs` | the shop's tray box in two languages; the slap mission to its end card | |
 | `journey.mjs` | nine shots of one sitting for a cold outside read | |
+| `ladder.mjs` | the Rush ladder from a pre-ladder save: shift 1, shift 2 with its mission, pips, the locked pip, a replay | `FIRST=1` for a first-ever Rush |
 
 Lessons that cost time: an ordinary-day walk must tap Play, tap the story card's button, and retry `kitchenCall(0)`
 until it returns true; frying needs Space held to the middle of the band; never edit game files while a walk is

@@ -203,7 +203,7 @@ console.log('ranks reachable: ok');
     const tg = sh.targets(save, night); assert.ok(tg.length === 3 && tg[0] < tg[1] && tg[1] < tg[2], `${night}, rank ${tier}: three rising targets`);
     assert.ok(sh.nightMenu(save, night).length >= 3, `${night}, rank ${tier}: at least three dishes`);
   }
-  assert.deepEqual(sh.nightsFor(saveAt(0)), ['rush']); assert.deepEqual(sh.targets(saveAt(4)), sh.TARGETS[4], 'the Rush targets are unchanged');
+  assert.deepEqual(sh.nightsFor(saveAt(0)), ['rush']); assert.deepEqual(sh.targets(saveAt(4)), sh.TARGETS[4], 'the Rush targets come from the table');
   {
     const s3 = sh.newShift({ save: saveAt(4), seed: 5, night: 'lunch' }); assert.equal(s3.secs, 90); for (let i = 0; i < 60 * 10; i++) sh.stepShift(s3, sim.DT, 0); assert.ok(s3.line.length && s3.line.every(g => g.price === Math.round(sh.setPriceFor(saveAt(4)) * (g.kind === 'rich' ? sh.RUSH.richPay : 1))), 'lunch is one set price'); assert.ok(s3.menu.every(id => sim.RECIPES[id].steps.length === 1), 'lunch dishes have one cooking step');
   }
@@ -228,6 +228,31 @@ console.log('ranks reachable: ok');
     { const m = sh.newShift({ save: saveAt(4), seed: 3, mission: 'trio' }); for (let i = 0; i < 120; i++) sh.stepShift(m, sim.DT, 0); assert.equal(sh.missionLost(m), false); sh.act(m, m.line[0], 'pan'); m.calm = 0; sh.act(m, m.line[0], 'pan'); assert.ok(m.nerve === 1 && sh.missionLost(m), 'two turns on one action: three different ones cannot be reached'); }
     assert.equal(sh.newShift({ save: saveAt(4), mission: 'constructor' }).mission, null);
     assert.ok(sh.missionPay(saveAt(0)) >= 5 && sh.missionPay(saveAt(10)) < sh.targets(saveAt(10))[0], 'a mission pays less than a star is worth');
+  }
+  {
+    // The ladder: shifts open in rank order, each on a night and with a mission its rank allows; a still tray clears
+    // none; the star lines sit where the scripted cooks say (NOTES.md pass line); a stuck cook is let through.
+    const L = sh.LADDER, PACE = 1.5; assert.equal(L.length, 12);
+    L.forEach((R, i) => {
+      assert.ok(i === 0 || R.from >= L[i - 1].from, 'shifts open in rank order'); assert.ok(sh.nightsFor(saveAt(R.from)).includes(R.night), `shift ${i + 1}: its night is open at its rank`);
+      assert.ok(!R.mission || sh.missionsFor(saveAt(R.from)).includes(R.mission), `shift ${i + 1}: its mission is allowed at its rank`); assert.ok(!(R.night === 'lunch' && R.mission === 'use_trash'), 'no swap mission on the quick menu');
+      assert.ok(R.need >= 1 && R.need <= 3 && sh.rungNeed(R, 0) === R.need && sh.rungNeed(R, 99) === 1);
+      for (const tier of [R.from, sim.TIERS.length - 1]) { const idle = playShift({ save: saveAt(tier), seed: 77, cook: COOKS.good, who: 'idle', night: R.night, mission: R.mission, speed: PACE }); for (const fails of [0, 2, 4, 9]) assert.ok(!sh.rungCleared(R, idle, fails), `shift ${i + 1}, rank ${tier}: a still tray never clears it`); }
+      assert.ok(sh.rungCleared(R, { stars: 1, missionDone: false }, 4) && (!R.mission ? true : !sh.rungCleared(R, { stars: 3, missionDone: false }, 3)), `shift ${i + 1}: let through after four failed tries, not before`);
+    });
+    assert.equal(sh.rungsOpen(saveAt(0)), 3); assert.equal(sh.rungsOpen(saveAt(1)), 6); assert.equal(sh.rungsOpen(saveAt(3)), 12);
+    const runs = Array.from({ length: 30 }, (_, i) => 101 + i * 37), share = (o, f) => o.filter(f).length / o.length;
+    for (const night of sh.NIGHT_IDS) for (const tier of [sh.NIGHTS[night].from, 2, 4]) {
+      const sharp = runs.map(seed => playShift({ save: saveAt(tier), seed, cook: COOKS.sharp, who: 'greedy', night, speed: PACE })), fresh = runs.map(seed => playShift({ save: saveAt(tier), seed, cook: COOKS.new, who: 'greedy', night, speed: PACE }));
+      const three = share(sharp, o => o.stars >= 3); assert.ok(three >= 0.15 && three <= 0.85, `${night}, rank ${tier}: a sharp cook misses three stars on some shifts and gets them on others (${three.toFixed(2)})`);
+      assert.ok(share(fresh, o => o.stars >= 1) >= 0.75, `${night}, rank ${tier}: a new cook mostly gets one star`); assert.ok(share(fresh, o => o.stars >= 3) <= 0.1, `${night}, rank ${tier}: a new cook rarely gets three`);
+    }
+    // A new cook who means to do each mission climbs the whole ladder, no shift taking more than six tries.
+    let seed = 500; L.forEach((R, i) => { let fails = 0; for (;;) {
+      const use = R.mission === 'trio' ? ['pan', 'slap', 'fridge'] : R.mission?.startsWith('use_') ? R.mission.slice(4) : null, trig = Object.fromEntries([].concat(use ?? []).map(id => [id, s => (s.t > 10 ? s.line.find(e => sh.canAct(s, e, id)) : null)]));
+      const o = playShift({ save: saveAt(R.from), seed: seed++, cook: COOKS.new, who: 'greedy', night: R.night, mission: R.mission, use, once: true, trig, speed: PACE });
+      if (sh.rungCleared(R, o, fails)) break; assert.ok(++fails <= 6, `shift ${i + 1}: a new cook is through within six tries`);
+    } });
   }
   console.log('rush: ok');
 }

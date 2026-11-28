@@ -609,3 +609,74 @@ ordinary day stuck; it is on the game clock now. Not fixed, written down: a Pace
 from the next shift, not the next pair; an unwanted item caught as the last guest walks out can be counted as missed;
 a rude guest's splat can land on the end card.
 
+
+### One Rush, a ladder of shifts (2026-11-28)
+
+The owner, after two Rush shifts: both nights look good but differ little; make it one continuous Rush with
+progressively harder missions that open with the story. Two outside designers, asked blind, both proposed the same
+shape: one two-minute format, about twelve rungs, clear the rung's goal to move up, gated by rank.
+
+**Pass line (written after the calibration below and before the page was built).**
+1. A still tray earns nothing and clears no shift, at any rank, at pace 1.5 and 1.85.
+2. A sharp scripted cook, without the wheel, gets three stars on some shifts and misses them on others: between 15% and
+   85% of shifts on both nights at ranks 0 to 4. The old lines failed this: the owner took three stars on both first tries.
+3. A new scripted cook gets one star on at least 75% of shifts and three on at most 10%.
+4. A new cook who means to do each mission clears every shift within six tries. Nothing blocks for good.
+5. A save from before the ladder (two plays, stars on both nights, no rung) loads, starts at shift 1 and keeps its
+   bests, stars, stamps and trays.
+
+**Calibration.** The owner's two shifts (rank 1, pace 1): 427 coins in a Rush hour and 400 in a Lunch rush. The old
+"good" scripted cook's middle half was 281 to 379 and 267 to 336, so both sat above it: the player model was too weak,
+and "three stars is a good cook's average" was too low. A `sharp` cook was added to `measure.mjs` (reacts in 0.18 s,
+cooks in 0.75 of the time); its middle half at pace 1 is 360 to 421 and 345 to 432. The 427 sits a little above it.
+Two shifts from one person, both from before the faster fall: nothing here is fitted tighter than a quartile.
+
+**Star lines** (`node measure.mjs lines 60`, at pace 1.5, the default): one star is 0.88 of a new cook's lower quarter,
+three stars a sharp cook's average, two a little past half way. At rank 1 a Rush hour went from 190/295/385 to
+195/315/415 and a Lunch rush from 150/225/300 to 165/335/470. The lines are measured at the default pace only: on Calm
+(pace 1) three stars is harder, which is not measured.
+
+**The ladder** (`shift.js` `LADDER`). Twelve shifts. A shift is a night (Rush hour or Lunch rush), a mission and the
+stars needed to move up. The Rush button plays the next shift not yet cleared; a row of pips under it replays a cleared
+one. Lunch is no longer a separate button: it is shifts 4, 6, 8, 10 and 12.
+
+| shift | night | mission | stars | opens at rank |
+|---|---|---|---|---|
+| 1 | rush | none (so the first hint is alone on the screen) | 1 | 0 |
+| 2 | rush | pan | 1 | 0 |
+| 3 | rush | slap | 2 | 0 |
+| 4 | lunch | fridge | 1 | 1 |
+| 5 | rush | swap the order (trash) | 2 | 1 |
+| 6 | lunch | hire | 2 | 1 |
+| 7 | rush | microwave | 2 | 2 |
+| 8 | lunch | kick out | 2 | 2 |
+| 9 | rush | make them cook | 3 | 2 |
+| 10 | lunch | lock the door | 2 | 3 |
+| 11 | rush | three different actions | 3 | 3 |
+| 12 | lunch | win a fist fight | 3 | 3 |
+
+Past the last open shift the button plays an open shift: a Rush hour with the next mission not yet done, as before, so
+the two missions not on the ladder (turn nobody away, rob) still come round and the golden tray's "all" is unchanged.
+A stuck player is let through: every two failed tries the stars needed drop by one, and after four the mission is
+waived. Measured (`node measure.mjs ladder 60`, a player who uses the mission's action the first time it is allowed):
+a good cook clears a two-star shift first try on 60 to 90% of shifts and a three-star shift on about 10%; a sharp cook
+28 to 57% on the three-star shifts; a new cook clears the one-star shifts first try and the others once eased.
+"Turn nobody away" was tried as shift 7 and dropped: a sharp cook held it on 18 to 55% of shifts, which is luck in who
+arrives, not skill.
+
+**What a rung does not do yet.** No new rules: every shift is one of the two existing nights. The consults' rule ideas
+(a marked guest who pays double if served first, a standby guest who takes a walkout's seat, a precision cooking bonus,
+double pay in the last twenty seconds) each need their own measurement and are not built.
+
+**Recording.** `start` and `end` carry `rung` (1 to 12, 0 for an open shift), `need`, and `end` adds `cleared` and
+`rungUp`. `kitchen-rush` gains `rung`, `fails` and `rungs`; nothing is renamed, and two tabs merge by the larger value.
+
+**Checked.** `bots.mjs` asserts the pass line. Through the real page (`walks/ladder.mjs`) at 390 by 844, at 320 by 568
+in Turkish and as a first-ever Rush: an old-shaped save starts at shift 1 with seven pips (six open, one locked) and
+keeps its bests and stars; shift 1 shows the drag hint alone on a first Rush; clearing it offers shift 2 with the pan
+mission; the pan mission clears shift 2; the locked pip says which rank opens it; a cleared pip replays its shift; no
+page errors. Shots looked at; at 320 wide the banner wrapped over the sign and the end card grew past the screen, both
+fixed and re-shot. Phone check passes in both browsers.
+
+**Not checked.** No person has played the ladder. Shifts 3 to 12 were not played through the page, only by the scripted
+cooks. The walk's own player (it follows the lowest wanted item) took 278 to 388 coins at rank 1, one or two stars.

@@ -270,13 +270,11 @@ export function act(s, e, id, won = false) {
   return out;
 }
 
-// The target: coins for one, two and three stars at each rank, set from `node measure.mjs targets` (see NOTES.md):
-// one star is a little under a new cook's poor shift, three stars is a good cook's average shift.
-export const TARGETS = [[150, 215, 260], [190, 295, 385], [180, 290, 380], [240, 410, 570], [240, 450, 660], [360, 630, 910], [430, 710, 1020], [480, 820, 1180], [480, 950, 1480], [550, 1050, 1570], [580, 1120, 1710]];
-// Another night has its own targets, set the same way from `node measure.mjs targets 60`: one star is 0.88 of a
-// new cook's poor shift (the lower quarter), three stars a good cook's average, two stars half way.
+// The target: coins for one, two and three stars at each rank, set from `node measure.mjs lines 60` at the default pace
+// (NOTES.md): one star is 0.88 of a new cook's lower quarter, three stars a sharp cook's average, two a little past half way.
+export const TARGETS = [[155, 220, 275], [195, 315, 415], [190, 385, 545], [225, 510, 745], [285, 655, 955], [390, 945, 1400], [495, 1125, 1640], [515, 1225, 1810], [540, 1325, 1970], [600, 1470, 2185], [650, 1485, 2170]];
 export const NIGHT_TARGETS = {
-  lunch: [null, [150, 225, 300], [150, 235, 315], [185, 295, 400], [260, 410, 560], [410, 620, 830], [395, 670, 945], [455, 765, 1075], [500, 825, 1145], [565, 900, 1230], [570, 960, 1345]],
+  lunch: [null, [165, 335, 470], [165, 340, 485], [195, 410, 585], [280, 575, 820], [435, 920, 1315], [495, 1090, 1575], [560, 1195, 1710], [605, 1290, 1850], [645, 1370, 1965], [690, 1470, 2105]],
 };
 export const targets = (save, night = 'rush') => { const t = Math.min(TARGETS.length - 1, save.tier); return NIGHT_TARGETS[night]?.[t] ?? TARGETS[t]; };
 // Rush coins are bigger than a day's. The save gets this share, so a Rush pays about what the same minutes of days pay.
@@ -303,6 +301,28 @@ export const missionHolds = (s, id = s.mission) => !!MISSIONS[id]?.ok(s);
 export const missionLost = (s, id = s.mission) => { const M = MISSIONS[id]; return !!M && !M.ok(s) && (M.keep || (M.lost ? M.lost(s) : s.nerve <= 0)); };
 export const missionDone = (s, id = s.mission) => missionHolds(s, id) && s.coins >= targets(s.save, s.night)[0];
 export const missionPay = (save, night = 'rush') => Math.max(5, Math.round(targets(save, night)[0] * 0.2 / 5) * 5);
+// The ladder: one Rush, twelve shifts in a row. A shift is a night, a mission and the stars it takes to move up. The
+// next shift opens when this one is cleared; `from` is the rank that opens it, so the ladder grows with the story.
+// A stuck player is let through: every two failed tries the stars needed drop by one (never under one), and after
+// four the mission is waived. The missions not on the ladder (seat, rob) come round in the open shifts after it.
+export const LADDER = [
+  { night: 'rush', mission: null, need: 1, from: 0 },
+  { night: 'rush', mission: 'use_pan', need: 1, from: 0 },
+  { night: 'rush', mission: 'use_slap', need: 2, from: 0 },
+  { night: 'lunch', mission: 'use_fridge', need: 1, from: 1 },
+  { night: 'rush', mission: 'use_trash', need: 2, from: 1 },
+  { night: 'lunch', mission: 'use_hire', need: 2, from: 1 },
+  { night: 'rush', mission: 'use_microwave', need: 2, from: 2 },
+  { night: 'lunch', mission: 'use_kick_out', need: 2, from: 2 },
+  { night: 'rush', mission: 'use_cook_self', need: 3, from: 2 },
+  { night: 'lunch', mission: 'use_lock_out', need: 2, from: 3 },
+  { night: 'rush', mission: 'trio', need: 3, from: 3 },
+  { night: 'lunch', mission: 'use_fight', need: 3, from: 3 },
+];
+export const rungsOpen = save => LADDER.filter(R => R.from <= save.tier).length;
+export const rungNeed = (R, fails = 0) => Math.max(1, R.need - Math.floor(Math.max(0, fails) / 2));
+export const rungWaived = (fails = 0) => fails >= 4;
+export const rungCleared = (R, res, fails = 0) => res.stars >= rungNeed(R, fails) && (!R.mission || res.missionDone || (rungWaived(fails) && res.stars >= 1));
 export function result(s) {
   const tg = targets(s.save, s.night), stars = tg.filter(x => s.coins >= x).length;
   return { share: Math.round(s.coins * SHARE), coins: s.coins, tips: s.tips, served: s.served, strikes: s.strikes, turned: s.turned, robbed: s.robbed, bestBuzz: s.bestBuzz, stars, targets: tg, closedEarly: !!s.closedEarly, mission: s.mission, missionDone: s.mission ? missionDone(s) : false };
