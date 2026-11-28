@@ -236,3 +236,9 @@ body.rush #banner { top: calc(150px + env(safe-area-inset-top)); }
 #actsClose { position: absolute; top: 6px; right: 8px; width: 36px; height: 36px; min-width: 0; min-height: 0; margin: 0; padding: 0; border-radius: 50%; border: 2.5px solid var(--ink); background: var(--ink); color: #fff; font-weight: 900; }
 body.nerve #rail .chip::after { content: '🎡'; position: absolute; right: -5px; bottom: -6px; font-size: 12px; background: var(--paper); border: 2px solid var(--ink); border-radius: 50%; width: 18px; height: 18px; line-height: 15px; text-align: center; }
 body.rush.sky #coach { top: 47vh; }
+
+/* The mission chip: one line under the tickets in a Rush. */
+#rushMission { position: fixed; top: calc(142px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); display: none; z-index: 5; max-width: 94vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12.5px; font-weight: 800; background: var(--paper); border: 2px solid var(--ink); border-radius: 99px; padding: 2px 10px; box-shadow: 0 2px 0 var(--shade); pointer-events: none; }
+#rushMission.done, #rushMission.keep { background: #d9ffd9; } #rushMission.lost { background: #eee; color: #777; text-decoration: line-through; }
+#dayMissions li.rm { text-align: center; } #dayMissions li.count { font-size: 13px; opacity: .8; }
+body.rush.mis #banner { top: calc(182px + env(safe-area-inset-top)); }

@@ -92,14 +92,14 @@ Built by the strongest available model in the lab thread; reviewers on other mod
 
 Owner's recorded asks: several orders at once and choosing which guests to serve; more variety and faster play; harder; better progress and missions; funny actions.
 
-| Ask | What the player decides | What the game must do for it to matter | Build before the rebuild | Live after slice 3 |
+| Ask | What the player decides | What the game must do for it to matter | Build before the rebuild | Live after slice 4 |
 |---|---|---|---|---|
 | choose which guests to serve | whose food to catch, and who to give up on | more guests than one cook can serve, patience that runs out, pay that differs by guest and by how long they waited | no pressure: nobody walks out, so order never matters | Rush: guests walk out and pay differs, but no adaptive serving rule beats every fixed plan (gate parked) |
 | several orders at once | take one order or two together | a joined catch is quicker per guest but harder, and both guests keep waiting | one guest at a time | Rush: three seated at once, one shared sky; every pair of falling things is a side to pick |
 | harder | how much risk to take | a shift that can go badly, with a visible target | a day cannot be lost | Rush: three strikes shut the doors; three coin targets a rank; Lunch rush is the riskier night |
 | faster play | nothing; this is pace | under 15 s from call to catch to cook to pay for a simple dish | about 20 to 30 s, with about 6 s of fixed waits | Rush: about 12 s a guest for a good scripted cook; Lunch rush is 90 s of one-step dishes |
 | funny actions | which wheel action, and when | each action does something different and has a price | 8 of 11 identical; Rob dominates | Rush: eleven effects, eleven prices, three turns a shift; Cook it! may be too strong, Lock out may be dead |
-| progress and missions | what to build first, which shift to attempt | builds that change the measured result in different ways | build order fixed by rank needs | weakest row. Two nights with their own stars; in a Rush only Tray and Decor change the result; Tables does nothing; no missions inside a shift |
+| progress and missions | what to build first, which shift to attempt | builds that change the measured result in different ways | build order fixed by rank needs | Two nights with their own stars; thirteen missions, one a shift, paid outside the stars; in a Rush only Tray and Decor change the result; Tables does nothing |
 
 ### The first situation: one Rush shift (slice 1, 2026-11-28)
 
@@ -268,7 +268,7 @@ Row served: progress and missions ("which shift to attempt"), and the owner's as
 
 Reading: the shape is the same at every rank. Rush hour takes more a shift, Lunch rush takes 10 to 40% more a minute and has two to three times the walkouts. Neither is better on both counts. Rank 2 is the worst case for a beginner: Lunch is shut early in 18% of shifts, and in 30% with the tray two levels down. Whether a person feels the trade as a choice is not known.
 
-**Did it pass?** The line used for a night was: the night pays most a shift for at least one of the four players (new or good cook, tray low or built) and not for all four. Lunch did not meet it. Rush hour pays more a shift for every player at nearly every rank (the one exception is the new cook with a low tray at rank 2, 188 against 182). Lunch is kept as variety with a measured trade (more a minute, more walkouts, half the time), not as the better night for some player. Lunch also had two tunings (1.7 times pay, then the set price), which is the one retune the stop rules allow.
+**Did it pass?** No line was recorded before the first nights run; the session record has none. The comparison actually used was coins a minute (the `<` mark in `measure.mjs nights`), under which Lunch is best for every player and the big-dish night was best for none. Stated as coins a shift, the line would be: the night pays most a shift for at least one of the four players (new or good cook, tray low or built) and not for all four. Lunch did not meet it. Rush hour pays more a shift for every player at nearly every rank (the one exception is the new cook with a low tray at rank 2, 188 against 182). Lunch is kept as variety with a measured trade (more a minute, more walkouts, half the time), not as the better night for some player. Lunch also had two tunings (1.7 times pay, then the set price), which is the one retune the stop rules allow.
 
 **In the real page** (browser players at the Fine rank, final rules, five seeds each; targets 260, 410 and 560): Lunch rush took 386, 527, 640, 524 and 587 coins at a good pace and 221, 486, 497, 298 and 495 at a beginner's pace. Rush hour on seed 4242 took 559 and 544. A browser player that only chases the lowest wanted thing took 35, 74 and 149 on Lunch, and once 679. Lunch is hard for a careless player. Only the Fine rank was played in the browser.
 
@@ -276,7 +276,7 @@ Reading: the shape is the same at every rank. Rush hour takes more a shift, Lunc
 
 - A still tray takes nothing at every rank (bots). A parked tray (moved once, then left) takes 195, 192, 332, 608 and 720 for the good cook at ranks 1, 2, 4, 7 and 10, which is one star each time and never two. For the new cook it is under one star at ranks 1, 2, 4 and 10 and one star at rank 7. Same open finding as Rush hour.
 - The wheel: no action changes Lunch by more than it changes Rush hour. Cook it! is again the strong one for a new cook (+80 at rank 4, +168 at rank 10). Rob at random still shuts the kitchen. Trash has lost its price on Lunch, because the smaller dish pays the same set price; used at random it gains a new cook 16, 36 and 54 coins at ranks 1, 4 and 10 (4 to 10%) and a good cook nothing at rank 4. Left as it is and recorded; it joins Cook it! and Lock out for the retune after a person's shifts.
-- Bots now run every action at random on both nights and assert the shift ends.
+- Bots run every action at random on both nights and assert the shift ends. (Correction, slice 4: this line was written in slice 3 but the edit that added the Lunch half had matched nothing, so only Rush hour was asserted until slice 4.)
 
 **First-time and early taps** (real page, 390 by 844): a save at rank 1 or above that has never played a Rush sees only the Rush hour button; Lunch appears after one Rush hour, so the first shift still gets the drag hint. A tap on either button while the models are still loading starts that night when loading ends (about six seconds later in the test).
 
@@ -299,3 +299,62 @@ Reading: the shape is the same at every rank. Rush hour takes more a shift, Lunc
 
 One adversarial code review of the diff by another model. Fixed: a second tab's newer record was overwritten by a whole-record write (records are now merged, keeping the higher best and stars); the measuring script could run a night that is not open at that rank (now refused); a start that waited for loading could fire after the player left the menu and came back; the tray kept its position from the last shift; "Again" after a seeded start replayed the saved pick, not the night just played; the end card named the other night. Obsolete: a finding about ticket and rob prices under the 1.7 pay multiplier, removed with the multiplier. Left: the page and script stepping difference above. A second outside review read the set price, the record merge and the menu-visit guard as finally written. Nothing blocked. Checked and rejected: that a second tab can still erase a best (the write rereads storage and merges in one step). Left and recorded: the play count can be one short when two tabs each finish a shift; a hand-damaged record holding a huge best is kept; fight then trash and trash then fight differ by one coin on a rich guest; and two faults older than this slice, a Play tap followed by a Restaurant tap during loading, and the Rush buttons failing without a message when the 3D view cannot start. Not reviewed by an outside reader: the look of the menu and Lunch screens.
 
+
+### Slice 4: missions inside a shift (2026-11-28)
+
+Row served: progress and missions. A mission is one goal shown when a shift starts and checked at the bell. Every mission also needs one star, so a tray that does nothing completes none. The reward sits outside the star count (a stamp, and coins added after the stars are counted), so no star target moves.
+
+**Pass line, written before the first run.** Each candidate is measured with `node measure.mjs missions 60` for a new and a good cook, on both nights, at the lowest rank where the night opens and at rank 10, with three plans on the same seeds: one that ignores the mission, one built for it, and a parked tray. A mission ships only if all of these hold in most of the eight cells (at least six):
+
+1. the ignoring plan completes it in under 30% of shifts;
+2. the built plan completes it at least 20 points more often than the ignoring plan;
+3. with the built plan the good cook completes it at least as often as the new cook;
+4. a still tray and a parked tray complete it in under 5% of shifts;
+5. no wheel action used at random completes it more often than the built plan.
+
+If the built plan takes no fewer coins than the ignoring plan, the mission is called a bonus, not a trade, and that is written next to its numbers. One retune a mission, then it is removed. Excluded before the trial: anything that leans on cooking quality (the scripted beginner's quality is known wrong) and anything that reduces to serving one guest first (the parked question).
+
+**First run** (`node measure.mjs missions 60`, seventeen candidates). Thirteen passed and four failed:
+
+- *Nobody walks out.* The good cook completes it while ignoring it in 67 to 98% of shifts. Failed line 1. Removed.
+- *Catch nothing unwanted.* No plan built for it did better than ignoring it. Failed line 2. Removed.
+- *Fill the buzz.* The same: 40 against 43%, 85 against 75%. Failed line 2. Removed.
+- *Four served in the first forty seconds.* Ignoring it completes it in 65 to 93% of shifts on Lunch and at low ranks, and a parked tray in 63% at one cell. Failed lines 1 and 4. Removed.
+
+**One retune** for two of the thirteen: *use the Microwave* is offered from the Bistro (rank 2), because it needs a moody guest and there are none before; *turn nobody away* is offered from the Bistro, because below it the room is rarely full and ignoring it completed it in 60 to 75% of Rush hours.
+
+**Second run, what ships** (share of shifts completed; coins against the ignoring plan; eight cells each):
+
+| Mission | Ignoring it | Built plan, new cook | Built plan, good cook | Coins against ignoring | Best random action |
+|---|---|---|---|---|---|
+| Use the Pan | 0% | 93 to 100% | 100% | -51 to +20 | 0% |
+| Use Slap | 0% | 88 to 97% | 100% | -28 to +11 | 0% |
+| Use the Fridge | 0% | 90 to 93% | 98 to 100% | -20 to +18 | 0% |
+| Use Trash | 0% | 83 to 93% | 97 to 100% | -68 to +15 | 0% |
+| Use Hire | 0% | 80 to 97% | 98 to 100% | -59 to +69 | 0% |
+| Use Kick out | 0% | 83 to 95% | 100% | -67 to +17 | 0% |
+| Use Cook it! | 0% | 87 to 95% | 98 to 100% | -35 to +46 | 0% |
+| Use Lock out | 0% | 85 to 97% | 97 to 100% | -34 to +110 | 0% |
+| Use the Microwave | 0% | 58 to 83% | 80 to 92% | -1 to +43 | 0% |
+| Three different actions | 0% | 88 to 98% | 100% | -65 to +34 | 0% |
+| Turn nobody away | 0 to 2% | 17 to 77% | 90 to 100% | -18 to +133 | 83% |
+| Win a fist fight | 0% | 50 to 65% | 80 to 88% | -41 to +75 | 0% |
+| Use Rob | 0% | 85 to 88% | 100% | -66 to +30 | 0% |
+
+Reading, plainly:
+
+- The twelve wheel missions pass lines 1, 2, 4 and 5 by construction: a plan that never opens the wheel cannot complete them. The lines could not fail for them, so their pass says little. What the numbers do show is line 3 (the good cook completes each more often, because of the one-star floor) and the cost: Rob, Kick out, Lock out and Cook it! cost coins in most cells (trades); the Fridge and the Microwave almost never do (bonuses that teach the action).
+- *Turn nobody away* is the one mission whose lines could fail, and it passed: nobody completes it by accident, a new cook completes it in 17 to 77% of shifts and a good cook in 90 to 100%. The random-action figure is high because locking the door or kicking someone out at random are the two routes to it.
+- A finding outside the missions: Lock out used whenever the room is full gains a good cook 87 coins a Rush hour and 120 a Lunch at rank 10. Slice 2 measured Lock out as dead with a different trigger. The action was fine and the trigger was wrong, the same fault as in slice 2. Lock out leaves the "may be dead" list; it may now be strong, and gets its one retune after a person's shifts.
+- Their purpose is the recorded fact from before the rebuild: one action was taken thirty times and the others almost never. Whether a person enjoys being sent to the other ten is not known.
+
+**In the page.** From the fourth Rush a shift shows one mission: a line at the start, a chip under the tickets (a target, then a tick, or struck out once it cannot be done), and a line on the end card with the coins. The mission is the next one not yet done, in a fixed order from plain to costly, one step along each shift so a hard one is not offered twice running. It pays a fifth of the one-star target (50 coins at the Fine rank), added after the stars are counted, and only with one star. Done missions are kept in `kitchen-rush.done` and merged across tabs like the bests. `rec` start and end carry the mission, whether it was done, whether its condition held without the star, and the actions used. The hook is `kitchenRush(seed, night, mission)`.
+
+**Real page** (390 by 844 English, 320 by 568 Turkish): the menu's pick after three plays is Use the Pan; the chip sits under the tickets at both sizes and is not cut; banging the pan ticks it; the end card shows "+50" with a star and "needs one star" without one, and still fits; a kept mission shows green until broken; three turns spent elsewhere strikes it out; pause and Menu clear the chip and do not count the shift; a damaged record (text, a huge number, an unknown id) is read safely; under three plays no mission is shown. No page errors.
+
+**Open after slice 4**
+
+- No person has played a shift with a mission.
+- There is no reward for a full card beyond the count. Two blind outside answers both proposed a cosmetic (a tray or knife skin) for stamps.
+- Both blind answers proposed missions with a follow-through (freeze a guest and serve them before they thaw; win a fight, then serve three without a walkout). None was built; they are the next candidates if the plain ones feel like chores.
+- Trash on Lunch, Cook it! and now Lock out wait for one retune each after a person's shifts.

@@ -1011,7 +1011,7 @@ function rebel(who) {
 const RUSH_KEY = 'kitchen-rush';                       // { plays, best: { tier: coins }, stars: { tier: n } }; its own key
 // Read defensively: a damaged record must not break the menu or the end of a shift.
 const readRush = () => {
-  const raw = readJson(RUSH_KEY, null), ok = raw && typeof raw === 'object' && !Array.isArray(raw), out = { plays: 0, best: {}, stars: {}, nights: {}, night: 'rush', tried: {} };
+  const raw = readJson(RUSH_KEY, null), ok = raw && typeof raw === 'object' && !Array.isArray(raw), out = { plays: 0, best: {}, stars: {}, nights: {}, night: 'rush', tried: {}, done: {}, turn: 0 };
   if (!ok) return out;
   if (Number.isFinite(raw.plays)) out.plays = Math.max(0, Math.floor(raw.plays));
   for (const [k, v] of Object.entries(raw.best && typeof raw.best === 'object' ? raw.best : {})) if (Number.isFinite(v)) out.best[k] = Math.max(0, Math.floor(v));
@@ -1024,6 +1024,8 @@ const readRush = () => {
     for (const [k, v] of Object.entries(n.best && typeof n.best === 'object' ? n.best : {})) if (Number.isFinite(v)) book.best[k] = Math.max(0, Math.floor(v));
     for (const [k, v] of Object.entries(n.stars && typeof n.stars === 'object' ? n.stars : {})) if (Number.isFinite(v)) book.stars[k] = Math.max(0, Math.min(3, Math.floor(v)));
   }
+  for (const id of Object.keys(sh.MISSIONS)) if (raw.done && typeof raw.done === 'object' && Number.isFinite(raw.done[id]) && raw.done[id] >= 1) out.done[id] = Math.min(999, Math.floor(raw.done[id]));   // missions done, by id
+  if (Number.isFinite(raw.turn)) out.turn = Math.max(0, Math.floor(raw.turn) % 1e6);
   if (raw.seen && typeof raw.seen === 'object') out.seen = Object.fromEntries(['rich', 'rude', 'picky', 'sneaky'].filter(m => raw.seen[m]).map(m => [m, 1]));
   return out;
 };
@@ -1032,13 +1034,16 @@ const rushSave = readRush();
 function storeRush() {
   const there = readRush(), up = (mine, theirs) => { for (const f of ['best', 'stars']) for (const [k, v] of Object.entries(theirs?.[f] ?? {})) mine[f][k] = Math.max(mine[f][k] ?? 0, v); };
   up(rushSave, there); for (const id of Object.keys(there.nights)) up(nightBook(id), there.nights[id]);
-  rushSave.plays = Math.max(rushSave.plays, there.plays); rushSave.tried = { ...there.tried, ...rushSave.tried }; if (there.seen || rushSave.seen) rushSave.seen = { ...there.seen, ...rushSave.seen };
+  rushSave.plays = Math.max(rushSave.plays, there.plays); rushSave.turn = Math.max(rushSave.turn, there.turn); for (const [k, v] of Object.entries(there.done)) rushSave.done[k] = Math.max(rushSave.done[k] ?? 0, v); rushSave.tried = { ...there.tried, ...rushSave.tried }; if (there.seen || rushSave.seen) rushSave.seen = { ...there.seen, ...rushSave.seen };
   writeJson(RUSH_KEY, rushSave);
 }
 // Nights: Rush hour, and from the second rank a Lunch rush. Each keeps its own best and stars.
 const NIGHT_ICON = { rush: '🔥', lunch: '🥪' };
 const nightNow = () => (sh.nightsFor(save).includes(rushSave.night) ? rushSave.night : 'rush');
 const nightBook = id => (id === 'rush' ? rushSave : (rushSave.nights[id] ??= { best: {}, stars: {} }));
+// A mission inside a shift (shift.js MISSIONS): offered from the fourth Rush, so it never shares the screen with a first hint.
+const MISSION_AFTER = 3;
+const missionText = id => (id === 'trio' || id === 'seat' ? t('mis_' + id) : id === 'use_fight' ? t('mis_fight') : t('mis_use', { a: `${WHEEL_ICON[id.slice(4)]} ${t('w_' + id.slice(4))}` }));
 const starRow = n => '★'.repeat(n) + '☆'.repeat(3 - n);
 function nightMenu() {
   const more = rushSave.plays ? sh.nightsFor(save).filter(id => id !== 'rush') : [], btn   /* another night shows after one Rush hour */ = id => `${NIGHT_ICON[id]} ${esc(t('night_' + id))} <small>${starRow(nightBook(id).stars?.[save.tier] ?? 0)}</small>`;
@@ -1051,11 +1056,12 @@ $('nights').addEventListener('click', async ev => {
   rushSave.night = b.dataset.night; storeRush(); beginRush();
 });
 const SEAT_COLOR = ['#ff7a4d', '#3fb6ff', '#a97bff', '#4fcf7a', '#ffc933'];
-let rush = null, lastMode = 'day', rushSeed = null, rushNight = null, lastNight = 'rush';
+let rush = null, lastMode = 'day', rushSeed = null, rushNight = null, lastNight = 'rush', rushMission;   // rushMission: a mission forced by the test hook (null forces none)
 const rings = new Map();                               // falling item n -> ring mesh
 let ringGeo = null;
 function clearRush() {
   for (const n of [...rings.keys()]) dropRing(n);
+  $('rushMission').style.display = 'none'; chipWas = ''; document.body.classList.remove('mis');
   $('rail').style.display = 'none'; $('rushHud').style.display = 'none'; $('rail').innerHTML = ''; $('acts').style.display = 'none'; actsFor = null; document.body.classList.remove('sky'); if (fight) { fight.over = true; fight = null; $('fight').style.display = 'none'; }
 }
 function beginRush() {
@@ -1066,17 +1072,18 @@ function beginRush() {
   clearCatch(); clearRush(); cook = null; g = null; waits = [];
   const night = rushNight ?? nightNow(); rushNight = null; lastNight = night;
   trayX = trayTarget = 0;
-  rush = sh.newShift({ save, seed, night });
   const firstNight = night !== 'rush' && !rushSave.tried[night];
+  const mission = rushMission !== undefined ? rushMission : (rushSave.plays >= MISSION_AFTER && !firstNight ? sh.missionFor(save, rushSave.done, rushSave.turn) : null); rushMission = undefined;
+  rush = sh.newShift({ save, seed, night, mission });
   if (!rushSave.tried[night]) { rushSave.tried[night] = 1; storeRush(); }
   day = { rush, plan: [], i: 0, served: 0, earned: 0, tips: 0, stars: [], seed, t0: clock, extras: 0, robbed: 0, rebels: [], line: null, next: 0, arriveT: 0, lost: 0, pickT: 0 };
   lastMode = 'rush';
   song?.start(seed);
-  rec.start({ mode: 'rush', night, day: save.day, tier: save.tier, tutorial: false, look: lookId, tool: tools.use, sound: save.sound, music: musicOn });
+  rec.start({ mode: 'rush', night, mission: rush.mission, day: save.day, tier: save.tier, tutorial: false, look: lookId, tool: tools.use, sound: save.sound, music: musicOn });
   paused = false; snd.release(); show('play'); hud();
   toSky();
   banner(t(night === 'rush' ? 'rushGo' : 'night_' + night), t(night === 'rush' ? 'rushGoSub' : 'nightGo_' + night));
-  rushCaught = false; if (firstNight) coach(t('nightSub_' + night), 8); else if ((rushSave.plays ?? 0) < 2) coach(t(matchMedia('(pointer: coarse)').matches ? 'rushDrag' : 'rushDragKeys'));   // first the control, then the rules
+  rushCaught = false; rushChip(); if (firstNight) coach(t('nightSub_' + night), 8); else if (rush.mission) coach(t('misGo', { m: missionText(rush.mission), n: sh.missionPay(save, night) }), 7); else if ((rushSave.plays ?? 0) < 2) coach(t(matchMedia('(pointer: coarse)').matches ? 'rushDrag' : 'rushDragKeys'));   // first the control, then the rules
 }
 function toSky() {
   phase = 'sky'; g = null; cook = null; document.body.classList.add('sky'); art.view('catch'); $('ticket').style.display = 'none'; gauge(null);
@@ -1097,6 +1104,7 @@ function rail() {
     return `<div class="chip${e.ready ? ' ready' : ''}${e.kind === 'rich' ? ' rich' : ''}" data-n="${e.n}" style="--c:${SEAT_COLOR[seatOf(e)]}"><div class="top"><img alt="" src="${art.thumb(dishModel(e.recipe))}"><b>${e.kind === 'rich' ? '💎' : ''}${e.mood ? MOOD_ICON[e.mood] : ''}${e.frozen > 0 ? '🧊' : ''}${e.self ? '👨‍🍳' : ''}<i class="coin"></i>${e.price}</b></div><div class="need">${icons}</div><div class="pat"><i></i></div></div>`;
   }).join('');
   railBars();
+  const rb = $('rail').getBoundingClientRect(); if (rb.height) $('rushMission').style.top = `${Math.round(rb.bottom + 7)}px`;   // the mission chip sits under the tickets, however tall they are
 }
 // ---------- the wheel in a Rush: tap a guest's ticket. The rules and the prices are in shift.js (act).
 let actsFor = null, actsAt = 0, rushHinted = false, rushCaught = true;
@@ -1160,6 +1168,18 @@ function railBars() {
   $('rushStars').textContent = '★'.repeat(tg.filter(x => s.coins >= x).length);
   $('rushTray').textContent = `${s.sky.tray.length}/${s.holds}`;
   $('rushTray').classList.toggle('full', s.sky.tray.length >= s.holds);
+  rushChip();
+}
+// The mission chip under the tickets: what to do, a tick once it holds, struck out once it cannot be done.
+let chipWas = '';
+function rushChip() {
+  const s = rush, el = $('rushMission'), id = s?.mission;
+  document.body.classList.toggle('mis', !!id);   // the banner sits a line lower while the chip is up
+  if (!id) { if (chipWas) { el.style.display = 'none'; chipWas = ''; } return; }
+  const M = sh.MISSIONS[id], holds = sh.missionHolds(s), state = M.keep ? (holds ? 'keep' : 'lost') : holds ? 'done' : s.nerve <= 0 && !fight ? 'lost' : 'todo', key = id + state;
+  if (key === chipWas) return;
+  if (chipWas && chipWas.startsWith(id) && state === 'done') { SFX.star(); const r = el.getBoundingClientRect(); floater({ x: r.left + r.width / 2, y: r.bottom + 18 }, '✓', 'gold'); }
+  chipWas = key; el.className = state; el.style.display = 'block'; el.textContent = `${state === 'done' ? '✓' : state === 'lost' ? '✗' : '🎯'} ${missionText(id)}`;
 }
 function stepRush(dt) {
   const s = rush;
@@ -1248,23 +1268,26 @@ function rushEnd() {
   phase = 'idle'; g = null;
   save.coins += r.share; store();
   rushSave.plays = (rushSave.plays ?? 0) + 1;
+  const bonus = r.missionDone ? sh.missionPay(save, s.night) : 0;
+  if (r.mission) { rushSave.turn++; if (r.missionDone) { rushSave.done[r.mission] = (rushSave.done[r.mission] ?? 0) + 1; save.coins += bonus; store(); } }
   const book = nightBook(s.night);
   book.best = { ...book.best, [save.tier]: Math.max(book.best?.[save.tier] ?? 0, r.coins) };
   const newStars = r.stars > (book.stars?.[save.tier] ?? 0);
   book.stars = { ...book.stars, [save.tier]: Math.max(book.stars?.[save.tier] ?? 0, r.stars) };
   storeRush();
-  rec.end('rush', { mode: 'rush', night: s.night, tier: save.tier, coins: r.coins, share: r.share, stars: r.stars, served: r.served, strikes: r.strikes, turned: r.turned, bestBuzz: r.bestBuzz, closedEarly: r.closedEarly, clatters: s.clatters, pushed: s.pushed, secs: Math.round(s.t) });
+  rec.end('rush', { mode: 'rush', night: s.night, mission: r.mission, missionDone: r.missionDone, missionHeld: r.mission ? sh.missionHolds(s) : false, acts: Object.keys(s.acts).join(' '), tier: save.tier, coins: r.coins, share: r.share, stars: r.stars, served: r.served, strikes: r.strikes, turned: r.turned, bestBuzz: r.bestBuzz, closedEarly: r.closedEarly, clatters: s.clatters, pushed: s.pushed, secs: Math.round(s.t) });
   clearRush(); clearCatch(); art.tray.load.clear();
   $('dayTitle').textContent = r.closedEarly ? t('rushOverClosed') : s.night === 'rush' ? t('rushOver') : `${NIGHT_ICON[s.night]} ${t('night_' + s.night)}`;
   $('dayStars').textContent = '★'.repeat(r.stars) + '☆'.repeat(3 - r.stars);
   const next = r.targets.find(x => r.coins < x);
   $('ledger').innerHTML = `<tr><td>${t('served')}</td><td>${r.served}</td></tr><tr><td>${t('walkouts')}</td><td>${day.lost}</td></tr><tr><td>${t('rushTook')}</td><td>${r.coins}</td></tr><tr><td>${t('rushBest')}</td><td>${book.best[save.tier]}</td></tr><tr><td>${t('rushShare')}</td><td>+${r.share}</td></tr><tr class="total"><td><i class="coin"></i></td><td>${save.coins}</td></tr>`;
   $('dayLine').textContent = next ? t('rushNext', { n: next - r.coins, s: r.stars + 1 }) : t('rushAll');
-  $('dayMissions').innerHTML = '';
+  const all = sh.missionsFor(save), got = all.filter(id => rushSave.done[id]).length;
+  $('dayMissions').innerHTML = r.mission ? `<li class="rm ${r.missionDone ? 'won' : ''}">${r.missionDone ? '✓' : '✗'} ${esc(missionText(r.mission))}${r.missionDone ? ` <b>+${bonus}</b>` : sh.missionHolds(s) ? ` · ${esc(t('misNoStar'))}` : ''}</li><li class="rm count">🎯 ${esc(t('misCount', { n: got, m: all.length }))}</li>` : '';
   $('nextDay').textContent = t('rushAgain');
   coach(null); fingerOff(); gauge(null);
   SFX.star(); if (newStars && r.stars) flash(); art.view('room');
-  rush = null; hud();
+  rush = null; hud(); rushChip();
   show('dayEnd');
 }
 
@@ -1513,7 +1536,7 @@ window.kitchenState = () => art && peopleIn && ({
   cook: cook ? { kind: cook.kind, d: cook.d, p: cook.p, band: cook.band, fill: cook.fill, left: cook.pieces?.filter(p => !p.done).length, misses: cook.misses ?? 0, striking: !!cook.strike, cuts: cook.pieces?.reduce((n, p) => n + p.cuts, 0), xs: cook.pieces?.map(p => p.done ? null : [p.m.position.x, p.m.position.z]), aim } : null, q: g?.q,
   look: lookId, hint: !!document.querySelector('.kit-hint.on'),
   line: day?.line ? day.line.map(e => ({ recipe: e.p.recipe, left: +e.left.toFixed(1) })) : null, lost: day?.lost ?? 0,
-  rush: rush ? { night: rush.night, secs: rush.secs, t: +rush.t.toFixed(2), coins: rush.coins, strikes: rush.strikes, buzz: rush.buzz, nerve: rush.nerve, acts: { ...rush.acts }, served: rush.served, turned: rush.turned, doors: rush.doors, over: rush.over, holds: rush.holds, at: rush.at?.recipe ?? null, tray: rush.sky.tray.map(it => it.id), line: rush.line.map(e => ({ n: e.n, recipe: e.recipe, kind: e.kind, left: +e.left.toFixed(1), full: e.full, need: { ...e.need }, got: { ...e.got }, ready: e.ready, price: e.price, mood: e.mood ?? null, frozen: e.frozen > 0, self: !!e.self })), sheet: !!actsFor, hold: rush.hold, calm: rush.calm > 0, locked: rush.locked > 0, items: rush.sky.items.map(it => ({ id: it.id, x: it.x, y: it.y, owner: sh.ownerOf(rush, it.id)?.n ?? null })) } : null,
+  rush: rush ? { mission: rush.mission, missionHolds: sh.missionHolds(rush), night: rush.night, secs: rush.secs, t: +rush.t.toFixed(2), coins: rush.coins, strikes: rush.strikes, buzz: rush.buzz, nerve: rush.nerve, acts: { ...rush.acts }, served: rush.served, turned: rush.turned, doors: rush.doors, over: rush.over, holds: rush.holds, at: rush.at?.recipe ?? null, tray: rush.sky.tray.map(it => it.id), line: rush.line.map(e => ({ n: e.n, recipe: e.recipe, kind: e.kind, left: +e.left.toFixed(1), full: e.full, need: { ...e.need }, got: { ...e.got }, ready: e.ready, price: e.price, mood: e.mood ?? null, frozen: e.frozen > 0, self: !!e.self })), sheet: !!actsFor, hold: rush.hold, calm: rush.calm > 0, locked: rush.locked > 0, items: rush.sky.items.map(it => ({ id: it.id, x: it.x, y: it.y, owner: sh.ownerOf(rush, it.id)?.n ?? null })) } : null,
   mood: g?.mood ?? null, staff: staff.map(m => m.kind), wheel: $('wheel').style.display === 'block', fight: fight ? { taps: fight.taps, need: fight.need } : null,
 });
 window.kitchenMusic = () => song && { ...song.melody, on: song.state.on, step: song.step, notes: song.log.length, kinds: song.log.map(l => l.kind) };
@@ -1527,7 +1550,7 @@ window.kitchenFight = win => { if (!fight) return false; if (win) { fight.taps =
 window.kitchenCall = i => { const e = day?.line?.[i]; if (e) callGuest(e); return !!e; };
 window.kitchenThrow = () => { throwNext = true; };
 window.kitchenMood = m => { if (g) g.mood = m; return !!g; };
-window.kitchenRush = (seed, night) => { if (screen !== 'menu' && phase !== 'sky') return false; if (seed != null) rushSeed = seed; if (night && sh.nightsFor(save).includes(night)) rushNight = night; beginRush(); return true; };
+window.kitchenRush = (seed, night, mission) => { if (screen !== 'menu' && phase !== 'sky') return false; if (seed != null) rushSeed = seed; if (night && sh.nightsFor(save).includes(night)) rushNight = night; if (mission !== undefined) rushMission = sh.MISSIONS[mission] ? mission : null; beginRush(); return true; };
 window.kitchenRushAct = (n, id, won = true) => { const e = rush?.line.find(x => x.n === n); if (!e || phase !== 'sky' || actsFor) return false; openActs(e); if (actsFor !== e) return false; actsAt = 0; doAct(id); if (id === 'fight' && fight) window.kitchenFight(won); return true; };
 window.kitchenSkipCatch = () => { skipCatch = true; };
 window.kitchenGolden = () => { goldenNext = true; };
