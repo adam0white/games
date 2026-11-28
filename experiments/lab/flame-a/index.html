@@ -54,6 +54,33 @@
         <h2 id="settingsTitle" data-i18n="settings">Settings</h2>
         <button id="closeSettings" type="button" data-i18n-aria="close"><span aria-hidden="true">×</span></button>
       </header>
+      <div id="featuredOptions">
+        <fieldset class="choice-group" data-setting="look">
+          <legend data-i18n="look">River look</legend>
+          <button type="button" data-value="paper">
+            <strong data-i18n="paper">Cut paper</strong><span data-i18n="paperDescription">Layered hills at dusk.</span>
+          </button>
+          <button type="button" data-value="thermal">
+            <strong data-i18n="thermal">Thermal</strong><span data-i18n="thermalDescription">Bright traces on dark water.</span>
+          </button>
+          <button type="button" data-value="storm">
+            <strong data-i18n="storm">Storm</strong><span data-i18n="stormDescription">Rain on grey water.</span>
+          </button>
+        </fieldset>
+        <fieldset class="choice-group" data-setting="difficulty">
+          <legend data-i18n="difficulty">Difficulty</legend>
+          <p id="nextLegHint" data-i18n="nextLegDifficulty" hidden>Difficulty changes apply to your next leg.</p>
+          <button type="button" data-value="gentle">
+            <strong data-i18n="gentle">Gentle</strong><span data-i18n="gentleDescription">Nearer embers, fewer rocks.</span>
+          </button>
+          <button type="button" data-value="steady">
+            <strong data-i18n="steady">Steady</strong><span data-i18n="steadyDescription">Embers on both sides.</span>
+          </button>
+          <button type="button" data-value="fierce">
+            <strong data-i18n="fierce">Fierce</strong><span data-i18n="fierceDescription">Fast water, paired rocks.</span>
+          </button>
+        </fieldset>
+      </div>
       <div id="options"></div>
       <label class="language" for="language"><span data-i18n="language">Language</span>
         <select id="language">

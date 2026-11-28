@@ -20,6 +20,23 @@ for (const changed of [
 ]) assert.equal(decodeLink(changed), null, changed);
 
 assert.deepEqual(decodeLink(link), first);
+const fierce = addCarrier(newChain(17), 'Sam', 1840, 47, 23, 'fierce');
+const fierceLink = '#f=2~1a2e2e0f~1~47~1840~23~1840-fierce:Sam';
+assert.equal(encodeLink(fierce), fierceLink);
+assert.deepEqual(decodeLink(fierceLink), fierce);
+assert.equal(decodeLink(fierceLink.replace('-fierce', '-gentle')), null);
+assert.equal(decodeLink(fierceLink.replace('-fierce', '')), null);
+assert.equal(decodeLink('#f=2~63144223~1~47~1840~23~1840-easy:Sam'), null);
+assert.equal(decodeLink(legacy.replace(':Sam', '-fierce:Sam')), null);
+assert.throws(() => addCarrier(first, 'Sam', 120, 30, 22, 'easy'), RangeError);
+let mixed = decodeLink(legacy);
+for (const difficulty of ['gentle', 'steady', 'fierce']) {
+  mixed = addCarrier(mixed, '', 120, 30, 22, difficulty);
+  const receipt = encodeLink(mixed);
+  assert.deepEqual(decodeLink(receipt), mixed);
+  assert.deepEqual(decodeLink(receipt.slice(0, -1)), mixed);
+}
+assert.deepEqual(mixed.carriers.map(c => c.difficulty), [undefined, 'gentle', 'steady', 'fierce']);
 let chain = first;
 for (let i = 0; i < 10; i++) chain = addCarrier(chain, i === 9 ? 'Çığ Şule.2' : '', 100, 13, i);
 assert.deepEqual(decodeLink(encodeLink(chain)), chain);
@@ -53,8 +70,8 @@ for (const source of [legacy, link]) {
   ]) assert.equal(decodeLink(bad), null, String(bad));
 }
 
-function play(chain, steer, dt = 1 / 60) {
-  const run = createRun(chain);
+function play(chain, steer, dt = 1 / 60, difficulty = 'steady') {
+  const run = createRun(chain, difficulty);
   while (!run.outcome && run.elapsed < 61) step(run, dt, steer(run));
   assert.ok(run.outcome);
   return run;
@@ -66,30 +83,63 @@ function followEmbers(run) {
 }
 
 const trials = 200;
-let finished = 0;
-let weakFinished = 0;
-let idleMin = Infinity;
-let idleMax = 0;
-for (let seed = 0; seed < trials; seed++) {
-  const chain = newChain(seed);
-  const played = play(chain, followEmbers);
-  if (played.outcome === 'handoff') finished++;
-  if (play({ ...chain, flame: 18 }, followEmbers).outcome === 'handoff') weakFinished++;
-  for (const flame of [1, 18, chain.flame, 100]) {
-    const idle = play({ ...chain, flame }, () => 0);
-    assert.equal(idle.outcome, 'drop', `idle seed ${seed}, light ${flame}`);
-    assert.ok(idle.elapsed >= 20 && idle.elapsed <= 40, `idle seed ${seed}, light ${flame}: ${idle.elapsed}s`);
-    idleMin = Math.min(idleMin, idle.elapsed);
-    idleMax = Math.max(idleMax, idle.elapsed);
+const levels = [
+  { difficulty: 'gentle', idleBand: [35, 55], finishBand: [0.95, 1] },
+  { difficulty: 'steady', idleBand: [20, 40], finishBand: [0.80, 1] },
+  { difficulty: 'fierce', idleBand: [12, 25], finishBand: [0.35, 0.75] }
+];
+for (const { difficulty, idleBand, finishBand } of levels) {
+  let finished = 0;
+  let weakFinished = 0;
+  let idleMin = Infinity;
+  let idleMax = 0;
+  for (let seed = 0; seed < trials; seed++) {
+    const chain = newChain(seed);
+    const played = play(chain, followEmbers, 1 / 60, difficulty);
+    if (played.outcome === 'handoff') finished++;
+    if (difficulty === 'steady' && play({ ...chain, flame: 18 }, followEmbers).outcome === 'handoff') weakFinished++;
+    for (const flame of [1, 18, chain.flame, 100]) {
+      const idle = play({ ...chain, flame }, () => 0, 1 / 60, difficulty);
+      const label = `${difficulty} idle seed ${seed}, light ${flame}: ${idle.elapsed}s`;
+      assert.equal(idle.outcome, 'drop', label);
+      assert.ok(idle.elapsed >= idleBand[0] && idle.elapsed <= idleBand[1], label);
+      idleMin = Math.min(idleMin, idle.elapsed);
+      idleMax = Math.max(idleMax, idle.elapsed);
+    }
+    const [firstEmber, ...later] = played.items;
+    const embers = later.filter(i => i.kind === 'ember');
+    const rocks = later.filter(i => i.kind === 'rock');
+    assert.equal(firstEmber.kind, 'ember');
+    assert.ok(firstEmber.at < 3 && firstEmber.x === 0);
+    assert.ok(embers.every(i => Math.abs(i.x) > 0.17));
+    assert.ok(rocks.every(i => i.at >= 8));
+    if (difficulty === 'steady') {
+      assert.deepEqual(createRun(chain), createRun(chain, 'steady'));
+      assert.ok(rocks.every(i => i.at >= 21 || Math.abs(i.x) > 0.125));
+    } else if (difficulty === 'gentle') {
+      const ordinary = createRun(chain);
+      const steadyEmbers = ordinary.items.filter(i => i.kind === 'ember' && i.at > 3);
+      assert.ok(embers.every((e, i) => Math.abs(e.x) < Math.abs(steadyEmbers[i].x)));
+      assert.ok(rocks.length < ordinary.items.filter(i => i.kind === 'rock').length);
+    } else {
+      assert.ok(played.speed > createRun(chain).speed && played.speed <= 34);
+      assert.ok(embers.every(i => Math.abs(i.x) >= 0.48));
+      assert.equal(rocks.length % 2, 0);
+      for (let i = 0; i < rocks.length; i += 2) {
+        assert.ok(rocks[i].x * rocks[i + 1].x <= 0);
+        assert.ok(rocks[i + 1].at - rocks[i].at < 0.7);
+      }
+    }
   }
-  const [firstEmber, ...later] = played.items;
-  assert.equal(firstEmber.kind, 'ember');
-  assert.ok(firstEmber.at < 3 && firstEmber.x === 0);
-  assert.ok(later.filter(i => i.kind === 'ember').every(i => Math.abs(i.x) > 0.17));
-  assert.ok(later.filter(i => i.kind === 'rock').every(i => i.at >= 8 && (i.at >= 21 || Math.abs(i.x) > 0.125)));
+  assert.ok(finished >= finishBand[0] * trials && finished <= finishBand[1] * trials,
+    `${difficulty}: ${finished}/${trials} fresh flames finished`);
+  if (difficulty === 'steady') {
+    // Frozen round-two results for these seeds and this steering policy.
+    assert.equal(finished, 200);
+    assert.equal(weakFinished, 121);
+  }
+  console.log(`${difficulty}: ember steering ${finished}/${trials}, idle drops ${idleMin.toFixed(2)}–${idleMax.toFixed(2)}s (800 legs).`);
 }
-assert.ok(finished >= 0.8 * trials, `${finished}/${trials} fresh flames finished`);
-assert.ok(weakFinished >= 0.5 * trials, `${weakFinished}/${trials} 18% flames finished`);
 const stranded = play(newChain(45), () => 1);
 assert.equal(stranded.outcome, 'drop');
 assert.equal(stranded.flame, 0);
@@ -98,4 +148,4 @@ const finish = play(newChain(4), followEmbers, 1 / 30);
 assert.equal(finish.progress, 1);
 const next = addCarrier(first, 'Ali', finish.distance, finish.flame, 22);
 assert.equal(createRun(decodeLink(encodeLink(next))).flame, Math.round(finish.flame));
-console.log(`Link validation and legacy compatibility passed. Ember steering finished ${finished}/${trials} fresh and ${weakFinished}/${trials} at 18%. All 800 idle legs dropped in ${idleMin.toFixed(1)}–${idleMax.toFixed(1)}s. Bank steering dropped the flame.`);
+console.log('Link validation, legacy compatibility, bank drop and handoff passed.');

@@ -91,6 +91,7 @@ h2 { font-size: clamp(32px, 4.5vw, 49px); letter-spacing: -.045em; line-height: 
 #carriers li { display: grid; grid-template-columns: 4px minmax(0, 1fr) auto; align-items: baseline; gap: .65em; overflow-wrap: anywhere; }
 #carriers li span:last-child { font-variant-numeric: tabular-nums; }
 #carriers li::before { content: ""; width: 4px; height: 4px; flex: 0 0 4px; background: var(--wick); transform: rotate(45deg); }
+.difficulty-mark { display: inline-block; border: 1px solid currentColor; border-radius: .3em; padding: 0 .35em; font-size: .75em; }
 #carriers li:last-child { color: var(--paper); }
 #nameField { display: grid; gap: 5px; font-size: .82rem; color: var(--muted); }
 #nickname, #shareUrl, select {
@@ -115,6 +116,18 @@ h2 { font-size: clamp(32px, 4.5vw, 49px); letter-spacing: -.045em; line-height: 
 .settings-head { margin-bottom: 14px; }
 #closeSettings { font-size: 28px; border: 1px solid var(--line); width: 44px; height: 44px; }
 .setting, .language, #recording { padding: 9px 0; margin: 0; border-top: 1px solid var(--line); }
+.choice-group { min-width: 0; margin: 0 0 12px; padding: 0; border: 0; }
+.choice-group legend { padding: 0; font-weight: 600; }
+.choice-group button {
+  width: 100%; display: grid; grid-template-columns: minmax(5.2em, auto) 1fr; align-items: center; gap: 8px;
+  min-height: 46px; margin-top: 4px; padding: 6px 10px; text-align: left;
+  border: 1px solid var(--line); border-radius: 2px; background: transparent;
+}
+.choice-group button strong { font-weight: 600; }
+.choice-group button span, #nextLegHint { color: var(--muted); font-size: .84rem; }
+.choice-group button[aria-pressed="true"] { border-color: var(--wick); box-shadow: inset 3px 0 var(--wick); }
+.choice-group button[aria-pressed="true"] strong { color: var(--wick); }
+#nextLegHint { margin: 3px 0; }
 .setting > b, .language > span { font-weight: 560; font-size: .92rem; }
 .setting button { background: transparent; border: 1px solid var(--line); padding: 8px 12px; min-height: 40px; border-radius: 2px; margin: 5px 5px 0 0; }
 .setting button.on { color: var(--ink); background: var(--wick); border-color: var(--wick); }

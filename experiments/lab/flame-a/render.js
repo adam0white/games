@@ -544,6 +544,7 @@ export function river(canvas) {
     boatY = h * 0.77;
     span = Math.min(w * 0.49, unit * 0.79);
     world = screen === 'leg' ? (state.progress || 0) * 60 : screen === 'arrival' ? ease(age / 4) * 4 : 60;
+    if (state.difficulty === 'fierce' && screen !== 'arrival') world *= 1.15;
     shore = state.shore;
     boatX = position(x, 0).x;
     if (screen !== lastScreen) {
