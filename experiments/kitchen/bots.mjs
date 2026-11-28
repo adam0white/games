@@ -159,3 +159,17 @@ for (let t = 1; t < sim.TIERS.length; t++) for (const [k, v] of Object.entries(s
 }
 for (const k of sim.BUILDING_IDS) for (let l = 1; l <= sim.BUILDINGS[k].max.at(-1); l++) assert.ok(Number.isFinite(sim.BUILDINGS[k].cost(l)), `${k} level ${l} has no price`);
 console.log('ranks reachable: ok');
+
+// The Rush shift (shift.js): a tray that never moves serves nobody and the doors shut early; a player who follows the
+// most impatient guest serves a full shift; and a shift always ends.
+{
+  const { playShift, saveAt, COOKS } = await import('./measure.mjs');
+  for (const tier of [0, 2, 5]) {
+    const idle = playShift({ save: saveAt(tier), seed: 77, cook: COOKS.good, who: 'idle' });
+    assert.equal(idle.served, 0, 'an idle tray serves nobody'); assert.ok(idle.closedEarly, 'and the doors shut early'); assert.equal(idle.stars, 0);
+    const out = playShift({ save: saveAt(tier), seed: 77, cook: COOKS.good, who: 'impatient' });
+    assert.ok(out.served >= 6 && out.coins > 0 && out.secs < 400, `rank ${tier}: a played shift serves guests and ends (${out.served} served, ${Math.round(out.secs)} s)`);
+    assert.ok(out.share === Math.round(out.coins * 0.25));
+  }
+  console.log('rush: ok');
+}

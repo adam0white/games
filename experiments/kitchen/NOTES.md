@@ -75,3 +75,84 @@ Nana's rule: "Feed everyone. Throw food? Spin first. THEN feed." From the Bistro
 - Kenney Food Kit, Furniture Kit and Mini Characters (kenney.nl), CC0. See `models/KENNEY-LICENSE.txt`.
 - three.js r187 (MIT), vendored in `vendor/`.
 - Sounds and music are made in the browser by the kit (`kit/audio.js`, `kit/music.js`). Nothing was bought.
+
+## Rush rebuild (started 2026-11-28, following `docs/playable-first.md`)
+
+Built by the strongest available model in the lab thread; reviewers on other model families. No person has played any of this yet unless a line below says so.
+
+### What recorded play shows (26 to 28 November, phone, 42 runs, about 250 minutes)
+
+- A day lasts about 1.4 minutes at the median and serves 2 to 5 guests for about 30 coins. Players start the next day about 15 to 20 seconds later, so they do come back.
+- Nothing can beat the player. A day cannot be lost. 49 guests arrived in the line on 27 November and none walked out (patience 86 s or more against about 20 s a guest).
+- "Catch again" is free and was tapped 13 times on 27 November.
+- Rob was 8 of 21 wheel uses, also on calm guests. It pays 0.6 of the price in about 5 seconds against about 1.25 of the price in about 25 seconds for cooking, and it costs nothing.
+- Eight wheel actions do the same thing. The rank needs fix the build order.
+
+### Target, as things the player decides
+
+Owner's recorded asks: several orders at once and choosing which guests to serve; more variety and faster play; harder; better progress and missions; funny actions.
+
+| Ask | What the player decides | What the game must do for it to matter | Current build |
+|---|---|---|---|
+| choose which guests to serve | whose food to catch, and who to give up on | more guests than one cook can serve, patience that runs out, pay that differs by guest and by how long they waited | no pressure: nobody walks out, so order never matters |
+| several orders at once | take one order or two together | a joined catch is quicker per guest but harder, and both guests keep waiting | one guest at a time |
+| harder | how much risk to take | a shift that can go badly, with a visible target | a day cannot be lost |
+| faster play | nothing; this is pace | under 15 s from call to catch to cook to pay for a simple dish | about 20 to 30 s, with about 6 s of fixed waits |
+| funny actions | which wheel action, and when | each action does something different and has a price | 8 of 11 identical; Rob dominates |
+| progress and missions | what to build first, which shift to attempt | builds that change the measured result in different ways | build order fixed by rank needs |
+
+### The first situation: one Rush shift (slice 1, 2026-11-28)
+
+A Rush is one shift on a clock, started from the menu ("Rush hour") on any save past the tutorial. The ordinary day is unchanged and stays the first button. Rules live in `shift.js` (no DOM); the page and the scripted players in `measure.mjs` use the same calls. Rush progress is in its own key, `kitchen-rush`; `kitchen-save` keeps its shape and only receives coins.
+
+- Doors are open 120 seconds. Three seats. Every seated guest's food falls in one shared sky.
+- Food falls two things at a time, one each side of the middle, each farther out than a tray left in the middle can reach. So every pair is a side to pick. Each thing is something a different seated guest lacks, or sometimes a thing nobody ordered.
+- A ring round a falling thing has the colour of the guest it would go to (the guest who lacks it and has the least patience). Things nobody ordered have no ring.
+- The tray holds 3 plus the Tray level. One more pushes the oldest thing of another guest off. Catching a thing nobody ordered knocks the newest thing off and costs one buzz.
+- When one guest's food is all on the tray, that dish is cooked at once with the usual steps. The sky waits; the other guests' patience does not.
+- Tip falls with the wait. A walkout is a strike and clears the buzz. Three strikes shut the doors early. A guest who finds no seat leaves and costs one buzz.
+- Buzz: each guest served adds a step (up to five); each step adds 12% to pay.
+- Stars: three coin targets per rank. The save receives a quarter of the shift's coins ("your share"), so a Rush pays about what the same minutes of ordinary days pay.
+
+### Measured (scripted players, 40 seeds, Bistro rank, coins a shift)
+
+`node experiments/kitchen/measure.mjs order 40 --tier=2`. "Good" reacts in 0.25 s and cooks at 0.93 quality; "new" reacts in 0.45 s, cooks 45% slower at 0.74.
+
+| Player | Good cook | Walkouts | New cook | Walkouts |
+|---|---|---|---|---|
+| tray never moves (middle) | 0, doors shut early every time | 4.4 | 0 | 4.4 |
+| tray parked at one side | 227 | 1.7 | 164 | 2.3 |
+| no plan: catch anything ringed | 362 | 0.47 | 223 | 1.05 |
+| most impatient guest first | 349 | 0.10 | 219 | 0.70 |
+| best payer first | 294 | 1.23 | 216 | 1.40 |
+| nearest to done first | 370 | 0.30 | 226 | 0.82 |
+| mixed rule (save who can be saved, then best coins a second) | 352 | 0.47 | 224 | 1.10 |
+
+What this shows, and what it does not:
+
+- Picking a side matters: a still tray earns nothing and a parked tray earns about 60% of a played one.
+- Which guest to build for changes walkouts by a factor of four to twelve, and "best payer first" loses about 20% for a good cook. It changes coins among the three sensible plans by under 6%, which is inside the spread between seeds (about 300 to 410). So the plan is a real choice for keeping guests, and close to flat for coins.
+- Not shown: a rule that reads the whole table and beats the best simple rule by a clear margin. The mixed rule does not. Until one does, do not claim the Rush has deep ordering strategy.
+- The measurement can fail: with the tray holding everything (`--off`), "best payer first" rises from 294 to 349 and walkouts halve, and "no plan" becomes the best plan (378). The tray limit is what makes chasing the best payer cost something.
+- The model was checked against the page. Ten dishes timed in a phone-size browser came within 1.2 s of `cookSecs`. A browser script at the good cook's pace took 405 (most impatient first, touch) and 271 (no plan, new cook's pace) on one seed at the Bistro; a tray left in the middle served nobody and the doors shut early with no page error.
+- No person has played a Rush.
+
+### Tried and dropped
+
+- Calling one guest to the counter and choosing the order. "Most impatient first" beat every other order (125 against 118 first come and 106 best payer), so it was one right answer.
+- A shared sky that drops one thing at a time. "No plan" won (161 against 128 to 145), so there was nothing to decide.
+- Pairs that fall anywhere 1.0 to 1.15 apart. A tray that never left the middle caught about one of each pair and earned three stars in the browser. Pairs now straddle the tray's reach.
+- A fourth and fifth seat from the Tables build. More seats lowered takings (good cook 329, 339, 309 for 3, 4, 5 seats on ten seeds; new cook 225, 218, 199) and shut the doors early in 40 to 90% of shifts at five seats, because a refusal costs one buzz and a walkout costs a strike. Seats are three at every rank until a seat is worth having (`node experiments/kitchen/measure.mjs seats`).
+- The first model of cooking time added 4 s a guest for walking, ordering and paying, which a Rush does not have. It put a good cook at 235 where the page gave 390, so the first star targets were far too low. Check the model against the page before setting any target from it.
+
+### Open
+
+- Star targets are set from the model (one star near a new cook's lower quartile, three near a good cook's upper quartile). A person's first shifts will show whether they are right.
+- From the Fine rank up, a new cook's doors shut early in 75 to 93% of shifts. No recorded player is there yet.
+- The wheel does not open in a Rush yet. `shift.js` has Rob with a price (a strike, the buzz, and nine seconds off every witness); `measure.mjs rob` has not been rerun since the sky changed.
+- Guests are tickets at the top of the screen, not people in the room.
+- The Rush is not in the browser phone check; `bots.mjs` asserts its rules (idle serves nobody, a played shift ends).
+
+### Review of slice 1
+
+One adversarial code review on another model family found nine things; seven were confirmed and fixed before merge: the end card could say "shut early" when the third walkout came after the bell; the third guest arrived with the opening two; things in the air hung still when the room emptied; a thing nobody ordered was drawn twice on a clatter; the tray kept showing a dish's food for a moment after it left; ring materials leaked on quit; a damaged `kitchen-rush` record could break the menu. Not fixed: the wheel and Rob are not reachable in a Rush (planned next).

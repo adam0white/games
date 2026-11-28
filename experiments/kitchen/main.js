@@ -11,6 +11,7 @@ import { screens } from '../kit/screens.js';
 import { lab } from '../kit/lab.js';
 import { settings } from '../kit/settings.js';
 import * as story from './story.js';
+import * as sh from './shift.js';
 // Story beats and daily specials (data). A failed load just means a day without story.
 const storyData = Promise.all(['beats', 'specials'].map(n => fetch(`./story/${n}.json`).then(r => r.json()).catch(() => null))).then(([beats, sp]) => ({ beats: beats ?? [], specials: sp?.specials ?? [] }));
 import { hint } from '../kit/hint.js';
@@ -136,6 +137,7 @@ const show = screens(['menu', 'paused', 'extra', 'dayEnd', 'shop'], name => {
   if (playing && g && ['catch', 'chop', 'fry', 'micro', 'blend', 'ring', 'close', 'serve', 'plate'].includes(phase)) $('ticket').style.display = 'block';
   // Off play, nothing of a station stays out: no Chop button; and off the pause card the knife, flames and pan go back.
   if (name !== 'play') chopBtn(false);
+  { const on = !!rush && (playing || name === 'paused'); $('rail').style.display = on ? 'flex' : 'none'; $('rushHud').style.display = on ? 'flex' : 'none'; $('rank').style.display = on ? 'none' : ''; $('coins').style.display = on ? 'none' : ''; document.body.classList.toggle('rush', on); }
   if (art && !playing && name !== 'paused') { art.knife.rest(); if (flames) flames.visible = false; art.pan.rotation.x = 0; art.panGlow.material.opacity = 0; }
   if (name === 'menu') menu();
   if (name === 'play') missionChip();
@@ -162,6 +164,8 @@ function hud() {
 function menu() {
   $('play').textContent = save.tutorial ? t('cont', { n: save.day }) : t('play');
   $('toShop').style.display = save.tutorial ? '' : 'none';
+  $('rush').style.display = save.tutorial ? '' : 'none';
+  { const st = rushSave.stars?.[save.tier] ?? 0; $('rush').innerHTML = `${esc(t('rush'))} <small>${'★'.repeat(st)}${'☆'.repeat(3 - st)}</small>`; }
   $('menuLine').textContent = save.tutorial ? t('menuLine', { coins: save.coins, rank: rankName(save.tier) }) : '';
   art?.view('menu');
 }
@@ -179,6 +183,7 @@ let menuGuest = null;
 
 // ---------- a day
 function beginDay() {
+  rush = null; clearRush(); $('nextDay').textContent = t('nextDay');
   art.register.reset?.();
   if (menuGuest) { menuGuest.gone = true; menuGuest = null; }
   for (const m of art.guests) m.gone = true;
@@ -605,7 +610,7 @@ function plate() {
   dish.position.set(1.75, TOP, 0.3); art.world.add(dish); art.popIn(dish);
   art.burst(new art.THREE.Vector3(1.75, TOP + 0.3, 0.3), { n: 20, color: '#ffe37a', speed: 1.4, up: 1.6, size: 0.025, life: 0.8, glow: true });
   SFX.good();
-  wait(0.9, serve);
+  wait(rush ? 0.5 : 0.9, rush ? rushServe : serve);
 }
 function serve() {
   phase = 'serve';
@@ -688,6 +693,7 @@ function flyCoin(from, to, done) {
 
 // ---------- the end of a day
 function endDay() {
+  lastMode = 'day';
   showFocus(false);
   phase = 'idle'; g = null; $('line').style.display = 'none';
   const first = !save.tutorial;
@@ -713,7 +719,7 @@ function endDay() {
   SFX.star(); art.view('room');
   show('dayEnd');
 }
-$('nextDay').addEventListener('click', () => { snd.unlock(); SFX.tap(); beginDay(); });
+$('nextDay').addEventListener('click', () => { snd.unlock(); SFX.tap(); if (lastMode === 'rush') beginRush(); else beginDay(); });
 $('dayMenu').addEventListener('click', () => { SFX.tap(); show('menu'); });
 $('toShop2').addEventListener('click', () => { SFX.tap(); show('shop'); });
 $('toShop').addEventListener('click', async () => { snd.unlock(); SFX.tap(); await ready; show('shop'); });
@@ -997,6 +1003,181 @@ function rebel(who) {
   }));
 }
 
+
+// ---------- the Rush shift: one shift on a clock with one shared sky. The rules are in shift.js.
+// Every seated guest's food falls at once, two things at a time and far apart. The ring round a falling thing is the
+// colour of the guest it would go to. The tray holds only so much; one more pushes the oldest off.
+const RUSH_KEY = 'kitchen-rush';                       // { plays, best: { tier: coins }, stars: { tier: n } }; its own key
+// Read defensively: a damaged record must not break the menu or the end of a shift.
+const rushSave = (() => {
+  const raw = readJson(RUSH_KEY, null), ok = raw && typeof raw === 'object' && !Array.isArray(raw), out = { plays: 0, best: {}, stars: {} };
+  if (!ok) return out;
+  if (Number.isFinite(raw.plays)) out.plays = Math.max(0, Math.floor(raw.plays));
+  for (const [k, v] of Object.entries(raw.best && typeof raw.best === 'object' ? raw.best : {})) if (Number.isFinite(v)) out.best[k] = Math.max(0, Math.floor(v));
+  for (const [k, v] of Object.entries(raw.stars && typeof raw.stars === 'object' ? raw.stars : {})) if (Number.isFinite(v)) out.stars[k] = Math.max(0, Math.min(3, Math.floor(v)));
+  return out;
+})();
+const SEAT_COLOR = ['#ff7a4d', '#3fb6ff', '#a97bff', '#4fcf7a', '#ffc933'];
+let rush = null, lastMode = 'day', rushSeed = null;
+const rings = new Map();                               // falling item n -> ring mesh
+let ringGeo = null;
+function clearRush() {
+  for (const n of [...rings.keys()]) dropRing(n);
+  $('rail').style.display = 'none'; $('rushHud').style.display = 'none'; $('rail').innerHTML = '';
+}
+function beginRush() {
+  art.register.reset?.();
+  if (menuGuest) { menuGuest.gone = true; menuGuest = null; }
+  for (const m of art.guests) m.gone = true;
+  const seed = rushSeed ?? (query.has('seed') ? Number(query.get('seed')) >>> 0 : (Date.now() ^ 0x9e3779b1) >>> 0); rushSeed = null;
+  clearCatch(); clearRush(); cook = null; g = null; waits = [];
+  rush = sh.newShift({ save, seed });
+  day = { rush, plan: [], i: 0, served: 0, earned: 0, tips: 0, stars: [], seed, t0: clock, extras: 0, robbed: 0, rebels: [], line: null, next: 0, arriveT: 0, lost: 0, pickT: 0 };
+  lastMode = 'rush';
+  song?.start(seed);
+  rec.start({ mode: 'rush', day: save.day, tier: save.tier, tutorial: false, look: lookId, tool: tools.use, sound: save.sound, music: musicOn });
+  paused = false; snd.release(); show('play'); hud();
+  toSky();
+  banner(t('rushGo'), t('rushGoSub'));
+  if (!rushSave.plays) coach(t('rushCoach'), 9);
+}
+function toSky() {
+  phase = 'sky'; g = null; cook = null; art.view('catch'); $('ticket').style.display = 'none'; gauge(null);
+  redrawTray(); rail();
+}
+function redrawTray(newest = null) {
+  art.tray.load.clear();
+  for (const it of rush.sky.tray) {
+    const m = art.item(itemModel(it.id), 0.27);
+    landOnTray(m, it); if (it !== newest) m.userData.drop = 0;
+  }
+}
+function seatOf(e) { if (e.seat == null) { const used = new Set(rush.line.map(x => x.seat)); e.seat = [0, 1, 2, 3, 4].find(i => !used.has(i)) ?? 0; } return e.seat; }
+function rail() {
+  const s = rush; if (!s) return;
+  $('rail').innerHTML = s.line.map(e => {
+    const icons = Object.entries(e.need).flatMap(([id, n]) => Array.from({ length: n }, (_, i) => `<img alt="" class="${i < (e.got[id] ?? 0) ? 'got' : ''}" src="${art.thumb(itemModel(id))}">`)).join('');
+    return `<div class="chip${e.ready ? ' ready' : ''}${e.kind === 'rich' ? ' rich' : ''}" data-n="${e.n}" style="--c:${SEAT_COLOR[seatOf(e)]}"><div class="top"><img alt="" src="${art.thumb(dishModel(e.recipe))}"><b>${e.kind === 'rich' ? '💎' : ''}${e.mood ? MOOD_ICON[e.mood] : ''}<i class="coin"></i>${e.price}</b></div><div class="need">${icons}</div><div class="pat"><i></i></div></div>`;
+  }).join('');
+  railBars();
+}
+function railBars() {
+  const s = rush, el = $('rail');
+  s.line.forEach((e, i) => {
+    const c = el.children[i]; if (!c) return;
+    const f = Math.max(0, e.left / e.full), bar = c.lastElementChild.firstElementChild;
+    bar.style.transform = `scaleX(${f})`; bar.style.background = f < 0.2 ? '#ff5a5a' : f < 0.5 ? '#ffb347' : '#6fd36f';
+    c.classList.toggle('hot', f < 0.2);
+  });
+  const left = Math.max(0, sh.RUSH.secs - s.t), tg = sh.targets(save), next = tg.find(x => s.coins < x);
+  $('rushClock').textContent = s.doors ? `${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}` : t('rushLast');
+  $('rushClock').classList.toggle('low', s.doors && left < 15);
+  $('rushStrikes').textContent = '✗'.repeat(Math.min(3, s.strikes)) + '·'.repeat(Math.max(0, 3 - s.strikes));
+  $('rushBuzz').textContent = s.buzz ? `🔥${s.buzz}` : '';
+  $('rushCoins').textContent = next ? `${s.coins}/${next}` : `${s.coins}`;
+  $('rushStars').textContent = '★'.repeat(tg.filter(x => s.coins >= x).length);
+  $('rushTray').textContent = `${s.sky.tray.length}/${s.holds}`;
+  $('rushTray').classList.toggle('full', s.sky.tray.length >= s.holds);
+}
+function stepRush(dt) {
+  const s = rush;
+  if (storyOpen()) return;
+  const ev = []; for (let left = dt; left > 1e-6; left -= 0.034) ev.push(...sh.stepShift(s, Math.min(0.034, left), trayX / LANE.s));
+  let redraw = false, changed = false;
+  for (const e of ev) {
+    if (e.type === 'arrive') { changed = true; SFX.tap(); rec.event('arrive', { recipe: e.e.recipe, kind: e.e.kind, mood: e.e.mood }); }
+    else if (e.type === 'turned') { floater({ x: innerWidth / 2, y: innerHeight * 0.2 }, t('rushTurned'), 'bad'); rec.event('turned', { recipe: e.e.recipe }); }
+    else if (e.type === 'walkout') {
+      changed = redraw = true; day.lost++; SFX.wrong(); buzz([60, 40, 60]); art.shake(0.8);
+      floater({ x: innerWidth / 2, y: innerHeight * 0.24 }, t('walkout', { what: t('r_' + e.e.recipe) }), 'bad');
+      rec.event('walkout', { recipe: e.e.recipe, kind: e.e.kind, strikes: s.strikes });
+    } else if (e.type === 'bell') { banner(t('rushBell'), t('rushBellSub')); SFX.star(); }
+    else if (e.type === 'closed') { banner(t('rushClosed'), t('rushClosedSub')); SFX.burnt?.(); }
+    else if (e.type === 'caught') {
+      changed = true; dropMesh(e.it.n); redrawTray(e.it);
+      SFX.catch(s.sky.tray.length); buzz(12); art.tray.bump();
+      art.burst(new art.THREE.Vector3(trayX, LANE.y0 + 0.05, LANE.z), { n: 8, color: SEAT_COLOR[seatOf(e.e)], speed: 1.2, up: 1.4, size: 0.03, life: 0.5 });
+      if (musicOn) song?.ember();
+    } else if (e.type === 'pushed') { changed = redraw = true; SFX.whoosh(); floater(worldPx(trayX, LANE.y0 + 0.3), t('rushPushed'), 'bad'); const m = art.item(itemModel(e.it.id), 0.25); flyAway(m, trayX); }
+    else if (e.type === 'clatter') {
+      changed = redraw = true; day.extras++; const m = meshes.get(e.it.n); meshes.delete(e.it.n); dropRing(e.it.n); if (m) { art.world.remove(m); flyAway(m, trayX); }
+      if (e.lost) flyAway(art.item(itemModel(e.lost.id), 0.25), trayX);
+      SFX.wrong(); buzz([40, 60, 40]); art.shake(1); floater(worldPx(trayX, LANE.y0 + 0.35), '✗', 'bad'); song?.hit();
+    } else if (e.type === 'ready') { changed = true; SFX.good(); }
+    else if (e.type === 'missed') { dropMesh(e.it.n); }
+  }
+  if (redraw) redrawTray();
+  if (changed) rail();
+  // Falling things and their rings.
+  const live = new Set();
+  if (phase === 'sky' && !s.at) for (const it of s.sky.items) {
+    if (it.state !== 'fall') continue;
+    live.add(it.n);
+    let m = meshes.get(it.n);
+    if (!m) { m = art.item(itemModel(it.id), 0.27); m.userData.spin = (it.spin % 1) * 1.4 - 0.7; art.world.add(m); meshes.set(it.n, m); }
+    m.position.set(it.x * LANE.s, LANE.y0 + it.y * LANE.h - 0.12, LANE.z);
+    m.rotation.z += m.userData.spin * dt; m.rotation.y += dt * 0.5;
+    const owner = sim.isJunk(it.id) ? null : sh.ownerOf(s, it.id);
+    let r = rings.get(it.n);
+    if (owner) {
+      if (!r) { ringGeo ??= new art.THREE.TorusGeometry(0.2, 0.022, 8, 28); r = new art.THREE.Mesh(ringGeo, new art.THREE.MeshBasicMaterial({ color: SEAT_COLOR[seatOf(owner)], transparent: true, opacity: 0.95 })); art.world.add(r); rings.set(it.n, r); }
+      r.visible = true; r.material.color.set(SEAT_COLOR[seatOf(owner)]); r.position.set(m.position.x, m.position.y + 0.12, LANE.z);
+    } else if (r) r.visible = false;
+  }
+  for (const n of [...meshes.keys()]) if (!live.has(n)) dropMesh(n);
+  railBars();
+  if (phase === 'sky' && !s.at) { const e = s.line.filter(x => x.ready).sort((a, b) => a.left - b.left)[0]; if (e) rushCook(e); }
+  if (s.over && phase === 'sky') rushEnd();
+}
+function dropRing(n) { const r = rings.get(n); if (r) { art.world.remove(r); r.material.dispose(); rings.delete(n); } }
+function dropMesh(n) { const m = meshes.get(n); if (m) { art.world.remove(m); meshes.delete(n); } dropRing(n); }
+// A guest's food is all on the tray: off to the board and the stove. The sky waits; the other guests do not.
+function rushCook(e) {
+  if (!sh.startCook(rush, e)) return;
+  for (const n of [...meshes.keys()]) dropMesh(n);
+  g = { rush: e, mood: e.mood, look: e.look, recipe: e.recipe, need: { ...e.need }, q: [], steps: RECIPES[e.recipe].steps.slice(), step: -1, wait: 0, extras: 0, restarts: 0, paid: 0, model: null, tut: -1, golden: false };
+  phase = 'caught'; coach(null); rail(); redrawTray();
+  banner(t('r_' + e.recipe)); ticket(); $('ticket').style.display = 'block';
+  rec.event('catch', { recipe: e.recipe, left: Math.round(e.left), tip: e.tipShare });
+  wait(0.3, nextStep);
+}
+function rushServe() {
+  const e = g.rush, q = g.q.length ? g.q.reduce((a, b) => a + b, 0) / g.q.length : 1;
+  const b = sh.finish(rush, q);
+  phase = 'serve'; day.served++; save.served++; day.earned += b.price; day.tips += b.tip; day.stars.push(b.stars);
+  const at = dish ? art.toScreen(dish.position.clone().add(new art.THREE.Vector3(0, 0.35, 0))) : { x: innerWidth / 2, y: innerHeight / 2 };
+  floater(at, `+${b.total}`, 'gold'); floater({ x: at.x, y: at.y - 34 }, '★'.repeat(b.stars), 'gold');
+  SFX.coin(); later(120, () => SFX.coin()); buzz(20);
+  if (b.thrown) { later(200, () => { SFX.splat(); splat(); art.shake(0.9); }); }
+  if (rush.buzz >= 2) floater({ x: innerWidth / 2, y: innerHeight * 0.3 }, `🔥 ×${sh.buzzPay(rush).toFixed(2)}`, 'gold');
+  rec.event('serve', { recipe: e.recipe, stars: b.stars, coins: b.total, buzz: rush.buzz });
+  const d = dish; dish = null; later(550, () => { if (d) art.world.remove(d); });
+  toSky();   // the sky is falling again from this moment, so the player sees it at once
+}
+function rushEnd() {
+  const s = rush, r = sh.result(s);
+  phase = 'idle'; g = null;
+  save.coins += r.share; store();
+  rushSave.plays = (rushSave.plays ?? 0) + 1;
+  rushSave.best = { ...rushSave.best, [save.tier]: Math.max(rushSave.best?.[save.tier] ?? 0, r.coins) };
+  const newStars = r.stars > (rushSave.stars?.[save.tier] ?? 0);
+  rushSave.stars = { ...rushSave.stars, [save.tier]: Math.max(rushSave.stars?.[save.tier] ?? 0, r.stars) };
+  writeJson(RUSH_KEY, rushSave);
+  rec.end('rush', { mode: 'rush', tier: save.tier, coins: r.coins, share: r.share, stars: r.stars, served: r.served, strikes: r.strikes, turned: r.turned, bestBuzz: r.bestBuzz, closedEarly: r.closedEarly, clatters: s.clatters, pushed: s.pushed, secs: Math.round(s.t) });
+  clearRush(); clearCatch(); art.tray.load.clear();
+  $('dayTitle').textContent = t(r.closedEarly ? 'rushOverClosed' : 'rushOver');
+  $('dayStars').textContent = '★'.repeat(r.stars) + '☆'.repeat(3 - r.stars);
+  const next = r.targets.find(x => r.coins < x);
+  $('ledger').innerHTML = `<tr><td>${t('served')}</td><td>${r.served}</td></tr><tr><td>${t('walkouts')}</td><td>${day.lost}</td></tr><tr><td>${t('rushTook')}</td><td>${r.coins}</td></tr><tr><td>${t('rushBest')}</td><td>${rushSave.best[save.tier]}</td></tr><tr><td>${t('rushShare')}</td><td>+${r.share}</td></tr><tr class="total"><td><i class="coin"></i></td><td>${save.coins}</td></tr>`;
+  $('dayLine').textContent = next ? t('rushNext', { n: next - r.coins, s: r.stars + 1 }) : t('rushAll');
+  $('dayMissions').innerHTML = '';
+  $('nextDay').textContent = t('rushAgain');
+  coach(null); fingerOff(); gauge(null);
+  SFX.star(); if (newStars && r.stars) flash(); art.view('room');
+  rush = null; hud();
+  show('dayEnd');
+}
+
 // ---------- the story: cards before the first catch, toasts, missions
 let storyBook = null, storyQueue = [], storyToasts = [], pendingCatch = null;
 storyData.then(d => { storyBook = d; });
@@ -1079,7 +1260,7 @@ function stepFinger(dt) {
 // The tray follows the finger's x at the tray's depth; arrows and A/D move it too. A tap stops the microwave, a hold fries.
 // How far the tray may go and stay at least half on screen on a narrow phone.
 function trayEdge() {
-  if (phase !== 'catch') return 1;
+  if (phase !== 'catch' && phase !== 'sky') return 1;
   const p = art.toScreen(art.tray.group.getWorldPosition(new art.THREE.Vector3()));
   const right = art.toPlane(innerWidth, p.y, LANE.z).x / LANE.s;
   return Number.isFinite(right) ? Math.max(0.6, Math.min(1, right - 0.1)) : 1;
@@ -1103,7 +1284,7 @@ canvas.addEventListener('pointermove', e => {
   if (screen !== 'play' || paused || !art) return;
   if (phase === 'chop' && (e.pointerType === 'mouse' || finger?.id === e.pointerId)) { aimAt(e.clientX, e.clientY); if (tapStart && Math.hypot(e.clientX - tapStart.x, e.clientY - tapStart.y) > 14) tapStart = null; }
   if (finger && finger.id === e.pointerId) trayTarget = pointerX(e);
-  else if (e.pointerType === 'mouse' && phase === 'catch') { trayTarget = pointerX(e); touched = true; }
+  else if (e.pointerType === 'mouse' && (phase === 'catch' || phase === 'sky')) { trayTarget = pointerX(e); touched = true; }
 });
 let pickStart = null;
 const up = e => {
@@ -1156,15 +1337,17 @@ $('pause').addEventListener('click', e => { e.preventDefault(); pause(); });
 $('resume').addEventListener('click', resume);
 $('quit').addEventListener('click', () => {
   paused = false; snd.release();
-  if (day && g) rec.end('left', { day: save.day, tier: save.tier, served: day.served, guest: day.i });
+  if (rush) rec.end('left', { mode: 'rush', tier: save.tier, t: Math.round(rush.t), served: rush.served, coins: rush.coins });
+  else if (day && g) rec.end('left', { day: save.day, tier: save.tier, served: day.served, guest: day.i });
   if (g?.model) g.model.gone = true;
   clearCatch(); for (const m of cook?.items ?? []) art.world.remove(m); for (const b of cook?.bits ?? []) art.world.remove(b.m); if (dish) { art.world.remove(dish); dish = null; }
-  g = null; cook = null; day = null; phase = 'idle'; waits = []; fingerOff(); coach(null); gauge(null);
+  g = null; cook = null; day = null; rush = null; clearRush(); phase = 'idle'; waits = []; fingerOff(); coach(null); gauge(null);
   art?.register.close();
   show('menu');
 });
 onLeave(pause);
 $('play').addEventListener('click', async () => { snd.unlock(); await ready; if (screen === 'menu') beginDay(); });
+$('rush').addEventListener('click', async () => { snd.unlock(); await ready; await art.peopleReady; if (screen === 'menu') beginRush(); });
 for (const id of ['sound1', 'sound2']) $(id).addEventListener('click', () => { save.sound = !save.sound; store(); settingChanged('sound', !save.sound, save.sound); if (save.sound) { snd.unlock(); if (!paused) snd.release(); SFX.tap(); } labels(); });
 for (const id of ['music1', 'music2']) $(id).addEventListener('click', () => { musicOn = !musicOn; write(MUSIC_KEY, musicOn ? '1' : '0'); settingChanged('music', !musicOn, musicOn); labels(); });
 for (const id of ['look1', 'look2']) $(id).addEventListener('click', () => {
@@ -1190,7 +1373,7 @@ function frame(now) {
     trayX += (trayTarget - trayX) * (1 - Math.exp(-dt * 45));
     { const lim = trayEdge(); trayX = Math.max(-lim, Math.min(lim, trayX)); }
     art.tray.setX(trayX);
-    art.tray.group.visible = phase === 'catch' || phase === 'caught' || phase === 'order' || phase === 'enter';
+    art.tray.group.visible = phase === 'catch' || phase === 'caught' || phase === 'order' || phase === 'enter' || phase === 'sky';
     if (phase === 'catch' && g?.catch) stepCatch(dt);
     else if (phase === 'fry' && cook) stepFry(dt);
     else if (phase === 'micro' && cook) stepMicro(dt);
@@ -1198,6 +1381,7 @@ function frame(now) {
     else if (phase === 'blend' && cook) stepBlend(dt);
     if (fight) stepFight(dt);
     stepLine(dt);
+    if (rush) stepRush(dt);
     if (!(g && phase === 'catch')) { const bar = $('patience').firstElementChild; bar.style.transform = ''; bar.style.background = ''; }
     if (g && phase === 'catch') { const w = (clock - g.catchT0) / TUNE.patience; $('patience').firstElementChild.style.transform = `scaleX(${Math.max(0, 1 - w)})`; $('patience').firstElementChild.style.background = w > 0.75 ? '#ff6b6b' : w > 0.5 ? '#ffb347' : ''; }
     for (const b of cook?.bits ?? []) { if (b.t > 0.6) continue; b.t += dt; b.v.y -= 6 * dt; b.m.position.addScaledVector(b.v, dt); if (b.m.position.y < b.y0) { b.m.position.y = b.y0; b.v.set(0, 0, 0); b.t = 1; } b.m.rotation.z += dt * 6 * Math.sign(b.v.x); }
@@ -1212,7 +1396,7 @@ function frame(now) {
   if (art) chopBtn(live && phase === 'chop' && !cook?.over);
   if ((phase !== 'order' || !live) && $('wheelBtn').style.display === 'flex') wheelBtn(false);
   if (screen !== 'play' && $('line').style.display === 'flex') $('line').style.display = 'none';
-  song?.set({ on: musicOn && live, progress: day ? Math.min(1, (day.i + 0.5) / day.plan.length) : 0, danger: phase === 'catch' && g?.catch ? Math.min(1, (clock - g.catchT0) / TUNE.patience) * 0.6 : 0, light: 1 });
+  song?.set({ on: musicOn && live, progress: rush ? Math.min(1, rush.t / sh.RUSH.secs) : day ? Math.min(1, (day.i + 0.5) / day.plan.length) : 0, danger: rush ? Math.min(0.8, rush.strikes * 0.3) : phase === 'catch' && g?.catch ? Math.min(1, (clock - g.catchT0) / TUNE.patience) * 0.6 : 0, light: 1 });
   art.frame(paused ? 0 : dt);
 }
 requestAnimationFrame(frame);
@@ -1221,7 +1405,7 @@ labels(); hud(); menu();
 // First-time help (kit/hint.js): a see-through finger slides side to side under the tray.
 hint(canvas, {
   kind: 'drag', key: 'kitchen:hint', delay: 1500,
-  when: () => screen === 'play' && !paused && (phase === 'enter' || phase === 'order' || phase === 'catch'),
+  when: () => screen === 'play' && !paused && (phase === 'enter' || phase === 'order' || phase === 'catch' || phase === 'sky'),
   played: hadSave, bottom: () => Math.max(120, innerHeight * 0.3),
 });
 
@@ -1235,6 +1419,7 @@ window.kitchenState = () => art && peopleIn && ({
   cook: cook ? { kind: cook.kind, d: cook.d, p: cook.p, band: cook.band, fill: cook.fill, left: cook.pieces?.filter(p => !p.done).length, misses: cook.misses ?? 0, striking: !!cook.strike, cuts: cook.pieces?.reduce((n, p) => n + p.cuts, 0), xs: cook.pieces?.map(p => p.done ? null : [p.m.position.x, p.m.position.z]), aim } : null, q: g?.q,
   look: lookId, hint: !!document.querySelector('.kit-hint.on'),
   line: day?.line ? day.line.map(e => ({ recipe: e.p.recipe, left: +e.left.toFixed(1) })) : null, lost: day?.lost ?? 0,
+  rush: rush ? { t: +rush.t.toFixed(2), coins: rush.coins, strikes: rush.strikes, buzz: rush.buzz, served: rush.served, turned: rush.turned, doors: rush.doors, over: rush.over, holds: rush.holds, at: rush.at?.recipe ?? null, tray: rush.sky.tray.map(it => it.id), line: rush.line.map(e => ({ n: e.n, recipe: e.recipe, kind: e.kind, left: +e.left.toFixed(1), full: e.full, need: { ...e.need }, got: { ...e.got }, ready: e.ready, price: e.price })), items: rush.sky.items.map(it => ({ id: it.id, x: it.x, y: it.y, owner: sh.ownerOf(rush, it.id)?.n ?? null })) } : null,
   mood: g?.mood ?? null, staff: staff.map(m => m.kind), wheel: $('wheel').style.display === 'block', fight: fight ? { taps: fight.taps, need: fight.need } : null,
 });
 window.kitchenMusic = () => song && { ...song.melody, on: song.state.on, step: song.step, notes: song.log.length, kinds: song.log.map(l => l.kind) };
@@ -1248,6 +1433,7 @@ window.kitchenFight = win => { if (!fight) return false; if (win) { fight.taps =
 window.kitchenCall = i => { const e = day?.line?.[i]; if (e) callGuest(e); return !!e; };
 window.kitchenThrow = () => { throwNext = true; };
 window.kitchenMood = m => { if (g) g.mood = m; return !!g; };
+window.kitchenRush = seed => { if (screen !== 'menu' && phase !== 'sky') return false; if (seed != null) rushSeed = seed; beginRush(); return true; };
 window.kitchenSkipCatch = () => { skipCatch = true; };
 window.kitchenGolden = () => { goldenNext = true; };
 window.kitchenAlive = () => { if (g?.catch) { g.catch.got = {}; g.catch.tray = []; g.catch.done = false; } };

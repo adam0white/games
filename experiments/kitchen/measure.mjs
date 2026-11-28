@@ -1,0 +1,118 @@
+// Scripted players for the Rush shift. node experiments/kitchen/measure.mjs <question> [seeds] [--off] [--tier=N]
+// Questions:
+//   order   whose dish to build: a tray that never moves (in the middle, or parked at one side), anything anyone wants, most impatient, best payer, nearest done, and a mixed rule. --off lets the tray hold everything.
+//   rob     cook everyone, rob everyone, or rob only a guest who was about to walk. --off removes the witnesses.
+//   seats   the same cook with 3, 4 and 5 seats (the page uses 3).
+//   targets coins a shift by rank for a new and a good cook (TARGETS in shift.js was set from this).
+// The players use the page's own calls (shift.js) and the real catch (sim.js). Cooking time is a model: see cookSecs.
+import * as sim from './sim.js';
+import * as sh from './shift.js';
+
+const args = process.argv.slice(2), question = args.find(a => !a.startsWith('-') && isNaN(a)) ?? 'order';
+const seeds = Number(args.find(a => !isNaN(a))) || 40, off = args.includes('--off');
+const tierArg = args.find(a => a.startsWith('--tier=')), TIER = tierArg ? Number(tierArg.slice(7)) : 0;
+
+export const COOKS = { new: { react: 0.45, skill: 0.6, q: 0.74, slow: 1.45 }, good: { react: 0.25, skill: 0.9, q: 0.93, slow: 1 } };
+export const OVERHEAD = 0.5; // seconds a dish costs besides its cooking steps. Checked against the page: ten dishes timed in a browser came within 1.2 s of cookSecs.
+
+export function saveAt(tier, tables = null) {
+  const s = sim.newSave(); s.tutorial = true; s.tier = tier;
+  for (let t = 1; t <= tier; t++) for (const [k, v] of Object.entries(sim.TIERS[t].needs)) s.built[k] = Math.max(s.built[k], v);
+  s.built.tray = Math.max(s.built.tray, Math.min(9, tier + 1));
+  if (tables != null) s.built.tables = tables;
+  return s;
+}
+export function cookSecs(save, recipe, cook) {
+  const r = sim.RECIPES[recipe]; let t = 0;
+  for (const s of r.steps) {
+    if (s === 'chop') t += sim.chopsFor(recipe) * sim.chopCuts(save) * 0.52 + 0.8;
+    if (s === 'fry') t += 0.62 / sim.FRY_RATE + 1.2;
+    if (s === 'micro') t += 0.7 / sim.microSpeed(save.tier) + 1.2;
+    if (s === 'blend') t += sim.blendTaps(save.built.blender, save.tier) / 6 + 1;
+  }
+  return t * cook.slow;
+}
+const perItem = 2.4; // rough seconds to get one wanted item onto the tray
+const estSecs = (e) => sh.leftOf(e) * perItem;
+
+// Whose dish to build. Each rule sees what the player sees: the seated guests, their patience, what they lack, their price.
+export const POLICY = {
+  idle: () => null,     // the tray never moves
+  park: () => null,     // the tray sits at one side and never moves
+  greedy: () => null,   // no plan: catch anything anyone wants
+  impatient: s => s.line.reduce((a, e) => (!a || e.left < a.left ? e : a), null),
+  payer: s => s.line.reduce((a, e) => (!a || e.price > a.price ? e : a), null),
+  nearest: s => s.line.reduce((a, e) => (!a || sh.leftOf(e) < sh.leftOf(a) || (sh.leftOf(e) === sh.leftOf(a) && e.left < a.left) ? e : a), null),
+  // Mixed: give up on anyone who cannot be saved; among the rest, build the best coins per second of catching, and
+  // put a guest first when they are about to be lost and can still be saved.
+  mixed: s => {
+    const can = s.line.filter(e => e.left > estSecs(e));
+    if (!can.length) return POLICY.nearest(s);
+    const urgent = can.filter(e => e.left < estSecs(e) + 9).sort((a, b) => a.left - b.left)[0];
+    if (urgent) return urgent;
+    return can.reduce((a, e) => (!a || e.price / (sh.leftOf(e) + 1) > a.price / (sh.leftOf(a) + 1) ? e : a), null);
+  },
+};
+
+// One shift. who: the rule for whose dish to build. rob: 'never' | 'doomed' | 'always'.
+export function playShift({ save, seed, cook, who = 'greedy', rob = 'never', off = {} }) {
+  const s = sh.newShift({ save, seed, off }), c = s.sky;
+  const r = sim.rng(seed * 31 + 7), seen = []; let busy = 0, job = null, x = who === 'park' ? 0.8 : 0, step = 0, focus = null, think = 0;
+  for (let i = 0; i < 60 * 600 && !s.over; i++) {
+    step++;
+    if (busy > 0) { sh.stepShift(s, sim.DT, x); busy -= sim.DT; if (busy <= 0 && job) { job(); job = null; seen.length = 0; } continue; }
+    const ready = s.line.filter(e => e.ready).sort((a, b) => a.left - b.left)[0];
+    if (ready) { sh.startCook(s, ready); const q = Math.max(0.3, Math.min(1, cook.q + (r() - 0.5) * 0.3)); busy = cookSecs(save, ready.recipe, cook) + OVERHEAD; job = () => sh.finish(s, q); continue; }
+    if (rob !== 'never') { const d = s.line.find(e => rob === 'always' || (e.left < 3 && !e.ready)); if (d && s.strikes < sh.RUSH.strikes - 1) { sh.rob(s, d); busy = 1.5; continue; } }
+    if ((think -= sim.DT) <= 0 || !s.line.includes(focus)) { focus = POLICY[who](s); think = 0.8; }   // a person re-plans about once a second
+    seen.push(c.items.map(it => ({ ...it })));
+    const view = seen[Math.max(0, seen.length - 1 - Math.round(cook.react * 60))];
+    const wantedBy = (it, e) => !sim.isJunk(it.id) && sh.lacks(e, it.id);
+    const anyWants = it => s.line.some(e => wantedBy(it, e));
+    const room = c.tray.length < s.holds - (focus ? sh.leftOf(focus) : 0);
+    const mine = it => (focus ? (sh.ownerOf(s, it.id) === focus) : anyWants(it));
+    const good = it => mine(it) || (focus && room && anyWants(it));
+    const goals = view.filter(mine).sort((a, b) => a.y - b.y), also = view.filter(good).sort((a, b) => a.y - b.y);
+    const low = (focus ? goals : goals.filter(it => it.y <= goals[0].y + 0.05).sort((p, q) => Math.abs(p.x - x) - Math.abs(q.x - x)));
+    let target = low.length ? low[0].x : also.length ? also[0].x : x;
+    for (const it of view) {
+      if (good(it) || it.y > 0.35) continue;
+      if (Math.abs(it.x - target) < c.half + sim.TUNE.size * 0.6) target = it.x + Math.sign(target - it.x || 1) * (c.half + sim.TUNE.size + 0.05);
+    }
+    target += Math.sin(step * 0.13 + seed) * (1 - cook.skill) * 0.25;
+    const move = sim.TUNE.traySpeed * sim.DT;
+    if (who !== 'idle' && who !== 'park') x += Math.max(-move, Math.min(move, target - x));
+    sh.stepShift(s, sim.DT, x);
+  }
+  return { ...sh.result(s), secs: s.t, clatters: s.clatters, pushed: s.pushed };
+}
+
+const mean = a => a.reduce((x, y) => x + y, 0) / a.length;
+const pct = (a, p) => a.slice().sort((x, y) => x - y)[Math.floor((a.length - 1) * p)];
+export function table(rows, runs) {
+  return rows.map(([name, opts]) => {
+    const out = runs.map(seed => playShift({ ...opts, seed }));
+    return { name, coins: +mean(out.map(o => o.coins)).toFixed(1), p25: pct(out.map(o => o.coins), 0.25), p75: pct(out.map(o => o.coins), 0.75), served: +mean(out.map(o => o.served)).toFixed(1), strikes: +mean(out.map(o => o.strikes)).toFixed(2), closedEarly: +mean(out.map(o => +o.closedEarly)).toFixed(2), turned: +mean(out.map(o => o.turned)).toFixed(1), buzz: +mean(out.map(o => o.bestBuzz)).toFixed(1), stars: +mean(out.map(o => o.stars)).toFixed(2), robbed: +mean(out.map(o => o.robbed)).toFixed(1), pushed: +mean(out.map(o => o.pushed)).toFixed(1), clat: +mean(out.map(o => o.clatters)).toFixed(1), secs: +mean(out.map(o => o.secs)).toFixed(0) };
+  });
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const runs = Array.from({ length: seeds }, (_, i) => 101 + i * 37);
+  const save = saveAt(TIER);
+  if (question === 'order') {
+    const o = off ? { cap: true } : {};
+    for (const who of ['good', 'new']) { console.log(`order, ${who} cook, rank ${TIER}${off ? ', tray holds everything' : ''}`); console.table(table(Object.keys(POLICY).map(p => [p, { save, cook: COOKS[who], who: p, off: o }]), runs)); }
+  } else if (question === 'rob') {
+    const o = off ? { scare: true } : {};
+    for (const who of ['good', 'new']) { console.log(`rob, ${who} cook, rank ${TIER}${off ? ', no witnesses' : ''}`); console.table(table(['never', 'always', 'doomed'].map(rob => [rob, { save, cook: COOKS[who], who: 'mixed', rob, off: o }]), runs)); }
+  } else if (question === 'seats') {
+    for (const who of ['good', 'new']) { console.log(`seats, ${who} cook, rank ${TIER}`); console.table(table([3, 4, 5].map(n => [`${n} seats`, { save, cook: COOKS[who], who: 'impatient', off: { seats: n } }]), runs)); }
+  } else if (question === 'targets') {
+    const rows = [];
+    for (let t = 0; t < sim.TIERS.length; t++) for (const who of ['new', 'good']) {
+      const [a] = table([[`${sim.TIERS[t].name} ${who}`, { save: saveAt(t), cook: COOKS[who], who: who === 'good' ? 'impatient' : 'greedy' }]], runs);
+      rows.push({ ...a, targets: sh.targets(saveAt(t)).join('/') });
+    }
+    console.table(rows);
+  }
+}
