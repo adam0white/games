@@ -1331,3 +1331,21 @@ was decided (The Crossing: 10 to 34 soldiers, no mess dug). Outside High Summer 
 the node, bots dug a mess on First Frost (two of four seeds) and The Stones (all four, 50 to 89 soldiers). Wins were not
 read. Seen on a phone profile: the fourth deed on the card, Mess in the tree (9 nodes), the button on The Crossing with
 the deed stored and not without. Not seen: a person earning the deed.
+
+## Interface round from the owner's phone play (war build)
+
+Read from the owner's lab records of one evening on a 414 by 774 touch phone (aggregates only; the records stay out of the repo). About twelve games of The Crossing, five finished: one win, four losses. Per long game the Nest was opened 15 to 19 times, "Look" was tapped 43 times and "Move" 54 times over the evening, 34 to 76 room orders were sent a game and a third of the build strokes were one cell. 65 to 135 cells were marked in the first minute with 30 ants at a seed a cell, and in one game 354 cells were unmarked again. Soldiers were asked for late and five of six long games ended with none. Speed was used only in the last ten seconds. The losses are read as evidence about the interface, not about balance.
+
+What changed:
+
+| Fault seen | Change |
+| --- | --- |
+| Look and a room tool had to be swapped to move the Nest view | Two fingers move and zoom the Nest (a mouse wheel zooms). One finger digs with a room in hand and moves the view with none. A second finger ends the stroke unsent, so a pinch spends nothing. A stroke that starts off your ground moves the view |
+| The cost of a stroke was unknown until seeds ran out | While the finger is down a label beside it reads "9 cells · 4 seeds to dig · 7 to spend", red when the stroke costs more than the hill can spend |
+| Marked cells waited with no word | The Dig tab has a line: "26 cells marked, 2 seeds to spend: 24 wait for seeds. The hill keeps 3 to eat." The limit line says the same on the Young tab when eight or more wait |
+| Soldiers asked for, none hatched | Limit line: "No soldier can hatch: a soldier grub eats 3 meat and the store holds 0. Red food is meat: draw a trail to it." |
+| The Nest was a sheet over the lower half, with the tool panel over the surface | Setting "The Nest" (`cinderhill:war:nest`): `full` (default) fills the screen under the counts and the small map, with the room tools as one row to swipe; `sheet` is the old layout |
+
+Lab events: `build` now carries `cost` and `seeds`; `nestPinch` counts strokes a second finger cut short. The setting is in the run's start record.
+
+Seen in a phone-size browser with touch events (Chromium, 414 by 774): a pinch that began as a one-finger stroke marked nothing and zoomed; a stroke showed its label; the waiting line and the soldier line appeared. Not seen: a person using it.

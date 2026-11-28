@@ -72,11 +72,17 @@
   #need { display: block; width: 100%; height: auto; font-family: inherit; margin: 0 0 8px; padding: 2px; font-size: 13px; line-height: 1.3; text-align: left; font-weight: 500; color: inherit; background: none; border: 0; } #need:empty { display: none; } #need b { color: #ffcf7a; }
   #diet[data-tab="dig"] #need { display: none; } #digHelp b { color: #ffcf7a; }
   #rooms button.want { box-shadow: inset 0 0 0 2px #ffcf7a; }
+  #digQueue { margin: 4px 2px 0; font-size: 12px; color: var(--dim); } #digQueue:empty { display: none; } #digQueue b { color: #ffcf7a; } #digQueue b.short { color: #ff9a8a; }
   #digHelp { margin: 7px 2px 0; font-size: 12px; color: var(--dim); min-height: 15px; }
   #rooms { grid-auto-flow: row; grid-template-columns: repeat(4, 1fr); } #rooms button { font-size: 12px; min-width: 0; } #rooms button small { font-size: 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
   #nestWrap { position: fixed; left: 0; right: 0; bottom: 0; height: calc(44vh + 70px + env(safe-area-inset-bottom)); transform: translateY(102%); transition: transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1); border-top: 2px solid rgba(255, 180, 100, 0.5); box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.55); z-index: 3; background: #1b130f; }
   body.nest #nestWrap { transform: none; }
+  /* The Nest as a view of its own (setting "nest": full): it fills the screen under the counts and the small map, and its tools are one row to swipe along. */
+  body[data-nest="full"] #nestWrap { height: auto; top: calc(138px + env(safe-area-inset-top)); }
+  body[data-nest="full"].nest .sheet { bottom: calc(78px + env(safe-area-inset-bottom)); width: calc(100vw - 12px); max-width: 520px; padding: 7px 8px; }
+  body[data-nest="full"].nest #rooms { grid-auto-flow: column; grid-template-columns: none; grid-auto-columns: 76px; overflow-x: auto; scrollbar-width: none; padding-bottom: 1px; } body[data-nest="full"].nest #rooms::-webkit-scrollbar { display: none; }
+  body[data-nest="full"].nest #diet .head { margin-bottom: 5px; } body[data-nest="full"].nest #digHelp { margin-top: 5px; }
   #nest { position: absolute; inset: 0; touch-action: none; }
 
   #toast { position: fixed; left: 50%; top: calc(140px + env(safe-area-inset-top)); transform: translate(-50%, -8px); padding: 8px 14px; border-radius: 16px; font-weight: 700; opacity: 0; transition: opacity 0.25s, transform 0.25s; pointer-events: none; z-index: 6; text-align: center; max-width: 86vw; }
@@ -201,7 +207,7 @@
   <div data-pane="dig">
   <div class="head"><i style="background:#8cd696"></i><b id="digHead">Rooms</b><span id="caps"><span>stores <b id="capFood">0</b></span> <span>young <b id="capBrood">0</b></span> <span>housing <b id="capAnts">0</b></span></span></div>
   <div class="opts" id="rooms">
-    <button data-room="look" aria-pressed="true">Look<small>drag to move</small></button>
+    <button data-room="look" aria-pressed="true">Look<small>hand empty</small></button>
     <button data-room="tunnel">Tunnel<small>a way through</small></button>
     <button data-room="store">Store<small>8 food each</small></button>
     <button data-room="nursery">Nursery<small>1 young each</small></button>
@@ -215,6 +221,7 @@
     <button data-room="clear" class="danger">Unmark<small>marks, rooms</small></button>
   </div>
   <div id="digHelp">Pick a room, then drag in the earth beside a tunnel.</div>
+  <div id="digQueue" aria-live="polite"></div>
 </div>
   <div data-pane="grow">
   <div class="head"><i style="background:#b98cff"></i><b id="growHead">The queen's chamber</b><span id="growInfo"></span></div>
