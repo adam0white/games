@@ -86,6 +86,15 @@ export const USE = {
   fight: s => s.line.find(e => e.kind === 'rich' && !e.fought && e.left > estSecs(e) + 6),
 };
 // One shift. who: the rule for whose dish to build. use: a wheel action id, or null. random: use it at random instead.
+function missionPlans() {
+  const any = s => s.line[0] ?? null, soon = id => (s, save, cook) => USE[id](s, save, cook) ?? (s.t > 45 ? any(s) : null);
+  const BUILT = {
+      seat: { use: ['lock_out', 'kick_out'], trig: { lock_out: s => (s.line.length >= s.seats ? any(s) : null), kick_out: s => (s.line.length >= s.seats && !(s.locked > 0) ? s.line.reduce((a, e) => (e.left < a.left ? e : a)) : null) } },
+      trio: { use: ['pan', 'hire', 'fridge', 'slap', 'trash'], once: true, trig: { pan: any, hire: s => (s.line.length >= 2 ? s.line.reduce((a, e) => (e.price < a.price ? e : a)) : null), fridge: any } },
+      ...Object.fromEntries(sh.ACTS.map(id => ['use_' + id, { use: [id], once: true, trig: { [id]: soon(id) } }])),
+    };
+  return { any, BUILT };
+}
 export function playShift({ save, seed, cook, who = 'greedy', use = null, random = false, once = false, trig = {}, off = {}, night = 'rush', mission = null }) {
   const s = sh.newShift({ save, seed, off, night, mission }), c = s.sky;
   const r = sim.rng(seed * 31 + 7), seen = []; let busy = 0, job = null, x = who === 'park' ? 0.8 : 0, step = 0, focus = null, think = 0, acted = false;
@@ -153,12 +162,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   } else if (question === 'missions') {
     // Each mission with three plans on the same seeds: ignore it, play for it, park the tray. Then every wheel action
     // at random, to find a free route. Cells: both nights, a new and a good cook, the night's first rank and rank 10.
-    const any = s => s.line[0] ?? null, soon = id => (s, save, cook) => USE[id](s, save, cook) ?? (s.t > 45 ? any(s) : null);
-    const BUILT = {
-      seat: { use: ['lock_out', 'kick_out'], trig: { lock_out: s => (s.line.length >= s.seats ? any(s) : null), kick_out: s => (s.line.length >= s.seats && !(s.locked > 0) ? s.line.reduce((a, e) => (e.left < a.left ? e : a)) : null) } },
-      trio: { use: ['pan', 'hire', 'fridge', 'slap', 'trash'], once: true, trig: { pan: any, hire: s => (s.line.length >= 2 ? s.line.reduce((a, e) => (e.price < a.price ? e : a)) : null), fridge: any } },
-      ...Object.fromEntries(sh.ACTS.map(id => ['use_' + id, { use: [id], once: true, trig: { [id]: soon(id) } }])),
-    };
+    const { any, BUILT } = missionPlans();
     const ids = Object.keys(sh.MISSIONS), cells = [], pctOf = (out, id) => Math.round(100 * mean(out.map(o => +o.done[id])));
     for (const night of sh.NIGHT_IDS) for (const hi of [0, 1]) for (const who of ['new', 'good']) {
       const cell = { name: `${night} ${hi ? 'top' : 'first'} ${who}`, who, rows: {} }, memo = {};
@@ -178,6 +182,24 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       const pair = (n, t) => [cells.find(c => c.name === `${n} ${t} new`).rows[id].built, cells.find(c => c.name === `${n} ${t} good`).rows[id].built];
       const pass = { 'ignore<30': cells.filter(c => c.rows[id].ignore < 30).length, 'built+20': cells.filter(c => c.rows[id].built >= c.rows[id].ignore + 20).length, 'good>=new': 2 * sh.NIGHT_IDS.flatMap(n => ['first', 'top'].map(t => pair(n, t))).filter(([a, b]) => b >= a).length, 'park<5': cells.filter(c => c.rows[id].park < 5).length, 'random<=built': cells.filter(c => c.rows[id].random <= c.rows[id].built).length, trade: cells.filter(c => c.rows[id].coins < 0).length };
       console.log(JSON.stringify(pass), Object.entries(pass).slice(0, 5).every(([, n]) => n >= 6) ? 'PASS' : 'fail');
+    }
+  } else if (question === 'card') {
+    // How many shifts until every open mission is stamped once, playing for each shift's mission as the page offers it.
+    const { BUILT } = missionPlans(), CAP = 150;
+    for (const tier of [0, 2, sim.TIERS.length - 1]) for (const who of ['new', 'good']) for (const night of sh.NIGHT_IDS) {
+      if (sh.NIGHTS[night].from > tier) continue;
+      const need = sh.missionsFor(saveAt(tier)), took = [], last = {}, stuck = {};
+      for (const seed0 of runs) {
+        const done = {}; let turn = 0, n = 0, lastId = null;
+        while (need.some(id => !done[id]) && n < CAP) {
+          const id = sh.missionFor(saveAt(tier), done, turn);
+          const o = playShift({ save: saveAt(tier), cook: COOKS[who], who: who === 'good' ? 'impatient' : 'greedy', night, ...BUILT[id], mission: id, seed: seed0 * 1000 + n });
+          if (o.done[id]) { done[id] = 1; lastId = id; } turn++; n++;
+        }
+        took.push(n); if (n >= CAP) for (const id of need) if (!done[id]) stuck[id] = (stuck[id] ?? 0) + 1; else if (lastId) {} ; if (lastId && n < CAP) last[lastId] = (last[lastId] ?? 0) + 1;
+      }
+      took.sort((a, b) => a - b);
+      console.log(`rank ${tier} ${who} ${night}: missions ${need.length}, shifts to a full card median ${took[took.length >> 1]}, worst ${took.at(-1)}, never (cap ${CAP}) ${took.filter(n => n >= CAP).length}/${took.length}`, 'last:', JSON.stringify(last), 'stuck:', JSON.stringify(stuck));
     }
   } else if (question === 'seats') {
     for (const who of ['good', 'new']) { console.log(`seats, ${who} cook, rank ${TIER}`); console.table(table([3, 4, 5].map(n => [`${n} seats`, { save, cook: COOKS[who], who: 'impatient', off: { seats: n } }]), runs)); }

@@ -449,3 +449,87 @@ an ordinary day, and food now starts at the top edge of the screen, so in the mi
 the tickets for roughly the first third of its fall (an estimate from the layout, not measured; bots cannot see it).
 Tickets only gives the old view. A guest walking in passes close to the camera on a wide screen and fills a corner for
 a moment.
+
+### Slice 6: a reward for the mission card (2026-11-28)
+
+Slice 4 left the card with a count and nothing else. Two blind outside answers there both proposed a cosmetic for
+stamps. The reward is a tray, because the tray is on screen in every catch: an enamel tray at six missions and a golden
+tray for every mission open at the player's rank. Once earned a tray is kept (stored in its own key, `kitchen-tray`),
+so a rank that opens a new mission does not take it back. It pays nothing and changes no rule.
+
+**Pass line, written before the build** (only lines that could fail are counted):
+
+1. Reachable: a scripted player who plays for each shift's mission fills the card within 40 shifts in every one of 30
+   runs, for a new and a good cook, on both nights, at ranks 0, 2 and 10 (`node measure.mjs card 30`).
+2. From a 320 by 568 catch screenshot, an outside reader who is shown the three trays' names picks which tray is in
+   use, in two looks.
+3. The end card's new-tray line is not cut at 320 by 568 in Turkish, beside the mission lines.
+4. On each tray, food on the tray and the orange and yellow seat rings read as clearly as on wood (outside read).
+
+Not counted, because it cannot fail: a tray that does nothing earns no stamps (already asserted in bots).
+
+**Results.**
+
+1. Reachable: **pass.** Median 11 to 20 shifts to a full card; the worst run was 32 (rank 10, new cook, Rush hour,
+   where "turn nobody away" falls last in 23 of 30 runs). No run was stuck. Eleven missions are open at ranks 0 and
+   1, thirteen from rank 2.
+2. Naming the tray in use: **miss for wood.** Shuffled 320 by 568 shots under neutral file names (three trays,
+   Sunny diner and Toon), one shot an ask, two outside readers. Enamel 2 of 2 and golden 4 of 4, each "very sure".
+   Wood was named right in 1 of 4 reads of the same two shots, and called golden in the other three: wood is a warm
+   amber, and a reader who sees one shot cannot compare. A player sees the tray change. Left as a miss. One retune
+   of the golden tray (dark floor, bright rim) was tried and taken back: readers still said yellow food blends into
+   it, and it looked less like a prize. The retune did not touch wood, so it could not have moved the wood reads;
+   the two rounds differed only in which reader saw which wood shot.
+3. End card at 320 by 568 in Turkish: **pass.** "Yeni tepsi: Emaye" at the sixth stamp and "Yeni tepsi: Altın" at
+   the thirteenth, neither cut, each under the mission line and the count. Walked through the real page: the tray is
+   owned and in use on the end card, still there after a reload; a failed mission earns nothing; junk in storage
+   falls back to wood.
+4. Food and rings on each tray: **part.** Rings were named right in all ten reads. On teal, "the food stands out".
+   On golden, both readers said a yellow item blends into the tray; one said the same of a lemon on wood. Golden is
+   no better than wood here and may be a little worse for yellow food.
+
+The first golden (metal 0.8) rendered dark olive in Sunny diner, because the scene has no sky to reflect. It is now a
+plain bright yellow that glows a little. Found by looking at the shot, not by any check.
+
+Not shown: nobody has earned a tray by playing. No shot had a yellow seat ring beside the golden tray, the pair most
+likely to fail line 4. The golden walk used the pan mission as the last stamp; the slap mission, which ended ✗ in an
+earlier walk, was then played to its end card through the real page and stamped ("✓ Use Slap +50"), so that ✗ was the
+walk and not the game.
+
+The shop's Trays box, walked at 320 by 568 in Turkish and English with one, two and three trays owned: no label is
+cut ("13 görevin hepsi", "All 13 missions"), a locked tray does nothing when tapped, an owned one is put in use, the
+list does not jump, and the box is absent before the first Rush.
+
+**Outside review of the wide-screen change, after it merged.** That change merged before its outside code review and
+outside read came back. They found four faults, all fixed here:
+
+- Turning the phone while a dish cooked deleted the guest waiting at the pass. Guests are still rebuilt on a turn,
+  but the one whose food is on the board is rebuilt too and walks to the pass. This also fixes the same loss when
+  Guests is switched off and on while cooking. Seated guests still walk in again from the door after a turn.
+- The camera stepped back even when no guest model had loaded. It now steps back when the first guest stands there.
+- On a screen between 0.62 and about 1.18 wide for its height the step back changed the aim but not the distance.
+  Both now use one number. Pass line for this trial: faces show at every size staged before, and the outer guests
+  are not cut at 768 by 1024. Staged at thirteen sizes, six of them wide: pass. A tablet now shows whole guests.
+- A window resized on the menu did not remember which side of the line it was on. It is sampled on every resize.
+
+The advisor's question found one more before it shipped: the lower edge of the two-edge switch (0.56) sat under a
+16:9 phone held upright (0.5625), so a phone turned and turned back would have stayed in the wide class. The edges
+are now 0.575 and 0.63. Staged 320 by 568, 360 by 640 and 390 by 660 arriving from landscape: faces show.
+
+Checks on this tree: bots ok; phone check on Chromium and WebKit; full walks at 320 by 568, 1280 by 720 and 768 by
+1024 with no errors, no halo over the tray and no models left after quitting; a turn mid-cook leaves four people
+(three seated, one at the pass).
+
+Left from the outside read: on a wide screen a guest's ring can overlap a neighbour's falling food ring; on a tablet
+the tickets sit over the kitchen sign and the pan and register are off screen while catching.
+
+**Outside code review of this slice, before it merged.** Eight findings, all fixed: a second tab could write an
+earned tray away (the store now merges with what is saved); stamps from before trays existed did not count until the
+next Rush (counted when the page loads; walked: six old stamps give the enamel tray at once); a tray skin replaced
+the Toon outline (seen back in a shot); a guest rebuilt at the pass stayed counted when its model failed; a tray
+given by the game was recorded as a setting the player chose; the setting and the run record used two names (both
+`trayskin` now); the end card played its sound twice with a new tray; and, older than this slice, a guest walking
+to a seat in an ordinary day arrived on the menu after quitting. Not rechecked by a walk: the second tab, the failed
+model, and the sound. Guests switched off and back on while cooking is fixed by the same code as the turn, but only
+the turn was walked, and neither was played on to the serve.
+
