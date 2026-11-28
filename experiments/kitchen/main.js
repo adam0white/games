@@ -23,7 +23,7 @@ const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
 W.apply();
 
 // ---------- the save: one JSON blob; fields only ever grow. Keys never change once shipped.
-const KEY = 'kitchen-save', MUSIC_KEY = 'kitchen-music', LOOK_KEY = 'kitchen-look';
+const KEY = 'kitchen-save', MUSIC_KEY = 'kitchen-music', LOOK_KEY = 'kitchen-look', PEOPLE_KEY = 'kitchen-people';
 const hadSave = readJson(KEY, null) !== null;
 const save = sim.newSave();
 {
@@ -107,7 +107,7 @@ const buzz = ms => { if (save.sound && navigator.vibrate) try { navigator.vibrat
 
 // ---------- lab recording
 const rec = lab('kitchen', { lang: W.lang });
-const opts = settings('kitchen', { look: { values: LOOK_ORDER, def: 'diner', key: LOOK_KEY } }, { rec });
+const opts = settings('kitchen', { look: { values: LOOK_ORDER, def: 'diner', key: LOOK_KEY }, people: { values: ['on', 'off'], def: 'on', key: PEOPLE_KEY } }, { rec });
 rec.notice($('menu').firstElementChild);
 rec.toggle($('paused').firstElementChild);
 
@@ -137,7 +137,7 @@ const show = screens(['menu', 'paused', 'extra', 'dayEnd', 'shop'], name => {
   if (playing && g && ['catch', 'chop', 'fry', 'micro', 'blend', 'ring', 'close', 'serve', 'plate'].includes(phase)) $('ticket').style.display = 'block';
   // Off play, nothing of a station stays out: no Chop button; and off the pause card the knife, flames and pan go back.
   if (name !== 'play') chopBtn(false);
-  { const on = !!rush && (playing || name === 'paused'); $('rail').style.display = on ? 'flex' : 'none'; $('rushHud').style.display = on ? 'flex' : 'none'; $('rank').style.display = on ? 'none' : ''; $('coins').style.display = on ? 'none' : ''; document.body.classList.toggle('rush', on); $('rushMission').style.visibility = playing ? '' : 'hidden'; }
+  { const on = !!rush && (playing || name === 'paused'); $('rail').style.display = on ? 'flex' : 'none'; $('rail').style.visibility = playing ? '' : 'hidden'; $('rushHud').style.display = on ? 'flex' : 'none'; $('rank').style.display = on ? 'none' : ''; $('coins').style.display = on ? 'none' : ''; document.body.classList.toggle('rush', on); $('rushMission').style.visibility = playing ? '' : 'hidden'; }
   if (art && !playing && name !== 'paused') { art.knife.rest(); if (flames) flames.visible = false; art.pan.rotation.x = 0; art.panGlow.material.opacity = 0; }
   if (name === 'menu') menu();
   if (name === 'play') missionChip();
@@ -151,6 +151,7 @@ function labels() {
   for (const id of ['sound1', 'sound2']) { $(id).textContent = t(save.sound ? 'soundOn' : 'soundOff'); $(id).setAttribute('aria-pressed', String(save.sound)); }
   for (const id of ['music1', 'music2']) { $(id).textContent = t(musicOn ? 'musicOn' : 'musicOff'); $(id).setAttribute('aria-pressed', String(musicOn)); }
   for (const id of ['look1', 'look2']) $(id).textContent = t('look', { name: t('looks_' + lookId) });
+  $('people2').textContent = t(peopleOn() ? 'peopleOn' : 'peopleOff');
   $('chopBtnText').textContent = t('chop'); $('wheelBtnText').textContent = t('wheelBtn');
 }
 const rankName = tier => t('rank_' + TIERS[tier].name);
@@ -1060,6 +1061,7 @@ let rush = null, lastMode = 'day', rushSeed = null, rushNight = null, lastNight 
 const rings = new Map();                               // falling item n -> ring mesh
 let ringGeo = null;
 function clearRush() {
+  clearPeople();
   for (const n of [...rings.keys()]) dropRing(n);
   $('rushMission').style.display = 'none'; chipWas = ''; document.body.classList.remove('mis');
   $('rail').style.display = 'none'; $('rushHud').style.display = 'none'; $('rail').innerHTML = ''; $('acts').style.display = 'none'; actsFor = null; document.body.classList.remove('sky'); if (fight) { fight.over = true; fight = null; $('fight').style.display = 'none'; }
@@ -1080,7 +1082,7 @@ function beginRush() {
   day = { rush, plan: [], i: 0, served: 0, earned: 0, tips: 0, stars: [], seed, t0: clock, extras: 0, robbed: 0, rebels: [], line: null, next: 0, arriveT: 0, lost: 0, pickT: 0 };
   lastMode = 'rush';
   song?.start(seed);
-  rec.start({ mode: 'rush', night, mission: rush.mission, day: save.day, tier: save.tier, tutorial: false, look: lookId, tool: tools.use, sound: save.sound, music: musicOn });
+  rec.start({ mode: 'rush', night, mission: rush.mission, people: opts.get('people'), day: save.day, tier: save.tier, tutorial: false, look: lookId, tool: tools.use, sound: save.sound, music: musicOn });
   paused = false; snd.release(); show('play'); hud();
   toSky();
   banner(t(night === 'rush' ? 'rushGo' : 'night_' + night), t(night === 'rush' ? 'rushGoSub' : 'nightGo_' + night));
@@ -1100,12 +1102,99 @@ function redrawTray(newest = null) {
 function seatOf(e) { if (e.seat == null) { const used = new Set(rush.line.map(x => x.seat)); e.seat = [0, 1, 2, 3, 4].find(i => !used.has(i)) ?? 0; } return e.seat; }
 function rail() {
   const s = rush; if (!s) return;
-  $('rail').innerHTML = s.line.map(e => {
+  // One column per seat, so a ticket stays over its guest and nothing shifts when somebody leaves.
+  const cols = Array.from({ length: Math.max(s.seats, ...s.line.map(e => seatOf(e) + 1)) }, (_, i) => s.line.find(e => seatOf(e) === i));
+  $('rail').innerHTML = cols.map(e => {
+    if (!e) return '<div class="chip gap"></div>';
     const icons = Object.entries(e.need).flatMap(([id, n]) => Array.from({ length: n }, (_, i) => `<img alt="" class="${i < (e.got[id] ?? 0) ? 'got' : ''}" src="${art.thumb(itemModel(id))}">`)).join('');
     return `<div class="chip${e.ready ? ' ready' : ''}${e.kind === 'rich' ? ' rich' : ''}" data-n="${e.n}" style="--c:${SEAT_COLOR[seatOf(e)]}"><div class="top"><img alt="" src="${art.thumb(dishModel(e.recipe))}"><b>${e.kind === 'rich' ? '💎' : ''}${e.mood ? MOOD_ICON[e.mood] : ''}${e.frozen > 0 ? '🧊' : ''}${e.self ? '👨‍🍳' : ''}<i class="coin"></i>${e.price}</b></div><div class="need">${icons}</div><div class="pat"><i></i></div></div>`;
   }).join('');
-  railBars();
+  railBars(); syncPeople();
   const rb = $('rail').getBoundingClientRect(); if (rb.height) $('rushMission').style.top = `${Math.round(rb.bottom + 7)}px`;   // the mission chip sits under the tickets, however tall they are
+}
+// ---------- people in a Rush: every guest in the line stands in front of the counter, on a spot in their ticket's
+// colour. They only show what the shift (shift.js) already decided: nothing here changes a rule, a clock or a coin.
+// One entry per guest: { e, seat, m (the model, once loaded), ring, state: 'in' | 'wait' | 'busy' | 'out', then }.
+const SEAT_SPOT = [[-0.72, 1.5], [0, 1.66], [0.72, 1.5], [-0.36, 2.2], [0.36, 2.2]], DOOR = [5.2, 1.2], PASS = [3.25, 0.95];
+const people = new Map();
+let peopleGen = 0, ringGeoP = null, haloGeo = null, TALL = 1.0;   // TALL: smaller on a wide screen, where little shows under the tray
+const haloMat = [];
+const peopleOn = () => opts.get('people') === 'on';
+function clearPeople() { peopleGen++; for (const p of people.values()) { if (p.m) p.m.gone = true; dropSpot(p); } people.clear(); }
+function dropSpot(p) { if (p.ring) { art.world.remove(p.ring); p.ring.material.dispose(); p.ring = null; } }
+// Called whenever the line changes: new guests walk in, guests no longer in the line go.
+function syncPeople() {
+  const s = rush; if (!s) return;
+  if (!peopleOn()) { if (people.size) clearPeople(); return; }   // switched off, here or in another tab
+  if (!people.size) TALL = innerWidth > innerHeight ? 0.66 : 1.0;
+  for (const e of s.line) if (!people.has(e.n)) addPerson(e);
+  for (const p of people.values()) if (p.state !== 'out' && !s.line.includes(p.e)) personOut(p, p.how ?? (s.at === p.e ? 'cook' : 'walk'));
+}
+async function addPerson(e) {
+  const gen = peopleGen, seat = seatOf(e), [x, z] = SEAT_SPOT[seat], p = { e, seat, m: null, ring: null, state: 'in', then: null, how: null, low: false };
+  people.set(e.n, p);
+  ringGeoP ??= new art.THREE.RingGeometry(0.2, 0.3, 28);
+  p.ring = new art.THREE.Mesh(ringGeoP, new art.THREE.MeshBasicMaterial({ color: SEAT_COLOR[seat], transparent: true, opacity: 0.9, side: art.THREE.DoubleSide }));
+  p.ring.rotation.x = -Math.PI / 2; p.ring.position.set(x, 0.02, z); art.world.add(p.ring);
+  const m = await art.guest(e.look, TALL);
+  if (gen !== peopleGen || people.get(e.n) !== p) { if (m) m.gone = true; return; }   // the shift ended, or they left, while the model loaded
+  if (!m) return dropSpot(p);   // no model: the ticket alone
+  p.m = m; m.speed = 3.2; m.g.position.set(2.4, 0, 2.2);
+  // The same ring that marks their food in the sky sits over their head.
+  haloGeo ??= new art.THREE.TorusGeometry(0.17, 0.03, 8, 28);
+  p.halo = new art.THREE.Mesh(haloGeo, haloMat[seat] ??= new art.THREE.MeshBasicMaterial({ color: SEAT_COLOR[seat] })); p.halo.rotation.x = Math.PI / 2; p.halo.scale.setScalar(TALL); p.halo.position.set(0, TALL * 1.1, 0); m.g.add(p.halo);
+  if (p.state === 'out') return personOut(p, p.how, true);
+  art.walkTo(m, x, z, () => { if (p.state !== 'in') return; p.state = 'wait'; m.face = 0; m.play('idle'); personNext(p); });
+}
+function personNext(p) { const f = p.then; p.then = null; f?.(); }
+// A short show on the spot (a stunt from the ordinary day's wheel), with the shift still running underneath.
+function personShow(p, kind, opt = {}) {
+  if (!p?.m || p.state !== 'wait') return;
+  p.state = 'busy';
+  art.stunt(p.m, kind, opt, () => { if (p.state !== 'busy') return; p.state = 'wait'; p.m.face = 0; p.m.play('idle'); p.low = false; if (people.get(p.e.n) === p && !rush?.line.includes(p.e)) personOut(p, p.how ?? 'walk'); else personNext(p); });
+}
+function personCheer(p, clip = 'jump') { if (!p?.m || p.state !== 'wait') return; const m = p.m; m.play(clip, true); p.due = { at: clock + 0.7, fn: () => { if (p.state === 'wait' && !m.gone) { p.low = false; m.play('idle'); } } }; }   // due: on the game's clock, so a pause holds it
+// how: 'walk' (gave up), 'cook' (their food is on the board: they wait at the pass), 'happy', 'boot', 'join'.
+function personOut(p, how, now = false) {
+  p.how = how; dropSpot(p);
+  if (p.state === 'busy' && !now) return;   // the show ends first, then they go
+  const m = p.m; p.state = 'out'; if (!m) { if (people.get(p.e.n) === p) people.delete(p.e.n); return; }
+  const off = () => { m.gone = true; if (people.get(p.e.n) === p) people.delete(p.e.n); };
+  if (how === 'cook') { m.speed = 3.2; return art.walkTo(m, PASS[0], PASS[1], () => { m.face = -Math.PI * 0.6; m.play('idle'); p.atPass = true; if (p.paid) personPaid(p); }); }
+  if (how === 'boot') return art.stunt(m, 'boot', {}, off);
+  if (how === 'join') { m.speed = 2.6; return art.walkTo(m, -2.6, 2.4, off); }
+  m.speed = how === 'happy' ? 2.6 : 2.0; if (how === 'walk') m.bubble.show(null, 'angry');
+  art.walkTo(m, DOOR[0], DOOR[1], off);
+}
+function personPaid(p) {
+  const m = p.m; p.paid = true; if (!m || !p.atPass) return;
+  m.bubble.show(null, 'happy'); m.play('emote-yes', true);
+  p.due = { at: clock + 0.9, fn: () => { if (m.gone) return; m.bubble.hide(); m.speed = 2.6; art.walkTo(m, DOOR[0], DOOR[1], () => { m.gone = true; if (people.get(p.e.n) === p) people.delete(p.e.n); }); } };
+}
+// The show for each wheel action in a Rush.
+const PERSON_SHOW = { slap: ['spin'], fridge: ['into', { at: 'fridge' }], pan: ['hop'], microwave: ['into', { at: 'micro' }], trash: ['into', { at: 'trash' }], fight: ['spin'] };
+function personAct(e, id, out) {
+  const p = people.get(e.n); if (!p) return;
+  if (out.gone) { p.how = id === 'hire' ? 'join' : id === 'kick_out' ? 'boot' : 'walk'; if (id === 'rob' && p.state === 'wait') personShow(p, 'shake'); return; }
+  const show = PERSON_SHOW[id]; if (!show) return personCheer(p, 'emote-no');
+  if (p.state !== 'wait') p.then = () => personShow(p, ...show); else personShow(p, ...show);   // still walking in, or mid-show: next
+}
+// Once a frame: a guest whose patience is nearly gone fidgets.
+let liftAt = 0, lift = 0;
+function stepPeople() {
+  // On a wide screen the floor is out of view: lift everyone until the face shows, but never over the tray.
+  if (people.size && phase === 'sky' && art.cam.name === 'catch' && art.cam.pos.distanceTo(art.cam.wantPos) < 0.02 && clock - liftAt > 0.5) {
+    liftAt = clock; const V = art.THREE.Vector3, trayPx = art.toScreen(new V(0, LANE.y0 - 0.14, LANE.z)).y; let best = 0;
+    for (let l = 0; l <= 0.9; l += 0.03) { if (art.toScreen(new V(0, l + TALL * 1.16, SEAT_SPOT[0][1])).y < trayPx + 14) break; best = l; if (art.toScreen(new V(0, l + TALL * 0.5, SEAT_SPOT[0][1])).y <= innerHeight - 4) break; }
+    lift = best;
+  }
+  for (const p of people.values()) {
+    if (p.due && clock >= p.due.at) { const f = p.due.fn; p.due = null; f(); }
+    if (p.m && (p.state === 'wait' || p.state === 'in')) p.m.g.position.y += (lift - p.m.g.position.y) * 0.2;
+    if (p.state !== 'wait' || !p.m) continue;
+    const low = p.e.left / p.e.full < 0.2 && !(p.e.frozen > 0);
+    if (low !== p.low) { p.low = low; p.m.play(low ? 'emote-no' : 'idle'); }
+  }
 }
 // ---------- the wheel in a Rush: tap a guest's ticket. The rules and the prices are in shift.js (act).
 let actsFor = null, actsAt = 0, rushHinted = false, rushCaught = true;
@@ -1147,13 +1236,14 @@ function applyAct(e, id, won) {
   if (out.coins) { SFX.coin(); }
   if (out.closed) { banner(t('rushClosed'), t('rushClosedSub')); }
   else if (id === 'rob' || (id === 'fight' && !won)) floater({ x: innerWidth / 2, y: innerHeight * 0.36 }, t('rushStrike', { n: Math.min(s.strikes, sh.RUSH.strikes), of: sh.RUSH.strikes }), 'bad');
+  personAct(e, id, out);
   redrawTray(); rail();
 }
 
 function railBars() {
   const s = rush, el = $('rail');
-  s.line.forEach((e, i) => {
-    const c = el.children[i]; if (!c) return;
+  s.line.forEach(e => {
+    const c = el.querySelector(`[data-n="${e.n}"]`); if (!c) return;
     const f = Math.max(0, e.left / e.full), bar = c.lastElementChild.firstElementChild;
     bar.style.transform = `scaleX(${f})`; bar.style.background = f < 0.2 ? '#ff5a5a' : f < 0.5 ? '#ffb347' : '#6fd36f';
     c.classList.toggle('hot', f < 0.2 && !(e.frozen > 0)); c.classList.toggle('iced', e.frozen > 0);
@@ -1169,7 +1259,7 @@ function railBars() {
   $('rushStars').textContent = '★'.repeat(tg.filter(x => s.coins >= x).length);
   $('rushTray').textContent = `${s.sky.tray.length}/${s.holds}`;
   $('rushTray').classList.toggle('full', s.sky.tray.length >= s.holds);
-  rushChip();
+  rushChip(); stepPeople();
 }
 // The mission chip under the tickets: what to do, a tick once it holds, struck out once it cannot be done.
 let chipWas = '';
@@ -1202,16 +1292,18 @@ function stepRush(dt) {
       SFX.catch(s.sky.tray.length); buzz(12); art.tray.bump();
       art.burst(new art.THREE.Vector3(trayX, LANE.y0 + 0.05, LANE.z), { n: 8, color: SEAT_COLOR[seatOf(e.e)], speed: 1.2, up: 1.4, size: 0.03, life: 0.5 });
       if (musicOn) song?.ember();
+      personCheer(people.get(e.e.n));
     } else if (e.type === 'pushed') { changed = redraw = true; SFX.whoosh(); floater(worldPx(trayX, LANE.y0 + 0.3), t('rushPushed'), 'bad'); const m = art.item(itemModel(e.it.id), 0.25); flyAway(m, trayX); }
     else if (e.type === 'clatter') {
       changed = redraw = true; day.extras++; const m = meshes.get(e.it.n); meshes.delete(e.it.n); dropRing(e.it.n); if (m) { art.world.remove(m); flyAway(m, trayX); }
       if (e.lost) flyAway(art.item(itemModel(e.lost.id), 0.25), trayX);
       SFX.wrong(); buzz([40, 60, 40]); art.shake(1); floater(worldPx(trayX, LANE.y0 + 0.35), t(e.lost ? 'rushWrongLost' : 'rushWrong'), 'bad'); song?.hit();
-    } else if (e.type === 'ready') { changed = true; SFX.good(); }
+    } else if (e.type === 'ready') { changed = true; SFX.good(); personCheer(people.get(e.e.n), 'emote-yes'); }
     else if (e.type === 'selfserved') {
       changed = redraw = true; day.served++; save.served++; day.earned += e.bill.price; day.stars.push(e.bill.stars);
       floater({ x: innerWidth / 2, y: innerHeight * 0.26 }, `👨‍🍳 +${e.bill.total}`, 'gold'); SFX.coin();
       rec.event('serve', { recipe: e.e.recipe, stars: e.bill.stars, coins: e.bill.total, buzz: s.buzz, self: true });
+      { const p = people.get(e.e.n); if (p) p.how = 'happy'; }
     }
     else if (e.type === 'missed') { dropMesh(e.it.n); }
   }
@@ -1262,6 +1354,7 @@ function rushServe() {
   if (rush.buzz >= 2) floater({ x: innerWidth / 2, y: innerHeight * 0.3 }, `🔥 ×${sh.buzzPay(rush).toFixed(2)}`, 'gold');
   rec.event('serve', { recipe: e.recipe, stars: b.stars, coins: b.total, buzz: rush.buzz });
   const d = dish; dish = null; later(550, () => { if (d) art.world.remove(d); });
+  { const p = people.get(e.n); if (p) personPaid(p); }
   toSky();   // the sky is falling again from this moment, so the player sees it at once
 }
 function rushEnd() {
@@ -1358,7 +1451,7 @@ function gaugeSet(v, band) {
   else { $('gaugeBand').style.left = '0'; $('gaugeBand').style.width = v * 100 + '%'; }
   $('gaugeNeedle').style.left = v * 100 + '%';
 }
-// The tutorial's pointing finger (Adam likes it in the other games): a tap on a piece, or on the register.
+// The tutorial's pointing finger (the owner likes it in the other games): a tap on a piece, or on the register.
 let fingerAnim = null;
 function fingerOff() { $('finger').style.display = 'none'; fingerAnim = null; }
 function fingerTap(world) { fingerAnim = { kind: 'tap', t: 0, world }; $('finger').style.display = 'block'; }
@@ -1468,6 +1561,7 @@ $('play').addEventListener('click', async () => { snd.unlock(); await ready; if 
 $('rush').addEventListener('click', async () => { const was = visits; snd.unlock(); await ready; await art.peopleReady; if (screen === 'menu' && visits === was && !rush) { if (rushSave.night !== 'rush') { rushSave.night = 'rush'; storeRush(); } beginRush(); } });
 for (const id of ['sound1', 'sound2']) $(id).addEventListener('click', () => { save.sound = !save.sound; store(); settingChanged('sound', !save.sound, save.sound); if (save.sound) { snd.unlock(); if (!paused) snd.release(); SFX.tap(); } labels(); });
 for (const id of ['music1', 'music2']) $(id).addEventListener('click', () => { musicOn = !musicOn; write(MUSIC_KEY, musicOn ? '1' : '0'); settingChanged('music', !musicOn, musicOn); labels(); });
+$('people2').addEventListener('click', () => { opts.set('people', peopleOn() ? 'off' : 'on'); if (!peopleOn()) clearPeople(); else if (rush) syncPeople(); SFX.tap(); labels(); });
 for (const id of ['look1', 'look2']) $(id).addEventListener('click', () => {
   lookId = opts.set('look', LOOK_ORDER[(LOOK_ORDER.indexOf(lookId) + 1) % LOOK_ORDER.length]);
   art?.setLook(lookId); SFX.tap(); labels();
@@ -1537,7 +1631,8 @@ window.kitchenState = () => art && peopleIn && ({
   cook: cook ? { kind: cook.kind, d: cook.d, p: cook.p, band: cook.band, fill: cook.fill, left: cook.pieces?.filter(p => !p.done).length, misses: cook.misses ?? 0, striking: !!cook.strike, cuts: cook.pieces?.reduce((n, p) => n + p.cuts, 0), xs: cook.pieces?.map(p => p.done ? null : [p.m.position.x, p.m.position.z]), aim } : null, q: g?.q,
   look: lookId, hint: !!document.querySelector('.kit-hint.on'),
   line: day?.line ? day.line.map(e => ({ recipe: e.p.recipe, left: +e.left.toFixed(1) })) : null, lost: day?.lost ?? 0,
-  rush: rush ? { mission: rush.mission, missionHolds: sh.missionHolds(rush), night: rush.night, secs: rush.secs, t: +rush.t.toFixed(2), coins: rush.coins, strikes: rush.strikes, buzz: rush.buzz, nerve: rush.nerve, acts: { ...rush.acts }, served: rush.served, turned: rush.turned, doors: rush.doors, over: rush.over, holds: rush.holds, at: rush.at?.recipe ?? null, tray: rush.sky.tray.map(it => it.id), line: rush.line.map(e => ({ n: e.n, recipe: e.recipe, kind: e.kind, left: +e.left.toFixed(1), full: e.full, need: { ...e.need }, got: { ...e.got }, ready: e.ready, price: e.price, mood: e.mood ?? null, frozen: e.frozen > 0, self: !!e.self })), sheet: !!actsFor, hold: rush.hold, calm: rush.calm > 0, locked: rush.locked > 0, items: rush.sky.items.map(it => ({ id: it.id, x: it.x, y: it.y, owner: sh.ownerOf(rush, it.id)?.n ?? null })) } : null,
+  mem: art.memory(), models: art.guests.length,
+  rush: rush ? { people: [...people.values()].filter(p => p.m && p.state !== 'out').length, peopleAll: people.size, lift: +lift.toFixed(2), halos: [...people.values()].filter(p => p.halo && p.state === 'wait').map(p => { const h = art.toScreen(p.halo.getWorldPosition(new art.THREE.Vector3())); return { seat: p.seat, x: Math.round(h.x), y: Math.round(h.y) }; }), trayPx: Math.round(art.toScreen(new art.THREE.Vector3(0, LANE.y0 - 0.14, LANE.z)).y), mission: rush.mission, missionHolds: sh.missionHolds(rush), night: rush.night, secs: rush.secs, t: +rush.t.toFixed(2), coins: rush.coins, strikes: rush.strikes, buzz: rush.buzz, nerve: rush.nerve, acts: { ...rush.acts }, served: rush.served, turned: rush.turned, doors: rush.doors, over: rush.over, holds: rush.holds, at: rush.at?.recipe ?? null, tray: rush.sky.tray.map(it => it.id), line: rush.line.map(e => ({ n: e.n, recipe: e.recipe, kind: e.kind, left: +e.left.toFixed(1), full: e.full, need: { ...e.need }, got: { ...e.got }, ready: e.ready, price: e.price, mood: e.mood ?? null, frozen: e.frozen > 0, self: !!e.self })), sheet: !!actsFor, hold: rush.hold, calm: rush.calm > 0, locked: rush.locked > 0, items: rush.sky.items.map(it => ({ id: it.id, x: it.x, y: it.y, owner: sh.ownerOf(rush, it.id)?.n ?? null })) } : null,
   mood: g?.mood ?? null, staff: staff.map(m => m.kind), wheel: $('wheel').style.display === 'block', fight: fight ? { taps: fight.taps, need: fight.need } : null,
 });
 window.kitchenMusic = () => song && { ...song.melody, on: song.state.on, step: song.step, notes: song.log.length, kinds: song.log.map(l => l.kind) };

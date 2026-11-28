@@ -14,15 +14,15 @@ Progression: eleven ranks. Food cart, diner, bistro, restaurant, fine dining, fi
 
 The first day is a tutorial: the coach line plus a pointing finger shows the catch, the chop swipe and the register taps. The kit drag hint also shows on a fresh save.
 
-## Looks (for Adam to pick)
+## Looks (for the owner to pick)
 
-Players pick the look with the **Style** button on the menu and pause cards (Adam 2026-11-27: "give the players more options ... set a
+Players pick the look with the **Style** button on the menu and pause cards (the owner, 2026-11-27: "give the players more options ... set a
 default, then check how many players changed it and to what"). Default `diner`. The order is diner, storybook, diorama, comic, toon,
 night, clay. A `?look=<id>` link also picks one. The pick sticks on that device (key `kitchen-look`).
 
 Telemetry for every setting, through `kit/settings.js`: the event `setting {id, value, from, def}` for look, tool, sound, music and lang. Every run's start
 record also carries `look`, `tool`, `sound` and `music`, so share of play per style can be counted as well as changes.
-Round 1 looks: `diner` (default), `toon`, `night`, `clay`. Adam called the cartoon "not bad but there's better", so round 2 adds three
+Round 1 looks: `diner` (default), `toon`, `night`, `clay`. The owner called the cartoon "not bad but there's better", so round 2 adds three
 art directions, each a full-screen shader pass over the 3D render (`post` in `LOOKS`, the `post` block in art.js):
 
 - `storybook`: watercolour. A Kuwahara filter turns surfaces into flat painted patches, brown ink lines come from depth and
@@ -35,7 +35,7 @@ Cost: one extra full-screen pass. Desktop WebKit holds 72 fps on all of them; CI
 
 ## Difficulty (bots.mjs)
 
-`node bots.mjs` plays 60 catches per stage with a "new" and a "good" bot. Clean = share of catches with no extra. Cart: about 0.92. Diner: about 0.9. Bistro: 0.7. Restaurant: about 0.33. Fine dining and five stars: about 0.2. Tuning lives in `TUNE` in `sim.js`. These numbers are the first guess; Adam's play sets the real curve.
+`node bots.mjs` plays 60 catches per stage with a "new" and a "good" bot. Clean = share of catches with no extra. Cart: about 0.92. Diner: about 0.9. Bistro: 0.7. Restaurant: about 0.33. Fine dining and five stars: about 0.2. Tuning lives in `TUNE` in `sim.js`. These numbers are the first guess; the owner's play sets the real curve.
 
 ## The line (from the Diner, rank 1)
 
@@ -365,3 +365,66 @@ Reading, plainly:
 - There is no reward for a full card beyond the count. Two blind outside answers both proposed a cosmetic (a tray or knife skin) for stamps.
 - Both blind answers proposed missions with a follow-through (freeze a guest and serve them before they thaw; win a fight, then serve three without a walkout). None was built; they are the next candidates if the plain ones feel like chores.
 - Trash on Lunch, Cook it! and now Lock out wait for one retune each after a person's shifts.
+
+### Slice 5: guests as people in the room (2026-11-28)
+
+Until now a guest in a Rush was a ticket. This slice draws each guest in the line as a person standing in front of the
+counter, under the tray, with a ring over their head in their ticket's colour (the same ring that marks their food in
+the sky). It changes no rule: `shift.js` and `sim.js` are not touched.
+
+**Pass line, written before the trial** (a staging test with three still people came first, to learn whether people fit
+in the catching view at all; nothing else was built or measured before this line):
+
+1. From one 320 by 568 screenshot with three guests, an outside reader who has not seen the game matches every person
+   to their ticket, on two different screenshots.
+2. At 320 by 568, 390 by 844 and 1280 by 720 no ring or head is drawn over the tray, and each waiting person's eyes are
+   on screen.
+3. With people on, the median frame time on the real page is within 15% of people off, same seed, same machine.
+4. `node bots.mjs` prints the same as before, and the rule files have no diff.
+5. While catching, the number of people equals the length of the line once arrivals have walked in; it is zero on the
+   menu, on the end card and after pause then Menu; the renderer's geometry and texture counts do not grow from the
+   first shift to the third.
+
+**What was built.** Each guest in a Rush or Lunch line is a person standing in front of the counter, under the tray,
+facing the camera, with a ring over their head in the colour of their ticket and of their food in the sky. Tickets stay
+the control; people are not tappable. A wheel action plays its stunt from the ordinary day on that person (slap, fridge,
+pan, microwave, trash, kick out, rob, hire) with the shift still running: no camera cut and no hold. A guest whose food
+is cooking waits at the pass and leaves happy when served. The ticket rail is now one column per seat, so ticket order
+and people order agree. Setting on the pause card: Guests shown (default) or tickets only, stored as `kitchen-people`
+and sent with each shift's start record. Rules, pay and bots are unchanged.
+
+**Results against the pass line.**
+
+1. Passed. Two outside readers each matched three of three people to tickets on both screenshots, one of which had
+   tickets in a different order from the people (taken before the rail was put in seat order).
+2. Passed on both phones (no ring over the tray in any sample across three shifts each). **Failed at 1280 by 720:**
+   about 0.3 world units show under the tray there, so only hair and rings show and no eyes. A ring was also drawn over
+   the tray line in 111 to 135 samples a shift, because the lift was worked out while the camera was still moving; it
+   now waits for the camera to settle, and the last wide walk had none in three shifts. Two retunes (people at 0.66 and at 0.5 of phone height) did not fix it; stopped under
+   the stop rule and kept 0.66. A wide screen needs a different staging (people beside the tray, or a lower camera), not
+   a smaller person.
+3. Median frame time 16.7 ms and 95th percentile 16.7 to 16.8 ms with people on and off. The test page is capped at
+   60 frames a second, so this shows no drop on this machine and nothing about a slow phone.
+4. Passed.
+5. Passed after a fix. Texture count grew every shift (79, 101, 116) because each cloned guest owns a bone texture that
+   was never freed; this leak was older than the slice and also ran in ordinary days. Freed on removal: the count is now
+   level across three shifts (72, 73, 73 and 74, 75, 75). Models are zero on the menu, the end card and after quitting.
+
+**Outside code review (two reviewers), fixed:** a stunt that spawns sparks kept spawning every paused frame; stunts
+outlived a removed guest; the setting turned off in another tab stranded models; two wall-clock timers ran through a
+pause (now on the game clock); a second wheel action on a guest mid-show lost its show (the next one now waits; a
+third replaces it); a floor ring stayed
+when a model failed to load. Exercised through the real page after the fixes: pause during a Pan hop (spark count 14 and
+14 two seconds apart), Guests switched off and on from the pause card (models 3, 0, 3), a second action on a guest
+mid-show, quit during a Fridge stunt (models and sparks zero), and Fridge, Kick out and Pan in an ordinary day (the day
+carries on). Changed but not exercised: the setting changed in another tab, and a model that fails to load.
+**Not fixed:** turning Guests off and on again while a dish is cooking does not bring back
+the guest waiting at the pass (the ticket and the pay are unaffected).
+
+**Dropped or changed on the way.** Full-size people (hid the counter and the tray on phones); floor rings as the only
+marker (the floor is off screen on phones, so the ring moved over the head); the lying-down spin for Cook it! and Lock
+out (it read as a knockout; now a head shake); tickets drawn over the pause card at 320 by 568 (rail hidden when not
+playing).
+
+**Not shown.** No person has played with the people on. Whether they make the choice of guest feel more like a choice
+is the open question for the owner. The wide-screen staging is open.

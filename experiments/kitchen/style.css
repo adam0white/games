@@ -213,6 +213,7 @@ button.small { min-width: 0; font-size: 15px; }
 #rushTrayBox b { margin-left: 2px; } #rushTray.full { color: #d8262c; }
 @keyframes rushPulse { to { transform: scale(1.18); } }
 #rail { position: fixed; top: calc(58px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); display: none; gap: 5px; z-index: 6; max-width: 100vw; }
+#rail .chip.gap { visibility: hidden; }
 #rail .chip { cursor: pointer; touch-action: none; position: relative; } #rail .chip.iced { background: #d9f1ff; }
 #rail .chip { width: 70px; background: #fffdf5; border: 2.5px solid var(--ink); border-top: 9px solid var(--c); border-radius: 10px; padding: 2px 3px 4px; box-shadow: 0 3px 0 var(--shade); display: flex; flex-direction: column; gap: 2px; align-items: center; }
 #rail .chip.rich { background: #fff3c2; } #rail .chip.hot { animation: rushPulse .35s infinite alternate; } #rail .chip.ready { background: #d9ffd9; }

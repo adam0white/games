@@ -82,7 +82,7 @@ assert.ok(get('cart day 1', 'good').seconds < 30, 'a first catch takes under hal
   console.log('line: ok');
 }
 if (mutate) assert.ok(rows.every(r => r.extras === 0), 'mutation: extras no longer stop a catch');
-// Variety (Adam 2026-11-26: "everybody wanted carrots, then everybody wants hot dogs"): every rank offers at least
+// Variety (the owner, 2026-11-26: "everybody wanted carrots, then everybody wants hot dogs"): every rank offers at least
 // five dishes, a day never serves the same dish twice in a row, and no dish takes more than half of a day.
 for (let tier = 0; tier < sim.TIERS.length; tier++) {
   const save = { ...sim.newSave(), tier, built: { tray: 3, knife: 3, stove: 1, micro: 1, blender: 1, tables: 3, decor: 1 } };
