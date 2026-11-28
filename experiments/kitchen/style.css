@@ -227,10 +227,14 @@ button.small { min-width: 0; font-size: 15px; }
 #rail .need { display: flex; flex-wrap: wrap; justify-content: center; gap: 1px; min-height: 20px; } #rail .need img { width: 19px; height: 19px; opacity: .62; filter: grayscale(.45); } #rail .need img.got { opacity: 1; filter: none; background: var(--c); border-radius: 50%; }
 #rail .pat { width: 94%; height: 7px; border: 2px solid var(--ink); border-radius: 6px; overflow: hidden; background: #fff; } #rail .pat i { display: block; height: 100%; transform-origin: left; background: #6fd36f; }
 #rush small { color: #e89a00; }
-#rushRow { gap: 8px; flex-wrap: nowrap; } #nights { display: contents; }
-#rushRow:has(#nights button) button { font-size: 15px; padding: 8px 8px; margin-left: 0; margin-right: 0; min-width: 0; white-space: nowrap; }
-#rushRow button { position: relative; display: inline-flex; flex-direction: column; align-items: center; line-height: 1.15; } #rushRow small { color: #e89a00; }
-#nights button.fresh::after { content: ''; position: absolute; top: -5px; right: -5px; width: 12px; height: 12px; border-radius: 50%; background: #ff5a5a; border: 2px solid var(--ink); }
+#rushRow { gap: 8px; flex-wrap: nowrap; }
+#rushRow button { position: relative; display: inline-flex; flex-direction: column; align-items: center; line-height: 1.15; } #rushRow small { color: #b96f00; font-size: .72em; }
+/* the ladder: one pip a shift, scrolled sideways when they do not fit */
+#nights { display: flex; gap: 4px; overflow-x: auto; justify-content: safe center; padding: 2px 4px 8px; scrollbar-width: none; } #nights::-webkit-scrollbar { display: none; } #nights:empty { display: none; }
+#dayEnd #nextDay.main { font-size: 1em; min-width: 7em; }   /* stays on one row with Menu */
+#nights .pip { flex: none; min-width: 34px; width: 34px; min-height: 48px; padding: 2px 0; margin: 0; border-radius: 12px; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.1; font-size: 15px; box-shadow: 0 3px 0 var(--ink); }
+#nights .pip i { font-style: normal; font-size: 10px; color: #e89a00; letter-spacing: -1px; } #nights .pip.at { background: var(--accent); color: #fff; } #nights .pip.at i { color: #fff; }
+#nights .pip.lock { opacity: .5; background: #e9e2d6; }
 body.rush #banner { top: calc(150px + env(safe-area-inset-top)); }
 /* The cooking meter sits at the top (under the tickets in a Rush); while it shows, the banner drops under it. */
 body.rush { --gt: 164px; } body.rush.mis { --gt: 196px; }

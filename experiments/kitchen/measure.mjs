@@ -15,7 +15,10 @@ const tierArg = args.find(a => a.startsWith('--tier=')), TIER = tierArg ? Number
 const whoArg = args.find(a => a.startsWith('--who=')), WHO = whoArg ? whoArg.slice(6) : 'impatient';   // the catching plan under the wheel question
 const nightArg = args.find(a => a.startsWith('--night=')), NIGHT = nightArg ? nightArg.slice(8) : 'rush';   // which night (order question)
 
-export const COOKS = { new: { react: 0.45, skill: 0.6, q: 0.74, slow: 1.45, fight: 0.6 }, good: { react: 0.25, skill: 0.9, q: 0.93, slow: 1, fight: 0.85 } };
+export const COOKS = { new: { react: 0.45, skill: 0.6, q: 0.74, slow: 1.45, fight: 0.6 }, good: { react: 0.25, skill: 0.9, q: 0.93, slow: 1, fight: 0.85 },
+  // sharp: set so the two Rush shifts a person played at the second rank (427 and 400 coins, pace 1) fall in or just above its middle half
+  sharp: { react: 0.18, skill: 0.97, q: 0.97, slow: 0.75, fight: 0.9 } };
+export const PACE = 1.5;   // the fall speed of a Rush at the default Pace setting (main.js paceFor)
 export const OVERHEAD = 0.5; // seconds a dish costs besides its cooking steps. Checked against the page: ten dishes timed in a browser came within 1.2 s of cookSecs.
 
 export function saveAt(tier, tables = null) {
@@ -214,6 +217,33 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       for (const r of rows) out.push({ player: `${who}, tray ${tray}`, night: r.name, coins: r.coins, perMin: r.perMin, served: r.served, strikes: r.strikes, closedEarly: r.closedEarly, secs: r.secs, best: r === best ? '<' : '' });
     }
     console.log(`nights, rank ${TIER}`); console.table(out);
+  } else if (question === 'lines') {
+    // The star lines, at the default pace: one star is 0.88 of a new cook's lower quarter, three a sharp cook's
+    // average, two a little past half way. Prints the tables for shift.js.
+    const r5 = x => Math.round(x / 5) * 5;
+    for (const night of sh.NIGHT_IDS) {
+      const out = [];
+      for (let t = 0; t < sim.TIERS.length; t++) {
+        if (t < sh.NIGHTS[night].from) { out.push('null'); continue; }
+        const [n, , k] = table([['new', { save: saveAt(t), cook: COOKS.new, who: 'greedy', night, speed: PACE }], ['good', { save: saveAt(t), cook: COOKS.good, who: 'impatient', night, speed: PACE }], ['sharp', { save: saveAt(t), cook: COOKS.sharp, who: 'greedy', night, speed: PACE }]], runs);
+        const one = r5(n.p25 * 0.88), three = Math.max(r5(k.coins), one + 20), two = r5(one + (three - one) * 0.55);   // half way and a little: a good cook's average sits too near the sharp one's at the low ranks
+        out.push(`[${one}, ${two}, ${three}]`);
+      }
+      console.log(`${night}: [${out.join(', ')}]`);
+    }
+  } else if (question === 'ladder') {
+    // Each shift of the ladder at the rank that opens it and two ranks on: how often each cook clears it first try
+    // (using the mission's wheel action), and the share of shifts with three stars.
+    const rows = [];
+    sh.LADDER.forEach((R, i) => { for (const t of [R.from, Math.min(sim.TIERS.length - 1, R.from + 2)]) for (const who of ['new', 'good', 'sharp']) {
+      const use = R.mission === 'trio' ? ['pan', 'slap', 'fridge'] : R.mission?.startsWith('use_') ? R.mission.slice(4) : null;
+      // a player who means to do the mission: the action is used the first time it is allowed, after ten seconds
+      const trig = Object.fromEntries([].concat(use ?? []).map(id => [id, s => (s.t > 10 ? s.line.find(e => sh.canAct(s, e, id)) : null)]));
+      const out = runs.map(seed => playShift({ save: saveAt(t), cook: COOKS[who], who: who === 'new' ? 'greedy' : 'impatient', night: R.night, mission: R.mission, use, once: true, trig, speed: PACE, seed }));
+      const share = f => +(out.filter(f).length / out.length).toFixed(2);
+      rows.push({ shift: i + 1, night: R.night, mission: R.mission ?? '-', need: R.need, rank: t, cook: who, clear: share(o => sh.rungCleared(R, o)), eased: share(o => sh.rungCleared(R, o, 2)), mission_done: R.mission ? share(o => o.missionDone) : 1, one: share(o => o.stars >= 1), three: share(o => o.stars >= 3) });
+    } });
+    console.table(rows);
   } else if (question === 'targets') {
     const rows = [];
     for (const night of sh.NIGHT_IDS) for (let t = sh.NIGHTS[night].from; t < sim.TIERS.length; t++) for (const who of ['new', 'good']) {
