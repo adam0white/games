@@ -6,13 +6,13 @@ This is the process that took Cinderhill from "too slow and still too basic" to 
 
 Shown by the record:
 
-1. **A playable build drew out the real target.** Two days of spec work with at least eighteen reviews and twelve answered taste calls missed it. Eighty-two minutes after a new playable build went live, the owner named what he wanted as six plain nouns (missions, worthwhile base building, strategy, variety, progression and tech tree, meaningful decision branch) and said graphics were not the point.
-2. **One contested situation was built before the campaign.** Three reviewers on three models, told not to cut scope, all said to prove one mission where the player can lose to something that plays by the player's rules. The owner's praise names difficulty and enemies. His recorded play before the praise was eleven runs of that first mission: four losses, six restarts, one win.
+1. **A playable build drew out the real target.** Two days of spec work with at least eighteen reviews and twelve answered taste calls missed it. Eighty-two minutes after a new playable build went live, the owner named the target as six plain nouns (missions, worthwhile base building, strategy, variety, progression and tech tree, meaningful decision branch) and said graphics were not the point.
+2. **One contested situation was built before the campaign.** Three reviewers on three models, told not to cut scope, all said to prove one mission where the player can lose to something that plays by the player's rules. The owner's praise names difficulty and enemies. The owner's recorded play before the praise was that first mission only: four losses, one win and about a dozen short restarts.
 3. **Bots that use the player's own orders measured whether choices were real.** They set the default difficulty, proved one room placement turns ten losses in ten into none, and exposed three advertised choices as fake.
 
 Not shown:
 
-- That the later breadth (missions 2 to 8, the tree, the home hill) is good. The owner had not played it when he wrote the praise.
+- That the later breadth (missions 2 to 8, the tree, the home hill) is good. The owner had not played it when the praise was written.
 - That any outside player agrees. None has played.
 - How much came from the builder model, its advisor, the two days of inherited work, or the owner's own strong picture of the genre. These changed at the same time as the process.
 - The interface. The owner's praise came with a list of faults (the nest as a pop-up, inconsistent controls, no tutorial, unclear costs and progress). Reviewers had flagged several of these hours earlier and the build moved on to new features. The gates below exist to stop that.
@@ -29,7 +29,7 @@ Bots find defects and measure balance. They do not vote on fun (AGENTS.md).
 
 ## The loop
 
-**1. Get the target as things the player does.** Ship the smallest playable build that shows your reading of the brief, even a rough one, and ask what is missing. Write the answer down verbatim. Turn each word into a row: what the player decides, what the game must do for that decision to matter, what the current build does. That table is the first section of the design and the rubric for every later review. Do not start from a reviewed spec; the owner can judge a game and cannot judge a document.
+**1. Get the target as things the player does.** Ship the smallest playable build that shows your reading of the brief, even a rough one, and ask what is missing. Write the answer down verbatim. Turn each word into a row: what the player decides, what the game must do for that decision to matter, what the current build does. That table is the first section of the design and the rubric for every later review. The first Cinderhill thread also had playable builds and owner play and still got "too basic"; what differed in the rebuild was that the owner's words became decision rows and a rubric, and the builder was allowed to exceed the spec. So treat a reviewed spec as background, never as the ceiling.
 
 **2. Read the actual play.** Before designing, read the owner's and any outside records: short exits, long sessions, a loss, a win. Say what happened before saying why.
 
