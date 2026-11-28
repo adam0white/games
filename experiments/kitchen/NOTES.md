@@ -566,3 +566,8 @@ Checks: bots ok; phone check on Chromium and WebKit; the shop walk in two langua
 
 The scripts behind this file's claims are now in `walks/`.
 
+Outside code review of this pass, read before merging: four findings. Fixed: the footer's two buttons wrap on a
+screen narrower than they are; keyboard focus follows a jump. Not fixed: resizing across 640 px of height while
+scrolled loses the place in the shop; buying the last level a rank needs moves that card to the end of the list
+(older than this pass).
+
