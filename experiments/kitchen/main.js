@@ -775,6 +775,10 @@ function shop(fresh = null) {
     }).join('')}</div></div>`);
     for (const b of $('builds').querySelectorAll('button[data-tray]')) b.addEventListener('click', () => trayIt(b.dataset.tray));
   }
+  // The knives and trays sit under a long list: a row at the top jumps to them.
+  const boxes = [...$('builds').querySelectorAll('.toolsBox')];
+  $('builds').insertAdjacentHTML('afterbegin', `<div class="jump">${boxes.map((b, i) => `<button type="button" data-j="${i}">${esc(b.querySelector('.name').textContent)} ↓</button>`).join('')}</div>`);
+  for (const j of $('builds').querySelectorAll('.jump button')) j.addEventListener('click', () => { SFX.tap(); boxes[j.dataset.j].scrollIntoView({ block: 'start', behavior: 'smooth' }); });
 }
 function trayIt(id) {
   if (!trays.own.includes(id) || trays.use === id) return;

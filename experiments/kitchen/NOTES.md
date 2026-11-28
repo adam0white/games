@@ -533,3 +533,36 @@ to a seat in an ordinary day arrived on the menu after quitting. Not rechecked b
 model, and the sound. Guests switched off and back on while cooking is fixed by the same code as the turn, but only
 the turn was walked, and neither was played on to the serve.
 
+### Stop adding: the whole Rush journey read cold (2026-11-28)
+
+**Play records first.** One run by a person on the day the Rush work shipped: 43 seconds of an ordinary day on a
+desktop, before the first Rush slice was live. No person has played a Rush, so every retune that waits on a person's
+shift still waits.
+
+**Pass line, written before the shots were read.** From nine shots of one sitting, in order (menu, Rush start, catch,
+a ticket's sheet, chopping, after a serve, end card, shop, shop at the trays), each of two outside readers, on a
+phone (390 by 844) and a wide screen (1280 by 720), can say: what to do on the catch screen; what the ticket sheet
+is for; what the mission was and whether it was done; how to change the tray. Anything they call broken is ranked by
+how many of the four reads name it.
+
+**Result: pass on all four questions in all four reads.** Ranked complaints:
+
+| named in | complaint | done |
+|---|---|---|
+| 4 of 4 | knives and trays are hard to find under the shop's list, which is cut by the footer | a row at the top of the list jumps to each box; on a screen under 640 px tall the whole card scrolls and the two buttons share a row (the list was a strip 124 px tall at 320 by 568) |
+| 4 of 4 | ingredient icons on tickets are small and pale | missing ingredients drawn stronger (opacity .38 to .62, less grey) |
+| 4 of 4 | nothing on the Rush screens shows how to move the tray or aim the knife | not changed: the ordinary day teaches both before Rush hour opens; the shots started from a save past that |
+| 3 of 4 | the menu's privacy line names a tick box that is not on that screen | not changed here: the line and the box are the shared kit's; the box is on the pause card |
+| 3 of 4 | the mission line covers the tray or the sign when a shift starts | not changed |
+| 2 of 4 | "Chop!" and the fading stars overlap the kitchen sign; rings overlap halos on wide | not changed |
+
+**Re-read of the fixed screens** (320 by 568, both readers, new shots): both said they would tap the Trays row to
+change the tray and read the three trays and what the locked ones need. Both now named most ticket ingredients
+(potatoes, cabbage, turnips or onions); one thin sandwich ingredient was still not named, and both still called the
+icons tiny. Not tested: telling a caught ingredient from a missing one, since the shot had none caught yet.
+
+Checks: bots ok; phone check on Chromium and WebKit; the shop walk in two languages; the journey walk at 320 by 568
+(English and Turkish), 390 by 844 and 1280 by 720 with no errors.
+
+The scripts behind this file's claims are now in `walks/`.
+
