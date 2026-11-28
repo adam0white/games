@@ -391,6 +391,36 @@ const smallSeed = {
 const smallState = page => page.evaluate(() => window.smallState());
 async function smallGo(page, until, base, query = `?lang=en&day=${DAY}`) { await page.goto(`${base}/small/${query}`); await until(page, () => window.smallState, 'home script'); }
 export const pageRuns = {
+  // The experiments page (/experiments/) and the lab page that links to it: every card on both leads to a page
+  // that answers, a card opened from the experiments page is marked and counted, and the filter hides it.
+  async experiments(page, { base, until }) {
+    await page.goto(`${base}/lab/`); await page.waitForSelector('#main a.card');
+    const lab = await page.$$eval('a.card', cards => cards.map(a => a.getAttribute('href')));
+    for (const href of ['/exile/', '/cinderhill/', '/small/', '/experiments/', 'https://human.adamwhite.work/games/']) assert.ok(lab.includes(href), `the lab page links to ${href}`);
+    assert.equal(lab.some(href => /^\/(murmur|stairwell|alibi)\//.test(href)), false, 'story games and experiments are one card each on the lab page');
+    await page.goto(`${base}/experiments/`); await page.waitForSelector('#own a.card');
+    const cards = await page.$$eval('a.card', cards => cards.map(a => a.getAttribute('href')));
+    assert.ok(cards.length >= 2 && new Set(cards).size === cards.length, 'cards, no address twice');
+    for (const href of [...lab, ...cards]) {
+      if (!href.startsWith('/') || href === '/crumbwar/') continue; // another site, and a Worker route the check server does not serve
+      const status = await page.evaluate(async href => (await fetch(href)).status, href);
+      assert.equal(status, 200, `${href} answers`);
+    }
+    assert.equal(await page.textContent('#count'), `Opened 0 of ${cards.length} on this device.`);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no sideways scroll');
+    const first = cards[0];
+    await page.evaluate(() => document.querySelector('#own a.card').addEventListener('click', e => e.preventDefault())); // stay on the page
+    await page.click('#own a.card');
+    assert.deepEqual(Object.keys(await page.evaluate(() => JSON.parse(localStorage.getItem('exp:opened')))), [first]);
+    await page.evaluate(() => dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
+    await until(page, () => document.querySelector('#own a.card').classList.contains('seen'), 'the opened card is marked after coming back');
+    assert.equal(await page.textContent('#count'), `Opened 1 of ${cards.length} on this device.`);
+    await page.click('#only');
+    assert.equal(await page.isHidden('#own a.card'), true, 'the filter hides an opened card');
+    await page.reload(); await page.waitForSelector('#own a.card', { state: 'attached' });
+    assert.equal(await page.getAttribute('#only', 'aria-pressed'), 'true', 'the filter is remembered');
+    assert.equal(await page.evaluate(() => Object.keys(localStorage).filter(k => !k.startsWith('exp:')).join()), '', 'the page writes only its own keys');
+  },
   // Cinderhill's determinism check: the browser runs a short fixed game and must reach the hash Node computes
   // (experiments/cinderhill/quick.js). Then the long run a phone player sends as one line (S2's 12,000 ticks).
   async 'cinderhill check'(page, { base, until }) {

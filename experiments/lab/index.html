@@ -21,65 +21,30 @@
 <body>
 <main>
   <h1>Lab experiments</h1>
-  <p>Every game we are working on, newest ideas included. Games on hold or archived are not listed.</p>
-  <a class="card top" href="/small/"><b>Small games</b><span>Twelve short games, three picked for tonight.</span></a>
-  <div id="list"></div>
+  <p>Every game we are working on. Archived games are not listed.</p>
+  <h2>Main games</h2>
+  <div id="main"></div>
+  <h2>More</h2>
+  <a class="card top" id="small"><b>Small games</b><span>Twelve short games, three picked for tonight.</span></a>
+  <a class="card top" id="experiments"><b>Experiments</b><span id="experimentsLine"></span></a>
+  <a class="card top" id="story"><b>Story games</b><span>The Two Voices, The Stairwell and the rest, listed on the Human Framework site.</span></a>
 </main>
 <script type="module">
-// The lab's game list: active games only, newest work first within each section. Small games are listed at /small/
-// (experiments/small/catalog.js), not here. Leave out games that are on hold (Exile, since 2026-11-25) or archived
-// (archive/). When a game is put on hold or archived, take its line out; when one goes live, add it.
-// The story games mirror the listed games in human-framework apps/site/src/games.ts; three of them live on that site.
-// One entry per game: [address, title, one line]
-const SECTIONS = [
-  ['Main games', [
-    ['/lantern/', 'Lantern', 'Carry the light down the river to dawn. Spark, Tide, Duet and Race modes.'],
-    ['/ant-promotion/', 'Ant Promotion', 'Start as an ant, eat what is weaker than you, and pick what you become next.'],
-    ['/kitchen/', 'Sky Kitchen', 'Catch falling ingredients, cook them, serve guests and grow a food cart into a restaurant.'],
-    ['/crumbwar/', 'Crumbwar', 'Ant colonies against other players online. Classic, Feast and Rush.'],
-    ['/cinderhill/', 'Cinderhill', 'Early build of an ant colony game: paint trails and watch the workers follow.'],
-  ]],
-  ['More experiments', [
-    ['/lab/flame-a/', 'Pass the Flame', 'A friend’s link hands you a flame. Carry it one leg down the river and pass it on.'],
-    ['/alibi/', 'Alibi', 'A wordless whodunit. Scrub the clock and catch the alibi that does not match.'],
-    ['/borrowed/', 'Borrowed Time', 'Live borrowed lives and name who lies before the candle runs out.'],
-    ['/grapevine/', 'Grapevine', 'Route the news through villagers who each change it, so it arrives right.'],
-    ['/fixit/', 'Fix-It Stall', 'Mend toys, doors and zips at a market stall before the customer gives up.'],
-    ['/ducklings/', 'Follow Me', 'Lead a mother duck home. Each duckling swims exactly where she swam.'],
-    ['/nightshift/', 'Tiptoe Museum', 'Freeze runaway exhibits with your torch until they return to their plinths.'],
-    ['/vine/', 'Night Vine', 'Grow a vine in a glasshouse with a lamp and a pruning flick.'],
-    ['/boat/', 'Paper Boat', 'You never steer the boat. You move the water.'],
-    ['/flock/', 'Night Flock', 'Bring the sheep into the fold over twenty evenings in the valley.'],
-    ['/harvest/', 'Harvest Morning', 'Cut the wheat and get it to the cart before the storm reaches the field.'],
-    ['/breath/', 'Hold Your Breath', 'Run a smoky building floor by floor, breathing only where the air is clean.'],
-    ['/matchmaker/', 'Good Match', 'Match each helper on the street to the home that needs them.'],
-    ['/sling/', 'Seed Sling', 'Sling seeds from flower to flower until every patch blooms.'],
-    ['/duel/', 'Thumb Duel', 'Two players, one phone, nine kinds of quick duels. Or play the bot.'],
-  ]],
-  ['Story games', [
-    ['/murmur/', 'The Two Voices', 'A week as one of two voices in Dilan’s head. Each evening, she reflects on her choices.'],
-    ['/stairwell/', 'The Stairwell', 'Caretaker of a seven-flat Istanbul building: bread, bins and what to share about the residents.'],
-    ['/pass/', 'The Pass', 'Run a small kitchen for four weeks. The people working with you can disagree.'],
-    ['/glance/', 'The Glance', 'The night desk at a dam during a stormy week. Your tired keepers read the gauges.'],
-    ['/warren/', 'The Warren', 'A village builds a refuge in soft stone. You mark where to dig; the villagers decide when.'],
-    ['/rope/', 'The Rope', 'Lead five people up a mountain and back. Every one of them can say no.'],
-    ['/word/', 'His Word', 'A tailor left conflicting promises. Agree on work, storage and rent before time runs out.'],
-    ['/lefthand/', 'The Left Hand', 'Carry help through a snowy village over three nights.'],
-    ['https://human.adamwhite.work/watch/', 'The Night Watch', 'Guide the watch in a walled village through many winters.'],
-    ['https://human.adamwhite.work/voice/', 'The Day You Say Nothing', 'A voice in Halil’s head during his first Ramadan as a widower.'],
-    ['https://human.adamwhite.work/colony/', 'Twice at the Well', 'Two versions of one village: one follows your orders, the other decides for itself.'],
-  ]],
-];
-const box = document.getElementById('list');
-for (const [heading, games] of SECTIONS) {
-  const h = document.createElement('h2'); h.textContent = heading; box.append(h);
-  for (const [href, title, line] of games) {
-    const a = document.createElement('a'); a.className = 'card'; a.href = href;
-    const b = document.createElement('b'); b.textContent = title;
-    const s = document.createElement('span'); s.textContent = line;
-    a.append(b, s); box.append(a);
-  }
+// The lab page: the main games as direct links, then one card each for the small games (/small/), the other
+// experiments (/experiments/) and the story games (the public list on the Human Framework site, which reads the
+// listed games in human-framework apps/site/src/games.ts). The lists are in experiments/experiments/catalog.js.
+import { MAIN, EXPERIMENTS, TRIALS, SMALL_HOME, EXPERIMENTS_HOME, STORY_HOME } from '../experiments/catalog.js';
+const box = document.getElementById('main');
+for (const [href, title, line] of MAIN) {
+  const a = document.createElement('a'); a.className = 'card'; a.href = href;
+  const b = document.createElement('b'); b.textContent = title;
+  const s = document.createElement('span'); s.textContent = line;
+  a.append(b, s); box.append(a);
 }
+document.getElementById('small').href = SMALL_HOME;
+document.getElementById('experiments').href = EXPERIMENTS_HOME;
+document.getElementById('story').href = STORY_HOME;
+document.getElementById('experimentsLine').textContent = `${EXPERIMENTS.length} games on their own and ${TRIALS.length} trials for the main games, each waiting for a play and a decision.`;
 </script>
 </body>
 </html>
