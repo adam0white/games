@@ -1370,7 +1370,9 @@ Machine players come two ways. `bot=` in the link runs the rival inside every pa
 
 Checked: 7 room tests in Node (round trip, two wire bots for 6000 ticks, late joiner, lost order noticed, other rules sent away, a page that drops and rejoins with an order typed while away landing once, replay without a room). In browsers through a local room: Chromium page, WebKit page and a Node wire bot in one room for 1670 ticks, 158 hashes compared, 0 mismatches; versus, co-op and a wire bot on the far hill each reached play on every page.
 
-Not checked: a dropped socket in a real browser (the browser walk's offline switch did not show the socket closing; the Node test covers the rejoin path); any match between two people; a phone on a mobile network; a match played to its end screen in a room; High Summer in a room; more than three seats; the cost of hashing on a slow phone.
+Checked on the live page after the merge: a full match with four seats (a Chromium page and a WebKit page, one on each hill, and two wire bots), 4883 ticks, 732 hashes compared, 0 mismatches, each hill's end screen naming its own result; the menu buttons and the Share link (the versus link puts the friend on the far hill, the co-op link on the same hill).
+
+Not checked: a dropped socket in a real browser (the browser walk's offline switch did not show the socket closing; the Node test covers the rejoin path); any match between two people; a phone on a mobile network; High Summer in a room; a match with four people; the cost of hashing on a slow phone.
 
 ## First steps and what goes with you (war build)
 
@@ -1383,4 +1385,4 @@ From the owner's list: "tutorial need" and "confusing inter mission progress".
 | Recording | Lab event `guide` with the step and tick at each step, and `end: done` or `skip`. | So the next read shows where people stop. |
 | Between missions | A panel on the end screen, "What goes with you": campaign count, whether this nest is kept and which mission starts in it, what the Lineage gained, and what is not kept. | The end screen listed deeds but never said what carries over. |
 
-Checked: the guide advanced through all six steps on state alone with the machine playing the seat, and wrote its key; the panel read correctly after a won Crossing (414×774 touch, Chromium). Not checked: a person following the steps by hand; whether six steps is the right number.
+Checked: by hand on the live page the card held at 1 of 6 for 220 idle ticks, moved to 2 on one touch-drawn forage trail, and sat behind the pause screen; with the machine playing the seat it went through all six and wrote its key. A step done out of turn now counts (opening the Nest early left the card on step 2 before); the panel read correctly after a won Crossing (414×774 touch, Chromium). Not checked: a person following the steps by hand; whether six steps is the right number.
