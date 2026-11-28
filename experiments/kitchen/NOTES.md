@@ -224,3 +224,24 @@ One cold read of the sheet on a third family (three screenshots, no context) rea
 
 Open after this slice: a tray parked at one side still takes 227 at the Bistro, above the one-star target of 180, so doing one thing and stopping earns a star; cells of +1 to +7 in the table are probably inside seed noise (no paired spread was printed); a wheel use in a Rush also counts toward the ordinary day's wheel missions (left in on purpose, not measured); only one action type a shift was measured, never a mix (for example a won fight then Rob on the same guest); a shaking ticket (low patience) is a moving target for a finger.
 
+### The adaptive-rule gate: parked after three trials (2026-11-28)
+
+The design reviews set a gate: some rule that reads the room should beat every fixed plan for whose dish to build. Three rules have now been tried with `measure.mjs order` (60 seeds, ranks 2, 4 and 7, both cooks): `mixed` (slice 1), `slack` (earliest deadline among guests who can still be saved) and `worth` (coins a second of work left, switching to most impatient when the buzz or the strikes are high).
+
+| Coins a shift | Rank 2 good | Rank 2 new | Rank 4 good | Rank 4 new | Rank 7 good | Rank 7 new |
+|---|---|---|---|---|---|---|
+| most impatient | 357 | 211 | 676 | 388 | 1156 | 650 |
+| no plan | 355 | 225 | 632 | 353 | 1073 | 596 |
+| best payer | 305 | 222 | 621 | 383 | 1147 | 627 |
+| mixed | 343 | 225 | 584 | 380 | 1106 | 623 |
+| slack | 344 | 217 | 647 | 369 | 1172 | 652 |
+| worth | 334 | 223 | 598 | 394 | 1129 | 642 |
+
+No adaptive rule beats "most impatient" by more than 2% anywhere, and each loses to it somewhere. Having a plan matters from rank 4 up (7 to 10% over no plan); which sensible plan matters little. Per the stop rule this question is parked until a person's shift can be read. What would reopen it: a recorded shift where the person lets a guest go on purpose, or a seat rule that makes refusing a guest cheaper than losing one.
+
+### A still tray and a parked tray at every rank (2026-11-28)
+
+The slice 1 check ran a still tray at three ranks. Run at all eleven, it took 202 to 584 coins at the top four ranks and sometimes a star: from rank 7 a gust slides the whole sky sideways and carried one side of every pair onto the tray. Gusts are now off in a Rush, a still tray takes nothing at any rank, and `bots.mjs` asserts it for every rank on three seeds. Targets at the top four ranks were rechecked and stand.
+
+A tray parked at one side with a good cook behind it still averages 0.7 to 1.1 stars at every rank (for example 209 coins against a one-star target of 180 at rank 2). Left as it is: the first star is set near a new cook's lower quartile, and catching one side of every pair while cooking well is about that good. Open for the owner if one star should demand more.
+

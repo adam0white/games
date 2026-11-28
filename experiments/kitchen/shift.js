@@ -36,6 +36,7 @@ export const priceOf = (save, recipe) => Math.round(sim.RECIPES[recipe].price * 
 // scare: rob has no witnesses. buzz: no buzz pay.
 export function newShift({ save, seed = 1, off = {} }) {
   const sky = sim.newCatch({ need: {}, hard: sim.hardness(save), trayLevel: save.built.tray, seed: seed ^ 0x736b79, twist: sim.twistFor(save.tier) });
+  if (sky.twist?.gust) sky.twist = { ...sky.twist, gust: 0 };   // a gust slides the whole sky sideways, which carries one side of every pair onto a tray that never moved
   sky.shared = true; sky.next = 1e9;   // the shift drops its own forks (dropFork); the catch's own spawner stays off
   return {
     save, seed, off, r: sim.rng(seed ^ 0x52757368), t: 0, doors: true, over: false,
