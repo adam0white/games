@@ -175,6 +175,7 @@ export const TUNE = {
   drift: { from: 4, amp: 0.12 },                       // sideways sway from this hardness
   pairsFrom: 5,         // two items at once from this hardness
   payBase: 2, payPerTier: 3,                           // coins to toss an extra and keep going
+  catchBand: 0.07,      // ... and for this much lower it can still be scooped by a tray that arrives late (the owner, 2026-11-28)
   catchY: 0.085,        // an item lands on the tray when its bottom reaches the tray top (drawn 0.12 world units low)
   golden: 0.07,         // chance a guest (after the first, from the diner on) orders a golden recipe
   patience: 40,         // seconds a guest waits happily for the catch; then the tip shrinks
@@ -186,9 +187,11 @@ export function rng(seed) { let a = seed >>> 0 || 1; return () => { a = a + 0x6D
 
 // ---------- the catch
 // need: { id: count }. Options: hard, trayLevel, seed, tutorial (only needed items, slower).
-export function newCatch({ need, hard = 0, trayLevel = 1, seed = 1, tutorial = false, pool = null, twist = null }) {
-  const fall = Math.min(TUNE.fall.max + (twist?.fall ?? 0), TUNE.fall.base + TUNE.fall.perHard * hard) * (tutorial ? 0.8 : 1);
-  const every = Math.max(TUNE.every.min, TUNE.every.base + TUNE.every.perHard * hard) * (tutorial ? 1.1 : 1);
+// speed: the Pace setting. Things fall this much faster and come this much sooner (a tutorial catch ignores it).
+export function newCatch({ need, hard = 0, trayLevel = 1, seed = 1, tutorial = false, pool = null, twist = null, speed = 1 }) {
+  if (tutorial) speed = 1;
+  const fall = Math.min(TUNE.fall.max + (twist?.fall ?? 0), TUNE.fall.base + TUNE.fall.perHard * hard) * (tutorial ? 0.8 : 1) * speed;
+  const every = Math.max(TUNE.every.min, TUNE.every.base + TUNE.every.perHard * hard) * (tutorial ? 1.1 : 1) / speed;
   const extraShare = tutorial === 'first' ? 0 : Math.min(TUNE.extra.max, TUNE.extra.base + TUNE.extra.perHard * hard);
   const others = (pool ?? Object.keys(ING)).filter(id => !(id in need));
   if (hard >= TUNE.junkFrom) others.push(...Object.keys(JUNK));
@@ -238,7 +241,7 @@ export function stepCatch(c, trayX, dt = DT) {
     it.y -= it.vy * dt;
     const gust = c.twist?.gust ? c.twist.gust * Math.sin(c.t * 0.9) : 0;
     if (it.drift || gust) it.x = Math.max(-TUNE.lane + TUNE.size, Math.min(TUNE.lane - TUNE.size, it.x0 + it.drift * Math.sin(c.t * 2.2 + it.phase) + gust));
-    if (prevY > TUNE.catchY && it.y <= TUNE.catchY) {
+    if (prevY > TUNE.catchY - TUNE.catchBand && it.y <= TUNE.catchY) {   // crossing the tray top, or still within the band under it
       if (Math.abs(it.x - c.x) <= c.half + TUNE.size * 0.5) {
         const wanted = !isJunk(it.id) && (c.got[it.id] ?? 0) < (c.need[it.id] ?? 0);
         it.state = 'caught'; it.dx = it.x - c.x; c.caught++;

@@ -58,10 +58,10 @@ button.small { min-width: 0; font-size: 15px; }
 #patience { height: 6px; border-radius: 3px; background: #e9dcc5; margin-top: 4px; overflow: hidden; }
 #patience i { display: block; height: 100%; width: 100%; background: var(--green); transform-origin: 0 0; }
 
-#gauge { position: fixed; left: calc(206px + env(safe-area-inset-left)); right: calc(14px + env(safe-area-inset-right)); max-width: 380px; bottom: calc(30px + env(safe-area-inset-bottom)); height: 40px; border: 3px solid var(--ink); border-radius: 18px; background: linear-gradient(90deg, #ffe9b0, #ffb347 55%, #8a3b12 95%); display: none; box-shadow: 0 4px 0 var(--shade); pointer-events: none; }
+#gauge { position: fixed; left: calc(16px + env(safe-area-inset-left)); right: calc(16px + env(safe-area-inset-right)); max-width: 460px; margin: 0 auto; top: calc(var(--gt, 84px) + env(safe-area-inset-top)); height: 46px; border: 3px solid var(--ink); border-radius: 18px; background: linear-gradient(90deg, #ffe9b0, #ffb347 55%, #8a3b12 95%); display: none; box-shadow: 0 4px 0 var(--shade); pointer-events: none; }
 #gaugeBand { position: absolute; top: 0; bottom: 0; background: #4caf50cc; border-left: 3px solid var(--ink); border-right: 3px solid var(--ink); }
 #gaugeNeedle { position: absolute; top: -10px; bottom: -10px; width: 6px; margin-left: -3px; background: var(--ink); border-radius: 3px; }
-#gaugeLabel { position: absolute; left: 0; right: 0; top: -30px; text-align: center; font-weight: 900; font-size: 18px; color: #fff; -webkit-text-stroke: 1px var(--ink); text-shadow: 0 2px 0 var(--ink); }
+#gaugeLabel { position: absolute; left: 0; right: 0; top: 0; line-height: 40px; text-align: center; font-weight: 900; font-size: 17px; color: #fff; -webkit-text-stroke: 1px var(--ink); text-shadow: 0 2px 0 var(--ink); }
 #gauge.taps { background: #e5f4ff; }
 #gauge.taps #gaugeBand { background: linear-gradient(90deg, #ff8fb1, #ff5d8f); border: 0; left: 0; }
 
@@ -220,7 +220,9 @@ button.small { min-width: 0; font-size: 15px; }
 #rail .chip.gap { visibility: hidden; }
 #rail .chip { cursor: pointer; touch-action: none; position: relative; } #rail .chip.iced { background: #d9f1ff; }
 #rail .chip { width: 70px; background: #fffdf5; border: 2.5px solid var(--ink); border-top: 9px solid var(--c); border-radius: 10px; padding: 2px 3px 4px; box-shadow: 0 3px 0 var(--shade); display: flex; flex-direction: column; gap: 2px; align-items: center; }
-#rail .chip.rich { background: #fff3c2; } #rail .chip.hot { animation: rushPulse .35s infinite alternate; } #rail .chip.ready { background: #d9ffd9; }
+#rail .chip.rich { background: #fff3c2; } #rail .chip.hot { animation: rushPulse .35s infinite alternate, rushBlink .45s steps(1) infinite; }
+@keyframes rushBlink { 50% { background: #ffd0d0; border-color: #d8262c; box-shadow: 0 0 0 3px #ff5a5a, 0 3px 0 var(--shade); } }
+@media (prefers-reduced-motion: reduce) { #rail .chip.hot { animation: none; background: #ffd0d0; border-color: #d8262c; } } #rail .chip.ready { background: #d9ffd9; }
 #rail .top { display: flex; align-items: center; gap: 2px; width: 100%; justify-content: space-between; } #rail .top img { width: 26px; height: 26px; } #rail .top b { font-size: 12px; display: inline-flex; align-items: center; gap: 1px; } #rail .top .coin { width: 10px; height: 10px; }
 #rail .need { display: flex; flex-wrap: wrap; justify-content: center; gap: 1px; min-height: 20px; } #rail .need img { width: 19px; height: 19px; opacity: .62; filter: grayscale(.45); } #rail .need img.got { opacity: 1; filter: none; background: var(--c); border-radius: 50%; }
 #rail .pat { width: 94%; height: 7px; border: 2px solid var(--ink); border-radius: 6px; overflow: hidden; background: #fff; } #rail .pat i { display: block; height: 100%; transform-origin: left; background: #6fd36f; }
@@ -230,6 +232,11 @@ button.small { min-width: 0; font-size: 15px; }
 #rushRow button { position: relative; display: inline-flex; flex-direction: column; align-items: center; line-height: 1.15; } #rushRow small { color: #e89a00; }
 #nights button.fresh::after { content: ''; position: absolute; top: -5px; right: -5px; width: 12px; height: 12px; border-radius: 50%; background: #ff5a5a; border: 2px solid var(--ink); }
 body.rush #banner { top: calc(150px + env(safe-area-inset-top)); }
+/* The cooking meter sits at the top (under the tickets in a Rush); while it shows, the banner drops under it. */
+body.rush { --gt: 164px; } body.rush.mis { --gt: 196px; }
+body.gauge #banner { font-size: 1.6em; }
+body.gauge #coach, body.rush.sky.gauge #coach { top: calc(var(--gt, 84px) + 112px + env(safe-area-inset-top)); }
+body.gauge #banner, body.rush.gauge #banner, body.rush.mis.gauge #banner { top: calc(var(--gt, 84px) + 56px + env(safe-area-inset-top)); }
 #rushNerve { font-size: 13px; }
 #acts { position: fixed; inset: 0; background: rgba(20, 12, 8, 0.5); display: none; z-index: 20; align-items: flex-end; justify-content: center; }
 #actsCard { position: relative; width: min(100vw, 480px); max-height: 100dvh; overflow-y: auto; box-sizing: border-box; background: var(--paper); border: 3px solid var(--ink); border-bottom: 0; border-radius: 18px 18px 0 0; padding: 10px 10px calc(12px + env(safe-area-inset-bottom)); box-shadow: 0 -4px 0 var(--shade); }
