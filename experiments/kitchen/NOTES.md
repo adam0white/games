@@ -203,14 +203,16 @@ Not shown: that a person finds the sheet, reads eleven buttons under pressure, o
 
 ### Cold first play (2026-11-28, slice 1 build)
 
-Seven phone screenshots of a Rush went to a reviewer on another model family with no other information. It read the mode, the clock, the tickets, the rings and the end card correctly. Findings, to fix in the next stop-adding pass:
+Seven phone screenshots of a Rush went to a reviewer on another model family with no other information. It read the mode, the clock, the tickets, the rings and the end card correctly. Six findings, all addressed the same day in the stop-adding pass and rechecked by playing a first-ever Rush in a browser and recording every hint and message:
 
-1. Control: the menu only explains mouse and keys; nothing on the first Rush screen says to drag the tray. (The screenshots came from a browser without touch, so recheck the menu text on a touch phone before fixing.)
-2. Control: nothing says what to do at the cooking step unless the hint has been seen in an ordinary day.
-3. Cost: the three dots read as strike slots only after one is lost, and nothing says what caused a strike.
-4. Cost: it could not tell whether a wrong catch or a miss costs anything.
-5. Progress: shift takings and the wallet share look like one number; the next star's target is not shown during play.
-6. It could not tell what the ticket's coloured top, the eyes or the diamond mean.
+1. Control: nothing on the first Rush screen said to drag the tray. Fixed: the first two shifts open with "Drag the tray under a ringed thing" (mouse and keys wording on a desktop); the rules line comes after the first catch. (The reviewer's screenshots came from a browser without touch, so its remark about the menu text was not checked on a phone.)
+2. Control: nothing said what to do at the cooking step. Fixed: each cooking step shows its one-line hint for the first two shifts.
+3. Cost: nothing said what caused a strike. Fixed: a walkout, a robbery and a lost fight each say "Strike n of 3".
+4. Cost: it could not tell what a wrong catch costs. Fixed: the wrong catch says it costs one buzz, and says so when it also knocked something off the tray.
+5. Progress: shift takings and the wallet share looked like one number. Changed: the end card's row reads "Your share (a quarter)". The next star's target was already the second number beside the coins.
+6. It could not tell what the diamond and the eyes mean. Fixed: the first time each kind of guest arrives, one line says what it does.
+
+Not rechecked by a cold reader yet. The first screen still stacks the banner, the hint and the tickets in the top half.
 
 ### Review of slice 2
 
