@@ -366,6 +366,7 @@ export async function createView(canvas, lookId) {
   };
   const cam = { pos: new THREE.Vector3(0, 3, 9), at: new THREE.Vector3(0, 1, 0), wantPos: new THREE.Vector3(), wantAt: new THREE.Vector3(), name: 'menu', shake: 0, orbit: 0, bias: 0 };
   let W = 1, H = 1;
+  const WIDE = 0.6, wide = () => (canvas.clientWidth || innerWidth) / (canvas.clientHeight || innerHeight) > WIDE;   // measured now, not at the last resize
   let catchRoom = 1; const catchUp = 0.03;   // with room: the tray near the middle of the screen, guests under it
   function setRoom(k) { if (k === catchRoom) return; catchRoom = k; if (cam.name === 'catch') view('catch'); }
   function framing(name) {
@@ -377,9 +378,10 @@ export async function createView(canvas, lookId) {
     if (name !== 'catch' && aspect < 0.8) at.y -= v.half[0] / aspect * 0.18 * (name === 'room' || name === 'menu' ? 0.4 : 1);
     if (name === 'catch') {
       // The lane fills the screen whatever its shape: the tray a quarter up from the bottom, items from near the top.
-      const visH = Math.max(2 * v.half[1] * catchRoom, 2 * v.half[0] / aspect) * 1.04;   // catchRoom: a wide screen steps back so guests under the tray show
-      LANE.h = visH * 0.6 / 1.15; at.y = LANE.y0 + visH * (catchRoom > 1 ? catchUp : 0.2);
-      const d = Math.max(v.half[1] * catchRoom, v.half[0] / aspect) * 1.04 / Math.tan(fovY);
+      const room = aspect > WIDE ? catchRoom : 1;   // only a screen that is not a tall phone needs it; checked here so a turned phone is right at once
+      const visH = Math.max(2 * v.half[1] * room, 2 * v.half[0] / aspect) * 1.04;   // catchRoom: a wide screen steps back so guests under the tray show
+      LANE.h = visH * 0.6 / 1.15; at.y = LANE.y0 + visH * (room > 1 ? catchUp : 0.2);
+      const d = Math.max(v.half[1] * room, v.half[0] / aspect) * 1.04 / Math.tan(fovY);
       return { pos: at.clone().addScaledVector(dir, d), at };
     }
     return { pos: at.clone().addScaledVector(dir, dist), at };
@@ -580,7 +582,7 @@ export async function createView(canvas, lookId) {
   resize(); view('menu', true);
   return {
     THREE, scene, camera, renderer, world, food, item, furniture, tray, register, board, knife, knifeLift, pan, panR, panGlow, micro, microLight, microGlass, blender, sign,
-    memory: () => ({ ...renderer.info.memory, parts: parts.length }), setRoom, guest, guestAt, walkTo, guests, stunt, staffSpots: STAFF_SPOTS, waitSpots: WAIT_SPOTS, view, cam, frame, resize, burst, steam, toScreen, toPlane, toY, setLook, setRestaurant, thumb, popIn,
+    memory: () => ({ ...renderer.info.memory, parts: parts.length }), setRoom, wide, guest, guestAt, walkTo, guests, stunt, staffSpots: STAFF_SPOTS, waitSpots: WAIT_SPOTS, view, cam, frame, resize, burst, steam, toScreen, toPlane, toY, setLook, setRestaurant, thumb, popIn,
     get look() { return look; }, peopleReady,
     shake(n = 1) { cam.shake = Math.max(cam.shake, n); },
     flashThumbs() { thumbCache.clear(); },

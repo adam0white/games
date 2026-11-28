@@ -812,7 +812,7 @@ async function arrive() {
   if (me !== day || !day.line.includes(e)) { if (m) m.gone = true; return; }
   e.model = m; if (!m) return; m.speed = 2.6;
   const [x, z] = art.waitSpots[spot];
-  art.walkTo(m, x, z, () => { if (!day.line.includes(e)) return; m.face = Math.PI; m.play('idle'); m.bubble.show(art.thumb(dishModel(p.recipe)), p.mood ?? 'want'); });
+  art.walkTo(m, x, z, () => { if (me !== day || !day.line.includes(e)) return; m.face = Math.PI; m.play('idle'); m.bubble.show(art.thumb(dishModel(p.recipe)), p.mood ?? 'want'); });
 }
 function callGuest(e) {
   if (phase !== 'pick' || !day.line.includes(e)) return;
@@ -1121,13 +1121,16 @@ const WIDE_TALL = 0.66, WIDE_ROOM = 1.2;   // a screen wider than tall: smaller 
 let peopleGen = 0, ringGeoP = null, haloGeo = null, TALL = 1.0;
 const haloMat = [];
 const peopleOn = () => opts.get('people') === 'on';
+// A turned phone or a resized window: guests are built at one height, so build them again.
+addEventListener('resize', () => { if (rush && people.size && TALL !== (art.wide() ? WIDE_TALL : 1.0)) { clearPeople(); syncPeople(); } });
 function clearPeople() { peopleGen++; art.setRoom(1); for (const p of people.values()) { if (p.m) p.m.gone = true; dropSpot(p); } people.clear(); }
 function dropSpot(p) { if (p.ring) { art.world.remove(p.ring); p.ring.material.dispose(); p.ring = null; } }
 // Called whenever the line changes: new guests walk in, guests no longer in the line go.
 function syncPeople() {
   const s = rush; if (!s) return;
-  if (!peopleOn()) { if (people.size) clearPeople(); return; }   // switched off, here or in another tab
-  if (!people.size) { const wide = innerWidth > innerHeight; TALL = wide ? WIDE_TALL : 1.0; art.setRoom(wide ? WIDE_ROOM : 1); }
+  if (!peopleOn()) { clearPeople(); return; }   // switched off, here or in another tab
+  if (!people.size) TALL = art.wide() ? WIDE_TALL : 1.0;
+  art.setRoom(WIDE_ROOM);
   for (const e of s.line) if (!people.has(e.n)) addPerson(e);
   for (const p of people.values()) if (p.state !== 'out' && !s.line.includes(p.e)) personOut(p, p.how ?? (s.at === p.e ? 'cook' : 'walk'));
 }
@@ -1186,7 +1189,7 @@ function stepPeople() {
   // On a wide screen the floor is out of view: lift everyone until the face shows, but never over the tray.
   if (people.size && phase === 'sky' && art.cam.name === 'catch' && art.cam.pos.distanceTo(art.cam.wantPos) < 0.02 && clock - liftAt > 0.5) {
     liftAt = clock; const V = art.THREE.Vector3, trayPx = art.toScreen(new V(0, LANE.y0 - 0.14, LANE.z)).y; let best = 0;
-    for (let l = 0; l <= 0.9; l += 0.03) { if (art.toScreen(new V(0, l + TALL * 1.16, SEAT_SPOT[0][1])).y < trayPx + 14) break; best = l; if (art.toScreen(new V(0, l + TALL * (innerWidth > innerHeight ? 0.25 : 0.5), SEAT_SPOT[0][1])).y <= innerHeight - 4) break; }
+    for (let l = 0; l <= 0.9; l += 0.03) { if (art.toScreen(new V(0, l + TALL * 1.16, SEAT_SPOT[0][1])).y < trayPx + 14) break; best = l; if (art.toScreen(new V(0, l + TALL * (art.wide() ? 0.25 : 0.35), SEAT_SPOT[0][1])).y <= innerHeight - 4) break; }
     lift = best;
   }
   for (const p of people.values()) {

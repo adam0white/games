@@ -401,8 +401,8 @@ and sent with each shift's start record. Rules, pay and bots are unchanged.
    about 0.3 world units show under the tray there, so only hair and rings show and no eyes. A ring was also drawn over
    the tray line in 111 to 135 samples a shift, because the lift was worked out while the camera was still moving; it
    now waits for the camera to settle, and the last wide walk had none in three shifts. Two retunes (people at 0.66 and at 0.5 of phone height) did not fix it; stopped under
-   the stop rule and kept 0.66. A wide screen needs a different staging (people beside the tray, or a lower camera), not
-   a smaller person.
+   the stop rule and kept 0.66. Fixed later the same day by moving the camera, not the person: see "Wide screens,
+   third attempt" below.
 3. Median frame time 16.7 ms and 95th percentile 16.7 to 16.8 ms with people on and off. The test page is capped at
    60 frames a second, so this shows no drop on this machine and nothing about a slow phone.
 4. Passed.
@@ -427,15 +427,25 @@ out (it read as a knockout; now a head shake); tickets drawn over the pause card
 playing).
 
 **Not shown.** No person has played with the people on. Whether they make the choice of guest feel more like a choice
-is the open question for the owner. The wide-screen staging is open.
+is the open question for the owner.
 
 **Wide screens, third attempt (same day).** The first two retunes shrank the person. The cause was the camera: the
-catching view puts the tray a fifth of the way up whatever the screen, and a wide screen is short, so almost nothing
-shows under it. Stepping the camera back alone changed nothing (the fifth stays a fifth). What worked: on a screen wider
-than tall, with Guests shown, the catching camera steps back by a fifth and aims lower so the tray sits near the middle,
-and guests are lifted until their shoulders show. Faces show at 1280 by 720, 844 by 390, 1024 by 768 and 1920 by 1080.
-Walks at 1280 by 720 and 844 by 390: no ring over the tray in three shifts each, all nine wheel actions accepted, models
-zero after quit, no errors. Phones are untouched (the step back is 1 there). Line 2 of the pass line now passes.
-Cost, for the owner to judge: on a wide screen a Rush with Guests shown has a smaller tray and food than an ordinary
-day, and food starts behind the tickets. Tickets only gives the old view. A guest walking in passes close to the camera
-on a wide screen and fills a corner for a moment.
+catching view puts the tray a fifth of the way up whatever the screen, and a short screen shows almost nothing under
+it. Stepping the camera back alone changed nothing (the fifth stays a fifth). What worked: on any screen wider than 0.6
+of its height (landscape, tablets, desktop windows), with Guests shown, the catching camera steps back by a fifth and
+aims lower so the tray sits near the middle, and guests are lifted until their shoulders show. Tall phones are
+untouched. Line 2 of the pass line now passes at the sizes staged: faces show at 1280 by 720, 1920 by 1080, 1024 by
+768, 844 by 390, 768 by 1024, 800 by 900 and 600 by 900. Full walks at 1280 by 720, 844 by 390, 768 by 1024 and 320 by
+568: no ring over the tray in three shifts each, all nine wheel actions accepted, models zero after quit, no errors.
+
+Also checked on a wide screen: the tray is back at its ordinary height in an ordinary day after a Rush is quit, after
+Guests is switched off, and when a Rush starts with Guests off; switching Guests on mid-shift moves the camera and
+lifts the guests; pause during a stunt keeps the spark count flat. Turning a phone mid-shift, both ways, rebuilds the
+guests at the right height (they walk in again). That walk also found a page error older than this slice: quitting an
+ordinary day while a guest was still walking in. Fixed.
+
+Cost, for the owner to judge: on a wide screen a Rush with Guests shown has a tray and food about a fifth smaller than
+an ordinary day, and food now starts at the top edge of the screen, so in the middle fifth of the width it is behind
+the tickets for roughly the first third of its fall (an estimate from the layout, not measured; bots cannot see it).
+Tickets only gives the old view. A guest walking in passes close to the camera on a wide screen and fills a corner for
+a moment.
