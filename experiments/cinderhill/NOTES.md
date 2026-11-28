@@ -1349,3 +1349,24 @@ What changed:
 Lab events: `build` now carries `cost` and `seeds`; `nestPinch` counts strokes a second finger cut short. The setting is in the run's start record.
 
 Seen in a phone-size browser with touch events (Chromium, 414 by 774): a pinch that began as a one-finger stroke marked nothing and zoomed; a stroke showed its label; the waiting line and the soldier line appeared. Not seen: a person using it.
+
+## Rooms for the war build: experimental multiplayer
+
+The owner asked for experimental multiplayer with two or more players and the ability to add bots, and offered bots that connect like real players for testing the server.
+
+| Decision | Taken | Why |
+| --- | --- | --- |
+| Where the sim runs | In every page, in lockstep. The room (`workers/cinderhill`, war mode) only orders and relays commands and compares hashes. | The war sim is already integer and deterministic; the room server already did this for the hill game. No sim code runs on the server. |
+| Seats | Up to four players on the two hills, in any split (versus, or together against a machine). | The sim has two colonies (`TEAMS = 2`). Three or more colonies is a sim change and is not built. |
+| Rules of a room | All from the link: `room`, `mission`, `bot` (machine rival mood), `botSide`, `side`. Seed from the code. `roomSim()` folds mission and bot into the number the room checks at join. | Two pages with different links would build different worlds; the room now sends the second one away (close 4005) instead of letting them drift. |
+| What a room leaves out | Lineage traits, growth settings, carried hill, visitor, day and falls settings, speed, restart. Campaign, deeds and road are not saved from a room. | Each of these is per-device state that would differ between pages. |
+| Start | A lobby: the sim waits for a `START` command on the wire. Any seat may start. | A match that starts when the first page loads leaves the second player a minute behind. |
+| Pause | Opens settings only. The room does not wait; the page says so. | A shared pause needs a rule about who may hold the room; not built. |
+| Colours | Your hill is always orange and labelled HOME, whichever colony you play. | First far-side screenshot showed the player's own nest labelled RIVAL. |
+| Lag | A page more than two ticks behind runs extra ticks; more than forty behind, up to 400 a frame. | Wire bots sat 20 ticks behind before this (a second of input delay). |
+
+Machine players come two ways. `bot=` in the link runs the rival inside every page's sim (no network). `workers/cinderhill/loadtest/warbot.mjs` is a Node seat that joins a room over a WebSocket like a page and plays through the wire; it fills a hill in a room people are in, or loads the server with many rooms.
+
+Checked: 6 room tests in Node (round trip, two wire bots for 6000 ticks, late joiner, lost order noticed, other rules sent away, replay without a room). In browsers through a local room: Chromium page, WebKit page and a Node wire bot in one room for 1670 ticks, 158 hashes compared, 0 mismatches; a page whose network dropped for 4 s caught up with 0 mismatches; versus, co-op and a wire bot on the far hill each reached play on every page.
+
+Not checked: any match between two people; a phone on a mobile network; a match played to its end screen in a room; High Summer in a room; more than three seats; the cost of hashing on a slow phone.

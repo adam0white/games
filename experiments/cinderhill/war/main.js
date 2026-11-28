@@ -1,6 +1,8 @@
 // Cinderhill: The Crossing. The page for the war sim (./sim.js): two colonies on one hill. No game rule lives here:
 // everything on screen is read from the sim or its events, and every order goes through host.order() under seat 0.
 import { Host } from './host.js';
+import { NetHost, roomLink, roomSeed, roomOptions, roomSim } from './wire.js';
+import { newCode, cleanCode, shareLink } from '../../kit/room.js';
 import { CMD, KIND, MODE, CG, EVENT, REASON, TASK, CASTE, STAGE, MAT, ROOM, TRAILS, PATH_MAX, MAX_PILES, C, LEVEL_SHARE, RAID_SHARE, PLUG, PEST } from './sim.js';
 import { CAMPAIGN, LINEAGE, LOSS_ANTS, MISSIONS, TRAITS, TIERS, BRANCH, ROAD, VISITOR } from './tables.js';
 import { makeGestures } from '../gestures.js';
@@ -15,7 +17,11 @@ import { settings } from '../../kit/settings.js';
 noZoom();
 const $ = id => document.getElementById(id);
 const query = new URLSearchParams(location.search);
-const ME = 0, FOE = 1;
+// A friends' room (experimental): ?room=CODE joins it, &side=1 takes the far hill, &bot=0|1|2 lets the machine play the hill
+// nobody on this link plays. Everything that shapes the sim comes from the link, so every page builds the same hill.
+const NET = cleanCode(query.get('room')), NET_BOT = NET && /^[012]$/.test(query.get('bot') ?? '') ? Number(query.get('bot')) : null;
+const ME = NET && query.get('side') === '1' ? 1 : 0, FOE = 1 - ME;
+const ROOM_URL = /^wss?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(query.get('roomHost') ?? '') ? query.get('roomHost') : 'wss://games-cinderhill.adamwhite.workers.dev';
 
 // ---- recording and settings: every taste choice is a setting with a default, and each change is recorded ----
 const rec = lab('cinderhill', { lang: () => 'en' });
@@ -40,11 +46,11 @@ const set = settings('cinderhill', {
 const LABEL = { caste: 'Your third caste', rival: 'Rival', view: 'View', light: 'Light', style: 'Style', size: 'Ants', sound: 'Sound', finger: 'One finger', nest: 'The Nest', forks: 'Forks', growth: 'The tree', home: 'The home hill', visitor: 'The weevil', day: 'High Summer: length', falls: 'High Summer: windfalls' };
 const NAME = { full: 'Fills the screen', sheet: 'Slides over the lower half', 12: 'Twelve minutes', 20: 'Twenty minutes', 30: 'Thirty minutes', lean: 'Lean: a third less falls', fair: 'Fair', rich: 'Rich: half as much again', comes: 'Comes for your stores', hungry: 'Comes hungry, and harder to kill', never: 'Never comes', carried: 'Kept from mission to mission', bare: 'A new hill every mission', mission: 'Grow the hill in each mission', deeds: 'Deeds alone open tools (no growth)', spitter: 'Spitters', warden: 'Wardens', timid: 'Timid', steady: 'Steady', bold: 'Bold', tilt: 'Tilted', top: 'Top down', low: 'Low', cycle: 'Day to dusk', day: 'Day', ember: 'Ember', relief: 'Painted', ink: 'Ink', 1: 'True size', 1.5: 'Larger', hill: 'Draws from your hill, moves the view elsewhere', draw: 'Always draws', kept: 'Kept for the campaign', free: 'Can be changed between missions', all: 'Music & effects', fx: 'Effects', off: 'Off' };
 const MOOD = { timid: 0, steady: 1, bold: 2 };
-const redraw = set.panel($('settings'), { only: set.ids.filter(id => id !== 'caste'), label: id => LABEL[id], name: (id, v) => NAME[v] ?? v, what: (id, v) => (id === 'caste' ? (v === 'spitter' ? 'Frail, but they spit from two cells away, over the front line. Applies from the next start.' : 'Slow and very hard to kill: they hold a tunnel. Applies from the next start.') : id === 'rival' ? (v === 'timid' ? 'It never attacks your hill. Applies from the next start.' : v === 'bold' ? 'It raids early, even at even odds. Applies from the next start.' : 'It holds the fords, and raids when it has the numbers. Applies from the next start.') : id === 'growth' ? (v === 'mission' ? 'Each mission you widen the queen\'s chamber, choose a War hill or a Deep hill, and grow into your tools. Applies from the next start.' : 'No growth: what your deeds have opened is yours from the first minute. Applies from the next start.') : id === 'home' ? (v === 'carried' ? 'First Frost, The Stones and The Larder are fought on the hill of The Crossing. Each starts in the nest as you left it, tunnels, stores and nurseries, and the rival starts in its own. Quarters come back as bare tunnels to paint again. Applies from the next start.' : 'Every mission starts in the same small nest. Applies from the next start.') : id === 'visitor' ? (v === 'never' ? 'No weevil in any mission. Applies from the next start.' : `In First Frost a weevil comes in at each door ${VISITOR[v].at.length} times and eats up to ${VISITOR[v].fill} seeds a visit from stores within ${VISITOR[v].reach} steps of the door. Applies from the next start.`) : null), onChange: (id, v) => { if (id === 'forks' || id === 'home' || id === 'visitor') renderPath(); if (id === 'sound') { if (v === 'off') snd.hold(); else { snd.release(); startSong(); } } tone(660, 0.06, 0.03, 'triangle', 80); } });
+const redraw = set.panel($('settings'), { only: set.ids.filter(id => id !== 'caste' && !(NET && ['rival', 'forks', 'growth', 'home', 'visitor', 'day', 'falls'].includes(id))), /* a room's rules come from its link, the same for every page */ label: id => LABEL[id], name: (id, v) => NAME[v] ?? v, what: (id, v) => (id === 'caste' ? (v === 'spitter' ? 'Frail, but they spit from two cells away, over the front line. Applies from the next start.' : 'Slow and very hard to kill: they hold a tunnel. Applies from the next start.') : id === 'rival' ? (v === 'timid' ? 'It never attacks your hill. Applies from the next start.' : v === 'bold' ? 'It raids early, even at even odds. Applies from the next start.' : 'It holds the fords, and raids when it has the numbers. Applies from the next start.') : id === 'growth' ? (v === 'mission' ? 'Each mission you widen the queen\'s chamber, choose a War hill or a Deep hill, and grow into your tools. Applies from the next start.' : 'No growth: what your deeds have opened is yours from the first minute. Applies from the next start.') : id === 'home' ? (v === 'carried' ? 'First Frost, The Stones and The Larder are fought on the hill of The Crossing. Each starts in the nest as you left it, tunnels, stores and nurseries, and the rival starts in its own. Quarters come back as bare tunnels to paint again. Applies from the next start.' : 'Every mission starts in the same small nest. Applies from the next start.') : id === 'visitor' ? (v === 'never' ? 'No weevil in any mission. Applies from the next start.' : `In First Frost a weevil comes in at each door ${VISITOR[v].at.length} times and eats up to ${VISITOR[v].fill} seeds a visit from stores within ${VISITOR[v].reach} steps of the door. Applies from the next start.`) : null), onChange: (id, v) => { if (id === 'forks' || id === 'home' || id === 'visitor') renderPath(); if (id === 'sound') { if (v === 'off') snd.hold(); else { snd.release(); startSong(); } } tone(660, 0.06, 0.03, 'triangle', 80); } });
 
 // ---- the game ----
 const qSeed = Math.floor(Number(query.get('seed')));
-let seed = qSeed > 0 ? qSeed : 1 + Math.floor(Math.random() * 9999);
+let seed = NET ? roomSeed(NET) : qSeed > 0 ? qSeed : 1 + Math.floor(Math.random() * 9999);
 const PICK = { spitter: CASTE.SPITTER, warden: CASTE.WARDEN };
 // A rival that fights takes the caste you did not. Both are set when the run starts, so the menu's settings count.
 // The campaign: what has been played to its end, and the forks taken. Its own key; nothing else reads it.
@@ -114,7 +120,7 @@ const visitorOf = id => (MISSIONS[id].visitor && set.get('visitor') !== 'never' 
 // A long mission (High Summer): its length and how much falls are settings. Noon, when the truce ends, stays at two fifths of the day.
 const FALLS = { lean: 2, fair: 3, rich: 4.5 };
 const longOpts = id => { const m = MISSIONS[id]; if (!m.long) return {}; const duskTick = +set.get('day') * 1200, f = FALLS[set.get('falls')] / 3, fl = m.kit.falls; return { duskTick, truce: Math.round(duskTick * 0.4), falls: { ...fl, amount: Math.round(fl.amount * f), mid: Math.round(fl.mid * f) } }; };
-const newHost = () => new Host({ seed, mission: missionId, ...lateOpts(missionId), ...longOpts(missionId), ...(visitorOf(missionId) ? { pest: visitorOf(missionId) } : {}), ...(hillOf(missionId) ? { nests: hillOf(missionId).nests } : {}), ...(sidesOf(missionId) ? { sides: sidesOf(missionId) } : {}), antsBy: startAnts(), traits: traitsNow(), tiers: set.get('growth') !== 'deeds', ai: { [FOE]: MOOD[set.get('rival')] } });
+const newHost = () => NET ? new NetHost(roomOptions({ code: NET, mission: missionId, bot: NET_BOT, botSide: query.get('botSide') === '0' ? 0 : 1 }), { team: ME, onStart: () => netStarted(), onSeats: s => netSeats(s) }) : new Host({ seed, mission: missionId, ...lateOpts(missionId), ...longOpts(missionId), ...(visitorOf(missionId) ? { pest: visitorOf(missionId) } : {}), ...(hillOf(missionId) ? { nests: hillOf(missionId).nests } : {}), ...(sidesOf(missionId) ? { sides: sidesOf(missionId) } : {}), antsBy: startAnts(), traits: traitsNow(), tiers: set.get('growth') !== 'deeds', ai: { [FOE]: MOOD[set.get('rival')] } });
 let host = newHost(), sim = host.sim;
 let screen = 'menu', tool = 'trail', nestOpen = false, running = false, speed = 1, lastT = 0;
 const Gs = makeGestures();
@@ -184,7 +190,7 @@ function uploadAnts() {
     if (sim.layer[i] !== 0) continue;
     const p = prevOf[i], jump = p < 0 || host.pl[p] !== 0, x = sim.x[i] / 256, y = sim.y[i] / 256, ca = sim.caste[i], major = ca === CASTE.MAJOR || ca === CASTE.WARDEN;
     inst[k] = jump ? x : host.px[p] / 256; inst[k + 1] = jump ? y : host.py[p] / 256; inst[k + 2] = x; inst[k + 3] = y;
-    inst[k + 4] = sim.heading[i] * (Math.PI / 128); inst[k + 5] = (ca === CASTE.WARDEN ? 3 + 8 : major ? 2 + 8 : ca === CASTE.SPITTER ? 1 : 0) + (sim.team[i] ? 16 : 0); inst[k + 6] = sim.carry[i] & 3; inst[k + 7] = (sim.id[i] * 0.618034) % 1;
+    inst[k + 4] = sim.heading[i] * (Math.PI / 128); inst[k + 5] = (ca === CASTE.WARDEN ? 3 + 8 : major ? 2 + 8 : ca === CASTE.SPITTER ? 1 : 0) + (sim.team[i] !== ME ? 16 : 0); inst[k + 6] = sim.carry[i] & 3; inst[k + 7] = (sim.id[i] * 0.618034) % 1;
     k += 8;
   }
   drawnAnts = k / 8; renderer.setAnts(inst, drawnAnts);
@@ -265,11 +271,11 @@ function growPane() {
   if (can && tier === 0 && sim.tick > 400 && !(nestOpen && $('diet').dataset.tab === 'grow')) once('grow', 'Seeds to spare. Open Nest, then Grow: the queen\'s chamber can be widened.', 4200);
 }
 function startRun() {
-  rec.start({ ...set.snapshot(), caste: camp.caste ?? 'none', way: camp.forks.way ?? 'none', craft: camp.forks.craft ?? 'none', nodes: nodesNow().join('+') || 'none', mode: 'war', mission: missionId, ants: sim.cfg.antsBy[ME], road: late(missionId) ? 'late' : camp.forks.road === missionId ? 'first' : 'none', hill: hillOf(missionId)?.from ?? 'new', dug: sim.cfg.nests ? sim.cfg.nests[ME].length / 3 : 0, look: `war:${set.get('view')}/${set.get('light')}/${set.get('style')}`, seed, v: 1 });
-  host.ai[FOE] = rivalMind(); pickCaste();
+  rec.start({ ...set.snapshot(), caste: camp.caste ?? 'none', way: camp.forks.way ?? 'none', craft: camp.forks.craft ?? 'none', nodes: nodesNow().join('+') || 'none', mode: NET ? 'room' : 'war', mission: missionId, ants: sim.cfg.antsBy?.[ME] ?? sim.cfg.ants, road: late(missionId) ? 'late' : camp.forks.road === missionId ? 'first' : 'none', hill: hillOf(missionId)?.from ?? 'new', dug: sim.cfg.nests ? sim.cfg.nests[ME].length / 3 : 0, look: `war:${set.get('view')}/${set.get('light')}/${set.get('style')}`, seed, v: 1 });
+  if (!NET) host.ai[FOE] = rivalMind(); pickCaste();
   running = true; opening();
 }
-function play() { snd.unlock(); startSong(); if (!isOpen(missionId)) return; if (!running) restart(false); else { setScreen('play'); lastT = 0; snd.release(); } }
+function play() { snd.unlock(); startSong(); if (NET) { if (host.started) { setScreen('play'); lastT = 0; snd.release(); } else host.begin(); return; } if (!isOpen(missionId)) return; if (!running) restart(false); else { setScreen('play'); lastT = 0; snd.release(); } }
 // The menu: the campaign's missions in order, the fork between them, and what the chosen mission asks.
 function renderPath() {
   const el = $('path'); el.textContent = '';
@@ -360,6 +366,7 @@ function dropTouches() { run(Gs.reset('pause')); strokeW = []; nestDrag = null; 
 function pauseGame() { if (screen !== 'play') return; dropTouches(); redraw(); setScreen('paused'); snd.hold(); }
 function resume() { if (renderer?.lost) return; setScreen('play'); lastT = 0; snd.release(); startSong(); }
 function restart(newSeed = true) {
+  if (NET) return; /* a room is one match: a new one is a new room */
   dropTouches();
   if (running) rec.end('restart', summary());
   if (newSeed && !(qSeed > 0)) seed = 1 + Math.floor(Math.random() * 9999);
@@ -367,13 +374,34 @@ function restart(newSeed = true) {
   if (tool !== 'trail') setTool('trail'); if (nestOpen) setNest(false);
   uploadTerrain(); uploadAnts(); startRun(); resume();
 }
+// ---- friends' rooms: the menu's block, and what a page in a room shows before the match ----
+function roomHref(code, kind, side = 0) { const u = new URL(location.href); u.search = ''; u.searchParams.set('room', code); u.searchParams.set('mission', missionId); if (kind === 'coop') u.searchParams.set('bot', String(MOOD[set.get('rival')])); if (side) u.searchParams.set('side', '1'); if (query.get('roomHost')) u.searchParams.set('roomHost', query.get('roomHost')); if (query.get('labRunSource')) u.searchParams.set('labRunSource', query.get('labRunSource')); return u.href; }
+let link = null, netState = 'connecting', netHere = new Map();
+const NET_SAY = { connecting: 'Joining the room…', live: '', waiting: 'The room is out of reach. Trying again…', full: 'This room has four players already.', version: 'This room runs other rules or another version of the game. Open the link the room was shared with, or start a new room.', drift: 'This page has drifted from the room. Reload it to catch up.' };
+function netCard() {
+  if (!NET) return;
+  const mates = [...netHere.values()], mine = mates.filter(s => s.team === ME).length, theirs = mates.length - mine, bots = mates.filter(s => s.bot).length;
+  $('roomInfo').textContent = NET_SAY[netState] || (host.started ? 'The match is on.' : `Room ${NET}. ${mates.length} here: ${mine} on your hill, ${NET_BOT === null ? `${theirs} on the far hill` : 'the machine plays the far hill'}${bots ? ` (${bots} machine player${bots > 1 ? 's' : ''})` : ''}. Share the link, then start.`);
+  $('play').textContent = host.started ? 'Back to the match' : 'Start the match'; $('play').disabled = netState !== 'live';
+}
+function netSeats(s) { netHere = new Map(s); netCard(); }
+function netStarted() { netCard(); if (!running) { uploadTerrain(); uploadAnts(); startRun(); } resume(); toast(host.behind > 40 ? 'Catching up with the room…' : 'The match begins', 2400); }
+if (NET) {
+  document.body.classList.add('room'); $('speed').hidden = true;
+  $('roomShare').addEventListener('click', async () => { const how = await shareLink(roomHref(NET, NET_BOT === null ? 'vs' : 'coop', NET_BOT === null ? 1 - ME : ME), NET_BOT === null ? 'Play Cinderhill against me' : 'Play Cinderhill with me'); toast(how === 'copied' ? 'Link copied' : how === 'shared' ? 'Sent' : 'Copy the link from the address bar', 2400); });
+  link = roomLink({ url: ROOM_URL, code: NET, seed, sim: roomSim({ mission: missionId, bot: NET_BOT, botSide: query.get('botSide') === '0' ? 0 : 1 }), host: () => host, store: (() => { try { return sessionStorage; } catch { return null; } })(), onStatus: s => { netState = s; netCard(); if (s !== 'live' && s !== 'connecting' && screen === 'play') toast(NET_SAY[s], 4000, true); } });
+  netCard();
+} else {
+  $('roomVs').addEventListener('click', () => { location.href = roomHref(newCode(), 'vs'); });
+  $('roomCoop').addEventListener('click', () => { location.href = roomHref(newCode(), 'coop'); });
+}
 $('play').addEventListener('click', play);
 $('pause').addEventListener('click', pauseGame);
 $('resume').addEventListener('click', resume);
 $('restart').addEventListener('click', () => restart());
 $('again').addEventListener('click', () => restart());
 $('toMenu').addEventListener('click', toMenu);
-$('next').addEventListener('click', () => { missionId = firstOpen(); toMenu(); });
+$('next').addEventListener('click', () => { if (NET) { location.href = roomHref(newCode(), NET_BOT === null ? 'vs' : 'coop'); return; } missionId = firstOpen(); toMenu(); });
 $('fresh').addEventListener('click', () => { if (!freshArmed) { freshArmed = true; $('fresh').textContent = 'Tap again to erase the campaign'; return; } camp = { v: 1, done: {}, caste: null, forks: {} }; saveCamp(); line = { v: 1, deeds: {} }; saveLine(); hills = { v: 1, after: {} }; saveHills(); doors = { v: 1, after: {} }; saveDoors(); rec.event('campaign', { fresh: 1 }); missionId = STEPS[0]; renderPath(); });
 $('harder').addEventListener('click', () => { const v = set.get('rival'); set.set('rival', won ? (v === 'timid' ? 'steady' : 'bold') : v === 'bold' ? 'steady' : 'timid'); restart(); });
 onLeave(pauseGame);
@@ -666,12 +694,12 @@ function finish(w, reason) {
   const s = summary(), T = (t, k) => g(t, k);
   rec.end(w ? 'won' : 'lost', { ...s, reason });
   const text = TEXT[missionId], was = camp.done[missionId];
-  camp.done[missionId] = { won: w || !!was?.won, best: Math.max(was?.best ?? 0, w ? s.adults : 0) }; saveCamp();
-  if (ROAD.pair.includes(missionId) && !camp.forks.road && !camp.done[ROAD.pair.find(x => x !== missionId)]) { camp.forks.road = missionId; saveCamp(); rec.event('road', { first: missionId }); }
-  if (set.get('home') === 'carried' && (sim.mission.from || Object.values(MISSIONS).some(x => x.from === missionId))) { hills.after[missionId] = { nests: sim.nests() }; saveHills(); doors.after[missionId] = [0, 1].map(t => (sim.side[t] >= 0 ? sim.side[t] % L0.sw : -1)); saveDoors(); }
+  if (!NET) camp.done[missionId] = { won: w || !!was?.won, best: Math.max(was?.best ?? 0, w ? s.adults : 0) }; saveCamp();
+  if (!NET && ROAD.pair.includes(missionId) && !camp.forks.road && !camp.done[ROAD.pair.find(x => x !== missionId)]) { camp.forks.road = missionId; saveCamp(); rec.event('road', { first: missionId }); }
+  if (!NET && set.get('home') === 'carried' && (sim.mission.from || Object.values(MISSIONS).some(x => x.from === missionId))) { hills.after[missionId] = { nests: sim.nests() }; saveHills(); doors.after[missionId] = [0, 1].map(t => (sim.side[t] >= 0 ? sim.side[t] % L0.sw : -1)); saveDoors(); }
   // Deeds: the sim judges them; the page only keeps which were done, and which are new this time.
   const did = sim.deeds(ME), fresh = [];
-  sim.mission.deeds.forEach((d, i) => { const key = `${missionId}.${d.id}`; if (did[i] && !line.deeds[key]) { const had = hasNode(d.opens); line.deeds[key] = 1; fresh.push(d.id); rec.event('deed', { deed: key, opens: had ? 'had' : d.opens }); } });
+  if (!NET) sim.mission.deeds.forEach((d, i) => { const key = `${missionId}.${d.id}`; if (did[i] && !line.deeds[key]) { const had = hasNode(d.opens); line.deeds[key] = 1; fresh.push(d.id); rec.event('deed', { deed: key, opens: had ? 'had' : d.opens }); } });
   if (fresh.length) saveLine();
   renderDeeds($('overDeeds'), missionId, fresh);
   // Where "next" leads: the first fork that is open and not taken, else the first mission not yet played to its end.
@@ -685,6 +713,7 @@ function finish(w, reason) {
   rows.forEach((r, i) => r.forEach((v, j) => { const el = document.createElement(j ? 'b' : 'span'); el.textContent = v; if (!i) el.className = 'h'; if (j === 2) el.classList.add('foe'); $('tally').append(el); }));
   const v = set.get('rival');
   $('harder').textContent = w ? (v === 'bold' ? 'Play the bold rival again' : `Play a ${v === 'timid' ? 'steady' : 'bold'} rival`) : v === 'timid' ? 'Play the timid rival again' : `Play a ${v === 'bold' ? 'steady' : 'timid'} rival`;
+  if (NET) { $('next').textContent = 'A new room'; $('again').hidden = $('harder').hidden = true; }
   running = false; dropTouches(); if (nestOpen) setNest(false);
   const mine = host;
   setTimeout(() => { if (host !== mine) return; setScreen('over'); (w ? [523, 659, 784, 1047] : [392, 330, 262, 196]).forEach((f, i) => setTimeout(() => tone(f, 0.5, 0.06, 'triangle'), i * 160)); }, 900);
@@ -805,10 +834,10 @@ function drawMini() {
   if (!miniBase || miniBase.sim !== sim) { const img = mctx.createImageData(w, h); for (let i = 0; i < w * h; i++) { const m = sim.mat[i], o = i * 4, c = m === MAT.WATER ? [40, 74, 110] : m === MAT.STONE ? [96, 92, 90] : [52, 44, 40]; img.data[o] = c[0]; img.data[o + 1] = c[1]; img.data[o + 2] = c[2]; img.data[o + 3] = 255; } miniBase = { sim, img }; }
   mctx.putImageData(miniBase.img, 0, 0);
   for (let p = 0; p < MAX_PILES; p++) if (sim.pileAmount[p] > 0) { const c = sim.pileCell[p], r = sim.pileAmount[p] > 40 ? 2.4 : 1.4; mctx.fillStyle = sim.pileKind[p] ? '#e0603c' : '#f3d77a'; mctx.beginPath(); mctx.arc(c % w + 0.5, Math.floor(c / w) + 0.5, r, 0, 7); mctx.fill(); }
-  for (let i = 0; i < sim.n; i++) if (sim.layer[i] === 0) { mctx.fillStyle = sim.team[i] ? '#8fb0ff' : '#ffb057'; mctx.fillRect(sim.x[i] >> 8, sim.y[i] >> 8, 1.4, 1.4); }
+  for (let i = 0; i < sim.n; i++) if (sim.layer[i] === 0) { mctx.fillStyle = sim.team[i] !== ME ? '#8fb0ff' : '#ffb057'; mctx.fillRect(sim.x[i] >> 8, sim.y[i] >> 8, 1.4, 1.4); }
   if (sim.beast[1] >= 0 && sim.beast[0] > 0) { mctx.fillStyle = '#ff6048'; mctx.beginPath(); mctx.arc(sim.beast[1] % w, Math.floor(sim.beast[1] / w), 3, 0, 7); mctx.fill(); }
   for (let k = 0; k < sim.sites.length; k++) { const c = sim.sites[k], hold = sim.siteHold[k]; mctx.fillStyle = hold === ME ? '#ffb057' : hold === FOE ? '#8fb0ff' : '#e8e0d6'; mctx.fillRect(c % w - 2, Math.floor(c / w) - 4, 4, 8); }
-  for (const t of [ME, FOE]) { const d = doorXY(t); mctx.strokeStyle = t ? '#8fb0ff' : '#ffb057'; mctx.lineWidth = 1.5; mctx.beginPath(); mctx.arc(d.x, d.y, 3.5, 0, 7); mctx.stroke(); if (sim.side[t] >= 0) { mctx.beginPath(); mctx.arc(sim.side[t] % L0.sw + 0.5, Math.floor(sim.side[t] / L0.sw) + 0.5, 2, 0, 7); mctx.stroke(); } }
+  for (const t of [ME, FOE]) { const d = doorXY(t); mctx.strokeStyle = t !== ME ? '#8fb0ff' : '#ffb057'; mctx.lineWidth = 1.5; mctx.beginPath(); mctx.arc(d.x, d.y, 3.5, 0, 7); mctx.stroke(); if (sim.side[t] >= 0) { mctx.beginPath(); mctx.arc(sim.side[t] % L0.sw + 0.5, Math.floor(sim.side[t] / L0.sw) + 0.5, 2, 0, 7); mctx.stroke(); } }
   if (eye) { const a = toWorld(0, 0), b = toWorld(W, H), c = toWorld(W, 0), d = toWorld(0, H); mctx.strokeStyle = 'rgba(255,255,255,0.8)'; mctx.lineWidth = 1; mctx.beginPath(); mctx.moveTo(a.x, a.y); mctx.lineTo(c.x, c.y); mctx.lineTo(b.x, b.y); mctx.lineTo(d.x, d.y); mctx.closePath(); mctx.stroke(); }
 }
 
@@ -873,16 +902,16 @@ function drawOverlay(now) {
     for (const t of [ME, FOE]) {
       const c = sim.side[t]; if (c < 0) continue;
       const p = toScreen(c % L0.sw + 0.5, Math.floor(c / L0.sw) + 0.5, 2.4); if (!p.s) continue;
-      const col = t ? '#8fb0ff' : '#ffb057';
+      const col = t !== ME ? '#8fb0ff' : '#ffb057';
       ctx.fillStyle = 'rgba(20, 14, 10, 0.85)'; ctx.strokeStyle = col; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.roundRect(p.x - 20, p.y - 8, 40, 16, 8); ctx.fill(); ctx.stroke();
       ctx.fillStyle = col; ctx.font = '800 9.5px ui-rounded, system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('DOOR', p.x, p.y);
     }
     // The two doors: a banner over each, and the queen's strength when she has been hurt.
     for (const t of [ME, FOE]) {
       const d = doorXY(t), p = toScreen(d.x, d.y, 3.2); if (!p.s) continue;
-      const hp = g(t, CG.QUEEN_HP) / sim.cfg.queenHp, col = t ? '#8fb0ff' : '#ffb057';
+      const hp = g(t, CG.QUEEN_HP) / sim.cfg.queenHp, col = t !== ME ? '#8fb0ff' : '#ffb057';
       ctx.fillStyle = 'rgba(20, 14, 10, 0.85)'; ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.roundRect(p.x - 26, p.y - 9, 52, 18, 9); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = col; ctx.font = '800 10.5px ui-rounded, system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(t ? 'RIVAL' : 'HOME', p.x, p.y);
+      ctx.fillStyle = col; ctx.font = '800 10.5px ui-rounded, system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(t !== ME ? 'RIVAL' : 'HOME', p.x, p.y);
       if (hp < 1) { ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(p.x - 24, p.y + 12, 48, 5); ctx.fillStyle = hp > 0.4 ? '#9ef252' : '#ff5a3c'; ctx.fillRect(p.x - 24, p.y + 12, 48 * hp, 5); }
     }
     if (rallyAt && now - rallyAt.at < 30000 && g(ME, CG.RALLY_HOLD) > 0) { const p = toScreen(rallyAt.x, rallyAt.y, 0), k = (now / 900) % 1; ctx.strokeStyle = `rgba(255, 90, 60, ${1 - k})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(p.x, p.y, p.s * (1 + 2.5 * k), p.s * (1 + 2.5 * k) * Math.max(0.3, eye.cos), 0, 0, 7); ctx.stroke(); }
@@ -964,11 +993,11 @@ function drawNest(now) {
     c.strokeStyle = s2 < TRAILS ? '#ff5a3c' : '#b98cff'; c.lineWidth = all ? 3.5 : 2; c.beginPath(); c.arc(px, py, r, 0, 7); c.moveTo(px - r * 1.4, py); c.lineTo(px + r * 1.4, py); c.moveTo(px, py - r * 1.4); c.lineTo(px, py + r * 1.4); c.stroke();
   }
   for (const t of [ME, FOE]) {
-    const st = sim.store[t] - base, stx = st % w, sty = Math.floor(st / w), q = sim.queen[t] - base, qx = sx(q % w + 0.5), qy = sy(Math.floor(q / w) + 0.5), tint = t ? '120, 150, 255' : '255, 170, 80';
+    const st = sim.store[t] - base, stx = st % w, sty = Math.floor(st / w), q = sim.queen[t] - base, qx = sx(q % w + 0.5), qy = sy(Math.floor(q / w) + 0.5), tint = t !== ME ? '120, 150, 255' : '255, 170, 80';
     const gl = c.createRadialGradient(qx, qy, 0, qx, qy, z * 7); gl.addColorStop(0, `rgba(${tint}, ${0.28 + 0.05 * Math.sin(now / 700)})`); gl.addColorStop(1, `rgba(${tint}, 0)`); c.fillStyle = gl; c.fillRect(qx - z * 7, qy - z * 7, z * 14, z * 14);
     if (g(t, CG.QUEEN_HP) > 0) {
       const u = Math.max(8, z * 1.5), pulse = 1 + 0.06 * Math.sin(now / 300);
-      c.fillStyle = t ? '#27345e' : '#6a2a16'; c.strokeStyle = t ? '#9fb8ff' : '#ffc070'; c.lineWidth = 1.5; c.shadowColor = t ? '#6a8cff' : '#ff9a3c'; c.shadowBlur = 14;
+      c.fillStyle = t !== ME ? '#27345e' : '#6a2a16'; c.strokeStyle = t !== ME ? '#9fb8ff' : '#ffc070'; c.lineWidth = 1.5; c.shadowColor = t !== ME ? '#6a8cff' : '#ff9a3c'; c.shadowBlur = 14;
       for (const [dx, rx, ry] of [[-1.05, 0.9 * pulse, 0.55 * pulse], [0, 0.4, 0.3], [0.8, 0.32, 0.28]]) { c.beginPath(); c.ellipse(qx + dx * u, qy, rx * u, ry * u, 0, 0, 7); c.fill(); c.stroke(); }
       c.shadowBlur = 0;
       const hp = g(t, CG.QUEEN_HP) / sim.cfg.queenHp; if (hp < 1) { c.fillStyle = 'rgba(0,0,0,0.6)'; c.fillRect(qx - 24, qy - u - 6, 48, 5); c.fillStyle = hp > 0.4 ? '#9ef252' : '#ff5a3c'; c.fillRect(qx - 24, qy - u - 6, 48 * hp, 5); }
@@ -989,7 +1018,7 @@ function drawNest(now) {
     const p = prevOf[i], jump = p < 0 || host.pl[p] !== 1, ax = sx((jump ? sim.x[i] : host.px[p] + (sim.x[i] - host.px[p]) * a) / 256), ay = sy((jump ? sim.y[i] : host.py[p] + (sim.y[i] - host.py[p]) * a) / 256);
     if (ax < -8 || ax > NW + 8 || ay > NH + 8) continue;
     const th = sim.heading[i] * (Math.PI / 128), co = Math.cos(th), si = Math.sin(th), u = Math.max(2.2, z * 0.5) * (sim.caste[i] === CASTE.WARDEN ? 1.8 : sim.caste[i] === CASTE.SPITTER ? 1.1 : sim.caste[i] ? 1.5 : 1);
-    c.fillStyle = sim.team[i] ? (sim.caste[i] === CASTE.SPITTER ? '#5f7fd8' : '#3a4f9a') : sim.caste[i] === CASTE.SPITTER ? '#8a5a1c' : sim.caste[i] ? '#5a1410' : '#0d0705';
+    c.fillStyle = sim.team[i] !== ME ? (sim.caste[i] === CASTE.SPITTER ? '#5f7fd8' : '#3a4f9a') : sim.caste[i] === CASTE.SPITTER ? '#8a5a1c' : sim.caste[i] ? '#5a1410' : '#0d0705';
     c.beginPath(); c.ellipse(ax - co * u * 0.55, ay - si * u * 0.55, u * 0.5, u * 0.34, th, 0, 7); c.fill();
     c.beginPath(); c.arc(ax + co * u * 0.1, ay + si * u * 0.1, u * 0.24, 0, 7); c.fill();
     c.beginPath(); c.arc(ax + co * u * 0.55, ay + si * u * 0.55, u * (sim.caste[i] ? 0.36 : 0.27), 0, 7); c.fill();
@@ -1008,7 +1037,7 @@ function drawNest(now) {
   }
   const skyG = c.createLinearGradient(0, 0, 0, 26); skyG.addColorStop(0, light.night > 0.5 ? '#0b0d18' : '#6f7f8f'); skyG.addColorStop(1, light.night > 0.5 ? '#241a1c' : '#c9b59a');
   c.fillStyle = skyG; c.fillRect(0, 0, NW, 26); c.fillStyle = '#4a4340'; c.fillRect(0, 22, NW, 5);
-  for (const t of [ME, FOE]) { const d = sx(doorXY(t).x); c.fillStyle = '#120c09'; c.fillRect(d - z * 0.8, 22, z * 1.6, 6); c.fillStyle = t ? '#8fb0ff' : '#ffb057'; c.font = '800 10px ui-rounded, system-ui, sans-serif'; c.textAlign = 'center'; c.fillText(t ? 'RIVAL' : 'HOME', d, 14); }
+  for (const t of [ME, FOE]) { const d = sx(doorXY(t).x); c.fillStyle = '#120c09'; c.fillRect(d - z * 0.8, 22, z * 1.6, 6); c.fillStyle = t !== ME ? '#8fb0ff' : '#ffb057'; c.font = '800 10px ui-rounded, system-ui, sans-serif'; c.textAlign = 'center'; c.fillText(t !== ME ? 'RIVAL' : 'HOME', d, 14); }
 }
 
 // ---- the frame ----
@@ -1020,7 +1049,7 @@ function frame(now) {
   const dt = Math.min(0.1, lastT ? (now - lastT) / 1000 : 0.016);
   run(Gs.tick(performance.now()));
   let stepped = 0;
-  if (screen === 'play') stepped = host.advance(lastT ? Math.min(100, now - lastT) : 0, speed);
+  if (screen === 'play' || (NET && host.started)) stepped = host.advance(lastT ? Math.min(100, now - lastT) : 0, speed);
   if (stepped) { news(); uploadAnts(); }
   if (sim.result && running) finish(sim.result - 1 === ME, g(ME, CG.QUEEN_HP) <= 0 || g(FOE, CG.QUEEN_HP) <= 0 ? REASON.QUEEN : sim.mission.goals.beast && sim.beast[0] <= 0 && !sim.mission.goals.carry ? REASON.BEAST : sim.mission.goals.points && Math.max(g(ME, CG.POINTS), g(FOE, CG.POINTS)) >= sim.mission.goals.points ? REASON.POINTS : sim.mission.goals.haul && Math.max(g(ME, CG.HAUL), g(FOE, CG.HAUL)) >= sim.mission.goals.haul ? REASON.HAUL : REASON.DUSK); // the result event was lost in a full buffer
   light = lightNow(now);
@@ -1057,6 +1086,7 @@ window.game = {
   modes: () => Array.from(sim.trMode.subarray(ME * TRAILS, ME * TRAILS + TRAILS)), select: k => { sel = k; showRoute(); hud(); },
   linked: () => sim.linked, strike: (x, y) => strikeAt(x, y), queen: t => { const q = sim.queen[t] - L0.nestBase; return [q % L0.nw, Math.floor(q / L0.nw)]; },
   trails: () => { let n = 0; for (let k = 0; k < TRAILS; k++) if (sim.trLive[ME * TRAILS + k]) n++; return n; },
+  order, marks: () => { const n = [0, 0]; for (let k = 0; k < sim.mark.length; k++) if (sim.mark[k]) n[sim.mark[k] - 1]++; return n; },
   setTool, setNest, setNestTool, canPaint: (x, y) => sim.owner(y * L0.nw + x) === ME && sim.mat[L0.nestBase + y * L0.nw + x] === MAT.CLAY && !sim.mark[y * L0.nw + x], nestXY: (x, y) => { const r = nestCanvas.getBoundingClientRect(); return [r.left + (x + 0.5 - nestCam.x) * nestCam.z + NW / 2, r.top + (y + 0.5 - nestCam.y) * nestCam.z + 26]; }, setSpeed, order, run: n => { host.run(n); news(); uploadAnts(); }, log: () => JSON.parse(JSON.stringify(host.log)), hash: () => sim.hash(),
 };
 void TASK;

@@ -64,6 +64,10 @@ Full tables, method and caveats: `experiments/cinderhill/sim/SPIKES.md`, "S1 dep
 - **Idle:** deployed with `DEBUG_ROLES` "0" (version 68d70086, 2026-11-26, sim version 2; a 30 s two-player relay check on it held 20.0 ticks a second with 0 hash differences). An empty room stops its clock after 5 s and is evicted, so no duration is billed while idle. What remains is SQLite storage of the test rooms (command logs and checkpoints, well under 1 MB in all), inside the 5 GB included; $0.20 per GB-month beyond it.
 - 60-minute determinism soak (offline replay of a fixed log), on sim versions 1 and 2: Node, Chromium 156, WebKit 27.2 and local workerd agree at all 3,600 records (Chromium 159 too, on sim 1). Firefox not run (not installed). The deployed S1 runs used sim version 1.
 
+## War rooms (experimental)
+
+A join with `game=war` makes the room a relay for the war build (`experiments/cinderhill/war`). The room holds no war sim: it files each command as int32s (`cleanWar`, at most 1400 a command), seals ticks as before, and compares the hashes pages send. The first page's `sim` number is the room's; it carries the code version and the link's rules (`roomSim` in `war/wire.js`), and a page with another number, or of the other game, gets `reload` and close 4005. Tests: `node --test test/war.test.mjs`. Wire bots: `node loadtest/warbot.mjs --url wss://games-cinderhill.adamwhite.workers.dev --rooms 4 --ticks 2400` (see the file's header for joining a room people opened).
+
 ## Open
 
 - The unexplained reset (SPIKES.md, S1 deployed).
