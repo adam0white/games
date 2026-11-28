@@ -473,11 +473,13 @@ Not counted, because it cannot fail: a tray that does nothing earns no stamps (a
 1. Reachable: **pass.** Median 11 to 20 shifts to a full card; the worst run was 32 (rank 10, new cook, Rush hour,
    where "turn nobody away" falls last in 23 of 30 runs). No run was stuck. Eleven missions are open at ranks 0 and
    1, thirteen from rank 2.
-2. Naming the tray in use: **miss for wood.** Six shuffled 320 by 568 shots (three trays, Sunny diner and Toon), one
-   shot an ask, two outside readers. Enamel 2 of 2 and golden 2 of 2, each "very sure". Wood 1 of 2: in Toon the
-   wood tray is a warm amber and was called golden. One retune (golden with a dark floor and a bright rim) made it
-   worse: both wood shots were then called golden, so the retune was taken back. A reader who sees one shot cannot
-   compare; a player sees the tray change. Left as a miss.
+2. Naming the tray in use: **miss for wood.** Shuffled 320 by 568 shots under neutral file names (three trays,
+   Sunny diner and Toon), one shot an ask, two outside readers. Enamel 2 of 2 and golden 4 of 4, each "very sure".
+   Wood was named right in 1 of 4 reads of the same two shots, and called golden in the other three: wood is a warm
+   amber, and a reader who sees one shot cannot compare. A player sees the tray change. Left as a miss. One retune
+   of the golden tray (dark floor, bright rim) was tried and taken back: readers still said yellow food blends into
+   it, and it looked less like a prize. The retune did not touch wood, so it could not have moved the wood reads;
+   the two rounds differed only in which reader saw which wood shot.
 3. End card at 320 by 568 in Turkish: **pass.** "Yeni tepsi: Emaye" at the sixth stamp and "Yeni tepsi: Altın" at
    the thirteenth, neither cut, each under the mission line and the count. Walked through the real page: the tray is
    owned and in use on the end card, still there after a reload; a failed mission earns nothing; junk in storage
@@ -489,8 +491,14 @@ Not counted, because it cannot fail: a tray that does nothing earns no stamps (a
 The first golden (metal 0.8) rendered dark olive in Sunny diner, because the scene has no sky to reflect. It is now a
 plain bright yellow that glows a little. Found by looking at the shot, not by any check.
 
-Not shown: nobody has earned a tray by playing. The slap mission was accepted on the first try through the real
-page, but its shift was not played to the end card; the golden walk used the pan mission as the last stamp.
+Not shown: nobody has earned a tray by playing. No shot had a yellow seat ring beside the golden tray, the pair most
+likely to fail line 4. The golden walk used the pan mission as the last stamp; the slap mission, which ended ✗ in an
+earlier walk, was then played to its end card through the real page and stamped ("✓ Use Slap +50"), so that ✗ was the
+walk and not the game.
+
+The shop's Trays box, walked at 320 by 568 in Turkish and English with one, two and three trays owned: no label is
+cut ("13 görevin hepsi", "All 13 missions"), a locked tray does nothing when tapped, an owned one is put in use, the
+list does not jump, and the box is absent before the first Rush.
 
 **Outside review of the wide-screen change, after it merged.** That change merged before its outside code review and
 outside read came back. They found four faults, all fixed here:
@@ -522,5 +530,6 @@ the Toon outline (seen back in a shot); a guest rebuilt at the pass stayed count
 given by the game was recorded as a setting the player chose; the setting and the run record used two names (both
 `trayskin` now); the end card played its sound twice with a new tray; and, older than this slice, a guest walking
 to a seat in an ordinary day arrived on the menu after quitting. Not rechecked by a walk: the second tab, the failed
-model, and the sound.
+model, and the sound. Guests switched off and back on while cooking is fixed by the same code as the turn, but only
+the turn was walked, and neither was played on to the serve.
 
