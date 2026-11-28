@@ -1563,7 +1563,7 @@ const GAMES = {
 
 // Every new page has its own save seed, controls and first-time help contract beside its registration.
 for (const [slug, g] of Object.entries({ ...pages, ...labPages })) {
-  const path = `/${slug}/${g.query ? `?${g.query}` : ''}`;
+  const path = `/${slug}/${g.page ?? ''}${g.query ? `?${g.query}` : ''}`;
   GAMES[slug] = page => savedPhone(page, { ...g, path });
   for (const hint of g.hints ?? (g.hint ? [g.hint] : [])) {
     const name = hint.name ? `hint ${slug} ${hint.name}` : `hint ${slug}`;
