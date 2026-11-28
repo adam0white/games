@@ -19,6 +19,18 @@ Not shown:
 
 Bots find defects and measure balance. They do not vote on fun (AGENTS.md).
 
+## Second run: Sky Kitchen (2026-11-28)
+
+The process was run a second time on a game with no opponent and almost no spec, as a light rebuild: one timed shift with several guests seated at once, then the game's existing eleven wheel actions given one effect and one printed price each. Two slices merged in a few hours. No person had played either when this was written, so this run says nothing yet about whether the result is good. What it showed about the process:
+
+- Reading recorded play first (step 2) paid at once: 42 runs showed one action taken thirty times, the others almost never, and no guest ever lost. The design started from those two facts, not from the feature list.
+- The scripted player's model of time was wrong by a factor of 1.7 until ten dishes were timed in the real client. Star targets set from the first model would have been far too low. This is now in step 6.
+- A tray that never moved earned three stars in the real client while the model said it could not. Only a do-nothing run through the real page found it. This is now in step 6.
+- Several hand-written triggers for an action did worse than using it at random. The action was fine and the trigger was wrong. One action looked strong everywhere until the script was made to pay its time cost as the page does. Both are now in step 6.
+- The edge run through the real client found a fault no test, bot or reviewer had: on a small phone the tap that opened a sheet also pressed the button that appeared under the finger. This is now in step 5.
+- The reviewers' own gate (an adaptive rule that beats every fixed plan) was not met in either slice. The notes and the reports say so. The process has no step that forces that gate to be met or dropped; step 7 is where it should be decided.
+- The brief reached a thread that already existed, and it took a round trip to settle which thread owned the game. The launch prompt now names the owner thread.
+
 ## Entry
 
 - A playable build that records play, or a brief for one. If recording fails, fix it first and read one stored record back.
@@ -43,6 +55,7 @@ Bots find defects and measure balance. They do not vote on fun (AGENTS.md).
 - build and run the game's tests;
 - measure (step 6);
 - send the diff to one adversarial code reviewer with a named list of failure classes, and the build or screenshots to one reviewer who has not seen your intent;
+- for anything that opens over live play (a sheet, a menu, a mini-game), run the edges through the real client at the smallest phone size and in the longest language: pause while it is open, the round ending while it is open, its target leaving while it is open, and the opening tap itself;
 - fix, merge, confirm the change on the live page by fetching the live file;
 - write the numbers, the decision and anything dropped to the notes file;
 - post one short status line that says what no person has played.
@@ -50,6 +63,13 @@ Bots find defects and measure balance. They do not vote on fun (AGENTS.md).
 Cinderhill's slices took a median of thirteen minutes from pull request to merge, and forty-four merged in twenty hours.
 
 **6. Measure each choice against doing neither.** Run option A, option B and neither on the same seeds, in both seats, to a fixed tick. Record intermediate state (stock, population, time to first payoff), not only who won. A choice is real when changing the action changes an outcome or a material intermediate state, and the player can see the difference. Then prove the measurement can fail: switch the effect off, or use a known bad layout, and check the number moves. Read one odd run end to end. If the bot never issued the order the choice needs, fix the bot before tuning the game.
+
+Four checks on the bot itself, each of which caught a wrong number on Sky Kitchen:
+
+- Before setting any target from a scripted player, time the same actions in the real client and compare. Fix the model until they agree.
+- Run a player that does nothing, and one that does one thing and stops, through the real client. Each must lose.
+- Before calling an action flat or strong, compare the scripted trigger with using the action at random. If random does better, the trigger is wrong.
+- Make the script pay what the client makes a person pay: the seconds an action takes, and anything that keeps running while a menu is open.
 
 **7. Every third or fourth slice, stop adding.** List every choice the game advertises. Measure each. Fix or remove any that one side always wins before adding another.
 
@@ -84,7 +104,7 @@ Check each finding against the code or the build before acting on it. Do not com
 
 Fill the brackets and hand this to the thread that will own the game.
 
-> Own **[game]** until **[named person or audience]** shows **[acceptance behaviour, in numbers]**. Read **[current build, notes file, play records, earlier decisions]** first. Keep **[what players already value]**. The owner's target, in the owner's words: **[verbatim]**. The current spec is background, not a ceiling. Keep the existing build reachable while you test a different direction.
+> You are the one thread that owns **[game]**; say so in your first report. Own it until **[named person or audience]** shows **[acceptance behaviour, in numbers]**. Read **[current build, notes file, play records, earlier decisions]** first. Keep **[what players already value]**. The owner's target, in the owner's words: **[verbatim]**. The current spec is background, not a ceiling. Keep the existing build reachable while you test a different direction.
 >
 > Follow `docs/playable-first.md`. Start with one complete situation in which **[decision]** changes **[outcome]**, playable from first input to result, with pressure that can beat the player. Send the first link as soon as that situation can be judged, and ask one specific question.
 >
