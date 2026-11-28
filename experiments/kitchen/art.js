@@ -271,16 +271,16 @@ export async function createView(canvas, lookId) {
 
   // ---------- guests
   const guests = [];
-  async function guest(i) {
+  async function guest(i, tall = 1.25) {
     await peopleReady;
     const src = people[i % people.length] ?? people.find(Boolean); if (!src) return null;
     const body = cloneSkinned(src.scene); styleObject(body); track(body);
-    const g = fit(body, 1.25, 'y'); g.position.set(5.2, 0, 1.2); world.add(g);
+    const g = fit(body, tall, 'y'); g.position.set(5.2, 0, 1.2); world.add(g);
     const mixer = new THREE.AnimationMixer(body), acts = {};
     for (const clip of src.animations) acts[clip.name] = mixer.clipAction(clip);
     let cur = null;
     const play = (name, once = false) => { const a = acts[name]; if (!a || a === cur) return; a.reset(); a.setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat); a.clampWhenFinished = once; a.fadeIn(0.2).play(); cur?.fadeOut(0.2); cur = a; };
-    const bubble = makeBubble(); bubble.group.position.set(0, 1.55, 0); g.add(bubble.group); bubble.group.visible = false;
+    const bubble = makeBubble(); bubble.group.position.set(0, tall + 0.3, 0); g.add(bubble.group); bubble.group.visible = false;
     const me = { g, mixer, play, bubble, target: null, speed: 1.6, onArrive: null, face: null };
     play('walk'); guests.push(me); return me;
   }
@@ -302,7 +302,7 @@ export async function createView(canvas, lookId) {
         else { const step = Math.min(L, me.speed * dt); me.g.position.addScaledVector(d.normalize(), step); const want = Math.atan2(d.x, d.z); me.g.rotation.y += angleTo(me.g.rotation.y, want) * Math.min(1, dt * 10); }
       } else if (me.face != null) me.g.rotation.y += angleTo(me.g.rotation.y, me.face) * Math.min(1, dt * 6);
       me.bubble.group.lookAt(camera.position.x, me.bubble.group.getWorldPosition(new THREE.Vector3()).y, camera.position.z);
-      if (me.gone) { world.remove(me.g); guests.splice(i, 1); }
+      if (me.gone) { me.onArrive = null; me.target = null; world.remove(me.g); me.bubble.dispose(); me.mixer.stopAllAction(); me.g.traverse(o => { if (o.isSkinnedMesh) o.skeleton.dispose(); }); guests.splice(i, 1); }   // each clone has its own bone texture
     }
   }
 
@@ -320,16 +320,19 @@ export async function createView(canvas, lookId) {
     const back = () => seg.push({ dur: 0, start() { g.visible = true; g.rotation.x = 0; g.rotation.z = 0; g.scale.setScalar(1); } });
     const walkIn = (from) => seg.push({ wait: true, start(next) { g.position.set(...from); g.visible = true; walkTo(me, home.x, home.z, next); } });
     if (kind === 'fly') { arc(new THREE.Vector3(6.6, 0, 2.8), 1.2, 2.4, 2); hold(1.0, () => { g.visible = false; }); back(); walkIn([5.2, 0, 1.2]); }
-    else if (kind === 'spin') { seg.push({ dur: 0.9, start() { me.play('die', true); }, step(k) { g.rotation.y += 0.5; g.position.y = Math.sin(k * Math.PI) * 0.3; } }); hold(0.5, () => me.play('emote-no', true)); }
-    else if (kind === 'hop') { seg.push({ dur: 1.4, start() { me.play('jump'); }, step(k) { g.position.y = Math.abs(Math.sin(k * Math.PI * 3)) * 0.45; if (Math.random() < 0.3) burst(g.position.clone(), { n: 2, color: Math.random() < 0.5 ? '#ff6a10' : '#ffc531', speed: 0.6, up: 1.5, life: 0.4, glow: true }); } }); hold(0.4, () => steam(g.position.clone().add(new THREE.Vector3(0, 1.2, 0)), 4)); }
+    else if (kind === 'spin') { seg.push({ dur: 0.9, start() { me.play('die', true); }, step(k) { g.rotation.y += 0.5; g.position.y = home.y + Math.sin(k * Math.PI) * 0.3; } }); hold(0.5, () => me.play('emote-no', true)); }
+    else if (kind === 'hop') { seg.push({ dur: 1.4, start() { me.play('jump'); }, step(k) { g.position.y = home.y + Math.abs(Math.sin(k * Math.PI * 3)) * 0.45; if (Math.random() < 0.3) burst(g.position.clone(), { n: 2, color: Math.random() < 0.5 ? '#ff6a10' : '#ffc531', speed: 0.6, up: 1.5, life: 0.4, glow: true }); } }); hold(0.4, () => steam(g.position.clone().add(new THREE.Vector3(0, 1.2, 0)), 4)); }
     else if (kind === 'into') { const p = new THREE.Vector3(...SPOTS[at]); arc(p, 0.9, 1.4, 1, 0.25); hold(0.25, () => { g.visible = false; burst(p, { n: 12, color: at === 'fridge' ? '#bfe8ff' : at === 'trash' ? '#8a8f7a' : '#ffb347', speed: 1.2, up: 1.2 }); }); hold(1.2); seg.push({ dur: 0, start() { g.visible = true; } }); arc(home.clone(), 0.9, 1.4, -1, 4); back(); hold(0.5, () => { me.play('emote-no', true); if (at === 'fridge') me.shiver = 1.2; else steam(g.position.clone().add(new THREE.Vector3(0, 1.2, 0)), 5); }); }
     else if (kind === 'out') { seg.push({ wait: true, start(next) { walkTo(me, 6.8, 2.6, next); } }); hold(1.6, () => me.play('emote-no')); walkIn([6.8, 0, 2.6]); }
-    else if (kind === 'shake') { seg.push({ dur: 1.4, start() { me.play('fall'); }, step(k) { g.rotation.z = Math.min(1, k * 4) * Math.PI; g.position.y = 1.2 * Math.min(1, k * 4); g.position.x = home.x + Math.sin(k * 40) * 0.08; if (Math.random() < 0.25) burst(g.position.clone().add(new THREE.Vector3(0, 0.4, 0)), { n: 2, color: '#ffc531', speed: 0.8, up: 0.5, cube: false, life: 0.8 }); } }); back(); seg.push({ dur: 0, start() { g.position.copy(home); } }); }
+    else if (kind === 'shake') { seg.push({ dur: 1.4, start() { me.play('fall'); }, step(k) { g.rotation.z = Math.min(1, k * 4) * Math.PI; g.position.y = home.y + 1.2 * Math.min(1, k * 4); g.position.x = home.x + Math.sin(k * 40) * 0.08; if (Math.random() < 0.25) burst(g.position.clone().add(new THREE.Vector3(0, 0.4, 0)), { n: 2, color: '#ffc531', speed: 0.8, up: 0.5, cube: false, life: 0.8 }); } }); back(); seg.push({ dur: 0, start() { g.position.copy(home); } }); }
     else if (kind === 'join') { const [x, z] = STAFF_SPOTS[staffSlot % STAFF_SPOTS.length]; seg.push({ wait: true, start(next) { walkTo(me, 2.0, 2.2, () => walkTo(me, x, z, next)); } }); seg.push({ dur: 0, start() { me.face = 0; me.play('idle'); } }); }
+    else if (kind === 'boot') { arc(new THREE.Vector3(home.x + 5.5, 0, home.z + 1.2), 1.0, 2.6, 2); hold(0.05, () => { g.visible = false; }); }
     else if (kind === 'fight') { seg.push({ dur: 0.01, start() { me.play('attack-melee-right'); } }); }
     stunts.push({ me, seg, i: -1, t: 0, done, waiting: false });
   }
   function stepStunts(dt) {
+    if (!(dt > 0)) return;   // paused: a stunt that spawns sparks every frame would pile them up
+    for (let n = stunts.length - 1; n >= 0; n--) if (stunts[n].me.gone) stunts.splice(n, 1);   // the guest was removed mid-stunt
     for (let n = stunts.length - 1; n >= 0; n--) {
       const s = stunts[n];
       if (s.waiting) continue;
@@ -575,7 +578,7 @@ export async function createView(canvas, lookId) {
   resize(); view('menu', true);
   return {
     THREE, scene, camera, renderer, world, food, item, furniture, tray, register, board, knife, knifeLift, pan, panR, panGlow, micro, microLight, microGlass, blender, sign,
-    guest, guestAt, walkTo, guests, stunt, staffSpots: STAFF_SPOTS, waitSpots: WAIT_SPOTS, view, cam, frame, resize, burst, steam, toScreen, toPlane, toY, setLook, setRestaurant, thumb, popIn,
+    memory: () => ({ ...renderer.info.memory }), guest, guestAt, walkTo, guests, stunt, staffSpots: STAFF_SPOTS, waitSpots: WAIT_SPOTS, view, cam, frame, resize, burst, steam, toScreen, toPlane, toY, setLook, setRestaurant, thumb, popIn,
     get look() { return look; }, peopleReady,
     shake(n = 1) { cam.shake = Math.max(cam.shake, n); },
     flashThumbs() { thumbCache.clear(); },
@@ -705,7 +708,7 @@ export async function createView(canvas, lookId) {
       else if (url) { const img = new Image(); img.src = url; await img.decode().catch(() => {}); cx.drawImage(img, 36, 20, 120, 120); }
       tex.needsUpdate = true; group.visible = true; group.scale.setScalar(0.01); const t0 = performance.now();
       const grow = () => { const k = Math.min(1, (performance.now() - t0) / 350); group.scale.setScalar(Math.max(0.01, elasticOut(k))); if (k < 1) requestAnimationFrame(grow); }; grow();
-    }, hide() { group.visible = false; } };
+    }, hide() { group.visible = false; }, dispose() { tex.dispose(); sp.material.dispose(); } };
   }
   function makeIsland(x, y, z, s) {
     const g = new THREE.Group(); g.position.set(x, y, z); g.userData.y = y; g.scale.setScalar(s);
