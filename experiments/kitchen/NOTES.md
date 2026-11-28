@@ -514,3 +514,13 @@ Checks on this tree: bots ok; phone check on Chromium and WebKit; full walks at 
 
 Left from the outside read: on a wide screen a guest's ring can overlap a neighbour's falling food ring; on a tablet
 the tickets sit over the kitchen sign and the pan and register are off screen while catching.
+
+**Outside code review of this slice, before it merged.** Eight findings, all fixed: a second tab could write an
+earned tray away (the store now merges with what is saved); stamps from before trays existed did not count until the
+next Rush (counted when the page loads; walked: six old stamps give the enamel tray at once); a tray skin replaced
+the Toon outline (seen back in a shot); a guest rebuilt at the pass stayed counted when its model failed; a tray
+given by the game was recorded as a setting the player chose; the setting and the run record used two names (both
+`trayskin` now); the end card played its sound twice with a new tray; and, older than this slice, a guest walking
+to a seat in an ordinary day arrived on the menu after quitting. Not rechecked by a walk: the second tab, the failed
+model, and the sound.
+

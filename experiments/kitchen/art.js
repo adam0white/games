@@ -610,7 +610,7 @@ export async function createView(canvas, lookId) {
       setSkin(id) {
         if (!Object.hasOwn(SKINS, id)) id = 'wood';
         const [a, b] = skinMats[id] ??= [0, 1].map(i => new THREE.MeshStandardMaterial({ color: SKINS[id][i], roughness: SKINS[id][2], metalness: SKINS[id][3], emissive: SKINS[id][i], emissiveIntensity: SKINS[id][4] ?? 0 }));
-        body.traverse(m => { if (!m.isMesh) return; const mat = m === base ? a : b; if (m.userData.baseMats) { m.userData.baseMats = [mat]; applyLook(m); } else m.material = mat; });
+        body.traverse(m => { if (!m.isMesh || m.userData.outline) return; const mat = m === base ? a : b; if (m.userData.baseMats) { m.userData.baseMats = [mat]; applyLook(m); } else m.material = mat; });
       },
       setLevel(l) { const half = TUNE.trayHalf[Math.min(TUNE.trayHalf.length - 1, l)]; width = half * 2 * LANE.s + 0.1; body.scale.set(width, 1, 1); rims.forEach((r, i) => { if (i >= 2) r.position.x = (i === 2 ? -1 : 1) * 0.52 * width; r.scale.x = i < 2 ? 1 : 1 / width; }); },
       setX(x) { group.position.x = x; },
