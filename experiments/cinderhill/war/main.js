@@ -605,22 +605,23 @@ const GUIDE = [
   { say: '<b>Raise soldiers.</b> In the Nest, on Young, tap 1 in 4. A soldier grub eats 3 meat.', done: () => g(ME, CG.DIET) > 0 },
   { say: '<b>Hold a ford.</b> Back on the surface, tap Raid and drag from your hill to a ford: your soldiers stand there.', done: () => myTrails(KIND.RAID) > 0 },
 ];
-let guideStep = -1, guideCap = 0, guideEnd = 0;
+let guideStep = -1, guideCap = 0, guideEnd = 0, guideDid = [];
 function guideStart() {
   let seen = false; try { seen = !!localStorage.getItem(GUIDE_KEY); } catch { /* no storage */ }
-  const v = set.get('guide'); guideStep = !NET && missionId === STEPS[0] && v !== 'off' && (v === 'always' || !seen) ? 0 : -1; guideCap = g(ME, CG.CAP_FOOD); guideEnd = 0; guideShow();
+  const v = set.get('guide'); guideStep = !NET && missionId === STEPS[0] && v !== 'off' && (v === 'always' || !seen) ? 0 : -1; guideCap = g(ME, CG.CAP_FOOD); guideEnd = 0; guideDid = []; guideShow();
 }
 function guideShow() {
   const el = $('guide'), on = guideStep >= 0; el.hidden = !on; document.body.classList.toggle('guided', on); if (!on) return;
   $('guideText').innerHTML = guideStep < GUIDE.length ? GUIDE[guideStep].say : '<b>That is the whole hill:</b> feed, dig, raise, raid. The larger colony at dusk wins.';
-  $('guideN').textContent = guideStep < GUIDE.length ? `${guideStep + 1} of ${GUIDE.length}` : ''; $('guideSkip').textContent = guideStep < GUIDE.length ? 'Skip' : 'Done';
+  $('guideN').textContent = guideStep < GUIDE.length ? `${Math.min(GUIDE.length, guideDid.filter(Boolean).length + 1)} of ${GUIDE.length}` : ''; $('guideSkip').textContent = guideStep < GUIDE.length ? 'Skip' : 'Done';
 }
 function guideStop(why) { if (guideStep < 0) return; rec.event('guide', { step: guideStep, at: sim.tick, end: why }); try { localStorage.setItem(GUIDE_KEY, '1'); } catch { /* no storage */ } guideStep = -1; guideShow(); }
 $('guideSkip').addEventListener('click', () => guideStop(guideStep >= GUIDE.length ? 'done' : 'skip'));
 function guideTick() {
   if (guideStep < 0 || screen !== 'play') return;
   if (guideStep >= GUIDE.length) { if (performance.now() > guideEnd) guideStop('done'); return; }
-  let moved = false; while (guideStep < GUIDE.length && GUIDE[guideStep].done()) { rec.event('guide', { step: guideStep, at: sim.tick }); guideStep++; moved = true; }
+  /* a step done out of turn counts: the card always shows the first thing not yet done */
+  let moved = false; GUIDE.forEach((st, i) => { if (!guideDid[i] && st.done()) { guideDid[i] = true; moved = true; rec.event('guide', { step: i, at: sim.tick }); } }); while (guideStep < GUIDE.length && guideDid[guideStep]) { guideStep++; moved = true; }
   if (moved) { if (guideStep >= GUIDE.length) guideEnd = performance.now() + 7000; tone(740, 0.08, 0.03, 'triangle', 120); guideShow(); }
 }
 let heard = []; // cells a colony opened in the other's ground, lately: drawn as rings in the nest view
