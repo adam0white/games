@@ -335,7 +335,7 @@ If the built plan takes no fewer coins than the ignoring plan, the mission is ca
 | Use Kick out | 0% | 83 to 95% | 100% | -67 to +17 | 0% |
 | Use Cook it! | 0% | 87 to 95% | 98 to 100% | -35 to +46 | 0% |
 | Use Lock out | 0% | 85 to 97% | 97 to 100% | -34 to +110 | 0% |
-| Use the Microwave | 0% | 58 to 83% | 80 to 92% | -1 to +43 | 0% |
+| Use the Microwave | 0% | 83 to 98% | 98 to 100% | -26 to +51 | 0% |
 | Three different actions | 0% | 88 to 98% | 100% | -65 to +34 | 0% |
 | Turn nobody away | 0 to 2% | 17 to 77% | 90 to 100% | -18 to +133 | 83% |
 | Win a fist fight | 0% | 50 to 65% | 80 to 88% | -41 to +75 | 0% |
@@ -351,6 +351,13 @@ Reading, plainly:
 **In the page.** From the fourth Rush a shift shows one mission: a line at the start, a chip under the tickets (a target, then a tick, or struck out once it cannot be done), and a line on the end card with the coins. The mission is the next one not yet done, in a fixed order from plain to costly, one step along each shift so a hard one is not offered twice running. It pays a fifth of the one-star target (50 coins at the Fine rank), added after the stars are counted, and only with one star. Done missions are kept in `kitchen-rush.done` and merged across tabs like the bests. `rec` start and end carry the mission, whether it was done, whether its condition held without the star, and the actions used. The hook is `kitchenRush(seed, night, mission)`.
 
 **Real page** (390 by 844 English, 320 by 568 Turkish): the menu's pick after three plays is Use the Pan; the chip sits under the tickets at both sizes and is not cut; banging the pan ticks it; the end card shows "+50" with a star and "needs one star" without one, and still fits; a kept mission shows green until broken; three turns spent elsewhere strikes it out; pause and Menu clear the chip and do not count the shift; a damaged record (text, a huge number, an unknown id) is read safely; under three plays no mission is shown. No page errors.
+
+**Review of slice 4.** One adversarial code review and one cold read of six screenshots, by two other models.
+
+- Fixed from the code review: the Microwave mission could meet no moody guest in a whole shift (now the second plain guest onward is moody if none has come; the row above is measured with that); the chip covered "Keep cooking" on the pause screen of a small phone (hidden while paused); "three different actions" stayed open after two turns on one action (now struck out); a second tab's plays and done missions were not read before a mission was chosen (now merged at the start of a shift); the test hook accepted an inherited property name as a mission.
+- Fixed from the cold read: the reader understood the mission, the star it also needs and the 50 coins, but not where the Pan is, so the start line now says "(tap a ticket)"; the chip now shows a hollow star while the mission holds but the star is still owed, and the coins once both are met; the start banner sits a line lower so the chip does not cover it.
+- Checked and rejected: that merging can erase a done mission (the merge keeps the higher count and is one synchronous step).
+- Left and recorded: the count of times a mission was done can be one short when two tabs each finish it (only "done at least once" is used); two tabs that each add coins to the wallet overwrite each other, which is older than the rebuild; the cold reader could not tell what the red dot on Lunch rush means or how the two nights differ from the menu alone; the end card does not say why the doors shut early.
 
 **Open after slice 4**
 

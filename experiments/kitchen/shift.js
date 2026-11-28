@@ -61,7 +61,7 @@ export function newShift({ save, seed = 1, off = {}, night = 'rush', mission = n
     save, seed, off, night: NIGHTS[night] ? night : 'rush', N, secs: N.secs ?? RUSH.secs, r: sim.rng(seed ^ 0x52757368), t: 0, doors: true, over: false,
     line: [], at: null, seq: 0, nextArrive: 0, seats: off.seats ?? seatsFor(save), menu: nightMenu(save, night), setPrice: N.setPrice ? setPriceFor(save) : null, sky, holds: off.cap ? 99 : trayHolds(save),
     skyNext: 0.5, coins: 0, tips: 0, served: 0, robbed: 0, strikes: 0, turned: 0, buzz: 0, bestBuzz: 0, stars: [], lastRecipe: null, clatters: 0, pushed: 0,
-    nerve: off.nerve ?? RUSH.nerve, calm: 0, locked: 0, hold: false, hired: false, acts: {}, won: 0, mission: MISSIONS[mission] ? mission : null,
+    nerve: off.nerve ?? RUSH.nerve, calm: 0, locked: 0, hold: false, hired: false, acts: {}, won: 0, moody: 0, mission: typeof mission === 'string' && Object.hasOwn(MISSIONS, mission) ? mission : null,
   };
 }
 
@@ -71,7 +71,10 @@ function makeGuest(s) {
   const recipe = (from.length ? from : s.menu)[Math.floor(r() * (from.length || s.menu.length))];
   s.lastRecipe = recipe;
   const kind = r() < RUSH.richShare ? 'rich' : null;
-  const mood = tier >= sim.MOOD_FROM && !kind && r() < 0.18 ? sim.MOODS[Math.floor(r() * sim.MOODS.length)] : null;
+  let mood = tier >= sim.MOOD_FROM && !kind && r() < 0.18 ? sim.MOODS[Math.floor(r() * sim.MOODS.length)] : null;
+  // The Microwave mission needs a moody guest: if none has come yet, the second plain guest onward is one (no extra draw).
+  if (!mood && !kind && s.mission === 'use_microwave' && !s.moody && s.seq >= 1 && tier >= sim.MOOD_FROM) mood = sim.MOODS[s.seq % sim.MOODS.length];
+  if (mood) s.moody++;
   let full = RUSH.patience[0] + r() * (RUSH.patience[1] - RUSH.patience[0]);
   full += RUSH.perItem * Math.max(0, sim.chopsFor(recipe) - 3) + RUSH.perStep * (sim.RECIPES[recipe].steps.length - 1) + RUSH.perRank * tier;   // bigger dishes buy more patience
   if (kind === 'rich') full *= RUSH.richWait;
@@ -283,7 +286,7 @@ export const SHARE = 0.25;
 // keep: true while it holds and lost for good once broken; the others are done the moment they happen.
 export const MISSIONS = {
   ...Object.fromEntries(ACTS.map(id => ['use_' + id, { ok: id === 'fight' ? s => s.won > 0 : s => (s.acts[id] ?? 0) > 0 }])),
-  trio: { ok: s => Object.keys(s.acts).length >= 3 },        // three different wheel actions
+  trio: { ok: s => Object.keys(s.acts).length >= 3, lost: s => Object.keys(s.acts).length + s.nerve < 3 },   // three different wheel actions
   seat: { ok: s => s.turned === 0, keep: true, from: 2 },    // nobody is turned away at the door (free below the Bistro)
 };
 MISSIONS.use_microwave.from = sim.MOOD_FROM;                 // it needs a moody guest
@@ -296,6 +299,8 @@ export function missionFor(save, done = {}, turn = 0) {
   return pool[Math.max(0, Math.floor(turn)) % pool.length] ?? null;
 }
 export const missionHolds = (s, id = s.mission) => !!MISSIONS[id]?.ok(s);
+// It can no longer be done this shift: a kept one is broken, or the wheel turns it needs are spent.
+export const missionLost = (s, id = s.mission) => { const M = MISSIONS[id]; return !!M && !M.ok(s) && (M.keep || (M.lost ? M.lost(s) : s.nerve <= 0)); };
 export const missionDone = (s, id = s.mission) => missionHolds(s, id) && s.coins >= targets(s.save, s.night)[0];
 export const missionPay = (save, night = 'rush') => Math.max(5, Math.round(targets(save, night)[0] * 0.2 / 5) * 5);
 export function result(s) {

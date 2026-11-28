@@ -86,8 +86,8 @@ export const USE = {
   fight: s => s.line.find(e => e.kind === 'rich' && !e.fought && e.left > estSecs(e) + 6),
 };
 // One shift. who: the rule for whose dish to build. use: a wheel action id, or null. random: use it at random instead.
-export function playShift({ save, seed, cook, who = 'greedy', use = null, random = false, once = false, trig = {}, off = {}, night = 'rush' }) {
-  const s = sh.newShift({ save, seed, off, night }), c = s.sky;
+export function playShift({ save, seed, cook, who = 'greedy', use = null, random = false, once = false, trig = {}, off = {}, night = 'rush', mission = null }) {
+  const s = sh.newShift({ save, seed, off, night, mission }), c = s.sky;
   const r = sim.rng(seed * 31 + 7), seen = []; let busy = 0, job = null, x = who === 'park' ? 0.8 : 0, step = 0, focus = null, think = 0, acted = false;
   const uses = use == null ? [] : [].concat(use);
   for (let i = 0; i < 60 * 600 && !s.over; i++) {
@@ -167,7 +167,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
         const base = { save: saveAt(tier), cook: COOKS[who], who: who === 'good' ? 'impatient' : 'greedy', night };
         const run = o => runs.map(seed => playShift({ ...base, ...o, seed }));
         const { ign, park, idle, rnd } = memo[tier] ??= { ign: run({}), park: run({ who: 'park' }), idle: run({ who: 'idle' }), rnd: Object.fromEntries(sh.ACTS.map(a => [a, run({ use: a, random: true })])) };
-        const b = run(BUILT[id]);
+        const b = run({ ...BUILT[id], mission: id });   // as on the page: the shift knows its mission
         cell.rows[id] = { rank: tier, ignore: pctOf(ign, id), built: pctOf(b, id), park: Math.max(pctOf(park, id), pctOf(idle, id)), coins: Math.round(mean(b.map(o => o.coins)) - mean(ign.map(o => o.coins))), random: Math.max(...sh.ACTS.filter(a => 'use_' + a !== id).map(a => pctOf(rnd[a], id))) };
       }
       cells.push(cell);

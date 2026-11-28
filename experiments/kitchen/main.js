@@ -137,7 +137,7 @@ const show = screens(['menu', 'paused', 'extra', 'dayEnd', 'shop'], name => {
   if (playing && g && ['catch', 'chop', 'fry', 'micro', 'blend', 'ring', 'close', 'serve', 'plate'].includes(phase)) $('ticket').style.display = 'block';
   // Off play, nothing of a station stays out: no Chop button; and off the pause card the knife, flames and pan go back.
   if (name !== 'play') chopBtn(false);
-  { const on = !!rush && (playing || name === 'paused'); $('rail').style.display = on ? 'flex' : 'none'; $('rushHud').style.display = on ? 'flex' : 'none'; $('rank').style.display = on ? 'none' : ''; $('coins').style.display = on ? 'none' : ''; document.body.classList.toggle('rush', on); }
+  { const on = !!rush && (playing || name === 'paused'); $('rail').style.display = on ? 'flex' : 'none'; $('rushHud').style.display = on ? 'flex' : 'none'; $('rank').style.display = on ? 'none' : ''; $('coins').style.display = on ? 'none' : ''; document.body.classList.toggle('rush', on); $('rushMission').style.visibility = playing ? '' : 'hidden'; }
   if (art && !playing && name !== 'paused') { art.knife.rest(); if (flames) flames.visible = false; art.pan.rotation.x = 0; art.panGlow.material.opacity = 0; }
   if (name === 'menu') menu();
   if (name === 'play') missionChip();
@@ -1072,6 +1072,7 @@ function beginRush() {
   clearCatch(); clearRush(); cook = null; g = null; waits = [];
   const night = rushNight ?? nightNow(); rushNight = null; lastNight = night;
   trayX = trayTarget = 0;
+  storeRush();   // another tab may have played: take its plays and done missions before choosing
   const firstNight = night !== 'rush' && !rushSave.tried[night];
   const mission = rushMission !== undefined ? rushMission : (rushSave.plays >= MISSION_AFTER && !firstNight ? sh.missionFor(save, rushSave.done, rushSave.turn) : null); rushMission = undefined;
   rush = sh.newShift({ save, seed, night, mission });
@@ -1083,7 +1084,7 @@ function beginRush() {
   paused = false; snd.release(); show('play'); hud();
   toSky();
   banner(t(night === 'rush' ? 'rushGo' : 'night_' + night), t(night === 'rush' ? 'rushGoSub' : 'nightGo_' + night));
-  rushCaught = false; rushChip(); if (firstNight) coach(t('nightSub_' + night), 8); else if (rush.mission) coach(t('misGo', { m: missionText(rush.mission), n: sh.missionPay(save, night) }), 7); else if ((rushSave.plays ?? 0) < 2) coach(t(matchMedia('(pointer: coarse)').matches ? 'rushDrag' : 'rushDragKeys'));   // first the control, then the rules
+  rushCaught = false; rushChip(); if (firstNight) coach(t('nightSub_' + night), 8); else if (rush.mission) coach(t('misGo', { m: missionText(rush.mission) + (rush.mission === 'seat' ? '' : t('misHow')), n: sh.missionPay(save, night) }), 8); else if ((rushSave.plays ?? 0) < 2) coach(t(matchMedia('(pointer: coarse)').matches ? 'rushDrag' : 'rushDragKeys'));   // first the control, then the rules
 }
 function toSky() {
   phase = 'sky'; g = null; cook = null; document.body.classList.add('sky'); art.view('catch'); $('ticket').style.display = 'none'; gauge(null);
@@ -1176,10 +1177,10 @@ function rushChip() {
   const s = rush, el = $('rushMission'), id = s?.mission;
   document.body.classList.toggle('mis', !!id);   // the banner sits a line lower while the chip is up
   if (!id) { if (chipWas) { el.style.display = 'none'; chipWas = ''; } return; }
-  const M = sh.MISSIONS[id], holds = sh.missionHolds(s), state = M.keep ? (holds ? 'keep' : 'lost') : holds ? 'done' : s.nerve <= 0 && !fight ? 'lost' : 'todo', key = id + state;
+  const M = sh.MISSIONS[id], holds = sh.missionHolds(s), star = s.coins >= sh.targets(save, s.night)[0], state = holds ? (M.keep ? 'keep' : 'done') : sh.missionLost(s) && !fight ? 'lost' : 'todo', key = id + state + (holds && star);
   if (key === chipWas) return;
   if (chipWas && chipWas.startsWith(id) && state === 'done') { SFX.star(); const r = el.getBoundingClientRect(); floater({ x: r.left + r.width / 2, y: r.bottom + 18 }, '✓', 'gold'); }
-  chipWas = key; el.className = state; el.style.display = 'block'; el.textContent = `${state === 'done' ? '✓' : state === 'lost' ? '✗' : '🎯'} ${missionText(id)}`;
+  chipWas = key; el.className = state; el.style.display = 'block'; el.textContent = `${state === 'done' ? '✓' : state === 'lost' ? '✗' : '🎯'} ${missionText(id)}${!holds ? '' : star ? ` · +${sh.missionPay(save, s.night)}` : ' · ☆'}`;   // ☆: the star it still needs
 }
 function stepRush(dt) {
   const s = rush;
@@ -1550,7 +1551,7 @@ window.kitchenFight = win => { if (!fight) return false; if (win) { fight.taps =
 window.kitchenCall = i => { const e = day?.line?.[i]; if (e) callGuest(e); return !!e; };
 window.kitchenThrow = () => { throwNext = true; };
 window.kitchenMood = m => { if (g) g.mood = m; return !!g; };
-window.kitchenRush = (seed, night, mission) => { if (screen !== 'menu' && phase !== 'sky') return false; if (seed != null) rushSeed = seed; if (night && sh.nightsFor(save).includes(night)) rushNight = night; if (mission !== undefined) rushMission = sh.MISSIONS[mission] ? mission : null; beginRush(); return true; };
+window.kitchenRush = (seed, night, mission) => { if (screen !== 'menu' && phase !== 'sky') return false; if (seed != null) rushSeed = seed; if (night && sh.nightsFor(save).includes(night)) rushNight = night; if (mission !== undefined) rushMission = typeof mission === 'string' && Object.hasOwn(sh.MISSIONS, mission) ? mission : null; beginRush(); return true; };
 window.kitchenRushAct = (n, id, won = true) => { const e = rush?.line.find(x => x.n === n); if (!e || phase !== 'sky' || actsFor) return false; openActs(e); if (actsFor !== e) return false; actsAt = 0; doAct(id); if (id === 'fight' && fight) window.kitchenFight(won); return true; };
 window.kitchenSkipCatch = () => { skipCatch = true; };
 window.kitchenGolden = () => { goldenNext = true; };

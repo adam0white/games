@@ -216,6 +216,9 @@ console.log('ranks reachable: ok');
     assert.ok(all.includes(sh.missionFor(saveAt(4), done, 5)), 'with all done, they come round again');
     assert.equal(sh.missionFor(saveAt(4), { use_pan: 1 }, 0), 'use_slap'); assert.equal(sh.newShift({ save: saveAt(4), mission: 'bogus' }).mission, null);
     const s4 = sh.newShift({ save: saveAt(4), seed: 3, mission: 'use_pan' }); assert.equal(sh.missionDone(s4), false); for (let i = 0; i < 120; i++) sh.stepShift(s4, sim.DT, 0); sh.act(s4, s4.line[0], 'pan'); assert.ok(sh.missionHolds(s4) && !sh.missionDone(s4), 'the action alone is not enough: it needs a star'); s4.coins = sh.targets(s4.save)[0]; assert.ok(sh.missionDone(s4) && sh.result(s4).missionDone);
+    for (const seed of [1, 2, 3, 4, 5, 6]) { const m = sh.newShift({ save: saveAt(2), seed, mission: 'use_microwave' }); for (let i = 0; i < 60 * 40; i++) sh.stepShift(m, sim.DT, 0); assert.ok(m.moody >= 1, 'the Microwave mission always meets a moody guest'); }
+    { const m = sh.newShift({ save: saveAt(4), seed: 3, mission: 'trio' }); for (let i = 0; i < 120; i++) sh.stepShift(m, sim.DT, 0); assert.equal(sh.missionLost(m), false); sh.act(m, m.line[0], 'pan'); m.calm = 0; sh.act(m, m.line[0], 'pan'); assert.ok(m.nerve === 1 && sh.missionLost(m), 'two turns on one action: three different ones cannot be reached'); }
+    assert.equal(sh.newShift({ save: saveAt(4), mission: 'constructor' }).mission, null);
     assert.ok(sh.missionPay(saveAt(0)) >= 5 && sh.missionPay(saveAt(10)) < sh.targets(saveAt(10))[0], 'a mission pays less than a star is worth');
   }
   console.log('rush: ok');
