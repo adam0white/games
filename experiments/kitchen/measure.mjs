@@ -143,8 +143,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     for (const who of ['good', 'new']) { console.log(`order, ${who} cook, rank ${TIER}, ${NIGHT}${off ? ', tray holds everything' : ''}`); console.table(table(Object.keys(POLICY).map(p => [p, { save, cook: COOKS[who], who: p, off: o, night: NIGHT }]), runs).map(({ name, coins, p25, p75, served, strikes, closedEarly, stars }) => ({ name, coins, p25, p75, served, strikes, closedEarly, stars }))); }
   } else if (question === 'wheel') {
     for (const who of ['good', 'new']) {
-      console.log(`wheel, ${who} cook, rank ${TIER}, plan ${WHO}${off ? ', used at random' : ''}`);
-      const rows = table([['never', { save, cook: COOKS[who], who: WHO }], ...sh.ACTS.map(id => [id, { save, cook: COOKS[who], who: WHO, use: id, random: off }])], runs);
+      console.log(`wheel, ${who} cook, rank ${TIER}, ${NIGHT}, plan ${WHO}${off ? ', used at random' : ''}`);
+      const rows = table([['never', { save, cook: COOKS[who], who: WHO, night: NIGHT }], ...sh.ACTS.map(id => [id, { save, cook: COOKS[who], who: WHO, use: id, random: off, night: NIGHT }])], runs);
       console.table(rows.map(({ name, coins, served, strikes, closedEarly, used, stars }) => ({ name, coins, 'vs never': +(coins - rows[0].coins).toFixed(1), served, strikes, closedEarly, used, stars })));
     }
   } else if (question === 'seats') {

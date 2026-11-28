@@ -257,6 +257,8 @@ Row served: progress and missions ("which shift to attempt"), and the owner's as
 |---|---|---|---|---|---|---|
 | 1 | new | 248 (102/min) | 201 (110/min) | 0.6 | 1.7 | 5% |
 | 1 | good | 332 (140/min) | 299 (166/min) | 0.0 | 0.4 | 0% |
+| 2 | new | 225 (86/min) | 196 (107/min) | 1.2 | 2.4 | 18% |
+| 2 | good | 357 (141/min) | 313 (166/min) | 0.1 | 1.0 | 2% |
 | 4 | new | 353 (134/min) | 345 (180/min) | 1.1 | 2.4 | 10% |
 | 4 | good | 676 (263/min) | 559 (297/min) | 0.1 | 0.6 | 0% |
 | 7 | new | 629 (226/min) | 615 (321/min) | 0.9 | 1.8 | 5% |
@@ -264,9 +266,19 @@ Row served: progress and missions ("which shift to attempt"), and the owner's as
 | 10 | new | 829 (298/min) | 772 (399/min) | 0.5 | 1.2 | 2% |
 | 10 | good | 1518 (580/min) | 1347 (722/min) | 0.0 | 0.1 | 0% |
 
-Reading: the shape is the same at every rank. Rush hour takes more a shift, Lunch rush takes 10 to 40% more a minute and has two to three times the walkouts. Neither is better on both counts. Whether a person feels that as a choice is not known.
+Reading: the shape is the same at every rank. Rush hour takes more a shift, Lunch rush takes 10 to 40% more a minute and has two to three times the walkouts. Neither is better on both counts. Rank 2 is the worst case for a beginner: Lunch is shut early in 18% of shifts, and in 30% with the tray two levels down. Whether a person feels the trade as a choice is not known.
 
-**In the real page** (browser players at the Fine rank, seed 4242, Lunch at its first tuning): Rush hour 544 and 559 coins, Lunch rush 305 and 457 for a slower and a faster player. A browser player that only chases the lowest wanted thing was shut early on Lunch twice (35 and 74 coins). Lunch is hard for a careless player. A still tray takes nothing on either night at any rank (bots).
+**Did it pass?** The line used for a night was: the night pays most a shift for at least one of the four players (new or good cook, tray low or built) and not for all four. Lunch did not meet it. Rush hour pays more a shift for every player at nearly every rank (the one exception is the new cook with a low tray at rank 2, 188 against 182). Lunch is kept as variety with a measured trade (more a minute, more walkouts, half the time), not as the better night for some player. Lunch also had two tunings (1.7 times pay, then the set price), which is the one retune the stop rules allow.
+
+**In the real page** (browser players at the Fine rank, final rules, five seeds each; targets 260, 410 and 560): Lunch rush took 386, 527, 640, 524 and 587 coins at a good pace and 221, 486, 497, 298 and 495 at a beginner's pace. Rush hour on seed 4242 took 559 and 544. A browser player that only chases the lowest wanted thing took 35, 74 and 149 on Lunch, and once 679. Lunch is hard for a careless player. Only the Fine rank was played in the browser.
+
+**The step 6 checks on Lunch** (`measure.mjs order 30 --night=lunch`, `measure.mjs wheel 40 --night=lunch`, with and without `--off`):
+
+- A still tray takes nothing at every rank (bots). A parked tray (moved once, then left) takes 195, 192, 332, 608 and 720 for the good cook at ranks 1, 2, 4, 7 and 10, which is one star each time and never two. For the new cook it is under one star at ranks 1, 2, 4 and 10 and one star at rank 7. Same open finding as Rush hour.
+- The wheel: no action changes Lunch by more than it changes Rush hour. Cook it! is again the strong one for a new cook (+80 at rank 4, +168 at rank 10). Rob at random still shuts the kitchen. Trash has lost its price on Lunch, because the smaller dish pays the same set price; used at random it gains a new cook 16, 36 and 54 coins at ranks 1, 4 and 10 (4 to 10%) and a good cook nothing at rank 4. Left as it is and recorded; it joins Cook it! and Lock out for the retune after a person's shifts.
+- Bots now run every action at random on both nights and assert the shift ends.
+
+**First-time and early taps** (real page, 390 by 844): a save at rank 1 or above that has never played a Rush sees only the Rush hour button; Lunch appears after one Rush hour, so the first shift still gets the drag hint. A tap on either button while the models are still loading starts that night when loading ends (about six seconds later in the test).
 
 **Tried and dropped in this slice**
 
@@ -281,4 +293,9 @@ Reading: the shape is the same at every rank. Rush hour takes more a shift, Lunc
 - In a Rush only Tray and Decor change the result. Knife, Stove, Microwave and Blender change nothing there, and Tables does nothing. "What to build first" is still not a Rush decision.
 - No missions inside a shift yet.
 - No person has played either night.
+- The page steps a shift on render frames and chops with `Math.random()`, while `measure.mjs` uses a fixed step. The same seed is the same guests, not the same shift, on page and script.
+
+### Review of slice 3
+
+One adversarial code review of the diff by another model. Fixed: a second tab's newer record was overwritten by a whole-record write (records are now merged, keeping the higher best and stars); the measuring script could run a night that is not open at that rank (now refused); a start that waited for loading could fire after the player left the menu and came back; the tray kept its position from the last shift; "Again" after a seeded start replayed the saved pick, not the night just played; the end card named the other night. Obsolete: a finding about ticket and rob prices under the 1.7 pay multiplier, removed with the multiplier. Left: the page and script stepping difference above. Not reviewed by an outside model: the set price, the record merge and the menu-visit guard as finally written, and the look of the menu and Lunch screens.
 

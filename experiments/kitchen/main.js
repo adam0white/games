@@ -1041,7 +1041,7 @@ const nightNow = () => (sh.nightsFor(save).includes(rushSave.night) ? rushSave.n
 const nightBook = id => (id === 'rush' ? rushSave : (rushSave.nights[id] ??= { best: {}, stars: {} }));
 const starRow = n => '★'.repeat(n) + '☆'.repeat(3 - n);
 function nightMenu() {
-  const more = sh.nightsFor(save).filter(id => id !== 'rush'), btn = id => `${NIGHT_ICON[id]} ${esc(t('night_' + id))} <small>${starRow(nightBook(id).stars?.[save.tier] ?? 0)}</small>`;
+  const more = rushSave.plays ? sh.nightsFor(save).filter(id => id !== 'rush') : [], btn   /* another night shows after one Rush hour */ = id => `${NIGHT_ICON[id]} ${esc(t('night_' + id))} <small>${starRow(nightBook(id).stars?.[save.tier] ?? 0)}</small>`;
   $('rush').innerHTML = more.length ? btn('rush') : `${esc(t('rush'))} <small>${starRow(rushSave.stars?.[save.tier] ?? 0)}</small>`;
   $('nights').innerHTML = save.tutorial ? more.map(id => `<button class="${rushSave.tried?.[id] ? '' : 'fresh'}" data-night="${id}">${btn(id)}</button>`).join('') : '';
 }
