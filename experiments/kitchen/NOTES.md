@@ -428,3 +428,14 @@ playing).
 
 **Not shown.** No person has played with the people on. Whether they make the choice of guest feel more like a choice
 is the open question for the owner. The wide-screen staging is open.
+
+**Wide screens, third attempt (same day).** The first two retunes shrank the person. The cause was the camera: the
+catching view puts the tray a fifth of the way up whatever the screen, and a wide screen is short, so almost nothing
+shows under it. Stepping the camera back alone changed nothing (the fifth stays a fifth). What worked: on a screen wider
+than tall, with Guests shown, the catching camera steps back by a fifth and aims lower so the tray sits near the middle,
+and guests are lifted until their shoulders show. Faces show at 1280 by 720, 844 by 390, 1024 by 768 and 1920 by 1080.
+Walks at 1280 by 720 and 844 by 390: no ring over the tray in three shifts each, all nine wheel actions accepted, models
+zero after quit, no errors. Phones are untouched (the step back is 1 there). Line 2 of the pass line now passes.
+Cost, for the owner to judge: on a wide screen a Rush with Guests shown has a smaller tray and food than an ordinary
+day, and food starts behind the tickets. Tickets only gives the old view. A guest walking in passes close to the camera
+on a wide screen and fills a corner for a moment.
