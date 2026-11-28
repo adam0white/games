@@ -3,6 +3,7 @@ import { words } from '../kit/i18n.js';
 
 export const W = words({
   en: {
+    rush: 'Rush hour', rushGo: 'Rush hour!', rushGoSub: 'Everyone is hungry at once.', rushCoach: 'The ring shows whose food it is. Two things fall at once: pick a side. Fill one ticket to cook it. The tray only holds so much.', rushLast: 'Last orders', rushTurned: 'No seat! They left.', rushPushed: 'Tray full!', rushBell: 'Doors closed', rushBellSub: 'Serve who is left.', rushClosed: 'Three walkouts!', rushClosedSub: 'The doors are shut early.', rushOver: 'Rush over!', rushOverClosed: 'Shut early!', rushTook: 'Rush takings', rushBest: 'Best at this rank', rushShare: 'Your share', rushNext: '{n} more coins for star {s}.', rushAll: 'Three stars. The town is talking.', rushAgain: 'Rush again',
     mood_rude: 'A rude one. They might throw it back at you.', mood_picky: 'A picky one. No tip unless it is perfect.', mood_sneaky: 'A sneaky one. They might run off without paying.',
     pickWho: 'Guests are waiting. Tap who comes to the counter. Swipe to look around.', focus_room: 'Dining room', focus_tables: 'The line', focus_serve: 'Counter', focus_door: 'Front door', focus_kitchen: 'Kitchen', walkout: 'Walked out: {what}', walkouts: 'Walked out',
     wheelBtn: 'Wheel', letGo: 'Let it go', thrown: 'SPLAT!', thrownSub: 'Spin the Wheel, then feed them.', dashed: 'They ran off with half the bill!',
@@ -61,6 +62,7 @@ export const W = words({
     r_smoothie: 'Smoothie', r_burger: 'Cheeseburger', r_skewer: 'Veggie skewer', r_steak: 'Steak dinner', r_fishplate: 'Fish plate', r_tasting: 'Chef\'s cake',
   },
   tr: {
+    rush: 'Yoğun saat', rushGo: 'Yoğun saat!', rushGoSub: 'Herkes aynı anda aç.', rushCoach: 'Halka, yemeğin kimin olduğunu gösterir. İki şey birden düşer: bir taraf seç. Bir fişi doldur, pişsin. Tepsi sınırlı.', rushLast: 'Son siparişler', rushTurned: 'Yer yok! Gittiler.', rushPushed: 'Tepsi dolu!', rushBell: 'Kapılar kapandı', rushBellSub: 'Kalanlara servis yap.', rushClosed: 'Üç kişi gitti!', rushClosedSub: 'Kapılar erken kapandı.', rushOver: 'Yoğun saat bitti!', rushOverClosed: 'Erken kapandı!', rushTook: 'Yoğun saat kazancı', rushBest: 'Bu seviyede en iyi', rushShare: 'Senin payın', rushNext: '{s}. yıldız için {n} para daha.', rushAll: 'Üç yıldız. Kasaba bunu konuşuyor.', rushAgain: 'Tekrar yoğun saat',
     mood_rude: 'Kaba biri. Yemeği suratına atabilir.', mood_picky: 'Titiz biri. Mükemmel olmazsa bahşiş yok.', mood_sneaky: 'Sinsi biri. Ödemeden kaçabilir.',
     pickWho: 'Misafirler bekliyor. Tezgâha kim gelsin, dokun. Etrafa bakmak için kaydır.', focus_room: 'Salon', focus_tables: 'Sıra', focus_serve: 'Tezgâh', focus_door: 'Giriş kapısı', focus_kitchen: 'Mutfak', walkout: 'Çekip gitti: {what}', walkouts: 'Çekip giden',
     wheelBtn: 'Çark', letGo: 'Boş ver', thrown: 'ŞAP!', thrownSub: 'Önce Çarkı çevir, sonra doyur.', dashed: 'Hesabın yarısıyla kaçtı!',

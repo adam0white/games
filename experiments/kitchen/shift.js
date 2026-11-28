@@ -1,0 +1,199 @@
+// Sky Kitchen: the Rush shift. Rules only, no window and no document: the page (main.js) and the scripted players
+// (measure.mjs) drive a shift through the same calls: newShift, stepShift, startCook, finish, rob, result.
+// A Rush is one shift on a clock with one shared sky: every seated guest's ingredients fall at once, the tray holds only
+// so much, and what you choose to catch decides whose dish gets made. More guests come than one cook can serve.
+import * as sim from './sim.js';
+
+export const RUSH = {
+  secs: 120,               // doors open this long; whoever is seated at the bell can still be served
+  open: 2,                 // guests already seated when the doors open
+  arrive: [7, 11],         // seconds between arrivals (drawn evenly), shorter at higher ranks (arriveCut a rank)
+  arriveCut: 0.25,
+  patience: [46, 62],      // seconds a seated guest waits (drawn evenly); moods and big spenders wait less
+  perItem: 7, perStep: 5, perRank: 2.5,   // extra seconds of patience for each item past three, each cook step past one, each rank
+  richShare: 0.22,         // a big spender pays richPay times the price and has richWait of the patience
+  richPay: 2.2, richWait: 0.7,
+  buzzMax: 5, buzzStep: 0.12,  // each guest served adds a step of buzz; each step adds this share to the pay
+  strikes: 3,              // walkouts that close the doors early
+  tipSteps: [[0.5, 1], [0.2, 0.5], [0, 0]],   // patience left when the cooking starts -> share of the full tip
+  tipByStars: [0, 0.1, 0.3, 0.6],
+  robTake: 0.6,            // rob: share of the price at once; it is a strike, the buzz is gone ...
+  robScare: 9,             // ... and every other seated guest loses this many seconds of patience
+  fork: 1.0,               // seconds between forks: two items fall together, too far apart to catch both on a small tray
+  forkGap: [1.0, 1.15],    // lane units between the two
+  decoy: 0.18,             // share of fork sides that hold something nobody wants (more with hardness)
+  trayBase: 3,             // the tray holds trayBase + tray level items; one more pushes the oldest off
+};
+export const trayHolds = save => RUSH.trayBase + save.built.tray;
+// Three seats at every rank for now. Measured with scripted players, a fourth and fifth seat lowered takings and
+// closed the doors early (NOTES.md), so the Tables build does not add Rush seats until a seat is worth having.
+export const seatsFor = () => 3;
+export const priceOf = (save, recipe) => Math.round(sim.RECIPES[recipe].price * (1 + 0.15 * save.tier));
+
+// off: switches for measure.mjs (--off). drain: patience does not run down. cap: the tray holds everything.
+// scare: rob has no witnesses. buzz: no buzz pay.
+export function newShift({ save, seed = 1, off = {} }) {
+  const sky = sim.newCatch({ need: {}, hard: sim.hardness(save), trayLevel: save.built.tray, seed: seed ^ 0x736b79, twist: sim.twistFor(save.tier) });
+  sky.shared = true; sky.next = 1e9;   // the shift drops its own forks (dropFork); the catch's own spawner stays off
+  return {
+    save, seed, off, r: sim.rng(seed ^ 0x52757368), t: 0, doors: true, over: false,
+    line: [], at: null, seq: 0, nextArrive: 0, seats: off.seats ?? seatsFor(save), menu: sim.menuFor(save), sky, holds: off.cap ? 99 : trayHolds(save),
+    skyNext: 0.5, coins: 0, tips: 0, served: 0, robbed: 0, strikes: 0, turned: 0, buzz: 0, bestBuzz: 0, stars: [], lastRecipe: null, clatters: 0, pushed: 0,
+  };
+}
+
+function makeGuest(s) {
+  const r = s.r, tier = s.save.tier;
+  const from = s.menu.filter(id => id !== s.lastRecipe);
+  const recipe = (from.length ? from : s.menu)[Math.floor(r() * (from.length || s.menu.length))];
+  s.lastRecipe = recipe;
+  const kind = r() < RUSH.richShare ? 'rich' : null;
+  const mood = tier >= sim.MOOD_FROM && !kind && r() < 0.18 ? sim.MOODS[Math.floor(r() * sim.MOODS.length)] : null;
+  let full = RUSH.patience[0] + r() * (RUSH.patience[1] - RUSH.patience[0]);
+  full += RUSH.perItem * Math.max(0, sim.chopsFor(recipe) - 3) + RUSH.perStep * (sim.RECIPES[recipe].steps.length - 1) + RUSH.perRank * tier;   // bigger dishes buy more patience
+  if (kind === 'rich') full *= RUSH.richWait;
+  if (mood === 'rude') full *= 0.8;
+  full = Math.round(full);
+  return { n: s.seq++, recipe, kind, mood, look: Math.floor(r() * 8), full, left: full, need: { ...sim.RECIPES[recipe].need }, got: {}, ready: false,
+    price: Math.round(priceOf(s.save, recipe) * (kind === 'rich' ? RUSH.richPay : 1)) };
+}
+// A fork: two things fall together, far apart. Each side is something a different seated guest lacks (when two guests
+// lack something), or now and then something nobody wants. The player's tray goes one way or the other.
+function dropFork(s) {
+  const c = s.sky, r = s.r, open = s.line.filter(e => leftOf(e) > 0);
+  if (!open.length) return;
+  const pickId = e => { const ids = Object.keys(e.need).filter(id => lacks(e, id)); return ids[Math.floor(r() * ids.length)]; };
+  const a = open[Math.floor(r() * open.length)], rest = open.filter(e => e !== a), b = rest.length ? rest[Math.floor(r() * rest.length)] : null;
+  const decoyShare = Math.min(0.4, RUSH.decoy + 0.02 * c.hard);
+  const ids = [pickId(a), b ? pickId(b) : null].map(id => (id == null || r() < decoyShare ? c.others[Math.floor(r() * c.others.length)] : id));
+  if (ids.every(id => !open.some(e => lacks(e, id)))) ids[0] = pickId(a);   // never two decoys
+  // One falls each side of the middle, each farther out than a tray left in the middle can reach: every pair is a side to pick.
+  const lim = sim.TUNE.lane - sim.TUNE.size, near = Math.min(lim - 0.04, c.half + sim.TUNE.size + 0.04);
+  const side = () => near + r() * (lim - near), xs = r() < 0.5 ? [-side(), side()] : [side(), -side()];
+  const vy = c.fall * (0.95 + r() * 0.1);
+  ids.forEach((id, i) => { c.items.push({ n: c.seq++, id, x: xs[i], x0: xs[i], y: sim.TUNE.start, vy, drift: 0, phase: 0, spin: r() * 6.28, state: 'fall', fork: c.seq }); c.spawned++; });
+}
+export const lacks = (e, id) => (e.got[id] ?? 0) < (e.need[id] ?? 0);
+export const leftOf = e => Object.entries(e.need).reduce((n, [k, v]) => n + Math.max(0, v - (e.got[k] ?? 0)), 0);
+// Who a caught item goes to: the seated guest who still lacks it and has the least patience left.
+export const ownerOf = (s, id) => s.line.filter(e => lacks(e, id)).reduce((a, e) => (!a || e.left < a.left ? e : a), null);
+// The sky drops what the seated guests still lack, so the catch sees their needs added together.
+function sync(s) {
+  const c = s.sky, need = {}, got = {};
+  for (const e of s.line) for (const [k, v] of Object.entries(e.need)) { need[k] = (need[k] ?? 0) + v; got[k] = (got[k] ?? 0) + (e.got[k] ?? 0); }
+  c.need = need; c.got = got; c.done = false;
+  c.others = Object.keys(sim.ING).filter(id => !(id in need));
+  if (c.hard >= sim.TUNE.junkFrom) c.others.push(...Object.keys(sim.JUNK));
+  c.tray = c.tray.filter(it => s.line.includes(it.owner));
+}
+function unseat(s, e) { s.line.splice(s.line.indexOf(e), 1); sync(s); }
+
+// Moves the shift on. trayX: where the player's tray is. Returns events: arrive {e}, turned {e} (no seat), walkout {e},
+// bell (doors close on time), closed (three strikes), over; and from the sky: caught {it, e}, pushed {it, e} (the tray was
+// full; the oldest item of another guest fell off), clatter {it, lost} (nobody wants this), ready {e}, missed {it}.
+export function stepShift(s, dt, trayX = 0) {
+  const ev = [];
+  if (s.over) return ev;
+  s.t += dt;
+  if (s.doors) {
+    if (s.t >= RUSH.secs) { s.doors = false; ev.push({ type: 'bell' }); }
+    else {
+      s.nextArrive -= dt;
+      while (s.nextArrive <= 0 && s.doors) {
+        const early = s.seq < RUSH.open;
+        s.nextArrive += early ? 0.8 : Math.max(3.5, RUSH.arrive[0] - RUSH.arriveCut * s.save.tier + s.r() * (RUSH.arrive[1] - RUSH.arrive[0]));
+        const e = makeGuest(s);
+        if (s.line.length >= s.seats) { s.turned++; s.buzz = Math.max(0, s.buzz - 1); ev.push({ type: 'turned', e }); }
+        else { s.line.push(e); sync(s); ev.push({ type: 'arrive', e }); }
+      }
+    }
+  }
+  if (!s.off.drain) for (const e of s.line.slice()) {
+    e.left -= dt;
+    if (e.left <= 0) {
+      unseat(s, e); s.strikes++; s.buzz = 0; ev.push({ type: 'walkout', e });
+      if (s.doors && s.strikes >= RUSH.strikes) { s.doors = false; ev.push({ type: 'closed' }); }
+    }
+  }
+  // The sky stops while the cook is at the counter.
+  if (!s.at && s.line.length) {
+    const c = s.sky;
+    c.next = 1e9; if ((s.skyNext -= dt) <= 0) { s.skyNext += RUSH.fork; dropFork(s); }
+    // stepCatch credits by the summed need; sort out here whose item it is.
+    for (const x of sim.stepCatch(c, trayX, dt)) {
+      if (x.type === 'done') continue;
+      if (x.type === 'missed') { ev.push(x); continue; }
+      const it = x.it;
+      if (x.type === 'extra') {
+        // Nobody wants this: it knocks the newest item off the tray and costs a step of buzz.
+        c.extra = null; c.tray = c.tray.filter(y => y !== it);
+        const lost = c.tray.pop() ?? null;
+        if (lost) { lost.owner.got[lost.id]--; lost.owner.ready = false; }
+        s.buzz = Math.max(0, s.buzz - 1); s.clatters++;
+        ev.push({ type: 'clatter', it, lost });
+      } else {
+        const e = ownerOf(s, it.id); it.owner = e; e.got[it.id] = (e.got[it.id] ?? 0) + 1;
+        ev.push({ type: 'caught', it, e });
+        if (c.tray.length > s.holds) {
+          const k = c.tray.findIndex(y => y.owner !== e), out = c.tray.splice(k < 0 ? 0 : k, 1)[0];
+          out.owner.got[out.id]--; out.owner.ready = false; s.pushed++;
+          ev.push({ type: 'pushed', it: out, e: out.owner });
+        }
+        if (leftOf(e) === 0 && !e.ready) { e.ready = true; ev.push({ type: 'ready', e }); }
+      }
+      sync(s);
+    }
+    c.done = false;
+  }
+  if (!s.doors && !s.line.length && !s.at) { s.over = true; ev.push({ type: 'over' }); }
+  return ev;
+}
+
+// Take a ready guest's food to the stove. Their seat frees, their clock stops, and how long they waited sets the tip.
+export function startCook(s, e) {
+  if (s.at || !s.line.includes(e) || !e.ready) return false;
+  const f = e.left / e.full; e.tipShare = RUSH.tipSteps.find(([min]) => f >= min)[1];
+  unseat(s, e); s.sky.items = s.sky.items.filter(it => it.y > 0.5); s.at = e; return true;
+}
+export const buzzPay = s => (s.off.buzz ? 1 : 1 + RUSH.buzzStep * s.buzz);
+
+// What the guest at the counter would pay for a dish of this quality (0 to 1). Does not change the shift.
+export function quote(s, e, quality) {
+  const stars = sim.dishStars(quality);
+  let tip = e.price * RUSH.tipByStars[stars] * (1 + 0.1 * (s.save.built.decor - 1)) * (e.tipShare ?? 1);
+  let price = e.price, thrown = false;
+  if (e.mood === 'rude') { tip = 0; thrown = stars < 3; }
+  if (e.mood === 'picky' && stars < 3) tip = 0;
+  if (e.mood === 'sneaky') { price = Math.ceil(price / 2); tip = 0; }
+  const m = buzzPay(s);
+  return { stars, price: Math.round(price * m), tip: Math.round(tip * m), total: Math.round(price * m) + Math.round(tip * m), thrown };
+}
+// The dish is served: the guest pays, the buzz grows.
+export function finish(s, quality) {
+  const e = s.at; if (!e) return null;
+  const b = quote(s, e, quality);
+  s.coins += b.total; s.tips += b.tip; s.served++; s.stars.push(b.stars);
+  s.buzz = Math.min(RUSH.buzzMax, s.buzz + 1); s.bestBuzz = Math.max(s.bestBuzz, s.buzz);
+  s.at = null; return b;
+}
+// Rob a seated guest: coins now. It is a strike, the buzz is gone, and the room saw it.
+export function rob(s, e) {
+  if (!s.line.includes(e)) return 0;
+  const n = Math.round(e.price * RUSH.robTake);
+  unseat(s, e);
+  s.coins += n; s.robbed += n; s.buzz = 0; s.strikes++;
+  if (!s.off.scare) for (const w of s.line) w.left = Math.max(0.5, w.left - RUSH.robScare);
+  const closed = s.doors && s.strikes >= RUSH.strikes; if (closed) s.doors = false;
+  return { coins: n, closed };
+}
+
+// The target: coins for one, two and three stars at each rank, set from `node measure.mjs targets` (see NOTES.md):
+// one star is a little under a new cook's poor shift, three stars is a good cook's average shift.
+export const TARGETS = [[150, 215, 260], [190, 295, 385], [180, 290, 380], [240, 410, 570], [240, 450, 660], [360, 630, 910], [430, 710, 1020], [480, 820, 1180], [480, 950, 1480], [550, 1050, 1570], [580, 1120, 1710]];
+export const targets = save => TARGETS[Math.min(TARGETS.length - 1, save.tier)];
+// Rush coins are bigger than a day's. The save gets this share, so a Rush pays about what the same minutes of days pay.
+export const SHARE = 0.25;
+export function result(s) {
+  const tg = targets(s.save), stars = tg.filter(x => s.coins >= x).length;
+  return { share: Math.round(s.coins * SHARE), coins: s.coins, tips: s.tips, served: s.served, strikes: s.strikes, turned: s.turned, robbed: s.robbed, bestBuzz: s.bestBuzz, stars, targets: tg, closedEarly: s.strikes >= RUSH.strikes };
+}
