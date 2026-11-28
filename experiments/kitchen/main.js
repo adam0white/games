@@ -392,6 +392,7 @@ function startChop() {
   cook = { kind: 'chop', pieces, t0: clock, cuts: sim.chopCuts(save), slide: sim.chopSlide(save) * sim.knifeCalm(save.built.knife), reach: sim.knifeReach(save.built.knife), bits: [] };
   banner(t('chop'), t('chopSub'));
   aim = 0; art.knife.position.x = 0.45;
+  if (g.rush && (rushSave.plays ?? 0) < 2) coach(t('t3'), 5);
   if (g.tut === 0) { coach(t('t3')); fingerTap(pieces[0].m.position.clone().add(new art.THREE.Vector3(0, 0.05, 0))); }
   gauge(null);
 }
@@ -474,7 +475,7 @@ function startFry() {
   for (const m of items) m.traverse(o => { if (o.isMesh) o.material = [].concat(o.material).map(x => x.clone()).at(0); });
   cook = { kind: 'fry', items, d: 0, held: false, band: sim.fryBand(save.built.stove, save.tier), t: 0, tick: 0, flips: 0 };
   banner(t('fry'), t('frySub')); gauge('fry');
-  if (g.tut >= 0 && !save.tutorial) coach(t('frySub'));
+  if ((g.tut >= 0 && !save.tutorial) || (g.rush && (rushSave.plays ?? 0) < 2)) coach(t('frySub'), g.rush ? 5 : 0);
 }
 // What goes into a pan or a microwave. Food chopped earlier in this dish goes in cut: potatoes as fry sticks, others as halves.
 function cookItems(x, y, z, span, where = 'micro') {
@@ -554,7 +555,7 @@ function startMicro() {
   cook = { kind: 'micro', items, p: 0, dir: 1, band: sim.microBand(save.built.micro, save.tier), speed: sim.microSpeed(save.tier), tick: 0 };
   art.microLight.intensity = 2.2; art.microGlass.material.opacity = 0.35;
   banner(t('micro'), t('microSub')); gauge('micro');
-  if (g.tut >= 0 && !save.tutorial) coach(t('microSub'));
+  if ((g.tut >= 0 && !save.tutorial) || (g.rush && (rushSave.plays ?? 0) < 2)) coach(t('microSub'), g.rush ? 5 : 0);
 }
 function stepMicro(dt) {
   if (cook.over) return;
@@ -577,7 +578,7 @@ function startBlend() {
   phase = 'blend'; art.view('blend');
   cook = { kind: 'blend', taps: 0, need: sim.blendTaps(save.built.blender, save.tier), fill: 0, t0: clock };
   banner(t('blend'), t('blendSub')); gauge('blend');
-  if (g.tut >= 0 && !save.tutorial) coach(t('blendSub'));
+  if ((g.tut >= 0 && !save.tutorial) || (g.rush && (rushSave.plays ?? 0) < 2)) coach(t('blendSub'), g.rush ? 5 : 0);
 }
 function tapBlend() {
   if (!cook || cook.kind !== 'blend' || cook.over) return;
@@ -1015,6 +1016,7 @@ const rushSave = (() => {
   if (Number.isFinite(raw.plays)) out.plays = Math.max(0, Math.floor(raw.plays));
   for (const [k, v] of Object.entries(raw.best && typeof raw.best === 'object' ? raw.best : {})) if (Number.isFinite(v)) out.best[k] = Math.max(0, Math.floor(v));
   for (const [k, v] of Object.entries(raw.stars && typeof raw.stars === 'object' ? raw.stars : {})) if (Number.isFinite(v)) out.stars[k] = Math.max(0, Math.min(3, Math.floor(v)));
+  if (raw.seen && typeof raw.seen === 'object') out.seen = Object.fromEntries(['rich', 'rude', 'picky', 'sneaky'].filter(m => raw.seen[m]).map(m => [m, 1]));
   return out;
 })();
 const SEAT_COLOR = ['#ff7a4d', '#3fb6ff', '#a97bff', '#4fcf7a', '#ffc933'];
@@ -1023,7 +1025,7 @@ const rings = new Map();                               // falling item n -> ring
 let ringGeo = null;
 function clearRush() {
   for (const n of [...rings.keys()]) dropRing(n);
-  $('rail').style.display = 'none'; $('rushHud').style.display = 'none'; $('rail').innerHTML = ''; $('acts').style.display = 'none'; actsFor = null; if (fight) { fight.over = true; fight = null; $('fight').style.display = 'none'; }
+  $('rail').style.display = 'none'; $('rushHud').style.display = 'none'; $('rail').innerHTML = ''; $('acts').style.display = 'none'; actsFor = null; document.body.classList.remove('sky'); if (fight) { fight.over = true; fight = null; $('fight').style.display = 'none'; }
 }
 function beginRush() {
   art.register.reset?.();
@@ -1039,10 +1041,10 @@ function beginRush() {
   paused = false; snd.release(); show('play'); hud();
   toSky();
   banner(t('rushGo'), t('rushGoSub'));
-  if (!rushSave.plays) coach(t('rushCoach'), 9);
+  rushCaught = false; if ((rushSave.plays ?? 0) < 2) coach(t(matchMedia('(pointer: coarse)').matches ? 'rushDrag' : 'rushDragKeys'));   // first the control, then the rules
 }
 function toSky() {
-  phase = 'sky'; g = null; cook = null; art.view('catch'); $('ticket').style.display = 'none'; gauge(null);
+  phase = 'sky'; g = null; cook = null; document.body.classList.add('sky'); art.view('catch'); $('ticket').style.display = 'none'; gauge(null);
   redrawTray(); rail();
 }
 function redrawTray(newest = null) {
@@ -1062,7 +1064,7 @@ function rail() {
   railBars();
 }
 // ---------- the wheel in a Rush: tap a guest's ticket. The rules and the prices are in shift.js (act).
-let actsFor = null, actsAt = 0, rushHinted = false;
+let actsFor = null, actsAt = 0, rushHinted = false, rushCaught = true;
 // A tap on a ticket. The tickets are redrawn whenever anything is caught, so the node under the finger can be replaced
 // between press and release and a click on it would be lost: remember the guest at the press and open at the release.
 let chipDown = null;
@@ -1100,6 +1102,7 @@ function applyAct(e, id, won) {
   art.shake(id === 'pan' || id === 'slap' || id === 'fight' ? 0.9 : 0.4); buzz(25);
   if (out.coins) { SFX.coin(); }
   if (out.closed) { banner(t('rushClosed'), t('rushClosedSub')); }
+  else if (id === 'rob' || (id === 'fight' && !won)) floater({ x: innerWidth / 2, y: innerHeight * 0.36 }, t('rushStrike', { n: Math.min(s.strikes, sh.RUSH.strikes), of: sh.RUSH.strikes }), 'bad');
   redrawTray(); rail();
 }
 
@@ -1129,15 +1132,16 @@ function stepRush(dt) {
   const ev = []; for (let left = dt; left > 1e-6; left -= 0.034) ev.push(...sh.stepShift(s, Math.min(0.034, left), trayX / LANE.s));
   let redraw = false, changed = false;
   for (const e of ev) {
-    if (e.type === 'arrive') { changed = true; SFX.tap(); rec.event('arrive', { recipe: e.e.recipe, kind: e.e.kind, mood: e.e.mood }); }
+    if (e.type === 'arrive') { changed = true; SFX.tap(); const mark = e.e.kind === 'rich' ? 'rich' : e.e.mood; if (mark && s.t > 6 && !rushSave.seen?.[mark]) { rushSave.seen = { ...rushSave.seen, [mark]: 1 }; writeJson(RUSH_KEY, rushSave); floater({ x: innerWidth / 2, y: innerHeight * 0.4 }, t('rushMark_' + mark), 'gold'); } rec.event('arrive', { recipe: e.e.recipe, kind: e.e.kind, mood: e.e.mood }); }
     else if (e.type === 'turned') { floater({ x: innerWidth / 2, y: innerHeight * 0.2 }, t('rushTurned'), 'bad'); rec.event('turned', { recipe: e.e.recipe }); }
     else if (e.type === 'walkout') {
       changed = redraw = true; day.lost++; SFX.wrong(); buzz([60, 40, 60]); art.shake(0.8);
-      floater({ x: innerWidth / 2, y: innerHeight * 0.24 }, t('walkout', { what: t('r_' + e.e.recipe) }), 'bad');
+      floater({ x: innerWidth / 2, y: innerHeight * 0.24 }, `${t('walkout', { what: t('r_' + e.e.recipe) })} ${t('rushStrike', { n: Math.min(s.strikes, sh.RUSH.strikes), of: sh.RUSH.strikes })}`, 'bad');
       rec.event('walkout', { recipe: e.e.recipe, kind: e.e.kind, strikes: s.strikes });
     } else if (e.type === 'bell') { banner(t('rushBell'), t('rushBellSub')); SFX.star(); }
     else if (e.type === 'closed') { banner(t('rushClosed'), t('rushClosedSub')); SFX.burnt?.(); }
     else if (e.type === 'caught') {
+      if (!rushCaught) { rushCaught = true; if (!rushSave.plays) coach(t('rushCoach'), 9); else coach(null); }
       changed = true; dropMesh(e.it.n); redrawTray(e.it);
       SFX.catch(s.sky.tray.length); buzz(12); art.tray.bump();
       art.burst(new art.THREE.Vector3(trayX, LANE.y0 + 0.05, LANE.z), { n: 8, color: SEAT_COLOR[seatOf(e.e)], speed: 1.2, up: 1.4, size: 0.03, life: 0.5 });
@@ -1146,7 +1150,7 @@ function stepRush(dt) {
     else if (e.type === 'clatter') {
       changed = redraw = true; day.extras++; const m = meshes.get(e.it.n); meshes.delete(e.it.n); dropRing(e.it.n); if (m) { art.world.remove(m); flyAway(m, trayX); }
       if (e.lost) flyAway(art.item(itemModel(e.lost.id), 0.25), trayX);
-      SFX.wrong(); buzz([40, 60, 40]); art.shake(1); floater(worldPx(trayX, LANE.y0 + 0.35), '✗', 'bad'); song?.hit();
+      SFX.wrong(); buzz([40, 60, 40]); art.shake(1); floater(worldPx(trayX, LANE.y0 + 0.35), t(e.lost ? 'rushWrongLost' : 'rushWrong'), 'bad'); song?.hit();
     } else if (e.type === 'ready') { changed = true; SFX.good(); }
     else if (e.type === 'selfserved') {
       changed = redraw = true; day.served++; save.served++; day.earned += e.bill.price; day.stars.push(e.bill.stars);
@@ -1186,7 +1190,7 @@ function rushCook(e) {
   if (!sh.startCook(rush, e)) return;
   for (const n of [...meshes.keys()]) dropMesh(n);
   g = { rush: e, mood: e.mood, look: e.look, recipe: e.recipe, need: { ...e.need }, q: [], steps: RECIPES[e.recipe].steps.slice(), step: -1, wait: 0, extras: 0, restarts: 0, paid: 0, model: null, tut: -1, golden: false };
-  phase = 'caught'; coach(null); rail(); redrawTray();
+  phase = 'caught'; document.body.classList.remove('sky'); coach(null); rail(); redrawTray();
   banner(t('r_' + e.recipe)); ticket(); $('ticket').style.display = 'block';
   rec.event('catch', { recipe: e.recipe, left: Math.round(e.left), tip: e.tipShare });
   wait(0.3, nextStep);
