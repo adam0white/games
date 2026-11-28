@@ -3,10 +3,10 @@
 // No game rule lives here. An order made on one phone is applied on every phone from the sealed frame, its own included.
 
 import { Host, TICK_MS } from './host.js';
-import { think, THINK_EVERY } from './ai.js';
+import { act, THINK_EVERY } from './ai.js';
 import { MISSIONS } from './tables.js';
 
-export const WIRE = 1; // raise when two pages of different code could not share a room
+export const WIRE = 2; // raise when two pages of different code could not share a room
 export const START = 0, HELLO = -1; // wire-only types: the match begins on the next room tick; a seat says which colony it plays
 const SCALARS = ['team', 'trail', 'level', 'kind', 'on', 'mode', 'x', 'y', 'special', 'hold', 'craft', 'caste', 'share', 'dig', 'branch'];
 const LISTS = ['points', 'cells', 'under'];
@@ -80,7 +80,7 @@ export class NetHost {
     if (this.startAt < 0 || r > this.through || s.result) return false;
     const q = this.byTick.get(r);
     if (q) { for (const o of q) s.order({ ...o, tick: s.tick }); this.byTick.delete(r); }
-    if (this.bot && s.tick % THINK_EVERY === 0) for (const o of think(s, this.bot.team, this.bot.mind)) this.order(o);
+    if (this.bot && s.tick % THINK_EVERY === 0) for (const o of act(s, this.bot.team, this.bot.mind)) this.order(o);
     this.inner.tick();
     if (r % HASH_EVERY === 0) this.send(JSON.stringify({ t: 'hash', tick: r, h: s.hash() | 0 }));
     return true;
@@ -109,7 +109,7 @@ export const roomSeed = code => 1 + [...String(code).toUpperCase()].reduce((h, c
  *  so two links that would build different worlds can never share a room. */
 export const roomSim = ({ mission, bot = null, botSide = 1 }) => WIRE * 100000 + [...`${mission}|${bot}|${bot === null ? '' : botSide === 0 ? 0 : 1}`].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 99991, 7);
 export function roomOptions({ code, mission, bot = null, botSide = 1 }) {
-  return { seed: roomSeed(code), mission, ...(MISSIONS[mission]?.long ? { duskTick: 24000, truce: 9600 } : {}), ai: bot === null ? {} : { [botSide === 0 ? 0 : 1]: bot } };
+  return { seed: roomSeed(code), mission, ...(MISSIONS[mission]?.long ? { duskTick: 24000, truce: 9600 } : {}), ai: bot === null ? {} : { [botSide === 0 ? 0 : 1]: { mood: bot, natural: true } } }; // a room's machine rival always has a person's manners
 }
 
 export const PROTO = 1;

@@ -1,9 +1,10 @@
 // Cinderhill: The Crossing. The page for the war sim (./sim.js): two colonies on one hill. No game rule lives here:
 // everything on screen is read from the sim or its events, and every order goes through host.order() under seat 0.
 import { Host } from './host.js';
+import { freePile } from './ai.js';
 import { NetHost, roomLink, roomSeed, roomOptions, roomSim } from './wire.js';
 import { newCode, cleanCode, shareLink } from '../../kit/room.js';
-import { CMD, KIND, MODE, CG, EVENT, REASON, TASK, CASTE, STAGE, MAT, ROOM, TRAILS, PATH_MAX, MAX_PILES, C, LEVEL_SHARE, RAID_SHARE, PLUG, PEST } from './sim.js';
+import { CMD, KIND, MODE, CG, EVENT, REASON, TASK, CASTE, STAGE, MAT, ROOM, TRAILS, PATH_MAX, MAX_PILES, C, LEVEL_SHARE, RAID_SHARE, PLUG, PEST, WHY } from './sim.js';
 import { CAMPAIGN, LINEAGE, LOSS_ANTS, MISSIONS, TRAITS, TIERS, BRANCH, ROAD, VISITOR } from './tables.js';
 import { makeGestures } from '../gestures.js';
 import { GameRenderer, sky } from '../game/gl.js';
@@ -28,6 +29,8 @@ const rec = lab('cinderhill', { lang: () => 'en' });
 rec.notice($('menuLab')); rec.toggle($('menuLab')); rec.toggle($('pauseLab'));
 const set = settings('cinderhill', {
   rival: { values: ['timid', 'steady', 'bold'], def: 'timid', key: 'cinderhill:war:rival' },
+  manners: { values: ['natural', 'sharp'], def: 'natural', key: 'cinderhill:war:manners' },
+  idle: { values: ['warn', 'pause', 'quiet'], def: 'warn', key: 'cinderhill:war:idle' },
   caste: { values: ['spitter', 'warden'], def: 'spitter', key: 'cinderhill:war:caste' },
   view: { values: ['tilt', 'top', 'low'], def: 'tilt', key: 'cinderhill:war:view' },
   light: { values: ['cycle', 'day', 'ember'], def: 'cycle', key: 'cinderhill:war:light' },
@@ -44,10 +47,10 @@ const set = settings('cinderhill', {
   day: { values: ['12', '20', '30'], def: '20', key: 'cinderhill:war:day' },
   falls: { values: ['lean', 'fair', 'rich'], def: 'fair', key: 'cinderhill:war:falls' },
 }, { rec });
-const LABEL = { guide: 'First steps', caste: 'Your third caste', rival: 'Rival', view: 'View', light: 'Light', style: 'Style', size: 'Ants', sound: 'Sound', finger: 'One finger', nest: 'The Nest', forks: 'Forks', growth: 'The tree', home: 'The home hill', visitor: 'The weevil', day: 'High Summer: length', falls: 'High Summer: windfalls' };
-const NAME = { once: 'Shown until done once', always: 'Shown every game', off: 'Hidden', full: 'Fills the screen', sheet: 'Slides over the lower half', 12: 'Twelve minutes', 20: 'Twenty minutes', 30: 'Thirty minutes', lean: 'Lean: a third less falls', fair: 'Fair', rich: 'Rich: half as much again', comes: 'Comes for your stores', hungry: 'Comes hungry, and harder to kill', never: 'Never comes', carried: 'Kept from mission to mission', bare: 'A new hill every mission', mission: 'Grow the hill in each mission', deeds: 'Deeds alone open tools (no growth)', spitter: 'Spitters', warden: 'Wardens', timid: 'Timid', steady: 'Steady', bold: 'Bold', tilt: 'Tilted', top: 'Top down', low: 'Low', cycle: 'Day to dusk', day: 'Day', ember: 'Ember', relief: 'Painted', ink: 'Ink', 1: 'True size', 1.5: 'Larger', hill: 'Draws from your hill, moves the view elsewhere', draw: 'Always draws', kept: 'Kept for the campaign', free: 'Can be changed between missions', all: 'Music & effects', fx: 'Effects', off: 'Off' };
+const LABEL = { manners: 'Rival\'s hands', idle: 'Idle workers', guide: 'First steps', caste: 'Your third caste', rival: 'Rival', view: 'View', light: 'Light', style: 'Style', size: 'Ants', sound: 'Sound', finger: 'One finger', nest: 'The Nest', forks: 'Forks', growth: 'The tree', home: 'The home hill', visitor: 'The weevil', day: 'High Summer: length', falls: 'High Summer: windfalls' };
+const NAME = { natural: 'Like a person', sharp: 'Like a machine', warn: 'Tell me', pause: 'Tell me, then pause', quiet: 'Say nothing', once: 'Shown until done once', always: 'Shown every game', off: 'Hidden', full: 'Fills the screen', sheet: 'Slides over the lower half', 12: 'Twelve minutes', 20: 'Twenty minutes', 30: 'Thirty minutes', lean: 'Lean: a third less falls', fair: 'Fair', rich: 'Rich: half as much again', comes: 'Comes for your stores', hungry: 'Comes hungry, and harder to kill', never: 'Never comes', carried: 'Kept from mission to mission', bare: 'A new hill every mission', mission: 'Grow the hill in each mission', deeds: 'Deeds alone open tools (no growth)', spitter: 'Spitters', warden: 'Wardens', timid: 'Timid', steady: 'Steady', bold: 'Bold', tilt: 'Tilted', top: 'Top down', low: 'Low', cycle: 'Day to dusk', day: 'Day', ember: 'Ember', relief: 'Painted', ink: 'Ink', 1: 'True size', 1.5: 'Larger', hill: 'Draws from your hill, moves the view elsewhere', draw: 'Always draws', kept: 'Kept for the campaign', free: 'Can be changed between missions', all: 'Music & effects', fx: 'Effects', off: 'Off' };
 const MOOD = { timid: 0, steady: 1, bold: 2 };
-const redraw = set.panel($('settings'), { only: set.ids.filter(id => id !== 'caste' && !(NET && ['rival', 'forks', 'growth', 'home', 'visitor', 'day', 'falls'].includes(id))), /* a room's rules come from its link, the same for every page */ label: id => LABEL[id], name: (id, v) => NAME[v] ?? v, what: (id, v) => (id === 'caste' ? (v === 'spitter' ? 'Frail, but they spit from two cells away, over the front line. Applies from the next start.' : 'Slow and very hard to kill: they hold a tunnel. Applies from the next start.') : id === 'rival' ? (v === 'timid' ? 'It never attacks your hill. Applies from the next start.' : v === 'bold' ? 'It raids early, even at even odds. Applies from the next start.' : 'It holds the fords, and raids when it has the numbers. Applies from the next start.') : id === 'growth' ? (v === 'mission' ? 'Each mission you widen the queen\'s chamber, choose a War hill or a Deep hill, and grow into your tools. Applies from the next start.' : 'No growth: what your deeds have opened is yours from the first minute. Applies from the next start.') : id === 'home' ? (v === 'carried' ? 'First Frost, The Stones and The Larder are fought on the hill of The Crossing. Each starts in the nest as you left it, tunnels, stores and nurseries, and the rival starts in its own. Quarters come back as bare tunnels to paint again. Applies from the next start.' : 'Every mission starts in the same small nest. Applies from the next start.') : id === 'visitor' ? (v === 'never' ? 'No weevil in any mission. Applies from the next start.' : `In First Frost a weevil comes in at each door ${VISITOR[v].at.length} times and eats up to ${VISITOR[v].fill} seeds a visit from stores within ${VISITOR[v].reach} steps of the door. Applies from the next start.`) : null), onChange: (id, v) => { if (id === 'forks' || id === 'home' || id === 'visitor') renderPath(); if (id === 'sound') { if (v === 'off') snd.hold(); else { snd.release(); startSong(); } } tone(660, 0.06, 0.03, 'triangle', 80); } });
+const redraw = set.panel($('settings'), { only: set.ids.filter(id => id !== 'caste' && !(NET && ['rival', 'manners', 'idle', 'forks', 'growth', 'home', 'visitor', 'day', 'falls'].includes(id))), /* a room's rules come from its link, the same for every page */ label: id => LABEL[id], name: (id, v) => NAME[v] ?? v, what: (id, v) => (id === 'caste' ? (v === 'spitter' ? 'Frail, but they spit from two cells away, over the front line. Applies from the next start.' : 'Slow and very hard to kill: they hold a tunnel. Applies from the next start.') : id === 'rival' ? (v === 'timid' ? 'It never attacks your hill. Applies from the next start.' : v === 'bold' ? 'It raids early, even at even odds. Applies from the next start.' : 'It holds the fords, and raids when it has the numbers. Applies from the next start.') : id === 'manners' ? (v === 'natural' ? 'It looks the ground over for a few seconds before its first order, gives no more than two orders a second, misses a beat now and then, and its trails wander a little. Applies from the next start.' : 'It orders the instant it can and its trails run dead straight. Applies from the next start.') : id === 'idle' ? (v === 'warn' ? 'When workers stand in the hill with no trail to walk and there is food worth a trail, a line says so.' : v === 'pause' ? 'The same line, and after a few seconds of it the game pauses once, so you can draw a trail. Not in a room with friends.' : 'No line and no pause.') : id === 'growth' ? (v === 'mission' ? 'Each mission you widen the queen\'s chamber, choose a War hill or a Deep hill, and grow into your tools. Applies from the next start.' : 'No growth: what your deeds have opened is yours from the first minute. Applies from the next start.') : id === 'home' ? (v === 'carried' ? 'First Frost, The Stones and The Larder are fought on the hill of The Crossing. Each starts in the nest as you left it, tunnels, stores and nurseries, and the rival starts in its own. Quarters come back as bare tunnels to paint again. Applies from the next start.' : 'Every mission starts in the same small nest. Applies from the next start.') : id === 'visitor' ? (v === 'never' ? 'No weevil in any mission. Applies from the next start.' : `In First Frost a weevil comes in at each door ${VISITOR[v].at.length} times and eats up to ${VISITOR[v].fill} seeds a visit from stores within ${VISITOR[v].reach} steps of the door. Applies from the next start.`) : null), onChange: (id, v) => { if (id === 'forks' || id === 'home' || id === 'visitor') renderPath(); if (id === 'sound') { if (v === 'off') snd.hold(); else { snd.release(); startSong(); } } tone(660, 0.06, 0.03, 'triangle', 80); } });
 
 // ---- the game ----
 const qSeed = Math.floor(Number(query.get('seed')));
@@ -63,7 +66,7 @@ const TEXT = {
   stones: { sub: 'Four standing stones. Stand by them longer than the rival does.', goals: ['A stone pays a point a second to the colony with more ants beside it. It takes three ants at least.', 'First to 400 points wins. At dusk, more points wins.', 'Draw a raid trail to a stone and your soldiers stand there.', 'Two stones stand on the fords. One stands on each far flank.'], clock: ['Dusk'], won: 'The stones are yours', end: 'dusk' },
   larder: { sub: 'A lean season. Their stores are full. So are yours.', goals: ['Carry ten loads home from the rival\'s store. A load counts when the thief reaches your own store with it.', 'Tap Raid, then tap the rival door. Every soldier goes, and workers go along to carry. The soldiers hold the store while the workers take from it.', 'Half the rival\'s soldiers stand on a ford. Strike while they are away, and mind your own door.', 'At dusk, more loads carried home wins.'], clock: ['Dusk'], won: 'Their larder is yours', end: 'dusk' },
   narrows: { sub: 'A ridge of stone. One pass. Their queen is frail, and dusk is on her side.', goals: ['Kill the rival queen before dusk. If she lives to see it, you have lost.', 'There is one way through the ridge, and the rich food lies in it.', 'The rival will not march on your hill. It will hold the pass and its own door.', 'Two ways in. Storm the pass: grow, raise soldiers, draw a raid to the rival door. Or go under the ridge: open Nest, pick Tunnel and drag through the clay toward the rival nest, then pick Strike. The ground under the ridge is soft loam: a cell takes half the time and costs no seed. It is the harder way: a long dig, the rival hears it, and its soldiers are at home.'], clock: ['Dusk'], won: 'The ridge is yours', end: 'dusk' },
-  wall: { sub: 'A wall of stone, whole. The only way to the other queen is through the clay.', goals: ['Kill the rival queen, or have the larger colony at dusk.', 'No ant can cross the wall. Open Nest, pick Tunnel and drag through the clay toward the rival nest. A seed to dig a cell.', 'When you are through, pick Strike and tap inside the rival nest. Your soldiers go that way for the queen.', 'The rival digs too, and you will hear it. A Guard post where its tunnel comes in keeps soldiers there to meet it.'], clock: ['Dusk'], won: 'The wall did not save them', end: 'dusk' },
+  wall: { sub: 'A wall of stone, whole. The only way to the other queen is through the clay.', goals: ['Kill the rival queen, or have the larger colony at dusk.', 'No ant can cross the wall. Open Nest, pick Tunnel and drag through the clay toward the rival nest. A tunnel costs nothing to dig.', 'When you are through, pick Strike and tap inside the rival nest. Your soldiers go that way for the queen.', 'The rival digs too, and you will hear it. A Guard post where its tunnel comes in keeps soldiers there to meet it.'], clock: ['Dusk'], won: 'The wall did not save them', end: 'dusk' },
   frost: { sub: 'The seeds are falling. The frost is coming.', goals: ['Half way through, the frost takes all the food outside.', 'In the cold the hill eats four times as fast. Dig stores and fill them with seeds.', 'Have the larger colony at the thaw. A small hill with full stores outlives a big hungry one.', 'Raiders can carry off the rival\'s stores.'], clock: ['Frost', 'Thaw'], won: 'The hill sees the thaw', end: 'the thaw' },
 };
 const FORK = { spitter: ['Spitters', 'Frail. They spit from two cells away, over the front line.'], warden: ['Wardens', 'Slow and very hard to kill. They hold a tunnel.'] };
@@ -109,7 +112,7 @@ function isOpen(id) { if (id === query.get('mission')) return true; if (SIDE.inc
 const firstOpen = () => { let last = STEPS[0]; for (const id of STEPS) { if (!isOpen(id)) break; last = id; if (!camp.done[id]) break; } return last; };
 const qMission = query.get('mission');
 let missionId = MISSIONS[qMission] ? qMission : firstOpen();
-const rivalMind = () => { const mood = MOOD[set.get('rival')]; if (!mood) return mood; const m = { mood }; if (camp.caste) m.pick = camp.caste === 'spitter' ? CASTE.WARDEN : CASTE.SPITTER; if (hasNode('door') && (MISSIONS[missionId].from || Object.values(MISSIONS).some(x => x.from === missionId))) m.outpost = 24; /* only on a hill that is kept: elsewhere the dig is never paid back */ return m.pick || m.outpost ? m : mood; };
+const rivalMind = () => { const mood = MOOD[set.get('rival')], m = { mood }; if (set.get('manners') !== 'sharp') m.natural = true; if (!mood) return m.natural ? m : mood; if (camp.caste) m.pick = camp.caste === 'spitter' ? CASTE.WARDEN : CASTE.SPITTER; if (hasNode('door') && (MISSIONS[missionId].from || Object.values(MISSIONS).some(x => x.from === missionId))) m.outpost = 24; /* only on a hill that is kept: elsewhere the dig is never paid back */ return m.pick || m.outpost || m.natural ? m : mood; };
 // A mission lost costs the next one some of its first workers: the colony carries on smaller.
 const roadBefore = id => { const [a, b] = ROAD.pair, r = camp.forks.road; if (id === a || id === b) return r && r !== id ? r : before(a); const p = before(id); return (p === a || p === b) && r ? (r === a ? b : a) : p; };
 const startAnts = () => { const prev = roadBefore(missionId), ants = MISSIONS[missionId].kit.ants; return prev && camp.done[prev] && !camp.done[prev].won ? [Math.max(10, ants - LOSS_ANTS), MISSIONS[missionId].kit.foeAnts ?? ants] : [ants, MISSIONS[missionId].kit.foeAnts ?? ants]; };
@@ -147,6 +150,7 @@ try { renderer = GameRenderer.create(glCanvas, { restored: () => { uploadTerrain
 if (!renderer) $('nogl').classList.add('on');
 const cam = { x: doorXY(ME).x, y: doorXY(ME).y, z: 10 };
 const nestCam = { x: doorXY(ME).x, y: 0, z: 12 }; let nestZoomed = false;
+let homeChip = null; // where the tap target for the way home is drawn in the Nest, or null when the view is already there
 const VIEW = { top: { pitch: 0, fk: 2.2 }, tilt: { pitch: 0.72, fk: 1.7 }, low: { pitch: 1.24, fk: 0.86 } };
 const lens = { ...VIEW.low };
 let nestLift = 0, eye = null, camGoal = null, shake = 0;
@@ -365,7 +369,7 @@ renderPath();
 function toMenu() { dropTouches(); if (running) rec.end('left', summary()); running = false; document.body.classList.remove('frost'); if (nestOpen) setNest(false); $('toast').classList.remove('on'); setScreen('menu'); renderPath(); }
 function dropTouches() { run(Gs.reset('pause')); strokeW = []; nestDrag = null; }
 function pauseGame() { if (screen !== 'play') return; dropTouches(); redraw(); setScreen('paused'); snd.hold(); }
-function resume() { if (renderer?.lost) return; setScreen('play'); lastT = 0; snd.release(); startSong(); }
+function resume() { if (renderer?.lost) return; $('idlePause').hidden = true; setScreen('play'); lastT = 0; snd.release(); startSong(); }
 function restart(newSeed = true) {
   if (NET) return; /* a room is one match: a new one is a new room */
   dropTouches();
@@ -445,6 +449,17 @@ function trailPoints() {
   if (pts.length < 2) return null;
   return (pts.length <= 64 ? pts : Array.from({ length: 64 }, (_, k) => pts[Math.round(k * (pts.length - 1) / 63)])).flat();
 }
+// A drawn trail that stops short of a destination is carried on to it: food for a forage trail; the rival door, a stone
+// or the beetle for a raid. Only over open ground in a straight line, and no farther than SNAP cells. Help for the hand:
+// the sim gets an ordinary trail.
+const SNAP = 7;
+function snapEnd(x, y, kind) {
+  const sw = L0.sw; let best = null, bd = SNAP + 1;
+  const tryAt = (c, reach = SNAP) => { if (c < 0 || c >= L0.nestBase) return; const cx = c % sw, cy = Math.floor(c / sw), d = Math.max(Math.abs(cx - x), Math.abs(cy - y)); if (d >= bd || d > reach) return; for (let k = 1; k < d; k++) if (sim.mat[Math.round(y + (cy - y) * k / d) * sw + Math.round(x + (cx - x) * k / d)] !== MAT.OPEN) return; bd = d; best = [cx, cy]; };
+  if (kind === KIND.FORAGE) { for (let p = 0; p < MAX_PILES; p++) if (sim.pileAmount[p] > 0) tryAt(sim.pileCell[p]); }
+  else { tryAt(sim.door[FOE], 3); /* a raid drawn to stand off their door stays a stand-off: only a trail that all but touches it goes in */ for (const c of sim.sites) tryAt(c); if (sim.beast[0] > 0) tryAt(sim.beast[1]); }
+  return best && bd > 0 ? best : null;
+}
 const trailMid = new Map();
 function pickTrailAt(sx, sy) {
   let best = -1, bd = 30 * 30;
@@ -477,6 +492,8 @@ function act(a) {
       strokeTake(a.points);
       const points = trailPoints(); strokeW = []; if (!points) break;
       const kind = tool === 'raid' ? KIND.RAID : KIND.FORAGE;
+      const end = snapEnd(points[points.length - 2], points[points.length - 1], kind);
+      if (end) { if (points.length >= 128) points.length -= 2; points.push(end[0], end[1]); rec.event('snap', { kind: kind === KIND.RAID ? 'raid' : 'forage', at: sim.tick }); }
       pending.push({ id: order({ type: CMD.TRAIL, kind, level: 2, points }), points, kind });
       tone(520, 0.05, 0.03, 'triangle');
       break;
@@ -526,7 +543,7 @@ function paintAt(e) {
 $('need').addEventListener('click', () => { const r = $('need').dataset.room; setNestTab('dig'); if (r) setNestTool(r); });
 function setNestTab(t) { $('diet').dataset.tab = t; for (const b of document.querySelectorAll('#diet .tabs [data-tab]')) b.setAttribute('aria-pressed', String(b.dataset.tab === t)); if (t !== 'dig' && nestTool !== 'look') setNestTool('look'); }
 for (const b of document.querySelectorAll('#diet .tabs [data-tab]')) b.addEventListener('click', () => { setNestTab(b.dataset.tab); tone(480, 0.05, 0.03, 'triangle'); });
-const DIG_HELP = { door: `Second door: tap the end of a tunnel dug along the top of your ground (the third row down), at least ${C.DOOR_APART} cells from your door. ${C.DOOR_SUGAR} seeds. New trails start at the nearer door, and it is still open in the next mission on this hill.`, plug: `Plug: tap an open tunnel of yours to pack it shut, ${C.PLUG_SUGAR} seeds. It takes five times as long to dig out. Not in a room, not with the rival near, and no more than ${C.PLUGS_MAX} at once.`, look: 'Pick a room, then drag one finger in the earth beside a tunnel. Two fingers move and zoom the view.', tunnel: 'Tunnel: drag through the earth, a seed to dig a cell. Seeds showing in the clay are an old cache: dig to it and it is carried to your stores.', store: 'Store: each cell holds 8 more seeds and 8 more meat. Drag in the earth: a seed to dig a cell.', nursery: 'Nursery: each cell holds one more egg or grub. Drag in the earth: a seed to dig a cell.', rest: 'Quarters: each cell houses 4 more ants. Drag in the earth: a seed to dig a cell.', garden: `Fungus garden: each cell pays a seed a minute with no trail to guard, and houses one ant fewer (its gardeners live in it). A raid can still carry the seeds off.`, mess: `Mess: a soldier eats as three ants. Each cell feeds ${C.MESS_FEEDS} soldiers as one ant each, so a cell saves most of a seed a minute once you have the soldiers to fill it. It houses nobody. Drag in the earth: a seed to dig a cell.`, post: 'Guard post: each cell keeps one in eight of your idle soldiers standing here, inside, and not out by the door.', clear: 'Drag over marks or rooms to take them off. Dug earth stays dug.', strike: 'Strike: tap an open cell in the rival nest. Half your soldiers go there under ground and on to the queen. Tap the mark again to send them all, and again to call them back.' };
+const DIG_HELP = { door: `Second door: tap the end of a tunnel dug along the top of your ground (the third row down), at least ${C.DOOR_APART} cells from your door. ${C.DOOR_SUGAR} seeds. New trails start at the nearer door, and it is still open in the next mission on this hill.`, plug: `Plug: tap an open tunnel of yours to pack it shut, ${C.PLUG_SUGAR} seeds. It takes five times as long to dig out. Not in a room, not with the rival near, and no more than ${C.PLUGS_MAX} at once.`, look: 'Pick a room, then drag one finger in the earth beside a tunnel. Two fingers move and zoom the view.', tunnel: 'Tunnel: drag through the earth. A tunnel costs nothing to dig. A room painted on it later costs a seed a cell. Seeds showing in the clay are an old cache: dig to it and it is carried to your stores.', store: 'Store: each cell holds 8 more seeds and 8 more meat. Drag in the earth: a seed to dig a cell.', nursery: 'Nursery: each cell holds one more egg or grub. Drag in the earth: a seed to dig a cell.', rest: 'Quarters: each cell houses 4 more ants. Drag in the earth: a seed to dig a cell.', garden: `Fungus garden: each cell pays a seed a minute with no trail to guard, and houses one ant fewer (its gardeners live in it). A raid can still carry the seeds off.`, mess: `Mess: a soldier eats as three ants. Each cell feeds ${C.MESS_FEEDS} soldiers as one ant each, so a cell saves most of a seed a minute once you have the soldiers to fill it. It houses nobody. Drag in the earth: a seed to dig a cell.`, post: 'Guard post: each cell keeps one in eight of your idle soldiers standing here, inside, and not out by the door.', clear: 'Drag over marks or rooms to take them off. Dug earth stays dug.', strike: 'Strike: tap an open cell in the rival nest. Half your soldiers go there under ground and on to the queen. Tap the mark again to send them all, and again to call them back.' };
 function roomButtons() { for (const b of document.querySelectorAll('#rooms [data-room]')) b.hidden = b.dataset.room === 'door' ? !sim.mayDoor(ME) || sim.side[ME] >= 0 : b.dataset.room === 'strike' ? !sim.mayBreach(ME) : b.dataset.room === 'plug' ? !sim.mayPlug() : !!ROOM_OF[b.dataset.room] && !sim.mayRoom(ME, ROOM_OF[b.dataset.room]); if (nestTool === 'strike' && !sim.mayBreach(ME)) setNestTool('look'); if (nestTool === 'door' && (!sim.mayDoor(ME) || sim.side[ME] >= 0)) setNestTool('look'); if (nestTool === 'plug' && !sim.mayPlug()) setNestTool('look'); if (ROOM_OF[nestTool] && !sim.mayRoom(ME, ROOM_OF[nestTool])) setNestTool('look'); }
 roomButtons();
 function setNestTool(t) { nestTool = t; delete $('digHelp').dataset.text; $('digHelp').textContent = sim.cfg.digSugar ? DIG_HELP[t] : DIG_HELP[t].replace(/a seed to dig a cell/g, 'soft ground here, no seed to dig'); if (t !== 'look' && $('diet').dataset.tab !== 'dig') setNestTab('dig'); for (const b of document.querySelectorAll('#rooms [data-room]')) b.setAttribute('aria-pressed', String(b.dataset.room === t)); }
@@ -541,8 +558,10 @@ function nestZoomAt(f, cx, cy) {
   const wx = (cx - r.left - NW / 2) / z0 + nestCam.x, wy = (cy - r.top - 26) / z0 + nestCam.y;
   nestCam.z = z1; nestZoomed = true; nestCam.x = wx - (cx - r.left - NW / 2) / z1; nestCam.y = wy - (cy - r.top - 26) / z1; nestPan(0, 0);
 }
-const paintCost = () => { if (!paint || paint.tool === 'clear' || paint.tool === 'plug') return 0; let n = 0; for (let j = 0; j < paint.cells.length; j += 2) { const k = paint.cells[j + 1] * L0.nw + paint.cells[j]; if (sim.mat[L0.nestBase + k] === MAT.CLAY && sim.mark[k] !== ME + 1) n++; } return n * sim.cfg.digSugar; };
+// What a stroke will cost: a room cell costs a seed (when it is dug, or at once on a tunnel that was dug for nothing); a plain tunnel costs nothing.
+const paintCost = () => { if (!paint || !ROOM_OF[paint.tool]) return 0; const kind = ROOM_OF[paint.tool]; let n = 0; for (let j = 0; j < paint.cells.length; j += 2) { const k = paint.cells[j + 1] * L0.nw + paint.cells[j], clay = sim.mat[L0.nestBase + k] === MAT.CLAY; if (clay ? !(sim.mark[k] === ME + 1 && sim.room[k] && sim.room[k] !== PLUG) : sim.bare[k] && sim.room[k] !== kind) n++; } return n * sim.cfg.digSugar; };
 nestCanvas.addEventListener('pointerdown', e => {
+  if (homeChip && !nestPts.size) { const r = nestCanvas.getBoundingClientRect(); if (Math.abs(e.clientX - r.left - homeChip.x) <= 40 && e.clientY - r.top <= 34) { nestHome(); return; } } // the way home: no stroke starts under it
   try { nestCanvas.setPointerCapture(e.pointerId); } catch { /* synthetic */ }
   nestPts.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (nestPts.size === 2) { const [p, q] = [...nestPts.values()]; if (paint) rec.event('nestPinch', { cut: paint.cells.length / 2, at: sim.tick }); paint = null; nestDrag = null; nestPinch = { d: Math.hypot(p.x - q.x, p.y - q.y) || 1, x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 }; return; }
@@ -617,6 +636,32 @@ function guideShow() {
 }
 function guideStop(why) { if (guideStep < 0) return; rec.event('guide', { step: guideStep, at: sim.tick, end: why }); try { localStorage.setItem(GUIDE_KEY, '1'); } catch { /* no storage */ } guideStep = -1; guideShow(); }
 $('guideSkip').addEventListener('click', () => guideStop(guideStep >= GUIDE.length ? 'done' : 'skip'));
+// ---- idle workers: a line when workers stand in the hill with no trail to walk and food lies untouched; by the
+// setting, a pause after a few more seconds of it. Once for each spell of idleness, never before the first trail,
+// never in a room. Drawn from sim state alone.
+const IDLE = { n: 8, share: 0.25, tell: 100, pause: 260 }; // eight workers at rest and a quarter of them all: a hill with three good trails hears it about once a game
+let idle = { since: -1, told: false, paused: false, pile: -1, at: -1, n: 0 };
+function idleTick() {
+  const mode = set.get('idle');
+  if (sim.tick < idle.at) idle = { since: -1, told: false, paused: false, pile: -1, at: -1, n: 0 }; // a new game
+  if (idle.at >= 0 && sim.tick - idle.at < 20) return; // once a second
+  idle.at = sim.tick;
+  let n = 0, live = 0;
+  if (mode !== 'quiet' && !sim.result && sim.tick >= 300 && g(ME, CG.SEQ) > 0 && !g(ME, CG.RECALL)) for (let i = 0; i < sim.n; i++) if (sim.team[i] === ME && sim.hp[i] > 0 && sim.caste[i] === CASTE.WORKER && sim.task[i] === TASK.REST) n++;
+  for (let k = 0; k < TRAILS; k++) if (sim.trLive[ME * TRAILS + k]) live++;
+  const pile = n >= Math.max(IDLE.n, g(ME, CG.WORKERS) * IDLE.share) && live < TRAILS ? freePile(sim, ME) : -1;
+  if (pile < 0) { idle.since = -1; idle.told = idle.paused = false; idle.pile = -1; return; }
+  idle.pile = pile; idle.n = n; if (idle.since < 0) idle.since = sim.tick;
+  const wait = sim.tick - idle.since, px = pile % L0.sw + 0.5, py = Math.floor(pile / L0.sw) + 0.5;
+  if (wait >= IDLE.tell && !idle.told) { idle.told = true; rec.event('idle', { n, at: sim.tick, mode }); toast(`${n} workers stand idle in the hill, and food lies untouched. Draw a trail to it.`, 4600, false, () => lookAt(px, py)); }
+  if (mode === 'pause' && !NET && wait >= IDLE.pause && !idle.paused && screen === 'play' && !preview && !nestOpen) { idle.paused = true; rec.event('idlePause', { n, at: sim.tick }); $('idlePause').textContent = `Paused: ${n} workers stand idle and food lies untouched. Resume and draw a trail to the ringed food. (Idle workers, in the settings below, turns this off.)`; $('idlePause').hidden = false; pauseGame(); }
+}
+/** While the idle line stands: a slow ring on the food it means. */
+function drawIdle(now) {
+  if (!idle.told || idle.pile < 0 || nestOpen) return;
+  const p = toScreen(idle.pile % L0.sw + 0.5, Math.floor(idle.pile / L0.sw) + 0.5), k = (now % 1600) / 1600;
+  ctx.strokeStyle = `rgba(255, 217, 160, ${0.9 * (1 - k)})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(p.x, p.y, 12 + 16 * k, 0, 6.2832); ctx.stroke();
+}
 function guideTick() {
   if (guideStep < 0 || screen !== 'play') return;
   if (guideStep >= GUIDE.length) { if (performance.now() > guideEnd) guideStop('done'); return; }
@@ -682,6 +727,7 @@ function news() {
     else if (type === EVENT.DUG && a === ME) { if (nestOpen) tone(210 + Math.random() * 60, 0.05, 0.03, 'square', -60); }
     else if (type === EVENT.FULL && a === ME) { if (now - (told.fullAt ?? 0) > 20000) { told.fullAt = now; toast(`No room for more ${b ? 'meat' : 'seeds'}. Dig a store in the Nest.`, 3600, true); } }
     else if (type === EVENT.REJECTED && a === ME) {
+      if (builds.has(b) && c === WHY.SEEDS) { builds.delete(b); tone(150, 0.12, 0.05, 'sawtooth', -40); toast(`Not enough seeds for every cell: the rest stay tunnel. A room on a dug tunnel costs a seed a cell, and the hill keeps ${C.DIG_KEEP} to eat.`, 3600); continue; }
       if (builds.has(b)) { builds.delete(b); tone(150, 0.12, 0.05, 'sawtooth', -40); toast(nestTool === 'door' ? `No door there. It needs your own open tunnel in the third row down, ${C.DOOR_APART} cells or more from your door, open ground above, and ${C.DOOR_SUGAR} seeds to spare.` : nestTool === 'clear' ? 'Nothing to clear there.' : nestTool === 'plug' ? 'No plug there: it needs an open tunnel of yours, no rival near, seeds to spare, and a way left to your door.' : 'Nothing to dig or change there.', nestTool === 'plug' ? 3600 : 2200); continue; }
       const q = pending.find(q => q.id === b); if (q) { pulses.push({ pts: q.points, at: now, bad: true }); q.done = true; }
       tone(150, 0.22, 0.07, 'sawtooth', -40); toast(c === 1 ? 'Six trails is the most. Erase one first.' : 'No ant can walk that.', 2600, true);
@@ -765,7 +811,7 @@ function finish(w, reason) {
 }
 function bump(id, value) { const el = $(id), span = el.querySelector('span'), text = String(value); if (span.textContent === text) return; const up = Number(text) > Number(span.textContent); span.textContent = text; if (up) { el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); } }
 function hud() {
-  guideTick();
+  guideTick(); idleTick();
   let brood = 0; for (let k = 0; k < sim.bn; k++) if (sim.bTeam[k] === ME) brood++;
   bump('chipAnts', g(ME, CG.ADULTS) - g(ME, CG.MAJORS)); bump('chipMajors', g(ME, CG.MAJORS)); bump('chipSugar', g(ME, CG.SUGAR)); bump('chipProtein', g(ME, CG.PROTEIN)); bump('chipBrood', brood);
   const G2 = sim.mission.goals, goal = (G2.points | 0) || (G2.haul | 0), slot = G2.points ? CG.POINTS : G2.haul ? CG.HAUL : G2.beast ? CG.HARM : CG.ADULTS, meat = !!G2.carry && sim.fallen, us = meat ? sim.carried(ME) : g(ME, slot), them = meat ? sim.carried(FOE) : g(FOE, slot);
@@ -809,7 +855,7 @@ function hud() {
 // What holds the hill back now: one line above the room buttons, with the room that answers it ringed. It reads the
 // sim's own counts and caps; nothing here decides anything.
 let seedLog = [];
-let markAt = -1, markN = 0;
+let markAt = -1, markN = 0, markPay = 0; // marks of mine, and those of them that are room cells (a seed each; plain tunnel is free)
 function needLine(pop, capA, brood, capB, capF) {
   const g = (t, k) => sim.g(t, k), seeds = g(ME, CG.SUGAR), home = g(ME, CG.LOADS_S);
   if (seedLog.length && seedLog[seedLog.length - 1][0] > sim.tick) seedLog = [];
@@ -828,9 +874,9 @@ function needLine(pop, capA, brood, capB, capF) {
   else if (Math.max(seeds, g(ME, CG.PROTEIN)) >= capF) { room = 'store'; text = `<b>The store is full</b> (${capF}): loads are left outside.`; dig = 'Dig store.'; }
   else if (pop * 10 >= capA * 9) { room = 'rest'; text = `<b>The hill is nearly full</b> (${pop} of ${capA}).`; dig = 'Dig quarters soon.'; }
   else if (income >= 0 && income < meal) text = `The hill eats ${meal} seeds a minute and ${income} came in. The store covers it for now.`;
-  if (markAt > sim.tick || sim.tick - markAt >= 20) { markAt = sim.tick; markN = 0; for (let k = 0; k < sim.mark.length; k++) if (sim.mark[k] === ME + 1) markN++; }
-  { const spare = Math.max(0, seeds - C.DIG_KEEP), cost = markN * sim.cfg.digSugar, q = $('digQueue'), want = !markN ? '' : cost > spare ? `<b>${markN} cells marked</b>, ${spare} seeds to spend: <b class="short">${markN - Math.floor(spare / sim.cfg.digSugar)} wait for seeds</b>. The hill keeps ${C.DIG_KEEP} to eat.` : `${markN} cells marked, ${cost ? cost + ' seeds' : 'no seed'} to dig them.`; if (q.dataset.text !== want) { q.dataset.text = want; q.innerHTML = want; }
-    if (!text && markN && cost > spare && markN - spare >= 8) text = `<b>Diggers are waiting for seeds</b>: ${markN} cells marked and ${spare} seeds to spend. Each cell costs a seed.`; }
+  if (markAt > sim.tick || sim.tick - markAt >= 20) { markAt = sim.tick; markN = 0; markPay = 0; for (let k = 0; k < sim.mark.length; k++) if (sim.mark[k] === ME + 1) { markN++; if (sim.room[k] && sim.room[k] !== PLUG) markPay++; } }
+  { const spare = Math.max(0, seeds - C.DIG_KEEP), cost = markPay * sim.cfg.digSugar, q = $('digQueue'), want = !markN ? '' : cost > spare ? `<b>${markPay} room cells marked</b>, ${spare} seeds to spend: <b class="short">${markPay - Math.floor(spare / sim.cfg.digSugar)} wait for seeds</b>. The hill keeps ${C.DIG_KEEP} to eat. Tunnels cost nothing.` : `${markN} cells marked, ${cost ? cost + ' seeds for the room cells' : 'no seed'} to dig them.`; if (q.dataset.text !== want) { q.dataset.text = want; q.innerHTML = want; }
+    if (!text && markPay && cost > spare && markPay - spare >= 8) text = `<b>Diggers are waiting for seeds</b>: ${markPay} room cells marked and ${spare} seeds to spend. A room cell costs a seed; a tunnel costs nothing.`; }
   if (room && !can(room)) { dig = room === 'garden' ? 'Put more workers on a seed trail.' : ''; room = ''; } /* a room this hill may not dig is not offered */
   if (dig) text += ' ' + dig;
   const el = $('need'); if (el.dataset.text !== text) { el.dataset.text = text; el.innerHTML = text; } el.dataset.room = room;
@@ -962,7 +1008,7 @@ function drawOverlay(now) {
     }
     if (rallyAt && now - rallyAt.at < 30000 && g(ME, CG.RALLY_HOLD) > 0) { const p = toScreen(rallyAt.x, rallyAt.y, 0), k = (now / 900) % 1; ctx.strokeStyle = `rgba(255, 90, 60, ${1 - k})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(p.x, p.y, p.s * (1 + 2.5 * k), p.s * (1 + 2.5 * k) * Math.max(0.3, eye.cos), 0, 0, 7); ctx.stroke(); }
     // Food off screen near home: an arrow at the edge until the first trail is laid.
-    if (!firstTrail) drawGhost(now);
+    if (!firstTrail) drawGhost(now); drawIdle(now);
   }
   for (const f of floats) {
     const k = (now - f.at) / 1100; if (k > 1) continue;
@@ -974,6 +1020,9 @@ function drawOverlay(now) {
   if (preview?.points.length && strokeW.length) {
     const raid = tool === 'raid'; ctx.shadowColor = raid ? '#ff3c2a' : '#ff9a3c'; ctx.shadowBlur = 14; ctx.strokeStyle = raid ? '#ffb0a0' : '#ffd9a0'; ctx.lineWidth = 5;
     ctx.beginPath(); strokeW.forEach(([x, y], i) => { const p = toScreen(x, y); i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); }); ctx.stroke(); ctx.shadowBlur = 0;
+    // Where the trail will be carried on to when the finger lifts here: a dashed line and a ring on the destination.
+    const l = strokeW[strokeW.length - 1], end = strokeW.length > 1 && snapEnd(Math.floor(l[0]), Math.floor(l[1]), raid ? KIND.RAID : KIND.FORAGE);
+    if (end) { const a = toScreen(l[0], l[1]), b = toScreen(end[0] + 0.5, end[1] + 0.5); ctx.setLineDash([5, 5]); ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); ctx.setLineDash([]); ctx.beginPath(); ctx.arc(b.x, b.y, 13, 0, 6.2832); ctx.stroke(); }
   }
 }
 /** Until the first trail: a ghost finger draws from the door to the nearest food. */
@@ -1029,7 +1078,7 @@ function drawNest(now) {
     if (m) { c.fillStyle = `rgba(${ROOM_CSS[r] || '255, 255, 255'}, ${0.2 + 0.08 * Math.sin(now / 260 + x + y)})`; c.fillRect(px + 1, py + 1, z - 2, z - 2); c.strokeStyle = `rgba(${ROOM_CSS[r] || '255, 255, 255'}, 0.8)`; c.lineWidth = 1; c.beginPath(); c.moveTo(px + 2, py + z - 2); c.lineTo(px + z - 2, py + 2); c.stroke(); const left = sim.digLeft[k] / sim.cfg.digTicks; if (left < 1) { c.fillStyle = '#120c09'; c.fillRect(px + 1, py + 1, (z - 2) * (1 - left), z - 2); } }
   }
   if (paint) { c.fillStyle = paint.tool === 'clear' ? 'rgba(255, 90, 60, 0.4)' : `rgba(${ROOM_CSS[ROOM_OF[paint.tool]] || '255, 255, 255'}, 0.45)`; for (let j = 0; j < paint.cells.length; j += 2) c.fillRect(sx(paint.cells[j]) + 1, sy(paint.cells[j + 1]) + 1, z - 2, z - 2); }
-  if (paint && paint.cells.length) { const n = paint.cells.length / 2, cost = paintCost(), have = sim.g(ME, CG.SUGAR), spare = Math.max(0, have - C.DIG_KEEP), txt = paint.tool === 'clear' ? `${n} unmarked` : cost ? `${n} cells · ${cost} seeds to dig · ${spare} to spend` : `${n} cells`; c.font = '800 13px ui-rounded, system-ui, sans-serif'; const tw = c.measureText(txt).width + 18, lx = paint.cells[paint.cells.length - 2], ly = paint.cells[paint.cells.length - 1], bx = Math.max(6, Math.min(NW - tw - 6, sx(lx + 0.5) - tw / 2)), by = Math.max(30, sy(ly) - 46); c.fillStyle = cost > spare ? 'rgba(120, 30, 20, 0.92)' : 'rgba(20, 14, 10, 0.88)'; c.beginPath(); c.roundRect(bx, by, tw, 24, 12); c.fill(); c.fillStyle = cost > spare ? '#ffd0c4' : '#ffe9c4'; c.textAlign = 'left'; c.textBaseline = 'middle'; c.fillText(txt, bx + 9, by + 12.5); }
+  if (paint && paint.cells.length) { const n = paint.cells.length / 2, cost = paintCost(), have = sim.g(ME, CG.SUGAR), spare = Math.max(0, have - C.DIG_KEEP), txt = paint.tool === 'clear' ? `${n} unmarked` : cost ? `${n} cells · ${cost} seeds · ${spare} to spend` : paint.tool === 'tunnel' ? `${n} cells · free` : `${n} cells`; c.font = '800 13px ui-rounded, system-ui, sans-serif'; const tw = c.measureText(txt).width + 18, lx = paint.cells[paint.cells.length - 2], ly = paint.cells[paint.cells.length - 1], bx = Math.max(6, Math.min(NW - tw - 6, sx(lx + 0.5) - tw / 2)), by = Math.max(30, sy(ly) - 46); c.fillStyle = cost > spare ? 'rgba(120, 30, 20, 0.92)' : 'rgba(20, 14, 10, 0.88)'; c.beginPath(); c.roundRect(bx, by, tw, 24, 12); c.fill(); c.fillStyle = cost > spare ? '#ffd0c4' : '#ffe9c4'; c.textAlign = 'left'; c.textBaseline = 'middle'; c.fillText(txt, bx + 9, by + 12.5); }
   // Digging heard in the other's ground: a ring that fades. A raid under ground: a mark on the cell it is sent to.
   heard = heard.filter(hd => now - hd.at < 5000);
   for (const hd of heard) { const u = (now - hd.at) / 5000; c.strokeStyle = `rgba(255, 80, 60, ${0.9 * (1 - u)})`; c.lineWidth = 2; c.beginPath(); c.arc(sx(hd.k % w + 0.5), sy(Math.floor(hd.k / w) + 0.5), z * (0.6 + 2.2 * u), 0, 7); c.stroke(); }
@@ -1084,7 +1133,12 @@ function drawNest(now) {
   const skyG = c.createLinearGradient(0, 0, 0, 26); skyG.addColorStop(0, light.night > 0.5 ? '#0b0d18' : '#6f7f8f'); skyG.addColorStop(1, light.night > 0.5 ? '#241a1c' : '#c9b59a');
   c.fillStyle = skyG; c.fillRect(0, 0, NW, 26); c.fillStyle = '#4a4340'; c.fillRect(0, 22, NW, 5);
   for (const t of [ME, FOE]) { const d = sx(doorXY(t).x); c.fillStyle = '#120c09'; c.fillRect(d - z * 0.8, 22, z * 1.6, 6); c.fillStyle = t !== ME ? '#8fb0ff' : '#ffb057'; c.font = '800 10px ui-rounded, system-ui, sans-serif'; c.textAlign = 'center'; c.fillText(t !== ME ? 'RIVAL' : 'HOME', d, 14); }
+  // The way home: the HOME label over the door, or a chip at the edge when the door is out of view. A tap on either centres the view on the hill.
+  { const d = sx(doorXY(ME).x), away = Math.abs(nestCam.x - doorXY(ME).x) > 1.5 || nestCam.y > 1.5, off = d < 34 || d > NW - 34;
+    homeChip = away ? { x: Math.max(40, Math.min(NW - 40, d)), y: 13 } : null;
+    if (away) { const x = homeChip.x, tw = 62; c.fillStyle = 'rgba(40, 22, 10, 0.92)'; c.strokeStyle = '#ffb057'; c.lineWidth = 1.5; c.beginPath(); c.roundRect(x - tw / 2, 2, tw, 21, 10); c.fill(); c.stroke(); c.fillStyle = '#ffd9a0'; c.font = '800 11px ui-rounded, system-ui, sans-serif'; c.textAlign = 'center'; c.fillText(off ? (d < 34 ? '‹ HOME' : 'HOME ›') : 'HOME ⌂', x, 17); } }
 }
+function nestHome() { nestCam.x = doorXY(ME).x; nestCam.y = 0; nestPan(0, 0); rec.event('nestHome', { at: sim.tick }); tone(520, 0.05, 0.03, 'triangle'); }
 
 // ---- the frame ----
 let light = sky(0.2);
@@ -1128,6 +1182,7 @@ window.game = {
   door: t => doorXY(t), caches: t => { const o = []; for (let k = 0; k < sim.cache.length; k++) if (sim.cache[k] && sim.owner(k) === t) o.push({ x: k % L0.nw, y: Math.floor(k / L0.nw), loads: sim.cache[k] >> 1, kind: sim.cache[k] & 1 }); return o; }, bins: t => sim.bins[t].map(k => ({ x: k % L0.nw, y: Math.floor(k / L0.nw), s: sim.binS[k], p: sim.binP[k] })), piles: () => { const o = []; for (let p = 0; p < MAX_PILES; p++) if (sim.pileAmount[p] > 0) o.push({ x: sim.pileCell[p] % L0.sw, y: Math.floor(sim.pileCell[p] / L0.sw), kind: sim.pileKind[p], amount: sim.pileAmount[p] }); return o; },
   run: n => { host.run(n); }, // tests: run the sim ahead
   traits: () => sim.cfg.traits,
+  ends: t => { const o = []; for (let k = 0; k < TRAILS; k++) { const q = t * TRAILS + k; if (sim.trLive[q]) { const c = sim.trPath[q * PATH_MAX + sim.trLen[q] - 1]; o.push([c % L0.sw, Math.floor(c / L0.sw)]); } } return o; }, seeds: () => g(ME, CG.SUGAR), nestCam: () => ({ ...nestCam }), homeChip: () => homeChip, idle: () => ({ ...idle }), bare: (x, y) => sim.bare[y * L0.nw + x], roomAt: (x, y) => sim.room[y * L0.nw + x], // tests
   auto: mood => { host.ai[ME] = mood; }, // tests: the rival's mind plays your seat too
   modes: () => Array.from(sim.trMode.subarray(ME * TRAILS, ME * TRAILS + TRAILS)), select: k => { sel = k; showRoute(); hud(); },
   linked: () => sim.linked, strike: (x, y) => strikeAt(x, y), queen: t => { const q = sim.queen[t] - L0.nestBase; return [q % L0.nw, Math.floor(q / L0.nw)]; },

@@ -1386,3 +1386,71 @@ From the owner's list: "tutorial need" and "confusing inter mission progress".
 | Between missions | A panel on the end screen, "What goes with you": campaign count, whether this nest is kept and which mission starts in it, what the Lineage gained, and what is not kept. | The end screen listed deeds but never said what carries over. |
 
 Checked: by hand on the live page the card held at 1 of 6 for 220 idle ticks, moved to 2 on one touch-drawn forage trail, and sat behind the pause screen; with the machine playing the seat it went through all six and wrote its key. A step done out of turn now counts (opening the Nest early left the card on step 2 before); the panel read correctly after a won Crossing (414×774 touch, Chromium). Not checked: a person following the steps by hand; whether six steps is the right number.
+
+## 2026-11-28: the rival's manners, free tunnels, trails that reach, idle workers, the way home
+
+From the owner's notes after an evening on The Crossing (lab records, one 414-wide phone: 13 runs, 8 restarts, six of
+them inside 72 seconds; no room was played by a person and no `guide` event was recorded yet).
+
+**The rival has a person's manners** (`act` in `war/ai.js`; hosts call `act`, tests and sweeps still call `think`).
+A mind with `natural: true` gives no order before tick 80 to 100 (timid), 60 to 80 (steady) or 50 to 70 (bold); misses
+one beat in five; gives two orders a beat at most, starting somewhere else in its list each beat so a refused order
+cannot starve the rest; and bends two new trails in three through a spot two or three cells off the straight line (the
+third is laid straight, so a bend the ground refuses is not asked for ever). No state, no dice: all of it goes by the
+seed, the tick and the seat. A rally to the door is never held back. Setting `manners` ("Rival's hands"): `natural`
+(default) or `sharp`. A room's machine rival is always natural, and `WIRE` is 2.
+
+Measured, a steady bot against the rival, 12 seeds, loads the rival carried by tick 1200 and 3600:
+
+| | plain | natural |
+|---|---|---|
+| Crossing, timid | 124, 432 | 108, 403 |
+| Crossing, steady | 124, 439 | 110, 416 |
+| Crossing, bold | 124, 386 | 112, 375 |
+| High Summer, steady | 105, 299 | 102, 300 |
+
+Rival wins of 12: Crossing steady 9 plain and 9 natural, bold 3 and 2, timid 1 and 0; High Summer steady 7 and 8.
+So about a tenth fewer loads in the first minute and the same strength after. Bots only: no person has played it.
+
+Found on the way: with its trails laid seconds apart the mind chose all three by the store of that second and took
+three meat piles (74 loads by tick 1200, 2 wins of 12). A natural mind with two trails to one food now sends the third
+to the other. The plain mind is unchanged, byte for byte (same hashes, same sweep numbers).
+
+Not done: an order limit for people. A room stroke is one order and a trail is one, so a limit would only bite a bot;
+the rival's limit is the part that answers the note.
+
+**Tunnels cost nothing.** A cell dug with no room on it is free and is remembered as bare (`sim.bare`, in the hash).
+A room cell costs a seed as before, paid at the opening stroke. A room painted on a bare cell costs the seed then, so
+"tunnel first, room after" is not a way round the price; without the seed to spare the cell stays tunnel and the order
+is refused with `WHY.SEEDS`. A cell pays once: unmarking and painting again is free. Cells open at the start of a
+mission (a carried hill) were never bare. The rival's cache and breach digs are free too; its own seed checks for them
+were left as they were. The Wall: plain 6 of 12, natural 7 of 12 rival wins after the change (no before figure taken
+with this script).
+
+**A trail reaches.** On the page only: a drawn trail whose end is within 7 cells of food (forage), or of the rival
+door, a stone or the beetle (raid), with open ground in a straight line between, is carried on to it. While drawing, a
+dashed line and a ring show where. Lab event `snap`. Multi-stop trails were asked for and then withdrawn by the owner.
+
+**Idle workers.** Eight or more workers at rest and a quarter of all workers, a free trail slot, a first trail already laid, tick 300 or later, no
+recall, and a pile `freePile` calls worth a trail (six loads, reachable, no forage trail of ours ending by it, not
+twice as far from our door as from theirs): after 5 seconds a line says so (tap it to look) and a ring pulses on the
+pile. Setting `idle`: `warn` (default), `pause` (after 8 more seconds the game pauses once for that spell; not in a
+room, not with the Nest open), `quiet`. Lab events `idle`, `idlePause`.
+
+How often a hill that plays well hears it (the steady mind in the player's seat, three trails, 6 seeds): with a
+threshold of six at rest it met the condition 56% of The Crossing and 32% of High Summer, 3.2 and 4.0 lines a game.
+With eight and a quarter of the workers: 13% and 16%, 1.0 and 1.7 lines a game. The second is what ships.
+
+A drawn raid snaps to the rival door only from 3 cells: one drawn to stand off the door stays a stand-off.
+
+**The way home.** In the Nest, when the view is off the hill, a HOME chip stands in the top strip (at the edge when
+the door is out of view). A tap on it centres the view and starts no stroke, whatever tool is in hand. Lab event
+`nestHome`.
+
+Walked by touch at 414 by 774 in Chromium on a local page: no rival trail at tick 60 and three by 400; a trail drawn
+5 cells short ended on the pile; three tunnel cells dug with seeds unchanged at 10, then a store painted on them took
+3 seeds; two-finger pan then a tap on HOME with Store in hand returned the view and added no mark; with one trail the
+idle line showed and, set to pause, the game paused with its reason on the pause screen. Local room, 8 rooms of wire
+bots for 2400 ticks, half with a machine rival: 0 mismatches.
+
+Not verified: a person's play with any of this; a real phone; whether 3 to 5 seconds is the pause the owner meant.

@@ -78,7 +78,7 @@ export const EVENT = {
 // What a nest's visitor did (EVENT.PEST): came in at the door, ate a seed, went out, or was killed.
 export const PEST = { CAME: 0, ATE: 1, LEFT: 2, DIED: 3, NEAR: 4 };
 export const REASON = { QUEEN: 1, DUSK: 2, STARVED: 3, POINTS: 4, HAUL: 5, BEAST: 6 };
-export const WHY = { FULL: 1, BLOCKED: 2, LONG: 3, NONE: 4 };
+export const WHY = { FULL: 1, BLOCKED: 2, LONG: 3, NONE: 4, SEEDS: 5 };
 
 export const TRAILS = 6; // per colony
 export const PATH_MAX = 1024;
@@ -144,6 +144,7 @@ export class Sim {
     // Nest cells only (index: cell - L.nestBase): the room painted there, the colony that marked it to dig (1 + team), work left.
     const NN = n - L.nestBase;
     this.room = new Uint8Array(NN); this.mark = new Uint8Array(NN); this.digLeft = new Uint8Array(NN);
+    this.bare = new Uint8Array(NN); // 1: a cell dug as plain tunnel, which cost nothing; a room painted on it costs the seed then
     this.link = new Int32Array(n).fill(-1);
     // Per colony, fixed by the map: the door (surface cell), the store and the queen (nest cells), the nursery rectangle.
     this.door = new Int32Array(TEAMS).fill(-1); this.store = new Int32Array(TEAMS).fill(-1); this.queen = new Int32Array(TEAMS).fill(-1);
@@ -546,7 +547,7 @@ export class Sim {
       // with dig: 1 it marks clay first, and with kind NONE it also takes marks off, so one stroke is one order.
       const L = this.L, pts = o.cells || [], dig = o.type === CMD.DIG, kind = o.kind | 0;
       if (!dig && kind !== ROOM.NONE && !this.mayRoom(t, kind)) return no(WHY.NONE);
-      let done = 0, marks = cg[base + CG.MARKS], stores = false;
+      let done = 0, marks = cg[base + CG.MARKS], stores = false, short = 0;
       const use = (k, to) => { if (this.room[k] === ROOM.STORE || to === ROOM.STORE || this.room[k] === ROOM.POST || to === ROOM.POST) stores = true; this.room[k] = to; done++; };
       for (let j = 0; j + 1 < pts.length && j < 512; j += 2) {
         const x = pts[j] | 0, y = pts[j + 1] | 0;
@@ -566,10 +567,15 @@ export class Sim {
           if (this.room[k] === PLUG && m !== MAT.OPEN) { if (!kind && this.mark[k] === t + 1) { this.mark[k] = 0; marks--; done++; } continue; } // a plug is not a room: it is dug out or left
           if (o.dig && kind && m === MAT.CLAY && this.mark[k] !== t + 1 && marks < C.MARKS_MAX) { this.mark[k] = t + 1; this.digLeft[k] = this.cfg.digTicks; marks++; done++; }
           if (!kind && this.mark[k] === t + 1) { this.mark[k] = 0; marks--; done++; }
-          if ((m === MAT.OPEN || this.mark[k] === t + 1 || !kind) && this.room[k] !== kind) use(k, kind);
+          if ((m === MAT.OPEN || this.mark[k] === t + 1 || !kind) && this.room[k] !== kind) {
+            // A plain tunnel is dug for nothing; a room on it costs the seed its digging did not. Without the seed the cell stays tunnel.
+            if (kind && m === MAT.OPEN && this.bare[k] && this.cfg.digSugar) { if (cg[base + CG.SUGAR] < this.cfg.digSugar + C.DIG_KEEP) { short++; continue; } this.take(t, FOOD.SUGAR, this.cfg.digSugar); this.bare[k] = 0; }
+            use(k, kind);
+          }
         }
       }
-      if (!done) return no(WHY.BLOCKED);
+      if (short) no(WHY.SEEDS);
+      if (!done) return short ? undefined : no(WHY.BLOCKED);
       this.recount();
       // Marks change only where the diggers go; the way home changes only with the stores.
       if (stores) this.dirty = true; else this.rebuildDig();
@@ -953,15 +959,16 @@ export class Sim {
         const m = L.nb[c * 4 + d], k = m - L.nestBase;
         if (m < L.nestBase || this.mark[k] !== t + 1) continue;
         this.to[i] = -1;
-        // The opening stroke costs a seed: earth is carried out on food. The last few seeds are kept for the colony to eat: the cell waits.
-        const plug = this.room[k] === PLUG, cost = plug ? C.PLUG_BREAK : this.cfg.digSugar;
+        // The opening stroke of a room cell costs a seed: earth is carried out on food. The last few seeds are kept for the colony
+        // to eat: the cell waits. A plain tunnel costs nothing, and is remembered as bare.
+        const plug = this.room[k] === PLUG, cost = plug ? C.PLUG_BREAK : this.room[k] ? this.cfg.digSugar : 0;
         if (plug) { // packed earth: one stroke on it every fifth tick, however many dig
           if (this.tick % C.PLUG_SLOW) return c;
           if (this.plugTick !== this.tick) { this.plugTick = this.tick; this.plugHit.clear(); }
           if (this.plugHit.has(k)) return c; this.plugHit.add(k);
         }
-        if (this.digLeft[k] === 1) { if (cg[o + CG.SUGAR] < cost + C.DIG_KEEP) return c; this.take(t, FOOD.SUGAR, cost); }
-        if (--this.digLeft[k] === 0) { this.mat[m] = MAT.OPEN; this.mark[k] = 0; if (plug) this.room[k] = 0; this.recount(); this.dirty = true; this.event(EVENT.DUG, t, m);
+        if (this.digLeft[k] === 1 && cost) { if (cg[o + CG.SUGAR] < cost + C.DIG_KEEP) return c; this.take(t, FOOD.SUGAR, cost); }
+        if (--this.digLeft[k] === 0) { this.mat[m] = MAT.OPEN; this.mark[k] = 0; this.bare[k] = !plug && !this.room[k] && this.owner(k) === t ? 1 : 0; if (plug) this.room[k] = 0; this.recount(); this.dirty = true; this.event(EVENT.DUG, t, m);
           if (this.owner(k) !== t) this.event(EVENT.HEARD, this.owner(k), m, t);
           this.lastDug = [t, m]; // if this stroke joins the nests, the rebuild at the end of the tick says whose it was
           // A cache: its loads join the stores (the next rebuild finds them cells; what finds no room spoils).
@@ -1415,7 +1422,7 @@ export class Sim {
   stateArrays() {
     const n = this.n, b = this.bn;
     return [
-      ['mat', this.mat], ['room', this.room], ['binS', this.binS], ['binP', this.binP], ['cache', this.cache], ['mark', this.mark], ['digLeft', this.digLeft], ['cg', this.cg], ['rng', this.rng], ['pileCell', this.pileCell], ['pileAmount', this.pileAmount], ['pileKind', this.pileKind], ['siteHold', this.siteHold], ['beast', this.beast], ['pest', this.pest], ['side', this.side],
+      ['mat', this.mat], ['room', this.room], ['binS', this.binS], ['binP', this.binP], ['cache', this.cache], ['mark', this.mark], ['digLeft', this.digLeft], ['bare', this.bare], ['cg', this.cg], ['rng', this.rng], ['pileCell', this.pileCell], ['pileAmount', this.pileAmount], ['pileKind', this.pileKind], ['siteHold', this.siteHold], ['beast', this.beast], ['pest', this.pest], ['side', this.side],
       ...['x', 'y', 'layer', 'heading', 'team', 'caste', 'hp', 'task', 'carry', 'tr', 'cool', 'press', 'to', 'tx', 'ty', 'since', 'inv', 'id'].map(k => [k, this[k], n]),
       ...['bTeam', 'bStage', 'bAge', 'bFed', 'bHunger', 'bCell', 'bMajor'].map(k => [k, this[k], b]),
       ['trLive', this.trLive], ['trKind', this.trKind], ['trLevel', this.trLevel], ['trDry', this.trDry], ['trMode', this.trMode], ['trLen', this.trLen], ['trSeq', this.trSeq], ['trPath', this.trPath],

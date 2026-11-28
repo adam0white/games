@@ -2,7 +2,7 @@
 // keeps the order log and a hash trail, and holds each ant's last position so a page can draw between ticks.
 
 import { Sim, TICK_HZ, TEAMS } from './sim.js';
-import { think, THINK_EVERY } from './ai.js';
+import { act, THINK_EVERY } from './ai.js';
 
 export const TICK_MS = 1000 / TICK_HZ;
 
@@ -26,7 +26,7 @@ export class Host {
 
   tick() {
     const s = this.sim;
-    if (s.tick % THINK_EVERY === 0) for (let t = 0; t < TEAMS; t++) if (this.ai[t] != null) for (const o of think(s, t, this.ai[t])) this.order(o);
+    if (s.tick % THINK_EVERY === 0) for (let t = 0; t < TEAMS; t++) if (this.ai[t] != null) for (const o of act(s, t, this.ai[t])) this.order(o);
     this.px.set(s.x.subarray(0, s.n)); this.py.set(s.y.subarray(0, s.n)); this.pid.set(s.id.subarray(0, s.n)); this.pl.set(s.layer.subarray(0, s.n)); this.pn = s.n;
     s.step();
     if (s.tick % 600 === 0) this.hashes.push([s.tick, s.hash()]);
