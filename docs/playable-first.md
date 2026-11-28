@@ -25,6 +25,7 @@ Bots find defects and measure balance. They do not vote on fun (AGENTS.md).
 - Standing approval to merge and deploy the game's own folder.
 - The owner's target in the owner's words. If you only have adjectives ("ambitious", "more fun"), go to step 1.
 - Reviewers on at least two other model families.
+- The strongest available model on the hard core of the game. It may build directly or hand parts to subagents; say which model built what, so the next trace can tell process from model.
 - A notes file for the game (`experiments/<slug>/NOTES.md`) with a "tried and dropped" section.
 
 ## The loop
@@ -54,7 +55,7 @@ Cinderhill's slices took a median of thirteen minutes from pull request to merge
 
 **8. Taste choices are settings.** A look, a pace, a control scheme, a difficulty: ship it through `experiments/kit/settings.js` with a recorded default. Ask the owner only for structure choices, as two to four options with a recommendation, and keep building on the recommendation.
 
-**9. Cold first play, before more breadth.** Capture the real first screen, first input, a refused input, first success, the first real choice and the end screen at phone size. Give them to a reviewer with no context and ask what they would do, what each cost is, and what just happened. Then run the same first situation through the real client by hand or by browser script. Every finding about controls, costs or progress is fixed and rechecked on the same screen before the next feature slice. This gate was missing on Cinderhill.
+**9. Cold first play, alongside the build.** Capture the real first screen, first input, a refused input, first success, the first real choice and the end screen at phone size. Give them to a reviewer with no context and ask what they would do, what each cost is, and what just happened. Then run the same first situation through the real client by hand or by browser script. This check does not block new features (owner, 2026-11-28). Run it after the first complete situation and again every few slices; put each control, cost and progress finding in the notes file with a date, and fix the oldest ones in the next stop-adding pass (step 7), rechecking on the same screen. On Cinderhill such findings were flagged and then left for a day, and they became the owner's complaint list.
 
 **10. A person plays.** Agents cannot pass this gate. State the human gate in numbers before asking (Cinderhill's own roadmap had one: four of five fresh phone players finish the first chapter without help, each giving at least five orders, and finishing by waiting does not count). Until a person has played, every report says so.
 
@@ -89,7 +90,7 @@ Fill the brackets and hand this to the thread that will own the game.
 >
 > You may merge and deploy **[folder]** without asking. Ship taste choices as settings with a recorded default. Decide technical questions yourself. Ask the owner only for structure choices, as two to four options with your recommendation, and keep building on it.
 >
-> After every slice: measure the choice against its alternative and against doing neither; get one adversarial code review and one outside read from models other than your own; write numbers and dropped ideas to the notes file. Every few slices stop adding and measure what is already there. Before adding breadth, pass the cold first-play check and fix what it finds. In every report, separate what was built, what bots measured, what the owner played and what an outside person played. Correct disproved claims where you made them.
+> After every slice: measure the choice against its alternative and against doing neither; get one adversarial code review and one outside read from models other than your own; write numbers and dropped ideas to the notes file. Every few slices stop adding and measure what is already there. Run the cold first-play check alongside the build; it does not block features, but its findings get fixed in the next stop-adding pass. In every report, separate what was built, what bots measured, what the owner played and what an outside person played. Correct disproved claims where you made them.
 
 ## Follow-ups this process asks for
 
