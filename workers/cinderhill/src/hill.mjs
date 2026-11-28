@@ -37,6 +37,14 @@ export function cleanCommand(cmd, tick, seat, id) {
   return null;
 }
 
+/** The war build's order: integers the room does not read (experiments/cinderhill/war/wire.js), bounded in count. */
+const WAR_INTS = 1400;
+export function cleanWar(cmd, tick, seat, id) {
+  const a = cmd?.ints;
+  if (!Array.isArray(a) || a.length < 1 || a.length > WAR_INTS || !a.every(v => int(v) !== null)) return null;
+  return Int32Array.from([tick, seat, id, ...a]);
+}
+
 export class Hill {
   constructor(ctx, env, deps = {}) {
     this.ctx = ctx; this.env = env ?? {};
@@ -72,9 +80,16 @@ export class Hill {
     const pair = makePair(), [client, server] = Object.values(pair);
     this.ctx.acceptWebSocket(server);
     const refuse = (code, why) => { this.stat.refused++; server.close(code, why); return new Response(null, { status: 101, webSocket: client }); };
-    if (Number(q.get('proto')) !== PROTO || Number(q.get('sim')) !== SIM_VERSION) {
-      server.send(JSON.stringify({ t: 'reload', proto: PROTO, sim: SIM_VERSION }));
+    // A war room is a relay for the war build (experiments/cinderhill/war): the room does not hold its sim, so the
+    // first page's version is the room's, and a page of another version or the other game is sent away.
+    const war = q.get('game') === 'war', simWant = war ? (this.cfg?.sim ?? (Number(q.get('sim')) | 0)) : SIM_VERSION;
+    if (Number(q.get('proto')) !== PROTO || Number(q.get('sim')) !== simWant || (this.cfg && (this.cfg.game === 'war') !== war)) {
+      server.send(JSON.stringify({ t: 'reload', proto: PROTO, sim: simWant }));
       return refuse(4005, 'version');
+    }
+    if (!this.cfg && war) {
+      this.cfg = { seed: (Number(q.get('seed')) >>> 0) || 2026, ants: 0, role: 'relay', game: 'war', sim: simWant };
+      this.sql.exec(`INSERT OR REPLACE INTO meta VALUES ('cfg', ?)`, JSON.stringify(this.cfg));
     }
     if (!this.cfg) {
       const debug = this.env.DEBUG_ROLES === '1';
@@ -98,7 +113,7 @@ export class Hill {
     server.serializeAttachment({ seat });
     this.stat.joins++;
     this.start();
-    server.send(JSON.stringify({ t: 'welcome', proto: PROTO, sim: SIM_VERSION, ...this.cfg, seat, token: mine, sealed: this.sealed, boots: this.boots, version: this.env.VERSION?.id ?? 'local', object: this.ctx.id?.toString?.() ?? '' }));
+    server.send(JSON.stringify({ t: 'welcome', proto: PROTO, sim: SIM_VERSION, ...this.cfg, seat, seats: this.ctx.getWebSockets().length, token: mine, sealed: this.sealed, boots: this.boots, version: this.env.VERSION?.id ?? 'local', object: this.ctx.id?.toString?.() ?? '' }));
     // Catch-up: everything sealed from the client's next tick on.
     const have = Math.max(0, Number(q.get('have')) | 0);
     if (this.sealed >= have) {
@@ -168,7 +183,7 @@ export class Hill {
   message(ws, data) {
     this.pump();
     let m;
-    try { m = typeof data === 'string' && data.length < 4096 ? JSON.parse(data) : null; } catch { m = null; }
+    try { m = typeof data === 'string' && data.length < (this.cfg?.game === 'war' ? 16384 : 4096) ? JSON.parse(data) : null; } catch { m = null; }
     const seat = ws.deserializeAttachment()?.seat;
     if (!m || seat === undefined) { this.stat.bad++; return; }
     if (m.t === 'cmd') return this.command(ws, seat, m);
@@ -186,7 +201,7 @@ export class Hill {
     let tick = int(m.tick) ?? 0;
     if (tick <= this.sealed) { tick = this.sealed + 1; this.stat.late++; }
     if (tick > this.sealed + AHEAD) { this.stat.bad++; return; }
-    const c = cleanCommand(m.cmd, tick, seat, id);
+    const c = this.cfg.game === 'war' ? cleanWar(m.cmd, tick, seat, id) : cleanCommand(m.cmd, tick, seat, id);
     if (!c) { this.stat.bad++; return; }
     this.pending.push([tick, c, ws]); this.pendingKeys.add(key); this.stat.cmds++;
   }

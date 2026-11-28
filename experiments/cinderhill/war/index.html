@@ -72,6 +72,9 @@
   #need { display: block; width: 100%; height: auto; font-family: inherit; margin: 0 0 8px; padding: 2px; font-size: 13px; line-height: 1.3; text-align: left; font-weight: 500; color: inherit; background: none; border: 0; } #need:empty { display: none; } #need b { color: #ffcf7a; }
   #diet[data-tab="dig"] #need { display: none; } #digHelp b { color: #ffcf7a; }
   #rooms button.want { box-shadow: inset 0 0 0 2px #ffcf7a; }
+  #roomBox { display: none; } body.room #roomBox { display: block; } body.room #friends, body.room #path, body.room #fresh, body.room #treeBtn, body.room #tree, body.room #mDeeds { display: none; } #friends p, #roomBox p { margin: 2px 0 6px; font-size: 13px; }
+body.room #restart { display: none; }
+body.room #roomPause { display: block; margin: 8px 4px 2px; font-size: 13px; color: #ffd9a8; text-align: center; }
   #digQueue { margin: 4px 2px 0; font-size: 12px; color: var(--dim); } #digQueue:empty { display: none; } #digQueue b { color: #ffcf7a; } #digQueue b.short { color: #ff9a8a; }
   #digHelp { margin: 7px 2px 0; font-size: 12px; color: var(--dim); min-height: 15px; }
   #rooms { grid-auto-flow: row; grid-template-columns: repeat(4, 1fr); } #rooms button { font-size: 12px; min-width: 0; } #rooms button small { font-size: 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -257,10 +260,12 @@
     <p class="sub" id="mSub"></p>
     <div class="goals glass" id="mGoals"></div>
     <div class="deeds glass" id="mDeeds"></div>
+    <div class="goals glass" id="roomBox"><p id="roomInfo"></p><button class="plain" id="roomShare">Share the link</button></div>
     <button class="big" id="play">Play</button>
     <button class="plain" id="treeBtn" aria-expanded="false">The Lineage</button>
     <div class="tree glass" id="tree" hidden></div>
     <button class="plain" id="fresh">New campaign</button>
+    <div class="goals glass" id="friends"><p><span><b>With friends</b> · experimental. Up to four players in a room, on two hills. A machine can play the far hill.</span></p><button class="plain" id="roomVs">Against a friend</button><button class="plain" id="roomCoop">Together against the machine</button></div>
     <div class="lab" id="menuLab"></div>
   </div>
 </div>
@@ -268,6 +273,7 @@
 <div id="paused" class="scrim">
   <div class="card">
     <button class="big" id="resume">Resume</button>
+    <p id="roomPause" hidden>The match keeps running while this is open: the room does not wait.</p>
     <div class="panel glass" id="settings"></div>
     <div class="lab" id="pauseLab"></div>
     <button class="plain" id="restart">Start again</button>
