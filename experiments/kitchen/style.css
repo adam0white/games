@@ -151,6 +151,10 @@ button.small { min-width: 0; font-size: 15px; }
 #shop .tool small { font-size: 11px; opacity: 0.85; }
 #shop .tool.on { border-color: var(--green); background: #e9f9ee; opacity: 1; }
 #shop .toolsBox { grid-column: 1 / -1; }
+#shop .jump { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+#shop .jump button { margin: 0; padding: 4px 12px; min-height: 0; font-size: 13px; border-radius: 99px; }
+/* A short phone: the goal box left the list a strip 120 px tall. The whole card scrolls instead, with the buttons kept in reach. */
+@media (max-height: 640px) { #shop .card.wide { display: block; overflow-y: auto; } #shop #builds { overflow: visible; } #shop .shopFoot { position: sticky; bottom: -1px; background: var(--paper); box-shadow: 0 24px 0 var(--paper); margin-bottom: 0; padding-bottom: 6px; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; } #shop .shopFoot button { margin: 0; } #shop .shopFoot .main { font-size: 18px; padding: 8px 14px; } }
 
 /* The Manners Wheel, the fist fight and the splat. */
 #wheelBtn { position: fixed; right: calc(16px + env(safe-area-inset-right)); bottom: calc(22px + env(safe-area-inset-bottom)); width: 88px; height: 88px; border-radius: 50%; border: 3px solid var(--ink); background: #ff8fb1; box-shadow: 0 6px 0 var(--shade); display: none; flex-direction: column; align-items: center; justify-content: center; font: 900 15px/1 inherit; color: var(--ink); z-index: 6; touch-action: none; }
@@ -218,7 +222,7 @@ button.small { min-width: 0; font-size: 15px; }
 #rail .chip { width: 70px; background: #fffdf5; border: 2.5px solid var(--ink); border-top: 9px solid var(--c); border-radius: 10px; padding: 2px 3px 4px; box-shadow: 0 3px 0 var(--shade); display: flex; flex-direction: column; gap: 2px; align-items: center; }
 #rail .chip.rich { background: #fff3c2; } #rail .chip.hot { animation: rushPulse .35s infinite alternate; } #rail .chip.ready { background: #d9ffd9; }
 #rail .top { display: flex; align-items: center; gap: 2px; width: 100%; justify-content: space-between; } #rail .top img { width: 26px; height: 26px; } #rail .top b { font-size: 12px; display: inline-flex; align-items: center; gap: 1px; } #rail .top .coin { width: 10px; height: 10px; }
-#rail .need { display: flex; flex-wrap: wrap; justify-content: center; gap: 1px; min-height: 20px; } #rail .need img { width: 19px; height: 19px; opacity: .38; filter: grayscale(.7); } #rail .need img.got { opacity: 1; filter: none; background: var(--c); border-radius: 50%; }
+#rail .need { display: flex; flex-wrap: wrap; justify-content: center; gap: 1px; min-height: 20px; } #rail .need img { width: 19px; height: 19px; opacity: .62; filter: grayscale(.45); } #rail .need img.got { opacity: 1; filter: none; background: var(--c); border-radius: 50%; }
 #rail .pat { width: 94%; height: 7px; border: 2px solid var(--ink); border-radius: 6px; overflow: hidden; background: #fff; } #rail .pat i { display: block; height: 100%; transform-origin: left; background: #6fd36f; }
 #rush small { color: #e89a00; }
 #rushRow { gap: 8px; flex-wrap: nowrap; } #nights { display: contents; }

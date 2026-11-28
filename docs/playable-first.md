@@ -67,11 +67,15 @@ The process was run a second time on a game with no opponent and almost no spec,
 
 **5. Slice.** Each slice adds to the weakest row of the target table and nothing else. For each slice:
 
+- write the pass line in the notes before the trial: only lines that could fail, and every screen size by name;
 - build and run the game's tests;
+- look at one screenshot of anything new on screen yourself before any outside read;
 - measure (step 6);
-- send the diff to one adversarial code reviewer with a named list of failure classes, and the build or screenshots to one reviewer who has not seen your intent;
+- when the pull request opens, send the diff to one adversarial code reviewer with a named list of failure classes, and the build or screenshots to one reviewer who has not seen your intent. Give screenshots neutral file names, shuffle them, send one image an ask when the question is "which is this", include every option, and keep the same reader on the same shot across rounds;
+- for anything that depends on the screen's shape, stage every common size, and each size arriving from the other shape (a turned phone, a resized window);
 - for anything that opens over live play (a sheet, a menu, a mini-game), run the edges through the real client at the smallest phone size and in the longest language: pause while it is open, the round ending while it is open, its target leaving while it is open, and the opening tap itself;
-- fix, merge, confirm the change on the live page by fetching the live file;
+- merge when both outside reviews have been read and their findings fixed or written down, not when the checks turn green; then confirm the change on the live page by fetching the live file;
+- keep the scripts that produced the evidence in the game's folder, so the next slice can rerun them;
 - write the numbers, the decision and anything dropped to the notes file;
 - post one short status line that says what no person has played.
 
@@ -90,7 +94,7 @@ Six checks on the bot itself, each of which caught a wrong number on Sky Kitchen
 
 Write the pass line before running a trial, in the notes file where a later reader can find it: which player should gain, which should not, and by how much. A trial that misses its line gets the one retune of the stop rules and is then removed, or is kept with the miss written next to the result. For each candidate, say whether each part of the line could have failed; a part that is true by construction is not evidence. After adding an assert or a check, break the thing it guards once and watch it fail. Run the checks above on every new mode too, not only on the first one: on Sky Kitchen the second night shipped to review before a parked tray and the wheel had been measured on it.
 
-**7. Every third or fourth slice, stop adding.** List every choice the game advertises. Measure each. Fix or remove any that one side always wins before adding another.
+**7. Every third or fourth slice, stop adding.** Read the play records first: a person's shift outranks any outside read. List every choice the game advertises. Measure each. Fix or remove any that one side always wins before adding another. Then give the whole journey as it is live, in order, to outside readers at one phone size and one wide size, and let their findings rank the pass.
 
 **8. Taste choices are settings.** A look, a pace, a control scheme, a difficulty: ship it through `experiments/kit/settings.js` with a recorded default. Ask the owner only for structure choices, as two to four options with a recommendation, and keep building on the recommendation.
 
@@ -129,7 +133,7 @@ Fill the brackets and hand this to the thread that will own the game.
 >
 > You may merge and deploy **[folder]** without asking. Ship taste choices as settings with a recorded default. Decide technical questions yourself. Ask the owner only for structure choices, as two to four options with your recommendation, and keep building on it.
 >
-> After every slice: measure the choice against its alternative and against doing neither; get one adversarial code review and one outside read from models other than your own; write numbers and dropped ideas to the notes file. Every few slices stop adding and measure what is already there. Run the cold first-play check alongside the build; it does not block features, but its findings get fixed in the next stop-adding pass. In every report, separate what was built, what bots measured, what the owner played and what an outside person played. Correct disproved claims where you made them.
+> Before every slice, write its pass line. After every slice: measure the choice against its alternative and against doing neither; get one adversarial code review and one outside read from models other than your own, and read both before you merge; write numbers and dropped ideas to the notes file; keep the scripts behind your evidence in the game's folder. Every few slices stop adding and measure what is already there. Run the cold first-play check alongside the build; it does not block features, but its findings get fixed in the next stop-adding pass. In every report, separate what was built, what bots measured, what the owner played and what an outside person played. Correct disproved claims where you made them.
 
 ## Follow-ups this process asks for
 
