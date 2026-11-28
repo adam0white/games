@@ -10,7 +10,7 @@ export const MAIN = [
   ['/lantern/', 'Lantern', 'Carry the light down the river to dawn. Spark, Tide, Duet and Race modes.'],
   ['/ant-promotion/', 'Ant Promotion', 'Start as an ant, eat what is weaker than you, and pick what you become next.'],
   ['/kitchen/', 'Sky Kitchen', 'Catch falling ingredients, cook them, serve guests and grow a food cart into a restaurant.'],
-  ['/cinderhill/', 'Cinderhill', 'Early build of an ant colony game: paint trails and watch the workers follow.'],
+  ['/cinderhill/', 'Cinderhill', 'Ant colony strategy: dig a nest, raise castes, hold trails and outlast a rival colony. Missions, a tree to grow, rooms with a friend.'],
   ['/exile/', 'Exile', 'A banished heir founds his own kingdom in a forest camp. Third person, made in Unity, best on a computer.'],
   ['/crumbwar/', 'Crumbwar', 'Ant colonies against other players online. Classic, Feast and Rush.'],
 ];
