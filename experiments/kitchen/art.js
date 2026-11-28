@@ -366,7 +366,10 @@ export async function createView(canvas, lookId) {
   };
   const cam = { pos: new THREE.Vector3(0, 3, 9), at: new THREE.Vector3(0, 1, 0), wantPos: new THREE.Vector3(), wantAt: new THREE.Vector3(), name: 'menu', shake: 0, orbit: 0, bias: 0 };
   let W = 1, H = 1;
-  const WIDE = 0.6, wide = () => (canvas.clientWidth || innerWidth) / (canvas.clientHeight || innerHeight) > WIDE;   // measured now, not at the last resize
+  // Wide: any screen that is not a tall phone. Measured now, not at the last resize; sticky between 0.56 and 0.62 so a
+  // browser bar sliding in or out does not flip it mid-shift.
+  let wasWide = false;
+  const wide = () => { const a = (canvas.clientWidth || innerWidth) / (canvas.clientHeight || innerHeight); wasWide = wasWide ? a > 0.575 : a > 0.63; return wasWide; };   // two edges so a window near the line does not flip; a 16:9 phone held upright (0.5625) is always tall
   let catchRoom = 1; const catchUp = 0.03;   // with room: the tray near the middle of the screen, guests under it
   function setRoom(k) { if (k === catchRoom) return; catchRoom = k; if (cam.name === 'catch') view('catch'); }
   function framing(name) {
@@ -378,17 +381,17 @@ export async function createView(canvas, lookId) {
     if (name !== 'catch' && aspect < 0.8) at.y -= v.half[0] / aspect * 0.18 * (name === 'room' || name === 'menu' ? 0.4 : 1);
     if (name === 'catch') {
       // The lane fills the screen whatever its shape: the tray a quarter up from the bottom, items from near the top.
-      const room = aspect > WIDE ? catchRoom : 1;   // only a screen that is not a tall phone needs it; checked here so a turned phone is right at once
-      const visH = Math.max(2 * v.half[1] * room, 2 * v.half[0] / aspect) * 1.04;   // catchRoom: a wide screen steps back so guests under the tray show
+      const room = wide() ? catchRoom : 1;   // only a screen that is not a tall phone needs it; checked here so a turned phone is right at once
+      const fit = Math.max(v.half[1], v.half[0] / aspect) * room * 1.04, visH = 2 * fit;   // catchRoom: a wide screen steps back so guests under the tray show
       LANE.h = visH * 0.6 / 1.15; at.y = LANE.y0 + visH * (room > 1 ? catchUp : 0.2);
-      const d = Math.max(v.half[1] * room, v.half[0] / aspect) * 1.04 / Math.tan(fovY);
+      const d = fit / Math.tan(fovY);
       return { pos: at.clone().addScaledVector(dir, d), at };
     }
     return { pos: at.clone().addScaledVector(dir, dist), at };
   }
   function view(name, instant = false) { cam.name = name; const f = framing(name); cam.wantPos.copy(f.pos); cam.wantAt.copy(f.at); if (instant) { cam.pos.copy(f.pos); cam.at.copy(f.at); } }
   function resize() {
-    W = canvas.clientWidth || innerWidth; H = canvas.clientHeight || innerHeight;
+    W = canvas.clientWidth || innerWidth; H = canvas.clientHeight || innerHeight; wide();   // sampled on every resize, the menu's too, so the two edges remember
     renderer.setSize(W, H, false); camera.aspect = W / H; camera.updateProjectionMatrix(); view(cam.name, true);
   }
   addEventListener('resize', resize);
@@ -600,8 +603,15 @@ export async function createView(canvas, lookId) {
     for (const m of [base, ...rims]) { m.userData.baseMats = [m.material]; m.userData.styled = true; }
     const load = new THREE.Group(); group.add(load);
     let width = 0.6, squash = 0, tilt = 0, lastX = 0;
+    // Tray skins (cosmetic, earned with missions): body colour, rim colour, roughness, metalness.
+    const SKINS = { wood: null, enamel: ['#2f9c95', '#f4efe6', 0.3, 0.1], golden: ['#f5c63a', '#d99a1c', 0.3, 0.25, 0.22] }, skinMats = { wood: [wood, rim] };
     return {
       group, load,
+      setSkin(id) {
+        if (!Object.hasOwn(SKINS, id)) id = 'wood';
+        const [a, b] = skinMats[id] ??= [0, 1].map(i => new THREE.MeshStandardMaterial({ color: SKINS[id][i], roughness: SKINS[id][2], metalness: SKINS[id][3], emissive: SKINS[id][i], emissiveIntensity: SKINS[id][4] ?? 0 }));
+        body.traverse(m => { if (!m.isMesh) return; const mat = m === base ? a : b; if (m.userData.baseMats) { m.userData.baseMats = [mat]; applyLook(m); } else m.material = mat; });
+      },
       setLevel(l) { const half = TUNE.trayHalf[Math.min(TUNE.trayHalf.length - 1, l)]; width = half * 2 * LANE.s + 0.1; body.scale.set(width, 1, 1); rims.forEach((r, i) => { if (i >= 2) r.position.x = (i === 2 ? -1 : 1) * 0.52 * width; r.scale.x = i < 2 ? 1 : 1 / width; }); },
       setX(x) { group.position.x = x; },
       bump() { squash = 1; },
