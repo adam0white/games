@@ -21,7 +21,7 @@ Bots find defects and measure balance. They do not vote on fun (AGENTS.md).
 
 ## Second run: Sky Kitchen (2026-11-28)
 
-The process was run a second time on a game with no opponent and almost no spec, as a light rebuild: one timed shift with several guests seated at once, then the game's existing eleven wheel actions given one effect and one printed price each, then a stop-adding pass, a second kind of shift, and a mission inside each shift. Four slices merged in a day. No person had played any of them when this was written, so this run says nothing yet about whether the result is good. What it showed about the process:
+The process was run a second time on a game with no opponent and almost no spec, as a light rebuild: one timed shift with several guests seated at once, then the game's existing eleven wheel actions given one effect and one printed price each, then a stop-adding pass, a second kind of shift, and a mission inside each shift. By the end of 2026-11-28 six slices and two stop-adding passes had merged (the list below is in the order they happened). No person had played any of them when this was written, so this run says nothing yet about whether the result is good. What it showed about the process:
 
 - Reading recorded play first (step 2) paid at once: 42 runs showed one action taken thirty times, the others almost never, and no guest ever lost. The design started from those two facts, not from the feature list.
 - The scripted player's model of time was wrong by a factor of 1.7 until ten dishes were timed in the real client. Star targets set from the first model would have been far too low. This is now in step 6.
@@ -35,13 +35,13 @@ The process was run a second time on a game with no opponent and almost no spec,
 - In the fourth slice (a mission inside each shift) the pass line was written into the notes before the first run, and four of seventeen candidates failed it and were removed in one run. Twelve of the thirteen that passed could not have failed four of its five lines, because a plan that never opens the action menu cannot complete "use this action". A pass line only counts for a candidate that could fail it; the notes say which.
 - The same slice found that a claim in the last slice's notes was false: a scripted text replacement that was meant to add an assert had matched nothing, and nothing checked that it had. A new check must be seen to fail once before it is reported.
 - An action measured as dead two slices earlier turned out strong under a different trigger. This was the third time a hand-written trigger, not the game, was the fault.
-- In the fifth slice (guests drawn as people) a ten-minute staging test with three still figures came before the pass line and settled whether the idea fit the screen at all. The pass line then named three screen sizes, and the widest failed it. Two retunes did not fix it, the stop rule ended the attempt, and the slice shipped with the miss written down. Name every screen size in the pass line; a line that names only phones would have passed. The third attempt worked because it asked why the first two had failed (the camera rule, not the person's size) before changing a number; a retune that only moves the number the last retune moved is the same trial again.
+- In the fifth slice (guests drawn as people) a ten-minute staging test with three still figures came before the pass line and settled whether the idea fit the screen at all. The pass line then named three screen sizes, and the widest failed it. Two retunes did not fix it, the stop rule ended the attempt, and the slice shipped with the miss written down. Name every screen size in the pass line; a line that names only phones would have passed. A later slice reopened it as a different question and worked, because it asked why the two retunes had failed (the camera rule, not the person's size) before changing a number; a retune that only moves the number the last retune moved is the same trial again.
 - A pass line about memory (counts level from the first shift to the third) found a leak older than the slice. A resource line costs one counter and belongs in any slice that creates and removes objects during play.
 - Twice a walk through the real page reported the game stuck when the walk script was at fault (it tapped where a person holds). Before reading a stuck walk as a game fault, play that step by hand or check the script's input against the control's rule. This is the same lesson as the wrong triggers, one level up: the instrument fails more often than the game.
 - Both outside code reviewers found faults in the paused state and in removal mid-animation that three clean walks had not, because the walks never paused during a stunt. For anything animated, the edge run in step 5 should pause, quit and change the setting in the middle of the animation.
 - One slice merged before its outside code review and outside read came back. Run afterwards, they found four faults (a guest deleted when the phone turned mid-cook, a camera change with nobody on screen, a multiplier that moved the aim but not the distance, a switch that forgot its side while on the menu). Start the outside reviews when the pull request opens and merge when they are read, not when the checks are green.
 - A switch with two edges needs every common screen checked against both edges. The lower edge sat just under a 16:9 phone held upright, so a phone turned and turned back would have stayed in the wrong class; staging from a fresh page could not show it. Stage each size arriving from the other class too.
-- An outside read of a screenshot must not leak the answer: copy the files to neutral names, shuffle them, send one image an ask, and include every option, since one pick from three names is right a third of the time by chance.
+- An outside read of a screenshot must not leak the answer: copy the files to neutral names, shuffle them, send one image in each request, and include every option, since one pick from three names is right a third of the time by chance.
 - When a second outside read disagrees with the first, check whether the image changed or only the reader. Here a retune seemed to make the wood tray's reads worse, but the wood shots were identical in both rounds; only which model saw which shot had changed. Keep the reader fixed for a shot across rounds, or send every shot to both.
 - A material can pass every check and look wrong: the first golden tray was a dark olive because the scene has nothing for metal to reflect. Look at one shot of anything new on screen before any outside read.
 - The brief reached a thread that already existed, and it took a round trip to settle which thread owned the game. The launch prompt now names the owner thread.
@@ -49,8 +49,9 @@ The process was run a second time on a game with no opponent and almost no spec,
 ## Entry
 
 - A playable build that records play, or a brief for one. If recording fails, fix it first and read one stored record back.
+- The practical facts, found in the repo before step 1 if the brief lacks them: where play records are read, the game's test and phone-check commands, the screen sizes it supports, how a change reaches the live page (AGENTS.md and `experiments/kit/README.md` hold these for this repo).
 - Standing approval to merge and deploy the game's own folder.
-- The owner's target in the owner's words. If you only have adjectives ("ambitious", "more fun"), go to step 1.
+- The owner's target in the owner's words. If you only have adjectives ("ambitious", "more fun"), go to step 1. If the owner does not answer and there is no recorded play, write your own target rows, mark each "provisional, builder's", and carry on; replace them when the owner or a record speaks.
 - Reviewers on at least two other model families.
 - The strongest available model on the hard core of the game. It may build directly or hand parts to subagents; say which model built what, so the next trace can tell process from model.
 - A notes file for the game (`experiments/<slug>/NOTES.md`) with a "tried and dropped" section.
@@ -61,19 +62,19 @@ The process was run a second time on a game with no opponent and almost no spec,
 
 **2. Read the actual play.** Before designing, read the owner's and any outside records: short exits, long sessions, a loss, a win. Say what happened before saying why.
 
-**3. Write the design in an hour, then ask what to build first.** Send it to three reviewers on different models with the owner's words and one instruction: do not recommend cutting scope; say which choices are fake and what must be proven first. Take the point they agree on. Correct your plan where you announced it.
+**3. Write the design in an hour, then ask what to build first.** Send it to three reviewers on different models with the owner's words and one instruction: do not recommend cutting scope; say which choices are fake and what must be proven first. Take the point at least two of them make. If they agree on nothing, build the smallest thing any of them asked to see proven. Correct your plan where you announced it.
 
 **4. Build one complete situation.** An opening action, feedback, a choice with a cost, pressure, and an outcome the player can lose. Name two plans that should each win somewhere. If the game has an opponent, the opponent issues the same inputs a player can. If it has none, write a scripted player with adjustable skill, or a solver, that drives the same inputs. Keep the old build reachable.
 
 **5. Slice.** Each slice adds to the weakest row of the target table and nothing else. For each slice:
 
-- write the pass line in the notes before the trial: only lines that could fail, and every screen size by name;
+- write the pass line in the notes before the trial: only lines that could fail, and every screen size by name (here: 320 by 568, 390 by 844, 768 by 1024 and 1280 by 720 unless the game says otherwise). A ten-minute staging to see whether an idea fits the screen at all may come before the line; it is not a trial and settles nothing else;
 - build and run the game's tests;
 - look at one screenshot of anything new on screen yourself before any outside read;
 - measure (step 6);
-- when the pull request opens, send the diff to one adversarial code reviewer with a named list of failure classes, and the build or screenshots to one reviewer who has not seen your intent. Give screenshots neutral file names, shuffle them, send one image an ask when the question is "which is this", include every option, and keep the same reader on the same shot across rounds;
+- when the pull request opens, send the diff to one adversarial code reviewer with a named list of failure classes, and the build or screenshots to one reviewer who has not seen your intent. Give screenshots neutral file names, shuffle them, send one image in each request when the question is "which is this", include every option, and keep the same reader on the same shot across rounds;
 - for anything that depends on the screen's shape, stage every common size, and each size arriving from the other shape (a turned phone, a resized window);
-- for anything that opens over live play (a sheet, a menu, a mini-game), run the edges through the real client at the smallest phone size and in the longest language: pause while it is open, the round ending while it is open, its target leaving while it is open, and the opening tap itself;
+- for anything that opens over live play (a sheet, a menu, a mini-game), run the edges through the real client at the smallest phone size and in the longest language: pause while it is open, the round ending while it is open, its target leaving while it is open, and the opening tap itself. For anything animated, also pause, quit and change its setting in the middle of the animation;
 - merge when both outside reviews have been read and their findings fixed or written down, not when the checks turn green; then confirm the change on the live page by fetching the live file;
 - keep the scripts that produced the evidence in the game's folder, so the next slice can rerun them;
 - write the numbers, the decision and anything dropped to the notes file;
@@ -81,20 +82,20 @@ The process was run a second time on a game with no opponent and almost no spec,
 
 Cinderhill's slices took a median of thirteen minutes from pull request to merge, and forty-four merged in twenty hours.
 
-**6. Measure each choice against doing neither.** Run option A, option B and neither on the same seeds, in both seats, to a fixed tick. Record intermediate state (stock, population, time to first payoff), not only who won. A choice is real when changing the action changes an outcome or a material intermediate state, and the player can see the difference. Then prove the measurement can fail: switch the effect off, or use a known bad layout, and check the number moves. Read one odd run end to end. If the bot never issued the order the choice needs, fix the bot before tuning the game.
+**6. Measure each choice against doing neither.** Run option A, option B and neither on the same seeds, in both seats if the game has two, to the same end point. Record intermediate state (stock, population, time to first payoff), not only who won. A choice is real when changing the action changes an outcome or a material intermediate state, and the player can see the difference. Then prove the measurement can fail: switch the effect off, or use a known bad layout, and check the number moves. Read one odd run end to end. If the bot never issued the order the choice needs, fix the bot before tuning the game.
 
 Six checks on the bot itself, each of which caught a wrong number on Sky Kitchen:
 
 - Before setting any target from a scripted player, time the same actions in the real client and compare. Fix the model until they agree.
-- Run a player that does nothing, and one that does one thing and stops, through the real client. Do it at every rank or difficulty, not a sample: on Sky Kitchen a still tray took nothing at the three ranks tried and earned a star at the top four. The first must lose and the second must earn no reward. (On Sky Kitchen the second still earns one star of three; that is recorded as open, not fixed.)
+- Run a player that does nothing, and one that does one thing and stops, through the real client. Do it at every rank or difficulty the game has, not a sample: on Sky Kitchen a still tray took nothing at the three ranks tried and earned a star at the top four. The first must lose and the second must earn no reward. (On Sky Kitchen the second still earns one star of three; that is recorded as open, not fixed.)
 - Before calling an action flat or strong, compare the scripted trigger with using the action at random. If random does better, the trigger is wrong.
 - Make the script pay what the client makes a person pay: the seconds an action takes, and anything that keeps running while a menu is open.
 - Check each skill number of the scripted player that a new rule leans on (speed, accuracy, quality) against recorded play before trusting a result that depends on it.
 - Measure a new mode or option at the lowest rank where it opens and at the highest, not only in the middle.
 
-Write the pass line before running a trial, in the notes file where a later reader can find it: which player should gain, which should not, and by how much. A trial that misses its line gets the one retune of the stop rules and is then removed, or is kept with the miss written next to the result. For each candidate, say whether each part of the line could have failed; a part that is true by construction is not evidence. After adding an assert or a check, break the thing it guards once and watch it fail. Run the checks above on every new mode too, not only on the first one: on Sky Kitchen the second night shipped to review before a parked tray and the wheel had been measured on it.
+Write the pass line before running a trial, in the notes file where a later reader can find it: which player should gain, which should not, and by how much. A trial that misses its line gets the one retune of the stop rules and is then removed. The one exception: the builder may keep it for a reason the line did not measure (variety, a look), with the miss and that reason written next to the result and in the report. For each candidate, say whether each part of the line could have failed; a part that is true by construction is not evidence. After adding an assert or a check, break the thing it guards once and watch it fail. Run the checks above on every new mode too, not only on the first one: on Sky Kitchen the second night shipped to review before a parked tray and the wheel had been measured on it.
 
-**7. Every third or fourth slice, stop adding.** Read the play records first: a person's shift outranks any outside read. List every choice the game advertises. Measure each. Fix or remove any that one side always wins before adding another. Then give the whole journey as it is live, in order, to outside readers at one phone size and one wide size, and let their findings rank the pass.
+**7. Every third or fourth slice, stop adding.** Read the play records first: a person's shift outranks any outside read. List every choice the game advertises (actions, modes, purchases; not settings). Measure each. Fix or remove any that one side always wins before adding another. Then give the whole journey as it is live, in order, to outside readers at one phone size and one wide size, and fix what they report in order of how many readers hit it, first screens first.
 
 **8. Taste choices are settings.** A look, a pace, a control scheme, a difficulty: ship it through `experiments/kit/settings.js` with a recorded default. Ask the owner only for structure choices, as two to four options with a recommendation, and keep building on the recommendation.
 
@@ -104,8 +105,8 @@ Write the pass line before running a trial, in the notes file where a later read
 
 ## Stop rules
 
-- A mechanic that measures flat gets one bounded retune. If it is still flat, remove it and record the numbers and the diff's location.
-- Three failed trials on one question parks it until a person's game can be read.
+- A mechanic that measures flat gets one bounded retune: one change, decided before the rerun. If it is still flat, remove it and record the numbers and the diff's location (step 6 names the one exception).
+- Three failed trials on one question parks it until a person's game can be read. Asking a different question about the same thing (why did the retunes fail?) is a new question; moving the same number again is not.
 - When reviewers repeat themselves on one row, move to the next weakest row.
 - When a bot result and a person disagree, check they played the same situation, then believe the person.
 - A claim that later measures false is corrected in the notes and in the message where it was made.
@@ -133,7 +134,7 @@ Fill the brackets and hand this to the thread that will own the game.
 >
 > You may merge and deploy **[folder]** without asking. Ship taste choices as settings with a recorded default. Decide technical questions yourself. Ask the owner only for structure choices, as two to four options with your recommendation, and keep building on it.
 >
-> Before every slice, write its pass line. After every slice: measure the choice against its alternative and against doing neither; get one adversarial code review and one outside read from models other than your own, and read both before you merge; write numbers and dropped ideas to the notes file; keep the scripts behind your evidence in the game's folder. Every few slices stop adding and measure what is already there. Run the cold first-play check alongside the build; it does not block features, but its findings get fixed in the next stop-adding pass. In every report, separate what was built, what bots measured, what the owner played and what an outside person played. Correct disproved claims where you made them.
+> Before every slice, write its pass line. After every slice: measure the choice against its alternative and against doing neither; get one adversarial code review and one outside read from models other than your own, and read both before you merge; write numbers and dropped ideas to the notes file; keep the scripts behind your evidence in the game's folder. Every few slices stop adding and measure what is already there. Run the cold first-play check alongside the build; it does not block features, but its oldest findings get fixed in the next stop-adding pass. In every report, separate what was built, what bots measured, what the owner played and what an outside person played. Correct disproved claims where you made them.
 
 ## Follow-ups this process asks for
 
