@@ -193,7 +193,7 @@ Measured with `measure.mjs wheel 60 --tier=4 --who=greedy` and the same with `--
 
 With the careful plan (most impatient first, `--who=impatient`) a good cook takes 676 without the wheel and the gains shrink: Cook it! +30, Microwave +21, Pan +16, Fight -1, Hire -27, Lock out -31, the rest within 5. A new cook on that plan: Cook it! +51, Microwave +23, Fight +17 (strikes 0.37 to 1.25), Pan +12.
 
-The scripted fight first cost no catching time and showed +38 to +46 everywhere. Modelled as on the page (nothing is caught for the 3.5 s of the fight, and it counts only if the guest is still seated) it is a gamble: it pays a good cook who is losing guests anyway and costs a new one.
+The scripted fight first cost no catching time and showed +38 to +46 everywhere. Modelled as on the page (nothing is caught for the 3.5 s of the fight, and it counts only if the guest is still seated) it is a gamble: +49 for a good cook who is losing guests anyway, and for a new cook -8 with the scripted trigger, +37 at random and +17 on the careful plan, so the new cook's trigger is wrong and the sign is not known.
 
 Reading. The moment matters for Kick out, Slap and Rob, and for Fridge with a good cook: each is worth using when timed and costs coins at random, and Rob at random is ruinous, which is the price recorded play said it lacked. Fight pays a player who wins fights and has time to spare, and it is the one that can close the doors. Cook it! is the best single action for a careless catcher of either skill, even with no tip and no buzz. Lock out helps nobody the scripts can find except a new cook at random. Trash can and Pan are better at random than with the scripted trigger, so their triggers are wrong.
 
@@ -205,7 +205,7 @@ Not shown: that a person finds the sheet, reads eleven buttons under pressure, o
 
 Seven phone screenshots of a Rush went to a reviewer on another model family with no other information. It read the mode, the clock, the tickets, the rings and the end card correctly. Findings, to fix in the next stop-adding pass:
 
-1. Control: the menu only explains mouse and keys; nothing on the first Rush screen says to drag the tray.
+1. Control: the menu only explains mouse and keys; nothing on the first Rush screen says to drag the tray. (The screenshots came from a browser without touch, so recheck the menu text on a touch phone before fixing.)
 2. Control: nothing says what to do at the cooking step unless the hint has been seen in an ordinary day.
 3. Cost: the three dots read as strike slots only after one is lost, and nothing says what caused a strike.
 4. Cost: it could not tell whether a wrong catch or a miss costs anything.
@@ -220,5 +220,5 @@ One adversarial code review on another model family gave nine findings. Fixed: P
 
 One cold read of the sheet on a third family (three screenshots, no context) read ten of eleven buttons correctly. Fixed from it: the turns left are now a labelled count that says each action uses one; a disabled button says why; Cook it! and Fight say what the player has to do. Left for the next stop-adding pass: mark which actions touch one guest and which the whole room.
 
-Open after this slice: a wheel use in a Rush also counts toward the ordinary day's wheel missions (left in on purpose, not measured); only one action type a shift was measured, never a mix (for example a won fight then Rob on the same guest); a shaking ticket (low patience) is a moving target for a finger.
+Open after this slice: a tray parked at one side still takes 227 at the Bistro, above the one-star target of 180, so doing one thing and stopping earns a star; cells of +1 to +7 in the table are probably inside seed noise (no paired spread was printed); a wheel use in a Rush also counts toward the ordinary day's wheel missions (left in on purpose, not measured); only one action type a shift was measured, never a mix (for example a won fight then Rob on the same guest); a shaking ticket (low patience) is a moving target for a finger.
 
