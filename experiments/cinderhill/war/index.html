@@ -73,6 +73,10 @@
   #diet[data-tab="dig"] #need { display: none; } #digHelp b { color: #ffcf7a; }
   #rooms button.want { box-shadow: inset 0 0 0 2px #ffcf7a; }
   #roomBox { display: none; } body.room #roomBox { display: block; } body.room #friends, body.room #path, body.room #fresh, body.room #treeBtn, body.room #tree, body.room #mDeeds { display: none; } #friends p, #roomBox p { margin: 2px 0 6px; font-size: 13px; }
+#guide { position: fixed; z-index: 6; left: 8px; right: 8px; top: calc(136px + env(safe-area-inset-top)); padding: 8px 10px; display: none; gap: 10px; align-items: center; font-size: 13.5px; line-height: 1.3; border-radius: 14px; border: 1px solid rgba(255, 190, 110, 0.55); }
+body.playing #guide:not([hidden]) { display: flex; } #guide b { color: #ffcf7a; } #guideText { flex: 1; } #guideSide { display: flex; flex-direction: column; align-items: center; gap: 4px; } #guideN { opacity: 0.7; font-size: 11px; white-space: nowrap; }
+#guideSkip { font: inherit; font-size: 12px; color: inherit; background: rgba(255, 255, 255, 0.1); border: 0; border-radius: 10px; padding: 7px 10px; }
+body.guided[data-nest="full"] #nestWrap { top: calc(204px + env(safe-area-inset-top)); }
 body.room #restart { display: none; }
 body.room #roomPause { display: block; margin: 8px 4px 2px; font-size: 13px; color: #ffd9a8; text-align: center; }
   #digQueue { margin: 4px 2px 0; font-size: 12px; color: var(--dim); } #digQueue:empty { display: none; } #digQueue b { color: #ffcf7a; } #digQueue b.short { color: #ff9a8a; }
@@ -171,6 +175,7 @@ body.room #roomPause { display: block; margin: 8px 4px 2px; font-size: 13px; col
 <div id="versus" class="glass"><div class="names"><span id="vsUs">You 0</span><span id="vsThem">0 Rival</span></div><div id="bar2"><i></i></div><span id="dusk"></span><span id="queens"></span></div>
 <div id="mini" class="glass"><canvas id="miniC" width="160" height="112"></canvas></div>
 <div id="toast" class="glass"></div>
+<div id="guide" class="glass" hidden><span id="guideText"></span><span id="guideSide"><small id="guideN"></small><button id="guideSkip">Skip</button></span></div>
 
 <div id="nestWrap"><canvas id="nest"></canvas></div>
 
@@ -289,6 +294,7 @@ body.room #roomPause { display: block; margin: 8px 4px 2px; font-size: 13px; col
     <p class="sub" id="overWhy"></p>
     <div class="panel glass"><div class="tally" id="tally"></div></div>
     <div class="deeds glass" id="overDeeds" style="margin-top:10px"></div>
+    <div class="goals glass" id="carry" style="margin-top:10px"></div>
     <button class="big" id="next" style="margin-top:14px">Next</button>
     <button class="plain" id="again">Play again</button>
     <button class="plain" id="harder">Play a bolder rival</button>

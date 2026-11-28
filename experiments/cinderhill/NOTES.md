@@ -1371,3 +1371,16 @@ Machine players come two ways. `bot=` in the link runs the rival inside every pa
 Checked: 7 room tests in Node (round trip, two wire bots for 6000 ticks, late joiner, lost order noticed, other rules sent away, a page that drops and rejoins with an order typed while away landing once, replay without a room). In browsers through a local room: Chromium page, WebKit page and a Node wire bot in one room for 1670 ticks, 158 hashes compared, 0 mismatches; versus, co-op and a wire bot on the far hill each reached play on every page.
 
 Not checked: a dropped socket in a real browser (the browser walk's offline switch did not show the socket closing; the Node test covers the rejoin path); any match between two people; a phone on a mobile network; a match played to its end screen in a room; High Summer in a room; more than three seats; the cost of hashing on a slow phone.
+
+## First steps and what goes with you (war build)
+
+From the owner's list: "tutorial need" and "confusing inter mission progress".
+
+| Decision | Taken | Why |
+| --- | --- | --- |
+| Shape of the tutorial | Six steps on a card under the score in the first mission: forage, a second trail to meat, open the Nest, dig a store, raise soldiers, raid a ford. Each is ticked by sim state (a live trail, a mark, the diet), never by a tap on the card. | The owner's records: diet orders came late and five of six long games ended with no soldiers; 65 to 135 cells were marked in the first minute. A card that follows what the hill shows cannot fall out of step with it. |
+| When it shows | Setting "First steps": until done once (default), every game, hidden. Done or skipped is kept under `cinderhill:war:guided`. Not in a room. | Options as settings. |
+| Recording | Lab event `guide` with the step and tick at each step, and `end: done` or `skip`. | So the next read shows where people stop. |
+| Between missions | A panel on the end screen, "What goes with you": campaign count, whether this nest is kept and which mission starts in it, what the Lineage gained, and what is not kept. | The end screen listed deeds but never said what carries over. |
+
+Checked: the guide advanced through all six steps on state alone with the machine playing the seat, and wrote its key; the panel read correctly after a won Crossing (414×774 touch, Chromium). Not checked: a person following the steps by hand; whether six steps is the right number.

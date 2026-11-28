@@ -36,6 +36,7 @@ const set = settings('cinderhill', {
   sound: { values: ['all', 'fx', 'off'], def: 'all', key: 'cinderhill:war:sound' },
   finger: { values: ['hill', 'draw'], def: 'hill', key: 'cinderhill:war:finger' },
   nest: { values: ['full', 'sheet'], def: 'full', key: 'cinderhill:war:nest' },
+  guide: { values: ['once', 'always', 'off'], def: 'once', key: 'cinderhill:war:guide' },
   forks: { values: ['kept', 'free'], def: 'kept', key: 'cinderhill:war:forks' },
   growth: { values: ['mission', 'deeds'], def: 'mission', key: 'cinderhill:war:growth' },
   home: { values: ['carried', 'bare'], def: 'carried', key: 'cinderhill:war:home' },
@@ -43,8 +44,8 @@ const set = settings('cinderhill', {
   day: { values: ['12', '20', '30'], def: '20', key: 'cinderhill:war:day' },
   falls: { values: ['lean', 'fair', 'rich'], def: 'fair', key: 'cinderhill:war:falls' },
 }, { rec });
-const LABEL = { caste: 'Your third caste', rival: 'Rival', view: 'View', light: 'Light', style: 'Style', size: 'Ants', sound: 'Sound', finger: 'One finger', nest: 'The Nest', forks: 'Forks', growth: 'The tree', home: 'The home hill', visitor: 'The weevil', day: 'High Summer: length', falls: 'High Summer: windfalls' };
-const NAME = { full: 'Fills the screen', sheet: 'Slides over the lower half', 12: 'Twelve minutes', 20: 'Twenty minutes', 30: 'Thirty minutes', lean: 'Lean: a third less falls', fair: 'Fair', rich: 'Rich: half as much again', comes: 'Comes for your stores', hungry: 'Comes hungry, and harder to kill', never: 'Never comes', carried: 'Kept from mission to mission', bare: 'A new hill every mission', mission: 'Grow the hill in each mission', deeds: 'Deeds alone open tools (no growth)', spitter: 'Spitters', warden: 'Wardens', timid: 'Timid', steady: 'Steady', bold: 'Bold', tilt: 'Tilted', top: 'Top down', low: 'Low', cycle: 'Day to dusk', day: 'Day', ember: 'Ember', relief: 'Painted', ink: 'Ink', 1: 'True size', 1.5: 'Larger', hill: 'Draws from your hill, moves the view elsewhere', draw: 'Always draws', kept: 'Kept for the campaign', free: 'Can be changed between missions', all: 'Music & effects', fx: 'Effects', off: 'Off' };
+const LABEL = { guide: 'First steps', caste: 'Your third caste', rival: 'Rival', view: 'View', light: 'Light', style: 'Style', size: 'Ants', sound: 'Sound', finger: 'One finger', nest: 'The Nest', forks: 'Forks', growth: 'The tree', home: 'The home hill', visitor: 'The weevil', day: 'High Summer: length', falls: 'High Summer: windfalls' };
+const NAME = { once: 'Shown until done once', always: 'Shown every game', off: 'Hidden', full: 'Fills the screen', sheet: 'Slides over the lower half', 12: 'Twelve minutes', 20: 'Twenty minutes', 30: 'Thirty minutes', lean: 'Lean: a third less falls', fair: 'Fair', rich: 'Rich: half as much again', comes: 'Comes for your stores', hungry: 'Comes hungry, and harder to kill', never: 'Never comes', carried: 'Kept from mission to mission', bare: 'A new hill every mission', mission: 'Grow the hill in each mission', deeds: 'Deeds alone open tools (no growth)', spitter: 'Spitters', warden: 'Wardens', timid: 'Timid', steady: 'Steady', bold: 'Bold', tilt: 'Tilted', top: 'Top down', low: 'Low', cycle: 'Day to dusk', day: 'Day', ember: 'Ember', relief: 'Painted', ink: 'Ink', 1: 'True size', 1.5: 'Larger', hill: 'Draws from your hill, moves the view elsewhere', draw: 'Always draws', kept: 'Kept for the campaign', free: 'Can be changed between missions', all: 'Music & effects', fx: 'Effects', off: 'Off' };
 const MOOD = { timid: 0, steady: 1, bold: 2 };
 const redraw = set.panel($('settings'), { only: set.ids.filter(id => id !== 'caste' && !(NET && ['rival', 'forks', 'growth', 'home', 'visitor', 'day', 'falls'].includes(id))), /* a room's rules come from its link, the same for every page */ label: id => LABEL[id], name: (id, v) => NAME[v] ?? v, what: (id, v) => (id === 'caste' ? (v === 'spitter' ? 'Frail, but they spit from two cells away, over the front line. Applies from the next start.' : 'Slow and very hard to kill: they hold a tunnel. Applies from the next start.') : id === 'rival' ? (v === 'timid' ? 'It never attacks your hill. Applies from the next start.' : v === 'bold' ? 'It raids early, even at even odds. Applies from the next start.' : 'It holds the fords, and raids when it has the numbers. Applies from the next start.') : id === 'growth' ? (v === 'mission' ? 'Each mission you widen the queen\'s chamber, choose a War hill or a Deep hill, and grow into your tools. Applies from the next start.' : 'No growth: what your deeds have opened is yours from the first minute. Applies from the next start.') : id === 'home' ? (v === 'carried' ? 'First Frost, The Stones and The Larder are fought on the hill of The Crossing. Each starts in the nest as you left it, tunnels, stores and nurseries, and the rival starts in its own. Quarters come back as bare tunnels to paint again. Applies from the next start.' : 'Every mission starts in the same small nest. Applies from the next start.') : id === 'visitor' ? (v === 'never' ? 'No weevil in any mission. Applies from the next start.' : `In First Frost a weevil comes in at each door ${VISITOR[v].at.length} times and eats up to ${VISITOR[v].fill} seeds a visit from stores within ${VISITOR[v].reach} steps of the door. Applies from the next start.`) : null), onChange: (id, v) => { if (id === 'forks' || id === 'home' || id === 'visitor') renderPath(); if (id === 'sound') { if (v === 'off') snd.hold(); else { snd.release(); startSong(); } } tone(660, 0.06, 0.03, 'triangle', 80); } });
 
@@ -273,7 +274,7 @@ function growPane() {
 function startRun() {
   rec.start({ ...set.snapshot(), caste: camp.caste ?? 'none', way: camp.forks.way ?? 'none', craft: camp.forks.craft ?? 'none', nodes: nodesNow().join('+') || 'none', mode: NET ? 'room' : 'war', mission: missionId, ants: sim.cfg.antsBy?.[ME] ?? sim.cfg.ants, road: late(missionId) ? 'late' : camp.forks.road === missionId ? 'first' : 'none', hill: hillOf(missionId)?.from ?? 'new', dug: sim.cfg.nests ? sim.cfg.nests[ME].length / 3 : 0, look: `war:${set.get('view')}/${set.get('light')}/${set.get('style')}`, seed, v: 1 });
   if (!NET) host.ai[FOE] = rivalMind(); pickCaste();
-  running = true; opening();
+  running = true; opening(); guideStart();
 }
 function play() { snd.unlock(); startSong(); if (NET) { if (host.started) { setScreen('play'); lastT = 0; snd.release(); } else host.begin(); return; } if (!isOpen(missionId)) return; if (!running) restart(false); else { setScreen('play'); lastT = 0; snd.release(); } }
 // The menu: the campaign's missions in order, the fork between them, and what the chosen mission asks.
@@ -592,6 +593,36 @@ for (const n of ['pointercancel', 'lostpointercapture']) nestCanvas.addEventList
 
 // ---- what the sim reports, shown ----
 const told = new Set();
+// First steps: six things to do in the first mission, each ticked off by what the hill shows, not by a tap.
+// The page reads sim state only; the steps give no order and change no rule.
+const GUIDE_KEY = 'cinderhill:war:guided';
+const myTrails = kind => { let n = 0; for (let k = 0; k < TRAILS; k++) if (sim.trLive[ME * TRAILS + k] && sim.trKind[ME * TRAILS + k] === kind) n++; return n; };
+const GUIDE = [
+  { say: '<b>Feed the hill.</b> Tap Forage, then drag from your hill to a pile of food.', done: () => myTrails(KIND.FORAGE) > 0 },
+  { say: '<b>Yellow is seeds, red is meat.</b> Draw a second trail, to red food: soldiers are raised on meat.', done: () => myTrails(KIND.FORAGE) > 1 || g(ME, CG.LOADS_P) > 0 },
+  { say: '<b>Open the Nest</b> on the bar below. The hill lives down there.', done: () => nestOpen },
+  { say: '<b>Dig a room.</b> Tap Dig rooms, pick Store, and drag one finger in the earth beside a tunnel. Each cell costs a seed.', done: () => g(ME, CG.MARKS) > 0 || g(ME, CG.CAP_FOOD) > guideCap },
+  { say: '<b>Raise soldiers.</b> In the Nest, on Young, tap 1 in 4. A soldier grub eats 3 meat.', done: () => g(ME, CG.DIET) > 0 },
+  { say: '<b>Hold a ford.</b> Back on the surface, tap Raid and drag from your hill to a ford: your soldiers stand there.', done: () => myTrails(KIND.RAID) > 0 },
+];
+let guideStep = -1, guideCap = 0, guideEnd = 0;
+function guideStart() {
+  let seen = false; try { seen = !!localStorage.getItem(GUIDE_KEY); } catch { /* no storage */ }
+  const v = set.get('guide'); guideStep = !NET && missionId === STEPS[0] && v !== 'off' && (v === 'always' || !seen) ? 0 : -1; guideCap = g(ME, CG.CAP_FOOD); guideEnd = 0; guideShow();
+}
+function guideShow() {
+  const el = $('guide'), on = guideStep >= 0; el.hidden = !on; document.body.classList.toggle('guided', on); if (!on) return;
+  $('guideText').innerHTML = guideStep < GUIDE.length ? GUIDE[guideStep].say : '<b>That is the whole hill:</b> feed, dig, raise, raid. The larger colony at dusk wins.';
+  $('guideN').textContent = guideStep < GUIDE.length ? `${guideStep + 1} of ${GUIDE.length}` : ''; $('guideSkip').textContent = guideStep < GUIDE.length ? 'Skip' : 'Done';
+}
+function guideStop(why) { if (guideStep < 0) return; rec.event('guide', { step: guideStep, at: sim.tick, end: why }); try { localStorage.setItem(GUIDE_KEY, '1'); } catch { /* no storage */ } guideStep = -1; guideShow(); }
+$('guideSkip').addEventListener('click', () => guideStop(guideStep >= GUIDE.length ? 'done' : 'skip'));
+function guideTick() {
+  if (guideStep < 0 || screen !== 'play') return;
+  if (guideStep >= GUIDE.length) { if (performance.now() > guideEnd) guideStop('done'); return; }
+  let moved = false; while (guideStep < GUIDE.length && GUIDE[guideStep].done()) { rec.event('guide', { step: guideStep, at: sim.tick }); guideStep++; moved = true; }
+  if (moved) { if (guideStep >= GUIDE.length) guideEnd = performance.now() + 7000; tone(740, 0.08, 0.03, 'triangle', 120); guideShow(); }
+}
 let heard = []; // cells a colony opened in the other's ground, lately: drawn as rings in the nest view
 $('toast').addEventListener('click', () => { const f = toastAct; if (!f) return; toastAct = null; $('toast').classList.remove('on', 'tap'); f(); });
 const lookAt = (x, y) => { if (nestOpen) setNest(false); camGoal = { x, y, z: Math.max(cam.z, startZoom()), rate: 3 }; };
@@ -702,6 +733,19 @@ function finish(w, reason) {
   if (!NET) sim.mission.deeds.forEach((d, i) => { const key = `${missionId}.${d.id}`; if (did[i] && !line.deeds[key]) { const had = hasNode(d.opens); line.deeds[key] = 1; fresh.push(d.id); rec.event('deed', { deed: key, opens: had ? 'had' : d.opens }); } });
   if (fresh.length) saveLine();
   renderDeeds($('overDeeds'), missionId, fresh);
+  /* What goes with you: the campaign so far, the nest if this hill is kept, what the deeds opened, and what comes next. */
+  { const el = $('carry'); el.textContent = ''; el.hidden = !!NET;
+    if (!NET) {
+      const add = (head, body) => { const p = document.createElement('p'), sp = document.createElement('span'), b = document.createElement('b'); b.textContent = head; sp.append(b, ` ${body}`); p.append(sp); el.append(p); };
+      const h = document.createElement('div'); h.className = 'kicker'; h.textContent = 'What goes with you'; el.append(h);
+      const doneN = STEPS.filter(id => camp.done[id]?.won).length; add('Campaign.', `${doneN} of ${STEPS.length} missions won.${w ? '' : ' A lost mission still opens the next one; you can come back to it.'}`);
+      const heir = Object.keys(MISSIONS).find(x => MISSIONS[x].from === missionId), kept = set.get('home') === 'carried' && (sim.mission.from || heir), nest = sim.nests()[ME];
+      if (kept) { let rooms = 0; for (let k = 2; k < nest.length; k += 3) if (nest[k]) rooms++; add('Your nest.', `${nest.length / 3} dug cells, ${rooms} of them rooms, are kept${heir ? `: ${MISSIONS[heir].name} starts in this nest` : ' on this hill'}. Quarters come back as bare tunnel.`); }
+      else add('Your nest.', set.get('home') === 'carried' ? 'This hill is not fought on again. The next mission starts in a small new nest.' : 'Every mission starts in the same small nest (a setting).');
+      const open = fresh.map(id => sim.mission.deeds.find(d => d.id === id)).filter(d => d && d.opens && TRAITS[d.opens]).map(d => TRAITS[d.opens].name);
+      add('The Lineage.', open.length ? `New: ${open.join(', ')}. ${nodesNow().length === 1 ? '1 node' : `${nodesNow().length} nodes`} open in all, yours in every mission.` : `${nodesNow().length === 1 ? '1 node' : `${nodesNow().length} nodes`} open, yours in every mission. Deeds open more; they are listed above.`);
+      add('Not kept.', 'Ants, food and the growth of the queen\'s chamber start again each mission.');
+    } }
   // Where "next" leads: the first fork that is open and not taken, else the first mission not yet played to its end.
   const forkNext = (() => { for (const c of CAMPAIGN) { if (c.side) continue; if (c.mission) { if (!camp.done[c.mission]) return null; } else if (c.fork && !taken(c.fork)) return c.fork; } return null; })(), nx = firstOpen();
   $('next').hidden = false; $('next').textContent = forkNext ? (forkNext === 'caste' ? 'Choose a third caste' : forkNext === 'craft' ? 'Choose a craft' : 'Choose a way of living') : !camp.done[nx] ? `Next: ${MISSIONS[nx].name}` : 'The missions';
@@ -720,6 +764,7 @@ function finish(w, reason) {
 }
 function bump(id, value) { const el = $(id), span = el.querySelector('span'), text = String(value); if (span.textContent === text) return; const up = Number(text) > Number(span.textContent); span.textContent = text; if (up) { el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); } }
 function hud() {
+  guideTick();
   let brood = 0; for (let k = 0; k < sim.bn; k++) if (sim.bTeam[k] === ME) brood++;
   bump('chipAnts', g(ME, CG.ADULTS) - g(ME, CG.MAJORS)); bump('chipMajors', g(ME, CG.MAJORS)); bump('chipSugar', g(ME, CG.SUGAR)); bump('chipProtein', g(ME, CG.PROTEIN)); bump('chipBrood', brood);
   const G2 = sim.mission.goals, goal = (G2.points | 0) || (G2.haul | 0), slot = G2.points ? CG.POINTS : G2.haul ? CG.HAUL : G2.beast ? CG.HARM : CG.ADULTS, meat = !!G2.carry && sim.fallen, us = meat ? sim.carried(ME) : g(ME, slot), them = meat ? sim.carried(FOE) : g(FOE, slot);
