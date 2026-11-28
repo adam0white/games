@@ -1008,13 +1008,21 @@ function rebel(who) {
 // Every seated guest's food falls at once, two things at a time and far apart. The ring round a falling thing is the
 // colour of the guest it would go to. The tray holds only so much; one more pushes the oldest off.
 const RUSH_KEY = 'kitchen-rush';                       // { plays, best: { tier: coins }, stars: { tier: n } }; its own key
-const rushSave = readJson(RUSH_KEY, null) ?? {};
+// Read defensively: a damaged record must not break the menu or the end of a shift.
+const rushSave = (() => {
+  const raw = readJson(RUSH_KEY, null), ok = raw && typeof raw === 'object' && !Array.isArray(raw), out = { plays: 0, best: {}, stars: {} };
+  if (!ok) return out;
+  if (Number.isFinite(raw.plays)) out.plays = Math.max(0, Math.floor(raw.plays));
+  for (const [k, v] of Object.entries(raw.best && typeof raw.best === 'object' ? raw.best : {})) if (Number.isFinite(v)) out.best[k] = Math.max(0, Math.floor(v));
+  for (const [k, v] of Object.entries(raw.stars && typeof raw.stars === 'object' ? raw.stars : {})) if (Number.isFinite(v)) out.stars[k] = Math.max(0, Math.min(3, Math.floor(v)));
+  return out;
+})();
 const SEAT_COLOR = ['#ff7a4d', '#3fb6ff', '#a97bff', '#4fcf7a', '#ffc933'];
 let rush = null, lastMode = 'day', rushSeed = null;
 const rings = new Map();                               // falling item n -> ring mesh
 let ringGeo = null;
 function clearRush() {
-  for (const r of rings.values()) art?.world.remove(r); rings.clear();
+  for (const n of [...rings.keys()]) dropRing(n);
   $('rail').style.display = 'none'; $('rushHud').style.display = 'none'; $('rail').innerHTML = '';
 }
 function beginRush() {
@@ -1103,6 +1111,7 @@ function stepRush(dt) {
   // Falling things and their rings.
   const live = new Set();
   if (phase === 'sky' && !s.at) for (const it of s.sky.items) {
+    if (it.state !== 'fall') continue;
     live.add(it.n);
     let m = meshes.get(it.n);
     if (!m) { m = art.item(itemModel(it.id), 0.27); m.userData.spin = (it.spin % 1) * 1.4 - 0.7; art.world.add(m); meshes.set(it.n, m); }
@@ -1127,7 +1136,7 @@ function rushCook(e) {
   if (!sh.startCook(rush, e)) return;
   for (const n of [...meshes.keys()]) dropMesh(n);
   g = { rush: e, mood: e.mood, look: e.look, recipe: e.recipe, need: { ...e.need }, q: [], steps: RECIPES[e.recipe].steps.slice(), step: -1, wait: 0, extras: 0, restarts: 0, paid: 0, model: null, tut: -1, golden: false };
-  phase = 'caught'; coach(null); rail();
+  phase = 'caught'; coach(null); rail(); redrawTray();
   banner(t('r_' + e.recipe)); ticket(); $('ticket').style.display = 'block';
   rec.event('catch', { recipe: e.recipe, left: Math.round(e.left), tip: e.tipShare });
   wait(0.3, nextStep);
@@ -1159,7 +1168,7 @@ function rushEnd() {
   $('dayTitle').textContent = t(r.closedEarly ? 'rushOverClosed' : 'rushOver');
   $('dayStars').textContent = '★'.repeat(r.stars) + '☆'.repeat(3 - r.stars);
   const next = r.targets.find(x => r.coins < x);
-  $('ledger').innerHTML = `<tr><td>${t('served')}</td><td>${r.served}</td></tr><tr><td>${t('walkouts')}</td><td>${r.strikes}</td></tr><tr><td>${t('rushTook')}</td><td>${r.coins}</td></tr><tr><td>${t('rushBest')}</td><td>${rushSave.best[save.tier]}</td></tr><tr><td>${t('rushShare')}</td><td>+${r.share}</td></tr><tr class="total"><td><i class="coin"></i></td><td>${save.coins}</td></tr>`;
+  $('ledger').innerHTML = `<tr><td>${t('served')}</td><td>${r.served}</td></tr><tr><td>${t('walkouts')}</td><td>${day.lost}</td></tr><tr><td>${t('rushTook')}</td><td>${r.coins}</td></tr><tr><td>${t('rushBest')}</td><td>${rushSave.best[save.tier]}</td></tr><tr><td>${t('rushShare')}</td><td>+${r.share}</td></tr><tr class="total"><td><i class="coin"></i></td><td>${save.coins}</td></tr>`;
   $('dayLine').textContent = next ? t('rushNext', { n: next - r.coins, s: r.stars + 1 }) : t('rushAll');
   $('dayMissions').innerHTML = '';
   $('nextDay').textContent = t('rushAgain');
@@ -1424,7 +1433,7 @@ window.kitchenFight = win => { if (!fight) return false; if (win) { fight.taps =
 window.kitchenCall = i => { const e = day?.line?.[i]; if (e) callGuest(e); return !!e; };
 window.kitchenThrow = () => { throwNext = true; };
 window.kitchenMood = m => { if (g) g.mood = m; return !!g; };
-window.kitchenRush = seed => { if (seed != null) rushSeed = seed; beginRush(); return true; };
+window.kitchenRush = seed => { if (screen !== 'menu' && phase !== 'sky') return false; if (seed != null) rushSeed = seed; beginRush(); return true; };
 window.kitchenSkipCatch = () => { skipCatch = true; };
 window.kitchenGolden = () => { goldenNext = true; };
 window.kitchenAlive = () => { if (g?.catch) { g.catch.got = {}; g.catch.tray = []; g.catch.done = false; } };

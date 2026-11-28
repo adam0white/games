@@ -152,3 +152,7 @@ What this shows, and what it does not:
 - The wheel does not open in a Rush yet. `shift.js` has Rob with a price (a strike, the buzz, and nine seconds off every witness); `measure.mjs rob` has not been rerun since the sky changed.
 - Guests are tickets at the top of the screen, not people in the room.
 - The Rush is not in the browser phone check; `bots.mjs` asserts its rules (idle serves nobody, a played shift ends).
+
+### Review of slice 1
+
+One adversarial code review on another model family found nine things; seven were confirmed and fixed before merge: the end card could say "shut early" when the third walkout came after the bell; the third guest arrived with the opening two; things in the air hung still when the room emptied; a thing nobody ordered was drawn twice on a clatter; the tray kept showing a dish's food for a moment after it left; ring materials leaked on quit; a damaged `kitchen-rush` record could break the menu. Not fixed: the wheel and Rob are not reachable in a Rush (planned next).

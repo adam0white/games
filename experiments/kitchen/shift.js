@@ -100,7 +100,7 @@ export function stepShift(s, dt, trayX = 0) {
     else {
       s.nextArrive -= dt;
       while (s.nextArrive <= 0 && s.doors) {
-        const early = s.seq < RUSH.open;
+        const early = s.seq + 1 < RUSH.open;   // the opening guests come together; the next one comes at the usual pace
         s.nextArrive += early ? 0.8 : Math.max(3.5, RUSH.arrive[0] - RUSH.arriveCut * s.save.tier + s.r() * (RUSH.arrive[1] - RUSH.arrive[0]));
         const e = makeGuest(s);
         if (s.line.length >= s.seats) { s.turned++; s.buzz = Math.max(0, s.buzz - 1); ev.push({ type: 'turned', e }); }
@@ -112,9 +112,11 @@ export function stepShift(s, dt, trayX = 0) {
     e.left -= dt;
     if (e.left <= 0) {
       unseat(s, e); s.strikes++; s.buzz = 0; ev.push({ type: 'walkout', e });
-      if (s.doors && s.strikes >= RUSH.strikes) { s.doors = false; ev.push({ type: 'closed' }); }
+      if (s.doors && s.strikes >= RUSH.strikes) { s.doors = false; s.closedEarly = true; ev.push({ type: 'closed' }); }
     }
   }
+  // An empty room has nothing falling: what was in the air belonged to guests who are gone.
+  if (!s.line.length && s.sky.items.length) { for (const it of s.sky.items) ev.push({ type: 'missed', it }); s.sky.items = []; }
   // The sky stops while the cook is at the counter.
   if (!s.at && s.line.length) {
     const c = s.sky;
@@ -183,7 +185,7 @@ export function rob(s, e) {
   unseat(s, e);
   s.coins += n; s.robbed += n; s.buzz = 0; s.strikes++;
   if (!s.off.scare) for (const w of s.line) w.left = Math.max(0.5, w.left - RUSH.robScare);
-  const closed = s.doors && s.strikes >= RUSH.strikes; if (closed) s.doors = false;
+  const closed = s.doors && s.strikes >= RUSH.strikes; if (closed) { s.doors = false; s.closedEarly = true; }
   return { coins: n, closed };
 }
 
@@ -195,5 +197,5 @@ export const targets = save => TARGETS[Math.min(TARGETS.length - 1, save.tier)];
 export const SHARE = 0.25;
 export function result(s) {
   const tg = targets(s.save), stars = tg.filter(x => s.coins >= x).length;
-  return { share: Math.round(s.coins * SHARE), coins: s.coins, tips: s.tips, served: s.served, strikes: s.strikes, turned: s.turned, robbed: s.robbed, bestBuzz: s.bestBuzz, stars, targets: tg, closedEarly: s.strikes >= RUSH.strikes };
+  return { share: Math.round(s.coins * SHARE), coins: s.coins, tips: s.tips, served: s.served, strikes: s.strikes, turned: s.turned, robbed: s.robbed, bestBuzz: s.bestBuzz, stars, targets: tg, closedEarly: !!s.closedEarly };
 }
