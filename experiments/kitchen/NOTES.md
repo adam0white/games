@@ -571,3 +571,32 @@ screen narrower than they are; keyboard focus follows a jump. Not fixed: resizin
 scrolled loses the place in the shop; buying the last level a rank needs moves that card to the end of the list
 (older than this pass).
 
+### The owner played two Rush shifts (2026-11-28): what the records say, and the first fixes
+
+**Records.** One Rush hour and one Lunch rush, on a phone, at rank 1, the first and second Rush shifts on that save. Both
+ended on three stars (427 and 400 coins against three-star lines of 385 and 300), 14 and 15 served, one walkout in all,
+three guests turned away at Lunch. No wheel action was used in either. Missions start at the fourth shift, so none was
+seen. So: the star lines set from the scripted player are too low for a person at rank 1, the wheel was not needed, and
+the two nights played alike. One fry in the Rush hour was lifted after a tenth of a second, pressed again a tenth later,
+and scored 0.35: the lift had ended the dish.
+
+**The owner's asks, and what changed here.**
+
+| ask | change |
+|---|---|
+| the register visit in a Rush feels redundant | a Rush dish no longer swings the camera to the register side: the pay floats up at the stove and the sky is back about 0.7 s sooner (the wait after a cooking step is 0.55 s, was 1.0 s; the plate pause is gone) |
+| dim the ring of the second one when catching the first makes it redundant | rings are claimed lowest first by the most urgent guest who lacks the ingredient; one more than anybody lacks is a spare and its ring is faint and smaller |
+| blink the urgent orders | under 30% patience a ticket blinks red, its guest's halo blinks and the rings on its food pulse (was a pulse on the ticket under 20%) |
+| catch two that land almost together | an item can be scooped for 0.07 of the lane's height under the tray top (`TUNE.catchBand`), about 0.1 s at Rush speed; applies to the ordinary day too |
+| the fry meter should be more prominent, at the top | every cooking meter sits at the top, wider, under the tickets in a Rush; the banner drops under it while it shows |
+| do not end the fry at once when undercooked | lifting before the green starts 0.3 s of grace; pressing again keeps cooking; left alone it ends as before. Lifting in or past the green ends at once, as before |
+| catching needs more speed, growing with the story, 1.5x in a Rush | a Pace setting (`kitchen-pace`): calm is the old speed; lively (default) is 1.1x on an ordinary day plus 0.03 a story beat seen up to 1.5x, and 1.5x in a Rush; wild adds 0.35. In a Rush only the fall is faster, not how often things drop, so the star lines do not inflate. Recorded at every run start as `pace` |
+
+**Checked.** `bots.mjs`: a tray that never moves takes nothing at pace 1.5 and 1.85 at every rank on both nights; the
+band scoops a late tray, not a later one, and an 83 ms frame does not tunnel. Through the real page at 390 by 844 and at
+320 by 568 in Turkish (`walks/fixes.mjs`): press again inside the grace keeps cooking, left alone it ends; an urgent
+ticket alternates two colours; a spare ring was seen; plate to sky 0.15 s; no page errors. Shots looked at.
+
+**Not done here.** The star lines are still the old ones, so a Rush is still too easy; they are retuned with the ladder
+(next). The scripted player has not been re-timed at the faster fall. No person has played this build.
+

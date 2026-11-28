@@ -52,9 +52,9 @@ export const priceOf = (save, recipe) => Math.round(sim.RECIPES[recipe].price * 
 
 // off: switches for measure.mjs (--off). drain: patience does not run down. cap: the tray holds everything.
 // scare: rob has no witnesses. buzz: no buzz pay.
-export function newShift({ save, seed = 1, off = {}, night = 'rush', mission = null }) {
+export function newShift({ save, seed = 1, off = {}, night = 'rush', mission = null, speed = 1 }) {
   const N = NIGHTS[night] ?? NIGHTS.rush;
-  const sky = sim.newCatch({ need: {}, hard: sim.hardness(save), trayLevel: save.built.tray, seed: seed ^ 0x736b79, twist: sim.twistFor(save.tier) });
+  const sky = sim.newCatch({ need: {}, hard: sim.hardness(save), trayLevel: save.built.tray, seed: seed ^ 0x736b79, twist: sim.twistFor(save.tier), speed });
   if (sky.twist?.gust) sky.twist = { ...sky.twist, gust: 0 };   // a gust slides the whole sky sideways, which carries one side of every pair onto a tray that never moved
   sky.shared = true; sky.next = 1e9;   // the shift drops its own forks (dropFork); the catch's own spawner stays off
   return {

@@ -23,7 +23,7 @@ const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
 W.apply();
 
 // ---------- the save: one JSON blob; fields only ever grow. Keys never change once shipped.
-const KEY = 'kitchen-save', MUSIC_KEY = 'kitchen-music', LOOK_KEY = 'kitchen-look', PEOPLE_KEY = 'kitchen-people';
+const KEY = 'kitchen-save', MUSIC_KEY = 'kitchen-music', LOOK_KEY = 'kitchen-look', PEOPLE_KEY = 'kitchen-people', PACE_KEY = 'kitchen-pace';
 const hadSave = readJson(KEY, null) !== null;
 const save = sim.newSave();
 {
@@ -112,7 +112,9 @@ const buzz = ms => { if (save.sound && navigator.vibrate) try { navigator.vibrat
 
 // ---------- lab recording
 const rec = lab('kitchen', { lang: W.lang });
-const opts = settings('kitchen', { look: { values: LOOK_ORDER, def: 'diner', key: LOOK_KEY }, people: { values: ['on', 'off'], def: 'on', key: PEOPLE_KEY } }, { rec });
+const opts = settings('kitchen', { look: { values: LOOK_ORDER, def: 'diner', key: LOOK_KEY }, people: { values: ['on', 'off'], def: 'on', key: PEOPLE_KEY }, pace: { values: ['calm', 'lively', 'wild'], def: 'lively', key: PACE_KEY } }, { rec });
+// How fast things fall. Calm is the speed before 2026-11-28. Lively grows with the story on an ordinary day and is half as fast again in a Rush.
+const paceFor = where => { const p = opts.get('pace'); if (p === 'calm') return 1; const up = p === 'wild' ? 0.35 : 0; return where === 'rush' ? 1.5 + up : Math.min(1.5, 1.1 + 0.03 * (save.story?.seen?.length ?? 0)) + up; };
 rec.notice($('menu').firstElementChild);
 rec.toggle($('paused').firstElementChild);
 
@@ -157,6 +159,7 @@ function labels() {
   for (const id of ['music1', 'music2']) { $(id).textContent = t(musicOn ? 'musicOn' : 'musicOff'); $(id).setAttribute('aria-pressed', String(musicOn)); }
   for (const id of ['look1', 'look2']) $(id).textContent = t('look', { name: t('looks_' + lookId) });
   $('people2').textContent = t(peopleOn() ? 'peopleOn' : 'peopleOff');
+  $('pace2').textContent = t('pace_' + opts.get('pace'));
   $('chopBtnText').textContent = t('chop'); $('wheelBtnText').textContent = t('wheelBtn');
 }
 const rankName = tier => t('rank_' + TIERS[tier].name);
@@ -209,7 +212,7 @@ function beginDay() {
   staff.forEach(m => { m.model = null; if (m.kind === 'owed' && rr() < sim.REBEL_CHANCE) day.rebels.push({ at: 1 + Math.floor(rr() * Math.max(1, plan.length - 1)), who: m }); });
   staffIn();
   song?.start(seed);
-  rec.start({ day: save.day, tier: save.tier, tutorial: !save.tutorial, look: lookId, tool: tools.use, trayskin: trays.use, sound: save.sound, music: musicOn });
+  rec.start({ day: save.day, tier: save.tier, tutorial: !save.tutorial, pace: opts.get('pace'), look: lookId, tool: tools.use, trayskin: trays.use, sound: save.sound, music: musicOn });
   paused = false; snd.release(); show('play'); hud();
   if (storyBook) { const d = story.due(save, storyBook.beats); storyQueue = d.cards.slice(); storyToasts = d.toasts.slice(); for (const b of d.toasts) story.see(save, b); store(); }
   nextStory(); missionChip();
@@ -261,7 +264,7 @@ const itemModel = id => (ING[id] ?? JUNK[id]).model;
 function startCatch() {
   phase = 'catch'; art.view('catch');
   const tutorial = g.tut === 0 ? 'first' : g.tut >= 1 ? true : false;
-  g.catch = sim.newCatch({ need: g.need, hard: sim.hardness(save) + (g.golden ? 2.5 : 0), trayLevel: save.built.tray, twist: sim.twistFor(save.tier), seed: day.seed + day.i * 101 + g.restarts * 7, tutorial });
+  g.catch = sim.newCatch({ need: g.need, hard: sim.hardness(save) + (g.golden ? 2.5 : 0), trayLevel: save.built.tray, twist: sim.twistFor(save.tier), seed: day.seed + day.i * 101 + g.restarts * 7, tutorial, speed: paceFor('day') });
   g.catchT0 = clock;
   banner(g.golden ? t('golden') : t('catch'), g.golden ? t('goldenSub') : '');
   if (g.tut === 0) coach(t('t2'), 4); else if (g.tut === 1) coach(t('t6'), 6); else coach(null);
@@ -521,6 +524,7 @@ function flameRing() {
 function stepFry(dt) {
   if (cook.over) return;
   if (cook.held) cook.d = Math.min(1, cook.d + sim.FRY_RATE * dt);
+  else if (cook.grace > 0 && (cook.grace -= dt) <= 0) { letGo(true); return; }   // lifted too early and did not press again in time
   cook.tick -= dt;
   art.panGlow.material.opacity = cook.held ? 0.55 * (0.8 + Math.random() * 0.2) : 0;
   const fl = flameRing(); fl.visible = cook.held;
@@ -546,9 +550,13 @@ function stepFry(dt) {
   gaugeSet(cook.d, cook.band);
   if (cook.d >= 1) letGo();
 }
-function letGo() {
+// Lifting before the green does not serve it raw at once: a short moment to press again and keep cooking (the owner, 2026-11-28).
+const FRY_GRACE = 0.3;
+function letGo(late = false) {
   if (!cook || cook.kind !== 'fry' || cook.over || cook.d < 0.04) { if (cook) cook.held = false; return; }
   cook.held = false;
+  if (!late && cook.d < cook.band[0]) { if (!(cook.grace > 0)) cook.grace = FRY_GRACE; return; }
+  cook.grace = 0;
   const q = sim.fryQuality(cook.d, cook.band);
   art.panGlow.material.opacity = 0; if (flames) flames.visible = false; art.pan.rotation.x = 0;
   finishStep('fry', q);
@@ -602,13 +610,15 @@ function finishStep(kind, q) {
   banner(t(word)); coach(null); fingerOff();
   rec.event('cook', { step: kind, q: +q.toFixed(2) });
   const done = cook;
-  wait(1.0, () => { for (const m of done.items ?? []) art.world.remove(m); for (const b of done.bits ?? []) art.world.remove(b.m); gauge(null); nextStep(); });
+  wait(rush ? 0.55 : 1.0, () => { for (const m of done.items ?? []) art.world.remove(m); for (const b of done.bits ?? []) art.world.remove(b.m); gauge(null); nextStep(); });
 }
 
 // ---------- plate, serve, ring up
 let dish = null;
 function plate() {
-  phase = 'plate'; cook = null; art.view('serve');
+  phase = 'plate'; cook = null;
+  if (rush) { SFX.good(); wait(0.12, rushServe); return; }   // a Rush has no register stop (the owner, 2026-11-28): the pay floats up where the cook stands and the sky is back
+  art.view('serve');
   const r = RECIPES[g.recipe];
   dish = new art.THREE.Group();
   const p = art.item('plate', 0.42); dish.add(p);
@@ -617,7 +627,7 @@ function plate() {
   dish.position.set(1.75, TOP, 0.3); art.world.add(dish); art.popIn(dish);
   art.burst(new art.THREE.Vector3(1.75, TOP + 0.3, 0.3), { n: 20, color: '#ffe37a', speed: 1.4, up: 1.6, size: 0.025, life: 0.8, glow: true });
   SFX.good();
-  wait(rush ? 0.5 : 0.9, rush ? rushServe : serve);
+  wait(0.9, serve);
 }
 function serve() {
   phase = 'serve';
@@ -1090,6 +1100,8 @@ $('nights').addEventListener('click', async ev => {
 });
 const SEAT_COLOR = ['#ff7a4d', '#3fb6ff', '#a97bff', '#4fcf7a', '#ffc933'];
 let rush = null, lastMode = 'day', rushSeed = null, rushNight = null, lastNight = 'rush', rushMission;   // rushMission: a mission forced by the test hook (null forces none)
+const URGENT = 0.3;                                    // share of patience left at which a ticket, its guest's halo and its food's rings blink
+let spareRings = 0;
 const rings = new Map();                               // falling item n -> ring mesh
 let ringGeo = null;
 function clearRush() {
@@ -1109,12 +1121,12 @@ function beginRush() {
   storeRush();   // another tab may have played: take its plays and done missions before choosing
   const firstNight = night !== 'rush' && !rushSave.tried[night];
   const mission = rushMission !== undefined ? rushMission : (rushSave.plays >= MISSION_AFTER && !firstNight ? sh.missionFor(save, rushSave.done, rushSave.turn) : null); rushMission = undefined;
-  rush = sh.newShift({ save, seed, night, mission });
+  rush = sh.newShift({ save, seed, night, mission, speed: paceFor('rush') });
   if (!rushSave.tried[night]) { rushSave.tried[night] = 1; storeRush(); }
   day = { rush, plan: [], i: 0, served: 0, earned: 0, tips: 0, stars: [], seed, t0: clock, extras: 0, robbed: 0, rebels: [], line: null, next: 0, arriveT: 0, lost: 0, pickT: 0 };
   lastMode = 'rush';
   song?.start(seed);
-  rec.start({ mode: 'rush', night, mission: rush.mission, people: opts.get('people'), day: save.day, tier: save.tier, tutorial: false, look: lookId, tool: tools.use, trayskin: trays.use, sound: save.sound, music: musicOn });
+  rec.start({ mode: 'rush', night, mission: rush.mission, people: opts.get('people'), pace: opts.get('pace'), day: save.day, tier: save.tier, tutorial: false, look: lookId, tool: tools.use, trayskin: trays.use, sound: save.sound, music: musicOn });
   paused = false; snd.release(); show('play'); hud();
   toSky();
   banner(t(night === 'rush' ? 'rushGo' : 'night_' + night), t(night === 'rush' ? 'rushGoSub' : 'nightGo_' + night));
@@ -1231,6 +1243,7 @@ function stepPeople() {
     if (p.state !== 'wait' || !p.m) continue;
     const low = p.e.left / p.e.full < 0.2 && !(p.e.frozen > 0);
     if (low !== p.low) { p.low = low; p.m.play(low ? 'emote-no' : 'idle'); }
+    if (p.halo) p.halo.visible = !(p.e.left / p.e.full < URGENT && !(p.e.frozen > 0)) || Math.sin(clock * 14) > -0.3;   // an urgent guest's halo blinks with the ticket
   }
 }
 // ---------- the wheel in a Rush: tap a guest's ticket. The rules and the prices are in shift.js (act).
@@ -1283,7 +1296,7 @@ function railBars() {
     const c = el.querySelector(`[data-n="${e.n}"]`); if (!c) return;
     const f = Math.max(0, e.left / e.full), bar = c.lastElementChild.firstElementChild;
     bar.style.transform = `scaleX(${f})`; bar.style.background = f < 0.2 ? '#ff5a5a' : f < 0.5 ? '#ffb347' : '#6fd36f';
-    c.classList.toggle('hot', f < 0.2 && !(e.frozen > 0)); c.classList.toggle('iced', e.frozen > 0);
+    c.classList.toggle('hot', f < URGENT && !(e.frozen > 0)); c.classList.toggle('iced', e.frozen > 0);
     if (f < 0.35 && s.nerve > 0 && !e.ready && !rushHinted && !actsFor && phase === 'sky' && !s.at && Object.keys(s.acts).length === 0 && rushSave.plays < 4) { rushHinted = true; const r = c.getBoundingClientRect(); floater({ x: r.left + r.width / 2, y: r.bottom + 26 }, t('actsHint'), 'gold'); }
   });
   const left = Math.max(0, s.secs - s.t), tg = sh.targets(save, s.night), next = tg.find(x => s.coins < x);
@@ -1348,6 +1361,16 @@ function stepRush(dt) {
   if (changed) rail();
   // Falling things and their rings.
   const live = new Set();
+  // Whose ring: the lowest of an ingredient is for the most urgent guest who lacks it, the next one for the next such guest.
+  // One more than anybody lacks is a spare: it only matters if the one under it is missed, so its ring is faint.
+  const claim = new Map();
+  if (phase === 'sky' && !s.at) {
+    const wants = {};
+    for (const e of s.line.slice().sort((a, b) => a.left - b.left)) if (!e.ready) for (const [id, n] of Object.entries(e.need)) for (let k = (e.got[id] ?? 0); k < n; k++) (wants[id] ??= []).push(e);
+    for (const it of s.sky.items.filter(x => x.state === 'fall' && !sim.isJunk(x.id)).sort((a, b) => a.y - b.y)) { const q = wants[it.id]; if (q?.length) claim.set(it.n, { e: q.shift(), spare: false }); else { const e = sh.ownerOf(s, it.id); if (e) claim.set(it.n, { e, spare: true }); } }
+  }
+  spareRings = [...claim.values()].filter(c => c.spare).length;
+  const blink = 0.55 + 0.45 * Math.sin(clock * 14);
   if (phase === 'sky' && !s.at) for (const it of s.sky.items) {
     if (it.state !== 'fall') continue;
     live.add(it.n);
@@ -1355,11 +1378,13 @@ function stepRush(dt) {
     if (!m) { m = art.item(itemModel(it.id), 0.27); m.userData.spin = (it.spin % 1) * 1.4 - 0.7; art.world.add(m); meshes.set(it.n, m); }
     m.position.set(it.x * LANE.s, LANE.y0 + it.y * LANE.h - 0.12, LANE.z);
     m.rotation.z += m.userData.spin * dt; m.rotation.y += dt * 0.5;
-    const owner = sim.isJunk(it.id) ? null : sh.ownerOf(s, it.id);
+    const cl = claim.get(it.n), owner = cl?.e ?? null;
     let r = rings.get(it.n);
     if (owner) {
       if (!r) { ringGeo ??= new art.THREE.TorusGeometry(0.2, 0.022, 8, 28); r = new art.THREE.Mesh(ringGeo, new art.THREE.MeshBasicMaterial({ color: SEAT_COLOR[seatOf(owner)], transparent: true, opacity: 0.95 })); art.world.add(r); rings.set(it.n, r); }
+      const urgent = !cl.spare && owner.left / owner.full < URGENT && !(owner.frozen > 0);
       r.visible = true; r.material.color.set(SEAT_COLOR[seatOf(owner)]); r.position.set(m.position.x, m.position.y + 0.12, LANE.z);
+      r.material.opacity = cl.spare ? 0.28 : urgent ? 0.35 + 0.6 * blink : 0.95; r.scale.setScalar(cl.spare ? 0.8 : urgent ? 1.05 + 0.2 * blink : 1);
     } else if (r) r.visible = false;
   }
   for (const n of [...meshes.keys()]) if (!live.has(n)) dropMesh(n);
@@ -1478,6 +1503,7 @@ function worldPx(x, y, z = LANE.z) { return art.toScreen(new art.THREE.Vector3(x
 function flash() { $('flash').style.opacity = 0.8; setTimeout(() => { $('flash').style.opacity = 0; }, 120); }
 function gauge(kind) {
   const el = $('gauge');
+  document.body.classList.toggle('gauge', !!kind);
   if (!kind) { el.style.display = 'none'; return; }
   el.style.display = 'block'; el.classList.toggle('taps', kind === 'blend');
   $('gaugeLabel').textContent = kind === 'fry' ? t('hold') + '!' : kind === 'micro' ? t('tap') + '!' : t('blendSub');
@@ -1518,7 +1544,7 @@ canvas.addEventListener('pointerdown', e => {
   trayTarget = pointerX(e);
   if (phase === 'pick') { pickStart = { x: e.clientX, y: e.clientY, id: e.pointerId }; return; }
   if (phase === 'chop') { aimAt(e.clientX, e.clientY); if (e.pointerType === 'mouse') strike(); else tapStart = { at: performance.now(), x: e.clientX, y: e.clientY, id: e.pointerId }; }
-  else if (phase === 'fry' && cook && !cook.over) cook.held = true;
+  else if (phase === 'fry' && cook && !cook.over) { cook.held = true; cook.grace = 0; }
   else if (phase === 'micro') stopMicro();
   else if (phase === 'blend') tapBlend();
   else if (phase === 'ring') openRegister();
@@ -1557,7 +1583,7 @@ addEventListener('keydown', e => {
     e.preventDefault();
     if (fight) { fightTap(); return; }
     if (phase === 'pick' && day?.line?.length) { callGuest(sim.nextInLine(day.line)); return; }
-    if (phase === 'fry' && cook && !cook.over) cook.held = true;
+    if (phase === 'fry' && cook && !cook.over) { cook.held = true; cook.grace = 0; }
     else if (phase === 'micro') stopMicro();
     else if (phase === 'blend') tapBlend();
     else if (phase === 'chop') strike();
@@ -1599,6 +1625,7 @@ $('play').addEventListener('click', async () => { snd.unlock(); await ready; if 
 $('rush').addEventListener('click', async () => { const was = visits; snd.unlock(); await ready; await art.peopleReady; if (screen === 'menu' && visits === was && !rush) { if (rushSave.night !== 'rush') { rushSave.night = 'rush'; storeRush(); } beginRush(); } });
 for (const id of ['sound1', 'sound2']) $(id).addEventListener('click', () => { save.sound = !save.sound; store(); settingChanged('sound', !save.sound, save.sound); if (save.sound) { snd.unlock(); if (!paused) snd.release(); SFX.tap(); } labels(); });
 for (const id of ['music1', 'music2']) $(id).addEventListener('click', () => { musicOn = !musicOn; write(MUSIC_KEY, musicOn ? '1' : '0'); settingChanged('music', !musicOn, musicOn); labels(); });
+$('pace2').addEventListener('click', () => { const v = ['calm', 'lively', 'wild'], i = v.indexOf(opts.get('pace')); opts.set('pace', v[(i + 1) % v.length]); SFX.tap(); labels(); });   // takes effect at the next catch
 $('people2').addEventListener('click', () => { opts.set('people', peopleOn() ? 'off' : 'on'); if (!peopleOn()) clearPeople(); else if (rush) syncPeople(); SFX.tap(); labels(); });
 for (const id of ['look1', 'look2']) $(id).addEventListener('click', () => {
   lookId = opts.set('look', LOOK_ORDER[(LOOK_ORDER.indexOf(lookId) + 1) % LOOK_ORDER.length]);
@@ -1666,11 +1693,11 @@ window.kitchenState = () => art && peopleIn && ({
   built: { ...save.built }, tutorial: save.tutorial, served: save.served, touched, ready: !!art, recipe: g?.recipe ?? null,
   guest: day?.i ?? -1, guests: day?.plan.length ?? 0, need: g?.catch ? { ...g.catch.need } : null, got: g?.catch ? { ...g.catch.got } : null,
   extra: g?.catch?.extra?.id ?? null, items: g?.catch ? g.catch.items.map(it => ({ id: it.id, x: it.x, y: it.y })) : [], half: g?.catch?.half ?? 0,
-  cook: cook ? { kind: cook.kind, d: cook.d, p: cook.p, band: cook.band, fill: cook.fill, left: cook.pieces?.filter(p => !p.done).length, misses: cook.misses ?? 0, striking: !!cook.strike, cuts: cook.pieces?.reduce((n, p) => n + p.cuts, 0), xs: cook.pieces?.map(p => p.done ? null : [p.m.position.x, p.m.position.z]), aim } : null, q: g?.q,
+  cook: cook ? { kind: cook.kind, over: !!cook.over, d: cook.d, p: cook.p, band: cook.band, fill: cook.fill, left: cook.pieces?.filter(p => !p.done).length, misses: cook.misses ?? 0, striking: !!cook.strike, cuts: cook.pieces?.reduce((n, p) => n + p.cuts, 0), xs: cook.pieces?.map(p => p.done ? null : [p.m.position.x, p.m.position.z]), aim } : null, q: g?.q,
   look: lookId, hint: !!document.querySelector('.kit-hint.on'),
   line: day?.line ? day.line.map(e => ({ recipe: e.p.recipe, left: +e.left.toFixed(1) })) : null, lost: day?.lost ?? 0,
   mem: art.memory(), models: art.guests.length, trays: { ...trays, own: [...trays.own] },
-  rush: rush ? { people: [...people.values()].filter(p => p.m && p.state !== 'out').length, peopleAll: people.size, lift: +lift.toFixed(2), halos: [...people.values()].filter(p => p.halo && p.state === 'wait').map(p => { const h = art.toScreen(p.halo.getWorldPosition(new art.THREE.Vector3())); return { seat: p.seat, x: Math.round(h.x), y: Math.round(h.y) }; }), trayPx: Math.round(art.toScreen(new art.THREE.Vector3(0, LANE.y0 - 0.14, LANE.z)).y), mission: rush.mission, missionHolds: sh.missionHolds(rush), night: rush.night, secs: rush.secs, t: +rush.t.toFixed(2), coins: rush.coins, strikes: rush.strikes, buzz: rush.buzz, nerve: rush.nerve, acts: { ...rush.acts }, served: rush.served, turned: rush.turned, doors: rush.doors, over: rush.over, holds: rush.holds, at: rush.at?.recipe ?? null, tray: rush.sky.tray.map(it => it.id), line: rush.line.map(e => ({ n: e.n, recipe: e.recipe, kind: e.kind, left: +e.left.toFixed(1), full: e.full, need: { ...e.need }, got: { ...e.got }, ready: e.ready, price: e.price, mood: e.mood ?? null, frozen: e.frozen > 0, self: !!e.self })), sheet: !!actsFor, hold: rush.hold, calm: rush.calm > 0, locked: rush.locked > 0, items: rush.sky.items.map(it => ({ id: it.id, x: it.x, y: it.y, owner: sh.ownerOf(rush, it.id)?.n ?? null })) } : null,
+  rush: rush ? { spares: spareRings, people: [...people.values()].filter(p => p.m && p.state !== 'out').length, peopleAll: people.size, lift: +lift.toFixed(2), halos: [...people.values()].filter(p => p.halo && p.state === 'wait').map(p => { const h = art.toScreen(p.halo.getWorldPosition(new art.THREE.Vector3())); return { seat: p.seat, x: Math.round(h.x), y: Math.round(h.y) }; }), trayPx: Math.round(art.toScreen(new art.THREE.Vector3(0, LANE.y0 - 0.14, LANE.z)).y), mission: rush.mission, missionHolds: sh.missionHolds(rush), night: rush.night, secs: rush.secs, t: +rush.t.toFixed(2), coins: rush.coins, strikes: rush.strikes, buzz: rush.buzz, nerve: rush.nerve, acts: { ...rush.acts }, served: rush.served, turned: rush.turned, doors: rush.doors, over: rush.over, holds: rush.holds, at: rush.at?.recipe ?? null, tray: rush.sky.tray.map(it => it.id), line: rush.line.map(e => ({ n: e.n, recipe: e.recipe, kind: e.kind, left: +e.left.toFixed(1), full: e.full, need: { ...e.need }, got: { ...e.got }, ready: e.ready, price: e.price, mood: e.mood ?? null, frozen: e.frozen > 0, self: !!e.self })), sheet: !!actsFor, hold: rush.hold, calm: rush.calm > 0, locked: rush.locked > 0, items: rush.sky.items.map(it => ({ id: it.id, x: it.x, y: it.y, owner: sh.ownerOf(rush, it.id)?.n ?? null })) } : null,
   mood: g?.mood ?? null, staff: staff.map(m => m.kind), wheel: $('wheel').style.display === 'block', fight: fight ? { taps: fight.taps, need: fight.need } : null,
 });
 window.kitchenMusic = () => song && { ...song.melody, on: song.state.on, step: song.step, notes: song.log.length, kinds: song.log.map(l => l.kind) };

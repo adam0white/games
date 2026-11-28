@@ -95,8 +95,8 @@ function missionPlans() {
     };
   return { any, BUILT };
 }
-export function playShift({ save, seed, cook, who = 'greedy', use = null, random = false, once = false, trig = {}, off = {}, night = 'rush', mission = null }) {
-  const s = sh.newShift({ save, seed, off, night, mission }), c = s.sky;
+export function playShift({ save, seed, cook, who = 'greedy', use = null, random = false, once = false, trig = {}, off = {}, night = 'rush', mission = null, speed = 1 }) {
+  const s = sh.newShift({ save, seed, off, night, mission, speed }), c = s.sky;
   const r = sim.rng(seed * 31 + 7), seen = []; let busy = 0, job = null, x = who === 'park' ? 0.8 : 0, step = 0, focus = null, think = 0, acted = false;
   const uses = use == null ? [] : [].concat(use);
   for (let i = 0; i < 60 * 600 && !s.over; i++) {

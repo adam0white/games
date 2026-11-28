@@ -174,6 +174,14 @@ console.log('ranks reachable: ok');
   }
   // The wheel in a Rush: three turns a shift, each with its price.
   const sh = await import('./shift.js');
+  // The Pace setting: at the faster speeds a tray that never moves still takes nothing, at every rank.
+  for (const speed of [1.5, 1.85]) for (let tier = 0; tier < sim.TIERS.length; tier++) for (const night of sh.nightsFor(saveAt(tier))) { const idle = playShift({ save: saveAt(tier), seed: 77, cook: COOKS.good, who: 'idle', night, speed }); assert.equal(idle.coins, 0, `pace ${speed}, ${night}, rank ${tier}: a tray that never moves takes nothing`); }
+  // The catch band: a tray that arrives just after an item passed its top still scoops it; one that arrives later does not;
+  // and one long frame cannot carry an item through a tray that was under it.
+  { const mk = () => { const c = sim.newCatch({ need: { tomato: 1 }, seed: 3, tutorial: 'first' }); c.next = 1e9; c.items = [{ n: 0, id: 'tomato', x: 0.6, x0: 0.6, y: sim.TUNE.catchY + 0.002, vy: 0.5, drift: 0, phase: 0, spin: 0, state: 'fall' }]; return c; };
+    let c = mk(); sim.stepCatch(c, -0.6, sim.DT); assert.equal(c.caught, 0); sim.stepCatch(c, 0.6, sim.DT); assert.equal(c.caught, 1, 'a late tray inside the band scoops it');
+    c = mk(); for (let i = 0; i < 12; i++) sim.stepCatch(c, -0.6, sim.DT); assert.ok(c.items[0].y < sim.TUNE.catchY - sim.TUNE.catchBand); sim.stepCatch(c, 0.6, sim.DT); assert.equal(c.caught, 0, 'below the band it is gone');
+    c = mk(); c.items[0].y = sim.TUNE.catchY + 0.01; c.items[0].vy = 1.2; sim.stepCatch(c, 0.6, 0.083); assert.equal(c.caught, 1, 'one 83 ms frame does not tunnel through the tray'); }
   const fresh = () => { const s = sh.newShift({ save: saveAt(4), seed: 5 }); for (let i = 0; i < 60 * 14; i++) sh.stepShift(s, sim.DT, 0); return s; };
   let s = fresh(); assert.ok(s.line.length >= 2 && s.nerve === 3);
   let e = s.line[0]; assert.ok(sh.act(s, e, 'kick_out').gone); assert.equal(s.strikes, 0, 'kicking out is not a strike'); assert.ok(!s.line.includes(e)); assert.equal(s.nerve, 2);
