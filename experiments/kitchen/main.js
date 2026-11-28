@@ -1023,7 +1023,7 @@ const rings = new Map();                               // falling item n -> ring
 let ringGeo = null;
 function clearRush() {
   for (const n of [...rings.keys()]) dropRing(n);
-  $('rail').style.display = 'none'; $('rushHud').style.display = 'none'; $('rail').innerHTML = ''; $('acts').style.display = 'none'; actsFor = null;
+  $('rail').style.display = 'none'; $('rushHud').style.display = 'none'; $('rail').innerHTML = ''; $('acts').style.display = 'none'; actsFor = null; if (fight) { fight.over = true; fight = null; $('fight').style.display = 'none'; }
 }
 function beginRush() {
   art.register.reset?.();
@@ -1059,25 +1059,25 @@ function rail() {
     const icons = Object.entries(e.need).flatMap(([id, n]) => Array.from({ length: n }, (_, i) => `<img alt="" class="${i < (e.got[id] ?? 0) ? 'got' : ''}" src="${art.thumb(itemModel(id))}">`)).join('');
     return `<div class="chip${e.ready ? ' ready' : ''}${e.kind === 'rich' ? ' rich' : ''}" data-n="${e.n}" style="--c:${SEAT_COLOR[seatOf(e)]}"><div class="top"><img alt="" src="${art.thumb(dishModel(e.recipe))}"><b>${e.kind === 'rich' ? '💎' : ''}${e.mood ? MOOD_ICON[e.mood] : ''}${e.frozen > 0 ? '🧊' : ''}${e.self ? '👨‍🍳' : ''}<i class="coin"></i>${e.price}</b></div><div class="need">${icons}</div><div class="pat"><i></i></div></div>`;
   }).join('');
-  for (const c of $('rail').children) c.addEventListener('pointerdown', ev => { ev.preventDefault(); ev.stopPropagation(); const e = rush?.line.find(x => x.n === Number(c.dataset.n)); if (e) openActs(e); });
+  for (const c of $('rail').children) c.addEventListener('click', ev => { ev.stopPropagation(); const e = rush?.line.find(x => x.n === Number(c.dataset.n)); if (e) openActs(e); });   // click, not pointerdown: the same tap must not land on the sheet that opens under the finger
   railBars();
 }
 // ---------- the wheel in a Rush: tap a guest's ticket. The rules and the prices are in shift.js (act).
-let actsFor = null, rushHinted = false;
+let actsFor = null, actsAt = 0, rushHinted = false;
 function openActs(e) {
   const s = rush; if (!s || phase !== 'sky' || s.at || paused || fight || actsFor) return;
   if (s.nerve <= 0) { floater({ x: innerWidth / 2, y: innerHeight * 0.3 }, t('actsNone'), 'bad'); SFX.wrong(); return; }
   if (e.ready) return;
-  actsFor = e; s.hold = true; SFX.spin(); coach(null);
-  $('actsHead').innerHTML = `<img alt="" src="${art.thumb(dishModel(e.recipe))}"><b style="color:${SEAT_COLOR[seatOf(e)]}">●</b> ${esc(t('r_' + e.recipe))} <span>${'🎡'.repeat(s.nerve)}</span>`;
-  $('actsList').innerHTML = sh.ACTS.map(id => `<button data-a="${id}" ${sh.canAct(s, e, id) ? '' : 'disabled'}><span>${WHEEL_ICON[id]}</span><b>${esc(t('w_' + id))}</b><small>${esc(t('ra_' + id))}</small></button>`).join('');
+  actsFor = e; actsAt = performance.now(); s.hold = true; SFX.spin(); coach(null);
+  $('actsHead').innerHTML = `<img alt="" src="${art.thumb(dishModel(e.recipe))}"><b style="color:${SEAT_COLOR[seatOf(e)]}">●</b> ${esc(t('r_' + e.recipe))} <span>${esc(t('actsLeft', { n: s.nerve }))}</span>`;
+  $('actsList').innerHTML = sh.ACTS.map(id => `<button data-a="${id}" ${sh.canAct(s, e, id) ? '' : 'disabled'}><span>${WHEEL_ICON[id]}</span><b>${esc(t('w_' + id))}</b><small>${esc(t((sh.canAct(s, e, id) ? 'ra_' : 'rn_') + id))}</small></button>`).join('');
   for (const b of $('actsList').children) b.addEventListener('click', ev => { ev.stopPropagation(); doAct(b.dataset.a); });
   $('acts').style.display = 'flex';
 }
 function closeActs() { $('acts').style.display = 'none'; actsFor = null; if (rush && !fight) rush.hold = false; }
 $('actsClose').addEventListener('click', e => { e.stopPropagation(); SFX.tap(); closeActs(); });
 function doAct(id) {
-  const s = rush, e = actsFor; if (!s || !e) return;
+  const s = rush, e = actsFor; if (!s || !e || performance.now() - actsAt < 250) return;
   if (id === 'fight') { $('acts').style.display = 'none'; actsFor = null; if (!sh.canAct(s, e, id)) { s.hold = false; return; } return fightStart(won => { if (rush !== s) return; s.hold = false; art.view('catch'); applyAct(e, id, won); }); }
   closeActs(); applyAct(e, id, false);
 }
@@ -1108,7 +1108,7 @@ function railBars() {
   $('rushClock').classList.toggle('low', s.doors && left < 15);
   $('rushStrikes').textContent = '✗'.repeat(Math.min(3, s.strikes)) + '·'.repeat(Math.max(0, 3 - s.strikes));
   $('rushBuzz').textContent = s.buzz ? `🔥${s.buzz}` : '';
-  $('rushNerve').textContent = '🎡'.repeat(s.nerve); document.body.classList.toggle('nerve', s.nerve > 0);
+  $('rushNerve').textContent = `🎡${s.nerve}`; document.body.classList.toggle('nerve', s.nerve > 0);
   $('rushCoins').textContent = next ? `${s.coins}/${next}` : `${s.coins}`;
   $('rushStars').textContent = '★'.repeat(tg.filter(x => s.coins >= x).length);
   $('rushTray').textContent = `${s.sky.tray.length}/${s.holds}`;
@@ -1167,7 +1167,8 @@ function stepRush(dt) {
   for (const n of [...meshes.keys()]) if (!live.has(n)) dropMesh(n);
   railBars();
   if (phase === 'sky' && !s.at) { const e = s.line.filter(x => x.ready).sort((a, b) => a.left - b.left)[0]; if (e) rushCook(e); }
-  if (s.over && phase === 'sky') rushEnd();
+  if (actsFor && (s.over || actsFor.ready || !s.line.includes(actsFor))) closeActs();   // the guest left, or the shift ended, under the open sheet
+  if (s.over && phase === 'sky' && !fight) rushEnd();
 }
 function dropRing(n) { const r = rings.get(n); if (r) { art.world.remove(r); r.material.dispose(); rings.delete(n); } }
 function dropMesh(n) { const m = meshes.get(n); if (m) { art.world.remove(m); meshes.delete(n); } dropRing(n); }
@@ -1341,12 +1342,13 @@ const up = e => {
 };
 canvas.addEventListener('pointerup', up); canvas.addEventListener('pointercancel', up);
 addEventListener('keydown', e => {
+  if (actsFor && e.key === 'Escape') { closeActs(); return; }   // Escape shuts the sheet before it pauses
   if (isPauseKey(e)) { if (screen === 'paused') resume(); else if (screen === 'play') pause(); return; }
   if (screen !== 'play' || paused) return;
   keys.add(e.key); touched = true;
   if (e.repeat) return;
   if (phase === 'pick' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { focusTo(focusI + (e.key === 'ArrowRight' ? 1 : -1)); return; }
-  if (actsFor && e.key === 'Escape') { closeActs(); return; }
+  if (actsFor) { if (e.key === 'Escape') closeActs(); return; }   // the sheet's own buttons take Space and Enter
   if (phase === 'sky' && rush && !actsFor && '123'.includes(e.key)) { const el = rush.line.find(x => seatOf(x) === Number(e.key) - 1); if (el) openActs(el); return; }
   if (e.key === ' ' || e.key === 'Enter') {
     e.preventDefault();
@@ -1367,6 +1369,7 @@ $('chopBtn').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPr
 // ---------- pause
 function pause() {
   if (paused || (screen !== 'play' && screen !== 'extra')) return;
+  if (actsFor) closeActs();
   before = screen; paused = true; snd.hold(); finger = null; tapStart = null; if (cook?.kind === 'fry') cook.held = false;
   show('paused');
 }
@@ -1476,7 +1479,7 @@ window.kitchenCall = i => { const e = day?.line?.[i]; if (e) callGuest(e); retur
 window.kitchenThrow = () => { throwNext = true; };
 window.kitchenMood = m => { if (g) g.mood = m; return !!g; };
 window.kitchenRush = seed => { if (screen !== 'menu' && phase !== 'sky') return false; if (seed != null) rushSeed = seed; beginRush(); return true; };
-window.kitchenRushAct = (n, id, won = true) => { const e = rush?.line.find(x => x.n === n); if (!e || phase !== 'sky') return false; if (id === 'fight') { applyAct(e, id, won); return true; } openActs(e); if (!actsFor) return false; doAct(id); return true; };
+window.kitchenRushAct = (n, id, won = true) => { const e = rush?.line.find(x => x.n === n); if (!e || phase !== 'sky' || actsFor) return false; openActs(e); if (actsFor !== e) return false; actsAt = 0; doAct(id); if (id === 'fight' && fight) window.kitchenFight(won); return true; };
 window.kitchenSkipCatch = () => { skipCatch = true; };
 window.kitchenGolden = () => { goldenNext = true; };
 window.kitchenAlive = () => { if (g?.catch) { g.catch.got = {}; g.catch.tray = []; g.catch.done = false; } };

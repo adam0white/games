@@ -181,6 +181,7 @@ console.log('ranks reachable: ok');
   sh.act(s, e, 'fridge'); const left = e.left; for (let i = 0; i < 120; i++) sh.stepShift(s, sim.DT, 0); assert.equal(e.left, left, 'a guest in the fridge loses no patience'); assert.ok(!sh.canAct(s, e, 'fridge'));
   assert.ok(sh.act(s, e, 'fight', true)); assert.ok(!sh.canAct(s, e, 'fight'), 'one fight a guest');
   assert.ok(sh.act(s, s.line[0], 'pan')); assert.equal(s.nerve, 0); for (const id of sh.ACTS) for (const g of s.line) assert.ok(!sh.canAct(s, g, id), 'no turns left');
+  s = fresh(); e = s.line.find(x => sh.canAct(s, x, 'trash')); if (e) { sh.act(s, e, 'fight', true); const paid = e.price; sh.act(s, e, 'trash'); assert.ok(e.price < paid && e.payMul === sh.RUSH.fightPay, 'a won fight still pays double after the order changes'); }
   s = fresh(); e = s.line[0]; const holds = s.holds; sh.act(s, e, 'hire'); assert.equal(s.holds, holds + sh.RUSH.hireHolds); assert.ok(!sh.canAct(s, s.line[0], 'hire'), 'one hire a shift');
   s = fresh(); e = s.line[0]; sh.act(s, e, 'fight', false); assert.equal(s.strikes, 1, 'a lost fight is a strike'); assert.ok(!s.line.includes(e));
   { const o = playShift({ save: saveAt(4), seed: 31, cook: COOKS.good, who: 'impatient', use: 'cook_self' }); assert.ok(o.used >= 1 && o.served >= 6, 'cook it yourself gets used and the shift still serves'); }

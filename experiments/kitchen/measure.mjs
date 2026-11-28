@@ -82,7 +82,11 @@ export function playShift({ save, seed, cook, who = 'greedy', use = null, random
     if (ready) { sh.startCook(s, ready); const q = Math.max(0.3, Math.min(1, cook.q + (r() - 0.5) * 0.3)); busy = cookSecs(save, ready.recipe, cook) + OVERHEAD; job = () => sh.finish(s, q); continue; }
     if (use && s.nerve > 0) {
       const e = random ? (r() < 0.004 && s.line.length ? s.line[Math.floor(r() * s.line.length)] : null) : USE[use](s, save, cook);
-      if (e && sh.canAct(s, e, use)) { sh.act(s, e, use, r() < cook.fight); busy = use === 'fight' ? 3.5 : 1; continue; }
+      if (e && sh.canAct(s, e, use)) {
+        if (use === 'fight') { s.hold = true; busy = 3.5; const won = r() < cook.fight; job = () => { s.hold = false; sh.act(s, e, use, won); }; }   // as on the page: nothing is caught during the fight, and it counts only if they are still seated
+        else { sh.act(s, e, use); busy = 1; }
+        continue;
+      }
     }
     if ((think -= sim.DT) <= 0 || !s.line.includes(focus)) { focus = POLICY[who](s); think = 0.8; }   // a person re-plans about once a second
     seen.push(c.items.map(it => ({ ...it })));

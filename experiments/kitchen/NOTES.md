@@ -175,23 +175,27 @@ Recorded play showed Rob taken 30 times and nothing else on the wheel more than 
 | Hire | tray holds two more for the shift | that guest's pay; once a shift |
 | Fight | win the tap fight: double pay | lose: they leave and it is a strike |
 
-Measured with `measure.mjs wheel` (60 seeds, coins a shift against never opening the wheel, up to three uses):
+Measured with `measure.mjs wheel 60 --tier=4 --who=greedy` and the same with `--off` (60 seeds, rank 4, a catcher with no plan, coins a shift against never opening the wheel, up to three uses; rerun on the merged code):
 
-| Action | Rank 4, careless catcher, new cook (never 353) | Rank 4, careless, good cook (never 632) | Rank 4, used at random, good cook |
-|---|---|---|---|
-| Kick out | +1, strikes 1.08 to 0.55 | flat | -64 |
-| Slap | +47, strikes to 0.15 | +24 | -43 |
-| Fridge | +24 | +15 | -26 |
-| Pan | +4 | +25 | +27 |
-| Microwave | +12 | +16 (plan: most impatient) | +5 |
-| Cook it! | +64 | +63 | +13 |
-| Lock out | -2 | -18 to -27 | -104 |
-| Trash can | +7 | +6 | +54 |
-| Rob | +15 | +9 | -515 |
-| Hire | +20 | -32 (plan: most impatient) | -8 |
-| Fight | +39, strikes 1.7, shut early 18% | +38 | +60 |
+| Action | New cook, timed (never 353, strikes 1.08) | Good cook, timed (never 632) | New cook, at random | Good cook, at random |
+|---|---|---|---|---|
+| Kick out | +1, strikes 0.55 | +5 | -5 | -61 |
+| Slap | +47, strikes 0.15 | +24 | -4 | -19 |
+| Fridge | +24, strikes 0.25 | +14 | +26 | -32 |
+| Pan | +4 | +36 | +29 | +16 |
+| Microwave | +16 | +7 | +11 | +6 |
+| Cook it! | +63 | +61 | +79 | +9 |
+| Lock out | -2 | -16 | +11, strikes 0.32 | -117 |
+| Trash can | +6 | +7 | +34 | +48 |
+| Rob | +14 | +9 | -241, shut early always | -511, shut early always |
+| Hire | +20 | -1 | +7 | -4 |
+| Fight | -8, strikes 1.68, shut early 17% | +49, strikes 0.67 | +37, strikes 1.78 | +14 |
 
-Reading. The moment matters for Kick out, Slap, Fridge and Rob: each is worth using when timed and costs coins at random, and Rob at random is ruinous, which is the price recorded play said it lacked. Fight is the strongest for a player who wins fights and the one that can close the doors. Cook it! is the best single action for both cooks even after its tip was removed (it was +60 for a good cook before that, +16 to +29 after, on the impatient plan). Lock out helps nobody the scripts can find except a new cook at random (+15, strikes down to 0.3).
+With the careful plan (most impatient first, `--who=impatient`) a good cook takes 676 without the wheel and the gains shrink: Cook it! +30, Microwave +21, Pan +16, Fight -1, Hire -27, Lock out -31, the rest within 5. A new cook on that plan: Cook it! +51, Microwave +23, Fight +17 (strikes 0.37 to 1.25), Pan +12.
+
+The scripted fight first cost no catching time and showed +38 to +46 everywhere. Modelled as on the page (nothing is caught for the 3.5 s of the fight, and it counts only if the guest is still seated) it is a gamble: it pays a good cook who is losing guests anyway and costs a new one.
+
+Reading. The moment matters for Kick out, Slap and Rob, and for Fridge with a good cook: each is worth using when timed and costs coins at random, and Rob at random is ruinous, which is the price recorded play said it lacked. Fight pays a player who wins fights and has time to spare, and it is the one that can close the doors. Cook it! is the best single action for a careless catcher of either skill, even with no tip and no buzz. Lock out helps nobody the scripts can find except a new cook at random. Trash can and Pan are better at random than with the scripted trigger, so their triggers are wrong.
 
 Decision: all eleven stay. Several scripted triggers did worse than random use (Trash can, Fridge, Pan, Lock out at first), which says the trigger was wrong, not that the action is flat. Per the stop rule, Cook it! and Lock out get one retune each after a person's shifts can be read: Cook it! may be too good, Lock out may be dead.
 
@@ -207,4 +211,14 @@ Seven phone screenshots of a Rush went to a reviewer on another model family wit
 4. Cost: it could not tell whether a wrong catch or a miss costs anything.
 5. Progress: shift takings and the wallet share look like one number; the next star's target is not shown during play.
 6. It could not tell what the ticket's coloured top, the eyes or the diamond mean.
+
+### Review of slice 2
+
+A browser script at phone size ran the edges: pause with the sheet open, a lost fight through the real tap fight, a third strike from a lost fight, the shift ending and the guest walking out during a fight, the guest walking out under an open sheet, Cook it! followed to its serve (price alone, buzz unchanged), and the sheet at 320 by 568 in Turkish. It found two faults, both fixed: on a small phone the tap that opened the sheet also pressed the button that appeared under the finger (the sheet now opens on click and ignores presses for a quarter second); and Escape paused the game instead of closing the sheet.
+
+One adversarial code review on another model family gave nine findings. Fixed: Pan could still send junk when one guest was left; Trash can after a won fight lost the double pay; Cook it! raised the best-buzz record; the fridge timer stopped under a measuring switch; the scripted fight cost no catching time; the test hook could act on the wrong guest or skip the fight. Two were already fixed by the edge run.
+
+One cold read of the sheet on a third family (three screenshots, no context) read ten of eleven buttons correctly. Fixed from it: the turns left are now a labelled count that says each action uses one; a disabled button says why; Cook it! and Fight say what the player has to do. Left for the next stop-adding pass: mark which actions touch one guest and which the whole room.
+
+Open after this slice: a wheel use in a Rush also counts toward the ordinary day's wheel missions (left in on purpose, not measured); only one action type a shift was measured, never a mix (for example a won fight then Rob on the same guest); a shaking ticket (low patience) is a moving target for a finger.
 

@@ -68,7 +68,7 @@ function dropFork(s) {
   const pickId = e => { const ids = Object.keys(e.need).filter(id => lacks(e, id)); return ids[Math.floor(r() * ids.length)]; };
   const a = open[Math.floor(r() * open.length)], rest = open.filter(e => e !== a), b = rest.length ? rest[Math.floor(r() * rest.length)] : null;
   const decoyShare = s.calm > 0 ? 0 : Math.min(0.4, RUSH.decoy + 0.02 * c.hard);
-  const ids = [pickId(a), b ? pickId(b) : null].map(id => (id == null || r() < decoyShare ? c.others[Math.floor(r() * c.others.length)] : id));
+  const ids = [pickId(a), b ? pickId(b) : null].map(id => (id == null ? (s.calm > 0 ? pickId(a) : c.others[Math.floor(r() * c.others.length)]) : r() < decoyShare ? c.others[Math.floor(r() * c.others.length)] : id));
   if (ids.every(id => !open.some(e => lacks(e, id)))) ids[0] = pickId(a);   // never two decoys
   // One falls each side of the middle, each farther out than a tray left in the middle can reach: every pair is a side to pick.
   const lim = sim.TUNE.lane - sim.TUNE.size, near = Math.min(lim - 0.04, c.half + sim.TUNE.size + 0.04);
@@ -112,8 +112,9 @@ export function stepShift(s, dt, trayX = 0) {
     }
   }
   if (s.calm > 0) s.calm -= dt;
-  if (!s.off.drain) for (const e of s.line.slice()) {
+  for (const e of s.line.slice()) {
     if (e.frozen > 0) { e.frozen -= dt; continue; }   // in the fridge: no patience lost
+    if (s.off.drain) continue;
     e.left -= dt;
     if (e.left <= 0) {
       unseat(s, e); s.strikes++; s.buzz = 0; ev.push({ type: 'walkout', e });
@@ -147,7 +148,7 @@ export function stepShift(s, dt, trayX = 0) {
           ev.push({ type: 'pushed', it: out, e: out.owner });
         }
         if (leftOf(e) === 0 && !e.ready) {
-          if (e.self) { e.tipShare = 0; unseat(s, e); s.at = e; const buzz = s.buzz; ev.push({ type: 'selfserved', e, bill: finish(s, RUSH.selfQuality) }); s.buzz = buzz; }   // told to cook it themselves
+          if (e.self) { e.tipShare = 0; unseat(s, e); s.at = e; const buzz = s.buzz, best = s.bestBuzz; ev.push({ type: 'selfserved', e, bill: finish(s, RUSH.selfQuality) }); s.buzz = buzz; s.bestBuzz = best; }   // told to cook it themselves
           else { e.ready = true; ev.push({ type: 'ready', e }); }
         }
       }
@@ -231,7 +232,7 @@ export function act(s, e, id, won = false) {
   else if (id === 'trash') {
     const to = smallest(s, e), rich = e.kind === 'rich' ? RUSH.richPay : 1;
     s.sky.tray = s.sky.tray.filter(it => it.owner !== e);
-    e.recipe = to; e.need = { ...sim.RECIPES[to].need }; e.got = {}; e.ready = false; e.price = Math.round(priceOf(s.save, to) * rich);
+    e.recipe = to; e.need = { ...sim.RECIPES[to].need }; e.got = {}; e.ready = false; e.price = Math.round(priceOf(s.save, to) * rich * (e.payMul ?? 1));
     e.left = Math.min(e.full, e.left + RUSH.trashWait); sync(s);
   } else if (id === 'rob') {
     const n = Math.round(e.price * RUSH.robTake); unseat(s, e); s.coins += n; s.robbed += n; out.coins = n; out.gone = true; strike();
@@ -239,7 +240,7 @@ export function act(s, e, id, won = false) {
   } else if (id === 'hire') { unseat(s, e); s.hired = true; s.holds += RUSH.hireHolds; out.gone = true; }
   else if (id === 'fight') {
     e.fought = true;
-    if (won) e.price = Math.round(e.price * RUSH.fightPay); else { unseat(s, e); out.gone = true; strike(); }
+    if (won) { e.payMul = RUSH.fightPay; e.price = Math.round(e.price * RUSH.fightPay); } else { unseat(s, e); out.gone = true; strike(); }
     out.won = won;
   }
   return out;
