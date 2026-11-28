@@ -600,3 +600,12 @@ ticket alternates two colours; a spare ring was seen; plate to sky 0.15 s; no pa
 **Not done here.** The star lines are still the old ones, so a Rush is still too easy; they are retuned with the ladder
 (next). The scripted player has not been re-timed at the faster fall. No person has played this build.
 
+**Outside code review of these fixes (before merge).** Ten findings. Fixed: a second finger or key still holding the pan
+no longer starts the grace, and a pause counts as a lift; a ring now shows the guest who would really get the item (two
+of one thing falling level share a claim, and only what can still be caught claims); an urgent halo comes back on when
+its guest stops waiting; the meter no longer paints over the pause card; `body.nerve` is cleared on quit. Older faults
+fixed in passing: the card after an unwanted catch ran on a wall-clock timer that a pause could swallow, leaving an
+ordinary day stuck; it is on the game clock now. Not fixed, written down: a Pace change made in the pause card applies
+from the next shift, not the next pair; an unwanted item caught as the last guest walks out can be counted as missed;
+a rude guest's splat can land on the end card.
+

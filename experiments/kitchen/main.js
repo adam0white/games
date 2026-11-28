@@ -297,7 +297,7 @@ function stepCatch(dt) {
       $('ticket').classList.remove('shake'); void $('ticket').offsetWidth; $('ticket').classList.add('shake');
       floater(worldPx(trayX, LANE.y0 + 0.35), '✗', 'bad');
       song?.hit();
-      later(500, () => { if (g?.catch === c && c.extra) extraCard(); });
+      wait(0.5, () => { if (g?.catch === c && c.extra) extraCard(); });   // on the game clock: a pause must not swallow it
     } else if (e.type === 'missed') {
       const m = meshes.get(e.it.n); meshes.delete(e.it.n); if (m) art.world.remove(m);
       if (!sim.isJunk(e.it.id) && g.need[e.it.id]) { SFX.miss(); song?.miss(); }
@@ -555,6 +555,7 @@ const FRY_GRACE = 0.3;
 function letGo(late = false) {
   if (!cook || cook.kind !== 'fry' || cook.over || cook.d < 0.04) { if (cook) cook.held = false; return; }
   cook.held = false;
+  if (!late && (finger || keys.has(' ') || keys.has('Enter'))) { cook.held = true; return; }   // another finger or key still holds the pan
   if (!late && cook.d < cook.band[0]) { if (!(cook.grace > 0)) cook.grace = FRY_GRACE; return; }
   cook.grace = 0;
   const q = sim.fryQuality(cook.d, cook.band);
@@ -1107,7 +1108,7 @@ let ringGeo = null;
 function clearRush() {
   clearPeople();
   for (const n of [...rings.keys()]) dropRing(n);
-  $('rushMission').style.display = 'none'; chipWas = ''; document.body.classList.remove('mis');
+  $('rushMission').style.display = 'none'; chipWas = ''; document.body.classList.remove('mis', 'nerve');
   $('rail').style.display = 'none'; $('rushHud').style.display = 'none'; $('rail').innerHTML = ''; $('acts').style.display = 'none'; actsFor = null; document.body.classList.remove('sky'); if (fight) { fight.over = true; fight = null; $('fight').style.display = 'none'; }
 }
 function beginRush() {
@@ -1240,6 +1241,7 @@ function stepPeople() {
   for (const p of people.values()) {
     if (p.due && clock >= p.due.at) { const f = p.due.fn; p.due = null; f(); }
     if (p.m && (p.state === 'wait' || p.state === 'in')) p.m.g.position.y += (lift - p.m.g.position.y) * 0.2;
+    if (p.halo && p.state !== 'wait') p.halo.visible = true;
     if (p.state !== 'wait' || !p.m) continue;
     const low = p.e.left / p.e.full < 0.2 && !(p.e.frozen > 0);
     if (low !== p.low) { p.low = low; p.m.play(low ? 'emote-no' : 'idle'); }
@@ -1367,7 +1369,14 @@ function stepRush(dt) {
   if (phase === 'sky' && !s.at) {
     const wants = {};
     for (const e of s.line.slice().sort((a, b) => a.left - b.left)) if (!e.ready) for (const [id, n] of Object.entries(e.need)) for (let k = (e.got[id] ?? 0); k < n; k++) (wants[id] ??= []).push(e);
-    for (const it of s.sky.items.filter(x => x.state === 'fall' && !sim.isJunk(x.id)).sort((a, b) => a.y - b.y)) { const q = wants[it.id]; if (q?.length) claim.set(it.n, { e: q.shift(), spare: false }); else { const e = sh.ownerOf(s, it.id); if (e) claim.set(it.n, { e, spare: true }); } }
+    // Only what can still be caught claims; two of one thing falling level (the two sides of a pair) share the claim,
+    // because whichever is caught goes to the same guest.
+    const last = {};
+    for (const it of s.sky.items.filter(x => x.state === 'fall' && !sim.isJunk(x.id) && x.y > sim.TUNE.catchY - sim.TUNE.catchBand).sort((a, b) => a.y - b.y)) {
+      const q = wants[it.id], was = last[it.id];
+      if (was && Math.abs(was.y - it.y) < 0.03) claim.set(it.n, was.c);
+      else { const e = q?.length ? q.shift() : null, c = e ? { e, spare: false } : (() => { const o = sh.ownerOf(s, it.id); return o ? { e: o, spare: true } : null; })(); if (c) { claim.set(it.n, c); last[it.id] = { y: it.y, c }; } }
+    }
   }
   spareRings = [...claim.values()].filter(c => c.spare).length;
   const blink = 0.55 + 0.45 * Math.sin(clock * 14);
@@ -1599,7 +1608,7 @@ $('chopBtn').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPr
 function pause() {
   if (paused || (screen !== 'play' && screen !== 'extra')) return;
   if (actsFor) closeActs();
-  before = screen; paused = true; snd.hold(); finger = null; tapStart = null; if (cook?.kind === 'fry') cook.held = false;
+  before = screen; paused = true; snd.hold(); finger = null; tapStart = null; if (cook?.kind === 'fry') { cook.held = false; if (cook.d >= 0.04 && !cook.over && !(cook.grace > 0)) cook.grace = FRY_GRACE; }   // a pause is a lift: the grace runs on the game clock after resume
   show('paused');
 }
 function resume() {

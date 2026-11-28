@@ -28,6 +28,7 @@ const actOn = async (id, won, pick = 0) => { for (let i = 0; i < 200; i++) { con
 // The owner's quality-of-life asks of 2026-11-28: urgent tickets blink, the cooking meter sits at the top, a fry lifted
 // early can be pressed again, a Rush plate does not visit the register, the Pace setting is recorded.
 res.pace = await page.evaluate(() => document.querySelector('#pace2')?.textContent);
+if (process.env.FIRST) { await page.evaluate(() => localStorage.setItem('kitchen-rush', JSON.stringify({ plays: 0 }))); await page.reload(); await page.waitForFunction(() => window.kitchenState?.()?.screen === 'menu', null, { timeout: 60000 }); }   // a first Rush shows the coach line over the meter
 await begin(11); await calib(); await page.waitForTimeout(1500); await shot('1-rings');
 // leave the tray parked until a ticket is urgent
 res.spares = 0; for (let i = 0; i < 240; i++) { res.spares = Math.max(res.spares, (await st()).rush?.spares ?? 0); if (await page.$('.chip.hot')) break; await page.waitForTimeout(250); }
@@ -39,6 +40,7 @@ const toFry = async () => { const t0 = Date.now(); while (Date.now() - t0 < 1200
 res.fry1 = await toFry();
 if (res.fry1) {
   await page.waitForTimeout(400); await shot('3-fry-meter');
+  await page.tap('#pause'); await page.waitForTimeout(400); await shot('3b-paused-over-meter'); res.pausedScreen = (await st()).screen; await page.tap('#resume'); await page.waitForTimeout(500); res.afterPause = { phase: (await st()).phase, over: (await st()).cook?.over };
   await page.keyboard.down('Space'); await page.waitForTimeout(250); await page.keyboard.up('Space');
   await page.waitForTimeout(150); const a = await st(); await page.keyboard.down('Space');   // pressed again inside the grace
   res.graceKept = { phase: a.phase, over: a.cook?.over, d: a.cook?.d };
