@@ -455,9 +455,9 @@ function trailPoints() {
 const SNAP = 7;
 function snapEnd(x, y, kind) {
   const sw = L0.sw; let best = null, bd = SNAP + 1;
-  const tryAt = c => { if (c < 0 || c >= L0.nestBase) return; const cx = c % sw, cy = Math.floor(c / sw), d = Math.max(Math.abs(cx - x), Math.abs(cy - y)); if (d >= bd) return; for (let k = 1; k < d; k++) if (sim.mat[Math.round(y + (cy - y) * k / d) * sw + Math.round(x + (cx - x) * k / d)] !== MAT.OPEN) return; bd = d; best = [cx, cy]; };
+  const tryAt = (c, reach = SNAP) => { if (c < 0 || c >= L0.nestBase) return; const cx = c % sw, cy = Math.floor(c / sw), d = Math.max(Math.abs(cx - x), Math.abs(cy - y)); if (d >= bd || d > reach) return; for (let k = 1; k < d; k++) if (sim.mat[Math.round(y + (cy - y) * k / d) * sw + Math.round(x + (cx - x) * k / d)] !== MAT.OPEN) return; bd = d; best = [cx, cy]; };
   if (kind === KIND.FORAGE) { for (let p = 0; p < MAX_PILES; p++) if (sim.pileAmount[p] > 0) tryAt(sim.pileCell[p]); }
-  else { tryAt(sim.door[FOE]); for (const c of sim.sites) tryAt(c); if (sim.beast[0] > 0) tryAt(sim.beast[1]); }
+  else { tryAt(sim.door[FOE], 3); /* a raid drawn to stand off their door stays a stand-off: only a trail that all but touches it goes in */ for (const c of sim.sites) tryAt(c); if (sim.beast[0] > 0) tryAt(sim.beast[1]); }
   return best && bd > 0 ? best : null;
 }
 const trailMid = new Map();
@@ -639,7 +639,7 @@ $('guideSkip').addEventListener('click', () => guideStop(guideStep >= GUIDE.leng
 // ---- idle workers: a line when workers stand in the hill with no trail to walk and food lies untouched; by the
 // setting, a pause after a few more seconds of it. Once for each spell of idleness, never before the first trail,
 // never in a room. Drawn from sim state alone.
-const IDLE = { n: 6, tell: 100, pause: 260 };
+const IDLE = { n: 8, share: 0.25, tell: 100, pause: 260 }; // eight workers at rest and a quarter of them all: a hill with three good trails hears it about once a game
 let idle = { since: -1, told: false, paused: false, pile: -1, at: -1, n: 0 };
 function idleTick() {
   const mode = set.get('idle');
@@ -649,7 +649,7 @@ function idleTick() {
   let n = 0, live = 0;
   if (mode !== 'quiet' && !sim.result && sim.tick >= 300 && g(ME, CG.SEQ) > 0 && !g(ME, CG.RECALL)) for (let i = 0; i < sim.n; i++) if (sim.team[i] === ME && sim.hp[i] > 0 && sim.caste[i] === CASTE.WORKER && sim.task[i] === TASK.REST) n++;
   for (let k = 0; k < TRAILS; k++) if (sim.trLive[ME * TRAILS + k]) live++;
-  const pile = n >= IDLE.n && live < TRAILS ? freePile(sim, ME) : -1;
+  const pile = n >= Math.max(IDLE.n, g(ME, CG.WORKERS) * IDLE.share) && live < TRAILS ? freePile(sim, ME) : -1;
   if (pile < 0) { idle.since = -1; idle.told = idle.paused = false; idle.pile = -1; return; }
   idle.pile = pile; idle.n = n; if (idle.since < 0) idle.since = sim.tick;
   const wait = sim.tick - idle.since, px = pile % L0.sw + 0.5, py = Math.floor(pile / L0.sw) + 0.5;

@@ -1431,11 +1431,17 @@ with this script).
 door, a stone or the beetle (raid), with open ground in a straight line between, is carried on to it. While drawing, a
 dashed line and a ring show where. Lab event `snap`. Multi-stop trails were asked for and then withdrawn by the owner.
 
-**Idle workers.** Six or more workers at rest, a free trail slot, a first trail already laid, tick 300 or later, no
+**Idle workers.** Eight or more workers at rest and a quarter of all workers, a free trail slot, a first trail already laid, tick 300 or later, no
 recall, and a pile `freePile` calls worth a trail (six loads, reachable, no forage trail of ours ending by it, not
 twice as far from our door as from theirs): after 5 seconds a line says so (tap it to look) and a ring pulses on the
 pile. Setting `idle`: `warn` (default), `pause` (after 8 more seconds the game pauses once for that spell; not in a
 room, not with the Nest open), `quiet`. Lab events `idle`, `idlePause`.
+
+How often a hill that plays well hears it (the steady mind in the player's seat, three trails, 6 seeds): with a
+threshold of six at rest it met the condition 56% of The Crossing and 32% of High Summer, 3.2 and 4.0 lines a game.
+With eight and a quarter of the workers: 13% and 16%, 1.0 and 1.7 lines a game. The second is what ships.
+
+A drawn raid snaps to the rival door only from 3 cells: one drawn to stand off the door stays a stand-off.
 
 **The way home.** In the Nest, when the view is off the hill, a HOME chip stands in the top strip (at the edge when
 the door is out of view). A tap on it centres the view and starts no stroke, whatever tool is in hand. Lab event
