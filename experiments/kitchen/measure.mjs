@@ -1,7 +1,8 @@
 // Scripted players for the Rush shift. node experiments/kitchen/measure.mjs <question> [seeds] [--off] [--tier=N]
-// Questions:
+// Questions (--who=<plan> picks the catching plan for the wheel question, default impatient):
 //   order   whose dish to build: a tray that never moves (in the middle, or parked at one side), anything anyone wants, most impatient, best payer, nearest done, and a mixed rule. --off lets the tray hold everything.
-//   rob     cook everyone, rob everyone, or rob only a guest who was about to walk. --off removes the witnesses.
+//   wheel   each wheel action used when it should help, against never using the wheel. --off uses it on a random guest
+//           at a random moment instead, which shows whether the moment matters.
 //   seats   the same cook with 3, 4 and 5 seats (the page uses 3).
 //   targets coins a shift by rank for a new and a good cook (TARGETS in shift.js was set from this).
 // The players use the page's own calls (shift.js) and the real catch (sim.js). Cooking time is a model: see cookSecs.
@@ -11,8 +12,9 @@ import * as sh from './shift.js';
 const args = process.argv.slice(2), question = args.find(a => !a.startsWith('-') && isNaN(a)) ?? 'order';
 const seeds = Number(args.find(a => !isNaN(a))) || 40, off = args.includes('--off');
 const tierArg = args.find(a => a.startsWith('--tier=')), TIER = tierArg ? Number(tierArg.slice(7)) : 0;
+const whoArg = args.find(a => a.startsWith('--who=')), WHO = whoArg ? whoArg.slice(6) : 'impatient';   // the catching plan under the wheel question
 
-export const COOKS = { new: { react: 0.45, skill: 0.6, q: 0.74, slow: 1.45 }, good: { react: 0.25, skill: 0.9, q: 0.93, slow: 1 } };
+export const COOKS = { new: { react: 0.45, skill: 0.6, q: 0.74, slow: 1.45, fight: 0.6 }, good: { react: 0.25, skill: 0.9, q: 0.93, slow: 1, fight: 0.85 } };
 export const OVERHEAD = 0.5; // seconds a dish costs besides its cooking steps. Checked against the page: ten dishes timed in a browser came within 1.2 s of cookSecs.
 
 export function saveAt(tier, tables = null) {
@@ -54,8 +56,23 @@ export const POLICY = {
   },
 };
 
-// One shift. who: the rule for whose dish to build. rob: 'never' | 'doomed' | 'always'.
-export function playShift({ save, seed, cook, who = 'greedy', rob = 'never', off = {} }) {
+// When a scripted player uses each wheel action. Each returns the guest to use it on, or nothing.
+const doomed = e => e.left < 6 && e.left < estSecs(e) * 0.6 && !(e.frozen > 0);
+export const USE = {
+  kick_out: s => s.line.find(doomed),
+  slap: s => s.line.find(e => e.left < 10 && !(e.frozen > 0)),
+  fridge: s => s.line.length >= 3 ? s.line.find(e => e.left < 12 && !(e.frozen > 0)) : null,
+  pan: s => (s.buzz >= 3 && !(s.calm > 0) ? s.line[0] : null),
+  microwave: s => s.line.find(e => e.mood),
+  cook_self: (s, save, cook) => s.line.find(e => !e.self && cookSecs(save, e.recipe, cook) >= 7 && e.left > estSecs(e)),
+  lock_out: s => (s.line.length >= s.seats && s.buzz >= 4 ? s.line[0] : null),
+  trash: s => s.line.find(e => sh.leftOf(e) >= 3 && e.left < estSecs(e) * 1.3),
+  rob: s => (s.strikes < sh.RUSH.strikes - 1 ? s.line.find(doomed) : null),
+  hire: s => (s.t < 25 && s.line.length ? s.line.reduce((a, e) => (e.price < a.price ? e : a)) : null),
+  fight: s => s.line.find(e => e.kind === 'rich' && !e.fought && e.left > estSecs(e) + 6),
+};
+// One shift. who: the rule for whose dish to build. use: a wheel action id, or null. random: use it at random instead.
+export function playShift({ save, seed, cook, who = 'greedy', use = null, random = false, off = {} }) {
   const s = sh.newShift({ save, seed, off }), c = s.sky;
   const r = sim.rng(seed * 31 + 7), seen = []; let busy = 0, job = null, x = who === 'park' ? 0.8 : 0, step = 0, focus = null, think = 0;
   for (let i = 0; i < 60 * 600 && !s.over; i++) {
@@ -63,7 +80,10 @@ export function playShift({ save, seed, cook, who = 'greedy', rob = 'never', off
     if (busy > 0) { sh.stepShift(s, sim.DT, x); busy -= sim.DT; if (busy <= 0 && job) { job(); job = null; seen.length = 0; } continue; }
     const ready = s.line.filter(e => e.ready).sort((a, b) => a.left - b.left)[0];
     if (ready) { sh.startCook(s, ready); const q = Math.max(0.3, Math.min(1, cook.q + (r() - 0.5) * 0.3)); busy = cookSecs(save, ready.recipe, cook) + OVERHEAD; job = () => sh.finish(s, q); continue; }
-    if (rob !== 'never') { const d = s.line.find(e => rob === 'always' || (e.left < 3 && !e.ready)); if (d && s.strikes < sh.RUSH.strikes - 1) { sh.rob(s, d); busy = 1.5; continue; } }
+    if (use && s.nerve > 0) {
+      const e = random ? (r() < 0.004 && s.line.length ? s.line[Math.floor(r() * s.line.length)] : null) : USE[use](s, save, cook);
+      if (e && sh.canAct(s, e, use)) { sh.act(s, e, use, r() < cook.fight); busy = use === 'fight' ? 3.5 : 1; continue; }
+    }
     if ((think -= sim.DT) <= 0 || !s.line.includes(focus)) { focus = POLICY[who](s); think = 0.8; }   // a person re-plans about once a second
     seen.push(c.items.map(it => ({ ...it })));
     const view = seen[Math.max(0, seen.length - 1 - Math.round(cook.react * 60))];
@@ -84,7 +104,7 @@ export function playShift({ save, seed, cook, who = 'greedy', rob = 'never', off
     if (who !== 'idle' && who !== 'park') x += Math.max(-move, Math.min(move, target - x));
     sh.stepShift(s, sim.DT, x);
   }
-  return { ...sh.result(s), secs: s.t, clatters: s.clatters, pushed: s.pushed };
+  return { ...sh.result(s), secs: s.t, clatters: s.clatters, pushed: s.pushed, used: use ? (s.acts[use] ?? 0) : 0 };
 }
 
 const mean = a => a.reduce((x, y) => x + y, 0) / a.length;
@@ -92,7 +112,7 @@ const pct = (a, p) => a.slice().sort((x, y) => x - y)[Math.floor((a.length - 1) 
 export function table(rows, runs) {
   return rows.map(([name, opts]) => {
     const out = runs.map(seed => playShift({ ...opts, seed }));
-    return { name, coins: +mean(out.map(o => o.coins)).toFixed(1), p25: pct(out.map(o => o.coins), 0.25), p75: pct(out.map(o => o.coins), 0.75), served: +mean(out.map(o => o.served)).toFixed(1), strikes: +mean(out.map(o => o.strikes)).toFixed(2), closedEarly: +mean(out.map(o => +o.closedEarly)).toFixed(2), turned: +mean(out.map(o => o.turned)).toFixed(1), buzz: +mean(out.map(o => o.bestBuzz)).toFixed(1), stars: +mean(out.map(o => o.stars)).toFixed(2), robbed: +mean(out.map(o => o.robbed)).toFixed(1), pushed: +mean(out.map(o => o.pushed)).toFixed(1), clat: +mean(out.map(o => o.clatters)).toFixed(1), secs: +mean(out.map(o => o.secs)).toFixed(0) };
+    return { name, coins: +mean(out.map(o => o.coins)).toFixed(1), p25: pct(out.map(o => o.coins), 0.25), p75: pct(out.map(o => o.coins), 0.75), served: +mean(out.map(o => o.served)).toFixed(1), strikes: +mean(out.map(o => o.strikes)).toFixed(2), closedEarly: +mean(out.map(o => +o.closedEarly)).toFixed(2), turned: +mean(out.map(o => o.turned)).toFixed(1), buzz: +mean(out.map(o => o.bestBuzz)).toFixed(1), stars: +mean(out.map(o => o.stars)).toFixed(2), robbed: +mean(out.map(o => o.robbed)).toFixed(1), used: +mean(out.map(o => o.used)).toFixed(1), pushed: +mean(out.map(o => o.pushed)).toFixed(1), clat: +mean(out.map(o => o.clatters)).toFixed(1), secs: +mean(out.map(o => o.secs)).toFixed(0) };
   });
 }
 
@@ -102,9 +122,12 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   if (question === 'order') {
     const o = off ? { cap: true } : {};
     for (const who of ['good', 'new']) { console.log(`order, ${who} cook, rank ${TIER}${off ? ', tray holds everything' : ''}`); console.table(table(Object.keys(POLICY).map(p => [p, { save, cook: COOKS[who], who: p, off: o }]), runs)); }
-  } else if (question === 'rob') {
-    const o = off ? { scare: true } : {};
-    for (const who of ['good', 'new']) { console.log(`rob, ${who} cook, rank ${TIER}${off ? ', no witnesses' : ''}`); console.table(table(['never', 'always', 'doomed'].map(rob => [rob, { save, cook: COOKS[who], who: 'mixed', rob, off: o }]), runs)); }
+  } else if (question === 'wheel') {
+    for (const who of ['good', 'new']) {
+      console.log(`wheel, ${who} cook, rank ${TIER}, plan ${WHO}${off ? ', used at random' : ''}`);
+      const rows = table([['never', { save, cook: COOKS[who], who: WHO }], ...sh.ACTS.map(id => [id, { save, cook: COOKS[who], who: WHO, use: id, random: off }])], runs);
+      console.table(rows.map(({ name, coins, served, strikes, closedEarly, used, stars }) => ({ name, coins, 'vs never': +(coins - rows[0].coins).toFixed(1), served, strikes, closedEarly, used, stars })));
+    }
   } else if (question === 'seats') {
     for (const who of ['good', 'new']) { console.log(`seats, ${who} cook, rank ${TIER}`); console.table(table([3, 4, 5].map(n => [`${n} seats`, { save, cook: COOKS[who], who: 'impatient', off: { seats: n } }]), runs)); }
   } else if (question === 'targets') {

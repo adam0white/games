@@ -148,11 +148,63 @@ What this shows, and what it does not:
 ### Open
 
 - Star targets are set from the model (one star near a new cook's lower quartile, three near a good cook's upper quartile). A person's first shifts will show whether they are right.
-- From the Fine rank up, a new cook's doors shut early in 75 to 93% of shifts. No recorded player is there yet.
-- The wheel does not open in a Rush yet. `shift.js` has Rob with a price (a strike, the buzz, and nine seconds off every witness); `measure.mjs rob` has not been rerun since the sky changed.
+- Corrected 2026-11-28: an earlier line here said a new cook's doors shut early in 75 to 93% of shifts from the Fine rank up. That was measured before the arrival-timing fix in the slice 1 review. Rerun on 30 seeds after it: no rank shuts early for either cook, and a new cook takes 0.4 to 1.1 strikes a shift.
+- The wheel opens in a Rush since slice 2 (below). No person has used it there yet.
 - Guests are tickets at the top of the screen, not people in the room.
 - The Rush is not in the browser phone check; `bots.mjs` asserts its rules (idle serves nobody, a played shift ends).
 
 ### Review of slice 1
 
 One adversarial code review on another model family found nine things; seven were confirmed and fixed before merge: the end card could say "shut early" when the third walkout came after the bell; the third guest arrived with the opening two; things in the air hung still when the room emptied; a thing nobody ordered was drawn twice on a clatter; the tray kept showing a dish's food for a moment after it left; ring materials leaked on quit; a damaged `kitchen-rush` record could break the menu. Not fixed: the wheel and Rob are not reachable in a Rush (planned next).
+
+### Slice 2: the wheel inside a Rush (2026-11-28)
+
+Recorded play showed Rob taken 30 times and nothing else on the wheel more than a handful, with no walkouts to make any of it matter. In a Rush every wheel action now has one effect and one price, the price is printed on its button, and a shift has three turns (`RUSH.nerve`). Tap a guest's ticket (or press 1, 2, 3) to open it. The sky holds still while the sheet is open and patience keeps running, so reading is not free.
+
+| Action | Effect | Price |
+|---|---|---|
+| Kick out | the guest leaves | no pay, one step of buzz, no strike |
+| Slap | patience full again | half their tip |
+| Fridge | no patience lost for 25 s | a turn |
+| Pan | junk in the air is gone and none falls for 15 s | a turn |
+| Microwave | a moody guest turns calm | a turn; tip is half as much again |
+| Cook it! | served the moment their food is caught | no tip, no buzz |
+| Lock out | nobody arrives for 18 s | the guests who would have come |
+| Trash can | their order becomes the smallest dish | the price of the bigger dish |
+| Rob | 60% of their price now | a strike, the buzz, nine seconds off everyone watching |
+| Hire | tray holds two more for the shift | that guest's pay; once a shift |
+| Fight | win the tap fight: double pay | lose: they leave and it is a strike |
+
+Measured with `measure.mjs wheel` (60 seeds, coins a shift against never opening the wheel, up to three uses):
+
+| Action | Rank 4, careless catcher, new cook (never 353) | Rank 4, careless, good cook (never 632) | Rank 4, used at random, good cook |
+|---|---|---|---|
+| Kick out | +1, strikes 1.08 to 0.55 | flat | -64 |
+| Slap | +47, strikes to 0.15 | +24 | -43 |
+| Fridge | +24 | +15 | -26 |
+| Pan | +4 | +25 | +27 |
+| Microwave | +12 | +16 (plan: most impatient) | +5 |
+| Cook it! | +64 | +63 | +13 |
+| Lock out | -2 | -18 to -27 | -104 |
+| Trash can | +7 | +6 | +54 |
+| Rob | +15 | +9 | -515 |
+| Hire | +20 | -32 (plan: most impatient) | -8 |
+| Fight | +39, strikes 1.7, shut early 18% | +38 | +60 |
+
+Reading. The moment matters for Kick out, Slap, Fridge and Rob: each is worth using when timed and costs coins at random, and Rob at random is ruinous, which is the price recorded play said it lacked. Fight is the strongest for a player who wins fights and the one that can close the doors. Cook it! is the best single action for both cooks even after its tip was removed (it was +60 for a good cook before that, +16 to +29 after, on the impatient plan). Lock out helps nobody the scripts can find except a new cook at random (+15, strikes down to 0.3).
+
+Decision: all eleven stay. Several scripted triggers did worse than random use (Trash can, Fridge, Pan, Lock out at first), which says the trigger was wrong, not that the action is flat. Per the stop rule, Cook it! and Lock out get one retune each after a person's shifts can be read: Cook it! may be too good, Lock out may be dead.
+
+Not shown: that a person finds the sheet, reads eleven buttons under pressure, or chooses differently from one shift to the next. The gate from the design reviews (an adaptive rule that beats every fixed plan) is still unmet.
+
+### Cold first play (2026-11-28, slice 1 build)
+
+Seven phone screenshots of a Rush went to a reviewer on another model family with no other information. It read the mode, the clock, the tickets, the rings and the end card correctly. Findings, to fix in the next stop-adding pass:
+
+1. Control: the menu only explains mouse and keys; nothing on the first Rush screen says to drag the tray.
+2. Control: nothing says what to do at the cooking step unless the hint has been seen in an ordinary day.
+3. Cost: the three dots read as strike slots only after one is lost, and nothing says what caused a strike.
+4. Cost: it could not tell whether a wrong catch or a miss costs anything.
+5. Progress: shift takings and the wallet share look like one number; the next star's target is not shown during play.
+6. It could not tell what the ticket's coloured top, the eyes or the diamond mean.
+

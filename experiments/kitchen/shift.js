@@ -22,6 +22,8 @@ export const RUSH = {
   fork: 1.0,               // seconds between forks: two items fall together, too far apart to catch both on a small tray
   forkGap: [1.0, 1.15],    // lane units between the two
   decoy: 0.18,             // share of fork sides that hold something nobody wants (more with hardness)
+  nerve: 3,                // wheel actions a shift
+  freeze: 25, calm: 15, lock: 18, hireHolds: 2, selfQuality: 0.62, fightPay: 2, trashWait: 12,   // what the wheel actions do (see act)
   trayBase: 3,             // the tray holds trayBase + tray level items; one more pushes the oldest off
 };
 export const trayHolds = save => RUSH.trayBase + save.built.tray;
@@ -39,6 +41,7 @@ export function newShift({ save, seed = 1, off = {} }) {
     save, seed, off, r: sim.rng(seed ^ 0x52757368), t: 0, doors: true, over: false,
     line: [], at: null, seq: 0, nextArrive: 0, seats: off.seats ?? seatsFor(save), menu: sim.menuFor(save), sky, holds: off.cap ? 99 : trayHolds(save),
     skyNext: 0.5, coins: 0, tips: 0, served: 0, robbed: 0, strikes: 0, turned: 0, buzz: 0, bestBuzz: 0, stars: [], lastRecipe: null, clatters: 0, pushed: 0,
+    nerve: off.nerve ?? RUSH.nerve, calm: 0, locked: 0, hold: false, hired: false, acts: {},
   };
 }
 
@@ -64,7 +67,7 @@ function dropFork(s) {
   if (!open.length) return;
   const pickId = e => { const ids = Object.keys(e.need).filter(id => lacks(e, id)); return ids[Math.floor(r() * ids.length)]; };
   const a = open[Math.floor(r() * open.length)], rest = open.filter(e => e !== a), b = rest.length ? rest[Math.floor(r() * rest.length)] : null;
-  const decoyShare = Math.min(0.4, RUSH.decoy + 0.02 * c.hard);
+  const decoyShare = s.calm > 0 ? 0 : Math.min(0.4, RUSH.decoy + 0.02 * c.hard);
   const ids = [pickId(a), b ? pickId(b) : null].map(id => (id == null || r() < decoyShare ? c.others[Math.floor(r() * c.others.length)] : id));
   if (ids.every(id => !open.some(e => lacks(e, id)))) ids[0] = pickId(a);   // never two decoys
   // One falls each side of the middle, each farther out than a tray left in the middle can reach: every pair is a side to pick.
@@ -98,7 +101,7 @@ export function stepShift(s, dt, trayX = 0) {
   if (s.doors) {
     if (s.t >= RUSH.secs) { s.doors = false; ev.push({ type: 'bell' }); }
     else {
-      s.nextArrive -= dt;
+      if (s.locked > 0) s.locked -= dt; else s.nextArrive -= dt;   // a locked door: nobody comes, nobody is turned away
       while (s.nextArrive <= 0 && s.doors) {
         const early = s.seq + 1 < RUSH.open;   // the opening guests come together; the next one comes at the usual pace
         s.nextArrive += early ? 0.8 : Math.max(3.5, RUSH.arrive[0] - RUSH.arriveCut * s.save.tier + s.r() * (RUSH.arrive[1] - RUSH.arrive[0]));
@@ -108,7 +111,9 @@ export function stepShift(s, dt, trayX = 0) {
       }
     }
   }
+  if (s.calm > 0) s.calm -= dt;
   if (!s.off.drain) for (const e of s.line.slice()) {
+    if (e.frozen > 0) { e.frozen -= dt; continue; }   // in the fridge: no patience lost
     e.left -= dt;
     if (e.left <= 0) {
       unseat(s, e); s.strikes++; s.buzz = 0; ev.push({ type: 'walkout', e });
@@ -118,7 +123,7 @@ export function stepShift(s, dt, trayX = 0) {
   // An empty room has nothing falling: what was in the air belonged to guests who are gone.
   if (!s.line.length && s.sky.items.length) { for (const it of s.sky.items) ev.push({ type: 'missed', it }); s.sky.items = []; }
   // The sky stops while the cook is at the counter.
-  if (!s.at && s.line.length) {
+  if (!s.at && !s.hold && s.line.length) {
     const c = s.sky;
     c.next = 1e9; if ((s.skyNext -= dt) <= 0) { s.skyNext += RUSH.fork; dropFork(s); }
     // stepCatch credits by the summed need; sort out here whose item it is.
@@ -141,7 +146,10 @@ export function stepShift(s, dt, trayX = 0) {
           out.owner.got[out.id]--; out.owner.ready = false; s.pushed++;
           ev.push({ type: 'pushed', it: out, e: out.owner });
         }
-        if (leftOf(e) === 0 && !e.ready) { e.ready = true; ev.push({ type: 'ready', e }); }
+        if (leftOf(e) === 0 && !e.ready) {
+          if (e.self) { e.tipShare = 0; unseat(s, e); s.at = e; const buzz = s.buzz; ev.push({ type: 'selfserved', e, bill: finish(s, RUSH.selfQuality) }); s.buzz = buzz; }   // told to cook it themselves
+          else { e.ready = true; ev.push({ type: 'ready', e }); }
+        }
       }
       sync(s);
     }
@@ -154,15 +162,16 @@ export function stepShift(s, dt, trayX = 0) {
 // Take a ready guest's food to the stove. Their seat frees, their clock stops, and how long they waited sets the tip.
 export function startCook(s, e) {
   if (s.at || !s.line.includes(e) || !e.ready) return false;
-  const f = e.left / e.full; e.tipShare = RUSH.tipSteps.find(([min]) => f >= min)[1];
+  tipFor(e);
   unseat(s, e); s.sky.items = s.sky.items.filter(it => it.y > 0.5); s.at = e; return true;
 }
+const tipFor = e => { const f = e.left / e.full; e.tipShare = RUSH.tipSteps.find(([min]) => f >= min)[1]; };
 export const buzzPay = s => (s.off.buzz ? 1 : 1 + RUSH.buzzStep * s.buzz);
 
 // What the guest at the counter would pay for a dish of this quality (0 to 1). Does not change the shift.
 export function quote(s, e, quality) {
   const stars = sim.dishStars(quality);
-  let tip = e.price * RUSH.tipByStars[stars] * (1 + 0.1 * (s.save.built.decor - 1)) * (e.tipShare ?? 1);
+  let tip = e.price * RUSH.tipByStars[stars] * (1 + 0.1 * (s.save.built.decor - 1)) * (e.tipShare ?? 1) * (e.tipMul ?? 1);
   let price = e.price, thrown = false;
   if (e.mood === 'rude') { tip = 0; thrown = stars < 3; }
   if (e.mood === 'picky' && stars < 3) tip = 0;
@@ -178,15 +187,62 @@ export function finish(s, quality) {
   s.buzz = Math.min(RUSH.buzzMax, s.buzz + 1); s.bestBuzz = Math.max(s.bestBuzz, s.buzz);
   s.at = null; return b;
 }
-// Rob a seated guest: coins now. It is a strike, the buzz is gone, and the room saw it.
-export function rob(s, e) {
-  if (!s.line.includes(e)) return 0;
-  const n = Math.round(e.price * RUSH.robTake);
-  unseat(s, e);
-  s.coins += n; s.robbed += n; s.buzz = 0; s.strikes++;
-  if (!s.off.scare) for (const w of s.line) w.left = Math.max(0.5, w.left - RUSH.robScare);
-  const closed = s.doors && s.strikes >= RUSH.strikes; if (closed) { s.doors = false; s.closedEarly = true; }
-  return { coins: n, closed };
+// The wheel in a Rush. Each action does one different thing and each has a price. A shift has RUSH.nerve of them.
+//   kick_out   the guest leaves: no strike, no pay, one step of buzz
+//   slap       their patience is full again; their tip is halved
+//   fridge     25 s in the fridge: no patience lost, and the tip stays where it was
+//   pan        bang it: everything in the air that nobody ordered is gone, and none falls for 15 s
+//   microwave  a moody guest turns calm and tips half as much again
+//   cook_self  they cook it themselves: when their food is caught they are served at once, for the price alone:
+//              no tip, and no buzz, because the kitchen did nothing
+//   lock_out   the door is locked for 18 s: nobody comes and nobody is turned away
+//   trash      their order goes in the bin: they get the smallest dish on the menu instead, and wait a little longer
+//   rob        their coins now: a strike, the buzz is gone and the room saw it
+//   hire       they join the staff (no pay): the tray holds two more for the rest of the shift; once a shift
+//   fight      win and they pay double; lose and they storm out, which is a strike
+export const ACTS = ['kick_out', 'slap', 'fridge', 'pan', 'microwave', 'cook_self', 'lock_out', 'trash', 'rob', 'hire', 'fight'];
+export function canAct(s, e, id) {
+  if (s.over || s.nerve <= 0 || s.at || !s.line.includes(e) || e.ready || !ACTS.includes(id)) return false;
+  if (id === 'microwave') return !!e.mood;
+  if (id === 'slap') return e.left < e.full * 0.9;   // nothing to wake up yet
+  if (id === 'cook_self') return !e.self;
+  if (id === 'fridge') return !(e.frozen > 0);
+  if (id === 'hire') return !s.hired;
+  if (id === 'lock_out') return s.doors && !(s.locked > 0);
+  if (id === 'trash') return !!smallest(s, e);
+  if (id === 'fight') return !e.fought;
+  return true;
+}
+const smallest = (s, e) => s.menu.filter(id => id !== e.recipe && sim.chopsFor(id) < sim.chopsFor(e.recipe)).sort((a, b) => sim.RECIPES[a].steps.length - sim.RECIPES[b].steps.length || sim.chopsFor(a) - sim.chopsFor(b))[0] ?? null;
+const less = (s, n = 1) => { s.buzz = Math.max(0, s.buzz - n); };
+// won: only for fight, the result of the tap fight. Returns null when it cannot be done, else what happened.
+export function act(s, e, id, won = false) {
+  if (!canAct(s, e, id)) return null;
+  s.nerve--; s.acts[id] = (s.acts[id] ?? 0) + 1;
+  const out = { id, gone: false, closed: false, coins: 0 };
+  const strike = () => { s.strikes++; s.buzz = 0; if (s.doors && s.strikes >= RUSH.strikes) { s.doors = false; s.closedEarly = true; out.closed = true; } };
+  if (id === 'kick_out') { unseat(s, e); less(s); out.gone = true; }
+  else if (id === 'slap') { e.left = e.full; e.tipMul = (e.tipMul ?? 1) * 0.5; }
+  else if (id === 'fridge') e.frozen = RUSH.freeze;
+  else if (id === 'pan') { s.calm = RUSH.calm; s.sky.items = s.sky.items.filter(it => s.line.some(e => lacks(e, it.id))); }
+  else if (id === 'microwave') { e.mood = null; e.tipMul = (e.tipMul ?? 1) * 1.5; }
+  else if (id === 'cook_self') e.self = true;
+  else if (id === 'lock_out') s.locked = RUSH.lock;
+  else if (id === 'trash') {
+    const to = smallest(s, e), rich = e.kind === 'rich' ? RUSH.richPay : 1;
+    s.sky.tray = s.sky.tray.filter(it => it.owner !== e);
+    e.recipe = to; e.need = { ...sim.RECIPES[to].need }; e.got = {}; e.ready = false; e.price = Math.round(priceOf(s.save, to) * rich);
+    e.left = Math.min(e.full, e.left + RUSH.trashWait); sync(s);
+  } else if (id === 'rob') {
+    const n = Math.round(e.price * RUSH.robTake); unseat(s, e); s.coins += n; s.robbed += n; out.coins = n; out.gone = true; strike();
+    if (!s.off.scare) for (const w of s.line) w.left = Math.max(0.5, w.left - RUSH.robScare);
+  } else if (id === 'hire') { unseat(s, e); s.hired = true; s.holds += RUSH.hireHolds; out.gone = true; }
+  else if (id === 'fight') {
+    e.fought = true;
+    if (won) e.price = Math.round(e.price * RUSH.fightPay); else { unseat(s, e); out.gone = true; strike(); }
+    out.won = won;
+  }
+  return out;
 }
 
 // The target: coins for one, two and three stars at each rank, set from `node measure.mjs targets` (see NOTES.md):

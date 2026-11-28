@@ -171,5 +171,19 @@ console.log('ranks reachable: ok');
     assert.ok(out.served >= 6 && out.coins > 0 && out.secs < 400, `rank ${tier}: a played shift serves guests and ends (${out.served} served, ${Math.round(out.secs)} s)`);
     assert.ok(out.share === Math.round(out.coins * 0.25));
   }
+  // The wheel in a Rush: three turns a shift, each with its price.
+  const sh = await import('./shift.js');
+  const fresh = () => { const s = sh.newShift({ save: saveAt(4), seed: 5 }); for (let i = 0; i < 60 * 14; i++) sh.stepShift(s, sim.DT, 0); return s; };
+  let s = fresh(); assert.ok(s.line.length >= 2 && s.nerve === 3);
+  let e = s.line[0]; assert.ok(sh.act(s, e, 'kick_out').gone); assert.equal(s.strikes, 0, 'kicking out is not a strike'); assert.ok(!s.line.includes(e)); assert.equal(s.nerve, 2);
+  e = s.line[0]; const price = e.price, robbed = sh.act(s, e, 'rob'); assert.equal(robbed.coins, Math.round(price * sh.RUSH.robTake)); assert.equal(s.strikes, 1, 'robbing is a strike'); assert.equal(s.coins, robbed.coins);
+  s = fresh(); e = s.line[0]; e.left = e.full; assert.equal(sh.act(s, e, 'slap'), null, 'a guest with full patience cannot be slapped'); assert.equal(s.nerve, 3);
+  sh.act(s, e, 'fridge'); const left = e.left; for (let i = 0; i < 120; i++) sh.stepShift(s, sim.DT, 0); assert.equal(e.left, left, 'a guest in the fridge loses no patience'); assert.ok(!sh.canAct(s, e, 'fridge'));
+  assert.ok(sh.act(s, e, 'fight', true)); assert.ok(!sh.canAct(s, e, 'fight'), 'one fight a guest');
+  assert.ok(sh.act(s, s.line[0], 'pan')); assert.equal(s.nerve, 0); for (const id of sh.ACTS) for (const g of s.line) assert.ok(!sh.canAct(s, g, id), 'no turns left');
+  s = fresh(); e = s.line[0]; const holds = s.holds; sh.act(s, e, 'hire'); assert.equal(s.holds, holds + sh.RUSH.hireHolds); assert.ok(!sh.canAct(s, s.line[0], 'hire'), 'one hire a shift');
+  s = fresh(); e = s.line[0]; sh.act(s, e, 'fight', false); assert.equal(s.strikes, 1, 'a lost fight is a strike'); assert.ok(!s.line.includes(e));
+  { const o = playShift({ save: saveAt(4), seed: 31, cook: COOKS.good, who: 'impatient', use: 'cook_self' }); assert.ok(o.used >= 1 && o.served >= 6, 'cook it yourself gets used and the shift still serves'); }
+  for (const id of sh.ACTS) for (const who of ['new', 'good']) { const o = playShift({ save: saveAt(4), seed: 31, cook: COOKS[who], who: 'greedy', use: id, random: true }); assert.ok(o.secs < 400, `a shift with ${id} at random ends`); }
   console.log('rush: ok');
 }
