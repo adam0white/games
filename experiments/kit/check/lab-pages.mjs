@@ -345,10 +345,10 @@ export const labPages = {
   // the nickname flame:name; each records under its own lab slug. The page opens on the arrival; a touch on the river takes the flame.
   'lab/flame-a': {
     sound: '[data-setting=sound] [data-value=off]', soundKey: 'flame:set:sound', soundOff: 'off',
-    seeds: flameSeeds,
+    seeds: { ...flameSeeds, 'flame:set:difficulty': 'fierce', 'flame:set:milestone': 'off' },
     state: () => { const s = window.flameState?.(); return s && { screen: s.screen === 'leg' ? 'play' : s.screen === 'arrival' ? 'menu' : s.screen, paused: s.paused, t: window.flameSim().elapsed }; },
     verify: flameVerify,
-    expect: { name: 'Sam', look: 'thermal', pressed: { ...flameExpect.pressed, retryRule: 'once' } },
+    expect: { name: 'Sam', look: 'thermal', pressed: { ...flameExpect.pressed, retryRule: 'once', difficulty: 'fierce', milestone: 'off' } },
     start: tapRiver('#river'),
     pause: '#gear', resumeWith: async page => { await page.click('#closeSettings'); },
     touch: steerFlame('#river'),

@@ -18,6 +18,8 @@ const randomSeed = () => crypto.getRandomValues(new Uint32Array(1))[0];
 const rec = lab('flame-a', { lang });
 const prefs = settings('flame', {
   look: { values: ['paper', 'thermal', 'storm'], def: 'paper' },
+  difficulty: { values: ['gentle', 'steady', 'fierce'], def: 'steady' },
+  milestone: { values: ['on', 'off'], def: 'on' },
   drop: { values: ['dims', 'ends'], def: 'dims' },
   retryRule: { values: ['allow', 'once'], def: 'allow' },
   sound: { values: ['on', 'off'], def: 'on' },
@@ -32,7 +34,7 @@ let byLink = Boolean(chain);
 let refusedLink = Boolean(location.hash) && !chain;
 let relit = false, transferCaught = false;
 chain ??= newChain(randomSeed());
-let run = createRun(chain);
+let run = createRun(chain, prefs.get('difficulty'));
 let screen = 'arrival', age = 0, time = 0, target = 0;
 let paused = false, revealed = false, sending = false;
 let nextSeed, dropRule, notesPlayed = 0, heldKey = 0;
@@ -77,18 +79,25 @@ const number = n => Math.round(n).toLocaleString(lang());
 const resultScreen = () => screen === 'drop' || screen === 'handoff';
 const mayPass = () => screen === 'handoff' || (screen === 'drop' && dropRule === 'dims' && !relit);
 const passLevel = () => screen === 'drop' ? 18 : Math.max(1, Math.round(run.flame));
+const nextKilometre = metres => Math.floor(metres / 1000) + 1;
 let historyLabels = [];
 function updateNames() {
   historyLabels = chain.carriers.map(c => ({ ...c, name: c.name || t('anonymous') }));
   if (!resultScreen()) return;
   const current = mayPass() && displayName() || t('you');
-  historyLabels.push({ name: current, distance: Math.round(run.distance) });
+  historyLabels.push({ name: current, distance: Math.round(run.distance), difficulty: run.difficulty });
   const list = el('carriers');
   list.replaceChildren();
-  const add = (text, meters) => {
+  const add = (text, meters, difficulty) => {
     const li = document.createElement('li');
     const label = document.createElement('span');
     label.textContent = text;
+    if (difficulty) {
+      const mark = document.createElement('small');
+      mark.className = 'difficulty-mark';
+      mark.textContent = t(difficulty);
+      label.append(' ', mark);
+    }
     const distance = document.createElement('span');
     distance.textContent = t('meters', { distance: number(meters) });
     li.append(label, distance);
@@ -98,14 +107,22 @@ function updateNames() {
     const earlierDistance = chain.total - chain.carriers.reduce((sum, c) => sum + c.distance, 0);
     add(t('older', { n: number(chain.count - chain.carriers.length) }), earlierDistance);
   }
-  for (const c of historyLabels) add(c.name, c.distance);
+  for (const c of historyLabels) add(c.name, c.distance, c.difficulty);
 }
 function updateText() {
   apply();
   el('language').value = lang();
   const prev = chain.carriers.at(-1);
   el('arrivalTitle').textContent = prev ? t('linkedTitle', { count: number(chain.count) }) : t('virginTitle');
-  el('arrivalStory').textContent = prev ? t('linkedStory', { name: prev.name || t('anonymous'), distance: number(prev.distance), next: number(chain.count + 1) }) : t(refusedLink ? 'brokenStory' : 'virginStory');
+  let story = t(refusedLink ? 'brokenStory' : 'virginStory');
+  if (prev) {
+    story = t(prev.difficulty ? 'markedStory' : 'linkedStory', {
+      name: prev.name || t('anonymous'), distance: number(prev.distance),
+      next: number(chain.count + 1), difficulty: prev.difficulty && t(prev.difficulty)
+    });
+    if (options.milestone === 'on') story += ' ' + t('reachMark', { km: number(nextKilometre(chain.total)) });
+  }
+  el('arrivalStory').textContent = story;
   if (resultScreen()) {
     el('resultTitle').textContent = t(screen === 'handoff' ? 'handoffTitle' : mayPass() ? 'dimTitle' : 'dropTitle');
     const count = chain.count + 1;
@@ -113,6 +130,10 @@ function updateText() {
       count: number(count), hands: t.plural(count, 'hand', 'hands'), distance: number(chain.total + Math.round(run.distance))
     });
     el('resultStats').textContent = t('stats', { distance: number(run.distance), flame: mayPass() ? passLevel() : 0 });
+    const totalKm = Math.floor((chain.total + Math.round(run.distance)) / 1000);
+    if (options.milestone === 'on' && totalKm >= nextKilometre(chain.total)) {
+      el('resultStats').textContent += ' · ' + t('reachedMark', { km: number(totalKm) });
+    }
   }
   updateNames();
 }
@@ -125,13 +146,14 @@ function panels() {
   el('newFlame').hidden = screen !== 'drop';
   el('retry').hidden = screen !== 'drop' || relit || options.retryRule !== 'allow';
   el('paused').hidden = !paused || el('settings').open;
+  el('nextLegHint').hidden = screen !== 'leg';
 }
 function reset(next, linked, relighting = false) {
   chain = next;
   byLink = linked;
   refusedLink = false;
   relit = relighting;
-  run = createRun(relit ? { ...chain, flame: 25 } : chain);
+  run = createRun(relit ? { ...chain, flame: 25 } : chain, prefs.get('difficulty'));
   screen = 'arrival';
   age = target = heldKey = 0;
   revealed = paused = false;
@@ -144,6 +166,8 @@ function reset(next, linked, relighting = false) {
 }
 function start() {
   if (screen !== 'arrival' || el('settings').open) return;
+  options = prefs.snapshot();
+  run = createRun(relit ? { ...chain, flame: 25 } : chain, options.difficulty);
   screen = 'leg';
   age = 0;
   transferCaught = false;
@@ -205,10 +229,31 @@ el('gear').onclick = () => {
 };
 el('closeSettings').onclick = () => el('settings').close();
 el('settings').addEventListener('close', () => { resume(); panels(); });
+const featured = el('featuredOptions');
+function markFeaturedChoices() {
+  for (const group of featured.querySelectorAll('[data-setting]')) {
+    for (const button of group.querySelectorAll('button')) {
+      button.setAttribute('aria-pressed', String(button.dataset.value === options[group.dataset.setting]));
+    }
+  }
+}
+featured.addEventListener('click', event => {
+  const button = event.target.closest('button');
+  if (!button || !el('settings').open || (screen === 'leg' && !paused)) return;
+  prefs.set(button.closest('[data-setting]').dataset.setting, button.dataset.value);
+});
+markFeaturedChoices();
 const redrawOptions = prefs.panel(el('options'), {
+  only: prefs.ids.filter(id => id !== 'look' && id !== 'difficulty'),
   label: id => t(id), name: (_, value) => t(value),
   onChange(id) {
     options = prefs.snapshot();
+    markFeaturedChoices();
+    if (id === 'milestone') {
+      el('shareUrl').hidden = true;
+      el('shareStatus').textContent = '';
+      updateText();
+    }
     document.documentElement.dataset.look = options.look;
     if (id === 'sound') {
       if (options.sound === 'on') { if (!paused) snd.release(); snd.unlock(); }
@@ -219,6 +264,7 @@ const redrawOptions = prefs.panel(el('options'), {
 });
 el('language').onchange = () => {
   setLang(el('language').value);
+  el('shareUrl').hidden = true;
   el('shareStatus').textContent = '';
   updateText();
   redrawOptions();
@@ -262,14 +308,15 @@ el('pass').onclick = async () => {
   if (!mayPass() || sending) return;
   const name = displayName();
   write('flame:name', name);
-  const next = addCarrier(chain, name, run.distance, passLevel(), nextSeed);
+  const next = addCarrier(chain, name, run.distance, passLevel(), nextSeed, run.difficulty);
   const url = new URL(location.pathname, location.href);
   url.hash = encodeLink(next);
   sending = true;
   try {
-    const pitch = t('shareText', {
+    let pitch = t('shareText', {
       count: number(next.count), people: t.plural(next.count, 'person', 'people'), distance: number(run.distance)
     });
+    if (options.milestone === 'on') pitch += ' ' + t('inviteMark', { km: number(nextKilometre(next.total)) });
     const message = pitch + '\n' + url.href;
     let how = 'shown';
     if (navigator.share) how = await shareLink(url.href, pitch);
@@ -278,7 +325,7 @@ el('pass').onclick = async () => {
       try { await navigator.clipboard.writeText(message); how = 'copied'; }
       catch { how = 'shown'; }
     }
-    rec.event('pass_send', { how });
+    rec.event('pass_send', { how, milestone: options.milestone });
     el('shareStatus').textContent = t(how === 'shown' ? 'manual' : how);
     el('shareUrl').hidden = how !== 'shown';
     if (how === 'shown') {
@@ -334,7 +381,7 @@ function frame(now) {
     !item.used && (item.kind !== 'rock' || run.elapsed >= 8) &&
     item.at - run.elapsed < 8 && item.at - run.elapsed > -1)
     .map(item => ({ kind: item.kind, x: item.x, ahead: item.at - run.elapsed }));
-  draw({ screen, look: options.look, time, age, x: run.x, flame: run.flame / 100, objects,
+  draw({ screen, difficulty: run.difficulty, look: options.look, time, age, x: run.x, flame: run.flame / 100, objects,
     history: historyLabels, chain: chain.count + Number(resultScreen()), progress: run.progress, emberAge: run.elapsed - run.lastEmber,
     hitAge: run.elapsed - run.lastHit, transferAge: screen === 'leg' && !relit ? age : Infinity });
   requestAnimationFrame(frame);
