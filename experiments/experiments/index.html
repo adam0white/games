@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0d14">
+<meta name="description" content="Experiments from the game lab, each waiting for a play and a decision.">
+<title>Experiments</title>
+<style>
+  html, body { margin: 0; min-height: 100%; background: #0b0d14; color: #efe8da; font: 17px/1.5 Georgia, 'Times New Roman', serif; }
+  main { max-width: 34em; margin: 0 auto; padding: 1.4em 1em 3em; }
+  @media (min-width: 720px) { main { max-width: 62em; } .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(17em, 1fr)); gap: 0 1em; } }
+  a.back { display: inline-flex; align-items: center; min-height: 44px; color: inherit; opacity: .8; font-size: 15px; text-underline-offset: 3px; }
+  h1 { font-weight: normal; letter-spacing: .08em; color: #ffd9a0; margin: 0 0 .2em; }
+  h2 { font-weight: normal; letter-spacing: .06em; color: #ffd9a0; font-size: 1.05em; margin: 2em 0 .2em; opacity: .9; }
+  p { opacity: .85; margin: .4em 0; }
+  #count { font: 14px/1.4 -apple-system, system-ui, sans-serif; opacity: .75; margin-top: .8em; }
+  .bar { display: flex; flex-wrap: wrap; gap: .5em; margin: .8em 0 0; }
+  button { font: 15px/1 -apple-system, system-ui, sans-serif; min-height: 44px; padding: 0 1em; border-radius: 22px; border: 1.5px solid #ffd9a055; background: #ffffff0a; color: #efe8da; touch-action: manipulation; }
+  button[aria-pressed="true"] { border-color: #ffd9a0; color: #ffd9a0; }
+  button.go { background: #ffd9a0; color: #1a1408; border-color: #ffd9a0; }
+  button:disabled { opacity: .4; }
+  a.card { position: relative; display: block; margin: 1em 0 0; padding: .9em 1em; border: 1.5px solid #ffd9a055; border-radius: 14px; color: inherit; text-decoration: none; background: #ffffff0a; }
+  a.card:focus-visible, a.card:hover { border-color: #ffd9a0aa; }
+  a.card b { display: block; font-weight: normal; font-size: 1.25em; color: #ffd9a0; padding-right: 5.5em; }
+  a.card i { position: absolute; top: 1.05em; right: 1em; font: normal 12px/1.3 -apple-system, system-ui, sans-serif; opacity: .7; }
+  a.card em { display: block; font: normal 12px/1.3 -apple-system, system-ui, sans-serif; letter-spacing: .04em; opacity: .65; margin-top: .4em; }
+  a.card.new { border-color: #ffd9a0aa; }
+  a.card.new i { color: #ffd9a0; opacity: 1; }
+  a.card.seen { background: #ffffff05; }
+  a.card.seen b { color: #efe8da; opacity: .85; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <a class="back" href="/lab/">‹ Lab</a>
+  <h1>Experiments</h1>
+  <p>Games we are still trying. After a play, each one is folded into a bigger game, moved to the small games, or dropped.</p>
+  <p id="count" role="status"></p>
+  <div class="bar">
+    <button type="button" class="go" id="next">Play one I have not opened</button>
+    <button type="button" id="only" aria-pressed="false">Show only unopened</button>
+  </div>
+  <h2 id="h-own">On their own</h2>
+  <div class="grid" id="own"></div>
+  <h2 id="h-trials">Trials for a bigger game</h2>
+  <div class="grid" id="trials"></div>
+</main>
+<script type="module">
+// The experiments page: every stand-alone experiment and every trial page, with a mark on the ones this browser has
+// opened from here. The list is catalog.js. The page saves one key, exp:opened { <address>: 'YYYY-MM-DD' }, and one
+// switch, exp:only ('1' shows only unopened). It reads and writes no game's own keys and records nothing.
+import { EXPERIMENTS, TRIALS } from './catalog.js';
+const KEY = 'exp:opened', ONLY = 'exp:only';
+const get = () => { try { const o = JSON.parse(localStorage.getItem(KEY) || '{}'); return o && typeof o === 'object' ? o : {}; } catch { return {}; } };
+const put = o => { try { localStorage.setItem(KEY, JSON.stringify(o)); } catch {} };
+const only = () => { try { return localStorage.getItem(ONLY) === '1'; } catch { return false; } };
+const day = () => new Date().toISOString().slice(0, 10);
+const label = d => { try { return new Date(d + 'T12:00:00Z').toLocaleDateString('en', { day: 'numeric', month: 'short', timeZone: 'UTC' }); } catch { return d; } };
+const ALL = [...EXPERIMENTS, ...TRIALS];
+function open(href) { const o = get(); o[href] = day(); put(o); }
+function card([href, title, line, parent]) {
+  const seen = get()[href];
+  const a = document.createElement('a'); a.className = `card ${seen ? 'seen' : 'new'}`; a.href = href; a.dataset.href = href;
+  const b = document.createElement('b'); b.textContent = title;
+  const i = document.createElement('i'); i.textContent = seen ? `Opened ${label(seen)}` : 'Not opened';
+  const s = document.createElement('span'); s.textContent = line;
+  a.append(b, i, s);
+  if (parent) { const e = document.createElement('em'); e.textContent = `For ${parent}`; a.append(e); }
+  a.addEventListener('click', () => open(href));
+  a.hidden = Boolean(seen) && only();
+  return a;
+}
+function draw() {
+  const o = get(), left = ALL.filter(([href]) => !o[href]);
+  document.getElementById('own').replaceChildren(...EXPERIMENTS.map(card));
+  document.getElementById('trials').replaceChildren(...TRIALS.map(card));
+  for (const [h, list] of [['h-own', EXPERIMENTS], ['h-trials', TRIALS]]) document.getElementById(h).hidden = only() && list.every(([href]) => o[href]);
+  document.getElementById('count').textContent = left.length ? `Opened ${ALL.length - left.length} of ${ALL.length} on this device.` : `All ${ALL.length} opened on this device.`;
+  const next = document.getElementById('next'); next.disabled = !left.length;
+  const b = document.getElementById('only'); b.setAttribute('aria-pressed', String(only()));
+}
+document.getElementById('next').onclick = () => {
+  const o = get(), left = ALL.filter(([href]) => !o[href]); if (!left.length) return;
+  const [href] = left[Math.floor(Math.random() * left.length)]; open(href); location.href = href;
+};
+document.getElementById('only').onclick = () => { try { localStorage.setItem(ONLY, only() ? '0' : '1'); } catch {} draw(); };
+// Safari restores this page from its cache on Back; read the marks again.
+addEventListener('pageshow', draw);
+window.experimentsState = () => ({ total: ALL.length, opened: Object.keys(get()).filter(href => ALL.some(([h]) => h === href)).length, only: only() });
+draw();
+</script>
+<script src="/notes/button.js" defer></script>
+</body>
+</html>

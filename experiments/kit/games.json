@@ -2,6 +2,7 @@
   "note": "Every game a tester can open, in the order the notes page lists them. The notes page (workers/feedback/public/notes/app.js) builds its games menu and its game picker from this file, so a game added here appears there once the site deploys. \"fresh\": true marks a game the page should point out as new. The phone check fails when an experiment directory is missing from this list.",
   "games": [
     { "slug": "small", "name": "Small games", "fresh": true },
+    { "slug": "experiments", "name": "Experiments page", "fresh": true },
     { "slug": "lantern", "name": "Lantern" },
     { "slug": "ant-promotion", "name": "Ant Promotion" },
     { "slug": "boat", "name": "Paper Boat", "fresh": true },
