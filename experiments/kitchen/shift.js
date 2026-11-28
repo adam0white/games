@@ -52,7 +52,7 @@ export const priceOf = (save, recipe) => Math.round(sim.RECIPES[recipe].price * 
 
 // off: switches for measure.mjs (--off). drain: patience does not run down. cap: the tray holds everything.
 // scare: rob has no witnesses. buzz: no buzz pay.
-export function newShift({ save, seed = 1, off = {}, night = 'rush' }) {
+export function newShift({ save, seed = 1, off = {}, night = 'rush', mission = null }) {
   const N = NIGHTS[night] ?? NIGHTS.rush;
   const sky = sim.newCatch({ need: {}, hard: sim.hardness(save), trayLevel: save.built.tray, seed: seed ^ 0x736b79, twist: sim.twistFor(save.tier) });
   if (sky.twist?.gust) sky.twist = { ...sky.twist, gust: 0 };   // a gust slides the whole sky sideways, which carries one side of every pair onto a tray that never moved
@@ -61,7 +61,7 @@ export function newShift({ save, seed = 1, off = {}, night = 'rush' }) {
     save, seed, off, night: NIGHTS[night] ? night : 'rush', N, secs: N.secs ?? RUSH.secs, r: sim.rng(seed ^ 0x52757368), t: 0, doors: true, over: false,
     line: [], at: null, seq: 0, nextArrive: 0, seats: off.seats ?? seatsFor(save), menu: nightMenu(save, night), setPrice: N.setPrice ? setPriceFor(save) : null, sky, holds: off.cap ? 99 : trayHolds(save),
     skyNext: 0.5, coins: 0, tips: 0, served: 0, robbed: 0, strikes: 0, turned: 0, buzz: 0, bestBuzz: 0, stars: [], lastRecipe: null, clatters: 0, pushed: 0,
-    nerve: off.nerve ?? RUSH.nerve, calm: 0, locked: 0, hold: false, hired: false, acts: {},
+    nerve: off.nerve ?? RUSH.nerve, calm: 0, locked: 0, hold: false, hired: false, acts: {}, won: 0, moody: 0, mission: typeof mission === 'string' && Object.hasOwn(MISSIONS, mission) ? mission : null,
   };
 }
 
@@ -71,7 +71,10 @@ function makeGuest(s) {
   const recipe = (from.length ? from : s.menu)[Math.floor(r() * (from.length || s.menu.length))];
   s.lastRecipe = recipe;
   const kind = r() < RUSH.richShare ? 'rich' : null;
-  const mood = tier >= sim.MOOD_FROM && !kind && r() < 0.18 ? sim.MOODS[Math.floor(r() * sim.MOODS.length)] : null;
+  let mood = tier >= sim.MOOD_FROM && !kind && r() < 0.18 ? sim.MOODS[Math.floor(r() * sim.MOODS.length)] : null;
+  // The Microwave mission needs a moody guest: if none has come yet, the second plain guest onward is one (no extra draw).
+  if (!mood && !kind && s.mission === 'use_microwave' && !s.moody && s.seq >= 1 && tier >= sim.MOOD_FROM) mood = sim.MOODS[s.seq % sim.MOODS.length];
+  if (mood) s.moody++;
   let full = RUSH.patience[0] + r() * (RUSH.patience[1] - RUSH.patience[0]);
   full += RUSH.perItem * Math.max(0, sim.chopsFor(recipe) - 3) + RUSH.perStep * (sim.RECIPES[recipe].steps.length - 1) + RUSH.perRank * tier;   // bigger dishes buy more patience
   if (kind === 'rich') full *= RUSH.richWait;
@@ -261,7 +264,7 @@ export function act(s, e, id, won = false) {
   } else if (id === 'hire') { unseat(s, e); s.hired = true; s.holds += RUSH.hireHolds; out.gone = true; }
   else if (id === 'fight') {
     e.fought = true;
-    if (won) { e.payMul = RUSH.fightPay; e.price = Math.round(e.price * RUSH.fightPay); } else { unseat(s, e); out.gone = true; strike(); }
+    if (won) { s.won++; e.payMul = RUSH.fightPay; e.price = Math.round(e.price * RUSH.fightPay); } else { unseat(s, e); out.gone = true; strike(); }
     out.won = won;
   }
   return out;
@@ -278,7 +281,29 @@ export const NIGHT_TARGETS = {
 export const targets = (save, night = 'rush') => { const t = Math.min(TARGETS.length - 1, save.tier); return NIGHT_TARGETS[night]?.[t] ?? TARGETS[t]; };
 // Rush coins are bigger than a day's. The save gets this share, so a Rush pays about what the same minutes of days pay.
 export const SHARE = 0.25;
+// Missions: one goal a shift, shown at the start and checked at the bell. Each also needs one star, so a tray that
+// does nothing completes none. A mission pays outside the star count, so no star target moves (NOTES.md, slice 4).
+// keep: true while it holds and lost for good once broken; the others are done the moment they happen.
+export const MISSIONS = {
+  ...Object.fromEntries(ACTS.map(id => ['use_' + id, { ok: id === 'fight' ? s => s.won > 0 : s => (s.acts[id] ?? 0) > 0 }])),
+  trio: { ok: s => Object.keys(s.acts).length >= 3, lost: s => Object.keys(s.acts).length + s.nerve < 3 },   // three different wheel actions
+  seat: { ok: s => s.turned === 0, keep: true, from: 2 },    // nobody is turned away at the door (free below the Bistro)
+};
+MISSIONS.use_microwave.from = sim.MOOD_FROM;                 // it needs a moody guest
+// The order they are offered in: the plain ones first, the costly ones last.
+export const MISSION_ORDER = ['use_pan', 'use_slap', 'use_fridge', 'use_trash', 'use_hire', 'use_kick_out', 'use_cook_self', 'use_lock_out', 'use_microwave', 'trio', 'seat', 'use_fight', 'use_rob'];
+export const missionsFor = save => MISSION_ORDER.filter(id => (MISSIONS[id].from ?? 0) <= save.tier);
+// The mission for a shift: the next one not yet done, a step along each shift so a hard one is not offered twice running.
+export function missionFor(save, done = {}, turn = 0) {
+  const open = missionsFor(save), todo = open.filter(id => !done[id]), pool = todo.length ? todo : open;
+  return pool[Math.max(0, Math.floor(turn)) % pool.length] ?? null;
+}
+export const missionHolds = (s, id = s.mission) => !!MISSIONS[id]?.ok(s);
+// It can no longer be done this shift: a kept one is broken, or the wheel turns it needs are spent.
+export const missionLost = (s, id = s.mission) => { const M = MISSIONS[id]; return !!M && !M.ok(s) && (M.keep || (M.lost ? M.lost(s) : s.nerve <= 0)); };
+export const missionDone = (s, id = s.mission) => missionHolds(s, id) && s.coins >= targets(s.save, s.night)[0];
+export const missionPay = (save, night = 'rush') => Math.max(5, Math.round(targets(save, night)[0] * 0.2 / 5) * 5);
 export function result(s) {
   const tg = targets(s.save, s.night), stars = tg.filter(x => s.coins >= x).length;
-  return { share: Math.round(s.coins * SHARE), coins: s.coins, tips: s.tips, served: s.served, strikes: s.strikes, turned: s.turned, robbed: s.robbed, bestBuzz: s.bestBuzz, stars, targets: tg, closedEarly: !!s.closedEarly };
+  return { share: Math.round(s.coins * SHARE), coins: s.coins, tips: s.tips, served: s.served, strikes: s.strikes, turned: s.turned, robbed: s.robbed, bestBuzz: s.bestBuzz, stars, targets: tg, closedEarly: !!s.closedEarly, mission: s.mission, missionDone: s.mission ? missionDone(s) : false };
 }

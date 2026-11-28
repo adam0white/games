@@ -21,7 +21,7 @@ Bots find defects and measure balance. They do not vote on fun (AGENTS.md).
 
 ## Second run: Sky Kitchen (2026-11-28)
 
-The process was run a second time on a game with no opponent and almost no spec, as a light rebuild: one timed shift with several guests seated at once, then the game's existing eleven wheel actions given one effect and one printed price each, then a stop-adding pass and a second kind of shift. Three slices merged in a day. No person had played any of them when this was written, so this run says nothing yet about whether the result is good. What it showed about the process:
+The process was run a second time on a game with no opponent and almost no spec, as a light rebuild: one timed shift with several guests seated at once, then the game's existing eleven wheel actions given one effect and one printed price each, then a stop-adding pass, a second kind of shift, and a mission inside each shift. Four slices merged in a day. No person had played any of them when this was written, so this run says nothing yet about whether the result is good. What it showed about the process:
 
 - Reading recorded play first (step 2) paid at once: 42 runs showed one action taken thirty times, the others almost never, and no guest ever lost. The design started from those two facts, not from the feature list.
 - The scripted player's model of time was wrong by a factor of 1.7 until ten dishes were timed in the real client. Star targets set from the first model would have been far too low. This is now in step 6.
@@ -32,6 +32,9 @@ The process was run a second time on a game with no opponent and almost no spec,
 - In the third slice a pass line was written before a trial. Four ideas failed and were removed within the hour (extra seats with a crowd bonus, a big-dish night, and two forms of a critics' night). The one night that shipped also missed its line: it was meant to pay most for some player, and it pays more a minute and less a shift for every player. It was kept as variety with that trade stated in the notes. So the line did its job on removals and was bent once on a keep; a missed line that ships must say so where the result is reported. Writing the line first is now in step 6.
 - One of those failures came from the scripted player, not the game: its beginner cooked far worse than recorded people do, so a night that rewards good cooking measured as a real test when for people it was close to double pay. Reading the recorded dishes settled it. This is now in step 6.
 - A new mode sampled at three middle ranks looked balanced and was dominant at the two lowest ranks where it opens. This is now in step 6.
+- In the fourth slice (a mission inside each shift) the pass line was written into the notes before the first run, and four of seventeen candidates failed it and were removed in one run. Twelve of the thirteen that passed could not have failed four of its five lines, because a plan that never opens the action menu cannot complete "use this action". A pass line only counts for a candidate that could fail it; the notes say which.
+- The same slice found that a claim in the last slice's notes was false: a scripted text replacement that was meant to add an assert had matched nothing, and nothing checked that it had. A new check must be seen to fail once before it is reported.
+- An action measured as dead two slices earlier turned out strong under a different trigger. This was the third time a hand-written trigger, not the game, was the fault.
 - The brief reached a thread that already existed, and it took a round trip to settle which thread owned the game. The launch prompt now names the owner thread.
 
 ## Entry
@@ -76,7 +79,7 @@ Six checks on the bot itself, each of which caught a wrong number on Sky Kitchen
 - Check each skill number of the scripted player that a new rule leans on (speed, accuracy, quality) against recorded play before trusting a result that depends on it.
 - Measure a new mode or option at the lowest rank where it opens and at the highest, not only in the middle.
 
-Write the pass line before running a trial: which player should gain, which should not, and by how much. A trial that misses its line gets the one retune of the stop rules and is then removed, or is kept with the miss written next to the result. Run the checks above on every new mode too, not only on the first one: on Sky Kitchen the second night shipped to review before a parked tray and the wheel had been measured on it.
+Write the pass line before running a trial, in the notes file where a later reader can find it: which player should gain, which should not, and by how much. A trial that misses its line gets the one retune of the stop rules and is then removed, or is kept with the miss written next to the result. For each candidate, say whether each part of the line could have failed; a part that is true by construction is not evidence. After adding an assert or a check, break the thing it guards once and watch it fail. Run the checks above on every new mode too, not only on the first one: on Sky Kitchen the second night shipped to review before a parked tray and the wheel had been measured on it.
 
 **7. Every third or fourth slice, stop adding.** List every choice the game advertises. Measure each. Fix or remove any that one side always wins before adding another.
 

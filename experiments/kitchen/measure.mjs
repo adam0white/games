@@ -86,22 +86,25 @@ export const USE = {
   fight: s => s.line.find(e => e.kind === 'rich' && !e.fought && e.left > estSecs(e) + 6),
 };
 // One shift. who: the rule for whose dish to build. use: a wheel action id, or null. random: use it at random instead.
-export function playShift({ save, seed, cook, who = 'greedy', use = null, random = false, off = {}, night = 'rush' }) {
-  const s = sh.newShift({ save, seed, off, night }), c = s.sky;
-  const r = sim.rng(seed * 31 + 7), seen = []; let busy = 0, job = null, x = who === 'park' ? 0.8 : 0, step = 0, focus = null, think = 0;
+export function playShift({ save, seed, cook, who = 'greedy', use = null, random = false, once = false, trig = {}, off = {}, night = 'rush', mission = null }) {
+  const s = sh.newShift({ save, seed, off, night, mission }), c = s.sky;
+  const r = sim.rng(seed * 31 + 7), seen = []; let busy = 0, job = null, x = who === 'park' ? 0.8 : 0, step = 0, focus = null, think = 0, acted = false;
+  const uses = use == null ? [] : [].concat(use);
   for (let i = 0; i < 60 * 600 && !s.over; i++) {
     step++;
     if (busy > 0) { sh.stepShift(s, sim.DT, x); busy -= sim.DT; if (busy <= 0 && job) { job(); job = null; seen.length = 0; } continue; }
     const ready = s.line.filter(e => e.ready).sort((a, b) => a.left - b.left)[0];
     if (ready) { sh.startCook(s, ready); const q = Math.max(0.3, Math.min(1, cook.q + (r() - 0.5) * 0.3)); busy = cookSecs(save, ready.recipe, cook) + OVERHEAD; job = () => sh.finish(s, q); continue; }
-    if (use && s.nerve > 0) {
-      const e = random ? (r() < 0.004 && s.line.length ? s.line[Math.floor(r() * s.line.length)] : null) : USE[use](s, save, cook);
+    for (const use of (uses.length && s.nerve > 0 ? uses : [])) {
+      if (once && s.acts[use]) continue;
+      const e = random ? (r() < 0.004 && s.line.length ? s.line[Math.floor(r() * s.line.length)] : null) : (trig[use] ?? USE[use])(s, save, cook);
       if (e && sh.canAct(s, e, use)) {
         if (use === 'fight') { s.hold = true; busy = 3.5; const won = r() < cook.fight; job = () => { s.hold = false; sh.act(s, e, use, won); }; }   // as on the page: nothing is caught during the fight, and it counts only if they are still seated
         else { sh.act(s, e, use); busy = 1; }
-        continue;
+        acted = true; break;
       }
     }
+    if (acted) { acted = false; continue; }
     if ((think -= sim.DT) <= 0 || !s.line.includes(focus)) { focus = POLICY[who](s, save, cook); think = 0.8; }   // a person re-plans about once a second
     seen.push(c.items.map(it => ({ ...it })));
     const view = seen[Math.max(0, seen.length - 1 - Math.round(cook.react * 60))];
@@ -122,7 +125,7 @@ export function playShift({ save, seed, cook, who = 'greedy', use = null, random
     if (who !== 'idle' && who !== 'park') x += Math.max(-move, Math.min(move, target - x));
     sh.stepShift(s, sim.DT, x);
   }
-  return { ...sh.result(s), secs: s.t, clatters: s.clatters, pushed: s.pushed, used: use ? (s.acts[use] ?? 0) : 0 };
+  return { ...sh.result(s), secs: s.t, clatters: s.clatters, pushed: s.pushed, used: uses.reduce((n, id) => n + (s.acts[id] ?? 0), 0), done: Object.fromEntries(Object.keys(sh.MISSIONS).map(id => [id, sh.missionDone(s, id)])) };   // every mission is checked on every shift, shown or not
 }
 
 const mean = a => a.reduce((x, y) => x + y, 0) / a.length;
@@ -146,6 +149,35 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       console.log(`wheel, ${who} cook, rank ${TIER}, ${NIGHT}, plan ${WHO}${off ? ', used at random' : ''}`);
       const rows = table([['never', { save, cook: COOKS[who], who: WHO, night: NIGHT }], ...sh.ACTS.map(id => [id, { save, cook: COOKS[who], who: WHO, use: id, random: off, night: NIGHT }])], runs);
       console.table(rows.map(({ name, coins, served, strikes, closedEarly, used, stars }) => ({ name, coins, 'vs never': +(coins - rows[0].coins).toFixed(1), served, strikes, closedEarly, used, stars })));
+    }
+  } else if (question === 'missions') {
+    // Each mission with three plans on the same seeds: ignore it, play for it, park the tray. Then every wheel action
+    // at random, to find a free route. Cells: both nights, a new and a good cook, the night's first rank and rank 10.
+    const any = s => s.line[0] ?? null, soon = id => (s, save, cook) => USE[id](s, save, cook) ?? (s.t > 45 ? any(s) : null);
+    const BUILT = {
+      seat: { use: ['lock_out', 'kick_out'], trig: { lock_out: s => (s.line.length >= s.seats ? any(s) : null), kick_out: s => (s.line.length >= s.seats && !(s.locked > 0) ? s.line.reduce((a, e) => (e.left < a.left ? e : a)) : null) } },
+      trio: { use: ['pan', 'hire', 'fridge', 'slap', 'trash'], once: true, trig: { pan: any, hire: s => (s.line.length >= 2 ? s.line.reduce((a, e) => (e.price < a.price ? e : a)) : null), fridge: any } },
+      ...Object.fromEntries(sh.ACTS.map(id => ['use_' + id, { use: [id], once: true, trig: { [id]: soon(id) } }])),
+    };
+    const ids = Object.keys(sh.MISSIONS), cells = [], pctOf = (out, id) => Math.round(100 * mean(out.map(o => +o.done[id])));
+    for (const night of sh.NIGHT_IDS) for (const hi of [0, 1]) for (const who of ['new', 'good']) {
+      const cell = { name: `${night} ${hi ? 'top' : 'first'} ${who}`, who, rows: {} }, memo = {};
+      for (const id of ids) {
+        const tier = hi ? sim.TIERS.length - 1 : Math.max(sh.NIGHTS[night].from, sh.MISSIONS[id].from ?? 0);
+        const base = { save: saveAt(tier), cook: COOKS[who], who: who === 'good' ? 'impatient' : 'greedy', night };
+        const run = o => runs.map(seed => playShift({ ...base, ...o, seed }));
+        const { ign, park, idle, rnd } = memo[tier] ??= { ign: run({}), park: run({ who: 'park' }), idle: run({ who: 'idle' }), rnd: Object.fromEntries(sh.ACTS.map(a => [a, run({ use: a, random: true })])) };
+        const b = run({ ...BUILT[id], mission: id });   // as on the page: the shift knows its mission
+        cell.rows[id] = { rank: tier, ignore: pctOf(ign, id), built: pctOf(b, id), park: Math.max(pctOf(park, id), pctOf(idle, id)), coins: Math.round(mean(b.map(o => o.coins)) - mean(ign.map(o => o.coins))), random: Math.max(...sh.ACTS.filter(a => 'use_' + a !== id).map(a => pctOf(rnd[a], id))) };
+      }
+      cells.push(cell);
+    }
+    for (const id of ids) {
+      console.log(`mission ${id}`);
+      console.table(cells.map(c => ({ cell: c.name, ...c.rows[id] })));
+      const pair = (n, t) => [cells.find(c => c.name === `${n} ${t} new`).rows[id].built, cells.find(c => c.name === `${n} ${t} good`).rows[id].built];
+      const pass = { 'ignore<30': cells.filter(c => c.rows[id].ignore < 30).length, 'built+20': cells.filter(c => c.rows[id].built >= c.rows[id].ignore + 20).length, 'good>=new': 2 * sh.NIGHT_IDS.flatMap(n => ['first', 'top'].map(t => pair(n, t))).filter(([a, b]) => b >= a).length, 'park<5': cells.filter(c => c.rows[id].park < 5).length, 'random<=built': cells.filter(c => c.rows[id].random <= c.rows[id].built).length, trade: cells.filter(c => c.rows[id].coins < 0).length };
+      console.log(JSON.stringify(pass), Object.entries(pass).slice(0, 5).every(([, n]) => n >= 6) ? 'PASS' : 'fail');
     }
   } else if (question === 'seats') {
     for (const who of ['good', 'new']) { console.log(`seats, ${who} cook, rank ${TIER}`); console.table(table([3, 4, 5].map(n => [`${n} seats`, { save, cook: COOKS[who], who: 'impatient', off: { seats: n } }]), runs)); }

@@ -186,7 +186,7 @@ console.log('ranks reachable: ok');
   s = fresh(); e = s.line[0]; const holds = s.holds; sh.act(s, e, 'hire'); assert.equal(s.holds, holds + sh.RUSH.hireHolds); assert.ok(!sh.canAct(s, s.line[0], 'hire'), 'one hire a shift');
   s = fresh(); e = s.line[0]; sh.act(s, e, 'fight', false); assert.equal(s.strikes, 1, 'a lost fight is a strike'); assert.ok(!s.line.includes(e));
   { const o = playShift({ save: saveAt(4), seed: 31, cook: COOKS.good, who: 'impatient', use: 'cook_self' }); assert.ok(o.used >= 1 && o.served >= 6, 'cook it yourself gets used and the shift still serves'); }
-  for (const id of sh.ACTS) for (const who of ['new', 'good']) { const o = playShift({ save: saveAt(4), seed: 31, cook: COOKS[who], who: 'greedy', use: id, random: true }); assert.ok(o.secs < 400, `a shift with ${id} at random ends`); }
+  for (const night of sh.NIGHT_IDS) for (const id of sh.ACTS) for (const who of ['new', 'good']) { const o = playShift({ save: saveAt(4), seed: 31, cook: COOKS[who], who: 'greedy', use: id, random: true, night }); assert.ok(o.secs < 400, `a ${night} shift with ${id} at random ends`); }
   // Nights: each opens at its rank, a still tray takes nothing on any of them, each ends, and each has its own rising targets.
   for (const night of sh.NIGHT_IDS) for (let tier = sh.NIGHTS[night].from; tier < sim.TIERS.length; tier++) {
     const save = saveAt(tier); assert.ok(sh.nightsFor(save).includes(night));
@@ -198,6 +198,28 @@ console.log('ranks reachable: ok');
   assert.deepEqual(sh.nightsFor(saveAt(0)), ['rush']); assert.deepEqual(sh.targets(saveAt(4)), sh.TARGETS[4], 'the Rush targets are unchanged');
   {
     const s3 = sh.newShift({ save: saveAt(4), seed: 5, night: 'lunch' }); assert.equal(s3.secs, 90); for (let i = 0; i < 60 * 10; i++) sh.stepShift(s3, sim.DT, 0); assert.ok(s3.line.length && s3.line.every(g => g.price === Math.round(sh.setPriceFor(saveAt(4)) * (g.kind === 'rich' ? sh.RUSH.richPay : 1))), 'lunch is one set price'); assert.ok(s3.menu.every(id => sim.RECIPES[id].steps.length === 1), 'lunch dishes have one cooking step');
+  }
+  {
+    // Missions inside a shift: every one is in the order, a tray that does nothing completes none at any rank on any
+    // night, a shift that ignores the wheel completes no wheel mission, and each is offered only from its rank.
+    assert.deepEqual([...sh.MISSION_ORDER].sort(), Object.keys(sh.MISSIONS).sort(), 'every mission is in the order');
+    for (const night of sh.NIGHT_IDS) for (let tier = sh.NIGHTS[night].from; tier < sim.TIERS.length; tier++) for (const who of ['idle', 'park']) {
+      const o = playShift({ save: saveAt(tier), seed: 77, cook: COOKS.good, who, night });
+      if (who === 'idle') assert.ok(Object.values(o.done).every(v => !v), `${night}, rank ${tier}: a still tray completes no mission`);
+      assert.ok(Object.entries(o.done).every(([id, v]) => !v || id === 'seat'), `${night}, rank ${tier}: a ${who} tray completes no wheel mission`);
+    }
+    const plain = playShift({ save: saveAt(4), seed: 31, cook: COOKS.good, who: 'impatient' });
+    assert.ok(Object.entries(plain.done).every(([id, v]) => !v || id === 'seat'), 'no wheel, no wheel mission');
+    const pan = playShift({ save: saveAt(4), seed: 31, cook: COOKS.good, who: 'impatient', use: 'pan' }); assert.ok(pan.done.use_pan && !pan.done.use_rob, 'banging the pan completes its mission and no other action\'s');
+    assert.ok(!sh.missionsFor(saveAt(0)).includes('use_microwave') && !sh.missionsFor(saveAt(1)).includes('seat') && sh.missionsFor(saveAt(2)).length === sh.MISSION_ORDER.length, 'missions open at their rank');
+    const all = sh.missionsFor(saveAt(4)), done = {}; for (let turn = 0; turn < all.length; turn++) { const id = sh.missionFor(saveAt(4), done, turn); assert.ok(id && !done[id], 'the next mission is one not yet done'); done[id] = 1; }
+    assert.ok(all.includes(sh.missionFor(saveAt(4), done, 5)), 'with all done, they come round again');
+    assert.equal(sh.missionFor(saveAt(4), { use_pan: 1 }, 0), 'use_slap'); assert.equal(sh.newShift({ save: saveAt(4), mission: 'bogus' }).mission, null);
+    const s4 = sh.newShift({ save: saveAt(4), seed: 3, mission: 'use_pan' }); assert.equal(sh.missionDone(s4), false); for (let i = 0; i < 120; i++) sh.stepShift(s4, sim.DT, 0); sh.act(s4, s4.line[0], 'pan'); assert.ok(sh.missionHolds(s4) && !sh.missionDone(s4), 'the action alone is not enough: it needs a star'); s4.coins = sh.targets(s4.save)[0]; assert.ok(sh.missionDone(s4) && sh.result(s4).missionDone);
+    for (const seed of [1, 2, 3, 4, 5, 6]) { const m = sh.newShift({ save: saveAt(2), seed, mission: 'use_microwave' }); for (let i = 0; i < 60 * 40; i++) sh.stepShift(m, sim.DT, 0); assert.ok(m.moody >= 1, 'the Microwave mission always meets a moody guest'); }
+    { const m = sh.newShift({ save: saveAt(4), seed: 3, mission: 'trio' }); for (let i = 0; i < 120; i++) sh.stepShift(m, sim.DT, 0); assert.equal(sh.missionLost(m), false); sh.act(m, m.line[0], 'pan'); m.calm = 0; sh.act(m, m.line[0], 'pan'); assert.ok(m.nerve === 1 && sh.missionLost(m), 'two turns on one action: three different ones cannot be reached'); }
+    assert.equal(sh.newShift({ save: saveAt(4), mission: 'constructor' }).mission, null);
+    assert.ok(sh.missionPay(saveAt(0)) >= 5 && sh.missionPay(saveAt(10)) < sh.targets(saveAt(10))[0], 'a mission pays less than a star is worth');
   }
   console.log('rush: ok');
 }
