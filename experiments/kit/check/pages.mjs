@@ -90,7 +90,7 @@ const flockHints = ['drag', 'hold', 'outrun'].map((name, index) => ({
 async function cinderhillOrders(page, { base, until }) {
   await page.goto(`${base}/notes/button.js`);
   await page.evaluate(() => { localStorage.clear(); localStorage.setItem('cinderhill:hint', '1'); });
-  await page.goto(`${base}/cinderhill/?ants=500`);
+  await page.goto(`${base}/cinderhill/painter.html?ants=500`);
   await until(page, () => window.painter, 'painter script');
   await page.click('#play');
   await until(page, () => window.painter.state().screen === 'play', 'play');
@@ -346,6 +346,7 @@ export const pages = {
   },
   // Cinderhill's trail painter: one finger on the canvas draws a trail; it becomes an order when the finger lifts.
   cinderhill: {
+    page: 'painter.html', // the game itself took /cinderhill/ on 2026-11-28; these checks are the painter's
     seeds: saved('cinderhill:save', { v: 1, sound: true, ants: 500, tapTrail: false }, 'cinderhill:hint'),
     saveKey: 'cinderhill:save', sound: '#sound', menu: '#toMenu',
     state: () => { const s = window.painter?.state(); return s && { screen: s.screen, t: s.t, paused: s.paused }; },
@@ -450,7 +451,7 @@ export const pageRuns = {
     await page.goto(`${base}/notes/button.js`);
     await page.evaluate(() => { localStorage.clear(); localStorage.setItem('cinderhill:hint', '1'); });
     for (const [q, want] of [['ember', 'ember'], ['field', 'field'], ['nope', 'ink']]) {
-      await page.goto(`${base}/cinderhill/?ants=500&look=${q}&labRunSource=agent`);
+      await page.goto(`${base}/cinderhill/painter.html?ants=500&look=${q}&labRunSource=agent`);
       await until(page, () => window.painter, 'painter script');
       await page.click('#play');
       await until(page, () => window.painter.state().screen === 'play' && window.painter.state().drawn > 5, `${q}: frames drawn`);
@@ -462,7 +463,7 @@ export const pageRuns = {
       await until(page, () => window.painter.state().gl && window.painter.state().glRestored === 1, `${q}: context restored`);
       assert.equal(await page.evaluate(() => window.painter.state().glFailed), '', `${q}: shaders compile again`);
     }
-    await page.goto(`${base}/cinderhill/?colony=1&look=ember&labRunSource=agent`);
+    await page.goto(`${base}/cinderhill/painter.html?colony=1&look=ember&labRunSource=agent`);
     await until(page, () => window.painter, 'painter script');
     assert.equal(await page.getAttribute('[data-look="ember"]', 'aria-pressed'), 'true');
     await page.click('#play'); // no days in a colony game (sim 8): no dawn card
@@ -488,7 +489,7 @@ export const pageRuns = {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(`${base}/notes/button.js`);
     await page.evaluate(() => { localStorage.clear(); localStorage.setItem('cinderhill:hint', '1'); });
-    await page.goto(`${base}/cinderhill/?ants=500&lang=en&labRunSource=agent`);
+    await page.goto(`${base}/cinderhill/painter.html?ants=500&lang=en&labRunSource=agent`);
     await until(page, () => window.painter, 'painter script');
     await page.click('#play');
     await until(page, () => window.painter.state().screen === 'play', 'play');
@@ -517,7 +518,7 @@ export const pageRuns = {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(`${base}/notes/button.js`);
     await page.evaluate(() => { localStorage.clear(); localStorage.setItem('cinderhill:hint', '1'); });
-    await page.goto(`${base}/cinderhill/?colony=1&lang=en&labRunSource=agent`);
+    await page.goto(`${base}/cinderhill/painter.html?colony=1&lang=en&labRunSource=agent`);
     await until(page, () => window.painter, 'painter script');
     await page.click('#play');
     await until(page, () => window.painter.state().screen === 'play', 'play');
@@ -542,7 +543,7 @@ export const pageRuns = {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(`${base}/notes/button.js`);
     await page.evaluate(() => { localStorage.clear(); localStorage.setItem('cinderhill:hint', '1'); });
-    await page.goto(`${base}/cinderhill/?colony=1&lang=en&labRunSource=agent`);
+    await page.goto(`${base}/cinderhill/painter.html?colony=1&lang=en&labRunSource=agent`);
     await until(page, () => window.painter, 'painter script');
     await page.click('#play'); // no days in a colony game (sim 8): no dawn card
     await until(page, () => window.painter.state().screen === 'play', 'play');
@@ -574,7 +575,7 @@ export const pageRuns = {
     await page.setViewportSize({ width: 360, height: 640 });
     await page.goto(`${base}/notes/button.js`);
     await page.evaluate(() => { localStorage.clear(); localStorage.setItem('cinderhill:hint', '1'); });
-    await page.goto(`${base}/cinderhill/?fps=1&ants=5000&lang=tr`);
+    await page.goto(`${base}/cinderhill/painter.html?fps=1&ants=5000&lang=tr`);
     await until(page, () => window.painter, 'painter script');
     await page.click('#play');
     await until(page, () => window.painter.state().screen === 'play', 'play');
@@ -600,7 +601,7 @@ export const pageRuns = {
     await page.setViewportSize({ width: 360, height: 640 });
     await page.goto(`${base}/notes/button.js`);
     await page.evaluate(() => { localStorage.clear(); localStorage.setItem('cinderhill:hint', '1'); localStorage.setItem('cinderhill:save', JSON.stringify({ v: 1, sound: true, ants: 500, tapTrail: false })); });
-    await page.goto(`${base}/cinderhill/?colony=1&lang=tr`);
+    await page.goto(`${base}/cinderhill/painter.html?colony=1&lang=tr`);
     await until(page, () => window.painter, 'painter script');
     assert.ok(await page.evaluate(() => [...document.querySelectorAll('.counts')].every(el => el.hidden)), 'no ant count buttons');
     await page.click('#play'); // no days in a colony game (sim 8): no dawn card
@@ -635,7 +636,7 @@ export const pageRuns = {
     await page.setViewportSize({ width: 360, height: 640 });
     await page.goto(`${base}/notes/button.js`);
     await page.evaluate(() => { localStorage.clear(); localStorage.setItem('cinderhill:hint', '1'); });
-    await page.goto(`${base}/cinderhill/?colony=1&day=200&labRunSource=agent`);
+    await page.goto(`${base}/cinderhill/painter.html?colony=1&day=200&labRunSource=agent`);
     await until(page, () => window.painter, 'painter script');
     const dawnHash = await page.evaluate(() => window.painter.hashes().total);
     await page.click('#play');

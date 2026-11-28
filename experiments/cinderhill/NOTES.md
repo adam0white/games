@@ -1454,3 +1454,13 @@ idle line showed and, set to pause, the game paused with its reason on the pause
 bots for 2400 ticks, half with a machine rival: 0 mismatches.
 
 Not verified: a person's play with any of this; a real phone; whether 3 to 5 seconds is the pause the owner meant.
+
+## 2026-11-28: the game is at `/cinderhill/`
+
+Owner: "drop /war/ route; this is the cinder hill."
+
+- `/cinderhill/` (`index.html`) is the game. Its code stays in `war/`; the page loads `./war/main.js`. No storage key, lab slug or room format changed, so saves, settings and room links carry over.
+- `/cinderhill/war/` is a redirect that keeps the query and the hash, so old links and room links still open.
+- The trail painter moved to `/cinderhill/painter.html` (same folder, so its imports hold). Its phone checks follow it (`page: 'painter.html'` in `kit/check/pages.mjs`). The one-colony page stays at `/cinderhill/game/`. Both are linked from the bottom of the game's menu as older builds and are not listed anywhere else.
+- Checked by touch at 414 by 774 on a local server: the old room link lands on `/cinderhill/` with its query and hash; the game starts; the painter and the one-colony page load; no failed requests.
+- Not verified: the game has no phone check of its own in CI (the `cinderhill` check is still the painter's).

@@ -41,7 +41,7 @@ paintTheme();
 const qDay = Number(query.get('day'));
 let host = colonyMode ? new Host(START.ants, SEED, { colony: true, dayTicks: qDay >= 100 && qDay <= 100000 ? Math.floor(qDay) : undefined }) : new Host(COUNTS.includes(qAnts) ? qAnts : save.ants);
 if (colonyMode) for (const el of document.querySelectorAll('.counts')) el.hidden = true;
-if (colonyMode) { $('modeLink').href = './'; $('modeLink').dataset.i18n = 'toPainter'; for (const [el, k] of [[document.querySelector('#menuCard .sub'), 'colonySub'], [document.querySelector('#menuCard [data-i18n="intro"]'), 'colonyIntro']]) if (el) el.dataset.i18n = k; }
+if (colonyMode) { $('modeLink').href = 'painter.html'; $('modeLink').dataset.i18n = 'toPainter'; for (const [el, k] of [[document.querySelector('#menuCard .sub'), 'colonySub'], [document.querySelector('#menuCard [data-i18n="intro"]'), 'colonyIntro']]) if (el) el.dataset.i18n = k; }
 let screen = 'menu', tool = 'trail', layer = SURFACE;
 // The tactical hold: time stops but the game stays on screen and takes orders; they apply on the first tick
 // after Go (an order is queued for the current tick, which has not run yet, so it is never late).
