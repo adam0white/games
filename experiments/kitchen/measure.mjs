@@ -13,6 +13,7 @@ const args = process.argv.slice(2), question = args.find(a => !a.startsWith('-')
 const seeds = Number(args.find(a => !isNaN(a))) || 40, off = args.includes('--off');
 const tierArg = args.find(a => a.startsWith('--tier=')), TIER = tierArg ? Number(tierArg.slice(7)) : 0;
 const whoArg = args.find(a => a.startsWith('--who=')), WHO = whoArg ? whoArg.slice(6) : 'impatient';   // the catching plan under the wheel question
+const nightArg = args.find(a => a.startsWith('--night=')), NIGHT = nightArg ? nightArg.slice(8) : 'rush';   // which night (order question)
 
 export const COOKS = { new: { react: 0.45, skill: 0.6, q: 0.74, slow: 1.45, fight: 0.6 }, good: { react: 0.25, skill: 0.9, q: 0.93, slow: 1, fight: 0.85 } };
 export const OVERHEAD = 0.5; // seconds a dish costs besides its cooking steps. Checked against the page: ten dishes timed in a browser came within 1.2 s of cookSecs.
@@ -85,8 +86,8 @@ export const USE = {
   fight: s => s.line.find(e => e.kind === 'rich' && !e.fought && e.left > estSecs(e) + 6),
 };
 // One shift. who: the rule for whose dish to build. use: a wheel action id, or null. random: use it at random instead.
-export function playShift({ save, seed, cook, who = 'greedy', use = null, random = false, off = {} }) {
-  const s = sh.newShift({ save, seed, off }), c = s.sky;
+export function playShift({ save, seed, cook, who = 'greedy', use = null, random = false, off = {}, night = 'rush' }) {
+  const s = sh.newShift({ save, seed, off, night }), c = s.sky;
   const r = sim.rng(seed * 31 + 7), seen = []; let busy = 0, job = null, x = who === 'park' ? 0.8 : 0, step = 0, focus = null, think = 0;
   for (let i = 0; i < 60 * 600 && !s.over; i++) {
     step++;
@@ -136,9 +137,10 @@ export function table(rows, runs) {
 if (import.meta.url === `file://${process.argv[1]}`) {
   const runs = Array.from({ length: seeds }, (_, i) => 101 + i * 37);
   const save = saveAt(TIER);
+  if (!sh.nightsFor(save).includes(NIGHT)) { console.error(`${NIGHT} is not open at rank ${TIER}`); process.exit(1); }
   if (question === 'order') {
     const o = off ? { cap: true } : {};
-    for (const who of ['good', 'new']) { console.log(`order, ${who} cook, rank ${TIER}${off ? ', tray holds everything' : ''}`); console.table(table(Object.keys(POLICY).map(p => [p, { save, cook: COOKS[who], who: p, off: o }]), runs)); }
+    for (const who of ['good', 'new']) { console.log(`order, ${who} cook, rank ${TIER}, ${NIGHT}${off ? ', tray holds everything' : ''}`); console.table(table(Object.keys(POLICY).map(p => [p, { save, cook: COOKS[who], who: p, off: o, night: NIGHT }]), runs).map(({ name, coins, p25, p75, served, strikes, closedEarly, stars }) => ({ name, coins, p25, p75, served, strikes, closedEarly, stars }))); }
   } else if (question === 'wheel') {
     for (const who of ['good', 'new']) {
       console.log(`wheel, ${who} cook, rank ${TIER}, plan ${WHO}${off ? ', used at random' : ''}`);
@@ -147,11 +149,22 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     }
   } else if (question === 'seats') {
     for (const who of ['good', 'new']) { console.log(`seats, ${who} cook, rank ${TIER}`); console.table(table([3, 4, 5].map(n => [`${n} seats`, { save, cook: COOKS[who], who: 'impatient', off: { seats: n } }]), runs)); }
+  } else if (question === 'nights') {
+    // Which night pays most, for four kinds of player: a new or a good cook, with the tray two levels down or as built.
+    const out = [];
+    for (const who of ['new', 'good']) for (const tray of ['low', 'built']) {
+      const sv = saveAt(TIER); if (tray === 'low') sv.built.tray = Math.max(1, sv.built.tray - 2);
+      const rows = table(sh.nightsFor(sv).map(n => [n, { save: sv, cook: COOKS[who], who: who === 'good' ? 'impatient' : 'greedy', night: n }]), runs);
+      for (const r of rows) r.perMin = +(r.coins / r.secs * 60).toFixed(0);
+      const best = rows.reduce((a, b) => (b.perMin > a.perMin ? b : a));
+      for (const r of rows) out.push({ player: `${who}, tray ${tray}`, night: r.name, coins: r.coins, perMin: r.perMin, served: r.served, strikes: r.strikes, closedEarly: r.closedEarly, secs: r.secs, best: r === best ? '<' : '' });
+    }
+    console.log(`nights, rank ${TIER}`); console.table(out);
   } else if (question === 'targets') {
     const rows = [];
-    for (let t = 0; t < sim.TIERS.length; t++) for (const who of ['new', 'good']) {
-      const [a] = table([[`${sim.TIERS[t].name} ${who}`, { save: saveAt(t), cook: COOKS[who], who: who === 'good' ? 'impatient' : 'greedy' }]], runs);
-      rows.push({ ...a, targets: sh.targets(saveAt(t)).join('/') });
+    for (const night of sh.NIGHT_IDS) for (let t = sh.NIGHTS[night].from; t < sim.TIERS.length; t++) for (const who of ['new', 'good']) {
+      const [a] = table([[`${night} ${sim.TIERS[t].name} ${who}`, { save: saveAt(t), cook: COOKS[who], who: who === 'good' ? 'impatient' : 'greedy', night }]], runs);
+      rows.push({ name: a.name, coins: a.coins, p25: a.p25, p75: a.p75, served: a.served, strikes: a.strikes, closedEarly: a.closedEarly, stars: a.stars, targets: sh.targets(saveAt(t), night).join('/') });
     }
     console.table(rows);
   }

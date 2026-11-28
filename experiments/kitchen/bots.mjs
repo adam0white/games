@@ -187,5 +187,17 @@ console.log('ranks reachable: ok');
   s = fresh(); e = s.line[0]; sh.act(s, e, 'fight', false); assert.equal(s.strikes, 1, 'a lost fight is a strike'); assert.ok(!s.line.includes(e));
   { const o = playShift({ save: saveAt(4), seed: 31, cook: COOKS.good, who: 'impatient', use: 'cook_self' }); assert.ok(o.used >= 1 && o.served >= 6, 'cook it yourself gets used and the shift still serves'); }
   for (const id of sh.ACTS) for (const who of ['new', 'good']) { const o = playShift({ save: saveAt(4), seed: 31, cook: COOKS[who], who: 'greedy', use: id, random: true }); assert.ok(o.secs < 400, `a shift with ${id} at random ends`); }
+  // Nights: each opens at its rank, a still tray takes nothing on any of them, each ends, and each has its own rising targets.
+  for (const night of sh.NIGHT_IDS) for (let tier = sh.NIGHTS[night].from; tier < sim.TIERS.length; tier++) {
+    const save = saveAt(tier); assert.ok(sh.nightsFor(save).includes(night));
+    const idle = playShift({ save, seed: 77, cook: COOKS.good, who: 'idle', night }); assert.equal(idle.coins, 0, `${night}, rank ${tier}: a tray that never moves takes nothing`);
+    const out = playShift({ save, seed: 77, cook: COOKS.good, who: 'impatient', night }); assert.ok(out.served >= 5 && out.secs < 400, `${night}, rank ${tier}: a played shift serves and ends (${out.served})`);
+    const tg = sh.targets(save, night); assert.ok(tg.length === 3 && tg[0] < tg[1] && tg[1] < tg[2], `${night}, rank ${tier}: three rising targets`);
+    assert.ok(sh.nightMenu(save, night).length >= 3, `${night}, rank ${tier}: at least three dishes`);
+  }
+  assert.deepEqual(sh.nightsFor(saveAt(0)), ['rush']); assert.deepEqual(sh.targets(saveAt(4)), sh.TARGETS[4], 'the Rush targets are unchanged');
+  {
+    const s3 = sh.newShift({ save: saveAt(4), seed: 5, night: 'lunch' }); assert.equal(s3.secs, 90); for (let i = 0; i < 60 * 10; i++) sh.stepShift(s3, sim.DT, 0); assert.ok(s3.line.length && s3.line.every(g => g.price === Math.round(sh.setPriceFor(saveAt(4)) * (g.kind === 'rich' ? sh.RUSH.richPay : 1))), 'lunch is one set price'); assert.ok(s3.menu.every(id => sim.RECIPES[id].steps.length === 1), 'lunch dishes have one cooking step');
+  }
   console.log('rush: ok');
 }
