@@ -398,8 +398,9 @@ and sent with each shift's start record. Rules, pay and bots are unchanged.
 1. Passed. Two outside readers each matched three of three people to tickets on both screenshots, one of which had
    tickets in a different order from the people (taken before the rail was put in seat order).
 2. Passed on both phones (no ring over the tray in any sample across three shifts each). **Failed at 1280 by 720:**
-   about 0.3 world units show under the tray there, so only hair and rings show, and a ring was drawn over the tray line
-   in 111 to 135 samples a shift. Two retunes (people at 0.66 and at 0.5 of phone height) did not fix it; stopped under
+   about 0.3 world units show under the tray there, so only hair and rings show and no eyes. A ring was also drawn over
+   the tray line in 111 to 135 samples a shift, because the lift was worked out while the camera was still moving; it
+   now waits for the camera to settle, and the last wide walk had none in three shifts. Two retunes (people at 0.66 and at 0.5 of phone height) did not fix it; stopped under
    the stop rule and kept 0.66. A wide screen needs a different staging (people beside the tray, or a lower camera), not
    a smaller person.
 3. Median frame time 16.7 ms and 95th percentile 16.7 to 16.8 ms with people on and off. The test page is capped at
@@ -411,8 +412,13 @@ and sent with each shift's start record. Rules, pay and bots are unchanged.
 
 **Outside code review (two reviewers), fixed:** a stunt that spawns sparks kept spawning every paused frame; stunts
 outlived a removed guest; the setting turned off in another tab stranded models; two wall-clock timers ran through a
-pause (now on the game clock); a second wheel action on a guest mid-show lost its show (now queued); a floor ring stayed
-when a model failed to load. **Not fixed:** turning Guests off and on again while a dish is cooking does not bring back
+pause (now on the game clock); a second wheel action on a guest mid-show lost its show (the next one now waits; a
+third replaces it); a floor ring stayed
+when a model failed to load. Exercised through the real page after the fixes: pause during a Pan hop (spark count 14 and
+14 two seconds apart), Guests switched off and on from the pause card (models 3, 0, 3), a second action on a guest
+mid-show, quit during a Fridge stunt (models and sparks zero), and Fridge, Kick out and Pan in an ordinary day (the day
+carries on). Changed but not exercised: the setting changed in another tab, and a model that fails to load.
+**Not fixed:** turning Guests off and on again while a dish is cooking does not bring back
 the guest waiting at the pass (the ticket and the pay are unaffected).
 
 **Dropped or changed on the way.** Full-size people (hid the counter and the tray on phones); floor rings as the only

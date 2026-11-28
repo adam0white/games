@@ -578,7 +578,7 @@ export async function createView(canvas, lookId) {
   resize(); view('menu', true);
   return {
     THREE, scene, camera, renderer, world, food, item, furniture, tray, register, board, knife, knifeLift, pan, panR, panGlow, micro, microLight, microGlass, blender, sign,
-    memory: () => ({ ...renderer.info.memory }), guest, guestAt, walkTo, guests, stunt, staffSpots: STAFF_SPOTS, waitSpots: WAIT_SPOTS, view, cam, frame, resize, burst, steam, toScreen, toPlane, toY, setLook, setRestaurant, thumb, popIn,
+    memory: () => ({ ...renderer.info.memory, parts: parts.length }), guest, guestAt, walkTo, guests, stunt, staffSpots: STAFF_SPOTS, waitSpots: WAIT_SPOTS, view, cam, frame, resize, burst, steam, toScreen, toPlane, toY, setLook, setRestaurant, thumb, popIn,
     get look() { return look; }, peopleReady,
     shake(n = 1) { cam.shake = Math.max(cam.shake, n); },
     flashThumbs() { thumbCache.clear(); },
