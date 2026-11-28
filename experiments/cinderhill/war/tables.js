@@ -41,6 +41,7 @@ export const TRAITS = {
   iron: { id: 'iron', name: 'Iron shell', text: 'Wardens take half as much again to kill.', needs: 'warden', set: [['hp', CASTE.WARDEN, 144]] },
   // Nodes of the Lineage that a deed opens. Each gives the colony something new to do, not a better number.
   post: { id: 'post', name: 'Guard post', text: 'A new room. Each cell keeps one soldier in eight inside the nest, where you paint it.', at: [2, 2], set: [['room', 4, 1]] },
+  mess: { id: 'mess', name: 'Mess', text: 'A new room. Each cell feeds four soldiers as one ant each, not as three. It houses nobody.', set: [['room', 6, 1]] },
   raiders: { id: 'raiders', name: 'Raiders', text: 'A raid may be sent for the store. Its soldiers carry loads home and leave the queen be.', at: [2, 1], set: [['loot', 1]] },
   hold: { id: 'hold', name: 'Hold fast', text: 'A raid may be told to hold. Its soldiers stand at the trail\'s end and never go down a door.', at: [2, 1], set: [['hold', 1]] },
   sappers: { id: 'sappers', name: 'Sappers', text: 'Your workers may tunnel into the other nest on any ground. It is a long dig, and it is heard.', at: [3, 0], set: [['breach', 1]] },
@@ -151,7 +152,7 @@ export const ROAD = {
 export const LINEAGE = [
   { id: 'fight', name: 'Fight', nodes: [{ fork: 'caste' }, { fork: 'craft' }] },
   { id: 'brood', name: 'Brood', nodes: [{ fork: 'way' }] },
-  { id: 'build', name: 'Build', nodes: [{ node: 'post' }, { node: 'door' }] },
+  { id: 'build', name: 'Build', nodes: [{ node: 'post' }, { node: 'door' }, { node: 'mess' }] },
   { id: 'raid', name: 'Raid', nodes: [{ node: 'raiders' }, { node: 'hold' }] },
   { id: 'dig', name: 'Dig', nodes: [{ node: 'sappers' }] },
 ];
@@ -239,7 +240,7 @@ export const MISSIONS = {
     kit: { ants: 30, sugar: 10, protein: 5, eggs: 20, larvae: 20, pupae: 12, duskTick: 24000, queenHp: 6400, truce: 9600, reserve: true, falls: { from: 2000, every: 1200, warn: 300, amount: 70, mid: 160 } },
     visits: [1500, 4500, 7500, 10500, 13500, 16500, 19500, 22500],
     goals: { queen: true, dusk: 'adults' },
-    deeds: [{ id: 'a', text: 'Win with two hundred ants or more.', won: true, min: { ADULTS: 200 }, opens: 'door' }, { id: 'b', text: 'Win by killing the rival queen.', won: true, why: 'QUEEN', opens: 'sappers' }, { id: 'c', text: 'Carry twenty stolen loads home.', min: { HAUL: 20 }, opens: 'raiders' }],
+    deeds: [{ id: 'a', text: 'Win with two hundred ants or more.', won: true, min: { ADULTS: 200 }, opens: 'door' }, { id: 'b', text: 'Win by killing the rival queen.', won: true, why: 'QUEEN', opens: 'sappers' }, { id: 'c', text: 'Carry twenty stolen loads home.', min: { HAUL: 20 }, opens: 'raiders' }, { id: 'd', text: 'End the day with sixty soldiers or more.', min: { MAJORS: 60 }, opens: 'mess' }],
     picks: [CASTE.SPITTER, CASTE.WARDEN],
     rooms: [ROOM.STORE, ROOM.NURSERY, ROOM.REST, ROOM.POST, ROOM.GARDEN, ROOM.MESS],
   },
