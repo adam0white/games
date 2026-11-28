@@ -784,3 +784,66 @@ test('High Summer: until noon no raid goes down the other door and no queen is h
   for (let k = 0; k < 2400; k++) plain.step();
   assert.ok(plain.g(0, CG.ADULTS) < r.g(0, CG.ADULTS), 'without the reserve it raises fewer');
 });
+
+// ---- 2026-11-28: a rival with a person's manners, free tunnels, and the pile an idle hill should walk to ----
+import { act, freePile, MANNERS } from '../war/ai.js';
+import { WHY } from '../war/sim.js';
+
+test('Manners: a natural rival waits before its first order, gives two a second at most, and plays the same every time', () => {
+  const play = mind => { const h = new Host({ seed: 7, mission: 'crossing', ai: { 1: mind } }), s = h.sim, order = h.order.bind(h), by = new Map(); let first = -1, bent = 0, trails = 0;
+    h.order = o => { if (o.team === 1) { if (first < 0) first = s.tick; if (o.type !== CMD.RALLY) by.set(s.tick, (by.get(s.tick) ?? 0) + 1); if (o.type === CMD.TRAIL && o.points) { trails++; if (o.points.length > 2) bent++; } } return order(o); };
+    h.run(4800); return { first, most: Math.max(...by.values()), bent, trails, hash: s.hash(), live: [0, 1, 2, 3, 4, 5].filter(k => s.trLive[TRAILS + k]).length, loads: s.g(1, CG.LOADS_S) + s.g(1, CG.LOADS_P) }; };
+  const sharp = play(1), a = play({ mood: 1, natural: true }), b = play({ mood: 1, natural: true });
+  assert.equal(sharp.first, 0, 'the plain mind orders at the first tick');
+  assert.ok(a.first >= MANNERS.open[1] && a.first <= MANNERS.open[1] + 40, `first order at ${a.first}`);
+  assert.ok(a.most <= MANNERS.cap, `${a.most} orders in one beat`);
+  assert.ok(a.bent > 0 && a.bent < a.trails, `${a.bent} of ${a.trails} trails bent: some, not all`);
+  assert.ok(a.live >= 2, 'its trails are laid: a bend the ground refuses does not stop it');
+  assert.equal(a.hash, b.hash, 'no dice: the same seed plays the same');
+  assert.ok(a.loads * 10 >= sharp.loads * 8, `it carries ${a.loads} loads to the plain mind's ${sharp.loads}: manners, not a handicap`);
+});
+
+test('Manners: a mind without manners is the plain mind, and one with them gives no order at the first tick', () => {
+  const h = new Host({ seed: 3, mission: 'crossing', ai: {} }), s = h.sim;
+  assert.deepEqual(act(s, 1, 1), think(s, 1, 1));
+  assert.deepEqual(act(s, 1, { mood: 2 }), think(s, 1, { mood: 2 }));
+  assert.deepEqual(act(s, 1, { mood: 1, natural: true }), [], 'the opening: nothing yet');
+});
+
+test('Digging: a plain tunnel costs nothing, a room cell costs a seed, and a room on a free tunnel costs the seed then', () => {
+  const start = () => { const s = new Sim({ seed: 4 }), L = s.L; let cell = null;
+    for (let y = 4; y < L.nh - 2 && !cell; y++) for (let x = 2; x < L.nw - 2 && !cell; x++) { const k = y * L.nw + x; if (s.owner(k) === 0 && s.mat[L.nestBase + k] === MAT.CLAY && s.mat[L.nestBase + k - 1] === MAT.OPEN && !s.room[k - 1]) cell = [x, y]; }
+    return { s, cell, k: cell[1] * L.nw + cell[0] }; };
+  const run = (s, k) => { for (let i = 0; i < 1200 && (s.mark[k] || !i); i++) s.step(); };
+  const none = start(), tunnel = start(), room = start();
+  tunnel.s.order({ team: 0, type: CMD.DIG, cells: tunnel.cell }); room.s.order({ team: 0, type: CMD.ROOM, cells: room.cell, kind: ROOM.STORE, dig: 1 });
+  run(tunnel.s, tunnel.k); run(room.s, room.k); while (none.s.tick < tunnel.s.tick) none.s.step();
+  assert.equal(tunnel.s.mat[tunnel.s.L.nestBase + tunnel.k], MAT.OPEN, 'the tunnel is dug');
+  assert.equal(tunnel.s.g(0, CG.SUGAR), none.s.g(0, CG.SUGAR), 'and cost nothing');
+  assert.equal(tunnel.s.bare[tunnel.k], 1);
+  const idle = start(); while (idle.s.tick < room.s.tick) idle.s.step();
+  assert.equal(room.s.mat[room.s.L.nestBase + room.k], MAT.OPEN, 'the room cell is dug');
+  assert.equal(room.s.g(0, CG.SUGAR), idle.s.g(0, CG.SUGAR) - 1, 'for a seed');
+  assert.equal(room.s.bare[room.k], 0);
+  // A room on the free tunnel: the seed is paid at once; without seeds to spare the cell stays tunnel, and the order says why.
+  const s = tunnel.s, before = s.g(0, CG.SUGAR); s.drainEvents();
+  s.cg[CG.SUGAR] = C.DIG_KEEP; s.order({ team: 0, type: CMD.ROOM, id: 5, cells: tunnel.cell, kind: ROOM.STORE }); s.step();
+  assert.equal(s.room[tunnel.k], ROOM.NONE);
+  { const ev = s.drainEvents(); let why = 0; for (let j = 0; j < ev.length; j += 4) if (ev[j] === EVENT.REJECTED && ev[j + 2] === 5) why = ev[j + 3]; assert.equal(why, WHY.SEEDS, 'refused for seeds'); }
+  s.cg[CG.SUGAR] = before; s.order({ team: 0, type: CMD.ROOM, cells: tunnel.cell, kind: ROOM.STORE }); s.step();
+  assert.equal(s.room[tunnel.k], ROOM.STORE); assert.equal(s.bare[tunnel.k], 0);
+  assert.ok(s.g(0, CG.SUGAR) <= before - 1, 'the seed is paid when the room is painted');
+  s.order({ team: 0, type: CMD.ROOM, cells: tunnel.cell, kind: ROOM.NONE }); s.step(); const then = s.g(0, CG.SUGAR);
+  s.order({ team: 0, type: CMD.ROOM, cells: tunnel.cell, kind: ROOM.REST }); s.step();
+  assert.ok(s.g(0, CG.SUGAR) >= then - 0 - 1 && s.room[tunnel.k] === ROOM.REST && s.bare[tunnel.k] === 0, 'paid once: painting it again is free');
+});
+
+test('Idle workers: the pile worth a trail is the nearest one no forage trail of the colony ends by', () => {
+  const s = new Sim({ seed: 3, mission: 'crossing' }), sw = s.L.sw, first = freePile(s, 0);
+  assert.ok(first >= 0 && s.doorF[0][first] < 0xFFFF);
+  s.order({ team: 0, type: CMD.TRAIL, kind: KIND.FORAGE, level: 2, points: [first % sw, Math.floor(first / sw)] }); s.step();
+  const next = freePile(s, 0);
+  assert.ok(next >= 0 && next !== first && s.doorF[0][next] >= s.doorF[0][first], 'the next nearest, not the one a trail already reaches');
+  for (let p = 0; p < s.pileAmount.length; p++) s.pileAmount[p] = Math.min(s.pileAmount[p], 5);
+  assert.equal(freePile(s, 0), -1, 'scraps are not worth a trail');
+});

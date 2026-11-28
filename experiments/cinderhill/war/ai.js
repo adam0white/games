@@ -133,7 +133,10 @@ export function think(sim, t, mind = 1) {
     for (let j = forage.length - 1; j >= 0; j--) if (lost(fends[j])) { out.push({ team: t, type: CMD.ERASE, trail: forage[j] }); forage.splice(j, 1); fends.splice(j, 1); }
   }
   if (forage.length < 3) {
-    const want = (winter ? cg[o + CG.PROTEIN] >= 6 : cg[o + CG.SUGAR] <= cg[o + CG.PROTEIN] * 2) ? FOOD.SUGAR : FOOD.PROTEIN;
+    let want = (winter ? cg[o + CG.PROTEIN] >= 6 : cg[o + CG.SUGAR] <= cg[o + CG.PROTEIN] * 2) ? FOOD.SUGAR : FOOD.PROTEIN;
+    // A mind with manners lays its trails seconds apart, and the stores change between them. Two trails to the same food
+    // already: the third goes for the other, whatever the stores say this second.
+    if (mind.natural && !winter && forage.length >= 2) { const kindAt = c => { for (let p = 0; p < MAX_PILES; p++) if (sim.pileCell[p] === c && sim.pileAmount[p] > 0) return sim.pileKind[p]; return -1; }; if (fends.every(e => kindAt(e) === want)) want = want === FOOD.SUGAR ? FOOD.PROTEIN : FOOD.SUGAR; }
     let best = -1, bd = 1e9;
     for (let p = 0; p < MAX_PILES; p++) {
       if (sim.pileAmount[p] < 6) continue;
@@ -307,3 +310,54 @@ export function think(sim, t, mind = 1) {
   }
   return out;
 }
+
+/** The nearest pile worth a new forage trail for this colony, or -1: six loads or more, a way to it, none of its forage
+ *  trails ends within two cells of it, and it is not twice as far from its own door as from the other hill's. */
+export function freePile(sim, t) {
+  const sw = sim.L.sw, F = sim.doorF[t], G = sim.doorF[1 - t], ends = [];
+  for (let k = 0; k < TRAILS; k++) { const s = t * TRAILS + k; if (sim.trLive[s] && sim.trKind[s] === KIND.FORAGE) ends.push(sim.trPath[s * PATH_MAX + sim.trLen[s] - 1]); }
+  let best = -1, bd = 0xFFFF;
+  for (let p = 0; p < MAX_PILES; p++) {
+    if (sim.pileAmount[p] < 6) continue;
+    const c = sim.pileCell[p];
+    if (c < 0 || F[c] >= bd || F[c] > 2 * G[c]) continue;
+    if (ends.some(e => Math.abs((e % sw) - (c % sw)) <= 2 && Math.abs(Math.floor(e / sw) - Math.floor(c / sw)) <= 2)) continue;
+    bd = F[c]; best = c;
+  }
+  return best;
+}
+
+// A rival with a person's manners (`mind.natural`): it looks the ground over before its first order, misses a beat now
+// and then, gives no more than two orders a second, and lays its trails a little off the straight line. Nothing is kept
+// between calls and no dice are thrown: what it does at a tick goes by the seed, the tick and its seat, so every page
+// of a room and every replay agrees. A call to the door (a rally) is never held back.
+export const MANNERS = { open: [80, 60, 50], cap: 2, miss: 5, bend: 3 };
+const mix = (a, b, c) => { let x = (a | 0) ^ Math.imul(b | 0, 0x9E3779B1) ^ Math.imul(c | 0, 0x85EBCA6B); x ^= x >>> 15; x = Math.imul(x, 0x2C1B3C6D); x ^= x >>> 12; x = Math.imul(x, 0x297A2D39); return (x ^ (x >>> 15)) >>> 0; };
+/** A trail to one point, bent through a spot a few cells off the straight line from the door, if that spot is open and no farther than the end. */
+function bend(sim, t, o, r) {
+  if (!o.points || o.points.length !== 2) return o;
+  const sw = sim.L.sw, d = sim.door[t], dx = d % sw, dy = Math.floor(d / sw), x = o.points[0], y = o.points[1], far = Math.max(Math.abs(x - dx), Math.abs(y - dy));
+  if (far < 10) return o;
+  const f = 3 + (r & 3), off = (2 + ((r >>> 2) & 1)) * ((r >>> 3) & 1 ? 1 : -1), len = Math.hypot(x - dx, y - dy);
+  const wx = Math.round(dx + (x - dx) * f / 8 - (y - dy) / len * off), wy = Math.round(dy + (y - dy) * f / 8 + (x - dx) / len * off);
+  if (wx < 0 || wy < 0 || wx >= sw || wy >= sim.L.sh) return o;
+  const w = wy * sw + wx, end = y * sw + x, F = sim.doorF[t];
+  if (sim.mat[w] !== 0 || !(F[w] < F[end])) return o; // closed, cut off, or a way round that is longer than the trail
+  return { ...o, points: [wx, wy, x, y] };
+}
+/** The orders this seat gives now, with a person's manners if its mind asks for them. Hosts call this; `think` is the mind alone. */
+export function act(sim, t, mind = 1) {
+  const out = think(sim, t, mind);
+  if (typeof mind !== 'object' || !mind.natural || !out.length) return out;
+  const mood = Math.max(0, Math.min(2, mind.mood ?? 1)), r = mix(sim.cfg.seed, sim.tick, t + 1);
+  const urgent = out.filter(o => o.type === CMD.RALLY);
+  if (sim.tick < MANNERS.open[mood] + (mix(sim.cfg.seed, 7, t + 1) % 20)) return urgent;
+  if (MANNERS.miss && r % MANNERS.miss === 0) return urgent; // a beat missed
+  let rest = out.filter(o => o.type !== CMD.RALLY);
+  // More to do than its hands allow: it starts somewhere else each beat, so that an order the ground refuses cannot keep the rest waiting.
+  if (rest.length > MANNERS.cap) { const at = (r >>> 5) % rest.length; rest = rest.map((o, i) => [(i - at + rest.length) % rest.length, i, o]).sort((a, b) => a[0] - b[0]).slice(0, MANNERS.cap).sort((a, b) => a[1] - b[1]).map(e => e[2]); }
+  // Two beats in three it bends a new trail; the third it lays it straight, so a bend the ground refuses is not asked for ever.
+  if (MANNERS.bend && (r >>> 9) % MANNERS.bend) rest = rest.map(o => o.type === CMD.TRAIL ? bend(sim, t, o, r >>> 12) : o);
+  return urgent.concat(rest);
+}
+
