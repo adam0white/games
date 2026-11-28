@@ -1363,10 +1363,11 @@ The owner asked for experimental multiplayer with two or more players and the ab
 | Start | A lobby: the sim waits for a `START` command on the wire. Any seat may start. | A match that starts when the first page loads leaves the second player a minute behind. |
 | Pause | Opens settings only. The room does not wait; the page says so. | A shared pause needs a rule about who may hold the room; not built. |
 | Colours | Your hill is always orange and labelled HOME, whichever colony you play. | First far-side screenshot showed the player's own nest labelled RIVAL. |
+| Trust | The room does not check which hill a seat's order names: any seat can send an order for either hill. | Experimental, among friends. A check needs the room to hold each seat's hill. |
 | Lag | A page more than two ticks behind runs extra ticks; more than forty behind, up to 400 a frame. | Wire bots sat 20 ticks behind before this (a second of input delay). |
 
 Machine players come two ways. `bot=` in the link runs the rival inside every page's sim (no network). `workers/cinderhill/loadtest/warbot.mjs` is a Node seat that joins a room over a WebSocket like a page and plays through the wire; it fills a hill in a room people are in, or loads the server with many rooms.
 
-Checked: 6 room tests in Node (round trip, two wire bots for 6000 ticks, late joiner, lost order noticed, other rules sent away, replay without a room). In browsers through a local room: Chromium page, WebKit page and a Node wire bot in one room for 1670 ticks, 158 hashes compared, 0 mismatches; a page whose network dropped for 4 s caught up with 0 mismatches; versus, co-op and a wire bot on the far hill each reached play on every page.
+Checked: 7 room tests in Node (round trip, two wire bots for 6000 ticks, late joiner, lost order noticed, other rules sent away, a page that drops and rejoins with an order typed while away landing once, replay without a room). In browsers through a local room: Chromium page, WebKit page and a Node wire bot in one room for 1670 ticks, 158 hashes compared, 0 mismatches; versus, co-op and a wire bot on the far hill each reached play on every page.
 
-Not checked: any match between two people; a phone on a mobile network; a match played to its end screen in a room; High Summer in a room; more than three seats; the cost of hashing on a slow phone.
+Not checked: a dropped socket in a real browser (the browser walk's offline switch did not show the socket closing; the Node test covers the rejoin path); any match between two people; a phone on a mobile network; a match played to its end screen in a room; High Summer in a room; more than three seats; the cost of hashing on a slow phone.

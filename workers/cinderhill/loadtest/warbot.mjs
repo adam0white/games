@@ -7,12 +7,12 @@
 //
 // --code joins one named room (a room people opened); --side picks the hill; --both seats a bot on each hill;
 // --bot 0|1|2 and --botSide must match the room's link when it has a machine rival (bot=, botSide=);
-// --mood 0 timid, 1 steady, 2 bold; --ticks 0 plays to the end; --start 0 waits for a person to start.
+// --mood 0 timid, 1 steady, 2 bold; --ticks 0 plays to the end. In a named room a bot waits for a person to start (--start 1 lets it start the match).
 import { NetHost, roomLink, roomOptions, roomSim } from '../../../experiments/cinderhill/war/wire.js';
 
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i < 0 ? d : process.argv[i + 1] ?? '1'; };
 const url = arg('url', 'ws://127.0.0.1:8787'), rooms = Number(arg('rooms', 1)), ticks = Number(arg('ticks', 2400));
-const mission = arg('mission', 'crossing'), mood = Number(arg('mood', 1)), named = arg('code', ''), start = arg('start', '1') !== '0';
+const mission = arg('mission', 'crossing'), mood = Number(arg('mood', 1)), named = arg('code', ''), start = arg('start', named ? '0' : '1') !== '0';
 const sides = named && !process.argv.includes('--both') ? [Number(arg('side', 1))] : [0, 1];
 const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ', newCode = () => Array.from({ length: 4 }, () => letters[Math.floor(Math.random() * 24)]).join('');
 const http = url.replace(/^ws/, 'http');
