@@ -186,7 +186,7 @@ export function think(sim, t, mind = 1) {
     if (mind.garden !== false && may(ROOM.GARDEN) && sim.mayRoom(t, ROOM.GARDEN) && adults >= 40 && sim.gardens[t] < (mind.gardens ?? 16) && cg[o + CG.SUGAR] >= 14) wants.push(ROOM.GARDEN);
     // A guard post in the throat of the shaft, where a break-in must pass, once there is a guard worth posting.
     // A mess, once its soldiers eat more than a few cells would save: four soldiers a cell.
-    if (mind.mess !== false && may(ROOM.MESS) && sim.mayRoom(t, ROOM.MESS) && majors >= 24 && sim.mess[t] * C.MESS_FEEDS + 8 <= majors && cg[o + CG.SUGAR] >= 16) wants.push(ROOM.MESS);
+    if (mind.mess !== false && may(ROOM.MESS) && sim.mayRoom(t, ROOM.MESS) && majors >= (sim.cfg.falls ? 24 : 12) && sim.mess[t] * C.MESS_FEEDS + 8 <= majors && cg[o + CG.SUGAR] >= 16) wants.push(ROOM.MESS);
     if (may(ROOM.POST) && sim.mayRoom(t, ROOM.POST) && majors >= 4) wants.push(ROOM.POST);
     // An outpost: a tunnel along the top of its ground toward the middle of the map, a second door at its end, and a
     // store beside that door, so that what is carried in from that side has a shorter road.

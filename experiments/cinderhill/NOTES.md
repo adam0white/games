@@ -1322,3 +1322,12 @@ is larger at dusk on all four seeds, and the smaller hill's store no longer reac
 246 to 294 ants). The limit line offers a mess when seeds run short, no garden may be dug and four or more soldiers eat
 unfed. Seen on a phone profile: the button shows in High Summer and not on The Crossing, the help text, the cells
 tinted blue. Not seen: a person painting one, or the limit line offering it.
+
+### The mess as a node of the tree
+
+Node `mess` on the Build bough, opened by a fourth deed of High Summer ("End the day with sixty soldiers or more"). It
+needs no growth of the chamber: with one, no hill of the eight-minute missions had the soldiers for it before the game
+was decided (The Crossing: 10 to 34 soldiers, no mess dug). Outside High Summer the rival digs one at 12 soldiers. With
+the node, bots dug a mess on First Frost (two of four seeds) and The Stones (all four, 50 to 89 soldiers). Wins were not
+read. Seen on a phone profile: the fourth deed on the card, Mess in the tree (9 nodes), the button on The Crossing with
+the deed stored and not without. Not seen: a person earning the deed.
