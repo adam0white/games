@@ -164,6 +164,7 @@ console.log('ranks reachable: ok');
 // most impatient guest serves a full shift; and a shift always ends.
 {
   const { playShift, saveAt, COOKS } = await import('./measure.mjs');
+  for (let tier = 0; tier < sim.TIERS.length; tier++) for (const seed of [77, 101, 138]) { const idle = playShift({ save: saveAt(tier), seed, cook: COOKS.good, who: 'idle' }); assert.equal(idle.coins, 0, `rank ${tier}: a tray that never moves takes nothing`); }
   for (const tier of [0, 2, 5]) {
     const idle = playShift({ save: saveAt(tier), seed: 77, cook: COOKS.good, who: 'idle' });
     assert.equal(idle.served, 0, 'an idle tray serves nobody'); assert.ok(idle.closedEarly, 'and the doors shut early'); assert.equal(idle.stars, 0);

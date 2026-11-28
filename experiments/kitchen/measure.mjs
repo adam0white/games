@@ -54,6 +54,19 @@ export const POLICY = {
     if (urgent) return urgent;
     return can.reduce((a, e) => (!a || e.price / (sh.leftOf(e) + 1) > a.price / (sh.leftOf(a) + 1) ? e : a), null);
   },
+  // Two more adaptive rules, tried against the fixed plans (the reviewers' gate). Both read what a player can see.
+  // slack: earliest deadline first, but only among guests who can still be saved; drop a guest the moment they cannot.
+  slack: s => {
+    const can = s.line.filter(e => e.left > estSecs(e) + 2);
+    return (can.length ? can : s.line).reduce((a, e) => (!a || e.left - estSecs(e) < a.left - estSecs(a) ? e : a), null);
+  },
+  // worth: coins a second of the work left (catching and cooking), with the buzz in mind: when the buzz is high, never
+  // let anyone walk, so the most impatient savable guest comes first.
+  worth: (s, save, cook) => {
+    const can = s.line.filter(e => e.left > estSecs(e) + 2); if (!can.length) return POLICY.nearest(s);
+    if (s.buzz >= 3 || s.strikes >= 2) return can.reduce((a, e) => (!a || e.left < a.left ? e : a), null);
+    return can.reduce((a, e) => { const v = x => x.price / (estSecs(x) + (save && cook ? cookSecs(save, x.recipe, cook) : 6)); return !a || v(e) > v(a) ? e : a; }, null);
+  },
 };
 
 // When a scripted player uses each wheel action. Each returns the guest to use it on, or nothing.
@@ -88,7 +101,7 @@ export function playShift({ save, seed, cook, who = 'greedy', use = null, random
         continue;
       }
     }
-    if ((think -= sim.DT) <= 0 || !s.line.includes(focus)) { focus = POLICY[who](s); think = 0.8; }   // a person re-plans about once a second
+    if ((think -= sim.DT) <= 0 || !s.line.includes(focus)) { focus = POLICY[who](s, save, cook); think = 0.8; }   // a person re-plans about once a second
     seen.push(c.items.map(it => ({ ...it })));
     const view = seen[Math.max(0, seen.length - 1 - Math.round(cook.react * 60))];
     const wantedBy = (it, e) => !sim.isJunk(it.id) && sh.lacks(e, it.id);

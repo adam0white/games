@@ -67,7 +67,7 @@ Cinderhill's slices took a median of thirteen minutes from pull request to merge
 Four checks on the bot itself, each of which caught a wrong number on Sky Kitchen:
 
 - Before setting any target from a scripted player, time the same actions in the real client and compare. Fix the model until they agree.
-- Run a player that does nothing, and one that does one thing and stops, through the real client. The first must lose and the second must earn no reward. (On Sky Kitchen the second still earns one star of three; that is recorded as open, not fixed.)
+- Run a player that does nothing, and one that does one thing and stops, through the real client. Do it at every rank or difficulty, not a sample: on Sky Kitchen a still tray took nothing at the three ranks tried and earned a star at the top four. The first must lose and the second must earn no reward. (On Sky Kitchen the second still earns one star of three; that is recorded as open, not fixed.)
 - Before calling an action flat or strong, compare the scripted trigger with using the action at random. If random does better, the trigger is wrong.
 - Make the script pay what the client makes a person pay: the seconds an action takes, and anything that keeps running while a menu is open.
 
