@@ -21,7 +21,7 @@ Bots find defects and measure balance. They do not vote on fun (AGENTS.md).
 
 ## Second run: Sky Kitchen (2026-11-28)
 
-The process was run a second time on a game with no opponent and almost no spec, as a light rebuild: one timed shift with several guests seated at once, then the game's existing eleven wheel actions given one effect and one printed price each. Two slices merged in a few hours. No person had played either when this was written, so this run says nothing yet about whether the result is good. What it showed about the process:
+The process was run a second time on a game with no opponent and almost no spec, as a light rebuild: one timed shift with several guests seated at once, then the game's existing eleven wheel actions given one effect and one printed price each, then a stop-adding pass and a second kind of shift. Three slices merged in a day. No person had played any of them when this was written, so this run says nothing yet about whether the result is good. What it showed about the process:
 
 - Reading recorded play first (step 2) paid at once: 42 runs showed one action taken thirty times, the others almost never, and no guest ever lost. The design started from those two facts, not from the feature list.
 - The scripted player's model of time was wrong by a factor of 1.7 until ten dishes were timed in the real client. Star targets set from the first model would have been far too low. This is now in step 6.
@@ -29,6 +29,9 @@ The process was run a second time on a game with no opponent and almost no spec,
 - Several hand-written triggers for an action did worse than using it at random. The action was fine and the trigger was wrong. One action looked strong everywhere until the script was made to pay its time cost as the page does. Both are now in step 6.
 - The edge run through the real client found a fault no test, bot or reviewer had: on a small phone the tap that opened a sheet also pressed the button that appeared under the finger. This is now in step 5.
 - The reviewers' own gate (an adaptive rule that beats every fixed plan) was not met in either slice. The notes and the reports say so. The process has no step that forces that gate to be met or dropped; step 7 is where it should be decided.
+- In the third slice a pass line was written before a trial. Four ideas failed and were removed within the hour (extra seats with a crowd bonus, a big-dish night, and two forms of a critics' night). The one night that shipped also missed its line: it was meant to pay most for some player, and it pays more a minute and less a shift for every player. It was kept as variety with that trade stated in the notes. So the line did its job on removals and was bent once on a keep; a missed line that ships must say so where the result is reported. Writing the line first is now in step 6.
+- One of those failures came from the scripted player, not the game: its beginner cooked far worse than recorded people do, so a night that rewards good cooking measured as a real test when for people it was close to double pay. Reading the recorded dishes settled it. This is now in step 6.
+- A new mode sampled at three middle ranks looked balanced and was dominant at the two lowest ranks where it opens. This is now in step 6.
 - The brief reached a thread that already existed, and it took a round trip to settle which thread owned the game. The launch prompt now names the owner thread.
 
 ## Entry
@@ -64,12 +67,16 @@ Cinderhill's slices took a median of thirteen minutes from pull request to merge
 
 **6. Measure each choice against doing neither.** Run option A, option B and neither on the same seeds, in both seats, to a fixed tick. Record intermediate state (stock, population, time to first payoff), not only who won. A choice is real when changing the action changes an outcome or a material intermediate state, and the player can see the difference. Then prove the measurement can fail: switch the effect off, or use a known bad layout, and check the number moves. Read one odd run end to end. If the bot never issued the order the choice needs, fix the bot before tuning the game.
 
-Four checks on the bot itself, each of which caught a wrong number on Sky Kitchen:
+Six checks on the bot itself, each of which caught a wrong number on Sky Kitchen:
 
 - Before setting any target from a scripted player, time the same actions in the real client and compare. Fix the model until they agree.
 - Run a player that does nothing, and one that does one thing and stops, through the real client. Do it at every rank or difficulty, not a sample: on Sky Kitchen a still tray took nothing at the three ranks tried and earned a star at the top four. The first must lose and the second must earn no reward. (On Sky Kitchen the second still earns one star of three; that is recorded as open, not fixed.)
 - Before calling an action flat or strong, compare the scripted trigger with using the action at random. If random does better, the trigger is wrong.
 - Make the script pay what the client makes a person pay: the seconds an action takes, and anything that keeps running while a menu is open.
+- Check each skill number of the scripted player that a new rule leans on (speed, accuracy, quality) against recorded play before trusting a result that depends on it.
+- Measure a new mode or option at the lowest rank where it opens and at the highest, not only in the middle.
+
+Write the pass line before running a trial: which player should gain, which should not, and by how much. A trial that misses its line gets the one retune of the stop rules and is then removed, or is kept with the miss written next to the result. Run the checks above on every new mode too, not only on the first one: on Sky Kitchen the second night shipped to review before a parked tray and the wheel had been measured on it.
 
 **7. Every third or fourth slice, stop adding.** List every choice the game advertises. Measure each. Fix or remove any that one side always wins before adding another.
 

@@ -92,14 +92,14 @@ Built by the strongest available model in the lab thread; reviewers on other mod
 
 Owner's recorded asks: several orders at once and choosing which guests to serve; more variety and faster play; harder; better progress and missions; funny actions.
 
-| Ask | What the player decides | What the game must do for it to matter | Current build |
-|---|---|---|---|
-| choose which guests to serve | whose food to catch, and who to give up on | more guests than one cook can serve, patience that runs out, pay that differs by guest and by how long they waited | no pressure: nobody walks out, so order never matters |
-| several orders at once | take one order or two together | a joined catch is quicker per guest but harder, and both guests keep waiting | one guest at a time |
-| harder | how much risk to take | a shift that can go badly, with a visible target | a day cannot be lost |
-| faster play | nothing; this is pace | under 15 s from call to catch to cook to pay for a simple dish | about 20 to 30 s, with about 6 s of fixed waits |
-| funny actions | which wheel action, and when | each action does something different and has a price | 8 of 11 identical; Rob dominates |
-| progress and missions | what to build first, which shift to attempt | builds that change the measured result in different ways | build order fixed by rank needs |
+| Ask | What the player decides | What the game must do for it to matter | Build before the rebuild | Live after slice 3 |
+|---|---|---|---|---|
+| choose which guests to serve | whose food to catch, and who to give up on | more guests than one cook can serve, patience that runs out, pay that differs by guest and by how long they waited | no pressure: nobody walks out, so order never matters | Rush: guests walk out and pay differs, but no adaptive serving rule beats every fixed plan (gate parked) |
+| several orders at once | take one order or two together | a joined catch is quicker per guest but harder, and both guests keep waiting | one guest at a time | Rush: three seated at once, one shared sky; every pair of falling things is a side to pick |
+| harder | how much risk to take | a shift that can go badly, with a visible target | a day cannot be lost | Rush: three strikes shut the doors; three coin targets a rank; Lunch rush is the riskier night |
+| faster play | nothing; this is pace | under 15 s from call to catch to cook to pay for a simple dish | about 20 to 30 s, with about 6 s of fixed waits | Rush: about 12 s a guest for a good scripted cook; Lunch rush is 90 s of one-step dishes |
+| funny actions | which wheel action, and when | each action does something different and has a price | 8 of 11 identical; Rob dominates | Rush: eleven effects, eleven prices, three turns a shift; Cook it! may be too strong, Lock out may be dead |
+| progress and missions | what to build first, which shift to attempt | builds that change the measured result in different ways | build order fixed by rank needs | weakest row. Two nights with their own stars; in a Rush only Tray and Decor change the result; Tables does nothing; no missions inside a shift |
 
 ### The first situation: one Rush shift (slice 1, 2026-11-28)
 
@@ -244,4 +244,58 @@ No adaptive rule beats "most impatient" by more than 2% anywhere, and each loses
 The slice 1 check ran a still tray at three ranks. Run at all eleven, it took 202 to 584 coins at the top four ranks and sometimes a star: from rank 7 a gust slides the whole sky sideways and carried one side of every pair onto the tray. Gusts are now off in a Rush, a still tray takes nothing at any rank, and `bots.mjs` asserts it for every rank on three seeds. Targets at the top four ranks were rechecked and stand.
 
 A tray parked at one side with a good cook behind it still averages 0.7 to 1.1 stars at every rank (for example 209 coins against a one-star target of 180 at rank 2). Left as it is: the first star is set near a new cook's lower quartile, and catching one side of every pair while cooking well is about that good. Open for the owner if one star should demand more.
+
+### Slice 3: nights (2026-11-28)
+
+Row served: progress and missions ("which shift to attempt"), and the owner's asks for variety and faster play. This is not a fourth trial of the parked serving-order question: the choice is made on the menu, before the shift.
+
+**What shipped.** From the Diner (rank 1) the menu has a second start button, Lunch rush. It is a Rush with one rule changed: only the quickest third of the menu, every dish at one set price (the average price of the whole menu at that rank), 90 seconds, guests arrive 1.67 times as often and wait 0.62 times as long. It keeps its own best and stars for each rank (`kitchen-rush.nights.lunch`; the Rush hour record keeps its place and shape). "Rush again" repeats the night just played. `rec` start and end events carry `night`.
+
+**Measured** (`node measure.mjs nights 60 --tier=N`, scripted cooks, coins a shift and coins a minute):
+
+| Rank | Cook | Rush hour | Lunch rush | Rush strikes | Lunch strikes | Lunch shut early |
+|---|---|---|---|---|---|---|
+| 1 | new | 248 (102/min) | 201 (110/min) | 0.6 | 1.7 | 5% |
+| 1 | good | 332 (140/min) | 299 (166/min) | 0.0 | 0.4 | 0% |
+| 2 | new | 225 (86/min) | 196 (107/min) | 1.2 | 2.4 | 18% |
+| 2 | good | 357 (141/min) | 313 (166/min) | 0.1 | 1.0 | 2% |
+| 4 | new | 353 (134/min) | 345 (180/min) | 1.1 | 2.4 | 10% |
+| 4 | good | 676 (263/min) | 559 (297/min) | 0.1 | 0.6 | 0% |
+| 7 | new | 629 (226/min) | 615 (321/min) | 0.9 | 1.8 | 5% |
+| 7 | good | 1160 (449/min) | 1075 (571/min) | 0.0 | 0.3 | 0% |
+| 10 | new | 829 (298/min) | 772 (399/min) | 0.5 | 1.2 | 2% |
+| 10 | good | 1518 (580/min) | 1347 (722/min) | 0.0 | 0.1 | 0% |
+
+Reading: the shape is the same at every rank. Rush hour takes more a shift, Lunch rush takes 10 to 40% more a minute and has two to three times the walkouts. Neither is better on both counts. Rank 2 is the worst case for a beginner: Lunch is shut early in 18% of shifts, and in 30% with the tray two levels down. Whether a person feels the trade as a choice is not known.
+
+**Did it pass?** The line used for a night was: the night pays most a shift for at least one of the four players (new or good cook, tray low or built) and not for all four. Lunch did not meet it. Rush hour pays more a shift for every player at nearly every rank (the one exception is the new cook with a low tray at rank 2, 188 against 182). Lunch is kept as variety with a measured trade (more a minute, more walkouts, half the time), not as the better night for some player. Lunch also had two tunings (1.7 times pay, then the set price), which is the one retune the stop rules allow.
+
+**In the real page** (browser players at the Fine rank, final rules, five seeds each; targets 260, 410 and 560): Lunch rush took 386, 527, 640, 524 and 587 coins at a good pace and 221, 486, 497, 298 and 495 at a beginner's pace. Rush hour on seed 4242 took 559 and 544. A browser player that only chases the lowest wanted thing took 35, 74 and 149 on Lunch, and once 679. Lunch is hard for a careless player. Only the Fine rank was played in the browser.
+
+**The step 6 checks on Lunch** (`measure.mjs order 30 --night=lunch`, `measure.mjs wheel 40 --night=lunch`, with and without `--off`):
+
+- A still tray takes nothing at every rank (bots). A parked tray (moved once, then left) takes 195, 192, 332, 608 and 720 for the good cook at ranks 1, 2, 4, 7 and 10, which is one star each time and never two. For the new cook it is under one star at ranks 1, 2, 4 and 10 and one star at rank 7. Same open finding as Rush hour.
+- The wheel: no action changes Lunch by more than it changes Rush hour. Cook it! is again the strong one for a new cook (+80 at rank 4, +168 at rank 10). Rob at random still shuts the kitchen. Trash has lost its price on Lunch, because the smaller dish pays the same set price; used at random it gains a new cook 16, 36 and 54 coins at ranks 1, 4 and 10 (4 to 10%) and a good cook nothing at rank 4. Left as it is and recorded; it joins Cook it! and Lock out for the retune after a person's shifts.
+- Bots now run every action at random on both nights and assert the shift ends.
+
+**First-time and early taps** (real page, 390 by 844): a save at rank 1 or above that has never played a Rush sees only the Rush hour button; Lunch appears after one Rush hour, so the first shift still gets the drag hint. A tap on either button while the models are still loading starts that night when loading ends (about six seconds later in the test).
+
+**Tried and dropped in this slice**
+
+- *A fourth and fifth seat with a crowd bonus* (pay +10, 15 or 20% for each guest seated beyond three when a dish goes to the stove). One trial, pass line written first: a good cook gains at least 4% at four seats and a new cook does not gain. It failed: the new cook gained more than the good cook at every strength (rank 4, +15%: new 388 to 420 to 428, good 676 to 677 to 709), because a slow cook has the fuller room. It was an upgrade for everyone, so not a choice. Seats stay at three. A blind outside answer to the same question proposed spare seats as an offer the player taps to accept; that is a serving choice and waits with the parked gate.
+- *Banquet night* (the biggest third of the menu). At its first tuning it paid most for every player; after one retune (no bonus, normal patience) it was within 5% of Rush hour for every player and best for none. Removed.
+- *Critics' night* (three stars pays double, less pays half). The scripted new cook never cooks three stars (quality 0.74), so it measured as a night for good cooks only (rank 4: new 164, good 825). Browser players earned three stars on it at both paces. Recorded play settles it: 82 of 97 recorded dishes were three stars, chopping scored 0.9 or more 94% of the time, frying 69%. For people it would be close to double pay for everyone. A second form (double pay only while the guest's bar is still green) made no serving plan better than "most impatient first" (rank 4 good cook: 1072 against 1025 for a plan built for the rule), because a good cook serves nearly everyone in the green. Removed. It could return if a person's Rush shifts show cooking quality falling under time pressure.
+- *Lunch at 1.7 times pay.* It beat Rush hour on both counts at ranks 1 and 2 (rank 1 new cook: 312 against 220 a shift), because at low ranks the quick dishes are most of the menu. Replaced by the set price, which gives the same shape at every rank.
+
+**Open after slice 3**
+
+- The scripted new cook's quality (0.74) is too low against recorded play (85% three-star dishes). It lowers that cook's tips, so the one-star targets on both nights are probably easy for a real beginner. Targets are not refitted until a person's Rush shifts can be read.
+- In a Rush only Tray and Decor change the result. Knife, Stove, Microwave and Blender change nothing there, and Tables does nothing. "What to build first" is still not a Rush decision.
+- No missions inside a shift yet.
+- No person has played either night.
+- The page steps a shift on render frames and chops with `Math.random()`, while `measure.mjs` uses a fixed step. The same seed is the same guests, not the same shift, on page and script.
+
+### Review of slice 3
+
+One adversarial code review of the diff by another model. Fixed: a second tab's newer record was overwritten by a whole-record write (records are now merged, keeping the higher best and stars); the measuring script could run a night that is not open at that rank (now refused); a start that waited for loading could fire after the player left the menu and came back; the tray kept its position from the last shift; "Again" after a seeded start replayed the saved pick, not the night just played; the end card named the other night. Obsolete: a finding about ticket and rob prices under the 1.7 pay multiplier, removed with the multiplier. Left: the page and script stepping difference above. A second outside review read the set price, the record merge and the menu-visit guard as finally written. Nothing blocked. Checked and rejected: that a second tab can still erase a best (the write rereads storage and merges in one step). Left and recorded: the play count can be one short when two tabs each finish a shift; a hand-damaged record holding a huge best is kept; fight then trash and trash then fight differ by one coin on a rich guest; and two faults older than this slice, a Play tap followed by a Restaurant tap during loading, and the Rush buttons failing without a message when the 3D view cannot start. Not reviewed by an outside reader: the look of the menu and Lunch screens.
 

@@ -125,11 +125,11 @@ const meshes = new Map();  // falling item n -> mesh
 const coarse = matchMedia('(pointer: coarse)').matches;
 let chopShown = false;
 function chopBtn(on) { on = on && (coarse || touchSeen); if (on !== chopShown) { chopShown = on; $('chopBtn').style.display = on ? 'flex' : 'none'; } }
-let touchSeen = false;
+let touchSeen = false, visits = 0;   // visits: counts screen changes, so a start that waited for loading can tell the menu was left
 addEventListener('pointerdown', e => { if (e.pointerType === 'touch') touchSeen = true; }, true);
 
 const show = screens(['menu', 'paused', 'extra', 'dayEnd', 'shop'], name => {
-  screen = name === 'dayEnd' ? 'dayend' : name;
+  screen = name === 'dayEnd' ? 'dayend' : name; visits++;
   const playing = name === 'play' || name === 'extra';
   $('pause').style.display = name === 'play' ? 'grid' : 'none';
   $('hud').style.display = playing || name === 'paused' ? 'flex' : 'none';
@@ -165,7 +165,7 @@ function menu() {
   $('play').textContent = save.tutorial ? t('cont', { n: save.day }) : t('play');
   $('toShop').style.display = save.tutorial ? '' : 'none';
   $('rush').style.display = save.tutorial ? '' : 'none';
-  { const st = rushSave.stars?.[save.tier] ?? 0; $('rush').innerHTML = `${esc(t('rush'))} <small>${'★'.repeat(st)}${'☆'.repeat(3 - st)}</small>`; }
+  nightMenu();
   $('menuLine').textContent = save.tutorial ? t('menuLine', { coins: save.coins, rank: rankName(save.tier) }) : '';
   art?.view('menu');
 }
@@ -720,7 +720,7 @@ function endDay() {
   SFX.star(); art.view('room');
   show('dayEnd');
 }
-$('nextDay').addEventListener('click', () => { snd.unlock(); SFX.tap(); if (lastMode === 'rush') beginRush(); else beginDay(); });
+$('nextDay').addEventListener('click', () => { snd.unlock(); SFX.tap(); if (lastMode === 'rush') { rushNight = sh.nightsFor(save).includes(lastNight) ? lastNight : null; beginRush(); } else beginDay(); });
 $('dayMenu').addEventListener('click', () => { SFX.tap(); show('menu'); });
 $('toShop2').addEventListener('click', () => { SFX.tap(); show('shop'); });
 $('toShop').addEventListener('click', async () => { snd.unlock(); SFX.tap(); await ready; show('shop'); });
@@ -1010,17 +1010,48 @@ function rebel(who) {
 // colour of the guest it would go to. The tray holds only so much; one more pushes the oldest off.
 const RUSH_KEY = 'kitchen-rush';                       // { plays, best: { tier: coins }, stars: { tier: n } }; its own key
 // Read defensively: a damaged record must not break the menu or the end of a shift.
-const rushSave = (() => {
-  const raw = readJson(RUSH_KEY, null), ok = raw && typeof raw === 'object' && !Array.isArray(raw), out = { plays: 0, best: {}, stars: {} };
+const readRush = () => {
+  const raw = readJson(RUSH_KEY, null), ok = raw && typeof raw === 'object' && !Array.isArray(raw), out = { plays: 0, best: {}, stars: {}, nights: {}, night: 'rush', tried: {} };
   if (!ok) return out;
   if (Number.isFinite(raw.plays)) out.plays = Math.max(0, Math.floor(raw.plays));
   for (const [k, v] of Object.entries(raw.best && typeof raw.best === 'object' ? raw.best : {})) if (Number.isFinite(v)) out.best[k] = Math.max(0, Math.floor(v));
   for (const [k, v] of Object.entries(raw.stars && typeof raw.stars === 'object' ? raw.stars : {})) if (Number.isFinite(v)) out.stars[k] = Math.max(0, Math.min(3, Math.floor(v)));
+  if (typeof raw.night === 'string' && sh.NIGHTS[raw.night]) out.night = raw.night;
+  for (const id of sh.NIGHT_IDS) {
+    if (raw.tried && typeof raw.tried === 'object' && raw.tried[id]) out.tried[id] = 1;
+    const n = raw.nights && typeof raw.nights === 'object' ? raw.nights[id] : null; if (id === 'rush' || !n || typeof n !== 'object') continue;
+    const book = out.nights[id] = { best: {}, stars: {} };
+    for (const [k, v] of Object.entries(n.best && typeof n.best === 'object' ? n.best : {})) if (Number.isFinite(v)) book.best[k] = Math.max(0, Math.floor(v));
+    for (const [k, v] of Object.entries(n.stars && typeof n.stars === 'object' ? n.stars : {})) if (Number.isFinite(v)) book.stars[k] = Math.max(0, Math.min(3, Math.floor(v)));
+  }
   if (raw.seen && typeof raw.seen === 'object') out.seen = Object.fromEntries(['rich', 'rude', 'picky', 'sneaky'].filter(m => raw.seen[m]).map(m => [m, 1]));
   return out;
-})();
+};
+const rushSave = readRush();
+// Another tab may have played since this page loaded: keep the higher best and stars of the two before writing.
+function storeRush() {
+  const there = readRush(), up = (mine, theirs) => { for (const f of ['best', 'stars']) for (const [k, v] of Object.entries(theirs?.[f] ?? {})) mine[f][k] = Math.max(mine[f][k] ?? 0, v); };
+  up(rushSave, there); for (const id of Object.keys(there.nights)) up(nightBook(id), there.nights[id]);
+  rushSave.plays = Math.max(rushSave.plays, there.plays); rushSave.tried = { ...there.tried, ...rushSave.tried }; if (there.seen || rushSave.seen) rushSave.seen = { ...there.seen, ...rushSave.seen };
+  writeJson(RUSH_KEY, rushSave);
+}
+// Nights: Rush hour, and from the second rank a Lunch rush. Each keeps its own best and stars.
+const NIGHT_ICON = { rush: '🔥', lunch: '🥪' };
+const nightNow = () => (sh.nightsFor(save).includes(rushSave.night) ? rushSave.night : 'rush');
+const nightBook = id => (id === 'rush' ? rushSave : (rushSave.nights[id] ??= { best: {}, stars: {} }));
+const starRow = n => '★'.repeat(n) + '☆'.repeat(3 - n);
+function nightMenu() {
+  const more = rushSave.plays ? sh.nightsFor(save).filter(id => id !== 'rush') : [], btn   /* another night shows after one Rush hour */ = id => `${NIGHT_ICON[id]} ${esc(t('night_' + id))} <small>${starRow(nightBook(id).stars?.[save.tier] ?? 0)}</small>`;
+  $('rush').innerHTML = more.length ? btn('rush') : `${esc(t('rush'))} <small>${starRow(rushSave.stars?.[save.tier] ?? 0)}</small>`;
+  $('nights').innerHTML = save.tutorial ? more.map(id => `<button class="${rushSave.tried?.[id] ? '' : 'fresh'}" data-night="${id}">${btn(id)}</button>`).join('') : '';
+}
+$('nights').addEventListener('click', async ev => {
+  const b = ev.target.closest('[data-night]'); if (!b) return;
+  const was = visits; snd.unlock(); await ready; await art.peopleReady; if (screen !== 'menu' || visits !== was || rush || !sh.nightsFor(save).includes(b.dataset.night)) return;
+  rushSave.night = b.dataset.night; storeRush(); beginRush();
+});
 const SEAT_COLOR = ['#ff7a4d', '#3fb6ff', '#a97bff', '#4fcf7a', '#ffc933'];
-let rush = null, lastMode = 'day', rushSeed = null;
+let rush = null, lastMode = 'day', rushSeed = null, rushNight = null, lastNight = 'rush';
 const rings = new Map();                               // falling item n -> ring mesh
 let ringGeo = null;
 function clearRush() {
@@ -1033,15 +1064,19 @@ function beginRush() {
   for (const m of art.guests) m.gone = true;
   const seed = rushSeed ?? (query.has('seed') ? Number(query.get('seed')) >>> 0 : (Date.now() ^ 0x9e3779b1) >>> 0); rushSeed = null;
   clearCatch(); clearRush(); cook = null; g = null; waits = [];
-  rush = sh.newShift({ save, seed });
+  const night = rushNight ?? nightNow(); rushNight = null; lastNight = night;
+  trayX = trayTarget = 0;
+  rush = sh.newShift({ save, seed, night });
+  const firstNight = night !== 'rush' && !rushSave.tried[night];
+  if (!rushSave.tried[night]) { rushSave.tried[night] = 1; storeRush(); }
   day = { rush, plan: [], i: 0, served: 0, earned: 0, tips: 0, stars: [], seed, t0: clock, extras: 0, robbed: 0, rebels: [], line: null, next: 0, arriveT: 0, lost: 0, pickT: 0 };
   lastMode = 'rush';
   song?.start(seed);
-  rec.start({ mode: 'rush', day: save.day, tier: save.tier, tutorial: false, look: lookId, tool: tools.use, sound: save.sound, music: musicOn });
+  rec.start({ mode: 'rush', night, day: save.day, tier: save.tier, tutorial: false, look: lookId, tool: tools.use, sound: save.sound, music: musicOn });
   paused = false; snd.release(); show('play'); hud();
   toSky();
-  banner(t('rushGo'), t('rushGoSub'));
-  rushCaught = false; if ((rushSave.plays ?? 0) < 2) coach(t(matchMedia('(pointer: coarse)').matches ? 'rushDrag' : 'rushDragKeys'));   // first the control, then the rules
+  banner(t(night === 'rush' ? 'rushGo' : 'night_' + night), t(night === 'rush' ? 'rushGoSub' : 'nightGo_' + night));
+  rushCaught = false; if (firstNight) coach(t('nightSub_' + night), 8); else if ((rushSave.plays ?? 0) < 2) coach(t(matchMedia('(pointer: coarse)').matches ? 'rushDrag' : 'rushDragKeys'));   // first the control, then the rules
 }
 function toSky() {
   phase = 'sky'; g = null; cook = null; document.body.classList.add('sky'); art.view('catch'); $('ticket').style.display = 'none'; gauge(null);
@@ -1115,7 +1150,7 @@ function railBars() {
     c.classList.toggle('hot', f < 0.2 && !(e.frozen > 0)); c.classList.toggle('iced', e.frozen > 0);
     if (f < 0.35 && s.nerve > 0 && !e.ready && !rushHinted && !actsFor && phase === 'sky' && !s.at && Object.keys(s.acts).length === 0 && rushSave.plays < 4) { rushHinted = true; const r = c.getBoundingClientRect(); floater({ x: r.left + r.width / 2, y: r.bottom + 26 }, t('actsHint'), 'gold'); }
   });
-  const left = Math.max(0, sh.RUSH.secs - s.t), tg = sh.targets(save), next = tg.find(x => s.coins < x);
+  const left = Math.max(0, s.secs - s.t), tg = sh.targets(save, s.night), next = tg.find(x => s.coins < x);
   $('rushClock').textContent = s.doors ? `${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}` : t('rushLast');
   $('rushClock').classList.toggle('low', s.doors && left < 15);
   $('rushStrikes').textContent = '✗'.repeat(Math.min(3, s.strikes)) + '·'.repeat(Math.max(0, 3 - s.strikes));
@@ -1132,7 +1167,7 @@ function stepRush(dt) {
   const ev = []; for (let left = dt; left > 1e-6; left -= 0.034) ev.push(...sh.stepShift(s, Math.min(0.034, left), trayX / LANE.s));
   let redraw = false, changed = false;
   for (const e of ev) {
-    if (e.type === 'arrive') { changed = true; SFX.tap(); const mark = e.e.kind === 'rich' ? 'rich' : e.e.mood; if (mark && s.t > 6 && !rushSave.seen?.[mark]) { rushSave.seen = { ...rushSave.seen, [mark]: 1 }; writeJson(RUSH_KEY, rushSave); floater({ x: innerWidth / 2, y: innerHeight * 0.4 }, t('rushMark_' + mark), 'gold'); } rec.event('arrive', { recipe: e.e.recipe, kind: e.e.kind, mood: e.e.mood }); }
+    if (e.type === 'arrive') { changed = true; SFX.tap(); const mark = e.e.kind === 'rich' ? 'rich' : e.e.mood; if (mark && s.t > 6 && !rushSave.seen?.[mark]) { rushSave.seen = { ...rushSave.seen, [mark]: 1 }; storeRush(); floater({ x: innerWidth / 2, y: innerHeight * 0.4 }, t('rushMark_' + mark), 'gold'); } rec.event('arrive', { recipe: e.e.recipe, kind: e.e.kind, mood: e.e.mood }); }
     else if (e.type === 'turned') { floater({ x: innerWidth / 2, y: innerHeight * 0.2 }, t('rushTurned'), 'bad'); rec.event('turned', { recipe: e.e.recipe }); }
     else if (e.type === 'walkout') {
       changed = redraw = true; day.lost++; SFX.wrong(); buzz([60, 40, 60]); art.shake(0.8);
@@ -1213,16 +1248,17 @@ function rushEnd() {
   phase = 'idle'; g = null;
   save.coins += r.share; store();
   rushSave.plays = (rushSave.plays ?? 0) + 1;
-  rushSave.best = { ...rushSave.best, [save.tier]: Math.max(rushSave.best?.[save.tier] ?? 0, r.coins) };
-  const newStars = r.stars > (rushSave.stars?.[save.tier] ?? 0);
-  rushSave.stars = { ...rushSave.stars, [save.tier]: Math.max(rushSave.stars?.[save.tier] ?? 0, r.stars) };
-  writeJson(RUSH_KEY, rushSave);
-  rec.end('rush', { mode: 'rush', tier: save.tier, coins: r.coins, share: r.share, stars: r.stars, served: r.served, strikes: r.strikes, turned: r.turned, bestBuzz: r.bestBuzz, closedEarly: r.closedEarly, clatters: s.clatters, pushed: s.pushed, secs: Math.round(s.t) });
+  const book = nightBook(s.night);
+  book.best = { ...book.best, [save.tier]: Math.max(book.best?.[save.tier] ?? 0, r.coins) };
+  const newStars = r.stars > (book.stars?.[save.tier] ?? 0);
+  book.stars = { ...book.stars, [save.tier]: Math.max(book.stars?.[save.tier] ?? 0, r.stars) };
+  storeRush();
+  rec.end('rush', { mode: 'rush', night: s.night, tier: save.tier, coins: r.coins, share: r.share, stars: r.stars, served: r.served, strikes: r.strikes, turned: r.turned, bestBuzz: r.bestBuzz, closedEarly: r.closedEarly, clatters: s.clatters, pushed: s.pushed, secs: Math.round(s.t) });
   clearRush(); clearCatch(); art.tray.load.clear();
-  $('dayTitle').textContent = t(r.closedEarly ? 'rushOverClosed' : 'rushOver');
+  $('dayTitle').textContent = r.closedEarly ? t('rushOverClosed') : s.night === 'rush' ? t('rushOver') : `${NIGHT_ICON[s.night]} ${t('night_' + s.night)}`;
   $('dayStars').textContent = '★'.repeat(r.stars) + '☆'.repeat(3 - r.stars);
   const next = r.targets.find(x => r.coins < x);
-  $('ledger').innerHTML = `<tr><td>${t('served')}</td><td>${r.served}</td></tr><tr><td>${t('walkouts')}</td><td>${day.lost}</td></tr><tr><td>${t('rushTook')}</td><td>${r.coins}</td></tr><tr><td>${t('rushBest')}</td><td>${rushSave.best[save.tier]}</td></tr><tr><td>${t('rushShare')}</td><td>+${r.share}</td></tr><tr class="total"><td><i class="coin"></i></td><td>${save.coins}</td></tr>`;
+  $('ledger').innerHTML = `<tr><td>${t('served')}</td><td>${r.served}</td></tr><tr><td>${t('walkouts')}</td><td>${day.lost}</td></tr><tr><td>${t('rushTook')}</td><td>${r.coins}</td></tr><tr><td>${t('rushBest')}</td><td>${book.best[save.tier]}</td></tr><tr><td>${t('rushShare')}</td><td>+${r.share}</td></tr><tr class="total"><td><i class="coin"></i></td><td>${save.coins}</td></tr>`;
   $('dayLine').textContent = next ? t('rushNext', { n: next - r.coins, s: r.stars + 1 }) : t('rushAll');
   $('dayMissions').innerHTML = '';
   $('nextDay').textContent = t('rushAgain');
@@ -1395,7 +1431,7 @@ $('pause').addEventListener('click', e => { e.preventDefault(); pause(); });
 $('resume').addEventListener('click', resume);
 $('quit').addEventListener('click', () => {
   paused = false; snd.release();
-  if (rush) rec.end('left', { mode: 'rush', tier: save.tier, t: Math.round(rush.t), served: rush.served, coins: rush.coins });
+  if (rush) rec.end('left', { mode: 'rush', night: rush.night, tier: save.tier, t: Math.round(rush.t), served: rush.served, coins: rush.coins });
   else if (day && g) rec.end('left', { day: save.day, tier: save.tier, served: day.served, guest: day.i });
   if (g?.model) g.model.gone = true;
   clearCatch(); for (const m of cook?.items ?? []) art.world.remove(m); for (const b of cook?.bits ?? []) art.world.remove(b.m); if (dish) { art.world.remove(dish); dish = null; }
@@ -1405,7 +1441,7 @@ $('quit').addEventListener('click', () => {
 });
 onLeave(pause);
 $('play').addEventListener('click', async () => { snd.unlock(); await ready; if (screen === 'menu') beginDay(); });
-$('rush').addEventListener('click', async () => { snd.unlock(); await ready; await art.peopleReady; if (screen === 'menu') beginRush(); });
+$('rush').addEventListener('click', async () => { const was = visits; snd.unlock(); await ready; await art.peopleReady; if (screen === 'menu' && visits === was && !rush) { if (rushSave.night !== 'rush') { rushSave.night = 'rush'; storeRush(); } beginRush(); } });
 for (const id of ['sound1', 'sound2']) $(id).addEventListener('click', () => { save.sound = !save.sound; store(); settingChanged('sound', !save.sound, save.sound); if (save.sound) { snd.unlock(); if (!paused) snd.release(); SFX.tap(); } labels(); });
 for (const id of ['music1', 'music2']) $(id).addEventListener('click', () => { musicOn = !musicOn; write(MUSIC_KEY, musicOn ? '1' : '0'); settingChanged('music', !musicOn, musicOn); labels(); });
 for (const id of ['look1', 'look2']) $(id).addEventListener('click', () => {
@@ -1454,7 +1490,7 @@ function frame(now) {
   if (art) chopBtn(live && phase === 'chop' && !cook?.over);
   if ((phase !== 'order' || !live) && $('wheelBtn').style.display === 'flex') wheelBtn(false);
   if (screen !== 'play' && $('line').style.display === 'flex') $('line').style.display = 'none';
-  song?.set({ on: musicOn && live, progress: rush ? Math.min(1, rush.t / sh.RUSH.secs) : day ? Math.min(1, (day.i + 0.5) / day.plan.length) : 0, danger: rush ? Math.min(0.8, rush.strikes * 0.3) : phase === 'catch' && g?.catch ? Math.min(1, (clock - g.catchT0) / TUNE.patience) * 0.6 : 0, light: 1 });
+  song?.set({ on: musicOn && live, progress: rush ? Math.min(1, rush.t / rush.secs) : day ? Math.min(1, (day.i + 0.5) / day.plan.length) : 0, danger: rush ? Math.min(0.8, rush.strikes * 0.3) : phase === 'catch' && g?.catch ? Math.min(1, (clock - g.catchT0) / TUNE.patience) * 0.6 : 0, light: 1 });
   art.frame(paused ? 0 : dt);
 }
 requestAnimationFrame(frame);
@@ -1477,7 +1513,7 @@ window.kitchenState = () => art && peopleIn && ({
   cook: cook ? { kind: cook.kind, d: cook.d, p: cook.p, band: cook.band, fill: cook.fill, left: cook.pieces?.filter(p => !p.done).length, misses: cook.misses ?? 0, striking: !!cook.strike, cuts: cook.pieces?.reduce((n, p) => n + p.cuts, 0), xs: cook.pieces?.map(p => p.done ? null : [p.m.position.x, p.m.position.z]), aim } : null, q: g?.q,
   look: lookId, hint: !!document.querySelector('.kit-hint.on'),
   line: day?.line ? day.line.map(e => ({ recipe: e.p.recipe, left: +e.left.toFixed(1) })) : null, lost: day?.lost ?? 0,
-  rush: rush ? { t: +rush.t.toFixed(2), coins: rush.coins, strikes: rush.strikes, buzz: rush.buzz, nerve: rush.nerve, acts: { ...rush.acts }, served: rush.served, turned: rush.turned, doors: rush.doors, over: rush.over, holds: rush.holds, at: rush.at?.recipe ?? null, tray: rush.sky.tray.map(it => it.id), line: rush.line.map(e => ({ n: e.n, recipe: e.recipe, kind: e.kind, left: +e.left.toFixed(1), full: e.full, need: { ...e.need }, got: { ...e.got }, ready: e.ready, price: e.price, mood: e.mood ?? null, frozen: e.frozen > 0, self: !!e.self })), sheet: !!actsFor, hold: rush.hold, calm: rush.calm > 0, locked: rush.locked > 0, items: rush.sky.items.map(it => ({ id: it.id, x: it.x, y: it.y, owner: sh.ownerOf(rush, it.id)?.n ?? null })) } : null,
+  rush: rush ? { night: rush.night, secs: rush.secs, t: +rush.t.toFixed(2), coins: rush.coins, strikes: rush.strikes, buzz: rush.buzz, nerve: rush.nerve, acts: { ...rush.acts }, served: rush.served, turned: rush.turned, doors: rush.doors, over: rush.over, holds: rush.holds, at: rush.at?.recipe ?? null, tray: rush.sky.tray.map(it => it.id), line: rush.line.map(e => ({ n: e.n, recipe: e.recipe, kind: e.kind, left: +e.left.toFixed(1), full: e.full, need: { ...e.need }, got: { ...e.got }, ready: e.ready, price: e.price, mood: e.mood ?? null, frozen: e.frozen > 0, self: !!e.self })), sheet: !!actsFor, hold: rush.hold, calm: rush.calm > 0, locked: rush.locked > 0, items: rush.sky.items.map(it => ({ id: it.id, x: it.x, y: it.y, owner: sh.ownerOf(rush, it.id)?.n ?? null })) } : null,
   mood: g?.mood ?? null, staff: staff.map(m => m.kind), wheel: $('wheel').style.display === 'block', fight: fight ? { taps: fight.taps, need: fight.need } : null,
 });
 window.kitchenMusic = () => song && { ...song.melody, on: song.state.on, step: song.step, notes: song.log.length, kinds: song.log.map(l => l.kind) };
@@ -1491,7 +1527,7 @@ window.kitchenFight = win => { if (!fight) return false; if (win) { fight.taps =
 window.kitchenCall = i => { const e = day?.line?.[i]; if (e) callGuest(e); return !!e; };
 window.kitchenThrow = () => { throwNext = true; };
 window.kitchenMood = m => { if (g) g.mood = m; return !!g; };
-window.kitchenRush = seed => { if (screen !== 'menu' && phase !== 'sky') return false; if (seed != null) rushSeed = seed; beginRush(); return true; };
+window.kitchenRush = (seed, night) => { if (screen !== 'menu' && phase !== 'sky') return false; if (seed != null) rushSeed = seed; if (night && sh.nightsFor(save).includes(night)) rushNight = night; beginRush(); return true; };
 window.kitchenRushAct = (n, id, won = true) => { const e = rush?.line.find(x => x.n === n); if (!e || phase !== 'sky' || actsFor) return false; openActs(e); if (actsFor !== e) return false; actsAt = 0; doAct(id); if (id === 'fight' && fight) window.kitchenFight(won); return true; };
 window.kitchenSkipCatch = () => { skipCatch = true; };
 window.kitchenGolden = () => { goldenNext = true; };
