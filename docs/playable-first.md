@@ -15,7 +15,7 @@ Not shown:
 - That the later breadth (missions 2 to 8, the tree, the home hill) is good. The owner had not played it when the praise was written.
 - That any outside player agrees. None has played.
 - How much came from the builder model, its advisor, the two days of inherited work, or the owner's own strong picture of the genre. These changed at the same time as the process.
-- The interface. The owner's praise came with a list of faults (the nest as a pop-up, inconsistent controls, no tutorial, unclear costs and progress). Reviewers had flagged several of these hours earlier and the build moved on to new features. The gates below exist to stop that.
+- The interface. The owner's praise came with a list of faults (the nest as a pop-up, inconsistent controls, no tutorial, unclear costs and progress). Reviewers had flagged several of these hours earlier and the build moved on to new features. Step 9 exists to catch that sooner, without stopping the build.
 
 Bots find defects and measure balance. They do not vote on fun (AGENTS.md).
 
